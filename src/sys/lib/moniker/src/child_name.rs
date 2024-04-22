@@ -56,6 +56,10 @@ impl ChildNameBase for ChildName {
 }
 
 impl ChildName {
+    pub fn new(name: LongName, collection: Option<Name>) -> Self {
+        Self { name, collection }
+    }
+
     pub fn try_new<S>(name: S, collection: Option<S>) -> Result<Self, MonikerError>
     where
         S: AsRef<str> + Into<String>,
@@ -91,12 +95,6 @@ impl TryFrom<&str> for ChildName {
 impl From<cm_rust::ChildRef> for ChildName {
     fn from(child_ref: cm_rust::ChildRef) -> Self {
         Self { name: child_ref.name, collection: child_ref.collection }
-    }
-}
-
-impl From<(LongName, Option<Name>)> for ChildName {
-    fn from(t: (LongName, Option<Name>)) -> Self {
-        Self { name: t.0, collection: t.1 }
     }
 }
 

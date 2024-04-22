@@ -46,7 +46,7 @@ fn protocol_name_from_capability(capability: &ftest::Capability) -> Result<Strin
 
 fn expose_decl(name: &str, id: bt_types::PeerId, capability_name: &str) -> ExposeDecl {
     ExposeDecl::Protocol(ExposeProtocolDecl {
-        source: ExposeSource::Child(name.to_string()),
+        source: ExposeSource::Child(name.parse().unwrap()),
         source_name: capability_name.parse().unwrap(),
         source_dictionary: Default::default(),
         target: ExposeTarget::Parent,
@@ -1033,7 +1033,7 @@ mod tests {
                 Name::new(super::capability_path_for_mock::<bredr::ProfileMarker>(&member_spec))
                     .unwrap();
             let custom_expose_profile_decl = ExposeProtocolDecl {
-                source: ExposeSource::Child(bt_rfcomm_name),
+                source: ExposeSource::Child(bt_rfcomm_name.parse().unwrap()),
                 source_name: profile_capability_name.parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: ExposeTarget::Parent,
@@ -1072,7 +1072,7 @@ mod tests {
         // root should have a similar-looking expose declaration for Profile, only the source
         // should be the child in question
         {
-            expose_proto_decl.source = ExposeSource::Child(member_spec.name.to_string());
+            expose_proto_decl.source = ExposeSource::Child(member_spec.name.parse().unwrap());
             let root_expose_decl = ExposeDecl::Protocol(expose_proto_decl);
             let root = builder.get_realm_decl().await.expect("failed to get root");
             assert!(root.exposes.contains(&root_expose_decl));
@@ -1310,7 +1310,7 @@ mod tests {
 
         // `Foo` is exposed by the profile to parent.
         let fake_capability_expose1 = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child(profile_name.to_string()),
+            source: ExposeSource::Child(profile_name.parse().unwrap()),
             source_name: fake_cap1.clone().parse().unwrap(),
             source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
@@ -1321,7 +1321,7 @@ mod tests {
         });
         // `Bar` is exposed by the profile to parent.
         let fake_capability_expose2 = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child(profile_name.to_string()),
+            source: ExposeSource::Child(profile_name.parse().unwrap()),
             source_name: fake_cap2.clone().parse().unwrap(),
             source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
@@ -1384,7 +1384,7 @@ mod tests {
 
         // Validate that `fake_cap` is exposed by both profiles, and is OK.
         let profile1_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child(profile_name1.to_string()),
+            source: ExposeSource::Child(profile_name1.parse().unwrap()),
             source_name: fake_cap.clone().parse().unwrap(),
             source_dictionary: Default::default(),
             target: ExposeTarget::Parent,
@@ -1394,7 +1394,7 @@ mod tests {
             availability: cm_rust::Availability::Required,
         });
         let profile2_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child(profile_name2.to_string()),
+            source: ExposeSource::Child(profile_name2.parse().unwrap()),
             source_name: fake_cap.clone().parse().unwrap(),
             source_dictionary: Default::default(),
             target: ExposeTarget::Parent,

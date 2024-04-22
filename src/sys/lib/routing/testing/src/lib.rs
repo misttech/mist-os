@@ -463,13 +463,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(
                         UseBuilder::directory()
-                            .source(UseSource::Child("b".to_string()))
+                            .source_static_child("b")
                             .name("bar_data")
                             .path("/data/hippo"),
                     )
                     .use_(
                         UseBuilder::protocol()
-                            .source(UseSource::Child("b".to_string()))
+                            .source_static_child("b")
                             .name("bar")
                             .path("/svc/hippo"),
                     )
@@ -550,13 +550,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .use_(
                         UseBuilder::directory()
-                            .source(UseSource::Child("b".to_string()))
+                            .source_static_child("b")
                             .name("baz_data")
                             .path("/data/hippo"),
                     )
                     .use_(
                         UseBuilder::protocol()
-                            .source(UseSource::Child("b".to_string()))
+                            .source_static_child("b")
                             .name("baz")
                             .path("/svc/hippo"),
                     )
@@ -569,7 +569,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(
                         ExposeBuilder::directory()
                             .name("bar_data")
-                            .source(ExposeSource::Child("c".to_string()))
+                            .source_static_child("c")
                             .target_name("baz_data")
                             .rights(fio::R_STAR_DIR),
                     )
@@ -577,7 +577,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ExposeBuilder::protocol()
                             .name("bar")
                             .target_name("baz")
-                            .source(ExposeSource::Child("c".to_string())),
+                            .source_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -959,7 +959,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(
                         ExposeBuilder::directory()
                             .name("bar_data")
-                            .source(ExposeSource::Child("d".to_string()))
+                            .source_static_child("d")
                             .target_name("baz_data")
                             .rights(fio::R_STAR_DIR),
                     )
@@ -967,7 +967,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ExposeBuilder::protocol()
                             .name("bar")
                             .target_name("baz")
-                            .source(ExposeSource::Child("d".to_string())),
+                            .source_static_child("d"),
                     )
                     .child_default("d")
                     .build(),
@@ -1073,7 +1073,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(
                         ExposeBuilder::directory()
                             .name("foo_from_d_data")
-                            .source(ExposeSource::Child("d".to_string()))
+                            .source_static_child("d")
                             .rights(fio::R_STAR_DIR),
                     )
                     .child_default("d")
@@ -1131,9 +1131,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "g",
                 ComponentDeclBuilder::new_empty_component()
                     .expose(
-                        ExposeBuilder::protocol()
-                            .name("foo_from_h_svc")
-                            .source(ExposeSource::Child("h".to_string())),
+                        ExposeBuilder::protocol().name("foo_from_h_svc").source_static_child("h"),
                     )
                     .child_default("h")
                     .build(),
@@ -2103,7 +2101,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(
                         ExposeBuilder::directory()
                             .name("foo_data")
-                            .source(ExposeSource::Child("b".to_string()))
+                            .source_static_child("b")
                             .target_name("hippo_data")
                             .subdir("s3"),
                     )
@@ -2116,7 +2114,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(
                         ExposeBuilder::directory()
                             .name("foo_data")
-                            .source(ExposeSource::Child("c".to_string()))
+                            .source_static_child("c")
                             .subdir("s1/s2"),
                     )
                     .child_default("c")
@@ -2161,7 +2159,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(
                         ExposeBuilder::directory()
                             .name("hippo_data")
-                            .source(ExposeSource::Child("c".to_string()))
+                            .source_static_child("c")
                             .target_name("hippo_bar_data")
                             .rights(fio::R_STAR_DIR),
                     )
@@ -2169,7 +2167,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         ExposeBuilder::protocol()
                             .name("hippo")
                             .target_name("hippo_bar")
-                            .source(ExposeSource::Child("c".to_string())),
+                            .source_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -3181,8 +3179,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// a: use from #b
     /// b: expose to parent from self
     pub async fn test_route_service_from_child(&self) {
-        let use_decl =
-            UseBuilder::service().name("foo").source(UseSource::Child("b".to_string())).build();
+        let use_decl = UseBuilder::service().name("foo").source_static_child("b").build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
             (
@@ -4036,11 +4033,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .use_(
-                        UseBuilder::runner()
-                            .source(UseSource::Child("b".to_string()))
-                            .name("dwarf"),
-                    )
+                    .use_(UseBuilder::runner().source_static_child("b").name("dwarf"))
                     .child_default("b")
                     .build(),
             ),

@@ -403,13 +403,6 @@ impl UseDeclCommon for UseStorageDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::EventSubscription")]
-pub struct EventSubscription {
-    pub event_name: String,
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq, Hash)]
 #[fidl_decl(fidl_table = "fdecl::UseEventStream", source_path = "name_only")]
 pub struct UseEventStreamDecl {
@@ -1195,7 +1188,7 @@ pub struct ChildDecl {
     pub url: String,
     pub startup: fdecl::StartupMode,
     pub on_terminate: Option<fdecl::OnTerminate>,
-    pub environment: Option<String>,
+    pub environment: Option<Name>,
     pub config_overrides: Option<Vec<ConfigOverride>>,
 }
 
@@ -1240,7 +1233,7 @@ impl NativeIntoFidl<fdecl::ChildRef> for ChildRef {
 pub struct CollectionDecl {
     pub name: Name,
     pub durability: fdecl::Durability,
-    pub environment: Option<String>,
+    pub environment: Option<Name>,
 
     #[fidl_decl(default)]
     pub allowed_offers: AllowedOffers,
@@ -1253,7 +1246,7 @@ pub struct CollectionDecl {
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Environment")]
 pub struct EnvironmentDecl {
-    pub name: String,
+    pub name: Name,
     pub extends: fdecl::EnvironmentExtends,
     pub runners: Vec<RunnerRegistration>,
     pub resolvers: Vec<ResolverRegistration>,
@@ -2259,7 +2252,7 @@ pub enum UseSource {
     Debug,
     Self_,
     Capability(Name),
-    Child(String),
+    Child(Name),
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Environment,
 }
@@ -2288,7 +2281,7 @@ impl FidlIntoNative<UseSource> for fdecl::Ref {
             fdecl::Ref::Self_(_) => UseSource::Self_,
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Capability(c) => UseSource::Capability(c.name.parse().unwrap()),
-            fdecl::Ref::Child(c) => UseSource::Child(c.name),
+            fdecl::Ref::Child(c) => UseSource::Child(c.name.parse().unwrap()),
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Ref::Environment(_) => UseSource::Environment,
             _ => panic!("invalid UseSource variant"),
@@ -2306,7 +2299,9 @@ impl NativeIntoFidl<fdecl::Ref> for UseSource {
             UseSource::Capability(name) => {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.to_string() })
             }
-            UseSource::Child(name) => fdecl::Ref::Child(fdecl::ChildRef { name, collection: None }),
+            UseSource::Child(name) => {
+                fdecl::Ref::Child(fdecl::ChildRef { name: name.to_string(), collection: None })
+            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             UseSource::Environment => fdecl::Ref::Environment(fdecl::EnvironmentRef {}),
         }
@@ -2415,7 +2410,7 @@ impl NativeIntoFidl<fdecl::Ref> for OfferSource {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExposeSource {
     Self_,
-    Child(String),
+    Child(Name),
     Collection(Name),
     Framework,
     Capability(Name),
@@ -2439,7 +2434,8 @@ impl FidlIntoNative<ExposeSource> for fdecl::Ref {
     fn fidl_into_native(self) -> ExposeSource {
         match self {
             fdecl::Ref::Self_(_) => ExposeSource::Self_,
-            fdecl::Ref::Child(c) => ExposeSource::Child(c.name),
+            // cm_fidl_validator should have already validated this
+            fdecl::Ref::Child(c) => ExposeSource::Child(c.name.parse().unwrap()),
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Collection(c) => ExposeSource::Collection(c.name.parse().unwrap()),
             fdecl::Ref::Framework(_) => ExposeSource::Framework,
@@ -2455,9 +2451,10 @@ impl NativeIntoFidl<fdecl::Ref> for ExposeSource {
     fn native_into_fidl(self) -> fdecl::Ref {
         match self {
             ExposeSource::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
-            ExposeSource::Child(child_name) => {
-                fdecl::Ref::Child(fdecl::ChildRef { name: child_name, collection: None })
-            }
+            ExposeSource::Child(name) => fdecl::Ref::Child(fdecl::ChildRef {
+                name: name.native_into_fidl(),
+                collection: None,
+            }),
             ExposeSource::Collection(name) => {
                 fdecl::Ref::Collection(fdecl::CollectionRef { name: name.native_into_fidl() })
             }
@@ -3336,7 +3333,7 @@ mod tests {
                         }),
                         UseDecl::Protocol(UseProtocolDecl {
                             dependency_type: DependencyType::Strong,
-                            source: UseSource::Child("echo".to_string()),
+                            source: UseSource::Child("echo".parse().unwrap()),
                             source_name: "echo_service".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/svc/echo_service".parse().unwrap(),
@@ -3363,7 +3360,7 @@ mod tests {
                             availability: Availability::Optional,
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
-                            source: UseSource::Child("netstack".to_string()),
+                            source: UseSource::Child("netstack".parse().unwrap()),
                             scope: Some(vec![EventScope::Child(ChildRef{ name: "a".parse().unwrap(), collection: None}), EventScope::Collection("b".parse().unwrap())]),
                             source_name: "stopped".parse().unwrap(),
                             target_path: "/svc/test".parse().unwrap(),
@@ -3385,7 +3382,7 @@ mod tests {
                     ],
                     exposes: vec![
                         ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "legacy_netstack".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "legacy_mynetstack".parse().unwrap(),
@@ -3393,7 +3390,7 @@ mod tests {
                             availability: Availability::Required,
                         }),
                         ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "dir".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "data".parse().unwrap(),
@@ -3403,14 +3400,14 @@ mod tests {
                             availability: Availability::Optional,
                         }),
                         ExposeDecl::Runner(ExposeRunnerDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "elf".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "elf".parse().unwrap(),
                         }),
                         ExposeDecl::Resolver(ExposeResolverDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "pkg".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target: ExposeTarget::Parent,
@@ -3433,7 +3430,7 @@ mod tests {
                             availability: Availability::Required,
                         }),
                         ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                            source: ExposeSource::Child("netstack".to_string()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "bundle".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "mybundle".parse().unwrap(),
@@ -3586,7 +3583,7 @@ mod tests {
                             url: "fuchsia-pkg://fuchsia.com/echo#meta/echo.cm".to_string(),
                             startup: fdecl::StartupMode::Eager,
                             on_terminate: Some(fdecl::OnTerminate::Reboot),
-                            environment: Some("test_env".to_string()),
+                            environment: Some("test_env".parse().unwrap()),
                             config_overrides: None,
                         },
                     ],
@@ -3602,7 +3599,7 @@ mod tests {
                         CollectionDecl {
                             name: "tests".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
-                            environment: Some("test_env".to_string()),
+                            environment: Some("test_env".parse().unwrap()),
                             allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
                             allow_long_names: true,
                             persistent_storage: Some(true),
@@ -3684,7 +3681,7 @@ mod tests {
                 UseSource::Framework,
                 UseSource::Debug,
                 UseSource::Capability("capability".parse().unwrap()),
-                UseSource::Child("foo".to_string()),
+                UseSource::Child("foo".parse().unwrap()),
                 UseSource::Environment,
             ],
             result_type = UseSource,
@@ -3702,7 +3699,7 @@ mod tests {
             input_type = fdecl::Ref,
             result = vec![
                 ExposeSource::Self_,
-                ExposeSource::Child("foo".to_string()),
+                ExposeSource::Child("foo".parse().unwrap()),
                 ExposeSource::Framework,
                 ExposeSource::Collection("foo".parse().unwrap()),
             ],
@@ -3912,7 +3909,7 @@ mod tests {
                         CollectionDecl {
                             name: "tests".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
-                            environment: Some("test_env".to_string()),
+                            environment: Some("test_env".parse().unwrap()),
                             allowed_offers: cm_types::AllowedOffers::StaticOnly,
                             allow_long_names: false,
                             persistent_storage: Some(false),

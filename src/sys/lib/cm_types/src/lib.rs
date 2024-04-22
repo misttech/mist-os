@@ -221,6 +221,12 @@ impl<const N: usize> From<BoundedName<N>> for String {
     }
 }
 
+impl From<Name> for LongName {
+    fn from(name: Name) -> Self {
+        Self(name.0)
+    }
+}
+
 impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

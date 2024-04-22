@@ -96,9 +96,7 @@ fn namespace_teardown_processes_final_request() {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .use_(
-                        UseBuilder::protocol().name("foo").source(UseSource::Child("leaf".into())),
-                    )
+                    .use_(UseBuilder::protocol().name("foo").source_static_child("leaf"))
                     .child(ChildBuilder::new().name("leaf"))
                     .build(),
             ),
@@ -162,7 +160,7 @@ async fn namespace_teardown_rejects_late_request() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseBuilder::protocol().name("foo").source(UseSource::Child("leaf".into())))
+                .use_(UseBuilder::protocol().name("foo").source_static_child("leaf"))
                 .child(ChildBuilder::new().name("leaf"))
                 .build(),
         ),
@@ -2580,7 +2578,7 @@ async fn offer_service_from_collections_multilevel() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collection() {
-    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("b".into())).build();
+    let use_decl = UseBuilder::service().name("foo").source_static_child("b").build();
     let mut components = vec![
         ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
         (
@@ -2628,7 +2626,7 @@ async fn expose_service_from_collection() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collections() {
-    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("b".into())).build();
+    let use_decl = UseBuilder::service().name("foo").source_static_child("b").build();
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2687,7 +2685,7 @@ async fn expose_service_from_collections() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collections_multilevel() {
-    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("m".into())).build();
+    let use_decl = UseBuilder::service().name("foo").source_static_child("m").build();
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2701,9 +2699,7 @@ async fn expose_service_from_collections_multilevel() {
         (
             "m",
             ComponentDeclBuilder::new()
-                .expose(
-                    ExposeBuilder::service().name("foo").source(ExposeSource::Child("b".into())),
-                )
+                .expose(ExposeBuilder::service().name("foo").source_static_child("b"))
                 .child_default("b")
                 .build(),
         ),
@@ -3802,7 +3798,7 @@ async fn build_realm_for_on_readable_tests() -> RoutingTest {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseBuilder::protocol().name("echo").source(UseSource::Child("b".into())))
+                .use_(UseBuilder::protocol().name("echo").source_static_child("b"))
                 .child(ChildBuilder::new().name("b"))
                 .build(),
         ),

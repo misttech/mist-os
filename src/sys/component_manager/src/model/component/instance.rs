@@ -296,7 +296,7 @@ impl shutdown::Component for ResolvedInstanceState {
         ResolvedInstanceState::children(self)
             .map(|(moniker, instance)| shutdown::Child {
                 moniker: moniker.clone(),
-                environment_name: instance.environment().name().map(|n| n.to_string()),
+                environment_name: instance.environment().name().cloned(),
             })
             .collect()
     }
@@ -321,7 +321,7 @@ pub struct ResolvedInstanceState {
     next_dynamic_instance_id: IncarnationId,
 
     /// The set of named Environments defined by this instance.
-    environments: HashMap<String, Arc<Environment>>,
+    environments: HashMap<Name, Arc<Environment>>,
 
     /// Directory that represents the program's namespace.
     ///
@@ -717,7 +717,7 @@ impl ResolvedInstanceState {
     fn instantiate_environments(
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
-    ) -> HashMap<String, Arc<Environment>> {
+    ) -> HashMap<Name, Arc<Environment>> {
         let mut environments = HashMap::new();
         for env_decl in &decl.environments {
             environments.insert(
@@ -748,7 +748,7 @@ impl ResolvedInstanceState {
     fn get_environment(
         &self,
         component: &Arc<ComponentInstance>,
-        environment_name: Option<&String>,
+        environment_name: Option<&Name>,
     ) -> Arc<Environment> {
         if let Some(environment_name) = environment_name {
             Arc::clone(

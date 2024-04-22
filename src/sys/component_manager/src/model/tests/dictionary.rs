@@ -54,7 +54,7 @@ async fn use_protocol_from_dictionary() {
                 .use_(UseBuilder::protocol().name("B").from_dictionary("parent_dict"))
                 .use_(
                     UseBuilder::protocol()
-                        .source(UseSource::Child("leaf".into()))
+                        .source_static_child("leaf")
                         .name("C")
                         .from_dictionary("child_dict"),
                 )
@@ -257,18 +257,8 @@ async fn expose_directory_from_dictionary_not_supported() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(
-                    UseBuilder::directory()
-                        .source(UseSource::Child("mid".into()))
-                        .name("A")
-                        .path("/A"),
-                )
-                .use_(
-                    UseBuilder::directory()
-                        .source(UseSource::Child("mid".into()))
-                        .name("B")
-                        .path("/B"),
-                )
+                .use_(UseBuilder::directory().source_static_child("mid").name("A").path("/A"))
+                .use_(UseBuilder::directory().source_static_child("mid").name("B").path("/B"))
                 .child_default("mid")
                 .build(),
         ),
@@ -294,7 +284,7 @@ async fn expose_directory_from_dictionary_not_supported() {
                 .expose(
                     ExposeBuilder::directory()
                         .name("B")
-                        .source(ExposeSource::Child("leaf".into()))
+                        .source_static_child("leaf")
                         .from_dictionary("child_dict"),
                 )
                 .child_default("leaf")
@@ -400,7 +390,7 @@ async fn use_protocol_from_nested_dictionary() {
                 .use_(UseBuilder::protocol().name("B").from_dictionary("parent_dict/nested"))
                 .use_(
                     UseBuilder::protocol()
-                        .source(UseSource::Child("leaf".into()))
+                        .source_static_child("leaf")
                         .name("C")
                         .from_dictionary("child_dict/nested"),
                 )
@@ -730,16 +720,10 @@ async fn expose_protocol_from_dictionary() {
             "root",
             ComponentDeclBuilder::new()
                 .use_(
-                    UseBuilder::protocol()
-                        .source(UseSource::Child("mid".into()))
-                        .name("A_svc")
-                        .path("/svc/A"),
+                    UseBuilder::protocol().source_static_child("mid").name("A_svc").path("/svc/A"),
                 )
                 .use_(
-                    UseBuilder::protocol()
-                        .source(UseSource::Child("mid".into()))
-                        .name("B_svc")
-                        .path("/svc/B"),
+                    UseBuilder::protocol().source_static_child("mid").name("B_svc").path("/svc/B"),
                 )
                 .child_default("mid")
                 .build(),
@@ -761,7 +745,7 @@ async fn expose_protocol_from_dictionary() {
                         .name("B")
                         .target_name("B_svc")
                         .from_dictionary("child_dict")
-                        .source(ExposeSource::Child("leaf".into())),
+                        .source_static_child("leaf"),
                 )
                 .offer(
                     OfferBuilder::protocol()
@@ -808,10 +792,7 @@ async fn expose_protocol_from_dictionary_not_found() {
             "root",
             ComponentDeclBuilder::new()
                 .use_(
-                    UseBuilder::protocol()
-                        .source(UseSource::Child("mid".into()))
-                        .name("A_svc")
-                        .path("/svc/A"),
+                    UseBuilder::protocol().source_static_child("mid").name("A_svc").path("/svc/A"),
                 )
                 .child_default("mid")
                 .build(),
@@ -867,16 +848,10 @@ async fn expose_protocol_from_nested_dictionary() {
             "root",
             ComponentDeclBuilder::new()
                 .use_(
-                    UseBuilder::protocol()
-                        .source(UseSource::Child("mid".into()))
-                        .name("A_svc")
-                        .path("/svc/A"),
+                    UseBuilder::protocol().source_static_child("mid").name("A_svc").path("/svc/A"),
                 )
                 .use_(
-                    UseBuilder::protocol()
-                        .source(UseSource::Child("mid".into()))
-                        .name("B_svc")
-                        .path("/svc/B"),
+                    UseBuilder::protocol().source_static_child("mid").name("B_svc").path("/svc/B"),
                 )
                 .child_default("mid")
                 .build(),
@@ -899,7 +874,7 @@ async fn expose_protocol_from_nested_dictionary() {
                         .name("B")
                         .target_name("B_svc")
                         .from_dictionary("child_dict/nested")
-                        .source(ExposeSource::Child("leaf".into())),
+                        .source_static_child("leaf"),
                 )
                 .offer(
                     OfferBuilder::protocol()
@@ -961,11 +936,7 @@ async fn dictionary_in_exposed_dir() {
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
                 .expose(ExposeBuilder::dictionary().name("self_dict").source(ExposeSource::Self_))
-                .expose(
-                    ExposeBuilder::dictionary()
-                        .name("child_dict")
-                        .source(ExposeSource::Child("leaf".into())),
-                )
+                .expose(ExposeBuilder::dictionary().name("child_dict").source_static_child("leaf"))
                 .offer(
                     OfferBuilder::protocol()
                         .name("foo")
@@ -1740,13 +1711,13 @@ async fn expose_from_dictionary_availability_attenuated() {
             ComponentDeclBuilder::new()
                 .use_(
                     UseBuilder::protocol()
-                        .source(UseSource::Child("leaf".into()))
+                        .source_static_child("leaf")
                         .name("A")
                         .availability(Availability::Optional),
                 )
                 .use_(
                     UseBuilder::protocol()
-                        .source(UseSource::Child("leaf".into()))
+                        .source_static_child("leaf")
                         .name("B")
                         .availability(Availability::Optional),
                 )
@@ -1819,9 +1790,9 @@ async fn expose_from_dictionary_availability_invalid() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseBuilder::protocol().source(UseSource::Child("mid".into())).name("A"))
-                .use_(UseBuilder::protocol().source(UseSource::Child("mid".into())).name("B"))
-                .use_(UseBuilder::protocol().source(UseSource::Child("mid".into())).name("C"))
+                .use_(UseBuilder::protocol().source_static_child("mid").name("A"))
+                .use_(UseBuilder::protocol().source_static_child("mid").name("B"))
+                .use_(UseBuilder::protocol().source_static_child("mid").name("C"))
                 .child_default("mid")
                 .build(),
         ),
@@ -1832,19 +1803,19 @@ async fn expose_from_dictionary_availability_invalid() {
                     ExposeBuilder::protocol()
                         .name("A")
                         .from_dictionary("required_dict")
-                        .source(ExposeSource::Child("leaf".into())),
+                        .source_static_child("leaf"),
                 )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("B")
                         .from_dictionary("optional_dict")
-                        .source(ExposeSource::Child("leaf".into())),
+                        .source_static_child("leaf"),
                 )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("C")
                         .from_dictionary("dict_with_optional_nested/nested")
-                        .source(ExposeSource::Child("leaf".into())),
+                        .source_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),

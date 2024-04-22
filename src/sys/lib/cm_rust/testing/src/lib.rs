@@ -166,7 +166,7 @@ pub struct ChildBuilder {
     #[derivative(Default(value = "fdecl::StartupMode::Lazy"))]
     startup: fdecl::StartupMode,
     on_terminate: Option<fdecl::OnTerminate>,
-    environment: Option<String>,
+    environment: Option<Name>,
 }
 
 impl ChildBuilder {
@@ -203,7 +203,7 @@ impl ChildBuilder {
     }
 
     pub fn environment(mut self, environment: &str) -> Self {
-        self.environment = Some(environment.into());
+        self.environment = Some(environment.parse().unwrap());
         self
     }
 
@@ -232,7 +232,7 @@ pub struct CollectionBuilder {
     name: Option<Name>,
     #[derivative(Default(value = "fdecl::Durability::Transient"))]
     durability: fdecl::Durability,
-    environment: Option<String>,
+    environment: Option<Name>,
     #[derivative(Default(value = "cm_types::AllowedOffers::StaticOnly"))]
     allowed_offers: cm_types::AllowedOffers,
     allow_long_names: bool,
@@ -255,7 +255,7 @@ impl CollectionBuilder {
     }
 
     pub fn environment(mut self, environment: &str) -> Self {
-        self.environment = Some(environment.into());
+        self.environment = Some(environment.parse().unwrap());
         self
     }
 
@@ -296,7 +296,7 @@ impl From<CollectionBuilder> for cm_rust::CollectionDecl {
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
 pub struct EnvironmentBuilder {
-    name: Option<String>,
+    name: Option<Name>,
     #[derivative(Default(value = "fdecl::EnvironmentExtends::Realm"))]
     extends: fdecl::EnvironmentExtends,
     runners: Vec<cm_rust::RunnerRegistration>,
@@ -311,7 +311,7 @@ impl EnvironmentBuilder {
     }
 
     pub fn name(mut self, name: &str) -> Self {
-        self.name = Some(name.into());
+        self.name = Some(name.parse().unwrap());
         self
     }
 
@@ -715,6 +715,10 @@ impl UseBuilder {
         self
     }
 
+    pub fn source_static_child(self, source: &str) -> Self {
+        self.source(cm_rust::UseSource::Child(source.parse().unwrap()))
+    }
+
     pub fn availability(mut self, availability: cm_rust::Availability) -> Self {
         assert_matches!(
             self.type_,
@@ -924,6 +928,10 @@ impl ExposeBuilder {
     pub fn source(mut self, source: cm_rust::ExposeSource) -> Self {
         self.source = Some(source);
         self
+    }
+
+    pub fn source_static_child(self, source: &str) -> Self {
+        self.source(cm_rust::ExposeSource::Child(source.parse().unwrap()))
     }
 
     pub fn target(mut self, target: cm_rust::ExposeTarget) -> Self {

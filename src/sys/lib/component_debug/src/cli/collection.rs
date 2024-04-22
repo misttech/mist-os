@@ -94,7 +94,7 @@ async fn get_all_collections_of_instance(
             name: collection.name.to_string(),
             moniker: moniker.clone(),
             durability: collection.durability.into(),
-            environment: collection.environment,
+            environment: collection.environment.map(|e| e.to_string()),
             offered_capabilities,
         });
     }

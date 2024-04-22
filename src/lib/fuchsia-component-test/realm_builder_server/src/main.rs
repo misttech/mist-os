@@ -875,7 +875,7 @@ impl RealmNodeState {
         child_name: LongName,
         child_url: String,
         child_options: ftest::ChildOptions,
-    ) {
+    ) -> Result<(), RealmBuilderError> {
         // TODO(https://fxbug.dev/42053123): Validate overrides in cm_fidl_validator before
         // converting them to cm_rust.
         let config_overrides: Option<Vec<_>> = child_options
@@ -890,7 +890,10 @@ impl RealmNodeState {
                 Some(fcdecl::StartupMode::Eager) => fcdecl::StartupMode::Eager,
                 None => fcdecl::StartupMode::Lazy,
             },
-            environment: child_options.environment,
+            environment: child_options
+                .environment
+                .map(|e| e.parse().map_err(|_| RealmBuilderError::EnvironmentNameInvalid))
+                .transpose()?,
             on_terminate: match child_options.on_terminate {
                 Some(fcdecl::OnTerminate::None) => Some(fcdecl::OnTerminate::None),
                 Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
@@ -898,6 +901,7 @@ impl RealmNodeState {
             },
             config_overrides,
         });
+        Ok(())
     }
 
     /// Function to route common protocols to every component if they are missing.
@@ -1059,8 +1063,7 @@ impl RealmNode2 {
         if state_guard.contains_child(&child_name) {
             return Err(RealmBuilderError::ChildAlreadyExists(child_name.to_string()));
         }
-        state_guard.add_child_decl(child_name, child_url, child_options);
-        Ok(())
+        state_guard.add_child_decl(child_name, child_url, child_options)
     }
 
     fn load_from_pkg(
@@ -1122,7 +1125,7 @@ impl RealmNode2 {
                             fcdecl::StartupMode::Lazy => Some(fcdecl::StartupMode::Lazy),
                             fcdecl::StartupMode::Eager => Some(fcdecl::StartupMode::Eager),
                         },
-                        environment: child.environment,
+                        environment: child.environment.map(|e| e.to_string()),
                         on_terminate: match child.on_terminate {
                             Some(fcdecl::OnTerminate::None) => Some(fcdecl::OnTerminate::None),
                             Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
@@ -1281,7 +1284,7 @@ impl RealmNode2 {
                         Clone::clone(&package_dir),
                     )
                     .await?;
-                state_guard.add_child_decl(child_name, child_url, child_options);
+                state_guard.add_child_decl(child_name, child_url, child_options)?;
             }
 
             if !component_loaded_from_pkg {
@@ -1944,6 +1947,9 @@ enum RealmBuilderError {
     #[error("Invalid child declaration. Field `name` is not a valid name.")]
     ChildNameInvalid,
 
+    #[error("Invalid child declaration. Field `environment` is not a valid name.")]
+    EnvironmentNameInvalid,
+
     /// The handle the client provided is not usable
     #[error("Handle for child realm \"{0}\" is not usable. {1:?}")]
     InvalidChildRealmHandle(String, fidl::Error),
@@ -1985,6 +1991,7 @@ impl From<RealmBuilderError> for ftest::RealmBuilderError {
             RealmBuilderError::InvalidComponentDeclWithName(_, _) => Self::InvalidComponentDecl,
             RealmBuilderError::NoSuchChild(_) => Self::NoSuchChild,
             RealmBuilderError::ChildNameInvalid => Self::InvalidChildDecl,
+            RealmBuilderError::EnvironmentNameInvalid => Self::InvalidChildDecl,
             RealmBuilderError::ChildDeclNotVisible(_) => Self::ChildDeclNotVisible,
             RealmBuilderError::NoSuchSource(_) => Self::NoSuchSource,
             RealmBuilderError::NoSuchTarget(_) => Self::NoSuchTarget,
@@ -2095,7 +2102,7 @@ mod tests {
                                     fcdecl::StartupMode::Eager => Some(fcdecl::StartupMode::Eager),
                                     fcdecl::StartupMode::Lazy => None,
                                 },
-                                environment: child.environment,
+                                environment: child.environment.map(|e| e.to_string()),
                                 on_terminate: match child.on_terminate {
                                     Some(fcdecl::OnTerminate::None) => {
                                         Some(fcdecl::OnTerminate::None)
@@ -2724,7 +2731,7 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 environments: vec![cm_rust::EnvironmentDecl {
-                    name: "new-env".to_string(),
+                    name: "new-env".parse().unwrap(),
                     extends: fcdecl::EnvironmentExtends::None,
                     resolvers: vec![cm_rust::ResolverRegistration {
                         resolver: "test".parse().unwrap(),
@@ -3486,7 +3493,7 @@ mod tests {
                     }),
                 ],
                 exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                    source: cm_rust::ExposeSource::Child("a".to_owned()),
+                    source: cm_rust::ExposeSource::Child("a".parse().unwrap()),
                     source_name: "fuchsia.examples.Echo".parse().unwrap(),
                     source_dictionary: Default::default(),
                     target: cm_rust::ExposeTarget::Parent,

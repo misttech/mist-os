@@ -1087,12 +1087,12 @@ mod tests {
                     .expose(
                         ExposeBuilder::service()
                             .name("my.service.Service")
-                            .source(ExposeSource::Child("static_a".into())),
+                            .source_static_child("static_a"),
                     )
                     .expose(
                         ExposeBuilder::service()
                             .name("my.service.Service")
-                            .source(ExposeSource::Child("static_b".into())),
+                            .source_static_child("static_b"),
                     )
                     .collection(CollectionBuilder::new().name("coll1"))
                     .collection(CollectionBuilder::new().name("coll2"))

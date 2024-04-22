@@ -145,7 +145,7 @@ impl EnvironmentForAnalyzer {
                     .iter()
                     .find(|&env| &env.name == child_env_name)
                     .ok_or(BuildAnalyzerModelError::EnvironmentNotFound(
-                        child_env_name.clone(),
+                        child_env_name.to_string(),
                         child.child_moniker.name().to_string(),
                         parent.moniker().to_string(),
                     ))?;

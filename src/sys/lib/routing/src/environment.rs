@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 pub struct Environment<Component: ComponentInstanceInterface> {
     /// Name of this environment as defined by its creator.
     /// Would be `None` for root environment.
-    name: Option<String>,
+    name: Option<Name>,
     /// The parent that created or inherited the environment.
     parent: WeakExtendedInstanceInterface<Component>,
     /// The extension mode of this environment.
@@ -36,7 +36,7 @@ pub struct Environment<Component: ComponentInstanceInterface> {
 
 impl<C: ComponentInstanceInterface> Environment<C> {
     pub fn new(
-        name: Option<String>,
+        name: Option<Name>,
         parent: WeakExtendedInstanceInterface<C>,
         extends: EnvironmentExtends,
         runner_registry: RunnerRegistry,
@@ -47,8 +47,8 @@ impl<C: ComponentInstanceInterface> Environment<C> {
 
     /// The name of this environment as defined by its creator.
     /// Should be `None` for the root environment.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<&Name> {
+        self.name.as_ref()
     }
 
     /// The parent component instance or top instance that created or inherited the environment.
@@ -104,12 +104,12 @@ impl<C: ComponentInstanceInterface> Environment<C> {
         &self,
         name: &Name,
     ) -> Result<
-        Option<(ExtendedInstanceInterface<C>, Option<String>, DebugRegistration)>,
+        Option<(ExtendedInstanceInterface<C>, Option<Name>, DebugRegistration)>,
         ComponentInstanceError,
     > {
         let parent = self.parent().upgrade()?;
         match self.debug_registry().get_capability(name) {
-            Some(reg) => Ok(Some((parent, self.name().map(String::from), reg.clone()))),
+            Some(reg) => Ok(Some((parent, self.name().cloned(), reg.clone()))),
             None => match self.extends() {
                 EnvironmentExtends::Realm => match parent {
                     ExtendedInstanceInterface::<C>::Component(parent) => {

@@ -515,7 +515,7 @@ mod tests {
                 name: name.parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: cm_rust::CapabilityTypeName::Protocol,
-                env_name: env_name.into(),
+                env_name: env_name.parse().unwrap(),
             },
             allowlist,
         );

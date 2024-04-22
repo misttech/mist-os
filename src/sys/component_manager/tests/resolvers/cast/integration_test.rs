@@ -42,7 +42,7 @@ async fn resolve_cast_url() {
     builder.replace_component_decl(&cast_resolver, cast_resolver_decl).await.unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
     realm_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: "cast_env".to_string(),
+        name: "cast_env".parse().unwrap(),
         extends: fdecl::EnvironmentExtends::Realm,
         runners: vec![],
         resolvers: vec![cm_rust::ResolverRegistration {

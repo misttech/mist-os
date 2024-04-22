@@ -35,7 +35,7 @@ use {
         resolving::ComponentAddress,
     },
     std::sync::{Arc, Weak},
-    tracing::{trace, warn},
+    tracing::warn,
     vfs::{
         directory::{entry::OpenRequest, entry_container::Directory},
         ToObjectRequest,
@@ -318,8 +318,6 @@ async fn resolve_declaration(
         _ => return Err(fsys::GetDeclarationError::BadChildLocation),
     };
 
-    trace!(parent=%parent_moniker, %collection, %url, "getting manifest for url in collection");
-
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance = model
         .root()
@@ -333,7 +331,6 @@ async fn resolve_declaration(
         let state = instance.lock_state().await;
         let resolved_state =
             state.get_resolved_state().ok_or(fsys::GetDeclarationError::InstanceNotResolved)?;
-        trace!("found parent, and it is resolved");
         let address = if url.starts_with("#") {
             resolved_state
                 .address_for_relative_url(url)
@@ -350,18 +347,11 @@ async fn resolve_declaration(
         (address, resolved_state.environment_for_collection(&instance, &collection_decl))
     };
 
-    trace!(
-        parent=%parent_moniker,
-        env=%environment.environment().name().as_ref().unwrap_or(&"<unnamed>"),
-        ?address,
-        "resolving manifest without creating component",
-    );
     let resolved = environment
         .resolve(&address)
         .await
         .map_err(|_| fsys::GetDeclarationError::InstanceNotResolved)?;
 
-    trace!("encoding manifest as persistent FIDL bytes");
     let bytes = fidl::persist(&resolved.decl.native_into_fidl()).map_err(|error| {
         warn!(parent=%parent_moniker, %error, "RealmQuery failed to encode manifest");
         fsys::GetDeclarationError::EncodeFailed
@@ -378,7 +368,6 @@ async fn resolve_declaration(
         fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();
 
     // Attach the iterator task to the scope root.
-    trace!("spawning bytes iterator task");
     let task_group = scope_root.nonblocking_task_group();
     task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes));
     Ok(client_end)

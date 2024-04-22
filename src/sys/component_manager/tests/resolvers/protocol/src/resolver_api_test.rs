@@ -73,7 +73,7 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
     // Add the resolver to the environment the child will be launched in.
     let mut realm_decl = builder.get_realm_decl().await?;
     realm_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: String::from(ENVIRONMENT_NAME),
+        name: ENVIRONMENT_NAME.parse().unwrap(),
         extends: fcdecl::EnvironmentExtends::Realm,
         resolvers: vec![cm_rust::ResolverRegistration {
             resolver: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),

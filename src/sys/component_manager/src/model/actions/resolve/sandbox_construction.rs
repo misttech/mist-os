@@ -51,7 +51,7 @@ pub fn build_component_sandbox(
     for environment_decl in &decl.environments {
         environments
             .insert(
-                Name::new(&environment_decl.name).unwrap(),
+                environment_decl.name.clone(),
                 build_environment(component, children, component_input, environment_decl),
             )
             .ok();
@@ -60,7 +60,7 @@ pub fn build_component_sandbox(
     for child in &decl.children {
         let environment;
         if let Some(environment_name) = child.environment.as_ref() {
-            environment = environments.get(&Name::new(environment_name).unwrap()).expect(
+            environment = environments.get(environment_name).expect(
                 "child references nonexistent environment, \
                     this should be prevented in manifest validation",
             )
@@ -75,7 +75,7 @@ pub fn build_component_sandbox(
     for collection in &decl.collections {
         let environment;
         if let Some(environment_name) = collection.environment.as_ref() {
-            environment = environments.get(&Name::new(environment_name).unwrap()).expect(
+            environment = environments.get(environment_name).expect(
                 "collection references nonexistent environment, \
                     this should be prevented in manifest validation",
             )

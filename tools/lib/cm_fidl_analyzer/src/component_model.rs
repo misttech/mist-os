@@ -18,6 +18,7 @@ use {
         SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource,
         UseStorageDecl,
     },
+    cm_types::Name,
     config_encoder::ConfigFields,
     fidl::prelude::*,
     fidl_fuchsia_sys2 as fsys,
@@ -138,7 +139,7 @@ impl ModelBuilderForAnalyzer {
     }
 
     fn load_dynamic_components(
-        input: HashMap<Moniker, (AbsoluteComponentUrl, Option<String>)>,
+        input: HashMap<Moniker, (AbsoluteComponentUrl, Option<Name>)>,
     ) -> (HashMap<Moniker, Vec<Child>>, Vec<anyhow::Error>) {
         let mut errors: Vec<anyhow::Error> = vec![];
         let mut dynamic_components: HashMap<Moniker, Vec<Child>> = HashMap::new();
@@ -199,7 +200,7 @@ impl ModelBuilderForAnalyzer {
 
     pub fn build_with_dynamic_components(
         self,
-        dynamic_components: HashMap<Moniker, (AbsoluteComponentUrl, Option<String>)>,
+        dynamic_components: HashMap<Moniker, (AbsoluteComponentUrl, Option<Name>)>,
         decls_by_url: HashMap<Url, (ComponentDecl, Option<ConfigFields>)>,
         runtime_config: Arc<RuntimeConfig>,
         component_id_index: Arc<component_id_index::Index>,
@@ -293,7 +294,7 @@ impl ModelBuilderForAnalyzer {
     ) {
         let mut children = vec![];
         for child_decl in instance.decl.children.iter() {
-            let child_moniker = ChildName::from((child_decl.name.clone(), None));
+            let child_moniker = ChildName::new(child_decl.name.clone(), None);
             match Self::get_absolute_child_url(&child_decl.url, instance) {
                 Ok(url) => {
                     children.push(Child {
@@ -1328,7 +1329,7 @@ impl ComponentModelForAnalyzer {
 pub struct Child {
     pub child_moniker: ChildName,
     pub url: Url,
-    pub environment: Option<String>,
+    pub environment: Option<Name>,
 }
 
 #[cfg(test)]

@@ -276,7 +276,7 @@ pub struct DebugCapabilityKey {
     pub name: Name,
     pub source: CapabilityAllowlistSource,
     pub capability: CapabilityTypeName,
-    pub env_name: String,
+    pub env_name: Name,
 }
 
 /// Represents a single allowed route for a debug capability.
@@ -587,10 +587,10 @@ pub enum PolicyConfigError {
     EmptyAllowlistedCapability,
     #[error("Debug registration type was empty in a debug policy entry.")]
     EmptyAllowlistedDebugRegistration,
-    #[error("Environment name was empty in a debug policy entry.")]
-    EmptyTargetMonikerDebugRegistration,
     #[error("Target moniker was empty in a debug policy entry.")]
-    EmptyEnvironmentNameDebugRegistration,
+    EmptyTargetMonikerDebugRegistration,
+    #[error("Environment name was empty or invalid in a debug policy entry.")]
+    InvalidEnvironmentNameDebugRegistration,
     #[error("Capability from type was empty in a capability policy entry.")]
     EmptyFromType,
     #[error("Capability source_moniker was empty in a capability policy entry.")]
@@ -764,7 +764,9 @@ fn parse_debug_capability_policy(
 
                 let env_name = e
                     .environment_name
-                    .ok_or(PolicyConfigError::EmptyEnvironmentNameDebugRegistration)?;
+                    .map(|n| n.parse().ok())
+                    .flatten()
+                    .ok_or(PolicyConfigError::InvalidEnvironmentNameDebugRegistration)?;
 
                 let key = DebugCapabilityKey {
                     name,
@@ -1051,7 +1053,7 @@ mod tests {
                                 name: "fuchsia.foo.bar".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
-                                env_name: "bar_env1".to_string(),
+                                env_name: "bar_env1".parse().unwrap(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
@@ -1064,7 +1066,7 @@ mod tests {
                                 name: "fuchsia.foo.bar".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
-                                env_name: "foo_env1".to_string(),
+                                env_name: "foo_env1".parse().unwrap(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
@@ -1077,7 +1079,7 @@ mod tests {
                                 name: "fuchsia.foo.baz".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
-                                env_name: "foo_env2".to_string(),
+                                env_name: "foo_env2".parse().unwrap(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
@@ -1090,7 +1092,7 @@ mod tests {
                                 name: "fuchsia.foo.baz".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
-                                env_name: "root_env".to_string(),
+                                env_name: "root_env".parse().unwrap(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(

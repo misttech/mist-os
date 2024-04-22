@@ -1678,11 +1678,11 @@ pub mod tests {
             vec![
                 shutdown::Child {
                     moniker: "a".try_into().unwrap(),
-                    environment_name: Some("env_a".to_string()),
+                    environment_name: Some("env_a".parse().unwrap()),
                 },
                 shutdown::Child {
                     moniker: "b".try_into().unwrap(),
-                    environment_name: Some("env_b".to_string()),
+                    environment_name: Some("env_b".parse().unwrap()),
                 },
                 shutdown::Child { moniker: "c".try_into().unwrap(), environment_name: None },
             ],
@@ -1775,7 +1775,7 @@ pub mod tests {
                 vec![
                     shutdown::Child {
                         moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".to_string()),
+                        environment_name: Some("env_a".parse().unwrap()),
                     },
                     shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
@@ -1788,7 +1788,7 @@ pub mod tests {
                     },
                     shutdown::Child {
                         moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".to_string()),
+                        environment_name: Some("env_b".parse().unwrap()),
                     },
                 ],
                 children
@@ -1814,7 +1814,7 @@ pub mod tests {
                 vec![
                     shutdown::Child {
                         moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".to_string()),
+                        environment_name: Some("env_a".parse().unwrap()),
                     },
                     shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
@@ -1823,7 +1823,7 @@ pub mod tests {
                     },
                     shutdown::Child {
                         moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".to_string()),
+                        environment_name: Some("env_b".parse().unwrap()),
                     },
                 ],
                 children
@@ -1882,7 +1882,7 @@ pub mod tests {
                 vec![
                     shutdown::Child {
                         moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".to_string()),
+                        environment_name: Some("env_a".parse().unwrap()),
                     },
                     shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
@@ -1895,7 +1895,7 @@ pub mod tests {
                     },
                     shutdown::Child {
                         moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".to_string()),
+                        environment_name: Some("env_b".parse().unwrap()),
                     },
                 ],
                 children

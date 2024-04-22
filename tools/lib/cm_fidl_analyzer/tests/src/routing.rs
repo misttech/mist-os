@@ -622,11 +622,8 @@ mod tests {
     /// b: expose to parent from self
     #[fuchsia::test]
     async fn check_use_service_from_child() {
-        let use_decl = UseBuilder::service()
-            .name("foo")
-            .path("/foo")
-            .source(UseSource::Child("b".to_string()))
-            .build();
+        let use_decl =
+            UseBuilder::service().name("foo").path("/foo").source_static_child("b").build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
             (
@@ -1264,7 +1261,7 @@ mod tests {
         let b_expose_decl = ExposeBuilder::directory()
             .name("bar_data")
             .target_name("baz_data")
-            .source(ExposeSource::Child("d".to_string()))
+            .source_static_child("d")
             .rights(fio::R_STAR_DIR)
             .build();
         let d_expose_decl = ExposeBuilder::directory()
@@ -1895,10 +1892,8 @@ mod tests {
             .build();
         let directory_decl =
             CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
-        let expose_protocol_decl = ExposeBuilder::protocol()
-            .name("bad_protocol")
-            .source(ExposeSource::Child("c".to_string()))
-            .build();
+        let expose_protocol_decl =
+            ExposeBuilder::protocol().name("bad_protocol").source_static_child("c").build();
         let use_event_decl =
             UseBuilder::event_stream().name("started_on_a").path("/started").build();
 

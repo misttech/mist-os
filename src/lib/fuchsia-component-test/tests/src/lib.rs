@@ -1706,7 +1706,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
                 &child_b,
                 cm_rust::ComponentDecl {
                     exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                        source: cm_rust::ExposeSource::Child("does-not-exist".to_string()),
+                        source: cm_rust::ExposeSource::Child("does-not-exist".parse().unwrap()),
                         source_name: "fuchsia.examples.Echo".parse().unwrap(),
                         source_dictionary: Default::default(),
                         target: cm_rust::ExposeTarget::Parent,
@@ -1725,7 +1725,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
         builder
             .replace_realm_decl(cm_rust::ComponentDecl {
                 exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                    source: cm_rust::ExposeSource::Child("does-not-exist".to_string()),
+                    source: cm_rust::ExposeSource::Child("does-not-exist".parse().unwrap()),
                     source_name: "fuchsia.examples.Echo".parse().unwrap(),
                     source_dictionary: Default::default(),
                     target: cm_rust::ExposeTarget::Parent,
@@ -1742,7 +1742,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
     // 'add_child' calls, and thus don't yet have a valid ChildDecl in the manifest.
     let mut realm_decl = builder.get_realm_decl().await?;
     realm_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-        source: cm_rust::ExposeSource::Child("b".to_string()),
+        source: cm_rust::ExposeSource::Child("b".parse().unwrap()),
         source_name: "fuchsia.examples.Echo".parse().unwrap(),
         source_dictionary: Default::default(),
         target: cm_rust::ExposeTarget::Parent,

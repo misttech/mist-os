@@ -79,19 +79,19 @@ mod tests {
                         .expose(
                             ExposeBuilder::service()
                                 .name("fuchsia.examples.EchoService")
-                                .source(ExposeSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .availability(test_case.expose_availability),
                         )
                         .expose(
                             ExposeBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
-                                .source(ExposeSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .availability(test_case.expose_availability),
                         )
                         .expose(
                             ExposeBuilder::directory()
                                 .name("dir")
-                                .source(ExposeSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .availability(test_case.expose_availability),
                         )
                         .child_default("b")

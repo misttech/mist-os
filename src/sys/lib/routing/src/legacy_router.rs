@@ -710,7 +710,7 @@ impl Use {
             UseSource::Child(name) => {
                 let moniker = target.moniker();
                 let child_component = {
-                    let child_moniker = ChildName::try_new(name, None)?;
+                    let child_moniker = ChildName::new(name.clone().into(), None);
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || {
                             RoutingError::use_from_child_instance_not_found(
@@ -1437,7 +1437,7 @@ impl Expose {
             }
             ExposeSource::Child(child) => {
                 let child_component = {
-                    let child_moniker = ChildName::try_new(child, None)?;
+                    let child_moniker = ChildName::new(child.clone().into(), None);
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::ExposeFromChildInstanceNotFound {
                             child_moniker,
@@ -1666,7 +1666,7 @@ mod tests {
         let child_exposes: Vec<_> = [1, 2, 3]
             .into_iter()
             .map(|i| ExposeServiceDecl {
-                source: ExposeSource::Child("source".into()),
+                source: ExposeSource::Child("source".parse().unwrap()),
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: ExposeTarget::Parent,
