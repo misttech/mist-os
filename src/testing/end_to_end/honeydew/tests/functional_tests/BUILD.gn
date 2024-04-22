@@ -60,16 +60,11 @@ if (is_host) {
     ]
   }
 
+  # Note - only SL4F tests are being run on core at this point. So no stability
+  # data available for FC tests on core
   group_with_no_dir_target_deps("core_emulator_stable_tests") {
     testonly = true
-    public_deps = [
-      "affordance_tests/test_session:session_test_fc($host_toolchain)",
-      "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-      "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
-      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
-      "transport_tests/test_ffx:ffx_test_fc($host_toolchain)",
-      "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
-    ]
+    public_deps = []
   }
 
   group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
@@ -79,7 +74,14 @@ if (is_host) {
 
   group_with_no_dir_target_deps("core_emulator_unstable_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [
+      "affordance_tests/test_session:session_test_fc($host_toolchain)",
+      "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
+      "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
+      "transport_tests/test_ffx:ffx_test_fc($host_toolchain)",
+      "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    ]
   }
 
   # workbench_eng.emulator
@@ -112,11 +114,11 @@ if (is_host) {
     ]
   }
 
+  # Note - only SL4F tests are being run on core at this point. So no stability
+  # data available for FC tests on core
   group_with_no_dir_target_deps("core_vim3_stable_tests") {
     testonly = true
-    public_deps = [
-      "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
-    ]
+    public_deps = []
   }
 
   group_with_no_dir_target_deps("core_vim3_unstable_sl4f_tests") {
@@ -129,6 +131,7 @@ if (is_host) {
     public_deps = [
       "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
       "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
     ]
   }
 
@@ -137,16 +140,14 @@ if (is_host) {
   group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     testonly = true
     public_deps = [
+      "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
       "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
     ]
   }
 
   group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
     testonly = true
-    public_deps = [
-      "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
-      "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
-    ]
+    public_deps = [ "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)" ]
   }
 
   # core.nuc
@@ -158,9 +159,11 @@ if (is_host) {
     ]
   }
 
+  # Note - only SL4F tests are being run on core at this point. So no stability
+  # data available for FC tests on core
   group_with_no_dir_target_deps("core_nuc_stable_tests") {
     testonly = true
-    public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)" ]
+    public_deps = []
   }
 
   group_with_no_dir_target_deps("core_nuc_unstable_sl4f_tests") {
@@ -170,7 +173,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("core_nuc_unstable_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)" ]
   }
 
   # workbench.nuc
@@ -189,12 +192,12 @@ if (is_host) {
   # Note: This will be run on internal builder, hence using `starnix` here instead of internal `<PRODUCT>` name.
   group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix_fc($host_toolchain)" ]
   }
 
   group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
     testonly = true
-    public_deps = [ "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix_fc($host_toolchain)" ]
+    public_deps = []
   }
 }
 
