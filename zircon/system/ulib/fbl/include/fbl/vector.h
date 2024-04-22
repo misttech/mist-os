@@ -106,7 +106,7 @@ class __OWNER(T) Vector {
     ptr_ = other.release();
   }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   Vector(std::initializer_list<T> init)
       : ptr_(init.size() != 0U
                  ? reinterpret_cast<T*>(AllocatorTraits::Allocate(init.size() * sizeof(T)))
@@ -142,7 +142,7 @@ class __OWNER(T) Vector {
     reallocate(capacity, ac);
   }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   void reserve(size_t capacity) {
     if (capacity <= capacity_) {
       return;
@@ -171,7 +171,7 @@ class __OWNER(T) Vector {
 
   void push_back(const T& value, AllocChecker* ac) { push_back_internal(value, ac); }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   void push_back(T&& value) { push_back_internal(std::move(value)); }
 
   void push_back(const T& value) { push_back_internal(value); }
@@ -183,7 +183,7 @@ class __OWNER(T) Vector {
 
   void insert(size_t index, const T& value, AllocChecker* ac) { insert_internal(index, value, ac); }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   void insert(size_t index, T&& value) { insert_internal(index, std::move(value)); }
 
   void insert(size_t index, const T& value) { insert_internal(index, value); }
@@ -193,7 +193,7 @@ class __OWNER(T) Vector {
 
   void resize(size_t size, const T& value, AllocChecker* ac) { resize_internal(size, value, ac); }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   void resize(size_t size) { resize_internal(size); }
 
   void resize(size_t size, const T& value) { resize_internal(size, value); }
@@ -415,7 +415,7 @@ class __OWNER(T) Vector {
     return true;
   }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   void reallocate(size_t newCapacity) {
     ZX_DEBUG_ASSERT(newCapacity > 0);
     ZX_DEBUG_ASSERT(newCapacity >= size_);
@@ -466,7 +466,7 @@ class __OWNER(T) Vector {
     }
   }
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
   void resize_internal(size_t size) {
     if (size_ > size) {
       destruct_at_end(size_ - size);
