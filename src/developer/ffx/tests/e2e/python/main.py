@@ -51,23 +51,27 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_target_echo_repeat(self) -> None:
         """Test `ffx target echo --repeat` is resilient to daemon failure."""
-        process = self.dut.ffx.popen(
+        with self.dut.ffx.popen(
             ["target", "echo", "--repeat"], stdout=subprocess.PIPE
-        )
-        line = process.stdout.readline()
-        asserts.assert_true(
-            line.startswith(b"SUCCESS"), f"First ping didn't succeed: {line}"
-        )
-        self.dut.ffx.run(["daemon", "stop"])
-        while True:
-            line = process.stdout.readline()
-            if line.startswith(b"ERROR"):
-                break
-        line = process.stdout.readline()
-        asserts.assert_true(
-            line.startswith(b"SUCCESS"),
-            f"Success didn't resume after error: {line}",
-        )
+        ) as process:
+            try:
+                line = process.stdout.readline()
+                asserts.assert_true(
+                    line.startswith(b"SUCCESS"),
+                    f"First ping didn't succeed: {line}",
+                )
+                self.dut.ffx.run(["daemon", "stop"])
+                while True:
+                    line = process.stdout.readline()
+                    if line.startswith(b"ERROR"):
+                        break
+                line = process.stdout.readline()
+                asserts.assert_true(
+                    line.startswith(b"SUCCESS"),
+                    f"Success didn't resume after error: {line}",
+                )
+            finally:
+                process.kill()
 
     # TODO(b/328505123): reenable when `ffx daemon stop` works in builders
     # def test_target_list_without_discovery(self) -> None:
