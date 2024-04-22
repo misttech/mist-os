@@ -54,7 +54,7 @@ class FuchsiaControllerTests(unittest.TestCase):
         self.ffx_obj.config = _MOCK_ARGS["ffx_config"]
 
         with mock.patch.object(
-            fuchsia_controller_transport.fuchsia_controller.Context,
+            fuchsia_controller.Context,
             "target_wait",
             autospec=True,
         ) as mock_target_wait:
@@ -77,25 +77,27 @@ class FuchsiaControllerTests(unittest.TestCase):
             mock_target_wait.assert_called_once()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller.Context,
+        fuchsia_controller.Context,
         "target_wait",
         autospec=True,
     )
-    def test_create_context(self, mock_target_wait) -> None:
+    def test_create_context(self, mock_target_wait: mock.Mock) -> None:
         """Test case for fuchsia_controller_transport.create_context()."""
         self.fuchsia_controller_obj_with_device_ip.create_context()
 
         mock_target_wait.assert_called_once()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller,
+        fuchsia_controller,
         "Context",
         side_effect=fuchsia_controller.ZxStatus(
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
         ),
         autospec=True,
     )
-    def test_create_context_creation_error(self, mock_fc_context) -> None:
+    def test_create_context_creation_error(
+        self, mock_fc_context: mock.Mock
+    ) -> None:
         """Verify create_context() when the fuchsia controller Context creation
         raises an error."""
         with self.assertRaises(errors.FuchsiaControllerError):
@@ -104,11 +106,13 @@ class FuchsiaControllerTests(unittest.TestCase):
         mock_fc_context.assert_called()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller.Context,
+        fuchsia_controller.Context,
         "connect_device_proxy",
         autospec=True,
     )
-    def test_connect_device_proxy(self, mock_fc_connect_device_proxy) -> None:
+    def test_connect_device_proxy(
+        self, mock_fc_connect_device_proxy: mock.Mock
+    ) -> None:
         """Test case for fuchsia_controller_transport.connect_device_proxy()"""
         self.fuchsia_controller_obj_with_device_ip.connect_device_proxy(
             _INPUT_ARGS["BuildInfo"]
@@ -117,7 +121,7 @@ class FuchsiaControllerTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller.Context,
+        fuchsia_controller.Context,
         "connect_device_proxy",
         side_effect=fuchsia_controller.ZxStatus(
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
@@ -125,7 +129,7 @@ class FuchsiaControllerTests(unittest.TestCase):
         autospec=True,
     )
     def test_connect_device_proxy_error(
-        self, mock_fc_connect_device_proxy
+        self, mock_fc_connect_device_proxy: mock.Mock
     ) -> None:
         """Test case for fuchsia_controller_transport.connect_device_proxy()"""
         with self.assertRaises(errors.FuchsiaControllerError):
@@ -136,23 +140,23 @@ class FuchsiaControllerTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller.Context,
+        fuchsia_controller.Context,
         "target_wait",
         autospec=True,
     )
-    def test_check_connection(self, mock_target_wait) -> None:
+    def test_check_connection(self, mock_target_wait: mock.Mock) -> None:
         """Testcase for FuchsiaController.check_connection()"""
         self.fuchsia_controller_obj_with_device_ip.check_connection()
 
         mock_target_wait.assert_called()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller.Context,
+        fuchsia_controller.Context,
         "target_wait",
         side_effect=RuntimeError("error"),
         autospec=True,
     )
-    def test_check_connection_raises(self, mock_target_wait) -> None:
+    def test_check_connection_raises(self, mock_target_wait: mock.Mock) -> None:
         """Testcase for FuchsiaController.check_connection() raises
         errors.FuchsiaControllerConnectionError"""
         with self.assertRaises(errors.FuchsiaControllerConnectionError):

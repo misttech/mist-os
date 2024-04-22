@@ -13,11 +13,25 @@ from unittest import mock
 import fuchsia_controller_py as fuchsia_controller
 from parameterized import param, parameterized
 
+from honeydew.affordances.sl4f import tracing as tracing_sl4f
+from honeydew.affordances.sl4f.bluetooth import bluetooth_common
+from honeydew.affordances.sl4f.bluetooth.profiles import (
+    bluetooth_avrcp as bluetooth_avrcp_sl4f,
+)
+from honeydew.affordances.sl4f.bluetooth.profiles import (
+    bluetooth_gap as bluetooth_gap_sl4f,
+)
+from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
+from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
+from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.fuchsia_device.sl4f import fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import sl4f as sl4f_transport
+from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 
 _INPUT_ARGS: dict[str, Any] = {
@@ -66,7 +80,7 @@ def _custom_test_name_func(
 class FuchsiaDeviceSL4FTests(unittest.TestCase):
     """Unit tests for honeydew.fuchsia_device.sl4f.fuchsia_device.py."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.fd_obj: fuchsia_device.FuchsiaDevice
         super().__init__(*args, **kwargs)
 
@@ -75,22 +89,22 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
 
         with (
             mock.patch.object(
-                fuchsia_device.sl4f_transport.SL4F,
+                sl4f_transport.SL4F,
                 "start_server",
                 autospec=True,
             ) as mock_sl4f_start_server,
             mock.patch.object(
-                fuchsia_device.sl4f_transport.SL4F,
+                sl4f_transport.SL4F,
                 "check_connection",
                 autospec=True,
             ) as mock_sl4f_check_connection,
             mock.patch.object(
-                base_fuchsia_device.ssh_transport.SSH,
+                ssh_transport.SSH,
                 "check_connection",
                 autospec=True,
             ) as mock_ssh_check_connection,
             mock.patch.object(
-                base_fuchsia_device.ffx_transport.FFX,
+                ffx_transport.FFX,
                 "check_connection",
                 autospec=True,
             ) as mock_ffx_check_connection,
@@ -116,13 +130,11 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
     def test_sl4f_transport(self) -> None:
         """Test case to make sure fsl4f_fuchsia_device supports SL4F
         transport."""
-        self.assertIsInstance(
-            self.fd_obj.sl4f, fuchsia_device.sl4f_transport.SL4F
-        )
+        self.assertIsInstance(self.fd_obj.sl4f, sl4f_transport.SL4F)
 
     # List all the tests related to affordances
     @mock.patch.object(
-        fuchsia_device.bluetooth_avrcp_sl4f.bluetooth_common.BluetoothCommon,
+        bluetooth_common.BluetoothCommon,
         "__init__",
         autospec=True,
         return_value=None,
@@ -134,12 +146,12 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         bluetooth_avrcp affordance implemented using SL4F transport."""
         self.assertIsInstance(
             self.fd_obj.bluetooth_avrcp,
-            fuchsia_device.bluetooth_avrcp_sl4f.BluetoothAvrcp,
+            bluetooth_avrcp_sl4f.BluetoothAvrcp,
         )
         mock_bluetooth_common_init.assert_called_once()
 
     @mock.patch.object(
-        fuchsia_device.bluetooth_avrcp_sl4f.bluetooth_common.BluetoothCommon,
+        bluetooth_common.BluetoothCommon,
         "__init__",
         autospec=True,
         return_value=None,
@@ -149,7 +161,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         bluetooth_gap affordance implemented using SL4F transport."""
         self.assertIsInstance(
             self.fd_obj.bluetooth_gap,
-            fuchsia_device.bluetooth_gap_sl4f.BluetoothGap,
+            bluetooth_gap_sl4f.BluetoothGap,
         )
         mock_bluetooth_common_init.assert_called_once()
 
@@ -164,7 +176,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         tracing affordance implemented using SL4F transport."""
         self.assertIsInstance(
             self.fd_obj.tracing,
-            fuchsia_device.tracing_sl4f.Tracing,
+            tracing_sl4f.Tracing,
         )
 
     def test_user_input(self) -> None:
@@ -172,7 +184,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         user_input affordance implemented using SL4F transport."""
         self.assertIsInstance(
             self.fd_obj.user_input,
-            fuchsia_device.user_input_sl4f.UserInput,
+            user_input_sl4f.UserInput,
         )
 
     def test_wlan_policy(self) -> None:
@@ -180,7 +192,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         wlan_policy affordance implemented using SL4F transport."""
         self.assertIsInstance(
             self.fd_obj.wlan_policy,
-            fuchsia_device.wlan_policy_sl4f.WlanPolicy,
+            wlan_policy_sl4f.WlanPolicy,
         )
 
     def test_wlan(self) -> None:
@@ -188,7 +200,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         wlan affordance implemented using SL4F transport."""
         self.assertIsInstance(
             self.fd_obj.wlan,
-            fuchsia_device.wlan_sl4f.Wlan,
+            wlan_sl4f.Wlan,
         )
 
     # List all the tests related to public methods
@@ -197,12 +209,12 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         self.fd_obj.close()
 
     @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F,
+        sl4f_transport.SL4F,
         "check_connection",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        base_fuchsia_device.BaseFuchsiaDevice,
         "health_check",
         autospec=True,
     )
@@ -219,7 +231,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         mock_sl4f_check_connection.assert_called_once_with(self.fd_obj.sl4f)
 
     @mock.patch.object(
-        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        base_fuchsia_device.BaseFuchsiaDevice,
         "on_device_boot",
         autospec=True,
     )
@@ -227,7 +239,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         fuchsia_device.FuchsiaDevice, "health_check", autospec=True
     )
     @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F,
+        sl4f_transport.SL4F,
         "start_server",
         autospec=True,
     )
@@ -248,7 +260,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
 
     # List all the tests related to private methods
     @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F,
+        sl4f_transport.SL4F,
         "run",
         return_value={"result": _MOCK_DEVICE_PROPERTIES["build_info"]},
         autospec=True,
@@ -263,7 +275,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         mock_sl4f_run.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F,
+        sl4f_transport.SL4F,
         "run",
         return_value={"result": _MOCK_DEVICE_PROPERTIES["device_info"]},
         autospec=True,
@@ -277,7 +289,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         mock_sl4f_run.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F,
+        sl4f_transport.SL4F,
         "run",
         return_value={"result": _MOCK_DEVICE_PROPERTIES["product_info"]},
         autospec=True,
@@ -316,7 +328,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(fuchsia_device.sl4f_transport.SL4F, "run", autospec=True)
+    @mock.patch.object(sl4f_transport.SL4F, "run", autospec=True)
     def test_send_log_command(
         self, parameterized_dict: dict[str, Any], mock_sl4f_run: mock.Mock
     ) -> None:
@@ -330,7 +342,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
 
         mock_sl4f_run.assert_called()
 
-    @mock.patch.object(fuchsia_device.sl4f_transport.SL4F, "run", autospec=True)
+    @mock.patch.object(sl4f_transport.SL4F, "run", autospec=True)
     def test_send_reboot_command(self, mock_sl4f_run: mock.Mock) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command()"""
         # pylint: disable=protected-access
@@ -339,7 +351,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         mock_sl4f_run.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F,
+        sl4f_transport.SL4F,
         "run",
         return_value={"result": {"zip": _BASE64_ENCODED_STR}},
         autospec=True,
@@ -347,9 +359,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
     @mock.patch.object(
         fuchsia_device.FuchsiaDevice, "health_check", autospec=True
     )
-    @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
-    )
+    @mock.patch.object(sl4f_transport.SL4F, "start_server", autospec=True)
     def test_send_snapshot_command(
         self,
         mock_sl4f_start_server: mock.Mock,

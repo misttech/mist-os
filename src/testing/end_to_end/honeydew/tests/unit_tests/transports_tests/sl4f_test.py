@@ -6,14 +6,16 @@
 
 import ipaddress
 import unittest
+from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.transports import ffx, sl4f
 from honeydew.typing import custom_types
+from honeydew.utils import http_utils
 
 # pylint: disable=protected-access
 
@@ -90,11 +92,13 @@ _EXPECTED_VALUES: dict[str, Any] = {
 }
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
     """Custom test name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -164,7 +168,9 @@ class Sl4fTests(unittest.TestCase):
     )
     @mock.patch.object(sl4f.SL4F, "_get_sl4f_server_address", autospec=True)
     def test_sl4f_url(
-        self, parameterized_dict, mock_get_sl4f_server_address
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_get_sl4f_server_address: mock.Mock,
     ) -> None:
         """Testcase for SL4F.url property.
 
@@ -185,7 +191,7 @@ class Sl4fTests(unittest.TestCase):
         return_value={"result": _MOCK_ARGS["device_name"]},
         autospec=True,
     )
-    def test_check_connection(self, mock_sl4f_run) -> None:
+    def test_check_connection(self, mock_sl4f_run: mock.Mock) -> None:
         """Testcase for SL4F.check_connection()"""
         self.sl4f_obj_wo_ip.check_connection()
 
@@ -197,7 +203,7 @@ class Sl4fTests(unittest.TestCase):
         return_value={"result": _MOCK_ARGS["invalid-device_name"]},
         autospec=True,
     )
-    def test_check_connection_exception(self, mock_sl4f_run) -> None:
+    def test_check_connection_exception(self, mock_sl4f_run: mock.Mock) -> None:
         """Testcase for SL4F.check_connection() raising exception"""
         with self.assertRaises(errors.Sl4fConnectionError):
             self.sl4f_obj_wo_ip.check_connection()
@@ -246,7 +252,7 @@ class Sl4fTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        sl4f.http_utils,
+        http_utils,
         "send_http_request",
         return_value=_MOCK_ARGS["sl4f_response"],
         autospec=True,
@@ -258,7 +264,10 @@ class Sl4fTests(unittest.TestCase):
         return_value=_MOCK_ARGS["sl4f_url_v4"],
     )
     def test_sl4f_run(
-        self, parameterized_dict, mock_sl4f_url, mock_send_http_request
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_sl4f_url: mock.Mock,
+        mock_send_http_request: mock.Mock,
     ) -> None:
         """Testcase for SL4F.run() success case"""
         method: str = parameterized_dict["method"]
@@ -274,7 +283,7 @@ class Sl4fTests(unittest.TestCase):
         mock_send_http_request.assert_called()
 
     @mock.patch.object(
-        sl4f.http_utils,
+        http_utils,
         "send_http_request",
         return_value=_MOCK_ARGS["sl4f_error_response"],
         autospec=True,
@@ -286,7 +295,7 @@ class Sl4fTests(unittest.TestCase):
         return_value=_MOCK_ARGS["sl4f_url_v4"],
     )
     def test_sl4f_run_fail_because_of_error_in_resp(
-        self, mock_sl4f_url, mock_send_http_request
+        self, mock_sl4f_url: mock.Mock, mock_send_http_request: mock.Mock
     ) -> None:
         """Testcase for SL4F.run() failure case when there is 'error' in SL4F
         response received"""
@@ -299,7 +308,7 @@ class Sl4fTests(unittest.TestCase):
         mock_send_http_request.assert_called()
 
     @mock.patch.object(
-        sl4f.http_utils,
+        http_utils,
         "send_http_request",
         side_effect=RuntimeError("some run time error"),
         autospec=True,
@@ -311,7 +320,7 @@ class Sl4fTests(unittest.TestCase):
         return_value=_MOCK_ARGS["sl4f_url_v4"],
     )
     def test_send_sl4f_command_fail_because_of_exception(
-        self, mock_sl4f_url, mock_send_http_request
+        self, mock_sl4f_url: mock.Mock, mock_send_http_request: mock.Mock
     ) -> None:
         """Testcase for SL4F.run() failure case when there is an exception
         thrown while sending HTTP request"""
@@ -324,7 +333,7 @@ class Sl4fTests(unittest.TestCase):
         mock_send_http_request.assert_called_once()
 
     @mock.patch.object(sl4f.SL4F, "check_connection", autospec=True)
-    def test_start_server(self, mock_check_connection) -> None:
+    def test_start_server(self, mock_check_connection: mock.Mock) -> None:
         """Testcase for SL4F.start_server()"""
         self.sl4f_obj_wo_ip.start_server()
 
@@ -371,7 +380,7 @@ class Sl4fTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     def test_get_sl4f_server_address_without_device_ip(
-        self, parameterized_dict
+        self, parameterized_dict: dict[str, Any]
     ) -> None:
         """Testcase for SL4F._get_sl4f_server_address() when called using SL4F
         object created without device_ip argument."""

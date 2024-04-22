@@ -5,6 +5,7 @@
 """Unit tests for honeydew.fuchsia_device.base_fuchsia_device.py."""
 
 import base64
+import os
 import unittest
 from collections.abc import Callable
 from typing import Any
@@ -14,11 +15,19 @@ import fuchsia_controller_py as fuchsia_controller
 from parameterized import param, parameterized
 
 from honeydew import errors
+from honeydew.affordances.ffx import session as session_ffx
+from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.fuchsia_device import base_fuchsia_device
+from honeydew.interfaces.auxiliary_devices import (
+    power_switch as power_switch_interface,
+)
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.transports import fastboot as fastboot_transport
+from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
@@ -61,12 +70,12 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
 
         with (
             mock.patch.object(
-                base_fuchsia_device.ssh_transport.SSH,
+                ssh_transport.SSH,
                 "check_connection",
                 autospec=True,
             ) as mock_ssh_check_connection,
             mock.patch.object(
-                base_fuchsia_device.ffx_transport.FFX,
+                ffx_transport.FFX,
                 "check_connection",
                 autospec=True,
             ) as mock_ffx_check_connection,
@@ -119,12 +128,8 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
         set(),
     )
-    @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True
-    )
-    @mock.patch.object(
-        base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
-    )
+    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
+    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
     def test_fuchsia_device_init(
         self,
         parameterized_dict: dict[str, Any],
@@ -158,7 +163,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
 
     # List all the tests related to transports
     @mock.patch.object(
-        base_fuchsia_device.fastboot_transport.Fastboot,
+        fastboot_transport.Fastboot,
         "__init__",
         autospec=True,
         return_value=None,
@@ -168,7 +173,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         transport."""
         self.assertIsInstance(
             self.fd_obj.fastboot,
-            base_fuchsia_device.fastboot_transport.Fastboot,
+            fastboot_transport.Fastboot,
         )
         mock_fastboot_init.assert_called_once()
 
@@ -176,14 +181,14 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Test case to make sure base_fuchsia_device supports ffx transport."""
         self.assertIsInstance(
             self.fd_obj.ffx,
-            base_fuchsia_device.ffx_transport.FFX,
+            ffx_transport.FFX,
         )
 
     def test_ssh_transport(self) -> None:
         """Test case to make sure base_fuchsia_device supports ssh transport."""
         self.assertIsInstance(
             self.fd_obj.ssh,
-            base_fuchsia_device.ssh_transport.SSH,
+            ssh_transport.SSH,
         )
 
     def test_sl4f_transport(self) -> None:
@@ -202,21 +207,19 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     def test_session(self) -> None:
         """Test case to make sure base_fuchsia_device supports session
         affordance implemented using FFX"""
-        self.assertIsInstance(
-            self.fd_obj.session, base_fuchsia_device.session_ffx.Session
-        )
+        self.assertIsInstance(self.fd_obj.session, session_ffx.Session)
 
     def test_screenshot(self) -> None:
         """Test case to make sure base_fuchsia_device supports screenshot
         affordance implemented using FFX"""
         self.assertIsInstance(
             self.fd_obj.screenshot,
-            base_fuchsia_device.screenshot_ffx.Screenshot,
+            screenshot_ffx.Screenshot,
         )
 
     # List all the tests related to static properties
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "get_target_board",
         return_value=_MOCK_ARGS["board"],
         autospec=True,
@@ -255,7 +258,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self.assertEqual(self.fd_obj.model, "default-model")
 
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "get_target_product",
         return_value=_MOCK_ARGS["product"],
         autospec=True,
@@ -313,12 +316,12 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
 
     # List all the tests related to public methods
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "check_connection",
         autospec=True,
     )
     @mock.patch.object(
-        base_fuchsia_device.ssh_transport.SSH,
+        ssh_transport.SSH,
         "check_connection",
         autospec=True,
     )
@@ -451,9 +454,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_on_device_boot: mock.Mock,
     ) -> None:
         """Testcase for BaseFuchsiaDevice.power_cycle()"""
-        power_switch = mock.MagicMock(
-            spec=base_fuchsia_device.power_switch_interface.PowerSwitch
-        )
+        power_switch = mock.MagicMock(spec=power_switch_interface.PowerSwitch)
         self.fd_obj.power_cycle(power_switch=power_switch, outlet=5)
 
         self.assertEqual(mock_log_message_to_device.call_count, 2)
@@ -532,7 +533,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         return_value=_BASE64_ENCODED_BYTES,
         autospec=True,
     )
-    @mock.patch.object(base_fuchsia_device.os, "makedirs", autospec=True)
+    @mock.patch.object(os, "makedirs", autospec=True)
     def test_snapshot(
         self,
         parameterized_dict: dict[str, Any],
@@ -565,7 +566,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_send_snapshot_command.assert_called()
 
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "wait_for_rcs_disconnection",
         autospec=True,
     )
@@ -578,7 +579,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_disconnection.assert_called()
 
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "wait_for_rcs_disconnection",
         side_effect=errors.FfxCommandError("error"),
         autospec=True,
@@ -595,7 +596,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_disconnection.assert_called()
 
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "wait_for_rcs_connection",
         autospec=True,
     )
@@ -608,7 +609,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_connection.assert_called()
 
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
+        ffx_transport.FFX,
         "wait_for_rcs_connection",
         side_effect=errors.FuchsiaDeviceError("some error"),
         autospec=True,

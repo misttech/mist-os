@@ -58,7 +58,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         return_value=b"some output",
         autospec=True,
@@ -100,7 +100,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         side_effect=subprocess.CalledProcessError(
             returncode=1, cmd="some command"
@@ -123,7 +123,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         mock_subprocess_check_output.assert_called_once()
 
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         return_value=b"some output",
         autospec=True,
@@ -165,7 +165,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         side_effect=subprocess.CalledProcessError(
             returncode=1, cmd="some command"

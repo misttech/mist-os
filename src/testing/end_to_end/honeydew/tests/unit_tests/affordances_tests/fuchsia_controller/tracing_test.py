@@ -391,7 +391,7 @@ class TracingFCTests(unittest.TestCase):
         "terminate_tracing",
         new_callable=mock.AsyncMock,
     )
-    @mock.patch.object(fc_tracing.fc, "Socket")
+    @mock.patch.object(fc, "Socket")
     def test_terminate_and_download(
         self,
         parameterized_dict: dict[str, Any],
@@ -483,7 +483,7 @@ class TracingFCTests(unittest.TestCase):
         "terminate_tracing",
         new_callable=mock.AsyncMock,
     )
-    @mock.patch.object(fc_tracing.fc, "Socket")
+    @mock.patch.object(fc, "Socket")
     def test_trace_session(
         self,
         parameterized_dict: dict[str, Any],

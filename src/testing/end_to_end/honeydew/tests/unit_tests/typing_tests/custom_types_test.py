@@ -51,7 +51,7 @@ class CustomTypesTests(unittest.TestCase):
         ]
     )
     def test_create_using_ip_and_port(
-        self, _, addr: str, expected: custom_types.IpPort
+        self, _: str, addr: str, expected: custom_types.IpPort
     ) -> None:
         """Test cases for IpPort.create_using_ip_and_port()."""
         got: custom_types.IpPort = custom_types.IpPort.create_using_ip_and_port(
@@ -95,7 +95,7 @@ class CustomTypesTests(unittest.TestCase):
         ]
     )
     def test_create_using_ip(
-        self, _, addr: str, expected: custom_types.IpPort
+        self, _: str, addr: str, expected: custom_types.IpPort
     ) -> None:
         """Test cases for IpPort.create_using_ip()."""
         got: custom_types.IpPort = custom_types.IpPort.create_using_ip(addr)
@@ -111,7 +111,7 @@ class CustomTypesTests(unittest.TestCase):
             ("invalid_port_number", "[::1]:asdf"),
         ]
     )
-    def test_create_using_ip_and_port_raises(self, _, addr: str) -> None:
+    def test_create_using_ip_and_port_raises(self, _: str, addr: str) -> None:
         """Test cases for IpPort.create_using_ip_and_port() which raise
         exceptions."""
         with self.assertRaises(ValueError):
@@ -124,7 +124,7 @@ class CustomTypesTests(unittest.TestCase):
             ("invalid_double_percent", "[::1%%eth0]"),
         ]
     )
-    def test_create_using_ip_raises(self, _, addr: str) -> None:
+    def test_create_using_ip_raises(self, _: str, addr: str) -> None:
         """Test cases for IpPort.create_using_ip() which raise exceptions."""
         with self.assertRaises(ValueError):
             custom_types.IpPort.create_using_ip(addr)
@@ -167,7 +167,7 @@ class CustomTypesTests(unittest.TestCase):
         ]
     )
     def test_ipport_str(
-        self, _, ip_port: custom_types.IpPort, expected: str
+        self, _: str, ip_port: custom_types.IpPort, expected: str
     ) -> None:
         """Test cases for IpPort.__str__."""
         got = str(ip_port)

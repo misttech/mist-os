@@ -5,6 +5,7 @@
 """Unit tests for honeydew.affordances.starnix.system_power_state_controller.py."""
 
 import unittest
+from collections.abc import Callable
 from unittest import mock
 
 from parameterized import param, parameterized
@@ -55,7 +56,9 @@ _SUSPEND_RESUME_FAILURE_LOGS_NO_LACEWING_END: list[str] = [
 ]
 
 
-def _custom_test_name_func(testcase_func, _, param_obj: param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_obj: param
+) -> str:
     """Custom test name function method."""
     test_func_name: str = testcase_func.__name__
     test_label: str = parameterized.to_safe_name(param_obj.kwargs["label"])

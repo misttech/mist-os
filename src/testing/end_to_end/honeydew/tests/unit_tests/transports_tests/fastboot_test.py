@@ -16,6 +16,7 @@ from parameterized import param, parameterized
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fastboot, ffx
+from honeydew.utils import common
 
 _IPV4: str = "11.22.33.44"
 _IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
@@ -290,7 +291,9 @@ class FastbootTests(unittest.TestCase):
     )
     @mock.patch.object(fastboot.Fastboot, "_get_target_info", autospec=True)
     def test_is_in_fastboot_mode(
-        self, parameterized_dict, mock_get_target_info
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_get_target_info: mock.Mock,
     ) -> None:
         """Test case for Fastboot.is_in_fastboot_mode()"""
         mock_get_target_info.side_effect = [
@@ -332,7 +335,7 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.subprocess,
+        subprocess,
         "check_output",
         return_value=_MOCK_ARGS["fastboot_getvar_hw_revision"],
         autospec=True,
@@ -391,7 +394,7 @@ class FastbootTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(fastboot.subprocess, "check_output", autospec=True)
+    @mock.patch.object(subprocess, "check_output", autospec=True)
     @mock.patch.object(
         fastboot.Fastboot,
         "is_in_fastboot_mode",
@@ -417,7 +420,7 @@ class FastbootTests(unittest.TestCase):
         mock_subprocess_check_output.assert_called()
 
     @mock.patch.object(
-        fastboot.subprocess,
+        subprocess,
         "check_output",
         side_effect=RuntimeError("error"),
         autospec=True,
@@ -580,7 +583,7 @@ class FastbootTests(unittest.TestCase):
         )
         mock_fastboot_get_target_info.assert_called()
 
-    @mock.patch.object(fastboot.common, "wait_for_state", autospec=True)
+    @mock.patch.object(common, "wait_for_state", autospec=True)
     def test_wait_for_fastboot_mode_success(
         self, mock_wait_for_state: mock.Mock
     ) -> None:
@@ -589,7 +592,7 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_state.assert_called()
 
     @mock.patch.object(
-        fastboot.common,
+        common,
         "wait_for_state",
         side_effect=errors.HoneydewTimeoutError("error"),
         autospec=True,
@@ -614,7 +617,7 @@ class FastbootTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj.wait_for_fuchsia_mode()
 
-    @mock.patch.object(fastboot.common, "wait_for_state", autospec=True)
+    @mock.patch.object(common, "wait_for_state", autospec=True)
     def test_wait_for_valid_tcp_address_success(
         self, mock_wait_for_state: mock.Mock
     ) -> None:
@@ -623,7 +626,7 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_state.assert_called()
 
     @mock.patch.object(
-        fastboot.common,
+        common,
         "wait_for_state",
         side_effect=errors.HoneydewTimeoutError("error"),
         autospec=True,
