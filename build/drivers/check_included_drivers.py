@@ -70,7 +70,7 @@ def main():
         print("You can do this by running the following command:")
         print("   cp " + output_name + " " + allowlist_name)
         print(
-            "Also please make sure to include your drivers in //bundles:drivers-build-only"
+            "Also please make sure to include your drivers in //bundles/drivers:drivers-build-only"
         )
         error = True
 
@@ -83,7 +83,7 @@ def main():
             for driver in sorted(missing_drivers):
                 print("  " + driver)
             print(
-                "Please make sure these drivers are included in //bundles:drivers-build-only"
+                "Please make sure these drivers are included in //bundles/drivers:drivers-build-only"
             )
             error = True
 
