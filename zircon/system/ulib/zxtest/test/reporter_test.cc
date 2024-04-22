@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -20,12 +21,14 @@ namespace zxtest {
 namespace test {
 namespace {
 
+#if !_KERNEL_MISTOS
 // Returns a new memfile that will be created at |path|.
 FILE* MakeMemfile(char* buffer, const char* path, const uint64_t size) {
   memset(buffer, '\0', size);
   FILE* memfile = fmemopen(buffer, size, "a");
   return memfile;
 }
+#endif
 
 // Fake class that simply checks whether something was written or not
 // to the sink.
@@ -88,6 +91,7 @@ void ReporterSetLogSink() {
   ZX_ASSERT_MSG(log_sink_ptr_2->IsWritten(), "Reporter did not wrote to the new LogSink\n");
 }
 
+#if !_KERNEL_MISTOS
 void FileLogSinkCallCloserOnDestruction() {
   bool called = false;
   {
@@ -113,6 +117,7 @@ void FileLogSinkWrite() {
   log_sink->Flush();
   ZX_ASSERT_MSG(strcmp(kExpectedOutput, buffer) == 0, "Failed to write formatted output\n");
 }
+#endif
 
 }  // namespace test
 }  // namespace zxtest

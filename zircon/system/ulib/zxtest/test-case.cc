@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -50,7 +51,12 @@ void TestCase::Filter(TestCase::FilterFn filter) {
 
 void TestCase::Shuffle(uint32_t random_seed) {
   for (unsigned long i = 1; i < selected_indexes_.size(); ++i) {
+#ifdef _KERNEL_MISTOS
+    uint64_t seed = random_seed;
+    unsigned long j = rand_r(&seed) % (i + 1);
+#else
     unsigned long j = rand_r(&random_seed) % (i + 1);
+#endif
     if (j != i) {
       std::swap(selected_indexes_[i], selected_indexes_[j]);
     }
@@ -59,7 +65,11 @@ void TestCase::Shuffle(uint32_t random_seed) {
 
 void TestCase::UnShuffle() {
   // Put the, possibly filtered, list back in order.
+#ifdef _KERNEL_MISTOS
+  // Sort not (yet) supported in MistOS Kernel
+#else
   std::sort(selected_indexes_.begin(), selected_indexes_.end());
+#endif
 }
 
 bool TestCase::RegisterTest(const fbl::String& name, const SourceLocation& location,

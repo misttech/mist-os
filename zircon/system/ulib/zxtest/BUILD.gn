@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -73,10 +74,44 @@ zxtest_public_deps = [
   "//zircon/system/ulib/fbl",
 ]
 
+if (is_mistos && !is_kernel) {
+  zxtest_public_deps -= [ "//src/zircon/lib/zircon" ]
+}
+
 zxtest_deps = [
   "//sdk/lib/fit",
   "//zircon/system/ulib/fbl",
 ]
+
+if (is_mistos && is_kernel) {
+  zxtest_public_deps += [
+    "//zircon/kernel/lib/init",
+    "//zircon/kernel/lib/mist-os/util",
+  ]
+
+  zxtest_headers -= [ "include/zxtest/cpp/zxtest.h" ]
+  zxtest_headers += [ "include/zxtest/cpp/zxtest_kernel.h" ]
+
+  sdk_headers_for_internal_use -= [ "include/zxtest/cpp/zxtest.h" ]
+  sdk_headers_for_internal_use += [ "include/zxtest/cpp/zxtest_kernel.h" ]
+
+  zxtest_sources -= [
+    "c-wrappers.cc",
+    "zxtest-main.cc",
+  ]
+  zxtest_sources += [ "zxtest-mistos.cc" ]
+
+  zxtest_deps += [
+    "//sdk/lib/stdcompat",
+    "//zircon/kernel/lib/console",
+  ]
+
+  zx_library("zxtest-mistos") {
+    sources = zxtest_sources
+    public_deps = zxtest_public_deps
+    deps = zxtest_deps
+  }
+}
 
 if (is_fuchsia) {
   zxtest_metadata = {

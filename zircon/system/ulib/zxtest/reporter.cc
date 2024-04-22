@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -7,7 +8,7 @@
 
 #include <utility>
 
-#ifdef __Fuchsia__
+#if defined(__Fuchsia__) || defined(_KERNEL_MISTOS)
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #else
@@ -20,7 +21,7 @@ namespace zxtest {
 namespace {
 
 uint64_t now() {
-#ifdef __Fuchsia__
+#if defined(__Fuchsia__) || defined(_KERNEL_MISTOS)
   return (zx::clock::get_monotonic() - zx::time(0)).to_nsecs();
 #else
   struct timeval tv;
@@ -165,8 +166,15 @@ void Reporter::OnTestSkip(const TestCase& test_case, const TestInfo& test) {
 
 void Reporter::OnTestFailure(const TestCase& test_case, const TestInfo& test) {
   int64_t elapsed_time = timers_.test.GetElapsedTime();
+#ifdef _KERNEL_MISTOS
+  size_t size = test_case.name().size() + test.name().size() + 2;
+  char* buffer = new char[size];
+  auto defer = fit::defer([&buffer] { delete[] buffer; });
+  snprintf(buffer, size, "%s.%s", test_case.name().c_str(), test.name().c_str());
+#else
   char buffer[test_case.name().size() + test.name().size() + 2];
   sprintf(buffer, "%s.%s", test_case.name().c_str(), test.name().c_str());
+#endif
   iteration_summary_.failed++;
   iteration_summary_.failed_tests.push_back(buffer);
   log_sink_->Write("[  FAILED  ] %s.%s (%" PRIi64 " ms)\n", test_case.name().c_str(),

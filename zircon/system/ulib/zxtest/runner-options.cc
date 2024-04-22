@@ -1,8 +1,12 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#if !_KERNEL_MISTOS
 #include <getopt.h>
+#endif
+
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 
@@ -17,6 +21,7 @@ namespace zxtest {
 namespace {
 using Options = Runner::Options;
 
+#ifndef _KERNEL_MISTOS
 bool GetBoolFlag(const char* arg) {
   return arg == nullptr || strlen(arg) == 0 || strcmp("true", arg) == 0;
 }
@@ -45,6 +50,7 @@ char* GetOptArg(int opt, int argc, char** argv) {
 
   return argv[index];
 }
+#endif
 
 constexpr char kUsageMsg[] = R"(
     [OPTIONS]
@@ -72,6 +78,9 @@ void Options::Usage(char* bin, LogSink* sink) {
 }
 
 Options Options::FromArgs(int argc, char** argv, fbl::Vector<fbl::String>* errors) {
+#ifdef _KERNEL_MISTOS
+  Runner::Options options;
+#else
   // Reset index of parsed arguments.
   optind = 0;
   static const struct option opts[] = {
@@ -142,6 +151,7 @@ Options Options::FromArgs(int argc, char** argv, fbl::Vector<fbl::String>* error
         break;
     }
   }
+#endif
 
   return options;
 }

@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -7,6 +8,9 @@
 #include <string_view>
 #include <utility>
 
+#if _KERNEL_MISTOS
+#include <lib/lazy_init/lazy_init.h>
+#endif
 #include <fbl/string_printf.h>
 #include <zxtest/base/log-sink.h>
 #include <zxtest/base/runner.h>
@@ -138,8 +142,8 @@ int Runner::Run(const Runner::Options& options) {
     event_broadcaster_.OnEnvironmentTearDown(*this);
 
     // Tear them down in reverse order
-    for (size_t i = environments_.size(); i > 0; --i) {
-      environments_[i - 1]->TearDown();
+    for (size_t j = environments_.size(); j > 0; --j) {
+      environments_[j - 1]->TearDown();
     }
     event_broadcaster_.OnIterationEnd(*this, i);
   }
@@ -194,9 +198,21 @@ void Runner::SkipCurrent(const Message& message) {
   test_driver_.Skip();
 }
 
+#if _KERNEL_MISTOS
+lazy_init::LazyInit<Runner> g_runner;
+void InitRunner(uint level) {
+  g_runner.Initialize(Reporter(std::make_unique<FileLogSink>(stdout)));
+}
+#endif
+
 Runner* Runner::GetInstance() {
+#ifndef _KERNEL_MISTOS
   static Runner runner = Runner(Reporter(std::make_unique<FileLogSink>(stdout)));
   return &runner;
+#else
+  Runner& runner = g_runner.Get();
+  return &runner;
+#endif
 }
 
 int RunAllTests(int argc, char** argv) {
@@ -303,3 +319,9 @@ bool FilterOp::operator()(const fbl::String& test_case, const fbl::String& test)
 }
 
 }  // namespace zxtest
+
+#if _KERNEL_MISTOS
+
+#include <lk/init.h>
+LK_INIT_HOOK(zxtest_runner, zxtest::InitRunner, LK_INIT_LEVEL_USER - 3)
+#endif

@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,7 +6,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#if !_KERNEL_MISTOS
 #include <cinttypes>
+#else
+#include <inttypes.h>
+#include <lib/fit/defer.h>
+#endif
 
 #include <fbl/string_buffer.h>
 #include <fbl/string_printf.h>
@@ -32,7 +38,12 @@ fbl::String ToHex(const void* ptr, size_t size) {
   // 2 char for 2 4 bit pairs in each byte.
   // 1 char for each space after a byte, except for the last byte.
   const size_t expected_size = 3 * size - 1;
+#ifdef _KERNEL_MISTOS
+  char* buffer = new char[expected_size];
+  auto defer = fit::defer([&buffer] { delete[] buffer; });
+#else
   char buffer[expected_size];
+#endif
   static constexpr char kHexTable[] = {'0', '1', '2', '3', '4', '5', '6', '7',
                                        '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
   const uint8_t* cur = static_cast<const uint8_t*>(ptr);

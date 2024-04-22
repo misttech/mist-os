@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,7 +6,14 @@
 #ifndef ZXTEST_BASE_MESSAGE_H_
 #define ZXTEST_BASE_MESSAGE_H_
 
+#if _KERNEL_MISTOS
+#include <lib/fit/defer.h>
+#include <lib/mistos/util/status.h>
+
+#include <fbl/alloc_checker.h>
+#else
 #include <zircon/status.h>
+#endif
 
 #include <array>
 #include <functional>
@@ -157,7 +165,14 @@ fbl::String PrintValue(const std::tuple<Ts...>& value) {
   }
   total_size += 1 + (2 * strings.size() - 1) + 2;
 
+#if _KERNEL_MISTOS
+  fbl::AllocChecker ac;
+  char* buffer = new (&ac) char[total_size];
+  ASSERT(ac.check());
+  auto defer = fit::defer([&buffer] { delete[] buffer; });
+#else
   char buffer[total_size];
+#endif
   size_t current = 0;
   buffer[current++] = '{';
   for (size_t index = 0; index < strings.size(); ++index) {

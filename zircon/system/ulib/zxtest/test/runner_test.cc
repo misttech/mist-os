@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -533,6 +534,7 @@ void RunnerRunReturnsNonZeroOnAssertionsReEnabled() {
                 "Runner::Run must return non zero when assertions are re-enabled.\n");
 }
 
+#if !_KERNEL_MISTOS
 void RunnerListTests() {
   // Should produce the following output.
   constexpr char kExpectedOutput[] =
@@ -553,6 +555,7 @@ void RunnerListTests() {
   fflush(memfile);
   ZX_ASSERT_MSG(strcmp(kExpectedOutput, buffer) == 0, "List output mismatch.");
 }
+#endif
 
 void TestDriverImplReset() {
   TestDriverImpl driver;

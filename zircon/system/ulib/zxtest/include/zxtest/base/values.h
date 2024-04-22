@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -8,7 +9,9 @@
 #include <lib/fit/function.h>
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
+#if !_KERNEL_MISTOS
 #include <math.h>
+#endif
 
 #include <optional>
 #include <tuple>
@@ -39,9 +42,9 @@ class ValueProvider {
 
   ValueProvider(const ValueProvider&) = delete;
   ValueProvider(ValueProvider&&) noexcept = default;
-  template <typename U, typename std::enable_if_t<
-                            (std::is_convertible_v<U, T> ||
-                             std::is_constructible_v<T, U>)&&!std::is_same_v<U, T>>* = nullptr>
+  template <typename U, typename std::enable_if_t<(std::is_convertible_v<U, T> ||
+                                                   std::is_constructible_v<T, U>) &&
+                                                  !std::is_same_v<U, T>>* = nullptr>
   ValueProvider(ValueProvider<U>&& other)
       : accessor_([cb = std::move(other.accessor_)](size_t index) -> const T& {
           static std::optional<cpp20::remove_cvref_t<T>> tmp;
@@ -173,6 +176,17 @@ auto Values(Args... args) {
   auto values = cpp20::to_array<ParamType>({args...});
   return ValuesIn(values);
 }
+
+#if _KERNEL_MISTOS
+#define CEILING_POS(X) ((X - (int)(X)) > 0 ? (int)(X + 1) : (int)(X))
+#define CEILING_NEG(X) ((X - (int)(X)) < 0 ? (int)(X - 1) : (int)(X))
+#define CEILING(X) (((X) > 0) ? CEILING_POS(X) : CEILING_NEG(X))
+
+template <typename T>
+constexpr auto ceil(T&& x) {
+  return CEILING(x);
+}
+#endif
 
 // Generates a series of values according to the parameters given.
 // Increments by `step` starting from `start`, ending before `end`.

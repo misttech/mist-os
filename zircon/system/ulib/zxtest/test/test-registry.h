@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -159,10 +160,12 @@ void TestTuplesCombine();
 void TestRange();
 
 // Fuchsia only tests.
+#if !_KERNEL_MISTOS
 #ifdef __Fuchsia__
 void DeathStatementCrash();
 void DeathStatementNoCrash();
 void DeathStatementInternalError();
+#endif
 #endif
 
 struct RegisteredTest {
@@ -191,9 +194,11 @@ static constexpr RegisteredTest kRegisteredTests[] = {
     RUN_TEST(TestCaseFilterAllMatching),
     RUN_TEST(TestCaseFilterNullMatchesAll),
     RUN_TEST(TestCaseFilterDoNotAccumulate),
+#if !_KERNEL_MISTOS
     RUN_TEST(TestCaseShuffle),
     RUN_TEST(TestCaseUnShuffle),
     RUN_TEST(TestCaseUnShuffleFiltered),
+#endif
     RUN_TEST(AssertionHasValues),
     RUN_TEST(AssertionHasNoValues),
     RUN_TEST(EventBroadcasterOnProgramStart),
@@ -209,8 +214,10 @@ static constexpr RegisteredTest kRegisteredTests[] = {
     RUN_TEST(EventBroadcasterOnEnvironmentTearDown),
     RUN_TEST(EventBroadcasterOnIterationEnd),
     RUN_TEST(EventBroadcasterOnProgramEnd),
+#if !_KERNEL_MISTOS
     RUN_TEST(FileLogSinkWrite),
     RUN_TEST(FileLogSinkCallCloserOnDestruction),
+#endif
     RUN_TEST(RunnerRegisterTest),
     RUN_TEST(RunnerRegisterTestWithCustomFactory),
     RUN_TEST(RunnerLifecycleObserversRegisteredAndNotified),
@@ -222,16 +229,20 @@ static constexpr RegisteredTest kRegisteredTests[] = {
     RUN_TEST(RunnerRunReturnsNonZeroOnAssertionsReEnabled),
     RUN_TEST(RunnerSetUpAndTearDownEnvironmentsTests),
     RUN_TEST(RunnerRunOnlyFilteredTests),
+#if !_KERNEL_MISTOS
     RUN_TEST(RunnerListTests),
+#endif
     RUN_TEST(ReporterSetLogSink),
     RUN_TEST(ReporterWritesToLogSink),
     RUN_TEST(TestDriverImplFatalFailureEndsTest),
     RUN_TEST(TestDriverImplNonFatalFailureDoesNotEndTest),
     RUN_TEST(TestDriverImplReset),
     RUN_TEST(TestDriverImplResetOnTestCompletion),
+#if !_KERNEL_MISTOS
     RUN_TEST(RunnerOptionsParseFromCmdLineShort),
     RUN_TEST(RunnerOptionsParseFromCmdLineLong),
     RUN_TEST(RunnerOptionsParseFromCmdLineErrors),
+#endif
     RUN_TEST(FilterOpFilterEmptyMatchesAll),
     RUN_TEST(FilterOpFilterFullMatch),
     RUN_TEST(FilterOpFilterFullNegativeMatch),
@@ -240,17 +251,23 @@ static constexpr RegisteredTest kRegisteredTests[] = {
     RUN_TEST(FilterOpFilterCombined),
     RUN_TEST(TestAddParameterizedSuites),
     RUN_TEST(TestAddParameterizedTests),
+#if !_KERNEL_MISTOS
     RUN_TEST(TestAddParameterizedInstaniations),
+#endif
     RUN_TEST(TestValuesIn),
     RUN_TEST(TestValuesBool),
     RUN_TEST(TestValuesCombine),
+#if !_KERNEL_MISTOS
     RUN_TEST(TestValuesSimilarTypes),
+#endif
     RUN_TEST(TestTuplesCombine),
     RUN_TEST(TestRange),
+#if !_KERNEL_MISTOS
 #ifdef __Fuchsia__
     RUN_TEST(DeathStatementCrash),
     RUN_TEST(DeathStatementNoCrash),
     RUN_TEST(DeathStatementInternalError),
+#endif
 #endif
 };
 

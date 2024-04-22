@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -55,4 +56,26 @@ test("zxtest") {
 bootfs_test("zxtest-bootfs-test") {
   name = "zxtest-test"
   deps = [ ":zxtest" ]
+}
+
+if (is_mistos && is_kernel) {
+  source_set("tests-mistos") {
+    sources = [
+      "assertion_test.cc",
+      "event-broadcaster_test.cc",
+      "main.cc",
+      "parameterized-value_test.cc",
+      "prod_test.cc",
+      "reporter_test.cc",
+      "runner_test.cc",
+      "test-case_test.cc",
+      "test-info_test.cc",
+      "test_test.cc",
+      "values_test.cc",
+    ]
+    deps = [
+      "//zircon/kernel/lib/unittest",
+      "//zircon/system/ulib/zxtest:zxtest-mistos",
+    ]
+  }
 }

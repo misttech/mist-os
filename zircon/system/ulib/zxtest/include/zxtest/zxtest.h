@@ -16,9 +16,17 @@ static inline void unittest_fails(void) {}
 // Select the right implementation.
 #define ZXTEST_INCLUDE_INTERNAL_HEADERS
 #ifdef __cplusplus
-#include <zxtest/cpp/zxtest.h>
+#if _KERNEL_MISTOS
+#include <zxtest/cpp/zxtest-mistos.h>
 #else
+#include <zxtest/cpp/zxtest.h>
+#endif
+#else  // __cplusplus
+#if !_KERNEL_MISTOS
 #include <zxtest/c/zxtest.h>
+#else
+#error "mist-os interface not supported from C"
+#endif
 #endif
 #undef ZXTEST_INCLUDE_INTERNAL_HEADERS
 
@@ -261,6 +269,7 @@ static inline void unittest_fails(void) {}
                             "Test registered failures in " #statement ".", ##__VA_ARGS__); \
   } while (0)
 
+#if !_KERNEL_MISTOS
 #ifdef __Fuchsia__
 
 // In cpp |statement| is allowed to be a lambda. To prevent the pre processor from tokenizing lambda
@@ -288,6 +297,7 @@ static inline void unittest_fails(void) {}
 #define ASSERT_NO_DEATH(statement, ...)                                   \
   LIB_ZXTEST_DEATH_STATEMENT(statement, LIB_ZXTEST_DEATH_STATUS_COMPLETE, \
                              "Unexpected exception was raised.", ##__VA_ARGS__)
+#endif
 #endif
 
 // Evaluates to true if the current test has any kind of EXPECT or ASSERT failures.
