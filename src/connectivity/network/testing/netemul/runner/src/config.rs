@@ -449,6 +449,7 @@ impl Config {
                         fnetemul_network::EndpointConfig {
                             mac: mac.map(Into::into).map(Box::new),
                             mtu,
+                            port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
                         },
                     )
                     .await

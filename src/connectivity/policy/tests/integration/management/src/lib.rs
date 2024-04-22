@@ -1959,6 +1959,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                             mac: Some(Box::new(
                                 fnet_ext::MacAddress { octets: SERVER_MAC.bytes() }.into(),
                             )),
+                            port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
                         },
                         netemul::InterfaceConfig {
                             name: Some("serveriface".into()),

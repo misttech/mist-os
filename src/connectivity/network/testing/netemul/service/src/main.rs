@@ -1383,7 +1383,14 @@ mod tests {
 
         let name = "ep";
         let (status, endpoint) = endpoint_mgr
-            .create_endpoint(&name, &fnetemul_network::EndpointConfig { mtu: 1500, mac: None })
+            .create_endpoint(
+                &name,
+                &fnetemul_network::EndpointConfig {
+                    mtu: 1500,
+                    mac: None,
+                    port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
+                },
+            )
             .await
             .expect("calling create endpoint");
         let () = zx::Status::ok(status).expect("endpoint creation");
@@ -1394,7 +1401,11 @@ mod tests {
         assert_eq!(endpoint.get_name().await.expect("calling get name"), name);
         assert_eq!(
             endpoint.get_config().await.expect("calling get config"),
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: None }
+            fnetemul_network::EndpointConfig {
+                mtu: 1500,
+                mac: None,
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual
+            }
         );
     }
 
@@ -1944,7 +1955,11 @@ mod tests {
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
+            fnetemul_network::EndpointConfig {
+                mtu: 1500,
+                mac: None,
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
+            },
         )
         .await;
 
@@ -2016,7 +2031,11 @@ mod tests {
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
+            fnetemul_network::EndpointConfig {
+                mtu: 1500,
+                mac: None,
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
+            },
         )
         .await;
         let (TestRealm { realm: realm_a }, TestRealm { realm: realm_b }) = (
@@ -2104,7 +2123,11 @@ mod tests {
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
+            fnetemul_network::EndpointConfig {
+                mtu: 1500,
+                mac: None,
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
+            },
         )
         .await;
         let () = realm
@@ -2321,7 +2344,11 @@ mod tests {
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
+            fnetemul_network::EndpointConfig {
+                mtu: 1500,
+                mac: None,
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
+            },
         )
         .await;
 

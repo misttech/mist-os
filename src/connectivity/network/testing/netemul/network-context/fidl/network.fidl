@@ -74,6 +74,8 @@ type EndpointConfig = struct {
     /// Fake ethernet mac address, if not provided will be set to randomized local mac,
     /// using endpoint name as seed.
     mac box<fuchsia.net.MacAddress>;
+    /// Port class of the endpoint.
+    port_class fuchsia.hardware.network.PortClass;
 };
 
 /// Manages virtual endpoints.

@@ -173,6 +173,7 @@ async fn create_test_realm<'a, N: Netstack>(
             fnetemul_network::EndpointConfig {
                 mtu: netemul::DEFAULT_MTU,
                 mac: Some(Box::new(fnet_ext::MacAddress { octets: MAC.bytes() }.into())),
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
             },
             netemul::InterfaceConfig { name: Some("clientiface".into()), ..Default::default() },
         )
@@ -194,6 +195,7 @@ async fn create_test_realm<'a, N: Netstack>(
             fnetemul_network::EndpointConfig {
                 mtu: netemul::DEFAULT_MTU,
                 mac: Some(Box::new(fnet_ext::MacAddress { octets: SERVER_MAC.bytes() }.into())),
+                port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
             },
             netemul::InterfaceConfig { name: Some("serveriface".into()), ..Default::default() },
         )
