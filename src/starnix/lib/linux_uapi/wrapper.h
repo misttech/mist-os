@@ -6,6 +6,7 @@
 #define SRC_STARNIX_LIB_LINUX_UAPI_WRAPPER_H_
 
 #include <stddef.h>
+#include <sys/socket.h>
 #include <typedefs.h>
 
 #include <asm/ioctls.h>
@@ -31,11 +32,13 @@
 #include <linux/falloc.h>
 #include <linux/fb.h>
 #include <linux/fcntl.h>
+#include <linux/fib_rules.h>
 #include <linux/filter.h>
 #include <linux/fs.h>
 #include <linux/fsverity.h>
 #include <linux/fuse.h>
 #include <linux/futex.h>
+#include <linux/if_arp.h>
 #include <linux/if_packet.h>
 #include <linux/inotify.h>
 #include <linux/input.h>

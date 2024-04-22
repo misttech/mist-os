@@ -5451,6 +5451,209 @@ pub const P_ALL: u32 = 0;
 pub const P_PID: u32 = 1;
 pub const P_PGID: u32 = 2;
 pub const P_PIDFD: u32 = 3;
+pub const ETH_ALEN: u32 = 6;
+pub const ETH_TLEN: u32 = 2;
+pub const ETH_HLEN: u32 = 14;
+pub const ETH_ZLEN: u32 = 60;
+pub const ETH_DATA_LEN: u32 = 1500;
+pub const ETH_FRAME_LEN: u32 = 1514;
+pub const ETH_FCS_LEN: u32 = 4;
+pub const ETH_MIN_MTU: u32 = 68;
+pub const ETH_MAX_MTU: u32 = 65535;
+pub const ETH_P_LOOP: u32 = 96;
+pub const ETH_P_PUP: u32 = 512;
+pub const ETH_P_PUPAT: u32 = 513;
+pub const ETH_P_TSN: u32 = 8944;
+pub const ETH_P_ERSPAN2: u32 = 8939;
+pub const ETH_P_IP: u32 = 2048;
+pub const ETH_P_X25: u32 = 2053;
+pub const ETH_P_ARP: u32 = 2054;
+pub const ETH_P_BPQ: u32 = 2303;
+pub const ETH_P_IEEEPUP: u32 = 2560;
+pub const ETH_P_IEEEPUPAT: u32 = 2561;
+pub const ETH_P_BATMAN: u32 = 17157;
+pub const ETH_P_DEC: u32 = 24576;
+pub const ETH_P_DNA_DL: u32 = 24577;
+pub const ETH_P_DNA_RC: u32 = 24578;
+pub const ETH_P_DNA_RT: u32 = 24579;
+pub const ETH_P_LAT: u32 = 24580;
+pub const ETH_P_DIAG: u32 = 24581;
+pub const ETH_P_CUST: u32 = 24582;
+pub const ETH_P_SCA: u32 = 24583;
+pub const ETH_P_TEB: u32 = 25944;
+pub const ETH_P_RARP: u32 = 32821;
+pub const ETH_P_ATALK: u32 = 32923;
+pub const ETH_P_AARP: u32 = 33011;
+pub const ETH_P_8021Q: u32 = 33024;
+pub const ETH_P_ERSPAN: u32 = 35006;
+pub const ETH_P_IPX: u32 = 33079;
+pub const ETH_P_IPV6: u32 = 34525;
+pub const ETH_P_PAUSE: u32 = 34824;
+pub const ETH_P_SLOW: u32 = 34825;
+pub const ETH_P_WCCP: u32 = 34878;
+pub const ETH_P_MPLS_UC: u32 = 34887;
+pub const ETH_P_MPLS_MC: u32 = 34888;
+pub const ETH_P_ATMMPOA: u32 = 34892;
+pub const ETH_P_PPP_DISC: u32 = 34915;
+pub const ETH_P_PPP_SES: u32 = 34916;
+pub const ETH_P_LINK_CTL: u32 = 34924;
+pub const ETH_P_ATMFATE: u32 = 34948;
+pub const ETH_P_PAE: u32 = 34958;
+pub const ETH_P_PROFINET: u32 = 34962;
+pub const ETH_P_REALTEK: u32 = 34969;
+pub const ETH_P_AOE: u32 = 34978;
+pub const ETH_P_ETHERCAT: u32 = 34980;
+pub const ETH_P_8021AD: u32 = 34984;
+pub const ETH_P_802_EX1: u32 = 34997;
+pub const ETH_P_PREAUTH: u32 = 35015;
+pub const ETH_P_TIPC: u32 = 35018;
+pub const ETH_P_LLDP: u32 = 35020;
+pub const ETH_P_MRP: u32 = 35043;
+pub const ETH_P_MACSEC: u32 = 35045;
+pub const ETH_P_8021AH: u32 = 35047;
+pub const ETH_P_MVRP: u32 = 35061;
+pub const ETH_P_1588: u32 = 35063;
+pub const ETH_P_NCSI: u32 = 35064;
+pub const ETH_P_PRP: u32 = 35067;
+pub const ETH_P_CFM: u32 = 35074;
+pub const ETH_P_FCOE: u32 = 35078;
+pub const ETH_P_IBOE: u32 = 35093;
+pub const ETH_P_TDLS: u32 = 35085;
+pub const ETH_P_FIP: u32 = 35092;
+pub const ETH_P_80221: u32 = 35095;
+pub const ETH_P_HSR: u32 = 35119;
+pub const ETH_P_NSH: u32 = 35151;
+pub const ETH_P_LOOPBACK: u32 = 36864;
+pub const ETH_P_QINQ1: u32 = 37120;
+pub const ETH_P_QINQ2: u32 = 37376;
+pub const ETH_P_QINQ3: u32 = 37632;
+pub const ETH_P_EDSA: u32 = 56026;
+pub const ETH_P_DSA_8021Q: u32 = 56027;
+pub const ETH_P_DSA_A5PSW: u32 = 57345;
+pub const ETH_P_IFE: u32 = 60734;
+pub const ETH_P_AF_IUCV: u32 = 64507;
+pub const ETH_P_802_3_MIN: u32 = 1536;
+pub const ETH_P_802_3: u32 = 1;
+pub const ETH_P_AX25: u32 = 2;
+pub const ETH_P_ALL: u32 = 3;
+pub const ETH_P_802_2: u32 = 4;
+pub const ETH_P_SNAP: u32 = 5;
+pub const ETH_P_DDCMP: u32 = 6;
+pub const ETH_P_WAN_PPP: u32 = 7;
+pub const ETH_P_PPP_MP: u32 = 8;
+pub const ETH_P_LOCALTALK: u32 = 9;
+pub const ETH_P_CAN: u32 = 12;
+pub const ETH_P_CANFD: u32 = 13;
+pub const ETH_P_CANXL: u32 = 14;
+pub const ETH_P_PPPTALK: u32 = 16;
+pub const ETH_P_TR_802_2: u32 = 17;
+pub const ETH_P_MOBITEX: u32 = 21;
+pub const ETH_P_CONTROL: u32 = 22;
+pub const ETH_P_IRDA: u32 = 23;
+pub const ETH_P_ECONET: u32 = 24;
+pub const ETH_P_HDLC: u32 = 25;
+pub const ETH_P_ARCNET: u32 = 26;
+pub const ETH_P_DSA: u32 = 27;
+pub const ETH_P_TRAILER: u32 = 28;
+pub const ETH_P_PHONET: u32 = 245;
+pub const ETH_P_IEEE802154: u32 = 246;
+pub const ETH_P_CAIF: u32 = 247;
+pub const ETH_P_XDSA: u32 = 248;
+pub const ETH_P_MAP: u32 = 249;
+pub const ETH_P_MCTP: u32 = 250;
+pub const __UAPI_DEF_ETHHDR: u32 = 1;
+pub const MAX_ADDR_LEN: u32 = 32;
+pub const INIT_NETDEV_GROUP: u32 = 0;
+pub const NET_NAME_UNKNOWN: u32 = 0;
+pub const NET_NAME_ENUM: u32 = 1;
+pub const NET_NAME_PREDICTABLE: u32 = 2;
+pub const NET_NAME_USER: u32 = 3;
+pub const NET_NAME_RENAMED: u32 = 4;
+pub const NET_ADDR_PERM: u32 = 0;
+pub const NET_ADDR_RANDOM: u32 = 1;
+pub const NET_ADDR_STOLEN: u32 = 2;
+pub const NET_ADDR_SET: u32 = 3;
+pub const ARPHRD_NETROM: u32 = 0;
+pub const ARPHRD_ETHER: u32 = 1;
+pub const ARPHRD_EETHER: u32 = 2;
+pub const ARPHRD_AX25: u32 = 3;
+pub const ARPHRD_PRONET: u32 = 4;
+pub const ARPHRD_CHAOS: u32 = 5;
+pub const ARPHRD_IEEE802: u32 = 6;
+pub const ARPHRD_ARCNET: u32 = 7;
+pub const ARPHRD_APPLETLK: u32 = 8;
+pub const ARPHRD_DLCI: u32 = 15;
+pub const ARPHRD_ATM: u32 = 19;
+pub const ARPHRD_METRICOM: u32 = 23;
+pub const ARPHRD_IEEE1394: u32 = 24;
+pub const ARPHRD_EUI64: u32 = 27;
+pub const ARPHRD_INFINIBAND: u32 = 32;
+pub const ARPHRD_SLIP: u32 = 256;
+pub const ARPHRD_CSLIP: u32 = 257;
+pub const ARPHRD_SLIP6: u32 = 258;
+pub const ARPHRD_CSLIP6: u32 = 259;
+pub const ARPHRD_RSRVD: u32 = 260;
+pub const ARPHRD_ADAPT: u32 = 264;
+pub const ARPHRD_ROSE: u32 = 270;
+pub const ARPHRD_X25: u32 = 271;
+pub const ARPHRD_HWX25: u32 = 272;
+pub const ARPHRD_CAN: u32 = 280;
+pub const ARPHRD_MCTP: u32 = 290;
+pub const ARPHRD_PPP: u32 = 512;
+pub const ARPHRD_CISCO: u32 = 513;
+pub const ARPHRD_HDLC: u32 = 513;
+pub const ARPHRD_LAPB: u32 = 516;
+pub const ARPHRD_DDCMP: u32 = 517;
+pub const ARPHRD_RAWHDLC: u32 = 518;
+pub const ARPHRD_RAWIP: u32 = 519;
+pub const ARPHRD_TUNNEL: u32 = 768;
+pub const ARPHRD_TUNNEL6: u32 = 769;
+pub const ARPHRD_FRAD: u32 = 770;
+pub const ARPHRD_SKIP: u32 = 771;
+pub const ARPHRD_LOOPBACK: u32 = 772;
+pub const ARPHRD_LOCALTLK: u32 = 773;
+pub const ARPHRD_FDDI: u32 = 774;
+pub const ARPHRD_BIF: u32 = 775;
+pub const ARPHRD_SIT: u32 = 776;
+pub const ARPHRD_IPDDP: u32 = 777;
+pub const ARPHRD_IPGRE: u32 = 778;
+pub const ARPHRD_PIMREG: u32 = 779;
+pub const ARPHRD_HIPPI: u32 = 780;
+pub const ARPHRD_ASH: u32 = 781;
+pub const ARPHRD_ECONET: u32 = 782;
+pub const ARPHRD_IRDA: u32 = 783;
+pub const ARPHRD_FCPP: u32 = 784;
+pub const ARPHRD_FCAL: u32 = 785;
+pub const ARPHRD_FCPL: u32 = 786;
+pub const ARPHRD_FCFABRIC: u32 = 787;
+pub const ARPHRD_IEEE802_TR: u32 = 800;
+pub const ARPHRD_IEEE80211: u32 = 801;
+pub const ARPHRD_IEEE80211_PRISM: u32 = 802;
+pub const ARPHRD_IEEE80211_RADIOTAP: u32 = 803;
+pub const ARPHRD_IEEE802154: u32 = 804;
+pub const ARPHRD_IEEE802154_MONITOR: u32 = 805;
+pub const ARPHRD_PHONET: u32 = 820;
+pub const ARPHRD_PHONET_PIPE: u32 = 821;
+pub const ARPHRD_CAIF: u32 = 822;
+pub const ARPHRD_IP6GRE: u32 = 823;
+pub const ARPHRD_NETLINK: u32 = 824;
+pub const ARPHRD_6LOWPAN: u32 = 825;
+pub const ARPHRD_VSOCKMON: u32 = 826;
+pub const ARPHRD_VOID: u32 = 65535;
+pub const ARPHRD_NONE: u32 = 65534;
+pub const ARPOP_REQUEST: u32 = 1;
+pub const ARPOP_REPLY: u32 = 2;
+pub const ARPOP_RREQUEST: u32 = 3;
+pub const ARPOP_RREPLY: u32 = 4;
+pub const ARPOP_InREQUEST: u32 = 8;
+pub const ARPOP_InREPLY: u32 = 9;
+pub const ARPOP_NAK: u32 = 10;
+pub const ATF_COM: u32 = 2;
+pub const ATF_PERM: u32 = 4;
+pub const ATF_PUBL: u32 = 8;
+pub const ATF_USETRAILERS: u32 = 16;
+pub const ATF_NETMASK: u32 = 32;
+pub const ATF_DONTPUB: u32 = 64;
 pub const XATTR_CREATE: u32 = 1;
 pub const XATTR_REPLACE: u32 = 2;
 pub const XATTR_OS2_PREFIX: &'static std::ffi::CStr = c"os2.";
@@ -5487,6 +5690,13 @@ pub const XATTR_POSIX_ACL_ACCESS: &'static std::ffi::CStr = c"posix_acl_access";
 pub const XATTR_NAME_POSIX_ACL_ACCESS: &'static std::ffi::CStr = c"system.posix_acl_access";
 pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"posix_acl_default";
 pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"system.posix_acl_default";
+pub const FIB_RULE_PERMANENT: u32 = 1;
+pub const FIB_RULE_INVERT: u32 = 2;
+pub const FIB_RULE_UNRESOLVED: u32 = 4;
+pub const FIB_RULE_IIF_DETACHED: u32 = 8;
+pub const FIB_RULE_DEV_DETACHED: u32 = 8;
+pub const FIB_RULE_OIF_DETACHED: u32 = 16;
+pub const FIB_RULE_FIND_SADDR: u32 = 65536;
 pub const ARCH_SET_GS: u32 = 4097;
 pub const ARCH_SET_FS: u32 = 4098;
 pub const ARCH_GET_FS: u32 = 4099;
@@ -17275,6 +17485,110 @@ pub struct sockaddr_vm {
     pub svm_flags: __u8,
     pub svm_zero: [crate::types::c_uchar; 3usize],
 }
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct ethhdr {
+    pub h_dest: [crate::types::c_uchar; 6usize],
+    pub h_source: [crate::types::c_uchar; 6usize],
+    pub h_proto: __be16,
+}
+pub const IF_PORT_UNKNOWN: _bindgen_ty_127 = 0;
+pub const IF_PORT_10BASE2: _bindgen_ty_127 = 1;
+pub const IF_PORT_10BASET: _bindgen_ty_127 = 2;
+pub const IF_PORT_AUI: _bindgen_ty_127 = 3;
+pub const IF_PORT_100BASET: _bindgen_ty_127 = 4;
+pub const IF_PORT_100BASETX: _bindgen_ty_127 = 5;
+pub const IF_PORT_100BASEFX: _bindgen_ty_127 = 6;
+pub type _bindgen_ty_127 = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct arpreq {
+    pub arp_pa: sockaddr,
+    pub arp_ha: sockaddr,
+    pub arp_flags: crate::types::c_int,
+    pub arp_netmask: sockaddr,
+    pub arp_dev: [crate::types::c_char; 16usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct arpreq_old {
+    pub arp_pa: sockaddr,
+    pub arp_ha: sockaddr,
+    pub arp_flags: crate::types::c_int,
+    pub arp_netmask: sockaddr,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct arphdr {
+    pub ar_hrd: __be16,
+    pub ar_pro: __be16,
+    pub ar_hln: crate::types::c_uchar,
+    pub ar_pln: crate::types::c_uchar,
+    pub ar_op: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct fib_rule_hdr {
+    pub family: __u8,
+    pub dst_len: __u8,
+    pub src_len: __u8,
+    pub tos: __u8,
+    pub table: __u8,
+    pub res1: __u8,
+    pub res2: __u8,
+    pub action: __u8,
+    pub flags: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct fib_rule_uid_range {
+    pub start: __u32,
+    pub end: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct fib_rule_port_range {
+    pub start: __u16,
+    pub end: __u16,
+}
+pub const FRA_UNSPEC: _bindgen_ty_128 = 0;
+pub const FRA_DST: _bindgen_ty_128 = 1;
+pub const FRA_SRC: _bindgen_ty_128 = 2;
+pub const FRA_IIFNAME: _bindgen_ty_128 = 3;
+pub const FRA_GOTO: _bindgen_ty_128 = 4;
+pub const FRA_UNUSED2: _bindgen_ty_128 = 5;
+pub const FRA_PRIORITY: _bindgen_ty_128 = 6;
+pub const FRA_UNUSED3: _bindgen_ty_128 = 7;
+pub const FRA_UNUSED4: _bindgen_ty_128 = 8;
+pub const FRA_UNUSED5: _bindgen_ty_128 = 9;
+pub const FRA_FWMARK: _bindgen_ty_128 = 10;
+pub const FRA_FLOW: _bindgen_ty_128 = 11;
+pub const FRA_TUN_ID: _bindgen_ty_128 = 12;
+pub const FRA_SUPPRESS_IFGROUP: _bindgen_ty_128 = 13;
+pub const FRA_SUPPRESS_PREFIXLEN: _bindgen_ty_128 = 14;
+pub const FRA_TABLE: _bindgen_ty_128 = 15;
+pub const FRA_FWMASK: _bindgen_ty_128 = 16;
+pub const FRA_OIFNAME: _bindgen_ty_128 = 17;
+pub const FRA_PAD: _bindgen_ty_128 = 18;
+pub const FRA_L3MDEV: _bindgen_ty_128 = 19;
+pub const FRA_UID_RANGE: _bindgen_ty_128 = 20;
+pub const FRA_PROTOCOL: _bindgen_ty_128 = 21;
+pub const FRA_IP_PROTO: _bindgen_ty_128 = 22;
+pub const FRA_SPORT_RANGE: _bindgen_ty_128 = 23;
+pub const FRA_DPORT_RANGE: _bindgen_ty_128 = 24;
+pub const __FRA_MAX: _bindgen_ty_128 = 25;
+pub type _bindgen_ty_128 = crate::types::c_uint;
+pub const FR_ACT_UNSPEC: _bindgen_ty_129 = 0;
+pub const FR_ACT_TO_TBL: _bindgen_ty_129 = 1;
+pub const FR_ACT_GOTO: _bindgen_ty_129 = 2;
+pub const FR_ACT_NOP: _bindgen_ty_129 = 3;
+pub const FR_ACT_RES3: _bindgen_ty_129 = 4;
+pub const FR_ACT_RES4: _bindgen_ty_129 = 5;
+pub const FR_ACT_BLACKHOLE: _bindgen_ty_129 = 6;
+pub const FR_ACT_UNREACHABLE: _bindgen_ty_129 = 7;
+pub const FR_ACT_PROHIBIT: _bindgen_ty_129 = 8;
+pub const __FR_ACT_MAX: _bindgen_ty_129 = 9;
+pub type _bindgen_ty_129 = crate::types::c_uint;
 #[repr(C)]
 #[repr(align(8))]
 #[derive(Debug, Default)]
