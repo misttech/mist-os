@@ -32,7 +32,6 @@
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
-namespace {
 // Number of attempted address range mapping, regardless arguments.
 KCOUNTER(vm_region_map_all_attempt, "vm.region.map.all.attempt")
 // Number of successful address range mapping.
@@ -45,7 +44,6 @@ KCOUNTER(vm_region_map_specific_success, "vm.region.map.specific.success")
 KCOUNTER(vm_region_map_upper_bound_attempt, "vm.region.map.upper_bound.attempt")
 // Number of successful mapping at a specified address.
 KCOUNTER(vm_region_map_upper_bound_success, "vm.region.map.upper_bound.success")
-}  // namespace
 
 VmAddressRegion::VmAddressRegion(VmAspace& aspace, vaddr_t base, size_t size, uint32_t vmar_flags)
     : VmAddressRegionOrMapping(base, size, vmar_flags | VMAR_CAN_RWX_FLAGS, &aspace, nullptr,
