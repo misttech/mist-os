@@ -1,4 +1,1 @@
-achyb@google.com
-natlf@google.com
-
-# Component: Workstation>platform
+include /src/devices/platform/OWNERS
