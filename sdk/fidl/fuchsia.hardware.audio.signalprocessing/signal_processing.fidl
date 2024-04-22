@@ -115,6 +115,13 @@ type Element = table {
     ///
     /// Optional.
     5: description string:MAX_STRING_SIZE;
+
+    /// If included and true, the processing element can be stopped via `ElementSetState`.
+    /// If not included or false, the processing element is always started.
+    ///
+    /// Optional.
+    @available(added=20)
+    6: can_stop bool;
 };
 
 /// Type-specific processing element state.
@@ -172,6 +179,20 @@ type ElementState = table {
     /// Optional.
     @available(added=HEAD)
     4: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
+
+    /// The started/stopped state for this processing element.
+    /// If true, the hardware associated with the element is started. If false, stopped.
+    ///
+    /// By default processing elements are started.
+    /// If the corresponding `Element` returned `can_stop` equals to `false`, then
+    /// this field can't be set to `false`.
+    ///
+    /// A stopped processing element does not provide its abstracted functionality.
+    /// Specifically, no audio data flows through a stopped element.
+    ///
+    /// Required.
+    @available(added=20)
+    5: started bool;
 };
 
 /// Edge pairs between processing elements used to define ordering in processing elements

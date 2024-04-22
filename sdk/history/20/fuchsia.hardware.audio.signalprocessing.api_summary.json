@@ -223,6 +223,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/Element.can_stop",
+        "ordinal": "6",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Element.description",
         "ordinal": "5",
         "type": "string:256"
@@ -260,6 +266,12 @@
         "name": "fuchsia.hardware.audio.signalprocessing/ElementState.latency",
         "ordinal": "3",
         "type": "fuchsia.hardware.audio.signalprocessing/Latency"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.started",
+        "ordinal": "5",
+        "type": "bool"
     },
     {
         "kind": "table/member",
