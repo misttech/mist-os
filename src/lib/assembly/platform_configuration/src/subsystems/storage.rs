@@ -74,6 +74,11 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             })
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
 
+        if *context.feature_set_level == FeatureSupportLevel::Embeddable {
+            // We don't need fshost in embeddable.
+            return Ok(());
+        }
+
         if storage_config.factory_data.enabled {
             builder.platform_bundle("factory_data");
         }

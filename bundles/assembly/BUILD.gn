@@ -96,7 +96,7 @@ kernel_assembly_input_bundle("zircon") {
 # WARNING:  The only way to remove items from this AIB for a given product is to
 # move them to other AIBs that are included by all other products.
 #
-assembly_input_bundle("bootstrap") {
+assembly_input_bundle("embeddable") {
   bootfs_files_labels = [
     "//build/info/bootfs",
     "//src/bringup:bootfs",
@@ -104,16 +104,12 @@ assembly_input_bundle("bootstrap") {
   ]
   bootfs_packages = [
     "//src/bringup/bin/critical-services:package",
-    "//src/bringup/bin/device-name-provider:package",
-    "//src/bringup/bin/sysinfo:package",
-    "//src/devices/sysmem/bin/sysmem_connector:pkg",
     "//src/diagnostics/archivist:package",
     "//src/power/shutdown-shim:package",
     "//src/sys/root:package",
     "//src/sys/startup:package",
     "//src/zircon/bin/role_manager:package",
   ]
-  kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
   compiled_packages = [
     {
@@ -127,6 +123,37 @@ assembly_input_bundle("bootstrap") {
         },
       ]
     },
+  ]
+
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/bus/drivers/platform:package"
+      driver_components = [
+        "meta/platform-bus.cm",
+        "meta/platform-bus.proxy.cm",
+      ]
+    },
+
+    # TODO: Move this to bootstrap after fixing pci to not depend on it.
+    {
+      package_target = "//src/devices/sysmem/drivers/sysmem:package"
+      driver_components = [ "meta/sysmem.cm" ]
+    },
+  ]
+}
+
+# The most minimal AIB that is included in assembled systems that are meant to be
+# standalone, regardless of build-type.
+#
+assembly_input_bundle("bootstrap") {
+  bootfs_packages = [
+    "//src/bringup/bin/device-name-provider:package",
+    "//src/bringup/bin/sysinfo:package",
+    "//src/devices/sysmem/bin/sysmem_connector:pkg",
+  ]
+  kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
+
+  compiled_packages = [
     {
       name = "bootstrap"
       component_shards = [
@@ -200,13 +227,6 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/zxcrypt.cm" ]
     },
     {
-      package_target = "//src/devices/bus/drivers/platform:package"
-      driver_components = [
-        "meta/platform-bus.cm",
-        "meta/platform-bus.proxy.cm",
-      ]
-    },
-    {
       package_target = "//src/devices/clock/drivers/clock:package"
       driver_components = [ "meta/clock.cm" ]
     },
@@ -249,10 +269,6 @@ assembly_input_bundle("bootstrap") {
     {
       package_target = "//src/devices/spi/drivers/spi:package"
       driver_components = [ "meta/spi.cm" ]
-    },
-    {
-      package_target = "//src/devices/sysmem/drivers/sysmem:package"
-      driver_components = [ "meta/sysmem.cm" ]
     },
     {
       package_target = "//src/devices/usb/drivers/usb-bus:package"
@@ -324,14 +340,29 @@ assembly_input_bundle("bootstrap") {
 # The most-common, most-basic, AIB that is included in all userdebug and eng
 # systems.
 #
-assembly_input_bundle("bootstrap_userdebug") {
+assembly_input_bundle("embeddable_userdebug") {
   bootfs_files_labels = [
     # tools
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
-    "//src/connectivity/network/bin/ping:bootfs",
     "//src/developer/forensics/crasher/cpp:bootfs",
+    "//src/sys/bin/psutils:bootfs",
+    "//src/sys/tools/component:bootfs",
+    "//src/zircon/bin/kcounter:bootfs",
+
+    # shell
+    "//zircon/third_party/uapp/dash:bootfs",
+  ]
+}
+
+# The most minimal AIB that is included in userdebug and eng assembled systems
+# that are meant to be standalone.
+#
+assembly_input_bundle("bootstrap_userdebug") {
+  bootfs_files_labels = [
+    # tools
+    "//src/connectivity/network/bin/ping:bootfs",
     "//src/devices/block/bin/disk-inspect:bootfs",
     "//src/devices/block/bin/fvm-check:bootfs",
     "//src/devices/nand/bin/nand-loader:bootfs",
@@ -340,15 +371,9 @@ assembly_input_bundle("bootstrap_userdebug") {
     "//src/storage/bin/dd:bootfs",
     "//src/storage/bin/df:bootfs",
     "//src/storage/bin/storage-metrics:bootfs",
-    "//src/sys/bin/psutils:bootfs",
-    "//src/sys/tools/component:bootfs",
-    "//src/zircon/bin/kcounter:bootfs",
     "//src/zircon/bin/kstress:bootfs",
     "//src/zircon/bin/ktrace:bootfs",
     "//src/zircon/bin/loadgen:bootfs",
-
-    # shell
-    "//zircon/third_party/uapp/dash:bootfs",
   ]
 
   # Do not automatically include pistress, but build it to keep it from
@@ -365,13 +390,24 @@ assembly_input_bundle("bootstrap_userdebug") {
 
 # The most-common, most-basic, AIB that is included in all eng systems.
 #
+assembly_input_bundle("embeddable_eng") {
+  testonly = true
+  bootfs_files_labels = [
+    # tools
+    "//src/devices/bin/driver_tools:bootfs",
+    "//src/devices/bin/lsdev:bootfs",
+    "//src/diagnostics/iquery:bootfs",
+  ]
+}
+
+# The most minimal AIB that is included in eng assembled systems that are meant
+# to be standalone.
+#
 assembly_input_bundle("bootstrap_eng") {
   testonly = true
   bootfs_files_labels = [
     # tools
     "//src/devices/acpi/bin/acpidump:bootfs",
-    "//src/devices/bin/driver_tools:bootfs",
-    "//src/devices/bin/lsdev:bootfs",
     "//src/devices/block/bin/biotime:bootfs",
     "//src/devices/block/bin/gpt:bootfs",
     "//src/devices/block/bin/iochk:bootfs",
@@ -388,7 +424,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
-    "//src/diagnostics/iquery:bootfs",
     "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
     "//src/sys/tools/package:bootfs",

@@ -90,9 +90,10 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
                     FeatureSupportLevel::Utility => {
                         builder.platform_bundle("no_update_checker");
                     }
-                    // Bootstrap has neither an update checker nor the system-update realm,
-                    // so do not include `no_update_checker` AIB that requires the realm.
+                    // Bootstrap and Embeddable hav neither an update checker nor the system-update
+                    // realm, so do not include `no_update_checker` AIB that requires the realm.
                     FeatureSupportLevel::Bootstrap => {}
+                    FeatureSupportLevel::Embeddable => {}
                 };
             }
         }

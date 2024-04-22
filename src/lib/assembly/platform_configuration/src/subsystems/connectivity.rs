@@ -27,6 +27,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             // FFX discovery is not enabled on bootstrap, therefore we do not need the wired
             // udp service.
             (FeatureSupportLevel::Bootstrap, _, _) => false,
+            (FeatureSupportLevel::Embeddable, _, _) => false,
 
             // User builds cannot have this service enabled.
             (_, BuildType::User, None) => false,
@@ -62,6 +63,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 bail!("The configuration of networking is not an option for `bootstrap`")
             }
             (FeatureSupportLevel::Bootstrap, _, None) => None,
+            (FeatureSupportLevel::Embeddable, _, _) => None,
 
             // utility, in user mode, only gets networking if requested.
             (FeatureSupportLevel::Utility, BuildType::User, networking) => networking.as_ref(),

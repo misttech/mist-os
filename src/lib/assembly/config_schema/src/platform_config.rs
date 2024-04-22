@@ -210,9 +210,17 @@ pub enum FeatureSupportLevel {
     #[serde(rename = "empty")]
     Empty,
 
+    /// This is a small build of fuchsia which is not meant to support
+    /// self-updates, but rather be updated externally. It is meant for truly
+    /// memory constrained environments where fuchsia does not need to driver a
+    /// large amount of hardware. It includes a minimal subset of bootstrap and
+    /// doesn't bring in any of core.
+    #[serde(rename = "embeddable")]
+    Embeddable,
+
     /// Bootable, but serial-only.  This is only the `/bootstrap` realm.  No
-    /// netstack, no storage drivers, etc.  this is the smallest bootable system
-    /// created by assembly, and is primarily used for board-level bringup.
+    /// netstack, no storage drivers, etc.  This is one of the smallest bootable
+    /// systems created by assembly, and is primarily used for board-level bringup.
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
     #[serde(rename = "bootstrap")]

@@ -31,7 +31,10 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             (BuildType::User, None) => "kernel_args_user",
         });
 
-        if matches!(config.enabled, Some(true)) || matches!(context.build_type, BuildType::Eng) {
+        if *context.feature_set_level != FeatureSupportLevel::Embeddable
+            && (matches!(config.enabled, Some(true))
+                || matches!(context.build_type, BuildType::Eng))
+        {
             builder.platform_bundle("netsvc");
         }
         if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {

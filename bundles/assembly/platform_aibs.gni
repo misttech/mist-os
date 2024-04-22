@@ -15,6 +15,9 @@ bootstrap_user_platform_aib_names = [
   # The kernel itself
   "zircon",
 
+  # The embeddable feature-set-level
+  "embeddable",
+
   # The bootstrap feature-set-level
   "bootstrap",
 
@@ -67,6 +70,9 @@ bootstrap_user_platform_aib_names = [
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 bootstrap_userdebug_platform_aib_names = [
+  # The embeddable feature-set-level
+  "embeddable_userdebug",
+
   # The bootstrap feature-set-level
   "bootstrap_userdebug",
 
@@ -87,6 +93,9 @@ bootstrap_userdebug_platform_aib_names = [
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 bootstrap_eng_platform_aib_names = [
+  # The embeddable feature-set-level
+  "embeddable_eng",
+
   # The bootstrap feature-set-level
   "bootstrap_eng",
 
@@ -325,6 +334,7 @@ eng_platform_aib_names =
 # LINT.ThenChange(platform_aib_names.bzl)
 
 required_user_aib_names = [
+  "embeddable",
   "bootstrap",
   "core_realm",
   "core_realm_user_and_userdebug",
@@ -333,8 +343,10 @@ required_user_aib_names = [
   "zircon",
 ]
 
-required_userdebug_aib_names =
-    required_user_aib_names + [ "bootstrap_userdebug" ]
+required_userdebug_aib_names = required_user_aib_names + [
+                                 "embeddable_userdebug",
+                                 "bootstrap_userdebug",
+                               ]
 
 # If an AIB is added to this experimental list, it does not require security
 # review, but will be banned from user builds. These AIBs may still be used

@@ -63,7 +63,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         match (context.build_type, context.feature_set_level) {
             // Always clear bind_services for bootstrap (bringup) and utility
             // systems.
-            (_, FeatureSupportLevel::Bootstrap) | (_, FeatureSupportLevel::Utility) => {
+            (_, FeatureSupportLevel::Bootstrap)
+            | (_, FeatureSupportLevel::Embeddable)
+            | (_, FeatureSupportLevel::Utility) => {
                 bind_services.clear();
             }
             // Detect isn't present on user builds.
@@ -167,15 +169,19 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             }
         }
 
-        let exception_handler_available =
-            !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
+        let exception_handler_available = matches!(
+            context.feature_set_level,
+            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+        );
         builder.set_config_capability(
             "fuchsia.diagnostics.ExceptionHandlerAvailable",
             Config::new(ConfigValueType::Bool, exception_handler_available.into()),
         )?;
 
         match context.feature_set_level {
-            FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
+            FeatureSupportLevel::Bootstrap
+            | FeatureSupportLevel::Utility
+            | FeatureSupportLevel::Embeddable => {}
             FeatureSupportLevel::Standard => {
                 if context.board_info.provides_feature("fuchsia::mali_gpu") {
                     builder.platform_bundle("diagnostics_triage_detect_mali");

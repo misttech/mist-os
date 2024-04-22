@@ -117,11 +117,30 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
     ) -> anyhow::Result<()> {
         // Set up the platform's common AIBs by feature_set_level and build_type.
         for bundle_name in match (context.feature_set_level, context.build_type) {
+            (FeatureSupportLevel::Embeddable, BuildType::Eng) => {
+                vec!["embeddable", "embeddable_userdebug", "embeddable_eng"]
+            }
+            (FeatureSupportLevel::Embeddable, BuildType::UserDebug) => {
+                vec!["embeddable", "embeddable_userdebug"]
+            }
+            (FeatureSupportLevel::Embeddable, BuildType::User) => {
+                vec!["embeddable"]
+            }
             (FeatureSupportLevel::Bootstrap, _) => {
-                vec!["bootstrap", "bootstrap_userdebug", "bootstrap_eng"]
+                vec![
+                    "embeddable",
+                    "embeddable_userdebug",
+                    "embeddable_eng",
+                    "bootstrap",
+                    "bootstrap_userdebug",
+                    "bootstrap_eng",
+                ]
             }
             (FeatureSupportLevel::Utility, BuildType::Eng) => {
                 vec![
+                    "embeddable",
+                    "embeddable_userdebug",
+                    "embeddable_eng",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "bootstrap_eng",
@@ -132,6 +151,8 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             }
             (FeatureSupportLevel::Utility, BuildType::UserDebug) => {
                 vec![
+                    "embeddable",
+                    "embeddable_userdebug",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "core_realm",
@@ -140,10 +161,13 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                 ]
             }
             (FeatureSupportLevel::Utility, BuildType::User) => {
-                vec!["bootstrap", "core_realm", "core_realm_user_and_userdebug"]
+                vec!["embeddable", "bootstrap", "core_realm", "core_realm_user_and_userdebug"]
             }
             (FeatureSupportLevel::Standard, BuildType::Eng) => {
                 vec![
+                    "embeddable",
+                    "embeddable_userdebug",
+                    "embeddable_eng",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "bootstrap_eng",
@@ -158,6 +182,8 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             }
             (FeatureSupportLevel::Standard, BuildType::UserDebug) => {
                 vec![
+                    "embeddable",
+                    "embeddable_userdebug",
                     "bootstrap",
                     "bootstrap_userdebug",
                     "core_realm",
@@ -170,6 +196,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             }
             (FeatureSupportLevel::Standard, BuildType::User) => {
                 vec![
+                    "embeddable",
                     "bootstrap",
                     "core_realm",
                     "core_realm_user_and_userdebug",

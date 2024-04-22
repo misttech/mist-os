@@ -196,7 +196,8 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder
             .add_board_input_bundle(
                 bundle,
-                platform.feature_set_level == FeatureSupportLevel::Bootstrap,
+                platform.feature_set_level == FeatureSupportLevel::Bootstrap
+                    || platform.feature_set_level == FeatureSupportLevel::Embeddable,
             )
             .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
     }

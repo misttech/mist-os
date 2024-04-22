@@ -12,15 +12,20 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         graphics_config: &GraphicsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let enable_virtual_console =
-            match (context.build_type, graphics_config.enable_virtual_console) {
-                // Use the value if one was specified.
-                (_, Some(enable_virtual_console)) => enable_virtual_console,
-                // If unspecified, virtcon is disabled if it's a user build-type
-                (assembly_config_schema::BuildType::User, _) => false,
-                // Otherwise, enable virtcon.
-                (_, _) => true,
-            };
+        let enable_virtual_console = match (
+            context.build_type,
+            context.feature_set_level,
+            graphics_config.enable_virtual_console,
+        ) {
+            // Use the value if one was specified.
+            (_, _, Some(enable_virtual_console)) => enable_virtual_console,
+            // If unspecified, virtcon is disabled if it's a user build-type
+            (assembly_config_schema::BuildType::User, _, _) => false,
+            // If neither of those, disable if we're targeting embeddable as well.
+            (_, FeatureSupportLevel::Embeddable, _) => false,
+            // Otherwise, enable virtcon.
+            (_, _, _) => true,
+        };
         if enable_virtual_console {
             builder.platform_bundle("virtcon");
         } else {
