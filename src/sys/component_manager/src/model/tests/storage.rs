@@ -4,22 +4,28 @@
 
 use {
     crate::model::{
+        actions::{ActionSet, DestroyAction, ShutdownType},
         component::StartReason,
         error::{ActionError, CreateNamespaceError, ModelError, StartActionError},
         routing::route_and_open_capability,
+        start::Start,
         testing::routing_test_helpers::*,
     },
     ::routing_test_helpers::{
         component_id_index::make_index_file, storage::CommonStorageTest, RoutingTestModel,
     },
     assert_matches::assert_matches,
+    async_utils::PollExt,
     bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
     component_id_index::InstanceId,
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon as zx,
+    fuchsia_async::TestExecutor,
+    fuchsia_sync as fsync, fuchsia_zircon as zx,
+    futures::{channel::mpsc, pin_mut, StreamExt},
     moniker::{Moniker, MonikerBase},
     routing::{error::RoutingError, RouteRequest},
     std::path::Path,
@@ -538,7 +544,7 @@ async fn use_restricted_storage_start_failure() {
 ///   child_consumer (not in component ID index)
 ///
 /// Test that a component cannot open a restricted storage capability if the component isn't in
-/// the component iindex.
+/// the component index.
 #[fuchsia::test]
 async fn use_restricted_storage_open_failure() {
     let parent_consumer_instance_id = InstanceId::new_random(&mut rand::thread_rng());
@@ -1576,4 +1582,109 @@ async fn storage_persistence_disablement() {
         &test.test_dir_proxy,
     )
     .await;
+}
+
+/// This is a regression test for https://fxbug.dev/332414801.
+///
+/// When a component connects to a capability where routing potentially requires unbounded work,
+/// those should not block shutdown. If those unbounded work were spawned in the namespace scope,
+/// that would block stop and shutdown.
+#[fuchsia::test]
+fn storage_does_not_block_shutdown_when_backing_dir_hangs() {
+    // Building the `RoutingTest` may stall so we run it outside of `run_until_stalled`.
+    //
+    //   a
+    //    \
+    //     b
+    //
+    // a: has storage decl with name "cache" with a source of self at path /data
+    // a: offers cache storage to b from "cache"
+    // b: uses cache storage as /storage
+    let mut executor = TestExecutor::new();
+    let test = executor.run_singlethreaded(async move {
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .capability(
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
+                    )
+                    .offer(
+                        OfferBuilder::storage()
+                            .name("cache")
+                            .source(OfferSource::Self_)
+                            .target_static_child("b"),
+                    )
+                    .child_default("b")
+                    .capability(
+                        CapabilityBuilder::storage()
+                            .name("cache")
+                            .backing_dir("data")
+                            .source(StorageDirectorySource::Self_),
+                    )
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
+                    .build(),
+            ),
+        ];
+        RoutingTestBuilder::new("a", components).build().await
+    });
+
+    let mut test_body = Box::pin(async {
+        // Setup a backing_dir that hangs.
+        let (out_dir_tx, mut out_dir_rx) = mpsc::channel(1);
+        let out_dir_tx = fsync::Mutex::new(out_dir_tx);
+        let url = "test:///a_resolved";
+        test.mock_runner.add_host_fn(
+            url,
+            Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
+                out_dir_tx.lock().try_send(server_end).unwrap();
+            }),
+        );
+        let root = test.model.root();
+        root.ensure_started(&StartReason::Debug).await.unwrap();
+        test.mock_runner.wait_for_url(url).await;
+
+        // Connect to storage. This will hang because `a` does not respond to outgoing dir requests.
+        let storage_user_fut = async {
+            test.check_use(
+                vec!["b"].try_into().unwrap(),
+                CheckUse::Storage {
+                    path: "/storage".parse().unwrap(),
+                    storage_relation: None,
+                    from_cm_namespace: false,
+                    storage_subdir: None,
+                    expected_res: ExpectedResult::Err(zx::Status::INTERNAL),
+                },
+            )
+            .await;
+        };
+        pin_mut!(storage_user_fut);
+        TestExecutor::poll_until_stalled(&mut storage_user_fut)
+            .await
+            .expect_pending("Storage connection should hang");
+
+        // We should receive the open request though.
+        let out_dir = out_dir_rx.next().await.unwrap();
+
+        // Shutdown the component. This should not hang despite an in-progress storage
+        // provisioning operation.
+        root.shutdown(ShutdownType::Instance).await.unwrap();
+
+        // Drop the `out_dir` which causes the `storage_user_fut` to proceed (with an error).
+        drop(out_dir);
+        TestExecutor::poll_until_stalled(&mut storage_user_fut)
+            .await
+            .expect("Storage connection should finish");
+
+        ActionSet::register(root.clone(), DestroyAction::new()).await.expect("destroy failed");
+    });
+    executor.run_until_stalled(&mut test_body).unwrap();
 }
