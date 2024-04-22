@@ -238,8 +238,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-gpu.cm" ]
     },
     {
-      package_target =
-          "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-package"
+      package_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-g12-composite.cm" ]
     },

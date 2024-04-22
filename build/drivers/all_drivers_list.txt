@@ -109,6 +109,9 @@
 //src/devices/bus/drivers/pci/test:pci_fake-driver
 //src/devices/bus/drivers/pci/test:pci_protocol_test_driver-driver
 //src/devices/bus/drivers/pci:bus-pci-driver
+//src/devices/bus/drivers/platform/test/power-integration-test:test-power-child-driver
+//src/devices/bus/drivers/platform/test/power-integration-test:test-power-integration-board-driver
+//src/devices/bus/drivers/platform/test/power-integration-test:test-power-parent-driver
 //src/devices/bus/drivers/platform/test:test-board-driver
 //src/devices/bus/drivers/platform/test:test-bti-board-driver
 //src/devices/bus/drivers/platform/test:test-bti-driver
@@ -122,9 +125,6 @@
 //src/devices/bus/drivers/platform/test:test-parent-driver
 //src/devices/bus/drivers/platform/test:test-power-driver
 //src/devices/bus/drivers/platform/test:test-spi-driver
-//src/devices/bus/drivers/platform/test/power-integration-test:test-power-child-driver
-//src/devices/bus/drivers/platform/test/power-integration-test:test-power-integration-board-driver
-//src/devices/bus/drivers/platform/test/power-integration-test:test-power-parent-driver
 //src/devices/bus/drivers/platform:platform-bus-driver
 //src/devices/bus/drivers/platform:platform-bus.proxy-driver
 //src/devices/clock/drivers/amlogic-clk:amlogic-clk-driver
@@ -315,7 +315,7 @@
 //src/media/audio/drivers/aml-dsp/aml-g12-tdm-dsp:aml-g12-tdm-dsp-driver
 //src/media/audio/drivers/aml-dsp:aml-dsp-driver
 //src/media/audio/drivers/aml-g12-pdm:aml-g12-pdm-driver
-//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-driver
+//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package.bazel_build
 //src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-dai-driver
 //src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-driver
 //src/media/audio/drivers/codecs/alc5514:alc5514-driver

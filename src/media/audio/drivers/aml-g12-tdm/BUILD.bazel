@@ -1,0 +1,84 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_cc_test",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+)
+
+# ========================
+# Composite driver (DFv2).
+# ========================
+
+fuchsia_driver_bind_bytecode(
+    name = "aml-g12-composite-bind",
+    output = "aml-g12-composite.bindbc",
+    rules = "aml_composite.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform.a311d",
+        "@fuchsia_sdk//bind/fuchsia.clock",
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
+        "@fuchsia_sdk//bind/fuchsia.gpio",
+        "@fuchsia_sdk//bind/fuchsia.platform",
+        "@fuchsia_sdk//bind/fuchsia.register",
+        "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "aml-g12-composite-driver",
+    srcs = [
+        "aml-tdm-config-device.cc",
+        "aml-tdm-config-device.h",
+        "composite.cc",
+        "composite.h",
+        "composite-server.cc",
+        "composite-server.h",
+    ],
+    defines = [
+        "ZX_ASSERT_LEVEL=2",
+        "_ALL_SOURCE",
+    ],
+    output_name = "aml-g12-composite",
+    deps = [
+        "//src/devices/lib/amlogic",
+        "//zircon/system/ulib/ddk-platform-defs",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_devfs_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime",
+        "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+        "@internal_sdk//pkg/driver_compat",
+        "@internal_sdk//pkg/memory_barriers",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "aml-g12-composite-manifest",
+    src = "meta/aml-g12-composite.cml",
+)
+
+fuchsia_driver_component(
+    name = "aml-g12-composite-component",
+    bind_bytecode = "aml-g12-composite-bind",
+    driver_lib = ":aml-g12-composite-driver",
+    manifest = ":aml-g12-composite-manifest",
+)
+
+fuchsia_package(
+    name = "aml-g12-composite",
+    package_name = "aml-g12-composite",
+    components = [":aml-g12-composite-component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    visibility = ["//visibility:public"],
+)
