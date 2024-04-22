@@ -136,36 +136,28 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             ),
         )?;
 
-        // Add the pipelines on systems that support blobfs, therefore can have a domain config
-        // package.
-        if matches!(
-            context.feature_set_level,
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
-        ) {
-            let pipelines = builder
-                .add_domain_config(PackageSetDestination::Boot(
-                    BootfsPackageDestination::ArchivistPipelines,
-                ))
-                .directory("config");
-            for pipeline in archivist_pipelines {
-                let ArchivistPipeline { name, files } = pipeline;
-                if files.is_empty() {
-                    bail!("An archivist pipeline must have a non-zero number of files");
-                }
-                if *name == PipelineType::All && *context.build_type == BuildType::User {
-                    bail!("The 'all' archivist pipeline is not allowed on user builds");
-                }
+        let pipelines = builder
+            .add_domain_config(PackageSetDestination::Boot(
+                BootfsPackageDestination::ArchivistPipelines,
+            ))
+            .directory("config");
+        for pipeline in archivist_pipelines {
+            let ArchivistPipeline { name, files } = pipeline;
+            if files.is_empty() {
+                bail!("An archivist pipeline must have a non-zero number of files");
+            }
+            if *name == PipelineType::All && *context.build_type == BuildType::User {
+                bail!("The 'all' archivist pipeline is not allowed on user builds");
+            }
 
-                for file in files {
-                    let filename = file.file_name().ok_or(anyhow!(
-                        "Failed to get filename for archivist pipeline: {}",
-                        &file
-                    ))?;
-                    pipelines.entry(FileEntry {
-                        source: file.clone(),
-                        destination: format!("{}/{}", name, filename),
-                    })?;
-                }
+            for file in files {
+                let filename = file
+                    .file_name()
+                    .ok_or(anyhow!("Failed to get filename for archivist pipeline: {}", &file))?;
+                pipelines.entry(FileEntry {
+                    source: file.clone(),
+                    destination: format!("{}/{}", name, filename),
+                })?;
             }
         }
 
