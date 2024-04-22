@@ -25,12 +25,10 @@ class CpuBreakdownMetricsProcessor:
     def __init__(
         self,
         model: trace_model.Model,
-        output_path: str = "",
         percent_cutoff: float = DEFAULT_PERCENT_CUTOFF,
     ) -> None:
         self._model: trace_model.Model = model
         self._percent_cutoff = percent_cutoff
-        self._output_path: str = output_path
         # Maps TID to a Dict of CPUs to total duration (ms) on that CPU.
         # E.g. For a TID of 1001 with 3 CPUs, this would be:
         #   {1001: {0: 1123.123, 1: 123123.123, 3: 1231.23}}

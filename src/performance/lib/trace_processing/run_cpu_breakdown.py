@@ -39,9 +39,8 @@ def main() -> None:
         model, args.percent_cutoff
     ).process_metrics()
 
-    if args.output_path:
-        with open(args.output_path, "w") as json_file:
-            json.dump(breakdown, json_file)
+    with open(args.output_path, "w") as json_file:
+        json.dump(breakdown, json_file)
 
 
 if __name__ == "__main__":
