@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma_client/test_util/test_device_helper.h>
+#include <lib/zx/clock.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +18,23 @@
 
 #include "src/graphics/tests/common/utils.h"
 #include "src/graphics/tests/common/vulkan_context.h"
+#include "src/graphics/tests/vkloop/config.h"
 
 #include <vulkan/vulkan.hpp>
+
+config::Config &GetConfig() {
+  static config::Config c = config::Config::TakeFromStartupHandle();
+  return c;
+}
+
+std::optional<uint32_t> GetGpuVendorId() {
+  auto c = GetConfig();
+  uint32_t vendor_id_int = c.gpu_vendor_id();
+  if (vendor_id_int != 0) {
+    return {vendor_id_int};
+  }
+  return {};
+}
 
 namespace {
 
@@ -329,6 +345,15 @@ bool VkLoopTest::InitCommandBuffer() {
   return true;
 }
 
+void RestartDriver(uint32_t gpu_vendor_id) {
+  std::string driver_url = GetConfig().gpu_driver_url();
+  if (!driver_url.empty()) {
+    magma::TestDeviceBase::RestartDFv2Driver(driver_url, gpu_vendor_id);
+  } else {
+    magma::TestDeviceBase::RebindParentDeviceFromId(gpu_vendor_id);
+  }
+}
+
 bool VkLoopTest::Exec(bool kill_driver, AllowSuccess allow_success) {
   auto rv_wait = ctx_->queue().waitIdle();
   if (vk::Result::eSuccess != rv_wait) {
@@ -347,7 +372,7 @@ bool VkLoopTest::Exec(bool kill_driver, AllowSuccess allow_success) {
   }
 
   if (kill_driver) {
-    magma::TestDeviceBase::RebindParentDeviceFromId(get_vendor_id());
+    RestartDriver(get_vendor_id());
   }
 
   constexpr int kReps = 5;
@@ -386,10 +411,6 @@ TEST(VkLoop, EventHang) {
 TEST(VkLoop, DriverDeath) {
   VkLoopTest test(true);
   ASSERT_TRUE(test.Initialize());
-
-  // TODO(https://fxbug.dev/42050744) - enable for ARM/Mali
-  if (test.get_vendor_id() == 0x13B5)
-    GTEST_SKIP();
 
   ASSERT_TRUE(test.Exec(true, VkLoopTest::AllowSuccess::kDisallow));
 }
