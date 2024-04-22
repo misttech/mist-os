@@ -299,9 +299,6 @@ impl DirEntry {
             // An entry was created. Update the ctime and mtime of this directory.
             self.node.update_ctime_mtime();
             entry.notify_creation();
-
-            // Initialize the SELinux security structure for the newly created directory entry.
-            crate::security::inode_create_and_init(current_task, &entry)?;
         }
         Ok((entry, exists))
     }

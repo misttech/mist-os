@@ -5,7 +5,7 @@
 use super::{selinux_hooks, ResolvedElfState, ThreadGroupState};
 use crate::{
     task::{CurrentTask, Kernel, Task, ThreadGroup},
-    vfs::{DirEntryHandle, FsNode, FsNodeHandle, FsStr, ValueOrSize},
+    vfs::{FsNode, FsNodeHandle, FsStr, ValueOrSize},
 };
 
 use {
@@ -13,8 +13,7 @@ use {
         security_server::{SecurityServer, SecurityServerStatus},
         InitialSid, SecurityId,
     },
-    selinux_common::FileClass,
-    starnix_uapi::{error, errors::Errno, signals::Signal, uapi},
+    starnix_uapi::{error, errors::Errno, signals::Signal},
     std::sync::Arc,
 };
 
@@ -275,56 +274,6 @@ pub fn post_setxattr(current_task: &CurrentTask, fs_node: &FsNode, name: &FsStr,
     });
 }
 
-/// Initializes the security identifier for an inode that has been newly created and linked to a
-/// directory entry. This is a combined implementation of the LSM operations `inode_init_security`
-/// and `inode_create`. Returns an error if the security server fails to compute a security
-/// identifier for the inode.
-pub fn inode_create_and_init(
-    current_task: &CurrentTask,
-    new_entry: &DirEntryHandle,
-) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
-        let source_sid = get_current_sid(&current_task.thread_group);
-        let target_sid = new_entry
-            .parent()
-            .expect("new directory entry hooking into inode_create_and_init has parent")
-            .node
-            .effective_sid(current_task);
-        let new_entry_node_class = get_file_class(new_entry.node.as_ref())
-            .expect("file class for new directory entry node");
-
-        if let Ok(new_entry_sid) =
-            security_server.compute_new_file_sid(source_sid, target_sid, new_entry_node_class)
-        {
-            new_entry.node.set_cached_sid(new_entry_sid);
-            Ok(())
-        } else {
-            error!(EPERM)
-        }
-    })
-}
-
-fn get_file_class(fs_node: &FsNode) -> Option<FileClass> {
-    let class_bits = fs_node.info().mode.bits() & uapi::S_IFMT;
-    if class_bits == uapi::S_IFREG {
-        Some(FileClass::File)
-    } else if class_bits == uapi::S_IFBLK {
-        Some(FileClass::Block)
-    } else if class_bits == uapi::S_IFCHR {
-        Some(FileClass::Character)
-    } else if class_bits == uapi::S_IFLNK {
-        Some(FileClass::Link)
-    } else if class_bits == uapi::S_IFIFO {
-        Some(FileClass::Fifo)
-    } else if class_bits == uapi::S_IFSOCK {
-        Some(FileClass::Socket)
-    } else if class_bits == uapi::S_IFDIR {
-        Some(FileClass::Directory)
-    } else {
-        None
-    }
-}
-
 /// Returns a security id that should be used for SELinux access control checks on `fs_node`. This
 /// computation will attempt to load the security id associated with an extended attribute value. If
 /// a meaningful security id cannot be determined, then the `unlabeled` security id is returned.
@@ -431,18 +380,11 @@ mod tests {
         locked: &mut Locked<'_, Unlocked>,
         current_task: &AutoReleasableTask,
     ) -> NamespaceNode {
-        let namespace_node = current_task
+        current_task
             .fs()
             .root()
             .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
-            .expect("create_node(file)");
-
-        // Directory entry creation computes SID. Clear it for test.
-        let node = &namespace_node.entry.node;
-        node.clear_cached_sid();
-        assert_eq!(None, node.cached_sid());
-
-        namespace_node
+            .expect("create_node(file)")
     }
 
     #[derive(Default, Debug, PartialEq)]
@@ -815,6 +757,7 @@ mod tests {
     async fn post_setxattr_noop_selinux_disabled() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -832,6 +775,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -849,6 +793,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -867,6 +812,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -885,6 +831,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -928,6 +875,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -946,6 +894,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         post_setxattr(
             current_task.as_ref(),
@@ -978,6 +927,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        assert_eq!(None, node.cached_sid());
 
         assert_eq!(
             SecurityId::initial(InitialSid::Unlabeled),
@@ -993,7 +943,6 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-
         node.ops()
             .set_xattr(node, &current_task, "security.selinux".into(), "".into(), XattrOp::Set)
             .expect("setxattr");
@@ -1013,7 +962,6 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-
         node.ops()
             .set_xattr(
                 node,
