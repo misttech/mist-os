@@ -4,13 +4,33 @@
 
 image: atlassian/default-image:3
 
-pipelines:
-  default:
-    - step:
-        name: "Build It"
+definitions:
+  steps:
+    - step: &set_up
+        name: Set Up
         script:
           - apt-get update && apt-get install -y rsync
           - curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
           - export PATH=$PWD/.jiri_root/bin:$PATH
           - jiri update -v -vv
-          - make it
+
+pipelines:
+  pull-requests:
+    "**":
+      - stage:
+          name: "Update and Test"
+          steps:
+            - step: *set_up
+            - step:
+                name: "Make Test"
+                script:
+                  - make test
+  default:
+    - stage:
+        name: "Update and Build"
+        steps:
+          - step: *set_up
+          - step:
+              name: "Make It"
+              script:
+                - make it
