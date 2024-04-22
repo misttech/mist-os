@@ -159,7 +159,6 @@ size_checker_input = {
         "audio_core",
         "audio_device_registry",
         "codec_factory",
-        "codec_runner_intel_gen",
         "mediasession",
         "soundplayer",
       ]
