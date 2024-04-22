@@ -118,6 +118,14 @@ async fn main() {
             late: {
             }
         },
+        escrow: {
+            started_durations: {
+                histogram: {},
+            },
+            stopped_durations: {
+                histogram: {},
+            },
+        },
         stats: contains {
             measurements: {
                 component_count: 3u64,

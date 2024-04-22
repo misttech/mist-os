@@ -153,6 +153,7 @@ rustc_binary("bin") {
     "src/builtin_environment.rs",
     "src/capability.rs",
     "src/constants.rs",
+    "src/diagnostics/escrow.rs",
     "src/diagnostics/lifecycle.rs",
     "src/diagnostics/mod.rs",
     "src/diagnostics/task_metrics/component_stats.rs",

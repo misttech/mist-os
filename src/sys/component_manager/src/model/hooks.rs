@@ -257,6 +257,8 @@ pub enum EventPayload {
     Stopped {
         status: zx::Status,
         stop_time: zx::Time,
+        execution_duration: zx::Duration,
+        requested_escrow: bool,
     },
     DebugStarted {
         runtime_dir: Option<fio::DirectoryProxy>,

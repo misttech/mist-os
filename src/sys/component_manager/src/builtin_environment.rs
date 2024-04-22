@@ -5,7 +5,7 @@
 #[cfg(target_arch = "aarch64")]
 use builtins::smc_resource::SmcResource;
 
-use crate::model::component::WeakComponentInstance;
+use crate::{diagnostics, model::component::WeakComponentInstance};
 #[cfg(target_arch = "x86_64")]
 use builtins::ioport_resource::IoportResource;
 
@@ -510,6 +510,8 @@ pub struct BuiltinEnvironment {
     pub component_tree_stats: Arc<ComponentTreeStats<DiagnosticsTask>>,
     // Keeps the inspect node alive.
     _component_lifecycle_time_stats: Arc<ComponentLifecycleTimeStats>,
+    // Keeps the inspect node alive.
+    _component_escrow_duration_status: Arc<diagnostics::escrow::DurationStats>,
     pub debug: bool,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
@@ -1165,6 +1167,11 @@ impl BuiltinEnvironment {
             Arc::new(ComponentLifecycleTimeStats::new(inspector.root().create_child("lifecycle")));
         model.root().hooks.install(component_lifecycle_time_stats.hooks()).await;
 
+        let component_escrow_duration_status = Arc::new(diagnostics::escrow::DurationStats::new(
+            inspector.root().create_child("escrow"),
+        ));
+        model.root().hooks.install(component_escrow_duration_status.hooks()).await;
+
         // Serve stats about inspect in a lazy node.
         inspector.record_lazy_stats();
 
@@ -1183,6 +1190,7 @@ impl BuiltinEnvironment {
             event_logger,
             component_tree_stats,
             _component_lifecycle_time_stats: component_lifecycle_time_stats,
+            _component_escrow_duration_status: component_escrow_duration_status,
             debug,
             num_threads,
             realm_builder_resolver,

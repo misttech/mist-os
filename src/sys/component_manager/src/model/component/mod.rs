@@ -626,6 +626,7 @@ impl ComponentInstance {
 
         let stop_result = {
             if let Some(started) = started {
+                let started_timestamp = started.timestamp;
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
                         self.environment.stop_timeout(),
@@ -663,7 +664,7 @@ impl ComponentInstance {
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                     top_instance.trigger_reboot().await;
                 }
-                Some(ret)
+                Some((ret, started_timestamp))
             } else {
                 None
             }
@@ -682,7 +683,9 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some(StopOutcomeWithEscrow { outcome, escrow_request }) = stop_result {
+        if let Some((StopOutcomeWithEscrow { outcome, escrow_request }, start_time)) = stop_result {
+            let requested_escrow = escrow_request.is_some();
+
             // Store any escrowed state.
             {
                 let mut state = self.lock_state().await;
@@ -693,11 +696,14 @@ impl ComponentInstance {
                 };
             }
 
+            let stop_time = zx::Time::get_monotonic();
             let event = Event::new(
                 self,
                 EventPayload::Stopped {
                     status: outcome.component_exit_status,
-                    stop_time: zx::Time::get_monotonic(),
+                    stop_time,
+                    execution_duration: stop_time - start_time,
+                    requested_escrow,
                 },
             );
             self.hooks.dispatch(&event).await;
@@ -1341,15 +1347,28 @@ impl std::fmt::Debug for ComponentInstance {
 }
 
 #[cfg(test)]
+pub mod testing {
+    use crate::model::{events::stream::EventStream, hooks::EventType};
+    use fuchsia_zircon as zx;
+    use moniker::{Moniker, MonikerBase};
+
+    pub async fn wait_until_event_get_timestamp(
+        event_stream: &mut EventStream,
+        event_type: EventType,
+    ) -> zx::Time {
+        event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
+    }
+}
+
+#[cfg(test)]
 pub mod tests {
     use {
+        super::testing::wait_until_event_get_timestamp,
         super::*,
         crate::model::{
-            actions::shutdown,
-            actions::test_utils::is_discovered,
-            actions::StopAction,
+            actions::{shutdown, test_utils::is_discovered, StopAction},
             error::{AddChildError, DynamicOfferError},
-            events::{registry::EventSubscription, stream::EventStream},
+            events::registry::EventSubscription,
             hooks::EventType,
             structured_dict::ComponentInput,
             testing::{
@@ -1369,8 +1388,8 @@ pub mod tests {
         cm_rust_testing::*,
         fasync::TestExecutor,
         fidl::endpoints::DiscoverableProtocolMarker,
-        fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_zircon as zx,
-        fuchsia_zircon::AsHandleRef,
+        fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
+        fuchsia_zircon::{self as zx, AsHandleRef},
         futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt},
         instance::UnresolvedInstanceState,
         routing_test_helpers::component_id_index::make_index_file,
@@ -1601,13 +1620,6 @@ pub mod tests {
             .await
             .unwrap();
         assert_eq!(None, a_realm.instance_id());
-    }
-
-    async fn wait_until_event_get_timestamp(
-        event_stream: &mut EventStream,
-        event_type: EventType,
-    ) -> zx::Time {
-        event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
     }
 
     #[fuchsia::test]
