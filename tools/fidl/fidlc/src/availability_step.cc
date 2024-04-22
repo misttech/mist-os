@@ -149,7 +149,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
       ok &= reporter()->Fail(ErrLibraryAvailabilityMissingAdded, attribute->span);
     }
     if (replaced) {
-      ok &= reporter()->Fail(ErrLibraryReplaced, replaced->span);
+      ok &= reporter()->Fail(ErrCannotBeReplaced, replaced->span, element->kind);
     }
   } else {
     if (platform) {
@@ -158,6 +158,9 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     if (!library()->attributes->Get("available")) {
       ok &= reporter()->Fail(ErrMissingLibraryAvailability, attribute->span, library()->name);
     }
+  }
+  if (element->kind == Element::Kind::kProtocolCompose && replaced) {
+    ok &= reporter()->Fail(ErrCannotBeReplaced, replaced->span, element->kind);
   }
   if (removed && replaced) {
     ok &= reporter()->Fail(ErrRemovedAndReplaced, attribute->span);

@@ -159,7 +159,7 @@ library dependency;
 type Foo = resource struct {};
 
 @available(added=4, removed=5)
-type Foo = table {};
+type Foo = struct {};
 )FIDL");
   ASSERT_COMPILED(dependency);
 
@@ -181,7 +181,9 @@ type Foo = struct {
   auto member_type = foo->members[0].type_ctor->type;
   ASSERT_EQ(member_type->kind, Type::Kind::kIdentifier);
   auto identifier_type = static_cast<const IdentifierType*>(member_type);
-  EXPECT_EQ(identifier_type->type_decl->kind, Decl::Kind::kTable);
+  EXPECT_EQ(identifier_type->type_decl->kind, Decl::Kind::kStruct);
+  auto struct_decl = static_cast<const Struct*>(identifier_type->type_decl);
+  EXPECT_EQ(struct_decl->resourceness, Resourceness::kValue);
 }
 
 TEST(VersioningPlatformTests, BadMultipleNameNotFound) {

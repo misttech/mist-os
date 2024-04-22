@@ -398,9 +398,8 @@ constexpr ErrorDef<201, const Library *, Platform> ErrPlatformVersionNotSelected
 constexpr RetiredDef<202> ErrTransitionalNotAllowed;
 constexpr ErrorDef<203> ErrRemovedAndReplaced(
     "the @available arguments 'removed' and 'replaced' are mutually exclusive");
-constexpr ErrorDef<204> ErrLibraryReplaced(
-    "the @available argument 'replaced' cannot be used on the library "
-    "declaration; used 'removed' instead");
+constexpr ErrorDef<204, Element::Kind> ErrCannotBeReplaced(
+    "the @available argument 'replaced' cannot be used on a {0}; used 'removed' instead");
 constexpr ErrorDef<205, std::string_view, Version, SourceSpan> ErrRemovedWithReplacement(
     "element '{0}' is marked removed={1}, but there is a replacement marked "
     "added={1} at {2}; change the removed={1} to replaced={1}");
@@ -630,7 +629,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0201 */ &ErrPlatformVersionNotSelected,
     /* fi-0202 */ &ErrTransitionalNotAllowed,
     /* fi-0203 */ &ErrRemovedAndReplaced,
-    /* fi-0204 */ &ErrLibraryReplaced,
+    /* fi-0204 */ &ErrCannotBeReplaced,
     /* fi-0205 */ &ErrRemovedWithReplacement,
     /* fi-0206 */ &ErrReplacedWithoutReplacement,
     /* fi-0207 */ &ErrTypeShapeIntegerOverflow,

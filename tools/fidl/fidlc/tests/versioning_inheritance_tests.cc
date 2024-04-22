@@ -783,48 +783,17 @@ type Foo = struct {
 };
 )FIDL");
 
-  for (auto& source : sources) {
-    {
+  for (std::string version : {"1", "2", "3", "4", "LEGACY"}) {
+    SCOPED_TRACE(version);
+    for (auto& source : sources) {
       TestLibrary library(source);
-      library.SelectVersion("example", "1");
+      library.SelectVersion("example", version);
       ASSERT_COMPILED(library);
-
       auto bar = library.LookupStruct("Bar");
-      ASSERT_EQ(bar, nullptr);
-    }
-    {
-      TestLibrary library(source);
-      library.SelectVersion("example", "2");
-      ASSERT_COMPILED(library);
-
-      auto bar = library.LookupStruct("Bar");
-      ASSERT_NE(bar, nullptr);
-      EXPECT_FALSE(bar->availability.is_deprecated());
-    }
-    {
-      TestLibrary library(source);
-      library.SelectVersion("example", "3");
-      ASSERT_COMPILED(library);
-
-      auto bar = library.LookupStruct("Bar");
-      ASSERT_NE(bar, nullptr);
-      EXPECT_TRUE(bar->availability.is_deprecated());
-    }
-    {
-      TestLibrary library(source);
-      library.SelectVersion("example", "4");
-      ASSERT_COMPILED(library);
-
-      auto bar = library.LookupStruct("Bar");
-      ASSERT_EQ(bar, nullptr);
-    }
-    {
-      TestLibrary library(source);
-      library.SelectVersion("example", "LEGACY");
-      ASSERT_COMPILED(library);
-
-      auto bar = library.LookupStruct("Bar");
-      ASSERT_NE(bar, nullptr);
+      EXPECT_EQ(bar != nullptr, version == "2" || version == "3" || version == "LEGACY");
+      if (bar) {
+        EXPECT_EQ(bar->availability.is_deprecated(), version == "3" || version == "LEGACY");
+      }
     }
   }
 }

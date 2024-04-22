@@ -135,12 +135,12 @@ library example;
 type Foo = struct {};
 
 @available(added=2)
-type Foo = table {};
+type Foo = resource struct {};
 )FIDL");
   library.SelectVersion("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
-  EXPECT_EQ(library.HasTable("Foo"), GetParam() > V1);
+  EXPECT_EQ(library.LookupStruct("Foo")->resourceness,
+            GetParam() == V1 ? Resourceness::kValue : Resourceness::kResource);
 }
 
 TEST_P(VersioningBasicTest, GoodDeclAddedAndDeprecatedAndRemoved) {
