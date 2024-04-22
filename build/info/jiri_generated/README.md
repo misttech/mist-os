@@ -1,14 +1,14 @@
-This directory contains two files (`integration_commit_hash.txt` and
-`integration_commit_stamp.txt`) which reflect the commit hash and timestamp of
-`//integration/.git/HEAD` respectively.
+This directory contains two files which reflect the commit
+hash and timestamp of //integration/.git/HEAD.
 
-These files are cannot be checked into git in any state since there is no way to
-`.gitignore` files that are already tracked by git. Rather, a jiri hook in
-`//integration/fuchsia/stem` is used to invoke
-`//build/info/create_jiri_hook_files.sh`, which will create these on each
-`jiri sync`/`jiri update` operation with up-to-date values.
+A Jiri hook, in //integration/fuchsia/stem, is used to invoke
+`//build/info/create_jiri_hook_files.sh` which will overwrite
+them, on each `jiri sync` operation, with up-to-date values.
 
-As such, fallback values/mechanisms should be used before the jiri hook is
-established.
+The files are listed in this directory's `.gitignore` to ensure
+that their updates are properly ignored by git commands. Their
+default values in the fuchsia.git checkout are provided to ensure
+that everything works even if the hook is not enabled yet in
+the integration.git repository.
 
 For context, see https://fxbug.dev/335391299
