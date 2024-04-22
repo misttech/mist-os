@@ -24,7 +24,15 @@
             },
         ],
     },
-    bootfs_file_checks: [],
+    bootfs_file_checks: [
+        // Ensure minimum_utc_stamp is present in this location. Build age checks depend on this.
+        {
+            source: {
+                BootfsFile: "config/build_info/minimum_utc_stamp",
+            },
+            state: "Present",
+        },
+    ],
     package_checks: [
         // Checks involving the system image package.
         {
