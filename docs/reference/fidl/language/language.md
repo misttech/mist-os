@@ -15,9 +15,9 @@ Also, see a modified [EBNF description of the FIDL grammar][fidl-grammar].
 FIDL provides a syntax for declaring data types and protocols. These
 declarations are collected into libraries for distribution.
 
-FIDL declarations are stored in UTF-8 text files. Each file consists of a
-sequence of semicolon-delimited declarations. The order of declarations within a
-FIDL file, or among FIDL files within a library, is irrelevant.
+FIDL declarations are stored in UTF-8 text files. Each file contains a sequence
+of semicolon-delimited declarations. The order of declarations within a FIDL
+file, or among FIDL files within a library, is irrelevant.
 
 ### Comments
 
@@ -79,8 +79,8 @@ canonical form of an identifier is obtained by converting it to `snake_case`.
 #### Qualified identifiers {#qualified-identifiers}
 
 FIDL always looks for unqualified symbols within the scope of the current
-library. To reference symbols in other libraries, they must be qualified by
-prefixing the identifier with the library name or alias thereof.
+library. To reference symbols in other libraries, you must qualify them with the
+library name or alias.
 
 **objects.fidl:**
 
@@ -112,7 +112,7 @@ type Color = struct {
 #### Resolution algorithm {#resolution-algorithm}
 
 FIDL uses the following algorithm to resolve identifiers. When a "try resolving"
-step fails, it proceeds to the next step. When a "resolve" step fails, the
+step fails, it proceeds to the next step below. When a "resolve" step fails, the
 compiler produces an error.
 
 * If it is unqualified:
@@ -151,18 +151,21 @@ example:
 * `fuchsia.process/Launcher.Launch` refers to the `Launch` method in the
   `Launcher` protocol of library `fuchsia.process`.
 
-FQNs are used in error messages, in the FIDL JSON intermediate representation,
-and in documentation comment cross references. They are also used as method
-selectors, which method ordinals are derived from.
+FQNs are used in error messages, the FIDL JSON intermediate representation,
+method selectors, and documentation comment cross references.
 
 ### Literals
 
 FIDL supports the following kinds of literals:
 
 * Boolean: `true`, `false`
-* Integer: `0`, `-1`, `123`, `0xABC`, `0b101`, etc.
-* Floating point: `1.23`, `-0.01`, `1e5`, `2.0e-3`, etc.
-* String: `"hello"`, `"\\ \" \n \r \t \u{1f642}"`, etc.
+* Integer: decimal (`123`), hex (`0xA1B2`), octal (`0755`), binary (`0b101`).
+    * Only decimal literals can be negative.
+* Floating point: `1.23`, `-0.01`, `1e5`, `2.0e-3`
+    * Only `e` and `e-` are allowed, not `e+`.
+* String: `"hello"`, `"\\ \" \n \r \t \u{1f642}"`
+
+All letters in numeric literals (e.g. hex digits) are case insensitive.
 
 ### Constants {#constants}
 
@@ -198,32 +201,25 @@ using fuchsia.mem;
 using fuchsia.geometry as geo;
 ```
 
-Libraries may declare that they use other libraries with a `using` declaration.
-This allows the library to refer to symbols defined in other libraries upon
-which they depend. Symbols imported this way may be accessed by qualifying them
-with the library name, as in `fuchsia.mem.Range`.
-
-A `using` declaration can also specify an alias with the `as` syntax. In this
-case, symbols in the other library can only be accessed by qualifying them with
-the alias, as in `geo.Rect` (using `fuchsia.geometry.Rect` would not work).
-
-In the source tree, each library consists of a directory with some number of
-**.fidl** files. The name of the directory is irrelevant to the FIDL compiler
-but by convention it should resemble the library name itself. A directory should
-not contain FIDL files for more than one library.
+Libraries import other libraries with `using` declarations. You can refer to
+symbols in an imported library by qualifying them with the library name, as in
+`fuchsia.mem.Range`. With the `using ... as` syntax you must qualify symbols
+with the alias, as in `geo.Rect` (`fuchsia.geometry.Rect` would not work).
 
 The scope of `library` and `using` declarations is limited to a single file.
-Each individual file within a FIDL library must restate the `library`
-declaration together with any `using` declarations needed by that file.
-Libraries with multiple files [conventionally have an overview.fidl
+Each file in a FIDL library must restate the `library` declaration and any
+`using` declarations that the file needs.
+
+The FIDL compiler does not require any particular directory structure, but each
+FIDL library is usually organized in its own directory named after the library.
+Libraries with more than one file [conventionally have an overview.fidl
 file][library-overview] containing only a `library` declaration along with
 attributes and a documentation comment.
 
-The library's name may be used by certain language bindings to provide scoping
-for symbols emitted by the code generator. For example, the C++ bindings
-generator places declarations for the FIDL library `fuchsia.ui` within the C++
-namespace `fuchsia_ui`. Similarly, for languages such as Dart and Rust, which
-have their own module system, each FIDL library is compiled as a module.
+The library's name may be used in language bindings as a namespace. For example,
+the C++ bindings generator places declarations for the FIDL library `fuchsia.ui`
+within the C++ namespace `fuchsia_ui`. Similarly, the Rust bindings generator
+would generate a crate named `fidl_fuchsia_ui`.
 
 ## Types and type declarations
 
@@ -235,14 +231,14 @@ FIDL supports a number of builtin types as well as declarations of new types
 *   Simple value types.
 *   Cannot be optional.
 
-The following primitive types are supported:
+FIDL supports the following primitive types:
 
 *    Boolean                 **`bool`**
 *    Signed integer          **`int8 int16 int32 int64`**
 *    Unsigned integer        **`uint8 uint16 uint32 uint64`**
 *    IEEE 754 Floating-point **`float32 float64`**
 
-Numbers are suffixed with their size in bits, **`int8`** is 1 byte.
+Numbers are suffixed with their size in bits. For example, **`int8`** is 1 byte.
 
 #### Use
 
@@ -257,7 +253,7 @@ Numbers are suffixed with their size in bits, **`int8`** is 1 byte.
 * Cannot be optional.
 * Bits can either be [`strict` or `flexible`](#strict-vs-flexible).
 * Bits default to `flexible`.
-* `strict` bits must have at least one member (`flexible` bits can be empty).
+* `strict` bits must have at least one member, `flexible` bits can be empty.
 
 #### Operators
 
@@ -276,8 +272,7 @@ Numbers are suffixed with their size in bits, **`int8`** is 1 byte.
 * Cannot be optional.
 * Enums can be [`strict` or `flexible`](#strict-vs-flexible).
 * Enums default to `flexible`.
-* `strict` enums must have at least one member (`flexible` enums can be
-  memberless).
+* `strict` enums must have at least one member, `flexible` enums can be empty.
 
 #### Declaration
 
@@ -321,7 +316,7 @@ of the type. In other words, changing the parameter `_N_` is an
 
 ### Strings
 
-*   Variable-length sequence of UTF-8 encoded characters representing text.
+*   Variable-length sequence of bytes representing text in UTF-8 encoding.
 *   Can be optional; absent strings and empty strings are distinct.
 *   Can specify a maximum size, e.g. **`string:40`** for a maximum 40 byte
     string. By default, `string` means `string:MAX`, i.e unbounded.
