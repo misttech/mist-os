@@ -177,6 +177,7 @@
             protocol: [ "power-manager-outlives-driver-manager" ],
             from: "#power_manager",
             to: "#driver_manager",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
@@ -340,11 +341,13 @@
             // drivers depend on system-activity-governor.
             // Weak to resolve dependency cycles.
             dependency: "weak",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: "#boot-drivers",
+            source_availability: "unknown",
         },
     ],
     expose: [
