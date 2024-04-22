@@ -172,7 +172,9 @@ impl ExecutionStateManager {
                 return;
             }
 
+            // LINT.IfChange
             tracing::info!("Suspending");
+            // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
             listener.on_suspend();
 
             let response = inner
@@ -182,7 +184,9 @@ impl ExecutionStateManager {
                     ..Default::default()
                 })
                 .await;
+            // LINT.IfChange
             tracing::info!(?response, "Resuming");
+            // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
 
             listener.suspend_stats().update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
                 let stats = stats_opt.as_mut().expect("stats is uninitialized");
