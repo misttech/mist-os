@@ -157,4 +157,16 @@ TEST(AddrTest, TestParseSockAddrLl) {
   EXPECT_EQ(actual_addr->sll_protocol, expected_addr.sll_protocol);
   EXPECT_EQ(actual_addr->sll_ifindex, expected_addr.sll_ifindex);
 }
+
+TEST(AddrTest, TestFormatHardwareAddress) {
+  const unsigned char addr_bytes[8] = {0x00, 0x0f, 0xff, 0x12, 0x34, 0x56, 0x00, 0x00};
+
+  std::stringstream o1;
+  o1 << PrintHardwareAddress{6, addr_bytes};
+  EXPECT_EQ(o1.str(), "[00:0f:ff:12:34:56]");
+
+  std::stringstream o2;
+  o2 << PrintHardwareAddress{0, addr_bytes};
+  EXPECT_EQ(o2.str(), "[]");
+}
 #endif  // PACKET_SOCKETS
