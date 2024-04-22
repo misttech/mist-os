@@ -6,7 +6,7 @@
 Description=Run fuchsia update and build nightly
 
 [Timer]
-OnCalendar=daily
+OnCalendar=*-*-* 06:00:00
 
 [Install]
 WantedBy=timers.target
