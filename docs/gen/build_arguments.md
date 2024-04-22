@@ -8300,15 +8300,6 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 
 From //build/config/compiler.gni:43
 
-### use_prebuilt_codec_runner_intel_gen
-
-True if a prebuilt codec_runner_intel_gen package is used. If false, the codec_runner will be
-built from scratch (requires a checkout of the intel media-driver repo).
-
-**Current value (from the default):** `true`
-
-From //src/media/codec/codecs/vaapi/BUILD.gn:11
-
 ### use_prebuilt_ffmpeg
 
 Use a prebuilt ffmpeg binary rather than building it locally.  See
