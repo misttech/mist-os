@@ -58,6 +58,7 @@ product_assembly_configuration("terminal") {
         "button",
         "touchscreen",
       ]
+      with_synthetic_device_support = true
     }
 
     media = {
