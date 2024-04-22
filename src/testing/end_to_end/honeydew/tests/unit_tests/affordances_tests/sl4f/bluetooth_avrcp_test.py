@@ -5,10 +5,11 @@
 """Unit tests for honeydew.affordances.sl4f.bluetooth_avrcp.py."""
 
 import unittest
+from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as sl4f_bluetooth_avrcp,
@@ -24,11 +25,13 @@ _SAMPLE_RECEIVED_REQUESTS: dict[str, Any] = {
 }
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -91,7 +94,9 @@ class BluetoothAvrcpSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_send_avrcp_command(self, parameterized_dict) -> None:
+    def test_send_avrcp_command(
+        self, parameterized_dict: dict[str, Any]
+    ) -> None:
         """Test for Bluetooth.send_avrcp_command() method."""
         self.bluetooth_obj.send_avrcp_command(
             command=parameterized_dict["command"]

@@ -22,7 +22,7 @@ ZX_ERR_INTERNAL = fuchsia_controller_py.ZxStatus.ZX_ERR_INTERNAL
 
 
 class RtcTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.m_run = self.enterContext(mock.patch.object(asyncio, "run"))
         self.m_proxy = self.enterContext(
             mock.patch.object(frtc.Device, "Client")
@@ -37,7 +37,7 @@ class RtcTest(unittest.TestCase):
         transport.connect_device_proxy.assert_called_once()
         reboot_af.register_for_on_device_boot.assert_called_once()
 
-    def test_rtc_get(self):
+    def test_rtc_get(self) -> None:
         chip_time = frtc.Time(23, 50, 15, 5, 2, 2022)
         self.m_run.return_value.response.rtc = chip_time
 
@@ -54,7 +54,7 @@ class RtcTest(unittest.TestCase):
         self.m_proxy.get.assert_called_once()
         self.m_run.assert_called_once()
 
-    def test_rtc_get_exception(self):
+    def test_rtc_get_exception(self) -> None:
         self.m_run.side_effect = fuchsia_controller_py.ZxStatus
 
         msg = r"Device\.Get\(\) error"
@@ -64,7 +64,7 @@ class RtcTest(unittest.TestCase):
         self.m_proxy.get.assert_called_once()
         self.m_run.assert_called_once()
 
-    def test_rtc_set(self):
+    def test_rtc_set(self) -> None:
         time = datetime.datetime(2022, 2, 5, 15, 50, 23)
         self.m_run.return_value.response.status = ZX_OK
 
@@ -76,7 +76,7 @@ class RtcTest(unittest.TestCase):
         self.m_proxy.set.assert_called_once_with(rtc=want)
         self.m_run.assert_called_once()
 
-    def test_rtc_set_error(self):
+    def test_rtc_set_error(self) -> None:
         """Test errors returned by Set()
 
         Unlike Get, the Set API does not currently use `-> () error zx.Status`
@@ -95,7 +95,7 @@ class RtcTest(unittest.TestCase):
         self.m_proxy.set.assert_called_once()
         self.m_run.assert_called_once()
 
-    def test_rtc_set_exception(self):
+    def test_rtc_set_exception(self) -> None:
         """Test errors returned by Set()
 
         Unlike Get, the Set API does not currently use `-> () error zx.Status`

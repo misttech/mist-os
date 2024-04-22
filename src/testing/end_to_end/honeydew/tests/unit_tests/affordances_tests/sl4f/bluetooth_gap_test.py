@@ -5,10 +5,11 @@
 """Unit tests for honeydew.affordances.sl4f.bluetooth.py."""
 
 import unittest
+from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as sl4f_bluetooth_gap,
@@ -44,11 +45,13 @@ _SAMPLE_KNOWN_DEVICES_OUTPUT: dict[str, Any] = {
 }
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -113,7 +116,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_connect_device(self, parameterized_dict) -> None:
+    def test_connect_device(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for Bluetooth.connect_device() method."""
         dummy_identifier = "0"
         self.bluetooth_obj.connect_device(
@@ -168,7 +171,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_pair_device(self, parameterized_dict) -> None:
+    def test_pair_device(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for Bluetooth.pair_device() method."""
         dummy_identifier = "0"
         self.bluetooth_obj.pair_device(
@@ -185,7 +188,9 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_request_discovery(self, parameterized_dict) -> None:
+    def test_request_discovery(
+        self, parameterized_dict: dict[str, Any]
+    ) -> None:
         """Test for Bluetooth.request_discovery() method."""
         self.bluetooth_obj.request_discovery(
             discovery=parameterized_dict["discovery"]
@@ -200,7 +205,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_set_discoverable(self, parameterized_dict) -> None:
+    def test_set_discoverable(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for Bluetooth.set_discoverable() method."""
         self.bluetooth_obj.set_discoverable(
             discoverable=parameterized_dict["discoverable"]
