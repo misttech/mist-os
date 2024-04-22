@@ -40,13 +40,13 @@ func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
 	}, nil
 }
 
-type targetEntry struct {
+type TargetListEntry struct {
 	NodeName    string   `json:"nodename"`
 	Addresses   []string `json:"addresses"`
 	TargetState string   `json:"target_state"`
 }
 
-func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
+func (f *FFXTool) TargetList(ctx context.Context) ([]TargetListEntry, error) {
 	args := []string{
 		"--machine",
 		"json",
@@ -56,28 +56,28 @@ func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
 
 	stdout, err := f.runFFXCmd(ctx, args...)
 	if err != nil {
-		return []targetEntry{}, fmt.Errorf("ffx target list failed: %w", err)
+		return []TargetListEntry{}, fmt.Errorf("ffx target list failed: %w", err)
 	}
 
 	if len(stdout) == 0 {
-		return []targetEntry{}, nil
+		return []TargetListEntry{}, nil
 	}
 
-	var entries []targetEntry
+	var entries []TargetListEntry
 	if err := json.Unmarshal(stdout, &entries); err != nil {
-		return []targetEntry{}, err
+		return []TargetListEntry{}, err
 	}
 
 	return entries, nil
 }
 
-func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]targetEntry, error) {
+func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]TargetListEntry, error) {
 	entries, err := f.TargetList(ctx)
 	if err != nil {
-		return []targetEntry{}, err
+		return []TargetListEntry{}, err
 	}
 
-	var matchingTargets []targetEntry
+	var matchingTargets []TargetListEntry
 
 	for _, target := range entries {
 		if target.NodeName == nodeName {
@@ -86,6 +86,47 @@ func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]tar
 	}
 
 	return matchingTargets, nil
+}
+
+type TargetShow = struct {
+	Target TargetShowEntry `json:"target"`
+}
+
+type TargetShowEntry = struct {
+	Name       string     `json:"name"`
+	SshAddress SshAddress `json:"ssh_address"`
+}
+
+type SshAddress = struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
+}
+
+func (f *FFXTool) TargetShow(ctx context.Context, target string) (TargetShow, error) {
+	args := []string{
+		"--machine",
+		"json",
+		"--target",
+		target,
+		"target",
+		"show",
+	}
+
+	stdout, err := f.runFFXCmd(ctx, args...)
+	if err != nil {
+		return TargetShow{}, fmt.Errorf("ffx target show failed: %w", err)
+	}
+
+	if len(stdout) == 0 {
+		return TargetShow{}, nil
+	}
+
+	var targetShow TargetShow
+	if err := json.Unmarshal(stdout, &targetShow); err != nil {
+		return TargetShow{}, err
+	}
+
+	return targetShow, nil
 }
 
 func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {

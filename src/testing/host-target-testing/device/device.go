@@ -47,7 +47,6 @@ type Client struct {
 // NewClient creates a new Client.
 func NewClient(
 	ctx context.Context,
-	deviceSshPort int,
 	repoPort int,
 	deviceResolver DeviceResolver,
 	privateKey ssh.Signer,
@@ -65,7 +64,6 @@ func NewClient(
 		ctx,
 		&addrResolver{
 			deviceResolver: deviceResolver,
-			port:           strconv.Itoa(deviceSshPort),
 		},
 		sshConfig,
 		sshConnectBackoff,
@@ -754,19 +752,24 @@ func (c *Client) Name() string {
 
 type addrResolver struct {
 	deviceResolver DeviceResolver
-	port           string
 }
 
 func (r addrResolver) Resolve(ctx context.Context) (net.Addr, error) {
 	host, err := r.deviceResolver.ResolveName(ctx)
 	if err != nil {
-		logger.Warningf(ctx, "failed to resolve %v: %v", r.deviceResolver.NodeName(), err)
+		logger.Warningf(ctx, "failed to resolve host for %v: %v", r.deviceResolver.NodeName(), err)
 		return nil, err
 	}
 
-	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, r.port))
+	port, err := r.deviceResolver.ResolveSshPort(ctx)
 	if err != nil {
-		logger.Warningf(ctx, "failed to connet to %v (%v): %v", r.deviceResolver.NodeName(), host, err)
+		logger.Warningf(ctx, "failed to resolve port for %v: %v", r.deviceResolver.NodeName(), err)
+		return nil, err
+	}
+
+	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	if err != nil {
+		logger.Warningf(ctx, "failed to connect to %v (%v): %v", r.deviceResolver.NodeName(), host, err)
 		return nil, err
 	}
 

@@ -98,7 +98,12 @@ func (c *DeviceConfig) deviceResolver(
 	ffxIsolateDir ffx.IsolateDir,
 ) (device.DeviceResolver, error) {
 	if c.deviceHostname != "" {
-		return device.NewConstantHostResolver(ctx, c.deviceName, c.deviceHostname), nil
+		return device.NewConstantHostResolver(
+			ctx,
+			c.deviceName,
+			c.deviceHostname,
+			c.deviceSshPort,
+		), nil
 	}
 
 	switch c.deviceResolverMode {
@@ -163,7 +168,6 @@ func (c *DeviceConfig) NewDeviceClient(
 	client, err := device.NewClient(
 		ctx,
 		c.deviceSshPort,
-		c.repoPort,
 		deviceResolver,
 		sshPrivateKey,
 		connectBackoff,
