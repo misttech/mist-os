@@ -9,7 +9,7 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":fake-display-test" ]
+  deps = [ ":fake-display-unittests" ]
 }
 
 source_set("fake-lib") {
@@ -88,7 +88,7 @@ static_library("fake-display-stack") {
   ]
 }
 
-test("fake-display-test-bin") {
+test("fake-display-unittests-bin") {
   sources = [ "fake-display-test.cc" ]
   configs += [ "//build/config:all_source" ]
 
@@ -102,11 +102,11 @@ test("fake-display-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("fake-display-test") {
+fuchsia_unittest_package("fake-display-unittests") {
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  deps = [ ":fake-display-test-bin" ]
+  deps = [ ":fake-display-unittests-bin" ]
 }

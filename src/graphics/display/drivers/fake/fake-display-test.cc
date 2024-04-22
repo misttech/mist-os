@@ -684,42 +684,49 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   EXPECT_NE(framebuffer_image_handle, INVALID_ID);
 
   // Create display configuration.
-  layer_t layer = CreatePrimaryLayerConfig(framebuffer_image_handle, kFramebufferImageMetadata);
-
-  constexpr size_t kNumLayers = 1;
-  std::array<const layer_t*, kNumLayers> layers = {&layer};
+  constexpr size_t kLayerCount = 1;
+  std::array<const layer_t, kLayerCount> kLayers = {
+      CreatePrimaryLayerConfig(framebuffer_image_handle, kFramebufferImageMetadata),
+  };
+  std::array<const layer_t*, kLayerCount> kLayerPtrs = {
+      kLayers.data(),
+  };
 
   // Must match kDisplayId in fake-display.cc.
   // TODO(https://fxbug.dev/42078942): Do not hardcode the display ID.
   constexpr display::DisplayId kDisplayId(1);
-  display_config_t display_config = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .mode = {},
+  constexpr size_t kDisplayCount = 1;
+  std::array<const display_config_t, kDisplayCount> kDisplayConfigs = {
+      display_config_t{
+          .display_id = display::ToBanjoDisplayId(kDisplayId),
+          .mode = {},
 
-      .cc_flags = 0u,
-      .cc_preoffsets = {},
-      .cc_coefficients = {},
-      .cc_postoffsets = {},
+          .cc_flags = 0u,
+          .cc_preoffsets = {},
+          .cc_coefficients = {},
+          .cc_postoffsets = {},
 
-      .layer_list = layers.data(),
-      .layer_count = layers.size(),
+          .layer_list = kLayerPtrs.data(),
+          .layer_count = kLayerPtrs.size(),
+      },
   };
-  constexpr size_t kNumDisplays = 1;
-  std::array<const display_config_t*, kNumDisplays> display_configs = {&display_config};
+  std::array<const display_config_t*, kDisplayCount> kDisplayConfigPtrs = {
+      kDisplayConfigs.data(),
+  };
 
-  std::array<client_composition_opcode_t, kNumLayers> client_composition_opcodes = {0u};
+  std::array<client_composition_opcode_t, kLayerCount> client_composition_opcodes = {0u};
   size_t client_composition_opcodes_count = 0;
 
   // Check and apply the display configuration.
   config_check_result_t config_check_result = display()->DisplayControllerImplCheckConfiguration(
-      display_configs.data(), display_configs.size(), client_composition_opcodes.data(),
+      kDisplayConfigPtrs.data(), kDisplayConfigPtrs.size(), client_composition_opcodes.data(),
       client_composition_opcodes.size(), &client_composition_opcodes_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::ConfigStamp config_stamp(1);
   const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
-  display()->DisplayControllerImplApplyConfiguration(display_configs.data(), display_configs.size(),
-                                                     &banjo_config_stamp);
+  display()->DisplayControllerImplApplyConfiguration(
+      kDisplayConfigPtrs.data(), kDisplayConfigPtrs.size(), &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
   EXPECT_FALSE(display_capture_completion.completed().signaled());
