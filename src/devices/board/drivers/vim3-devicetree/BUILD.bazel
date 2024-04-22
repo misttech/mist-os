@@ -120,7 +120,7 @@ fuchsia_component_manifest(
     name = "test-manifest",
     src = "meta/vim3-devicetree-test.cml",
     includes = [
-        "@internal_sdk//pkg/sys/component:realm_builder",
+        "@fuchsia_sdk//pkg/sys/component:realm_builder_absolute",
     ],
 )
 
