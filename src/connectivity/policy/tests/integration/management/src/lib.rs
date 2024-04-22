@@ -829,15 +829,20 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         };
 
         // Add a device to the realm that looks like a WLAN AP from the
-        // perspective of NetCfg. The topological path for the interface must
-        // include "wlanif-ap" as that is how NetCfg identifies a WLAN AP
-        // interface.
+        // perspective of NetCfg.
         let network = sandbox
             .create_network(format!("dhcp-server-{}", offset))
             .await
             .expect("create network");
         let wlan_ap = network
-            .create_endpoint(format!("wlanif-ap-dhcp-server-{}", offset))
+            .create_endpoint_with(
+                format!("wlanif-ap-dhcp-server-{}", offset),
+                fnetemul_network::EndpointConfig {
+                    mtu: netemul::DEFAULT_MTU,
+                    mac: None,
+                    port_class: fidl_fuchsia_hardware_network::PortClass::WlanAp,
+                },
+            )
             .await
             .expect("create wlan ap");
         let path = netemul::devfs_device_path(&format!("dhcp-server-ep-{}", offset));
