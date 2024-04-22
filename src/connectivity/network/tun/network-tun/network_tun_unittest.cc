@@ -2,16 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.network/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.network/cpp/markers.h>
+#include <fidl/fuchsia.hardware.network/cpp/natural_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/syslog/global.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
 
+#include <optional>
+
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -150,22 +158,42 @@ zx::result<OwnedPortEvent> WatchPorts(
   return zx::ok(OwnedPortEvent(result.value().event));
 }
 
-zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
+zx::result<fuchsia_hardware_network::PortInfo> GetPortInfo(
     fit::function<zx_status_t(fidl::ServerEnd<fuchsia_hardware_network::Port>)> get_port) {
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
+  auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
   if (zx_status_t status = get_port(std::move(server)); status != ZX_OK) {
     return zx::error(status);
   }
 
-  fidl::WireResult result = fidl::WireCall(client)->GetInfo();
-  if (!result.ok()) {
-    return zx::error(result.status());
+  fidl::SyncClient<fuchsia_hardware_network::Port> client{std::move(client_end)};
+  fidl::Result result = client->GetInfo();
+
+  if (!result.is_ok()) {
+    return zx::error(result.error_value().status());
   }
-  fuchsia_hardware_network::wire::PortInfo& port_info = result.value().info;
-  if (!port_info.has_id()) {
+  fuchsia_hardware_network::PortInfo port_info = result.value().info();
+  if (!port_info.id().has_value()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok(port_info.id());
+  return zx::ok(port_info);
+}
+
+zx::result<fuchsia_hardware_network::PortInfo> GetPortInfo(
+    const fidl::ClientEnd<fuchsia_net_tun::Port>& tun_port) {
+  return GetPortInfo([&tun_port](fidl::ServerEnd<fuchsia_hardware_network::Port> server) {
+    return fidl::WireCall(tun_port)->GetPort(std::move(server)).status();
+  });
+}
+
+zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
+    fit::function<zx_status_t(fidl::ServerEnd<fuchsia_hardware_network::Port>)> get_port) {
+  zx::result result = GetPortInfo(std::move(get_port));
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
+  fidl::Arena arena;
+  return zx::ok(fidl::ToWire(arena, result.value().id().value()));
 }
 
 zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
@@ -1660,6 +1688,63 @@ MATCHER_P(IsRemovedPortEvent, port, "") {
   *result_listener << "which is " << arg.describe();
   return arg.which == fuchsia_hardware_network::wire::DevicePortEvent::Tag::kRemoved &&
          arg.port_id.value().base == port.base && arg.port_id.value().salt == port.salt;
+}
+
+TEST_F(TunTest, SetPortClass) {
+  zx::result device_result = CreateDevice(DefaultDeviceConfig());
+  ASSERT_OK(device_result.status_value());
+  fidl::WireSyncClient tun{std::move(*device_result)};
+
+  fidl::ClientEnd<fuchsia_hardware_network::Device> device;
+  {
+    zx::result server_end = fidl::CreateEndpoints(&device);
+    ASSERT_OK(server_end.status_value());
+    ASSERT_OK(tun->GetDevice(std::move(*server_end)).status());
+  }
+
+  struct {
+    const char* name;
+    fuchsia_hardware_network::wire::PortId id;
+    std::optional<fuchsia_hardware_network::wire::PortClass> port_class;
+    fuchsia_hardware_network::wire::PortClass expects_port_class;
+  } ports[] = {
+      {
+          .name = "port with virtual class",
+          .id = {.base = 1},
+          .port_class = fuchsia_hardware_network::wire::PortClass::kVirtual,
+          .expects_port_class = fuchsia_hardware_network::wire::PortClass::kVirtual,
+      },
+      {
+          .name = "port with no explicit class",
+          .id = {.base = 2},
+          .port_class = std::nullopt,
+          .expects_port_class = fuchsia_hardware_network::wire::PortClass::kVirtual,
+      },
+      {
+          .name = "port with non-virtual class",
+          .id = {.base = 3},
+          .port_class = fuchsia_hardware_network::wire::PortClass::kWlanAp,
+          .expects_port_class = fuchsia_hardware_network::wire::PortClass::kWlanAp,
+      },
+  };
+
+  for (auto& port : ports) {
+    SCOPED_TRACE(port.name);
+    fidl::ClientEnd<fuchsia_net_tun::Port> client_end;
+    zx::result server_end = fidl::CreateEndpoints(&client_end);
+    ASSERT_OK(server_end.status_value());
+    fuchsia_net_tun::wire::DevicePortConfig port_config = DefaultDevicePortConfig();
+    port_config.base().set_id(port.id.base);
+    if (port.port_class.has_value()) {
+      port_config.base().set_port_class(port.port_class.value());
+    }
+
+    ASSERT_OK(tun->AddPort(port_config, std::move(*server_end)).status());
+
+    zx::result port_info = GetPortInfo(client_end);
+    ASSERT_OK(port_info.status_value());
+    ASSERT_EQ(port_info->base_info()->port_class(), port.expects_port_class);
+  }
 }
 
 TEST_F(TunTest, AddRemovePorts) {

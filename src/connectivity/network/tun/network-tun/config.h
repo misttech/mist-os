@@ -19,6 +19,7 @@ class BasePortConfig {
   uint32_t mtu;
   std::vector<fuchsia_hardware_network::wire::FrameType> rx_types;
   std::vector<fuchsia_hardware_network::wire::FrameTypeSupport> tx_types;
+  fuchsia_hardware_network::wire::PortClass port_class;
 };
 
 class DevicePortConfig : public BasePortConfig {
