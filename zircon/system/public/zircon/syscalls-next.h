@@ -9,6 +9,7 @@
 #include <zircon/compiler.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
+#include <zircon/syscalls/iob.h>
 
 // ====== Pager writeback support ====== //
 
@@ -164,6 +165,37 @@ typedef struct {
 } zx_processor_power_level_transition_t;
 
 // ====== End of runtime processor power management support ====== //
+// ====== Upcoming IOB support ====== //
+
+// Represents an IOBuffer region of "ID allocator" discipline, used to map sized
+// data blobs to sequentially-allocated numeric IDs.
+//
+// Suppose there are N mapped blobs. The memory is laid out as follows, with
+// copies of the blobs growing down and their corresponding bookkeeping indices
+// growing up:
+// --------------------------------
+//   next available blob ID (4 bytes)
+//   blob head offset (4 bytes)
+//   ----------------------------
+//   blob 0 size (4 bytes)       } <-- bookkeeping index
+//   blob 0 offset (4 bytes)     }
+//   ...
+//   blob N-1 size (4 bytes)
+//   blob N-1 offset (4 bytes)
+//   ----------------------------
+//   zero-initialized memory      <-- remaining bytes available
+//   ---------------------------- <-- blob head offset
+//   blob N-1
+//   ...
+//   blob 0
+// --------------------------------
+//
+#define ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR ((zx_iob_discipline_type_t)(1u))
+
+// Allocation options for `zx_iob_allocate_id()`.
+typedef uint32_t zx_iob_allocate_id_options_t;
+
+// ====== End of upcoming IOB support ====== //
 
 #ifndef _KERNEL
 

@@ -19,8 +19,8 @@
 namespace iob {
 
 // Represents a thread-safe view into an IOBuffer region of "ID allocator"
-// discipline, used to map sized data blobs to sequentially-allocated numeric
-// IDs.
+// discipline (ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR), used to map sized data
+// blobs to sequentially-allocated numeric IDs.
 //
 // Suppose there are N mapped blobs. The memory is laid out as follows, with
 // copies of the blobs growing down and their corresponding bookkeeping indices
@@ -44,9 +44,6 @@ namespace iob {
 //
 // This class takes care of the atomic nuance required of accessing and updating
 // such a structure.
-//
-// TODO(https://fxbug.dev/319501447): Reference the corresponding
-// ZX_IOB_DISCIPLINE_TYPE_* value once defined.
 class BlobIdAllocator {
  public:
   // The possible failure modes of Allocate().
@@ -401,7 +398,9 @@ class BlobIdAllocator {
 
  private:
   struct alignas(8) Header {
-    constexpr uint32_t index_end() const { return sizeof(Header) + next_id * sizeof(Index); }
+    constexpr uint32_t index_end() const {
+      return static_cast<uint32_t>(sizeof(Header) + next_id * sizeof(Index));
+    }
 
     // See AllocateError::kInvalidHeader.
     constexpr bool IsValid(size_t length) const {

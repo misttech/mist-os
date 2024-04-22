@@ -25,6 +25,7 @@ pub type zx_koid_t = u64;
 pub type zx_obj_type_t = u32;
 pub type zx_object_info_topic_t = u32;
 pub type zx_info_maps_type_t = u32;
+pub type zx_iob_allocate_id_options_t = u32;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
 pub type zx_rights_t = u32;

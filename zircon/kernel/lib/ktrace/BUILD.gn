@@ -37,6 +37,7 @@ config("suppress-warning.config") {
     "//build/config/*",
     "//sdk/fidl/zbi:*",
     "//sdk/lib/fit/*",
+    "//sdk/lib/iob/*",
     "//sdk/lib/stdcompat/*",
     "//sdk/lib/zbi-format/*",
     "//src/lib/elfldltl/*",

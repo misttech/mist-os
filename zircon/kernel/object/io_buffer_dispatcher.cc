@@ -6,6 +6,9 @@
 
 #include <assert.h>
 #include <lib/counters.h>
+#include <lib/iob/blob-id-allocator.h>
+#include <lib/user_copy/user_ptr.h>
+#include <lib/zx/result.h>
 #include <string.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
@@ -14,7 +17,6 @@
 #include <zircon/types.h>
 
 #include <cstdint>
-#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
@@ -27,8 +29,12 @@
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
+#include <vm/pinned_vm_object.h>
 #include <vm/pmm.h>
+#include <vm/vm_address_region.h>
 #include <vm/vm_object.h>
+
+#include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
 
@@ -36,11 +42,12 @@ KCOUNTER(dispatcher_iob_create_count, "dispatcher.iob.create")
 KCOUNTER(dispatcher_iob_destroy_count, "dispatcher.iob.destroy")
 
 // static
-zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::CreateRegions(
+zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher::CreateRegions(
     const IoBufferDispatcher::RegionArray& region_configs, VmObjectChildObserver* ep0,
     VmObjectChildObserver* ep1) {
   fbl::AllocChecker ac;
-  fbl::Array<IobRegion> region_inner = fbl::MakeArray<IobRegion>(&ac, region_configs.size());
+  fbl::Array<IobRegionVariant> region_inner =
+      fbl::MakeArray<IobRegionVariant>(&ac, region_configs.size());
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -120,8 +127,14 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::Create
     ep0_reference->SetChildObserver(ep1);
     ep1_reference->SetChildObserver(ep0);
 
-    region_inner[i] =
-        IobRegion{ktl::move(ep0_reference), ktl::move(ep1_reference), region_config, koid};
+    if (zx::result result =
+            CreateIobRegionVariant(ktl::move(ep0_reference), ktl::move(ep1_reference),
+                                   ktl::move(vmo), region_config, koid);
+        result.is_error()) {
+      return result.take_error();
+    } else {
+      region_inner[i] = ktl::move(result.value());
+    }
   }
   return zx::ok(ktl::move(region_inner));
 }
@@ -163,7 +176,7 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx::result<fbl::Array<IobRegion>> regions =
+  zx::result<fbl::Array<IobRegionVariant>> regions =
       CreateRegions(region_configs, new_handle0.dispatcher().get(), new_handle1.dispatcher().get());
   if (regions.is_error()) {
     return regions.error_value();
@@ -193,29 +206,22 @@ IoBufferDispatcher::IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher
 }
 
 zx_rights_t IoBufferDispatcher::GetMapRights(zx_rights_t iob_rights, size_t region_index) const {
-  Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  DEBUG_ASSERT(region_index < shared_state_->regions.size());
-  zx_rights_t region_rights = shared_state_->regions[region_index].GetMapRights(GetEndpointId());
+  zx_rights_t region_rights =
+      shared_state_->GetRegion<>(region_index)->GetMapRights(GetEndpointId());
   region_rights &= (iob_rights | ZX_RIGHT_MAP);
   return region_rights;
 }
 
 zx_rights_t IoBufferDispatcher::GetMediatedRights(size_t region_index) const {
-  Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  DEBUG_ASSERT(region_index < shared_state_->regions.size());
-  return shared_state_->regions[region_index].GetMediatedRights(GetEndpointId());
+  return shared_state_->GetRegion<>(region_index)->GetMediatedRights(GetEndpointId());
 }
 
 const fbl::RefPtr<VmObject>& IoBufferDispatcher::GetVmo(size_t region_index) const {
-  Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  DEBUG_ASSERT(region_index < shared_state_->regions.size());
-  return shared_state_->regions[region_index].GetVmo(GetEndpointId());
+  return shared_state_->GetRegion<>(region_index)->GetVmo(GetEndpointId());
 }
 
 zx_iob_region_t IoBufferDispatcher::GetRegion(size_t region_index) const {
-  Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  DEBUG_ASSERT(region_index < shared_state_->regions.size());
-  return shared_state_->regions[region_index].GetRegion();
+  return shared_state_->GetRegion<>(region_index)->region();
 }
 
 size_t IoBufferDispatcher::RegionCount() const {
@@ -275,8 +281,9 @@ IoBufferDispatcher::~IoBufferDispatcher() {
   Guard<CriticalMutex> guard{&shared_state_->state_lock};
   IobEndpointId other_id =
       endpoint_id_ == IobEndpointId::Ep0 ? IobEndpointId::Ep1 : IobEndpointId::Ep0;
-  for (const IobRegion& region : shared_state_->regions) {
-    if (const fbl::RefPtr<VmObject>& vmo = region.GetVmo(other_id); vmo != nullptr) {
+  for (size_t i = 0; i < shared_state_->regions.size(); ++i) {
+    if (const fbl::RefPtr<VmObject>& vmo = shared_state_->GetRegionLocked<>(i)->GetVmo(other_id);
+        vmo != nullptr) {
       vmo->SetChildObserver(nullptr);
     }
   }
@@ -291,29 +298,27 @@ zx_info_iob_t IoBufferDispatcher::GetInfo() const {
 }
 
 zx_iob_region_info_t IoBufferDispatcher::GetRegionInfo(size_t index) const {
-  Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  DEBUG_ASSERT(index < shared_state_->regions.size());
   canary_.Assert();
-  return shared_state_->regions[index].GetRegionInfo(endpoint_id_ == IobEndpointId::Ep1);
+  return shared_state_->GetRegion<>(index)->GetRegionInfo(endpoint_id_ == IobEndpointId::Ep1);
 }
 
 zx_status_t IoBufferDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
-  Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  shared_state_->regions[0].GetVmo(IobEndpointId::Ep0)->get_name(out_name, ZX_MAX_NAME_LEN);
+  shared_state_->GetRegion<>(0)->GetVmo(IobEndpointId::Ep0)->get_name(out_name, ZX_MAX_NAME_LEN);
   return ZX_OK;
 }
 
 zx_status_t IoBufferDispatcher::set_name(const char* name, size_t len) {
   canary_.Assert();
   Guard<CriticalMutex> guard{&shared_state_->state_lock};
-  for (const IobRegion& region : shared_state_->regions) {
-    switch (region.GetRegion().type) {
+  for (size_t i = 0; i < shared_state_->regions.size(); ++i) {
+    const IobRegion* region = shared_state_->GetRegionLocked<>(i);
+    switch (region->region().type) {
       case ZX_IOB_REGION_TYPE_PRIVATE: {
-        zx_status_t region_result = region.GetVmo(IobEndpointId::Ep0)->set_name(name, len);
+        zx_status_t region_result = region->GetVmo(IobEndpointId::Ep0)->set_name(name, len);
         if (region_result != ZX_OK) {
           return region_result;
         }
-        region_result = region.GetVmo(IobEndpointId::Ep1)->set_name(name, len);
+        region_result = region->GetVmo(IobEndpointId::Ep1)->set_name(name, len);
         if (region_result != ZX_OK) {
           return region_result;
         }
@@ -353,4 +358,153 @@ zx::result<fbl::RefPtr<VmObject>> IoBufferDispatcher::CreateMappableVmoForRegion
   }
   child_reference->set_user_id(vmo->user_id());
   return zx::ok(child_reference);
+}
+
+zx::result<uint32_t> IoBufferDispatcher::AllocateId(size_t region_index,
+                                                    user_in_ptr<const ktl::byte> blob_ptr,
+                                                    size_t blob_size) {
+  if (region_index >= RegionCount()) {
+    return zx::error{ZX_ERR_OUT_OF_RANGE};
+  }
+  if (auto* region = shared_state_->GetRegion<IobRegionIdAllocator>(region_index)) {
+    return region->AllocateId(GetEndpointId(), blob_ptr, blob_size);
+  }
+  return zx::error{ZX_ERR_WRONG_TYPE};
+}
+
+// static
+zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRegionVariant(
+    fbl::RefPtr<VmObject> ep0_vmo,     //
+    fbl::RefPtr<VmObject> ep1_vmo,     //
+    fbl::RefPtr<VmObject> kernel_vmo,  //
+    const zx_iob_region_t& region,     //
+    zx_koid_t koid) {
+  constexpr zx_iob_access_t kEp0MedR = ZX_IOB_EP0_CAN_MEDIATED_READ;
+  constexpr zx_iob_access_t kEp0MedW = ZX_IOB_EP0_CAN_MEDIATED_WRITE;
+  constexpr zx_iob_access_t kEp0MapW = ZX_IOB_EP0_CAN_MAP_WRITE;
+  constexpr zx_iob_access_t kEp1MedR = ZX_IOB_EP1_CAN_MEDIATED_READ;
+  constexpr zx_iob_access_t kEp1MedW = ZX_IOB_EP1_CAN_MEDIATED_WRITE;
+  constexpr zx_iob_access_t kEp1MapW = ZX_IOB_EP1_CAN_MAP_WRITE;
+
+  zx_iob_access_t mediated0 = region.access & (kEp0MedR | kEp0MedW);
+  zx_iob_access_t mediated1 = region.access & (kEp1MedR | kEp1MedW);
+  bool mediated = mediated0 != 0 || mediated1 != 0;
+  bool map_writable = (region.access & kEp0MapW) != 0 || (region.access & kEp1MapW) != 0;
+
+  // The region memory must be directly accessible by userspace or the kernel.
+  if (!map_writable && !mediated) {
+    return zx::error{ZX_ERR_INVALID_ARGS};
+  }
+
+  fbl::RefPtr<VmMapping> mapping;
+  zx_vaddr_t base = 0;
+  if (mediated) {
+    const char* mapping_name;
+    switch (region.discipline.type) {
+      case ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR:
+        // If an ID allocator endpoint requests mediated access, that access must at
+        // least admit mediated writes. Equivalently, no ID allocator endpoint can
+        // be read-only in terms of mediated access.
+        if (mediated0 == kEp0MedR || mediated1 == kEp1MedR) {
+          return zx::error{ZX_ERR_INVALID_ARGS};
+        }
+        mapping_name = "IOBuffer region (ID allocator)";
+        break;
+      case ZX_IOB_DISCIPLINE_TYPE_NONE:
+        // NONE type discipline does not support mediated access.
+        [[fallthrough]];
+      default:
+        // Unknown discipline.
+        return zx::error{ZX_ERR_INVALID_ARGS};
+    }
+
+    // Create a mapping of this VMO in the kernel aspace. It is convenient to
+    // create the mapping object first before any discipline-specific pinning
+    // and mapping is actually performed, allowing that to be done in
+    // subclasses, so we pass `VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING`.
+    fbl::RefPtr<VmAddressRegion> kernel_vmar =
+        VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
+    zx::result<VmAddressRegion::MapResult> result = kernel_vmar->CreateVmMapping(
+        0, region.size, 0, VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, ktl::move(kernel_vmo), 0,
+        ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, mapping_name);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    mapping = ktl::move(result.value().mapping);
+    base = result.value().base;
+  }
+
+  IobRegionVariant variant;
+  switch (region.discipline.type) {
+    case ZX_IOB_DISCIPLINE_TYPE_NONE:
+      variant = IobRegionNone{
+          ktl::move(ep0_vmo), ktl::move(ep1_vmo), ktl::move(mapping), base, region, koid};
+      break;
+    case ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR: {
+      IobRegionIdAllocator allocator{
+          ktl::move(ep0_vmo), ktl::move(ep1_vmo), ktl::move(mapping), base, region, koid};
+      if (zx::result result = allocator.Init(); result.is_error()) {
+        return result.take_error();
+      }
+      variant = ktl::move(allocator);
+      break;
+    }
+    default:
+      // Unknown discipline.
+      return zx::error{ZX_ERR_INVALID_ARGS};
+  }
+  return zx::ok(ktl::move(variant));
+}
+
+zx::result<> IoBufferDispatcher::IobRegionIdAllocator::Init() {
+  AssertDiscipline(ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR);
+
+  if (!mapping()) {
+    return zx::ok();
+  }
+
+  zx_status_t status =
+      PinnedVmObject::Create(mapping()->vmo(), 0, region().size, /*write=*/true, &pin_);
+  if (status != ZX_OK) {
+    return zx::error{status};
+  }
+  status = mapping()->MapRange(0, region().size, /*commit=*/true);
+  if (status != ZX_OK) {
+    return zx::error{status};
+  }
+
+  iob::BlobIdAllocator allocator(mediated_bytes());
+  allocator.Init(/*zero_fill=*/false);  // A fresh VMO, so already zero-filled.
+
+  return zx::ok();
+}
+
+zx::result<uint32_t> IoBufferDispatcher::IobRegionIdAllocator::AllocateId(
+    IobEndpointId id, user_in_ptr<const ktl::byte> blob_ptr, size_t blob_size) {
+  AssertDiscipline(ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR);
+
+  zx_rights_t mediated_rights = GetMediatedRights(id);
+  if ((mediated_rights & ZX_RIGHT_WRITE) == 0) {
+    return zx::error{ZX_ERR_ACCESS_DENIED};
+  }
+
+  iob::BlobIdAllocator allocator(mediated_bytes());
+  zx_status_t copy_status = ZX_OK;
+  auto result = allocator.Allocate(
+      [&copy_status](auto blob_ptr, ktl::span<ktl::byte> dest) {
+        copy_status = blob_ptr.copy_array_from_user(dest.data(), dest.size());
+      },
+      blob_ptr, blob_size);
+  if (copy_status != ZX_OK) {
+    return zx::error{copy_status};
+  }
+  if (result.is_error()) {
+    switch (result.error_value()) {
+      case iob::BlobIdAllocator::AllocateError::kOutOfMemory:
+        return zx::error{ZX_ERR_NO_MEMORY};
+      default:
+        return zx::error{ZX_ERR_IO_DATA_INTEGRITY};
+    }
+  }
+  return zx::ok(result.value());
 }

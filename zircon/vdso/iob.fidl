@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 library zx;
 
+/// zx_iob_allocate_id() options.
+@next
+type IobAllocateIdOptions = flexible bits : uint32 {};
+
 @transport("Syscall")
 closed protocol Iob {
     /// ## Summary
@@ -24,13 +28,16 @@ closed protocol Iob {
     ///
     /// `zx_iob_create()` creates an IOBuffer, a memory object designed for
     /// efficient point-to-point communication. An IOBuffer can be thought
-    /// of as an abstraction over a shared buffer with (optionally
-    /// kernel-mediated) reads and writes that maintain data integrity and
-    /// enforce permissions.
+    /// of as an abstraction over a shared buffer backing a specific container
+    /// with (optionally kernel-mediated) reads and writes that maintain data
+    /// integrity and enforce permissions.
     ///
     /// An IOBuffer may have multiple regions, specified by *region_count*.
     /// Each region may be set to support varying access patterns or permissions
     /// configured by *regions*.
+    ///
+    /// If a region is configured for mediated access, then it will be created
+    /// with the associated container initialized.
     ///
     /// ### Region Descriptions
     ///
@@ -89,15 +96,8 @@ closed protocol Iob {
     /// *options* must be 0
     ///
     /// ### Discipline Types
-    /// #### ZX_IOB_DISCIPLINE_TYPE_NONE
     ///
-    ///  ```C++
-    ///  struct iob_discipline_t {
-    ///    uint64_t type; // Must be ZX_IOB_DISCIPLINE_TYPE_NONE
-    ///  };
-    ///  ```
-    ///
-    /// Specifies a free form region with no kernel mediated operations.
+    /// See `zx_iob_discipline_type_t` for more detail.
     ///
     /// ## Return value
     ///
@@ -108,7 +108,9 @@ closed protocol Iob {
     ///
     /// `ZX_ERR_INVALID_ARGS`  *ep_out0* or *ep_out1* is an invalid pointer or
     /// NULL, *options* is any value other than 0, or the regions configuration
-    /// is invalid
+    /// is invalid (e.g., if the region is inaccessible, being neither
+    /// map-writable or configured for mediated-access, or if the discipline is
+    /// invalid).
     ///
     /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory to allocated the
     /// requested buffers.
@@ -119,5 +121,66 @@ closed protocol Iob {
     }) -> (resource struct {
         ep0_out Handle;
         ep1_out Handle;
+    }) error Status;
+
+    /// ## Summary
+    ///
+    /// Allocates an ID out of an IOBuffer region of discipline
+    /// `ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR`.
+    ///
+    /// ## Declaration
+    /// ```c
+    /// #include <zircon/syscalls-next.h>
+    ///
+    /// zx_status_t zx_iob_allocate_id(zx_handle_t handle,
+    ///                                zx_iob_allocate_id_options_t options,
+    ///                                uint32_t region_index,
+    ///                                const void* blob,
+    ///                                uint64_t blob_size,
+    ///                                uint32_t* id);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// A new ID is allocated for the provided blob from the associated
+    /// container backing an IOBuffer region of discipline
+    /// `ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR`,
+    ///
+    /// The IOBuffer handle used to interact with the region must admit mediated
+    /// write access.
+    ///
+    /// ## Return value
+    ///
+    /// On success, `zx_iob_allocate_id()` returns `ZX_OK` and populates `id`
+    /// with the allocated ID.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_OUT_OF_RANGE`  `region_index` exceeded the maximum region
+    /// index.
+    ///
+    /// `ZX_ERR_WRONG_TYPE`  The corresponding region is not of the
+    /// `ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR` discipline.
+    ///
+    /// `ZX_ERR_INVALID_ARGS`  `options` was nonzero (there are no non-default
+    /// options supported at this time).
+    ///
+    /// `ZX_ERR_ACCESS_DENIED`  The IOB handle does not have write permissions,
+    /// or the corresponding region does not have mediated write permissions.
+    ///
+    /// `ZX_ERR_NO_MEMORY`  The ID allocator region has run out of memory from
+    /// which to allocate new IDs. Note that this unrelated to the state of
+    /// system memory.
+    ///
+    /// `ZX_ERR_IO_DATA_INTEGRITY`  The ID allocator region has been corrupted.
+    @next
+    strict AllocateId(resource struct {
+        handle Handle:IOB;
+        options IobAllocateIdOptions;
+        region_index uint32;
+        @voidptr
+        blob vector<byte>:MAX;
+    }) -> (struct {
+        id uint32;
     }) error Status;
 };

@@ -60,22 +60,20 @@ zx::result<> sampler::ThreadSamplerDispatcher::CreateImpl(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   for (size_t i = 0; i < configs.size(); i++) {
-    configs[i] =
-        zx_iob_region_t{.type = ZX_IOB_REGION_TYPE_PRIVATE,
-                        .access = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE |
-                                  ZX_IOB_EP0_CAN_MEDIATED_READ | ZX_IOB_EP0_CAN_MEDIATED_WRITE |
-                                  ZX_IOB_EP1_CAN_MEDIATED_READ | ZX_IOB_EP1_CAN_MAP_READ,
-                        .size = config.buffer_size,
-                        .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
-                        .private_region = zx_iob_region_private_t{
-                            .options = 0,
-                        }};
+    configs[i] = zx_iob_region_t{
+        .type = ZX_IOB_REGION_TYPE_PRIVATE,
+        .access = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE | ZX_IOB_EP1_CAN_MAP_READ,
+        .size = config.buffer_size,
+        .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+        .private_region = zx_iob_region_private_t{
+            .options = 0,
+        }};
   }
 
   {
     Guard<CriticalMutex> guard{&shared_regions->state_lock};
 
-    zx::result<fbl::Array<IobRegion>> regions = CreateRegions(
+    zx::result<fbl::Array<IobRegionVariant>> regions = CreateRegions(
         configs, write_dispatcher.dispatcher().get(), read_dispatcher.dispatcher().get());
     if (regions.is_error()) {
       return regions.take_error();

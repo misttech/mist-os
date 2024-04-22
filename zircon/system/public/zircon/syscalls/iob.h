@@ -31,8 +31,10 @@ typedef uint64_t zx_iob_discipline_type_t;
 // interfaces are also mirrored in discipline-specific syscalls that permit
 // indirect, kernel-mediated access to the region in this manner.
 typedef struct zx_iob_discipline {
-  uint64_t type;
-  uint64_t reserved[8];
+  zx_iob_discipline_type_t type;
+  union {
+    uint64_t reserved[8];
+  };
 } zx_iob_discipline_t;
 
 // The type of a region specifies the nature of its backing memory object and

@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/iob/blob-id-allocator.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
+#include <zircon/process.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
-#include <zircon/system/public/zircon/process.h>
-#include <zircon/system/public/zircon/syscalls/iob.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
@@ -168,17 +168,17 @@ TEST(Iob, MappingRights) {
   constexpr size_t noPermissionsIdx = 0;
   constexpr size_t onlyEp0Idx = 1;
   constexpr size_t rdOnlyIdx = 2;
-  // There are 3 factors that go into the resulting permissions of a mapped region:
+  // There are 4 factors that go into the resulting permissions of a mapped region:
   // - The options the region it was created with
-  // - The handle rights of the iorb we have
+  // - The handle rights of the iob we have
   // - The handle rights of the vmar we have
   // - The VmOptions that the map call requests
   zx_iob_region_t config[3]{
       {
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = ZX_IOB_EP0_CAN_MEDIATED_READ,
+          .access = ZX_IOB_EP0_CAN_MEDIATED_WRITE,
           .size = ZX_PAGE_SIZE,
-          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
           .private_region =
               {
                   .options = 0,
@@ -196,9 +196,9 @@ TEST(Iob, MappingRights) {
       },
       {
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = kIoBufferRdOnlyMap,
+          .access = kIoBufferRdOnlyMap | ZX_IOB_EP0_CAN_MEDIATED_WRITE,
           .size = ZX_PAGE_SIZE,
-          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
           .private_region =
               {
                   .options = 0,
@@ -695,6 +695,165 @@ TEST(Iob, GetInfoProcessMaps) {
     }
   }
   EXPECT_TRUE(saw_iob_mapping);
+}
+
+TEST(Iob, IdAllocatorMediatedAccess) {
+  constexpr std::array<std::byte, 10> kBlob{std::byte{'a'}};
+  constexpr zx_iob_allocate_id_options_t kOptions = 0;
+  constexpr uint32_t kIdAllocatorIdx = 0;
+
+  // Endpoint 0 will be mapped, while endpoint 1 will facilitate mediated
+  // allocations.
+  zx_handle_t ep0, ep1;
+  zx_iob_region_t config[]{
+      {
+          .type = ZX_IOB_REGION_TYPE_PRIVATE,
+          .access = kIoBufferEp0OnlyRwMap | ZX_IOB_EP1_CAN_MEDIATED_WRITE,
+          .size = ZX_PAGE_SIZE,
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
+          .private_region = {.options = 0},
+      },
+  };
+
+  ASSERT_OK(zx_iob_create(0, config, std::size(config), &ep0, &ep1));
+
+  cpp20::span<std::byte> bytes;
+  {
+    zx_vaddr_t addr;
+    EXPECT_OK(zx_vmar_map_iob(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0,
+                              ZX_PAGE_SIZE, &addr));
+
+    ASSERT_NE(addr, 0u);
+    bytes = {reinterpret_cast<std::byte*>(addr), ZX_PAGE_SIZE};
+  }
+
+  // Since mediated access is enabled, the region should already be initialized.
+  iob::BlobIdAllocator allocator(bytes);
+
+  // Check that mediated allocation works.
+  for (uint64_t expected_id = 0; expected_id < 100; ++expected_id) {
+    EXPECT_EQ(expected_id, allocator.next_id());
+
+    uint32_t id;
+    if (expected_id % 2 == 0) {
+      auto result = allocator.Allocate(kBlob);
+      ASSERT_TRUE(result.is_ok());
+      id = result.value();
+    } else {
+      ASSERT_OK(
+          zx_iob_allocate_id(ep1, kOptions, kIdAllocatorIdx, kBlob.data(), kBlob.size(), &id));
+    }
+    EXPECT_EQ(expected_id, id);
+  }
+  EXPECT_EQ(100, allocator.next_id());
+}
+
+TEST(Iob, IdAllocatorMediatedErrors) {
+  constexpr std::array<std::byte, 10> kBlob{std::byte{'a'}};
+  constexpr zx_iob_allocate_id_options_t kOptions = 0;
+  constexpr uint32_t kIdAllocatorIdx = 0;
+
+  // Endpoint 0 will be mapped, while endpoint 1 will facilitate mediated
+  // allocations.
+  zx_handle_t ep0, ep1;
+  zx_iob_region_t config[]{
+      {
+          .type = ZX_IOB_REGION_TYPE_PRIVATE,
+          .access = kIoBufferEp0OnlyRwMap | ZX_IOB_EP1_CAN_MEDIATED_WRITE,
+          .size = ZX_PAGE_SIZE,
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
+          .private_region = {.options = 0},
+      },
+      {
+          .type = ZX_IOB_REGION_TYPE_PRIVATE,
+          .access = kIoBufferEpRwMap,
+          .size = ZX_PAGE_SIZE,
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+          .private_region = {.options = 0},
+      },
+  };
+
+  ASSERT_OK(zx_iob_create(0, config, std::size(config), &ep0, &ep1));
+
+  cpp20::span<std::byte> bytes;
+  {
+    zx_vaddr_t addr;
+    EXPECT_OK(zx_vmar_map_iob(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0,
+                              ZX_PAGE_SIZE, &addr));
+
+    ASSERT_NE(addr, 0u);
+    bytes = {reinterpret_cast<std::byte*>(addr), ZX_PAGE_SIZE};
+  }
+
+  // Since mediated access is enabled, the region should already be initialized.
+  iob::BlobIdAllocator allocator(bytes);
+
+  // ZX_ERR_OUT_OF_RANGE (region index too large)
+  {
+    uint32_t id;
+    zx_status_t status = zx_iob_allocate_id(ep1, kOptions, 2, kBlob.data(), kBlob.size(), &id);
+    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, status);
+  }
+
+  // ZX_ERR_WRONG_TYPE (region not of ID_ALLOCATOR discipline)
+  {
+    uint32_t id;
+    zx_status_t status = zx_iob_allocate_id(ep1, kOptions, 1, kBlob.data(), kBlob.size(), &id);
+    EXPECT_EQ(ZX_ERR_WRONG_TYPE, status);
+  }
+
+  // ZX_ERR_INVALID_ARGS (invalid options)
+  {
+    uint32_t id;
+    zx_status_t status =
+        zx_iob_allocate_id(ep1, -1, kIdAllocatorIdx, kBlob.data(), kBlob.size(), &id);
+    EXPECT_EQ(ZX_ERR_INVALID_ARGS, status);
+  }
+
+  // ZX_ERR_ACCESS_DENIED (endpoint not mediated-writable)
+  {
+    uint32_t id;
+    zx_status_t status =
+        zx_iob_allocate_id(ep0, kOptions, kIdAllocatorIdx, kBlob.data(), kBlob.size(), &id);
+    EXPECT_EQ(ZX_ERR_ACCESS_DENIED, status);
+  }
+
+  // ZX_ERR_NO_MEMORY (no memory left in container)
+  {
+    using AllocateError = iob::BlobIdAllocator::AllocateError;
+
+    fit::result<AllocateError, uint32_t> result = fit::ok(0);
+    while (result.is_ok()) {
+      result = allocator.Allocate(kBlob);
+    }
+    ASSERT_EQ(AllocateError::kOutOfMemory, result.error_value());
+
+    uint32_t id;
+    zx_status_t status =
+        zx_iob_allocate_id(ep1, kOptions, kIdAllocatorIdx, kBlob.data(), kBlob.size(), &id);
+    EXPECT_EQ(ZX_ERR_NO_MEMORY, status);
+  }
+
+  // ZX_ERR_IO_DATA_INTEGRITY (corrupted memory)
+  {
+    struct Header {
+      uint32_t next_id;
+      uint32_t blob_head;
+    };
+    Header* header = reinterpret_cast<Header*>(bytes.data());
+    header->next_id = -1;
+
+    uint32_t id;
+    zx_status_t status =
+        zx_iob_allocate_id(ep1, kOptions, kIdAllocatorIdx, kBlob.data(), kBlob.size(), &id);
+    EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, status);
+  }
+
+  // The whole region should be pinned, so decommitting should result in
+  // ZX_ERR_BAD_STATE.
+  EXPECT_EQ(ZX_ERR_BAD_STATE,
+            zx_vmar_op_range(zx_vmar_root_self(), ZX_VMAR_OP_DECOMMIT,
+                             reinterpret_cast<zx_vaddr_t>(bytes.data()), bytes.size(), nullptr, 0));
 }
 
 }  // namespace
