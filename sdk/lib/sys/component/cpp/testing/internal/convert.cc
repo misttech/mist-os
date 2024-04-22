@@ -116,7 +116,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
   }
-  if (auto config = cpp17_get_if<Config>(&capability)) {
+  if ([[maybe_unused]] auto config = cpp17_get_if<Config>(&capability)) {
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
     fuchsia::component::test::Config fidl_capability;
 
