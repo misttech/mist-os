@@ -280,7 +280,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
     RoutesWorkerState<I>
 {
     pub(crate) async fn create(
-        set_provider_proxy: &<I::SetProviderMarker as ProtocolMarker>::Proxy,
+        set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
         routes_state_proxy: &<I::StateMarker as ProtocolMarker>::Proxy,
     ) -> Result<
         (

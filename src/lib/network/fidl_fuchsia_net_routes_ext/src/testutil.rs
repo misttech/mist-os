@@ -140,11 +140,11 @@ pub mod admin {
 
     use crate::admin::{FidlRouteAdminIpExt, Responder, RouteSetRequest};
 
-    /// Provides a SetProvider implementation that provides one RouteSet and
+    /// Provides a RouteTable implementation that provides one RouteSet and
     /// then panics on subsequent invocations. Returns the request stream for
     /// that RouteSet.
     pub fn serve_one_route_set<I: FidlRouteAdminIpExt>(
-        server_end: fidl::endpoints::ServerEnd<I::SetProviderMarker>,
+        server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
     ) -> impl Stream<
             Item = <
                     <<I as FidlRouteAdminIpExt>::RouteSetMarker as ProtocolMarker>
@@ -154,7 +154,7 @@ pub mod admin {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct In<I: FidlRouteAdminIpExt>(
-            <<<I as FidlRouteAdminIpExt>::SetProviderMarker as ProtocolMarker>
+            <<<I as FidlRouteAdminIpExt>::RouteTableMarker as ProtocolMarker>
                 ::RequestStream as Stream
             >::Item,
         );
@@ -167,7 +167,7 @@ pub mod admin {
             .scan(false, |responded, item| {
                 let responded = std::mem::replace(responded, true);
                 if responded {
-                    panic!("received multiple SetProvider requests");
+                    panic!("received multiple RouteTable requests");
                 }
 
                 futures::future::ready(Some(item))
@@ -193,14 +193,14 @@ pub mod admin {
             .flatten()
     }
 
-    /// Provides a SetProvider implementation that serves no-op RouteSets.
+    /// Provides a RouteTable implementation that serves no-op RouteSets.
     pub async fn serve_noop_route_sets<I: FidlRouteAdminIpExt>(
-        server_end: fidl::endpoints::ServerEnd<I::SetProviderMarker>,
+        server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
     ) {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct In<I: FidlRouteAdminIpExt>(
-            <<<I as FidlRouteAdminIpExt>::SetProviderMarker as ProtocolMarker>
+            <<<I as FidlRouteAdminIpExt>::RouteTableMarker as ProtocolMarker>
                 ::RequestStream as Stream
             >::Item,
         );

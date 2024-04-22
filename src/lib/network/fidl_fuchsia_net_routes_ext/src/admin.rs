@@ -30,9 +30,9 @@ pub enum RouteSetCreationError {
 /// Admin extension for the `fuchsia.net.routes.admin` FIDL API.
 pub trait FidlRouteAdminIpExt: Ip {
     /// The "set provider" protocol to use for this IP version.
-    type SetProviderMarker: DiscoverableProtocolMarker;
+    type RouteTableMarker: DiscoverableProtocolMarker;
     /// The "root set" protocol to use for this IP version.
-    type GlobalSetProviderMarker: DiscoverableProtocolMarker;
+    type GlobalRouteTableMarker: DiscoverableProtocolMarker;
     /// The "route set" protocol to use for this IP version.
     type RouteSetMarker: ProtocolMarker;
     /// The request stream for the route set protocol.
@@ -48,8 +48,8 @@ pub trait FidlRouteAdminIpExt: Ip {
 }
 
 impl FidlRouteAdminIpExt for Ipv4 {
-    type SetProviderMarker = fnet_routes_admin::RouteTableV4Marker;
-    type GlobalSetProviderMarker = fnet_root::RoutesV4Marker;
+    type RouteTableMarker = fnet_routes_admin::RouteTableV4Marker;
+    type GlobalRouteTableMarker = fnet_root::RoutesV4Marker;
     type RouteSetMarker = fnet_routes_admin::RouteSetV4Marker;
     type RouteSetRequestStream = fnet_routes_admin::RouteSetV4RequestStream;
     type AddRouteResponder = fnet_routes_admin::RouteSetV4AddRouteResponder;
@@ -59,8 +59,8 @@ impl FidlRouteAdminIpExt for Ipv4 {
 }
 
 impl FidlRouteAdminIpExt for Ipv6 {
-    type SetProviderMarker = fnet_routes_admin::RouteTableV6Marker;
-    type GlobalSetProviderMarker = fnet_root::RoutesV6Marker;
+    type RouteTableMarker = fnet_routes_admin::RouteTableV6Marker;
+    type GlobalRouteTableMarker = fnet_root::RoutesV6Marker;
     type RouteSetMarker = fnet_routes_admin::RouteSetV6Marker;
     type RouteSetRequestStream = fnet_routes_admin::RouteSetV6RequestStream;
     type AddRouteResponder = fnet_routes_admin::RouteSetV6AddRouteResponder;
@@ -118,7 +118,7 @@ impl_responder!(
 /// Dispatches `new_route_set` on either the `RouteTableV4`
 /// or `RouteTableV6` proxy.
 pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
-    set_provider_proxy: &<I::SetProviderMarker as ProtocolMarker>::Proxy,
+    set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {
     let (route_set_proxy, route_set_server_end) =
         fidl::endpoints::create_proxy::<I::RouteSetMarker>()
@@ -128,7 +128,7 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
     #[generic_over_ip(I, Ip)]
     struct NewRouteSetInput<'a, I: FidlRouteAdminIpExt> {
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
-        set_provider_proxy: &'a <I::SetProviderMarker as ProtocolMarker>::Proxy,
+        set_provider_proxy: &'a <I::RouteTableMarker as ProtocolMarker>::Proxy,
     }
     let IpInvariant(result) = I::map_ip::<NewRouteSetInput<'_, I>, _>(
         NewRouteSetInput::<'_, I> { route_set_server_end, set_provider_proxy },
@@ -147,7 +147,7 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
 /// Dispatches `global_route_set` on either the `RoutesV4` or `RoutesV6` in
 /// fuchsia.net.root.
 pub fn new_global_route_set<I: Ip + FidlRouteAdminIpExt>(
-    set_provider_proxy: &<I::GlobalSetProviderMarker as ProtocolMarker>::Proxy,
+    set_provider_proxy: &<I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {
     let (route_set_proxy, route_set_server_end) =
         fidl::endpoints::create_proxy::<I::RouteSetMarker>()
@@ -157,7 +157,7 @@ pub fn new_global_route_set<I: Ip + FidlRouteAdminIpExt>(
     #[generic_over_ip(I, Ip)]
     struct NewRouteSetInput<'a, I: FidlRouteAdminIpExt> {
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
-        set_provider_proxy: &'a <I::GlobalSetProviderMarker as ProtocolMarker>::Proxy,
+        set_provider_proxy: &'a <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
     }
     let IpInvariant(result) = I::map_ip::<NewRouteSetInput<'_, I>, _>(
         NewRouteSetInput::<'_, I> { route_set_server_end, set_provider_proxy },

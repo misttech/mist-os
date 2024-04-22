@@ -44,8 +44,8 @@ struct TestSetup<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> {
     realm: netemul::TestRealm<'a>,
     network: netemul::TestNetwork<'a>,
     interface: netemul::TestInterface<'a>,
-    set_provider: <I::SetProviderMarker as ProtocolMarker>::Proxy,
-    global_set_provider: <I::GlobalSetProviderMarker as ProtocolMarker>::Proxy,
+    set_provider: <I::RouteTableMarker as ProtocolMarker>::Proxy,
+    global_set_provider: <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
     state: <I::StateMarker as ProtocolMarker>::Proxy,
 }
 
@@ -68,10 +68,10 @@ impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
             sandbox.create_network(format!("routes-admin-{name}")).await.expect("create network");
         let interface = realm.join_network(&network, "ep1").await.expect("join network");
         let set_provider = realm
-            .connect_to_protocol::<I::SetProviderMarker>()
-            .expect("connect to routes-admin SetProvider");
+            .connect_to_protocol::<I::RouteTableMarker>()
+            .expect("connect to routes-admin RouteTable");
         let global_set_provider = realm
-            .connect_to_protocol::<I::GlobalSetProviderMarker>()
+            .connect_to_protocol::<I::GlobalRouteTableMarker>()
             .expect("connect to global route set provider");
 
         let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to routes State");
