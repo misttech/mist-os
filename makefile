@@ -39,6 +39,10 @@ it: info gen ## Build multiboot(bootloader) and kernel zircon binary image(zbi)
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
 .PHONY: it
 
+all: gen ## Build all targets
+	$(NOECHO)$(NINJA) -C $(OUTPUT)
+.PHONY: all
+
 rain: ## Run qemu with precompiled images (do not rebuild)
 	$(NOECHO) $(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
