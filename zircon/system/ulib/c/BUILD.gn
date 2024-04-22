@@ -99,7 +99,11 @@ config("llvm-libc.config") {
 config("testonly.config") {
   visibility = [ "./*" ]
   defines = [
-    "LIBC_COPT_TEST_USE_FUCHSIA=1",
+    "LIBC_COPT_TEST_USE_ZXTEST",
+
+    # TODO(mcgrathr): This is being replaced by LIBC_COPT_TEST_USE_ZXTEST,
+    # but during the transition both are needed.
+    "LIBC_COPT_TEST_USE_FUCHSIA",
 
     # This namespace is different from the one used below for building libc
     # itself, mostly just for more visual clarity looking at backtraces from
