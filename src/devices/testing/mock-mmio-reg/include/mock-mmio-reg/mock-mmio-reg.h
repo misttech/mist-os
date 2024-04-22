@@ -196,7 +196,8 @@ class MockMmioRegRegion {
   }
 
   fdf::MmioBuffer GetMmioBuffer() {
-    return fdf_testing::CreateMmioBuffer((reg_offset_ + reg_size_) + reg_count_,
+    // TODO(https://fxbug.dev/335906001): This creates an unneeded VMO for now.
+    return fdf_testing::CreateMmioBuffer((reg_offset_ + reg_count_) * reg_size_,
                                          ZX_CACHE_POLICY_CACHED, &kMockMmioOps, this);
   }
 

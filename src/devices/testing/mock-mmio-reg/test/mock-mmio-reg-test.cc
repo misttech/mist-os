@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/mmio/mmio.h>
+#include <zircon/syscalls.h>
 
 #include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
@@ -28,6 +29,20 @@ TEST(MockMmioReg, CopyFrom) {
   ASSERT_NO_FATAL_FAILURE(reg_region_2.VerifyAll());
 }
 
+TEST(MockMmioReg, GetMmioBuffer) {
+  // By using page sized registers we ensure that the VMO sizing does not have any chance of
+  // rounding in a way that obscures an error in the constructor.
+  constexpr size_t kRegArrayLength = 128;
+  const size_t kRegSize = zx_system_get_page_size();
+  const size_t kExpectedMmioSize = kRegArrayLength * kRegSize;
+  ddk_mock::MockMmioRegRegion reg_region_no_offset(kRegSize, kRegArrayLength);
+  ddk_mock::MockMmioRegRegion reg_region_with_offset(kRegSize, kRegArrayLength / 2,
+                                                     kRegArrayLength / 2);
+
+  ASSERT_EQ(kExpectedMmioSize, reg_region_no_offset.GetMmioBuffer().get_size());
+  ASSERT_EQ(kExpectedMmioSize, reg_region_with_offset.GetMmioBuffer().get_size());
+}
+
 TEST(MockMmioReg, View) {
   ddk_mock::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100);
 
@@ -51,8 +66,7 @@ TEST(MockMmioReg, View) {
 }
 
 TEST(MockMmioReg, Offset) {
-  ddk_mock::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100,
-                                         0x1'0000 / sizeof(uint32_t));
+  ddk_mock::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100, 0x1'0000 / sizeof(uint32_t));
 
   fdf::MmioBuffer dut = reg_region.GetMmioBuffer();
 
