@@ -302,7 +302,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         )
         mock_sl4f_run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

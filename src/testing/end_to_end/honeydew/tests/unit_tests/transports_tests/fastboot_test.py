@@ -266,7 +266,7 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
         mock_fastboot_run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -360,7 +360,7 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
         mock_subprocess_check_output.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -543,7 +543,7 @@ class FastbootTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             self.fastboot_obj._get_target_info()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

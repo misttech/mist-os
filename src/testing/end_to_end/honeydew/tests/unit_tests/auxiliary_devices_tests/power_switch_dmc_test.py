@@ -68,7 +68,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         self.power_switch_dmc_obj.power_off()
         mock_subprocess_check_output.assert_called_once()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -133,7 +133,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         self.power_switch_dmc_obj.power_on()
         mock_subprocess_check_output.assert_called_once()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

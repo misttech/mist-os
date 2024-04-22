@@ -51,7 +51,7 @@ class TracingFCTests(unittest.TestCase):
             reboot_affordance=self.reboot_affordance_obj,
         )
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -115,7 +115,7 @@ class TracingFCTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.initialize()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -196,7 +196,7 @@ class TracingFCTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.start()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -288,7 +288,7 @@ class TracingFCTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.stop()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -356,7 +356,7 @@ class TracingFCTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.terminate()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -439,7 +439,7 @@ class TracingFCTests(unittest.TestCase):
                 data: str = file.read()
                 self.assertEqual(data, return_value)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

@@ -134,7 +134,7 @@ class Sl4fTests(unittest.TestCase):
 
             self.assertEqual(mock_sl4f_start_server.call_count, 3)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -210,7 +210,7 @@ class Sl4fTests(unittest.TestCase):
 
         mock_sl4f_run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -345,7 +345,7 @@ class Sl4fTests(unittest.TestCase):
         with self.assertRaises(errors.Sl4fError):
             self.sl4f_obj_wo_ip.start_server()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

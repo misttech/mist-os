@@ -50,7 +50,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
         )
         self.sl4f_obj.reset_mock()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -94,7 +94,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -187,7 +187,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -332,7 +332,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

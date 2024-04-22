@@ -99,7 +99,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -154,7 +154,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         self.sl4f_obj.run.assert_called()
         assert res["16085008211800713200"]["id"] == "16085008211800713200"
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {
@@ -181,7 +181,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ({"label": "discovery_true", "discovery": True},),
             ({"label": "discovery_false", "discovery": False},),
@@ -198,7 +198,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ({"label": "set_discoverable_true", "discoverable": True},),
             ({"label": "set_discoverable_false", "discoverable": False},),

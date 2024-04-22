@@ -56,7 +56,7 @@ def _custom_test_name_func(
 class HttpUtilsTests(unittest.TestCase):
     """Unit tests for honeydew.utils.http_utils.py."""
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 {

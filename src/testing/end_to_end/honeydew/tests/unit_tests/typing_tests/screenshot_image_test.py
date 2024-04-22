@@ -164,7 +164,7 @@ class ScreenshotImageTest(unittest.TestCase):
         ):
             ScreenshotImage.load_from_path("foo.jpg")
 
-    @parameterized.expand([param(suffix="png"), param(suffix="bgra")])
+    @parameterized.expand([param(suffix="png"), param(suffix="bgra")])  # type: ignore[misc]
     def test_load_from_resource(self, suffix: str) -> None:
         # Unfortunately cannot just import the `resources` subpackage since
         # it has a different absolute package name when the test runs in `fx test`
@@ -198,7 +198,7 @@ class ScreenshotImageTest(unittest.TestCase):
         image = ScreenshotImage(size=Size(1, 1), data=rgba_data(RED))
         self.assertEqual(image.get_pixel(0, 0), RED)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             param(x=2, y=0),
             param(x=0, y=2),
@@ -227,7 +227,7 @@ class ScreenshotImageTest(unittest.TestCase):
             },
         )
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             param(
                 pixels1=[RED, WHITE, BLUE, GREEN],
@@ -271,7 +271,7 @@ class ScreenshotImageTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             image1.pixel_similarity(image2)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             param(
                 pixels1=[WHITE, RED, GREEN, BLUE],
