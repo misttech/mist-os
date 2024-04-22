@@ -498,6 +498,10 @@ func WithTargetDuration(
 	output := make([]*Shard, 0, len(shards))
 	for _, shard := range shards {
 		numNewShards := 0
+		totalTests := 0
+		for _, t := range shard.Tests {
+			totalTests += t.minRequiredRuns()
+		}
 		if targetDuration > 0 {
 			var targetDurationForShard time.Duration
 			if maxShardSize > 0 {
@@ -512,12 +516,14 @@ func WithTargetDuration(
 				total += testDurations.Get(t).MedianDuration * time.Duration(t.minRequiredRuns())
 			}
 			numNewShards = divRoundUp(int(total), int(targetDurationForShard))
+			// While calculating the targetDurationForShard, some rounding might happen
+			// that could cause it to be slightly less than the duration of a test, which
+			// could cause numNewShards to be greater than the number of tests in the shard,
+			// so set it to the number of tests instead so that at least one test is run
+			// per shard.
+			numNewShards = min(totalTests, numNewShards)
 		} else {
-			var total int
-			for _, t := range shard.Tests {
-				total += t.minRequiredRuns()
-			}
-			numNewShards = divRoundUp(total, targetTestCount)
+			numNewShards = divRoundUp(totalTests, targetTestCount)
 		}
 		if numNewShards == 0 {
 			// If targetDuration is set but all durations are zero, we'll
@@ -525,7 +531,7 @@ func WithTargetDuration(
 			// careful and assume that we need the maximum allowed shards to be
 			// able to fit all tests or one shard per test if the number of tests
 			// is less than the maximum allowed shards.
-			numNewShards = min(len(shard.Tests), maxShardsPerEnvironment)
+			numNewShards = min(totalTests, maxShardsPerEnvironment)
 		}
 		numNewShards = min(numNewShards, maxShardsPerEnvironment)
 
