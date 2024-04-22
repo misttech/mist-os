@@ -18,9 +18,14 @@ where
     F: TargetFilter,
     U: FnMut(FastbootConnectionState) -> Result<(), InterfaceFactoryError>,
 {
-    let mut device_stream =
-        wait_for_devices(filter, true, false, DiscoverySources::MDNS | DiscoverySources::MANUAL)
-            .await?;
+    let mut device_stream = wait_for_devices(
+        filter,
+        None,
+        true,
+        false,
+        DiscoverySources::MDNS | DiscoverySources::MANUAL,
+    )
+    .await?;
 
     if let Some(Ok(event)) = device_stream.next().await {
         // This is the first event that matches our filter.

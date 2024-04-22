@@ -878,7 +878,8 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use emulator_instance::{
-        DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EngineType, PortMapping,
+        DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances,
+        EngineType, PortMapping,
     };
     use ffx_config::ConfigLevel;
     use serde::{Deserialize, Serialize};
@@ -1322,6 +1323,8 @@ mod tests {
             DiskImageFormat::Fvm,
         )
         .await?;
+        let emu_instances = EmulatorInstances::new(root.clone());
+
         data.set_instance_directory(&root.join("test-instance").to_string_lossy());
         fs::create_dir_all(&data.get_emulator_configuration().runtime.instance_directory)
             .expect("creating instance dir");
@@ -1341,7 +1344,7 @@ mod tests {
 
         // use the current pid for the emulator instance
 
-        let mut engine = crate::FemuEngine::new(data);
+        let mut engine = crate::FemuEngine::new(data, emu_instances);
         engine.set_pid(std::process::id());
         engine.set_engine_state(EngineState::Running);
 

@@ -9,7 +9,7 @@ use super::get_host_tool;
 use crate::qemu_based::QemuBasedEngine;
 use async_trait::async_trait;
 use emulator_instance::{
-    get_instance_dir, EmulatorConfiguration, EmulatorInstanceData, EmulatorInstanceInfo,
+    EmulatorConfiguration, EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances,
     EngineState, EngineType,
 };
 use ffx_config::EnvironmentContext;
@@ -18,14 +18,15 @@ use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
 use std::{env, process::Command};
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct FemuEngine {
     data: EmulatorInstanceData,
+    emu_instances: EmulatorInstances,
 }
 
 impl FemuEngine {
-    pub(crate) fn new(data: EmulatorInstanceData) -> Self {
-        Self { data }
+    pub(crate) fn new(data: EmulatorInstanceData, emu_instances: EmulatorInstances) -> Self {
+        Self { data, emu_instances }
     }
 
     fn validate_configuration(&self) -> Result<()> {
@@ -181,7 +182,7 @@ impl EmulatorEngine for FemuEngine {
     async fn save_to_disk(&self) -> Result<()> {
         emulator_instance::write_to_disk(
             &self.data,
-            &get_instance_dir(self.data.get_name(), true).await?,
+            &self.emu_instances.get_instance_dir(self.data.get_name(), true)?,
         )
         .map_err(|e| bug!("Error saving instance to disk: {e}"))
     }
@@ -209,7 +210,7 @@ impl QemuBasedEngine for FemuEngine {
 mod tests {
     use super::*;
     use emulator_instance::NetworkingMode;
-    use std::ffi::OsStr;
+    use std::{ffi::OsStr, path::PathBuf};
 
     #[test]
     fn test_build_emulator_cmd() {
@@ -220,7 +221,7 @@ mod tests {
 
         let mut emu_data = EmulatorInstanceData::new(cfg, EngineType::Femu, EngineState::New);
         emu_data.set_emulator_binary(program_name.into());
-        let test_engine = FemuEngine::new(emu_data);
+        let test_engine = FemuEngine::new(emu_data, EmulatorInstances::new(PathBuf::new()));
         let cmd = test_engine.build_emulator_cmd();
         assert_eq!(cmd.get_program(), program_name);
         assert_eq!(
@@ -238,7 +239,7 @@ mod tests {
 
         let mut emu_data = EmulatorInstanceData::new(cfg, EngineType::Femu, EngineState::New);
         emu_data.set_emulator_binary(program_name.into());
-        let test_engine = FemuEngine::new(emu_data);
+        let test_engine = FemuEngine::new(emu_data, EmulatorInstances::new(PathBuf::new()));
         let cmd = test_engine.build_emulator_cmd();
         assert_eq!(cmd.get_program(), program_name);
         assert_eq!(cmd.get_envs().collect::<Vec<_>>(), []);

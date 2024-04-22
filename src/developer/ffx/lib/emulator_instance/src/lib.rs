@@ -21,8 +21,7 @@ pub use enumerations::{
 };
 
 pub use instances::{
-    clean_up_instance_dir, get_all_instances, get_instance_dir, read_from_disk,
-    read_from_disk_untyped, write_to_disk, EMU_INSTANCE_ROOT_DIR,
+    read_from_disk, read_from_disk_untyped, write_to_disk, EmulatorInstances, EMU_INSTANCE_ROOT_DIR,
 };
 
 pub use targets::{

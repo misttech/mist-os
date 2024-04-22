@@ -195,9 +195,14 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
 
     // Only want added events
-    let device_stream =
-        wait_for_devices(|_: &_| true, true, false, DiscoverySources::MDNS | DiscoverySources::USB)
-            .await?;
+    let device_stream = wait_for_devices(
+        |_: &_| true,
+        None,
+        true,
+        false,
+        DiscoverySources::MDNS | DiscoverySources::USB,
+    )
+    .await?;
 
     let mut stdout = io::stdout().lock();
     let targets = discover_target_events(&mut stdout, device_stream, wait_duration).await?;

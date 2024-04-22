@@ -2,20 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::path::PathBuf;
+
 use anyhow::{anyhow, Result};
+use emulator_instance::{EmulatorInstances, EMU_INSTANCE_ROOT_DIR};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
-use ffx_emulator_commands::get_engine_by_name;
 use ffx_emulator_config::EngineConsoleType;
 use ffx_emulator_console_args::ConsoleCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
-
+use ffx_emulator_engines::EngineBuilder;
+use fho::{bug, FfxMain, FfxTool, SimpleWriter};
 /// Sub-sub tool for `emu console`
 #[derive(FfxTool)]
 pub struct EmuConsoleTool {
     #[command]
     cmd: ConsoleCommand,
-    _context: EnvironmentContext,
+    context: EnvironmentContext,
 }
 
 // Since this is a part of a legacy plugin, add
@@ -29,12 +31,16 @@ impl FfxMain for EmuConsoleTool {
     type Writer = SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let instance_dir: PathBuf =
+            self.context.get(EMU_INSTANCE_ROOT_DIR).await.map_err(|e| bug!("{e}"))?;
+        let builder = EngineBuilder::new(EmulatorInstances::new(instance_dir));
+
         let console = match get_console_type(&self.cmd) {
             Ok(c) => c,
             Err(e) => ffx_bail!("{:?}", e),
         };
         let mut name: Option<String> = self.cmd.name.clone();
-        match get_engine_by_name(&mut name).await {
+        match builder.get_engine_by_name(&mut name) {
             Ok(Some(engine)) => engine.attach(console),
             Ok(None) => {
                 if let Some(name) = self.cmd.name {

@@ -24,6 +24,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv6Addr};
 use std::net::{SocketAddr, SocketAddrV6};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -225,7 +226,9 @@ pub async fn resolve_target_query(
         let description = handle_to_description(handle);
         query.match_description(&description)
     };
-    let stream = discovery::wait_for_devices(filter, true, false, sources).await?;
+    let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR).await?;
+    let stream =
+        discovery::wait_for_devices(filter, Some(emu_instance_root), true, false, sources).await?;
     let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(1000);
     let delay = Duration::from_millis(discovery_delay);
 

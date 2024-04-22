@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{
-    get_all_instances, EmulatorInstanceData, EmulatorInstanceInfo, EngineOption, NetworkingMode,
-    EMU_INSTANCE_ROOT_DIR,
+    EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances, EngineOption, NetworkingMode,
 };
 use anyhow::{Context, Result};
 use ffx::TargetAddrInfo;
@@ -48,6 +47,7 @@ use notify::RecommendedWatcher;
 pub struct EmulatorWatcher {
     emu_instance_rx: Receiver<EmulatorInstanceEvent>,
     emu_instance_tx: Sender<EmulatorInstanceEvent>,
+    emu_instances: EmulatorInstances,
     // Hold a reference here to the watcher to keep it in scope.
     _watcher: RecommendedWatcher,
 }
@@ -85,15 +85,13 @@ struct EmulatorWatcherHandler {
     cutoff: Duration,
 }
 #[tracing::instrument()]
-pub async fn start_emulator_watching() -> Result<EmulatorWatcher> {
-    let instance_dir: PathBuf =
-        ffx_config::get(EMU_INSTANCE_ROOT_DIR).await.context("Reading emu instance config")?;
+pub async fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher> {
     let (emu_instance_tx, emu_instance_rx) = mpsc::channel::<EmulatorInstanceEvent>(100);
-    if !instance_dir.exists() {
-        create_dir_all(&instance_dir).context("Creating instance root directory")?;
+    if !instance_root.exists() {
+        create_dir_all(&instance_root).context("Creating instance root directory")?;
     }
     let watch_handler = EmulatorWatcherHandler {
-        instance_dir: instance_dir.clone(),
+        instance_dir: instance_root.clone(),
         emu_instance_tx: emu_instance_tx.clone(),
         cutoff: Duration::from_millis(100),
         throttle: HashMap::new(),
@@ -108,10 +106,14 @@ pub async fn start_emulator_watching() -> Result<EmulatorWatcher> {
     let res = RecommendedWatcher::new(watch_handler, notify::Config::default());
     let mut watcher = res.context("Creating emulator watcher")?;
     watcher
-        .watch(&instance_dir, RecursiveMode::Recursive)
+        .watch(&instance_root, RecursiveMode::Recursive)
         .context("Setting emulator watcher context")?;
-    let watcher_handler =
-        EmulatorWatcher { emu_instance_rx: emu_instance_rx, emu_instance_tx, _watcher: watcher };
+    let watcher_handler = EmulatorWatcher {
+        emu_instances: EmulatorInstances::new(instance_root),
+        emu_instance_rx: emu_instance_rx,
+        emu_instance_tx,
+        _watcher: watcher,
+    };
     Ok(watcher_handler)
 }
 impl EmulatorWatcherHandler {
@@ -220,7 +222,18 @@ impl EmulatorWatcher {
             tracing::trace!("checking instance {:?}", event);
             match event {
                 EmulatorInstanceEvent::Name(instance_name, kind) => {
-                    match crate::read_from_disk(&instance_name).await {
+                    let instance_dir = match self
+                        .emu_instances
+                        .get_instance_dir(&instance_name, false)
+                    {
+                        Ok(d) => d,
+
+                        Err(e) => {
+                            tracing::error!("Error getting instance dir for {instance_name}: {e}");
+                            return None;
+                        }
+                    };
+                    match crate::read_from_disk(&instance_dir) {
                         Ok(EngineOption::DoesExist(emu_instance)) => {
                             if let Some(target_info) = Self::handle_instance(&emu_instance) {
                                 return Some(EmulatorTargetAction::Add(target_info));
@@ -268,7 +281,7 @@ impl EmulatorWatcher {
         None
     }
     pub async fn check_all_instances(&mut self) -> Result<()> {
-        let instances = get_all_instances().await?;
+        let instances = self.emu_instances.get_all_instances()?;
         for emu in instances {
             self.emu_instance_tx.send(EmulatorInstanceEvent::Data(emu)).await?;
         }
@@ -320,9 +333,10 @@ impl EmulatorWatcher {
         })
     }
 }
-pub async fn get_all_targets() -> Result<Vec<ffx::TargetInfo>> {
-    let instances = get_all_instances().await?;
-    Ok(instances.iter().flat_map(|i| EmulatorWatcher::make_target(i)).collect())
+
+pub fn get_all_targets(instances: &EmulatorInstances) -> Result<Vec<ffx::TargetInfo>> {
+    let items = instances.get_all_instances()?;
+    Ok(items.iter().flat_map(|i| EmulatorWatcher::make_target(i)).collect())
 }
 #[cfg(test)]
 mod tests {
@@ -589,6 +603,7 @@ mod tests {
                 notify::Config::default().with_poll_interval(Duration::from_secs(500 * 60)),
             )?;
             let mut watcher = EmulatorWatcher {
+                emu_instances: EmulatorInstances::new(new_instance_dir.clone()),
                 emu_instance_rx,
                 emu_instance_tx: emu_instance_tx.clone(),
                 _watcher: iwatcher,
@@ -599,25 +614,17 @@ mod tests {
         }
         Ok(())
     }
-    #[fuchsia::test]
-    async fn test_get_all_targets() -> Result<()> {
-        use serde_json::json;
+
+    #[test]
+    fn test_get_all_targets() -> Result<()> {
         use std::fs::File;
         use std::io::Write;
-        let env = ffx_config::test_init().await.unwrap();
-        let temp_dir = tempdir()
-            .expect("Couldn't get a temporary directory for testing.")
-            .path()
-            .to_str()
-            .expect("Couldn't convert Path to str")
-            .to_string();
-        env.context
-            .query(EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ffx_config::ConfigLevel::User))
-            .set(json!(temp_dir))
-            .await?;
+        let temp_dir = tempdir().expect("Couldn't get a temporary directory for testing.");
 
-        let path1 = PathBuf::from(&temp_dir).join("path1");
+        let instance_root = PathBuf::from(temp_dir.path());
+        let emulator_instances = EmulatorInstances::new(instance_root.clone());
+
+        let path1 = instance_root.join("path1");
         create_dir_all(path1.as_path())?;
         let file1_path = path1.join(crate::instances::SERIALIZE_FILE_NAME);
         let mut file1 = File::create(&file1_path)?;
@@ -635,7 +642,7 @@ mod tests {
         let emu_config = serde_json::to_string(&instance_data)?;
         file1.write_all(emu_config.as_bytes())?;
 
-        let targets = get_all_targets().await?;
+        let targets = get_all_targets(&emulator_instances)?;
         assert_eq!(targets.first().unwrap().nodename, Some(String::from("emu-data-instance")));
 
         Ok(())
