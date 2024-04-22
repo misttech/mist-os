@@ -343,8 +343,6 @@ type GetVmoError = strict enum {
     INTERNAL_ERROR = 2;
 };
 
-/// For an overview see
-/// [Audio Driver Streaming Interface](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_streaming)
 closed protocol RingBuffer {
     /// Accessor for top level static properties.
     strict GetProperties() -> (struct {

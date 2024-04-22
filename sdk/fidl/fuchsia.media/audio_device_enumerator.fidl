@@ -130,6 +130,13 @@ closed protocol AudioDeviceEnumerator {
         device_token uint64;
     });
 
+    /// # Deprecation
+    ///
+    /// StreamConfig is not supported anymore, instead use an
+    /// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
+    /// , see
+    /// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
+    @available(deprecated=20)
     strict AddDeviceByChannel(resource struct {
         device_name string:256;
         is_input bool;

@@ -19,7 +19,7 @@ type CodecInfo = struct {
     product_name string:MAX_UI_STRING_SIZE;
 };
 
-@available(added=HEAD)
+@available(added=20)
 type CodecProperties = table {
     /// Driver type is input (true) or output (false)
     /// If not included, then the driver may be used for both input and output.
@@ -138,7 +138,14 @@ type CodecFormatInfo = table {
 };
 
 /// For an overview see
-/// [[Audio Codec Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_codec).
+/// [[Audio Codec Interface]](https://fuchsia.dev/fuchsia-src/development/audio/drivers/codec).
+/// # Deprecation
+///
+/// Not supported anymore, instead use an
+/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
+/// with one DAI and no Ring Buffer, see
+/// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
+@available(deprecated=20)
 closed protocol Codec {
     /// Allows providing driver health state.
     compose Health;
@@ -159,7 +166,7 @@ closed protocol Codec {
     });
 
     /// Retrieves top level static properties.
-    @available(added=HEAD)
+    @available(added=20)
     strict GetProperties() -> (struct {
         properties CodecProperties;
     });
@@ -173,10 +180,10 @@ closed protocol Codec {
     /// If the driver cannot successfully configure the codec to stop, it will close the codec
     /// protocol channel, in which case the client may obtain a new codec protocol channel and retry.
     strict Stop() -> (struct {
-        @available(removed=HEAD)
+        @available(removed=20)
         start_time zx.Time;
 
-        @available(added=HEAD)
+        @available(added=20)
         stop_time zx.Time;
     });
 
@@ -284,6 +291,13 @@ closed protocol Codec {
     });
 };
 
+/// # Deprecation
+///
+/// Not supported anymore, instead use an
+/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
+/// with one DAI and no Ring Buffer, see
+/// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
+@available(deprecated=20)
 service CodecService {
     codec client_end:Codec;
 };

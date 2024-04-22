@@ -1,5 +1,7 @@
 # Audio Driver Streaming Interface
 
+Caution: This page contains information for the deprecated StreamConfig API.
+
 Caution: This page may contain information that is specific to the legacy
 version of the driver framework (DFv1).
 

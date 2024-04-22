@@ -51,6 +51,13 @@ const DEFAULT_RING_BUFFER_ELEMENT_ID ElementId = 0;
 const DEFAULT_DAI_INTERCONNECT_ELEMENT_ID ElementId = 1;
 
 /// The protocol channel used to configure and observe a device.
+/// # Deprecation
+///
+/// Codec, Dai and StreamConfig are not supported anymore, instead use an
+/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
+/// , see
+/// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
+@available(deprecated=HEAD)
 type DriverClient = flexible resource union {
     /// Populated for drivers that use the `fuchsia_hardware_audio.Codec` interface.
     1: codec client_end:fuchsia.hardware.audio.Codec;
