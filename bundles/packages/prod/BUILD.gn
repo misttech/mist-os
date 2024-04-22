@@ -47,7 +47,6 @@ group("bluetooth_a2dp") {
 group("bluetooth_all") {
   testonly = true
   public_deps = [
-    ":bluetooth_core",
     ":bluetooth_hci",
     ":bluetooth_intel",
     ":bluetooth_profiles",
@@ -57,14 +56,6 @@ group("bluetooth_all") {
 group("bluetooth_avrcp") {
   testonly = true
   public_deps = [ "//src/connectivity/bluetooth/profiles/bt-avrcp" ]
-}
-
-group("bluetooth_core") {
-  public_deps = [
-    "//src/connectivity/bluetooth/core/bt-gap",
-    "//src/connectivity/bluetooth/core/bt-init",
-    "//src/connectivity/bluetooth/tools/bt-snoop",
-  ]
 }
 
 group("bluetooth_hci") {
