@@ -223,4 +223,9 @@ __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
   return dev->ConnectFragmentRuntime(fragment_name, service_name, protocol_name,
                                      fdf::Channel(request));
 }
+
+__EXPORT zx_status_t device_connect_ns_protocol(zx_device_t* dev, const char* protocol_name,
+                                                zx_handle_t request) {
+  return dev->ConnectNsProtocol(protocol_name, zx::channel(request));
+}
 }

@@ -478,6 +478,26 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return device_get_fragment_protocol(zxdev(), name, proto_id, out);
   }
 
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
+  zx::result<fidl::ClientEnd<Protocol>> DdkConnectNsProtocol() const {
+    return DdkConnectNsProtocol<Protocol>(parent());
+  }
+
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
+  static zx::result<fidl::ClientEnd<Protocol>> DdkConnectNsProtocol(zx_device_t* parent) {
+    auto endpoints = fidl::CreateEndpoints<Protocol>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+
+    auto status = device_connect_ns_protocol(parent, fidl::DiscoverableProtocolName<Protocol>,
+                                             endpoints->server.TakeChannel().release());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(endpoints->client));
+  }
+
   template <typename ServiceMember,
             typename = std::enable_if_t<fidl::IsServiceMemberV<ServiceMember>>>
   zx::result<fidl::ClientEnd<typename ServiceMember::ProtocolType>> DdkConnectFidlProtocol() const {
