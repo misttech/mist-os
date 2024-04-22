@@ -135,9 +135,9 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     /// ongoing scan will be cancelled when scanning is disabled. If a scan
     /// is in progress but cannot be cancelled, this function returns
     /// zx::Status::NOT_SUPPORTED and makes no changes to the system.
-    pub fn disable_scanning(&mut self) -> Result<(), zx::Status> {
+    pub async fn disable_scanning(&mut self) -> Result<(), zx::Status> {
         if self.scanner.scanning_enabled {
-            self.cancel_ongoing_scan()?;
+            self.cancel_ongoing_scan().await?;
             self.scanner.scanning_enabled = false;
         }
         Ok(())
@@ -149,14 +149,17 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
 
     /// Canceling any software scan that's in progress
     /// TODO(b/254290448): Remove 'pub' when all clients use enable/disable scanning.
-    pub fn cancel_ongoing_scan(&mut self) -> Result<(), zx::Status> {
+    pub async fn cancel_ongoing_scan(&mut self) -> Result<(), zx::Status> {
         if let Some(scan) = &self.scanner.ongoing_scan {
-            let discovery_support = self.ctx.device.discovery_support()?;
+            let discovery_support = self.ctx.device.discovery_support().await?;
             if discovery_support.scan_offload.scan_cancel_supported {
-                self.ctx.device.cancel_scan(&fidl_softmac::WlanSoftmacBaseCancelScanRequest {
-                    scan_id: Some(scan.scan_id()),
-                    ..Default::default()
-                })
+                self.ctx
+                    .device
+                    .cancel_scan(&fidl_softmac::WlanSoftmacBaseCancelScanRequest {
+                        scan_id: Some(scan.scan_id()),
+                        ..Default::default()
+                    })
+                    .await
             } else {
                 Err(zx::Status::NOT_SUPPORTED)
             }
@@ -169,7 +172,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     ///
     /// If a scan request is in progress, or the new request has invalid argument (empty channel
     /// list or larger min channel time than max), then the request is rejected.
-    pub fn on_sme_scan(&'a mut self, req: fidl_mlme::ScanRequest) -> Result<(), Error> {
+    pub async fn on_sme_scan(&'a mut self, req: fidl_mlme::ScanRequest) -> Result<(), Error> {
         if self.scanner.ongoing_scan.is_some() || !self.scanner.scanning_enabled {
             return Err(Error::ScanError(ScanError::Busy));
         }
@@ -184,14 +187,15 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             .ctx
             .device
             .wlan_softmac_query_response()
+            .await
             .map_err(|status| Error::Status(String::from("Failed to query device."), status))?;
-        let discovery_support = device::try_query_discovery_support(&mut self.ctx.device)?;
+        let discovery_support = device::try_query_discovery_support(&mut self.ctx.device).await?;
 
         // TODO(https://fxbug.dev/321627682): MLME only supports offloaded scanning.
         if discovery_support.scan_offload.supported {
             match req.scan_type {
-                fidl_mlme::ScanTypes::Passive => self.start_passive_scan(req),
-                fidl_mlme::ScanTypes::Active => self.start_active_scan(req, &query_response),
+                fidl_mlme::ScanTypes::Passive => self.start_passive_scan(req).await,
+                fidl_mlme::ScanTypes::Active => self.start_active_scan(req, &query_response).await,
             }
             .map(|ongoing_scan| self.scanner.ongoing_scan = Some(ongoing_scan))
             .map_err(|e| {
@@ -203,7 +207,10 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         }
     }
 
-    fn start_passive_scan(&mut self, req: fidl_mlme::ScanRequest) -> Result<OngoingScan, Error> {
+    async fn start_passive_scan(
+        &mut self,
+        req: fidl_mlme::ScanRequest,
+    ) -> Result<OngoingScan, Error> {
         Ok(OngoingScan::PassiveOffloadScan {
             mlme_txn_id: req.txn_id,
             in_progress_device_scan_id: self
@@ -223,13 +230,14 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
                     min_home_time: Some(MIN_HOME_TIME.into_nanos()),
                     ..Default::default()
                 })
+                .await
                 .map_err(|status| Error::ScanError(ScanError::StartOffloadScanFails(status)))?
                 .scan_id
                 .ok_or(Error::ScanError(ScanError::InvalidResponse))?,
         })
     }
 
-    fn start_active_scan(
+    async fn start_active_scan(
         &mut self,
         req: fidl_mlme::ScanRequest,
         query_response: &fidl_softmac::WlanSoftmacQueryResponse,
@@ -268,17 +276,18 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
                 mlme_txn_id: req.txn_id,
                 in_progress_device_scan_id: self
                     .start_next_active_scan(&active_scan_request)
+                    .await
                     .map_err(|scan_error| Error::ScanError(scan_error))?,
                 remaining_active_scan_requests,
             }),
         }
     }
 
-    fn start_next_active_scan(
+    async fn start_next_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
     ) -> Result<u64, ScanError> {
-        match self.ctx.device.start_active_scan(request) {
+        match self.ctx.device.start_active_scan(request).await {
             Ok(response) => Ok(response.scan_id.ok_or_else(|| {
                 error!("Active scan response missing scan id!");
                 ScanError::InvalidResponse
@@ -317,7 +326,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         send_scan_result(mlme_txn_id, bss_description, &mut self.ctx.device);
     }
 
-    pub fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
+    pub async fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
         macro_rules! send_on_scan_end {
             ($mlme_txn_id: ident, $code:expr) => {
                 self.ctx
@@ -364,7 +373,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
                         send_on_scan_end!(mlme_txn_id, fidl_mlme::ScanResultCode::Success);
                     }
                     Some(active_scan_request) => {
-                        match self.start_next_active_scan(&active_scan_request) {
+                        match self.start_next_active_scan(&active_scan_request).await {
                             Ok(in_progress_device_scan_id) => {
                                 self.scanner.ongoing_scan = Some(OngoingScan::ActiveOffloadScan {
                                     mlme_txn_id,
@@ -664,9 +673,13 @@ mod tests {
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
         let scan_req = fidl_mlme::ScanRequest { txn_id: 1338, ..passive_scan_req() };
-        let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
+        let result = scanner.bind(&mut ctx).on_sme_scan(scan_req).await;
         assert_variant!(result, Err(Error::ScanError(ScanError::Busy)));
         m.fake_device_state
             .lock()
@@ -680,8 +693,8 @@ mod tests {
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
-        scanner.bind(&mut ctx).disable_scanning().expect("Failed to disable scanning");
-        let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
+        scanner.bind(&mut ctx).disable_scanning().await.expect("Failed to disable scanning");
+        let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).await;
         assert_variant!(result, Err(Error::ScanError(ScanError::Busy)));
         m.fake_device_state
             .lock()
@@ -690,7 +703,11 @@ mod tests {
 
         // Accept after reenabled.
         scanner.bind(&mut ctx).enable_scanning();
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -700,7 +717,7 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
 
         let scan_req = fidl_mlme::ScanRequest { channel_list: vec![], ..passive_scan_req() };
-        let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
+        let result = scanner.bind(&mut ctx).on_sme_scan(scan_req).await;
         assert_variant!(result, Err(Error::ScanError(ScanError::EmptyChannelList)));
         m.fake_device_state
             .lock()
@@ -719,7 +736,7 @@ mod tests {
             max_channel_time: 100,
             ..passive_scan_req()
         };
-        let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
+        let result = scanner.bind(&mut ctx).on_sme_scan(scan_req).await;
         assert_variant!(result, Err(Error::ScanError(ScanError::MaxChannelTimeLtMin)));
         m.fake_device_state
             .lock()
@@ -734,7 +751,11 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
 
         // Verify that passive offload scan is requested
         assert_eq!(
@@ -761,7 +782,7 @@ mod tests {
         assert_eq!(scan_result.bss, *BSS_DESCRIPTION_FOO);
 
         // Verify ScanEnd sent after handle_scan_complete
-        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, expected_scan_id);
+        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, expected_scan_id).await;
         let scan_end = m
             .fake_device_state
             .lock()
@@ -840,6 +861,7 @@ mod tests {
         scanner
             .bind(&mut ctx)
             .on_sme_scan(active_scan_req(channel_list))
+            .await
             .expect("expect scan req accepted");
 
         for probe_request_ies in &[expected_two_ghz_dynamic_args, expected_five_ghz_dynamic_args] {
@@ -897,7 +919,10 @@ mod tests {
                     assert_eq!(scan_result.bss, *BSS_DESCRIPTION_BAR);
 
                     // Verify ScanEnd sent after handle_scan_complete
-                    scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, expected_scan_id);
+                    scanner
+                        .bind(&mut ctx)
+                        .handle_scan_complete(zx::Status::OK, expected_scan_id)
+                        .await;
                 }
             }
         }
@@ -919,7 +944,7 @@ mod tests {
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
-        let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
+        let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).await;
         assert_variant!(
             result,
             Err(Error::ScanError(ScanError::StartOffloadScanFails(zx::Status::NOT_SUPPORTED)))
@@ -937,7 +962,7 @@ mod tests {
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
-        let result = scanner.bind(&mut ctx).on_sme_scan(active_scan_req(&[6]));
+        let result = scanner.bind(&mut ctx).on_sme_scan(active_scan_req(&[6])).await;
         assert_variant!(
             result,
             Err(Error::ScanError(ScanError::StartOffloadScanFails(zx::Status::NOT_SUPPORTED)))
@@ -955,7 +980,11 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
 
         // Verify that passive offload scan is requested
         assert_variant!(
@@ -977,7 +1006,7 @@ mod tests {
         assert_eq!(scan_result.bss, *BSS_DESCRIPTION_FOO);
 
         // Verify ScanEnd sent after handle_scan_complete
-        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::CANCELED, expected_scan_id);
+        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::CANCELED, expected_scan_id).await;
         let scan_end = m
             .fake_device_state
             .lock()
@@ -999,6 +1028,7 @@ mod tests {
         scanner
             .bind(&mut ctx)
             .on_sme_scan(active_scan_req(&[6]))
+            .await
             .expect("expect scan req accepted");
 
         // Verify that active offload scan is requested
@@ -1020,7 +1050,7 @@ mod tests {
         assert_eq!(scan_result.bss, *BSS_DESCRIPTION_FOO);
 
         // Verify ScanEnd sent after handle_scan_complete
-        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::CANCELED, expected_scan_id);
+        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::CANCELED, expected_scan_id).await;
         let scan_end = m
             .fake_device_state
             .lock()
@@ -1039,10 +1069,14 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
         handle_beacon_foo(&mut scanner, &mut ctx);
         let ongoing_scan_id = scanner.ongoing_scan.as_ref().unwrap().scan_id();
-        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, ongoing_scan_id);
+        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, ongoing_scan_id).await;
 
         let scan_result = m
             .fake_device_state
@@ -1071,12 +1105,16 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
 
         handle_beacon_foo(&mut scanner, &mut ctx);
         handle_beacon_bar(&mut scanner, &mut ctx);
         let ongoing_scan_id = scanner.ongoing_scan.as_ref().unwrap().scan_id();
-        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, ongoing_scan_id);
+        scanner.bind(&mut ctx).handle_scan_complete(zx::Status::OK, ongoing_scan_id).await;
 
         // Verify that one scan result is sent for each beacon
         let foo_scan_result = m
@@ -1115,7 +1153,11 @@ mod tests {
         let mut scanner = Scanner::new(*IFACE_MAC);
         assert_eq!(false, scanner.is_scanning());
 
-        scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
+        scanner
+            .bind(&mut ctx)
+            .on_sme_scan(passive_scan_req())
+            .await
+            .expect("expect scan req accepted");
         assert_eq!(true, scanner.is_scanning());
     }
 

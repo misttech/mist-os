@@ -35,7 +35,7 @@ use {
             mpsc::{self, TrySendError},
             oneshot,
         },
-        select, StreamExt,
+        select, Future, StreamExt,
     },
     std::{cmp, fmt, sync::Arc, time::Duration},
     tracing::info,
@@ -121,19 +121,30 @@ pub trait MlmeImpl {
         device: Self::Device,
         buffer_provider: buffer::CBufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
-    ) -> Result<Self, Error>
+    ) -> impl Future<Output = Result<Self, Error>> + Send
     where
         Self: Sized;
-    fn handle_mlme_request(&mut self, msg: wlan_sme::MlmeRequest) -> Result<(), Error>;
+    fn handle_mlme_request(
+        &mut self,
+        msg: wlan_sme::MlmeRequest,
+    ) -> impl Future<Output = Result<(), Error>>;
     fn handle_mac_frame_rx(
         &mut self,
         bytes: &[u8],
         rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
-    );
+    ) -> impl Future<Output = ()>;
     fn handle_eth_frame_tx(&mut self, bytes: &[u8], async_id: trace::Id) -> Result<(), Error>;
-    fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64);
-    fn handle_timeout(&mut self, event_id: common::timer::EventId, event: Self::TimerEvent);
+    fn handle_scan_complete(
+        &mut self,
+        status: zx::Status,
+        scan_id: u64,
+    ) -> impl Future<Output = ()>;
+    fn handle_timeout(
+        &mut self,
+        event_id: common::timer::EventId,
+        event: Self::TimerEvent,
+    ) -> impl Future<Output = ()>;
     fn access_device(&mut self) -> &mut Self::Device;
 }
 
@@ -255,7 +266,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
 ) -> Result<(), Error> {
     let (minstrel_timer, minstrel_time_stream) = common::timer::create_timer();
-    let minstrel = device.mac_sublayer_support().ok().filter(should_enable_minstrel).map(
+    let minstrel = device.mac_sublayer_support().await.ok().filter(should_enable_minstrel).map(
         |mac_sublayer_support| {
             let minstrel = Arc::new(Mutex::new(minstrel::MinstrelRateSelector::new(
                 MinstrelTimer { timer: minstrel_timer, current_timer: None },
@@ -274,7 +285,8 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
 
     // Failure to create MLME likely indicates a problem querying the device. There is no recovery
     // path if this occurs.
-    let mlme_impl = T::new(config, device, buffer_provider, timer).expect("Failed to create MLME.");
+    let mlme_impl =
+        T::new(config, device, buffer_provider, timer).await.expect("Failed to create MLME.");
 
     // Signal init is complete.
     init_sender.send(Ok(())).map_err(|_| format_err!("Failed to signal init complete."))?;
@@ -307,13 +319,14 @@ async fn main_loop_impl<T: MlmeImpl>(
     let mut timer_stream = common::timer::make_async_timed_event_stream(time_stream).fuse();
     let mut minstrel_timer_stream =
         common::timer::make_async_timed_event_stream(minstrel_time_stream).fuse();
+
     loop {
         select! {
             // Process requests from SME.
             mlme_request = mlme_request_stream.next() => match mlme_request {
                 Some(req) => {
                     let method_name = req.name();
-                    if let Err(e) = mlme_impl.handle_mlme_request(req) {
+                    if let Err(e) = mlme_impl.handle_mlme_request(req).await {
                         info!("Failed to handle mlme {} request: {}", method_name, e);
                     }
                 },
@@ -329,7 +342,7 @@ async fn main_loop_impl<T: MlmeImpl>(
                     },
                     DriverEvent::MacFrameRx { bytes, rx_info, async_id } => {
                         wtrace::duration!(c"DriverEvent::MacFrameRx");
-                        mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info, async_id);
+                        mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info, async_id).await;
                     }
                     DriverEvent::EthFrameTx { bytes, async_id } => {
                         wtrace::duration!(c"DriverEvent::EthFrameTx");
@@ -341,7 +354,7 @@ async fn main_loop_impl<T: MlmeImpl>(
                             });
                     }
                     DriverEvent::ScanComplete { status, scan_id } => {
-                        mlme_impl.handle_scan_complete(status, scan_id)
+                        mlme_impl.handle_scan_complete(status, scan_id).await
                     },
                     DriverEvent::TxResultReport { tx_result } => {
                         if let Some(minstrel) = minstrel.as_ref() {
@@ -352,7 +365,7 @@ async fn main_loop_impl<T: MlmeImpl>(
                 None => bail!("Driver event stream terminated unexpectedly."),
             },
             timed_event = timer_stream.select_next_some() => {
-                mlme_impl.handle_timeout(timed_event.id, timed_event.event);
+                mlme_impl.handle_timeout(timed_event.id, timed_event.event).await;
             }
             _minstrel_timeout = minstrel_timer_stream.select_next_some() => {
                 if let Some(minstrel) = minstrel.as_ref() {
@@ -382,7 +395,7 @@ pub mod test_utils {
         type Device = FakeDevice;
         type TimerEvent = ();
 
-        fn new(
+        async fn new(
             _config: Self::Config,
             device: Self::Device,
             _buffer_provider: buffer::CBufferProvider,
@@ -391,14 +404,14 @@ pub mod test_utils {
             Ok(Self { device })
         }
 
-        fn handle_mlme_request(
+        async fn handle_mlme_request(
             &mut self,
             _msg: wlan_sme::MlmeRequest,
         ) -> Result<(), anyhow::Error> {
             unimplemented!()
         }
 
-        fn handle_mac_frame_rx(
+        async fn handle_mac_frame_rx(
             &mut self,
             _bytes: &[u8],
             _rx_info: fidl_softmac::WlanRxInfo,
@@ -415,11 +428,11 @@ pub mod test_utils {
             unimplemented!()
         }
 
-        fn handle_scan_complete(&mut self, _status: zx::Status, _scan_id: u64) {
+        async fn handle_scan_complete(&mut self, _status: zx::Status, _scan_id: u64) {
             unimplemented!()
         }
 
-        fn handle_timeout(
+        async fn handle_timeout(
             &mut self,
             _event_id: wlan_common::timer::EventId,
             _event: Self::TimerEvent,

@@ -174,7 +174,7 @@ async fn start<D: DeviceOps + Send + 'static>(
         bootstrap_generic_sme(&mut device, driver_event_sink, softmac_ifc_bridge_proxy).await?;
 
     // Make a series of queries to gather device information from the vendor driver.
-    let softmac_info = device.wlan_softmac_query_response()?;
+    let softmac_info = device.wlan_softmac_query_response().await?;
     let sta_addr = softmac_info.sta_addr;
     let device_info = match wlan_mlme::mlme_device_info_from_softmac(softmac_info) {
         Ok(info) => info,
@@ -184,14 +184,14 @@ async fn start<D: DeviceOps + Send + 'static>(
         }
     };
 
-    let mac_sublayer_support = device.mac_sublayer_support()?;
+    let mac_sublayer_support = device.mac_sublayer_support().await?;
     let mac_implementation_type = &mac_sublayer_support.device.mac_implementation_type;
     if *mac_implementation_type != fidl_common::MacImplementationType::Softmac {
         error!("Wrong MAC implementation type: {:?}", mac_implementation_type);
         return Err(zx::Status::INTERNAL);
     }
-    let security_support = device.security_support()?;
-    let spectrum_management_support = device.spectrum_management_support()?;
+    let security_support = device.security_support().await?;
+    let spectrum_management_support = device.spectrum_management_support().await?;
 
     // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
     //                         in *.cml files

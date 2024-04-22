@@ -196,7 +196,7 @@ impl RemoteClient {
         }
     }
 
-    fn change_state<D: DeviceOps>(
+    async fn change_state<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         next_state: State,
@@ -208,6 +208,7 @@ impl RemoteClient {
                         peer_addr: Some(self.addr.to_array()),
                         ..Default::default()
                     })
+                    .await
                     .map_err(|s| Error::Status(format!("failed to clear association"), s))?;
             }
             _ => (),
@@ -237,7 +238,7 @@ impl RemoteClient {
         )
     }
 
-    fn handle_bss_idle_timeout<D: DeviceOps>(
+    async fn handle_bss_idle_timeout<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         event_id: EventId,
@@ -255,7 +256,7 @@ impl RemoteClient {
             }
         }
 
-        self.change_state(ctx, State::Authenticated).map_err(ClientRejection::DeviceError)?;
+        self.change_state(ctx, State::Authenticated).await.map_err(ClientRejection::DeviceError)?;
 
         // On BSS idle timeout, we need to tell the client that they've been disassociated, and the
         // SME to transition the client to Authenticated.
@@ -309,14 +310,14 @@ impl RemoteClient {
         frame_class <= self.state.as_ref().max_frame_class()
     }
 
-    pub fn handle_event<D: DeviceOps>(
+    pub async fn handle_event<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         event_id: EventId,
         event: ClientEvent,
     ) -> Result<(), ClientRejection> {
         match event {
-            ClientEvent::BssIdleTimeout => self.handle_bss_idle_timeout(ctx, event_id),
+            ClientEvent::BssIdleTimeout => self.handle_bss_idle_timeout(ctx, event_id).await,
         }
     }
 
@@ -327,7 +328,7 @@ impl RemoteClient {
     /// If result_code is Success, the SME will have authenticated this client.
     ///
     /// Otherwise, the MLME should forget about this client.
-    pub fn handle_mlme_auth_resp<D: DeviceOps>(
+    pub async fn handle_mlme_auth_resp<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         result_code: fidl_mlme::AuthenticateResultCode,
@@ -341,7 +342,8 @@ impl RemoteClient {
             } else {
                 State::Deauthenticated
             },
-        )?;
+        )
+        .await?;
 
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
         tracing::info!("creating auth frame");
@@ -385,12 +387,12 @@ impl RemoteClient {
     /// The SME has already deauthenticated this client.
     ///
     /// After this function is called, the MLME must forget about this client.
-    pub fn handle_mlme_deauth_req<D: DeviceOps>(
+    pub async fn handle_mlme_deauth_req<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         reason_code: fidl_ieee80211::ReasonCode,
     ) -> Result<(), Error> {
-        self.change_state(ctx, State::Deauthenticated)?;
+        self.change_state(ctx, State::Deauthenticated).await?;
 
         // IEEE Std 802.11-2016, 6.3.6.3.3 states that we should send MLME-DEAUTHENTICATE.confirm
         // to the SME on success. However, our SME only sends MLME-DEAUTHENTICATE.request when it
@@ -408,7 +410,7 @@ impl RemoteClient {
     ///
     /// Otherwise, the SME has not associated this client. However, the SME has not forgotten about
     /// the client either until MLME-DEAUTHENTICATE.request is received.
-    pub fn handle_mlme_assoc_resp<D: DeviceOps>(
+    pub async fn handle_mlme_assoc_resp<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         is_rsn: bool,
@@ -434,7 +436,8 @@ impl RemoteClient {
             } else {
                 State::Authenticated
             },
-        )?;
+        )
+        .await?;
 
         if let State::Associated { .. } = self.state.as_ref() {
             // Reset the client's activeness as soon as it is associated, kicking off the BSS max
@@ -465,6 +468,7 @@ impl RemoteClient {
                     vht_op: None,
                     ..Default::default()
                 })
+                .await
                 .map_err(|s| Error::Status(format!("failed to configure association"), s))?;
         }
 
@@ -520,12 +524,12 @@ impl RemoteClient {
     ///
     /// The MLME doesn't have to do anything other than change its state to acknowledge the
     /// disassociation.
-    pub fn handle_mlme_disassoc_req<D: DeviceOps>(
+    pub async fn handle_mlme_disassoc_req<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         reason_code: u16,
     ) -> Result<(), Error> {
-        self.change_state(ctx, State::Authenticated)?;
+        self.change_state(ctx, State::Authenticated).await?;
 
         // IEEE Std 802.11-2016, 6.3.9.2.3 states that we should send MLME-DISASSOCIATE.confirm
         // to the SME on success. Like MLME-DEAUTHENTICATE.confirm, our SME has already forgotten
@@ -585,12 +589,12 @@ impl RemoteClient {
     /// Handles disassociation frames (IEEE Std 802.11-2016, 9.3.3.5) from the PHY.
     ///
     /// self is mutable here as receiving a disassociation immediately disassociates us.
-    fn handle_disassoc_frame<D: DeviceOps>(
+    async fn handle_disassoc_frame<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         reason_code: ReasonCode,
     ) -> Result<(), ClientRejection> {
-        self.change_state(ctx, State::Authenticated).map_err(ClientRejection::DeviceError)?;
+        self.change_state(ctx, State::Authenticated).await.map_err(ClientRejection::DeviceError)?;
         ctx.send_mlme_disassoc_ind(
             self.addr.clone(),
             Option::<fidl_ieee80211::ReasonCode>::from(reason_code)
@@ -618,7 +622,7 @@ impl RemoteClient {
     ///
     /// self is mutable here as we may deauthenticate without even getting to the SME if we don't
     /// recognize the authentication algorithm.
-    fn handle_auth_frame<D: DeviceOps>(
+    async fn handle_auth_frame<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         auth_alg_num: AuthAlgorithmNumber,
@@ -634,6 +638,7 @@ impl RemoteClient {
                 AuthAlgorithmNumber::SAE => fidl_mlme::AuthenticationTypes::Sae,
                 _ => {
                     self.change_state(ctx, State::Deauthenticated)
+                        .await
                         .map_err(ClientRejection::DeviceError)?;
 
                     // Don't even bother sending this to the SME if we don't understand the auth
@@ -669,12 +674,14 @@ impl RemoteClient {
     /// Handles deauthentication frames (IEEE Std 802.11-2016, 9.3.3.13) from the PHY.
     ///
     /// self is mutable here as receiving a deauthentication immediately deauthenticates us.
-    fn handle_deauth_frame<D: DeviceOps>(
+    async fn handle_deauth_frame<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         reason_code: ReasonCode,
     ) -> Result<(), ClientRejection> {
-        self.change_state(ctx, State::Deauthenticated).map_err(ClientRejection::DeviceError)?;
+        self.change_state(ctx, State::Deauthenticated)
+            .await
+            .map_err(ClientRejection::DeviceError)?;
         ctx.send_mlme_deauth_ind(
             self.addr.clone(),
             Option::<fidl_ieee80211::ReasonCode>::from(reason_code)
@@ -928,7 +935,7 @@ impl RemoteClient {
     // Public handler functions.
 
     /// Handles management frames (IEEE Std 802.11-2016, 9.3.3) from the PHY.
-    pub fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    pub async fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         capabilities: mac::CapabilityInfo,
@@ -941,7 +948,7 @@ impl RemoteClient {
 
         match mgmt_frame.try_into_mgmt_body().1.ok_or(ClientRejection::ParseFailed)? {
             mac::MgmtBody::Authentication(mac::AuthFrame { auth_hdr, .. }) => {
-                self.handle_auth_frame(ctx, auth_hdr.auth_alg_num)
+                self.handle_auth_frame(ctx, auth_hdr.auth_alg_num).await
             }
             mac::MgmtBody::AssociationReq(assoc_req_frame) => {
                 let mut rates = vec![];
@@ -998,10 +1005,10 @@ impl RemoteClient {
                 )
             }
             mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
-                self.handle_deauth_frame(ctx, deauth_hdr.reason_code)
+                self.handle_deauth_frame(ctx, deauth_hdr.reason_code).await
             }
             mac::MgmtBody::Disassociation { disassoc_hdr, .. } => {
-                self.handle_disassoc_frame(ctx, disassoc_hdr.reason_code)
+                self.handle_disassoc_frame(ctx, disassoc_hdr.reason_code).await
             }
             mac::MgmtBody::Action(_) => self.handle_action_frame(ctx),
             _ => Err(ClientRejection::Unsupported),
@@ -1165,6 +1172,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -1194,6 +1202,7 @@ mod tests {
                 &mut ctx,
                 fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
             )
+            .await
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -1229,6 +1238,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         r_sta
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
+            .await
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -1261,6 +1271,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
 
         assert_variant!(
@@ -1324,6 +1335,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
 
@@ -1332,6 +1344,7 @@ mod tests {
                 &mut ctx,
                 fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive(),
             )
+            .await
             .expect("expected OK");
         assert!(!fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
@@ -1352,11 +1365,13 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
 
         r_sta
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
+            .await
             .expect("expected OK");
         assert!(!fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
@@ -1376,6 +1391,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         assert_variant!(
             r_sta.state.as_ref(),
@@ -1398,6 +1414,7 @@ mod tests {
                 1, // This AID is ignored in the case of an error.
                 &[][..],
             )
+            .await
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -1432,6 +1449,7 @@ mod tests {
                 1, // This AID is ignored in the case of an error.
                 &[][..],
             )
+            .await
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -1461,6 +1479,7 @@ mod tests {
                 &mut ctx,
                 fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive(),
             )
+            .await
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -1591,6 +1610,7 @@ mod tests {
                 &mut ctx,
                 ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive()),
             )
+            .await
             .expect("expected OK");
 
         let msg = fake_device_state
@@ -1665,7 +1685,10 @@ mod tests {
         r_sta.state = StateMachine::new(init_state);
         let (mut ctx, _) = make_context(fake_device);
 
-        r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber::SHARED_KEY).expect("expected OK");
+        r_sta
+            .handle_auth_frame(&mut ctx, AuthAlgorithmNumber::SHARED_KEY)
+            .await
+            .expect("expected OK");
         let msg = fake_device_state
             .lock()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
@@ -1685,7 +1708,7 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
-        r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber(0xffff)).expect("expected OK");
+        r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber(0xffff)).await.expect("expected OK");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
@@ -1720,6 +1743,7 @@ mod tests {
                 &mut ctx,
                 ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth.into_primitive()),
             )
+            .await
             .expect("expected OK");
         let msg = fake_device_state
             .lock()
@@ -2344,6 +2368,7 @@ mod tests {
                     ][..],
                 },
             )
+            .await
             .expect("expected OK");
     }
 
@@ -2387,6 +2412,7 @@ mod tests {
                     body: &assoc_frame_body[..],
                 },
             )
+            .await
             .expect("expected OK");
 
         let msg = fake_device_state
@@ -2458,6 +2484,7 @@ mod tests {
                     body: &ies[..],
                 },
             )
+            .await
             .expect("parsing should not fail");
 
         let msg = fake_device_state
@@ -2507,6 +2534,7 @@ mod tests {
                         ][..],
                     },
                 )
+                .await
                 .expect_err("expected error"),
             ClientRejection::NotPermitted
         );
@@ -2577,6 +2605,7 @@ mod tests {
                         ][..],
                     },
                 )
+                .await
                 .expect_err("expected error"),
             ClientRejection::Unsupported
         );
@@ -2616,6 +2645,7 @@ mod tests {
                     ][..],
                 },
             )
+            .await
             .expect("expected OK");
         assert_ne!(
             match r_sta.state.as_ref() {
@@ -2640,7 +2670,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
 
-        r_sta.handle_bss_idle_timeout(&mut ctx, event_id).expect("expected OK");
+        r_sta.handle_bss_idle_timeout(&mut ctx, event_id).await.expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]

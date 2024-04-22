@@ -9,7 +9,7 @@ use {
     anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    futures::channel::mpsc,
+    futures::{channel::mpsc, Future},
     ieee80211::MacAddr,
     std::{
         ffi::c_void,
@@ -239,13 +239,19 @@ pub trait DeviceOps {
     ) -> Result<zx::Handle, zx::Status>;
     fn wlan_softmac_query_response(
         &mut self,
-    ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>;
-    fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status>;
-    fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status>;
-    fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status>;
+    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>> + Send;
+    fn discovery_support(
+        &mut self,
+    ) -> impl Future<Output = Result<fidl_common::DiscoverySupport, zx::Status>> + Send;
+    fn mac_sublayer_support(
+        &mut self,
+    ) -> impl Future<Output = Result<fidl_common::MacSublayerSupport, zx::Status>> + Send;
+    fn security_support(
+        &mut self,
+    ) -> impl Future<Output = Result<fidl_common::SecuritySupport, zx::Status>> + Send;
     fn spectrum_management_support(
         &mut self,
-    ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status>;
+    ) -> impl Future<Output = Result<fidl_common::SpectrumManagementSupport, zx::Status>> + Send;
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
     /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
     /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
@@ -263,41 +269,50 @@ pub trait DeviceOps {
     fn set_ethernet_down(&mut self) -> Result<(), zx::Status> {
         self.set_ethernet_status(LinkStatus::DOWN)
     }
-    fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status>;
+    fn set_channel(
+        &mut self,
+        channel: fidl_common::WlanChannel,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
     fn start_passive_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
-    ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status>;
+    ) -> impl Future<
+        Output = Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status>,
+    > + Send;
     fn start_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
-    ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status>;
+    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status>>
+           + Send;
     fn cancel_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
-    ) -> Result<(), zx::Status>;
-    fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    fn join_bss(
+        &mut self,
+        request: &fidl_common::JoinBssRequest,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
     fn enable_beaconing(
         &mut self,
         request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
-    ) -> Result<(), zx::Status>;
-    fn disable_beaconing(&mut self) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    fn disable_beaconing(&mut self) -> impl Future<Output = Result<(), zx::Status>> + Send;
     fn install_key(
         &mut self,
         key_configuration: &fidl_softmac::WlanKeyConfiguration,
-    ) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
     fn notify_association_complete(
         &mut self,
         assoc_cfg: fidl_softmac::WlanAssociationConfig,
-    ) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
     fn clear_association(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
-    ) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
     fn update_wmm_parameters(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
-    ) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>;
     fn send_mlme_event(&mut self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error>;
     fn set_minstrel(&mut self, minstrel: crate::MinstrelWrapper);
@@ -334,16 +349,17 @@ pub trait DeviceOps {
     }
 }
 
-pub fn try_query(
+pub async fn try_query(
     device: &mut impl DeviceOps,
 ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, Error> {
     device
         .wlan_softmac_query_response()
+        .await
         .map_err(|status| Error::Status(String::from("Failed to query device."), status))
 }
 
-pub fn try_query_iface_mac(device: &mut impl DeviceOps) -> Result<MacAddr, Error> {
-    try_query(device).and_then(|query_response| {
+pub async fn try_query_iface_mac(device: &mut impl DeviceOps) -> Result<MacAddr, Error> {
+    try_query(device).await.and_then(|query_response| {
         query_response.sta_addr.map(From::from).ok_or_else(|| {
             Error::Internal(format_err!(
                 "Required field not set in device query response: iface MAC"
@@ -352,34 +368,34 @@ pub fn try_query_iface_mac(device: &mut impl DeviceOps) -> Result<MacAddr, Error
     })
 }
 
-pub fn try_query_discovery_support(
+pub async fn try_query_discovery_support(
     device: &mut impl DeviceOps,
 ) -> Result<fidl_common::DiscoverySupport, Error> {
-    device.discovery_support().map_err(|status| {
+    device.discovery_support().await.map_err(|status| {
         Error::Status(String::from("Failed to query discovery support for device."), status)
     })
 }
 
-pub fn try_query_mac_sublayer_support(
+pub async fn try_query_mac_sublayer_support(
     device: &mut impl DeviceOps,
 ) -> Result<fidl_common::MacSublayerSupport, Error> {
-    device.mac_sublayer_support().map_err(|status| {
+    device.mac_sublayer_support().await.map_err(|status| {
         Error::Status(String::from("Failed to query MAC sublayer support for device."), status)
     })
 }
 
-pub fn try_query_security_support(
+pub async fn try_query_security_support(
     device: &mut impl DeviceOps,
 ) -> Result<fidl_common::SecuritySupport, Error> {
-    device.security_support().map_err(|status| {
+    device.security_support().await.map_err(|status| {
         Error::Status(String::from("Failed to query security support for device."), status)
     })
 }
 
-pub fn try_query_spectrum_management_support(
+pub async fn try_query_spectrum_management_support(
     device: &mut impl DeviceOps,
 ) -> Result<fidl_common::SpectrumManagementSupport, Error> {
-    device.spectrum_management_support().map_err(|status| {
+    device.spectrum_management_support().await.map_err(|status| {
         Error::Status(
             String::from("Failed to query spectrum management support for device."),
             status,
@@ -422,7 +438,7 @@ impl DeviceOps for Device {
         zx::ok(status).map(|_| unsafe { zx::Handle::from_raw(out_channel) })
     }
 
-    fn wlan_softmac_query_response(
+    async fn wlan_softmac_query_response(
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
         Self::flatten_and_log_error(
@@ -431,28 +447,30 @@ impl DeviceOps for Device {
         )
     }
 
-    fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
+    async fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
         Self::flatten_and_log_error(
             "QueryDiscoverySupport",
             self.wlan_softmac_bridge_proxy.query_discovery_support(zx::Time::INFINITE),
         )
     }
 
-    fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
+    async fn mac_sublayer_support(
+        &mut self,
+    ) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
         Self::flatten_and_log_error(
             "QueryMacSublayerSupport",
             self.wlan_softmac_bridge_proxy.query_mac_sublayer_support(zx::Time::INFINITE),
         )
     }
 
-    fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
+    async fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
         Self::flatten_and_log_error(
             "QuerySecuritySupport",
             self.wlan_softmac_bridge_proxy.query_security_support(zx::Time::INFINITE),
         )
     }
 
-    fn spectrum_management_support(
+    async fn spectrum_management_support(
         &mut self,
     ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
         Self::flatten_and_log_error(
@@ -530,7 +548,7 @@ impl DeviceOps for Device {
         zx::ok((self.raw_device.set_ethernet_status)(*self.raw_device.device.get_mut(), status.0))
     }
 
-    fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
+    async fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
             .set_channel(
                 &fidl_softmac::WlanSoftmacBaseSetChannelRequest {
@@ -546,7 +564,7 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
-    fn start_passive_scan(
+    async fn start_passive_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
     ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status> {
@@ -556,7 +574,7 @@ impl DeviceOps for Device {
         )
     }
 
-    fn start_active_scan(
+    async fn start_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
     ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status> {
@@ -566,7 +584,7 @@ impl DeviceOps for Device {
         )
     }
 
-    fn cancel_scan(
+    async fn cancel_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
     ) -> Result<(), zx::Status> {
@@ -576,14 +594,14 @@ impl DeviceOps for Device {
         )
     }
 
-    fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
+    async fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
         Self::flatten_and_log_error(
             "JoinBss",
             self.wlan_softmac_bridge_proxy.join_bss(request, zx::Time::INFINITE),
         )
     }
 
-    fn enable_beaconing(
+    async fn enable_beaconing(
         &mut self,
         request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
     ) -> Result<(), zx::Status> {
@@ -596,7 +614,7 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
-    fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
+    async fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
             .disable_beaconing(zx::Time::INFINITE)
             .map_err(|error| {
@@ -606,7 +624,7 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
-    fn install_key(
+    async fn install_key(
         &mut self,
         key_configuration: &fidl_softmac::WlanKeyConfiguration,
     ) -> Result<(), zx::Status> {
@@ -619,7 +637,7 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
-    fn notify_association_complete(
+    async fn notify_association_complete(
         &mut self,
         assoc_cfg: fidl_softmac::WlanAssociationConfig,
     ) -> Result<(), zx::Status> {
@@ -633,7 +651,7 @@ impl DeviceOps for Device {
         )
     }
 
-    fn clear_association(
+    async fn clear_association(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
     ) -> Result<(), zx::Status> {
@@ -653,7 +671,7 @@ impl DeviceOps for Device {
         )
     }
 
-    fn update_wmm_parameters(
+    async fn update_wmm_parameters(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
     ) -> Result<(), zx::Status> {
@@ -1486,7 +1504,7 @@ pub mod test_utils {
             Ok(usme_bootstrap_server_end_handle)
         }
 
-        fn wlan_softmac_query_response(
+        async fn wlan_softmac_query_response(
             &mut self,
         ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
             let state = self.state.lock();
@@ -1496,7 +1514,7 @@ pub mod test_utils {
             }
         }
 
-        fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
+        async fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
             let state = self.state.lock();
             match state.config.mock_discovery_support.as_ref() {
                 Some(discovery_support) => discovery_support.clone(),
@@ -1504,7 +1522,9 @@ pub mod test_utils {
             }
         }
 
-        fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
+        async fn mac_sublayer_support(
+            &mut self,
+        ) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
             let state = self.state.lock();
             match state.config.mock_mac_sublayer_support.as_ref() {
                 Some(mac_sublayer_support) => mac_sublayer_support.clone(),
@@ -1512,7 +1532,7 @@ pub mod test_utils {
             }
         }
 
-        fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
+        async fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
             let state = self.state.lock();
             match state.config.mock_security_support.as_ref() {
                 Some(security_support) => security_support.clone(),
@@ -1526,7 +1546,7 @@ pub mod test_utils {
             }
         }
 
-        fn spectrum_management_support(
+        async fn spectrum_management_support(
             &mut self,
         ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
             let state = self.state.lock();
@@ -1562,7 +1582,7 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn set_channel(
+        async fn set_channel(
             &mut self,
             wlan_channel: fidl_common::WlanChannel,
         ) -> Result<(), zx::Status> {
@@ -1570,7 +1590,7 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn start_passive_scan(
+        async fn start_passive_scan(
             &mut self,
             request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
         ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status> {
@@ -1587,7 +1607,7 @@ pub mod test_utils {
             })
         }
 
-        fn start_active_scan(
+        async fn start_active_scan(
             &mut self,
             request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
         ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status> {
@@ -1604,19 +1624,22 @@ pub mod test_utils {
             })
         }
 
-        fn cancel_scan(
+        async fn cancel_scan(
             &mut self,
             _request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
         ) -> Result<(), zx::Status> {
             Err(zx::Status::NOT_SUPPORTED)
         }
 
-        fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
+        async fn join_bss(
+            &mut self,
+            request: &fidl_common::JoinBssRequest,
+        ) -> Result<(), zx::Status> {
             self.state.lock().join_bss_request.replace(request.clone());
             Ok(())
         }
 
-        fn enable_beaconing(
+        async fn enable_beaconing(
             &mut self,
             request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
         ) -> Result<(), zx::Status> {
@@ -1632,12 +1655,12 @@ pub mod test_utils {
             }
         }
 
-        fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
+        async fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
             self.state.lock().beacon_config = None;
             Ok(())
         }
 
-        fn install_key(
+        async fn install_key(
             &mut self,
             key_configuration: &fidl_softmac::WlanKeyConfiguration,
         ) -> Result<(), zx::Status> {
@@ -1646,7 +1669,7 @@ pub mod test_utils {
             state.install_key_results.pop_front().unwrap_or(Ok(()))
         }
 
-        fn notify_association_complete(
+        async fn notify_association_complete(
             &mut self,
             cfg: fidl_softmac::WlanAssociationConfig,
         ) -> Result<(), zx::Status> {
@@ -1658,7 +1681,7 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn clear_association(
+        async fn clear_association(
             &mut self,
             request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
         ) -> Result<(), zx::Status> {
@@ -1672,7 +1695,7 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn update_wmm_parameters(
+        async fn update_wmm_parameters(
             &mut self,
             request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
         ) -> Result<(), zx::Status> {
@@ -1783,7 +1806,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn fake_device_returns_expected_wlan_softmac_query_response() {
         let (mut fake_device, _) = FakeDevice::new().await;
-        let query_response = fake_device.wlan_softmac_query_response().unwrap();
+        let query_response = fake_device.wlan_softmac_query_response().await.unwrap();
         assert_eq!(query_response.sta_addr, [7u8; 6].into());
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Client));
         assert_eq!(
@@ -1857,7 +1880,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn fake_device_returns_expected_discovery_support() {
         let (mut fake_device, _) = FakeDevice::new().await;
-        let discovery_support = fake_device.discovery_support().unwrap();
+        let discovery_support = fake_device.discovery_support().await.unwrap();
         assert_eq!(
             discovery_support,
             fidl_common::DiscoverySupport {
@@ -1875,7 +1898,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn fake_device_returns_expected_mac_sublayer_support() {
         let (mut fake_device, _) = FakeDevice::new().await;
-        let mac_sublayer_support = fake_device.mac_sublayer_support().unwrap();
+        let mac_sublayer_support = fake_device.mac_sublayer_support().await.unwrap();
         assert_eq!(
             mac_sublayer_support,
             fidl_common::MacSublayerSupport {
@@ -1897,7 +1920,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn fake_device_returns_expected_security_support() {
         let (mut fake_device, _) = FakeDevice::new().await;
-        let security_support = fake_device.security_support().unwrap();
+        let security_support = fake_device.security_support().await.unwrap();
         assert_eq!(
             security_support,
             fidl_common::SecuritySupport {
@@ -1913,7 +1936,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn fake_device_returns_expected_spectrum_management_support() {
         let (mut fake_device, _) = FakeDevice::new().await;
-        let spectrum_management_support = fake_device.spectrum_management_support().unwrap();
+        let spectrum_management_support = fake_device.spectrum_management_support().await.unwrap();
         assert_eq!(
             spectrum_management_support,
             fidl_common::SpectrumManagementSupport {
@@ -1928,13 +1951,13 @@ mod tests {
             FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::Client),
         )
         .await;
-        let query_response = fake_device.wlan_softmac_query_response().unwrap();
+        let query_response = fake_device.wlan_softmac_query_response().await.unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Client));
 
         fake_device_state.lock().config =
             FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::Ap);
 
-        let query_response = fake_device.wlan_softmac_query_response().unwrap();
+        let query_response = fake_device.wlan_softmac_query_response().await.unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Ap));
     }
 
@@ -1989,6 +2012,7 @@ mod tests {
                 cbw: fidl_common::ChannelBandwidth::Cbw80P80,
                 secondary80: 4,
             })
+            .await
             .expect("set_channel failed?");
         // Check the internal state.
         assert_eq!(
@@ -2016,6 +2040,7 @@ mod tests {
                 rsc: Some(12),
                 ..Default::default()
             })
+            .await
             .expect("error setting key");
         assert_eq!(fake_device_state.lock().keys.len(), 1);
     }
@@ -2024,14 +2049,15 @@ mod tests {
     async fn start_passive_scan() {
         let (mut fake_device, fake_device_state) = FakeDevice::new().await;
 
-        let result =
-            fake_device.start_passive_scan(&fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
+        let result = fake_device
+            .start_passive_scan(&fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                 channels: Some(vec![1u8, 2, 3]),
                 min_channel_time: Some(zx::Duration::from_millis(0).into_nanos()),
                 max_channel_time: Some(zx::Duration::from_millis(200).into_nanos()),
                 min_home_time: Some(0),
                 ..Default::default()
-            });
+            })
+            .await;
         assert!(result.is_ok());
 
         assert_eq!(
@@ -2050,8 +2076,8 @@ mod tests {
     async fn start_active_scan() {
         let (mut fake_device, fake_device_state) = FakeDevice::new().await;
 
-        let result =
-            fake_device.start_active_scan(&fidl_softmac::WlanSoftmacStartActiveScanRequest {
+        let result = fake_device
+            .start_active_scan(&fidl_softmac::WlanSoftmacStartActiveScanRequest {
                 channels: Some(vec![1u8, 2, 3]),
                 ssids: Some(vec![
                     ddk_converter::cssid_from_ssid_unchecked(
@@ -2080,7 +2106,8 @@ mod tests {
                 min_probes_per_channel: Some(1),
                 max_probes_per_channel: Some(3),
                 ..Default::default()
-            });
+            })
+            .await;
         assert!(result.is_ok());
         assert_eq!(
             fake_device_state.lock().captured_active_scan_request,
@@ -2129,6 +2156,7 @@ mod tests {
                 beacon_period: Some(100),
                 ..Default::default()
             })
+            .await
             .expect("error configuring bss");
         assert!(fake_device_state.lock().join_bss_request.is_some());
     }
@@ -2148,6 +2176,7 @@ mod tests {
                 beacon_interval: Some(2),
                 ..Default::default()
             })
+            .await
             .expect("error enabling beaconing");
         assert_variant!(
         fake_device_state.lock().beacon_config.as_ref(),
@@ -2156,7 +2185,7 @@ mod tests {
             assert_eq!(*tim_ele_offset, 1);
             assert_eq!(*beacon_interval, TimeUnit(2));
         });
-        fake_device.disable_beaconing().expect("error disabling beaconing");
+        fake_device.disable_beaconing().await.expect("error disabling beaconing");
         assert_variant!(fake_device_state.lock().beacon_config.as_ref(), None);
     }
 
@@ -2193,6 +2222,7 @@ mod tests {
                 vht_op: None,
                 ..Default::default()
             })
+            .await
             .expect("error configuring assoc");
         assert!(fake_device_state.lock().assocs.contains_key(&[1, 2, 3, 4, 5, 6].into()));
     }
@@ -2208,6 +2238,7 @@ mod tests {
                 beacon_period: Some(100),
                 ..Default::default()
             })
+            .await
             .expect("error configuring bss");
 
         let assoc_cfg = fidl_softmac::WlanAssociationConfig {
@@ -2222,13 +2253,14 @@ mod tests {
         };
 
         assert!(fake_device_state.lock().join_bss_request.is_some());
-        fake_device.notify_association_complete(assoc_cfg).expect("error configuring assoc");
+        fake_device.notify_association_complete(assoc_cfg).await.expect("error configuring assoc");
         assert_eq!(fake_device_state.lock().assocs.len(), 1);
         fake_device
             .clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
                 peer_addr: Some([1, 2, 3, 4, 5, 6]),
                 ..Default::default()
             })
+            .await
             .expect("error clearing assoc");
         assert_eq!(fake_device_state.lock().assocs.len(), 0);
         assert!(fake_device_state.lock().join_bss_request.is_none());
@@ -2273,7 +2305,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let result = fake_device.update_wmm_parameters(&request);
+        let result = fake_device.update_wmm_parameters(&request).await;
         assert!(result.is_ok());
 
         assert_eq!(fake_device_state.lock().captured_update_wmm_parameters_request, Some(request),);

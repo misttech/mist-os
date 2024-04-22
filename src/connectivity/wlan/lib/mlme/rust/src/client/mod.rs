@@ -110,29 +110,32 @@ pub struct ClientMlme<D> {
     channel_state: ChannelState,
 }
 
-impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
+impl<D: DeviceOps + Send> crate::MlmeImpl for ClientMlme<D> {
     type Config = ClientConfig;
     type Device = D;
     type TimerEvent = TimedEvent;
-    fn new(
+    async fn new(
         config: Self::Config,
         device: Self::Device,
         buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error> {
-        Self::new(config, device, buffer_provider, timer).map_err(From::from)
+        Self::new(config, device, buffer_provider, timer).await.map_err(From::from)
     }
-    fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), anyhow::Error> {
-        Self::handle_mlme_req(self, req).map_err(From::from)
+    async fn handle_mlme_request(
+        &mut self,
+        req: wlan_sme::MlmeRequest,
+    ) -> Result<(), anyhow::Error> {
+        Self::handle_mlme_req(self, req).await.map_err(From::from)
     }
-    fn handle_mac_frame_rx(
+    async fn handle_mac_frame_rx(
         &mut self,
         bytes: &[u8],
         rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     ) {
         wtrace::duration!(c"ClientMlme::handle_mac_frame_rx");
-        Self::on_mac_frame_rx(self, bytes, rx_info, async_id)
+        Self::on_mac_frame_rx(self, bytes, rx_info, async_id).await
     }
     fn handle_eth_frame_tx(
         &mut self,
@@ -142,11 +145,11 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         wtrace::duration!(c"ClientMlme::handle_eth_frame_tx");
         Self::on_eth_frame_tx(self, bytes, async_id).map_err(From::from)
     }
-    fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
-        Self::handle_scan_complete(self, status, scan_id);
+    async fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
+        Self::handle_scan_complete(self, status, scan_id).await;
     }
-    fn handle_timeout(&mut self, event_id: EventId, event: TimedEvent) {
-        Self::handle_timed_event(self, event_id, event)
+    async fn handle_timeout(&mut self, event_id: EventId, event: TimedEvent) {
+        Self::handle_timed_event(self, event_id, event).await
     }
     fn access_device(&mut self) -> &mut Self::Device {
         &mut self.ctx.device
@@ -206,13 +209,13 @@ impl<D> ClientMlme<D> {
 }
 
 impl<D: DeviceOps> ClientMlme<D> {
-    pub fn new(
+    pub async fn new(
         config: ClientConfig,
         mut device: D,
         buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, Error> {
-        let iface_mac = device::try_query_iface_mac(&mut device)?;
+        let iface_mac = device::try_query_iface_mac(&mut device).await?;
         Ok(Self {
             sta: None,
             ctx: Context {
@@ -227,14 +230,14 @@ impl<D: DeviceOps> ClientMlme<D> {
         })
     }
 
-    pub fn set_main_channel(
+    pub async fn set_main_channel(
         &mut self,
         channel: fidl_common::WlanChannel,
     ) -> Result<(), zx::Status> {
-        self.channel_state.bind(&mut self.ctx, &mut self.scanner).set_main_channel(channel)
+        self.channel_state.bind(&mut self.ctx, &mut self.scanner).set_main_channel(channel).await
     }
 
-    pub fn on_mac_frame_rx(
+    pub async fn on_mac_frame_rx(
         &mut self,
         frame: &[u8],
         rx_info: fidl_softmac::WlanRxInfo,
@@ -274,9 +277,11 @@ impl<D: DeviceOps> ClientMlme<D> {
             //   - ChannelState currently has a main channel.
             //   - ClientMlme received the frame on the main channel.
             match self.channel_state.get_main_channel() {
-                Some(main_channel) if main_channel.primary == rx_info.channel.primary => sta
-                    .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                    .on_mac_frame(frame, rx_info, async_id),
+                Some(main_channel) if main_channel.primary == rx_info.channel.primary => {
+                    sta.bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
+                        .on_mac_frame(frame, rx_info, async_id)
+                        .await
+                }
                 Some(_) => {
                     wtrace::async_end_wlansoftmac_rx(async_id, "off main channel");
                 }
@@ -295,25 +300,29 @@ impl<D: DeviceOps> ClientMlme<D> {
         }
     }
 
-    pub fn handle_mlme_req(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), Error> {
+    pub async fn handle_mlme_req(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), Error> {
         use wlan_sme::MlmeRequest as Req;
 
         match req {
             // Handle non station specific MLME messages first (Join, Scan, etc.)
-            Req::Scan(req) => Ok(self.on_sme_scan(req)),
-            Req::Connect(req) => self.on_sme_connect(req),
+            Req::Scan(req) => Ok(self.on_sme_scan(req).await),
+            Req::Connect(req) => self.on_sme_connect(req).await,
             Req::GetIfaceCounterStats(responder) => self.on_sme_get_iface_counter_stats(responder),
             Req::GetIfaceHistogramStats(responder) => {
                 self.on_sme_get_iface_histogram_stats(responder)
             }
-            Req::QueryDeviceInfo(responder) => self.on_sme_query_device_info(responder),
-            Req::QueryDiscoverySupport(responder) => self.on_sme_query_discovery_support(responder),
-            Req::QueryMacSublayerSupport(responder) => {
-                self.on_sme_query_mac_sublayer_support(responder)
+            Req::QueryDeviceInfo(responder) => self.on_sme_query_device_info(responder).await,
+            Req::QueryDiscoverySupport(responder) => {
+                self.on_sme_query_discovery_support(responder).await
             }
-            Req::QuerySecuritySupport(responder) => self.on_sme_query_security_support(responder),
+            Req::QueryMacSublayerSupport(responder) => {
+                self.on_sme_query_mac_sublayer_support(responder).await
+            }
+            Req::QuerySecuritySupport(responder) => {
+                self.on_sme_query_security_support(responder).await
+            }
             Req::QuerySpectrumManagementSupport(responder) => {
-                self.on_sme_query_spectrum_management_support(responder)
+                self.on_sme_query_spectrum_management_support(responder).await
             }
             Req::ListMinstrelPeers(responder) => self.on_sme_list_minstrel_peers(responder),
             Req::GetMinstrelStats(req, responder) => {
@@ -341,14 +350,15 @@ impl<D: DeviceOps> ClientMlme<D> {
                 }
                 Some(sta) => Ok(sta
                     .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                    .handle_mlme_req(other_message)),
+                    .handle_mlme_req(other_message)
+                    .await),
             },
         }
     }
 
-    fn on_sme_scan(&mut self, req: fidl_mlme::ScanRequest) {
+    async fn on_sme_scan(&mut self, req: fidl_mlme::ScanRequest) {
         let txn_id = req.txn_id;
-        let _ = self.scanner.bind(&mut self.ctx).on_sme_scan(req).map_err(|e| {
+        let _ = self.scanner.bind(&mut self.ctx).on_sme_scan(req).await.map_err(|e| {
             error!("Scan failed in MLME: {:?}", e);
             let code = match e {
                 Error::ScanError(scan_error) => scan_error.into(),
@@ -363,14 +373,14 @@ impl<D: DeviceOps> ClientMlme<D> {
         });
     }
 
-    pub fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
-        self.scanner.bind(&mut self.ctx).handle_scan_complete(status, scan_id);
+    pub async fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
+        self.scanner.bind(&mut self.ctx).handle_scan_complete(status, scan_id).await;
     }
 
-    fn on_sme_connect(&mut self, req: fidl_mlme::ConnectRequest) -> Result<(), Error> {
+    async fn on_sme_connect(&mut self, req: fidl_mlme::ConnectRequest) -> Result<(), Error> {
         // Cancel any ongoing scan so that it doesn't conflict with the connect request
         // TODO(b/254290448): Use enable/disable scanning for better guarantees.
-        if let Err(e) = self.scanner.bind(&mut self.ctx).cancel_ongoing_scan() {
+        if let Err(e) = self.scanner.bind(&mut self.ctx).cancel_ongoing_scan().await {
             warn!("Failed to cancel ongoing scan before connect: {}.", e);
         }
 
@@ -385,7 +395,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                     wep_key: req.wep_key.map(|k| *k),
                     security_ie: req.security_ie,
                 };
-                self.join_device(&req.selected_bss).map(|cap| (req, cap))
+                self.join_device(&req.selected_bss).await.map(|cap| (req, cap))
             }
             Err(e) => Err(Error::Status(
                 format!("Error parsing BssDescription: {:?}", e),
@@ -397,12 +407,13 @@ impl<D: DeviceOps> ClientMlme<D> {
             Ok((req, client_capabilities)) => {
                 self.sta.replace(Client::new(
                     req,
-                    device::try_query_iface_mac(&mut self.ctx.device)?,
+                    device::try_query_iface_mac(&mut self.ctx.device).await?,
                     client_capabilities,
                 ));
                 if let Some(sta) = &mut self.sta {
                     sta.bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                        .start_connecting();
+                        .start_connecting()
+                        .await;
                 }
                 Ok(())
             }
@@ -423,9 +434,10 @@ impl<D: DeviceOps> ClientMlme<D> {
         }
     }
 
-    fn join_device(&mut self, bss: &BssDescription) -> Result<ClientCapabilities, Error> {
-        let info =
-            ddk_converter::mlme_device_info_from_softmac(device::try_query(&mut self.ctx.device)?)?;
+    async fn join_device(&mut self, bss: &BssDescription) -> Result<ClientCapabilities, Error> {
+        let info = ddk_converter::mlme_device_info_from_softmac(
+            device::try_query(&mut self.ctx.device).await?,
+        )?;
         let join_caps = derive_join_capabilities(Channel::from(bss.channel), bss.rates(), &info)
             .map_err(|e| {
                 Error::Status(
@@ -435,6 +447,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             })?;
 
         self.set_main_channel(bss.channel.into())
+            .await
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
         let join_bss_request = fidl_common::JoinBssRequest {
@@ -449,52 +462,54 @@ impl<D: DeviceOps> ClientMlme<D> {
         self.ctx
             .device
             .join_bss(&join_bss_request)
+            .await
             .map(|()| join_caps)
             .map_err(|status| Error::Status(format!("Error setting BSS in driver"), status))
     }
 
-    fn on_sme_query_device_info(
+    async fn on_sme_query_device_info(
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_mlme::DeviceInfo>,
     ) -> Result<(), Error> {
-        let info =
-            ddk_converter::mlme_device_info_from_softmac(device::try_query(&mut self.ctx.device)?)?;
+        let info = ddk_converter::mlme_device_info_from_softmac(
+            device::try_query(&mut self.ctx.device).await?,
+        )?;
         responder.respond(info);
         Ok(())
     }
 
-    fn on_sme_query_discovery_support(
+    async fn on_sme_query_discovery_support(
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
     ) -> Result<(), Error> {
-        let support = device::try_query_discovery_support(&mut self.ctx.device)?;
+        let support = device::try_query_discovery_support(&mut self.ctx.device).await?;
         responder.respond(support);
         Ok(())
     }
 
-    fn on_sme_query_mac_sublayer_support(
+    async fn on_sme_query_mac_sublayer_support(
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
     ) -> Result<(), Error> {
-        let support = device::try_query_mac_sublayer_support(&mut self.ctx.device)?;
+        let support = device::try_query_mac_sublayer_support(&mut self.ctx.device).await?;
         responder.respond(support);
         Ok(())
     }
 
-    fn on_sme_query_security_support(
+    async fn on_sme_query_security_support(
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::SecuritySupport>,
     ) -> Result<(), Error> {
-        let support = device::try_query_security_support(&mut self.ctx.device)?;
+        let support = device::try_query_security_support(&mut self.ctx.device).await?;
         responder.respond(support);
         Ok(())
     }
 
-    fn on_sme_query_spectrum_management_support(
+    async fn on_sme_query_spectrum_management_support(
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::SpectrumManagementSupport>,
     ) -> Result<(), Error> {
-        let support = device::try_query_spectrum_management_support(&mut self.ctx.device)?;
+        let support = device::try_query_spectrum_management_support(&mut self.ctx.device).await?;
         responder.respond(support);
         Ok(())
     }
@@ -518,11 +533,12 @@ impl<D: DeviceOps> ClientMlme<D> {
 
     /// Called when a previously scheduled `TimedEvent` fired.
     /// Return true if auto-deauth has triggered. Return false otherwise.
-    pub fn handle_timed_event(&mut self, event_id: EventId, event: TimedEvent) {
+    pub async fn handle_timed_event(&mut self, event_id: EventId, event: TimedEvent) {
         if let Some(sta) = self.sta.as_mut() {
             return sta
                 .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                .handle_timed_event(event, event_id);
+                .handle_timed_event(event, event_id)
+                .await;
         }
     }
 }
@@ -1017,12 +1033,13 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     /// Called when a previously scheduled `TimedEvent` fired.
-    pub fn handle_timed_event(&mut self, event: TimedEvent, event_id: EventId) {
-        self.sta.state = Some(self.sta.state.take().unwrap().on_timed_event(self, event, event_id))
+    pub async fn handle_timed_event(&mut self, event: TimedEvent, event_id: EventId) {
+        self.sta.state =
+            Some(self.sta.state.take().unwrap().on_timed_event(self, event, event_id).await)
     }
 
     /// Called when an arbitrary frame was received over the air.
-    pub fn on_mac_frame<B: ByteSlice>(
+    pub async fn on_mac_frame<B: ByteSlice>(
         &mut self,
         bytes: B,
         rx_info: fidl_softmac::WlanRxInfo,
@@ -1031,7 +1048,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         wtrace::duration!(c"BoundClient::on_mac_frame");
         // Safe: |state| is never None and always replaced with Some(..).
         self.sta.state =
-            Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info, async_id));
+            Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info, async_id).await);
     }
 
     pub fn on_eth_frame_tx<B: ByteSlice>(
@@ -1047,15 +1064,15 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         result
     }
 
-    pub fn start_connecting(&mut self) {
+    pub async fn start_connecting(&mut self) {
         // Safe: |state| is never None and always replaced with Some(..).
-        let next_state = self.sta.state.take().unwrap().start_connecting(self);
+        let next_state = self.sta.state.take().unwrap().start_connecting(self).await;
         self.sta.state.replace(next_state);
     }
 
-    pub fn handle_mlme_req(&mut self, msg: wlan_sme::MlmeRequest) {
+    pub async fn handle_mlme_req(&mut self, msg: wlan_sme::MlmeRequest) {
         // Safe: |state| is never None and always replaced with Some(..).
-        let next_state = self.sta.state.take().unwrap().handle_mlme_req(self, msg);
+        let next_state = self.sta.state.take().unwrap().handle_mlme_req(self, msg).await;
         self.sta.state.replace(next_state);
     }
 
@@ -1141,11 +1158,14 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .unwrap_or_else(|e| error!("error sending MLME-DISASSOCIATE.indication: {}", e));
     }
 
-    fn clear_association(&mut self) -> Result<(), zx::Status> {
-        self.ctx.device.clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
-            peer_addr: Some(self.sta.bssid().to_array()),
-            ..Default::default()
-        })
+    async fn clear_association(&mut self) -> Result<(), zx::Status> {
+        self.ctx
+            .device
+            .clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
+                peer_addr: Some(self.sta.bssid().to_array()),
+                ..Default::default()
+            })
+            .await
     }
 
     /// Sends an sae frame rx message to the SME.
@@ -1310,9 +1330,7 @@ mod tests {
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-        fuchsia_async::TestExecutor,
         fuchsia_sync::Mutex,
-        futures::task::Poll,
         lazy_static::lazy_static,
         std::sync::Arc,
         wlan_common::{
@@ -1385,15 +1403,18 @@ mod tests {
             Self { fake_device, fake_device_state, timer: Some(timer), time_stream }
         }
 
-        fn make_mlme(&mut self) -> ClientMlme<FakeDevice> {
+        async fn make_mlme(&mut self) -> ClientMlme<FakeDevice> {
             let mut mlme = ClientMlme::new(
                 Default::default(),
                 self.fake_device.clone(),
                 FakeCBufferProvider::new(),
                 self.timer.take().unwrap(),
             )
+            .await
             .expect("Failed to create client MLME.");
-            mlme.set_main_channel(fake_wlan_channel().into()).expect("unable to set main channel");
+            mlme.set_main_channel(fake_wlan_channel().into())
+                .await
+                .expect("unable to set main channel");
             mlme
         }
     }
@@ -1477,20 +1498,21 @@ mod tests {
             self.sta.state.replace(state);
         }
 
-        fn close_controlled_port(&mut self) {
+        async fn close_controlled_port(&mut self) {
             self.handle_mlme_req(wlan_sme::MlmeRequest::SetCtrlPort(
                 fidl_mlme::SetControlledPortRequest {
                     peer_sta_address: BSSID.to_array(),
                     state: fidl_mlme::ControlledPortState::Closed,
                 },
-            ));
+            ))
+            .await;
         }
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn spawns_new_sta_on_connect_request_from_sme() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
@@ -1500,6 +1522,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         })
+        .await
         .expect("valid ConnectRequest should be handled successfully");
         me.get_bound_client().expect("client sta should have been created by now.");
     }
@@ -1507,7 +1530,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn fails_to_connect_if_channel_unknown() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         let mut req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
@@ -1519,14 +1542,16 @@ mod tests {
         };
 
         req.selected_bss.channel.cbw = fidl_fuchsia_wlan_common::ChannelBandwidth::unknown();
-        me.on_sme_connect(req).expect_err("ConnectRequest with unknown channel should be rejected");
+        me.on_sme_connect(req)
+            .await
+            .expect_err("ConnectRequest with unknown channel should be rejected");
         assert!(me.get_bound_client().is_none());
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn rsn_ie_implies_sta_eapol_required() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Wpa2, ssid: Ssid::try_from("foo").unwrap()),
@@ -1536,6 +1561,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         })
+        .await
         .expect("valid ConnectRequest should be handled successfully");
         let client = me.get_bound_client().expect("client sta should have been created by now.");
         assert!(client.sta.eapol_required());
@@ -1544,7 +1570,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn wpa1_implies_sta_eapol_required() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Wpa1, ssid: Ssid::try_from("foo").unwrap()),
@@ -1554,6 +1580,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         })
+        .await
         .expect("valid ConnectRequest should be handled successfully");
         let client = me.get_bound_client().expect("client sta should have been created by now.");
         assert!(client.sta.eapol_required());
@@ -1562,7 +1589,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn no_wpa_or_rsn_ie_implies_sta_eapol_not_required() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
@@ -1572,6 +1599,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         })
+        .await
         .expect("valid ConnectRequest should be handled successfully");
         let client = me.get_bound_client().expect("client sta should have been created by now.");
         assert!(!client.sta.eapol_required());
@@ -1586,7 +1614,7 @@ mod tests {
     ///     and schedule the next.
     ///   - `mlme` produces a `fidl_mlme::SignalReportIndication` for each StatusCheckTimeout
     ///     consumed.
-    fn handle_association_status_checks_and_signal_reports(
+    async fn handle_association_status_checks_and_signal_reports(
         mock_objects: &mut MockObjects,
         mlme: &mut ClientMlme<FakeDevice>,
         beacon_count: u32,
@@ -1597,7 +1625,7 @@ mod tests {
                 .try_next()
                 .unwrap()
                 .expect("Should have scheduled a timed event");
-            mlme.handle_timed_event(timed_event.id, timed_event.event);
+            mlme.handle_timed_event(timed_event.id, timed_event.event).await;
             assert_eq!(mock_objects.fake_device_state.lock().wlan_queue.len(), 0);
             mock_objects
                 .fake_device_state
@@ -1610,7 +1638,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_auto_deauth_uninterrupted_interval() {
         let mut mock_objects = MockObjects::new().await;
-        let mut mlme = mock_objects.make_mlme();
+        let mut mlme = mock_objects.make_mlme().await;
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
 
@@ -1621,7 +1649,8 @@ mod tests {
             &mut mock_objects,
             &mut mlme,
             DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT,
-        );
+        )
+        .await;
 
         // One more timeout to trigger the auto deauth
         let (_, timed_event) = mock_objects
@@ -1631,7 +1660,7 @@ mod tests {
             .expect("Should have scheduled a timed event");
 
         // Verify that triggering event at deadline causes deauth
-        mlme.handle_timed_event(timed_event.id, timed_event.event);
+        mlme.handle_timed_event(timed_event.id, timed_event.event).await;
         mock_objects
             .fake_device_state
             .lock()
@@ -1667,7 +1696,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_auto_deauth_received_beacon() {
         let mut mock_objects = MockObjects::new().await;
-        let mut mlme = mock_objects.make_mlme();
+        let mut mlme = mock_objects.make_mlme().await;
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
 
@@ -1678,7 +1707,8 @@ mod tests {
             &mut mock_objects,
             &mut mlme,
             DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT,
-        );
+        )
+        .await;
 
         // Receive beacon midway, so lost bss countdown is reset.
         // If this beacon is not received, the next timeout will trigger auto deauth.
@@ -1695,14 +1725,16 @@ mod tests {
                 snr_dbh: 0,
             },
             0.into(),
-        );
+        )
+        .await;
 
         // Verify auto deauth is not triggered for the entire duration.
         handle_association_status_checks_and_signal_reports(
             &mut mock_objects,
             &mut mlme,
             DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT,
-        );
+        )
+        .await;
 
         // Verify more timer is scheduled
         let (_, timed_event2) = mock_objects
@@ -1712,7 +1744,7 @@ mod tests {
             .expect("Should have scheduled a timed event");
 
         // Verify that triggering event at new deadline causes deauth
-        mlme.handle_timed_event(timed_event2.id, timed_event2.event);
+        mlme.handle_timed_event(timed_event2.id, timed_event2.event).await;
         mock_objects
             .fake_device_state
             .lock()
@@ -1748,7 +1780,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_open_auth_frame() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_open_auth_frame().expect("error delivering WLAN frame");
@@ -1772,7 +1804,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_assoc_req_frame() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let connect_req = ParsedConnectRequest {
             selected_bss: fake_bss_description!(Wpa2,
                 ssid: Ssid::try_from([11, 22, 33, 44]).unwrap(),
@@ -1839,7 +1871,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_keep_alive_resp_frame() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_keep_alive_resp_frame().expect("error delivering WLAN frame");
@@ -1860,7 +1892,7 @@ mod tests {
     async fn client_send_data_frame() {
         let payload = vec![5; 8];
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
@@ -1888,7 +1920,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_data_frame_ipv4_qos() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let mut client = make_client_station();
         client
             .bind(&mut me.ctx, &mut me.scanner, &mut me.channel_state)
@@ -1925,7 +1957,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_data_frame_ipv6_qos() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let mut client = make_client_station();
         client
             .bind(&mut me.ctx, &mut me.scanner, &mut me.channel_state)
@@ -1963,7 +1995,7 @@ mod tests {
     async fn client_send_data_frame_from_ds() {
         let payload = vec![5; 8];
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
@@ -1992,7 +2024,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_deauthentication_notification() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
 
@@ -2031,12 +2063,12 @@ mod tests {
             0x10, 0, // Sequence Control
         ];
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into()).await;
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2059,12 +2091,12 @@ mod tests {
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into()).await;
 
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
         #[rustfmt::skip]
@@ -2084,12 +2116,12 @@ mod tests {
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into()).await;
 
         let queue = &m.fake_device_state.lock().eth_queue;
         assert_eq!(queue.len(), 2);
@@ -2119,12 +2151,12 @@ mod tests {
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into()).await;
 
         let queue = &m.fake_device_state.lock().eth_queue;
         assert_eq!(queue.len(), 1);
@@ -2146,13 +2178,13 @@ mod tests {
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
-        client.close_controlled_port();
+        client.close_controlled_port().await;
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into()).await;
 
         // Verify frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2166,13 +2198,13 @@ mod tests {
         eapol_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
-        client.close_controlled_port();
+        client.close_controlled_port().await;
 
-        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client), 0.into()).await;
 
         // Verify EAPoL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2201,12 +2233,12 @@ mod tests {
         eapol_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client), 0.into());
+        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client), 0.into()).await;
 
         // Verify EAPoL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2230,7 +2262,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_eapol_ind_success() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
@@ -2254,7 +2286,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_eapol_frame_success() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_eapol_frame(*IFACE_MAC, (*BSSID).into(), false, &[5; 8]);
@@ -2296,7 +2328,7 @@ mod tests {
     async fn send_eapol_frame_failure() {
         let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.send_wlan_frame_fails = true;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_eapol_frame([1; 6].into(), [2; 6].into(), false, &[5; 200]);
@@ -2322,13 +2354,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_keys() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
         assert!(m.fake_device_state.lock().keys.is_empty());
-        client.handle_mlme_req(crate::test_utils::fake_set_keys_req((*BSSID).into()));
+        client.handle_mlme_req(crate::test_utils::fake_set_keys_req((*BSSID).into())).await;
         assert_eq!(m.fake_device_state.lock().keys.len(), 1);
 
         let sent_key = crate::test_utils::fake_key((*BSSID).into());
@@ -2341,7 +2373,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_ps_poll_frame() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_ps_poll_frame(0xABCD).expect("failed sending PS POLL frame");
@@ -2350,7 +2382,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_power_state_doze_frame_success() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let mut client = make_client_station();
         client
             .send_power_state_frame(&mut me.ctx, PowerState::DOZE)
@@ -2363,14 +2395,15 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_addba_req_frame() {
         let mut mock = MockObjects::new().await;
-        let mut mlme = mock.make_mlme();
+        let mut mlme = mock.make_mlme().await;
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
 
         let mut body = [0u8; 16];
         let mut writer = BufferWriter::new(&mut body[..]);
-        block_ack::write_addba_req_body(&mut writer, 1)
-            .and_then(|_| client.send_block_ack_frame(ADDBA_REQ_FRAME_LEN, writer.into_written()))
+        block_ack::write_addba_req_body(&mut writer, 1).expect("failed writing addba frame");
+        client
+            .send_block_ack_frame(ADDBA_REQ_FRAME_LEN, writer.into_written())
             .expect("failed sending addba frame");
         assert_eq!(
             &mock.fake_device_state.lock().wlan_queue[0].0[..],
@@ -2396,14 +2429,15 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn send_addba_resp_frame() {
         let mut mock = MockObjects::new().await;
-        let mut mlme = mock.make_mlme();
+        let mut mlme = mock.make_mlme().await;
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
 
         let mut body = [0u8; 16];
         let mut writer = BufferWriter::new(&mut body[..]);
-        block_ack::write_addba_resp_body(&mut writer, 1)
-            .and_then(|_| client.send_block_ack_frame(ADDBA_RESP_FRAME_LEN, writer.into_written()))
+        block_ack::write_addba_resp_body(&mut writer, 1).expect("failed writing addba frame");
+        client
+            .send_block_ack_frame(ADDBA_RESP_FRAME_LEN, writer.into_written())
             .expect("failed sending addba frame");
         assert_eq!(
             &mock.fake_device_state.lock().wlan_queue[0].0[..],
@@ -2429,7 +2463,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_successful_connect_conf() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
 
@@ -2453,7 +2487,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_failed_connect_conf() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_connect_conf_failure(fidl_ieee80211::StatusCode::DeniedNoMoreStas);
@@ -2476,12 +2510,12 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_scan_end_on_mlme_scan_busy() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
 
         // Issue a second scan before the first finishes
-        me.on_sme_scan(scan_req());
-        me.on_sme_scan(fidl_mlme::ScanRequest { txn_id: 1338, ..scan_req() });
+        me.on_sme_scan(scan_req()).await;
+        me.on_sme_scan(fidl_mlme::ScanRequest { txn_id: 1338, ..scan_req() }).await;
 
         let scan_end = m
             .fake_device_state
@@ -2497,12 +2531,12 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_scan_end_on_scan_busy() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         me.make_client_station();
 
         // Issue a second scan before the first finishes
-        me.on_sme_scan(scan_req());
-        me.on_sme_scan(fidl_mlme::ScanRequest { txn_id: 1338, ..scan_req() });
+        me.on_sme_scan(scan_req()).await;
+        me.on_sme_scan(fidl_mlme::ScanRequest { txn_id: 1338, ..scan_req() }).await;
 
         let scan_end = m
             .fake_device_state
@@ -2518,7 +2552,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_scan_end_on_mlme_scan_invalid_args() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
         me.make_client_station();
         me.on_sme_scan(fidl_mlme::ScanRequest {
@@ -2529,7 +2563,8 @@ mod tests {
             probe_delay: 0,
             min_channel_time: 100,
             max_channel_time: 300,
-        });
+        })
+        .await;
         let scan_end = m
             .fake_device_state
             .lock()
@@ -2544,7 +2579,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn client_send_scan_end_on_scan_invalid_args() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
         me.make_client_station();
         me.on_sme_scan(fidl_mlme::ScanRequest {
@@ -2555,7 +2590,8 @@ mod tests {
             probe_delay: 0,
             min_channel_time: 300, // min > max
             max_channel_time: 100,
-        });
+        })
+        .await;
         let scan_end = m
             .fake_device_state
             .lock()
@@ -2571,10 +2607,10 @@ mod tests {
     async fn client_send_scan_end_on_passive_scan_fails() {
         let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.start_passive_scan_fails = true;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
         me.make_client_station();
-        me.on_sme_scan(scan_req());
+        me.on_sme_scan(scan_req()).await;
         let scan_end = m
             .fake_device_state
             .lock()
@@ -2589,16 +2625,14 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_query_device_info() {
         let mut mock_objects = MockObjects::new().await;
-        let mut mlme = mock_objects.make_mlme();
+        let mut mlme = mock_objects.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
-        assert_variant!(
-            mlme.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)),
-            Ok(())
-        );
-        let info = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
+        let (responder, receiver) = Responder::new();
+        mlme.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder))
+            .await
+            .expect("Failed to send MlmeRequest::Connect");
         assert_eq!(
-            info,
+            receiver.await.unwrap(),
             fidl_mlme::DeviceInfo {
                 sta_addr: IFACE_MAC.to_array(),
                 role: fidl_common::WlanMacRole::Client,
@@ -2612,14 +2646,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_query_discovery_support() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
-        assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder)),
-            Ok(())
-        );
-        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
+        let (responder, receiver) = Responder::new();
+        me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder))
+            .await
+            .expect("Failed to send MlmeRequest::Connect");
+        let resp = receiver.await.unwrap();
         assert_eq!(resp.scan_offload.supported, true);
         assert_eq!(resp.probe_response_offload.supported, false);
     }
@@ -2627,14 +2660,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_query_mac_sublayer_support() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
-        assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::QueryMacSublayerSupport(responder)),
-            Ok(())
-        );
-        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
+        let (responder, receiver) = Responder::new();
+        me.handle_mlme_req(wlan_sme::MlmeRequest::QueryMacSublayerSupport(responder))
+            .await
+            .expect("Failed to send MlmeRequest::Connect");
+        let resp = receiver.await.unwrap();
         assert_eq!(resp.rate_selection_offload.supported, false);
         assert_eq!(resp.data_plane.data_plane_type, fidl_common::DataPlaneType::EthernetDevice);
         assert_eq!(resp.device.is_synthetic, true);
@@ -2648,14 +2680,14 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_query_security_support() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
+        let (responder, receiver) = Responder::new();
         assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)),
+            me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)).await,
             Ok(())
         );
-        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
+        let resp = receiver.await.unwrap();
         assert_eq!(resp.mfp.supported, false);
         assert_eq!(resp.sae.driver_handler_supported, false);
         assert_eq!(resp.sae.sme_handler_supported, false);
@@ -2664,21 +2696,19 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_query_spectrum_management_support() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
-        assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySpectrumManagementSupport(responder)),
-            Ok(())
-        );
-        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
-        assert_eq!(resp.dfs.supported, true);
+        let (responder, receiver) = Responder::new();
+        me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySpectrumManagementSupport(responder))
+            .await
+            .expect("Failed to send MlmeRequest::QuerySpectrumManagementSupport");
+        assert_eq!(receiver.await.unwrap().dfs.supported, true);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_connect_unprotected_happy_path() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let channel = Channel::new(6, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open,
@@ -2692,8 +2722,9 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         };
-        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
-        assert_variant!(result, Ok(()));
+        me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req))
+            .await
+            .expect("Failed to send MlmeRequest::Connect");
 
         // Verify an event was queued up in the timer.
         assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
@@ -2738,7 +2769,8 @@ mod tests {
             &auth_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
             0.into(),
-        );
+        )
+        .await;
 
         // Verify association request frame was went to AP
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
@@ -2798,7 +2830,8 @@ mod tests {
             &assoc_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
             0.into(),
-        );
+        )
+        .await;
 
         // Verify a successful connect conf is sent
         let msg = m
@@ -2834,7 +2867,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_connect_protected_happy_path() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let channel = Channel::new(6, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Wpa2,
@@ -2854,8 +2887,9 @@ mod tests {
                 1, 0, 0x00, 0x0F, 0xAC, 2, // 1 AKM: PSK
             ],
         };
-        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
-        assert_variant!(result, Ok(()));
+        me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req))
+            .await
+            .expect("Failed to send MlmeRequest::Connect");
 
         // Verify an event was queued up in the timer.
         assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
@@ -2900,7 +2934,8 @@ mod tests {
             &auth_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
             0.into(),
-        );
+        )
+        .await;
 
         // Verify association request frame was went to AP
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
@@ -2970,7 +3005,8 @@ mod tests {
             &assoc_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
             0.into(),
-        );
+        )
+        .await;
 
         // Verify a successful connect conf is sent
         let msg = m
@@ -3014,6 +3050,7 @@ mod tests {
                 state: fidl_mlme::ControlledPortState::Open,
             },
         ))
+        .await
         .expect("expect sending msg to succeed");
 
         // Verify that link is now up
@@ -3023,7 +3060,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_connect_vht() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let channel = Channel::new(36, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open,
@@ -3037,8 +3074,9 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         };
-        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
-        assert_variant!(result, Ok(()));
+        me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req))
+            .await
+            .expect("Failed to send MlmeRequest::Connect.");
 
         // Verify an event was queued up in the timer.
         assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(ids) => {
@@ -3068,7 +3106,8 @@ mod tests {
             &auth_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
             0.into(),
-        );
+        )
+        .await;
 
         // Verify association request frame was went to AP
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
@@ -3103,7 +3142,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_connect_timeout() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open, bssid: BSSID.to_array()),
             connect_failure_timeout: 100,
@@ -3112,8 +3151,9 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         };
-        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
-        assert_variant!(result, Ok(()));
+        me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req))
+            .await
+            .expect("Failed to send MlmeRequest::Connect.");
 
         // Verify an event was queued up in the timer.
         let (event, id) = assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(events) => {
@@ -3126,7 +3166,7 @@ mod tests {
         let (_frame, _txflags) = m.fake_device_state.lock().wlan_queue.remove(0);
 
         // Send connect timeout
-        me.handle_timed_event(id, event);
+        me.handle_timed_event(id, event).await;
 
         // Verify a connect confirm message was sent
         let msg = m
@@ -3148,10 +3188,10 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_reconnect_no_sta() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
         let reconnect_req = fidl_mlme::ReconnectRequest { peer_sta_address: [1, 2, 3, 4, 5, 6] };
-        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Reconnect(reconnect_req));
+        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Reconnect(reconnect_req)).await;
         assert_variant!(result, Err(Error::Status(_, zx::Status::BAD_STATE)));
 
         // Verify a connect confirm message was sent
@@ -3174,34 +3214,32 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_get_iface_counter_stats_with_error_status() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
-        assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceCounterStats(responder)),
-            Ok(())
-        );
-        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
+        let (responder, receiver) = Responder::new();
+        me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceCounterStats(responder))
+            .await
+            .expect("Failed to send MlmeRequest::GetIfaceCounterStats.");
         assert_eq!(
-            resp,
-            fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)
+            receiver.await,
+            Ok(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED))
         );
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_respond_to_get_iface_histogram_stats_with_error_status() {
         let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme();
+        let mut me = m.make_mlme().await;
 
-        let (responder, mut receiver) = Responder::new();
-        assert_variant!(
-            me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceHistogramStats(responder)),
-            Ok(())
-        );
-        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
+        let (responder, receiver) = Responder::new();
+        me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceHistogramStats(responder))
+            .await
+            .expect("Failed to send MlmeRequest::GetIfaceHistogramStats");
         assert_eq!(
-            resp,
-            fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)
+            receiver.await,
+            Ok(fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(
+                zx::sys::ZX_ERR_NOT_SUPPORTED
+            ))
         );
     }
 

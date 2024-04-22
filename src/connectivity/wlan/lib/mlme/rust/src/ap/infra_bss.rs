@@ -66,7 +66,7 @@ fn make_client_error(addr: MacAddr, e: Error) -> Error {
 }
 
 impl InfraBss {
-    pub fn new<D: DeviceOps>(
+    pub async fn new<D: DeviceOps>(
         ctx: &mut Context<D>,
         ssid: Ssid,
         beacon_interval: TimeUnit,
@@ -98,6 +98,7 @@ impl InfraBss {
                 cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
+            .await
             .map_err(|s| Error::Status(format!("failed to set channel"), s))?;
 
         // TODO(https://fxbug.dev/42113580): Support DTIM.
@@ -116,6 +117,7 @@ impl InfraBss {
                 beacon_interval: Some(beacon_interval.0),
                 ..Default::default()
             })
+            .await
             .map_err(|s| Error::Status(format!("failed to enable beaconing"), s))?;
         ctx.device
             .set_ethernet_up()
@@ -124,12 +126,13 @@ impl InfraBss {
         Ok(bss)
     }
 
-    pub fn stop<D: DeviceOps>(&self, ctx: &mut Context<D>) -> Result<(), Error> {
+    pub async fn stop<D: DeviceOps>(&self, ctx: &mut Context<D>) -> Result<(), Error> {
         ctx.device
             .set_ethernet_down()
             .map_err(|s| Error::Status(format!("Failed to set ethernet status to DOWN"), s))?;
         ctx.device
             .disable_beaconing()
+            .await
             .map_err(|s| Error::Status(format!("failed to disable beaconing"), s))
     }
 
@@ -147,7 +150,7 @@ impl InfraBss {
         tim
     }
 
-    pub fn handle_mlme_setkeys_req<D: DeviceOps>(
+    pub async fn handle_mlme_setkeys_req<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         keylist: Vec<fidl_mlme::SetKeyDescriptor>,
@@ -170,19 +173,20 @@ impl InfraBss {
 
         for key_descriptor in keylist.into_iter() {
             let key_type = key_descriptor.key_type;
-            ctx.device.install_key(&softmac_key_configuration_from_mlme(key_descriptor)).map_err(
-                |status| {
+            ctx.device
+                .install_key(&softmac_key_configuration_from_mlme(key_descriptor))
+                .await
+                .map_err(|status| {
                     Error::Status(
                         format!("failed to set {} on PHY", key_type_name(key_type)),
                         status,
                     )
-                },
-            )?;
+                })?;
         }
         Ok(())
     }
 
-    pub fn handle_mlme_auth_resp<D: DeviceOps>(
+    pub async fn handle_mlme_auth_resp<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         resp: fidl_mlme::AuthenticateResponse,
@@ -190,10 +194,11 @@ impl InfraBss {
         let client = get_client_mut(&mut self.clients, resp.peer_sta_address.into())?;
         client
             .handle_mlme_auth_resp(ctx, resp.result_code)
+            .await
             .map_err(|e| make_client_error(client.addr, e))
     }
 
-    pub fn handle_mlme_deauth_req<D: DeviceOps>(
+    pub async fn handle_mlme_deauth_req<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         req: fidl_mlme::DeauthenticateRequest,
@@ -201,6 +206,7 @@ impl InfraBss {
         let client = get_client_mut(&mut self.clients, req.peer_sta_address.into())?;
         client
             .handle_mlme_deauth_req(ctx, req.reason_code)
+            .await
             .map_err(|e| make_client_error(client.addr, e))?;
         if client.deauthenticated() {
             self.clients.remove(&req.peer_sta_address.into());
@@ -208,7 +214,7 @@ impl InfraBss {
         Ok(())
     }
 
-    pub fn handle_mlme_assoc_resp<D: DeviceOps>(
+    pub async fn handle_mlme_assoc_resp<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         resp: fidl_mlme::AssociateResponse,
@@ -225,10 +231,11 @@ impl InfraBss {
                 resp.association_id,
                 &resp.rates,
             )
+            .await
             .map_err(|e| make_client_error(client.addr, e))
     }
 
-    pub fn handle_mlme_disassoc_req<D: DeviceOps>(
+    pub async fn handle_mlme_disassoc_req<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         req: fidl_mlme::DisassociateRequest,
@@ -236,6 +243,7 @@ impl InfraBss {
         let client = get_client_mut(&mut self.clients, req.peer_sta_address.into())?;
         client
             .handle_mlme_disassoc_req(ctx, req.reason_code.into_primitive())
+            .await
             .map_err(|e| make_client_error(client.addr, e))
     }
 
@@ -331,7 +339,7 @@ impl InfraBss {
             })
     }
 
-    pub fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    pub async fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         mgmt_frame: mac::MgmtFrame<B>,
@@ -349,6 +357,7 @@ impl InfraBss {
 
         if mgmt_frame.mgmt_subtype() == mac::MgmtSubtype::PROBE_REQ {
             if device::try_query_discovery_support(&mut ctx.device)
+                .await
                 .map_err(anyhow::Error::from)?
                 .probe_response_offload
                 .supported
@@ -397,8 +406,9 @@ impl InfraBss {
             None => new_client.get_or_insert(RemoteClient::new(client_addr)),
         };
 
-        if let Err(e) =
-            client.handle_mgmt_frame(ctx, self.capabilities, Some(self.ssid.clone()), mgmt_frame)
+        if let Err(e) = client
+            .handle_mgmt_frame(ctx, self.capabilities, Some(self.ssid.clone()), mgmt_frame)
+            .await
         {
             return Err(Rejection::Client(client_addr, e));
         }
@@ -602,7 +612,7 @@ impl InfraBss {
     // Timed event functions
 
     /// Handles timed events.
-    pub fn handle_timed_event<D: DeviceOps>(
+    pub async fn handle_timed_event<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         event_id: EventId,
@@ -614,6 +624,7 @@ impl InfraBss {
 
                 client
                     .handle_event(ctx, event_id, event)
+                    .await
                     .map_err(|e| Rejection::Client(client.addr, e))
             }
         }
@@ -658,7 +669,7 @@ mod tests {
         (Context::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID), time_stream)
     }
 
-    fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
+    async fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
         InfraBss::new(
             ctx,
             Ssid::try_from("coolnet").unwrap(),
@@ -669,10 +680,11 @@ mod tests {
             1,
             None,
         )
+        .await
         .expect("expected InfraBss::new ok")
     }
 
-    fn make_protected_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
+    async fn make_protected_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
         InfraBss::new(
             ctx,
             Ssid::try_from("coolnet").unwrap(),
@@ -683,6 +695,7 @@ mod tests {
             1,
             Some(fake_wpa2_rsne()),
         )
+        .await
         .expect("expected InfraBss::new ok")
     }
 
@@ -700,6 +713,7 @@ mod tests {
             1,
             None,
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         assert_eq!(
@@ -740,8 +754,8 @@ mod tests {
     async fn stop() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let bss = make_infra_bss(&mut ctx);
-        bss.stop(&mut ctx).expect("expected InfraBss::stop ok");
+        let bss = make_infra_bss(&mut ctx).await;
+        bss.stop(&mut ctx).await.expect("expected InfraBss::stop ok");
         assert!(fake_device_state.lock().beacon_config.is_none());
     }
 
@@ -749,7 +763,7 @@ mod tests {
     async fn handle_mlme_auth_resp() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
@@ -760,6 +774,7 @@ mod tests {
                 result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
             },
         )
+        .await
         .expect("expected InfraBss::handle_mlme_auth_resp ok");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -784,7 +799,7 @@ mod tests {
     async fn handle_mlme_auth_resp_no_such_client() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_eq!(
             zx::Status::from(
@@ -795,6 +810,7 @@ mod tests {
                         result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
                     },
                 )
+                .await
                 .expect_err("expected InfraBss::handle_mlme_auth_resp error")
             ),
             zx::Status::NOT_FOUND
@@ -805,7 +821,7 @@ mod tests {
     async fn handle_mlme_deauth_req() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
@@ -816,6 +832,7 @@ mod tests {
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
             },
         )
+        .await
         .expect("expected InfraBss::handle_mlme_deauth_req ok");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -840,7 +857,7 @@ mod tests {
     async fn handle_mlme_assoc_resp() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         bss.handle_mlme_assoc_resp(
@@ -853,6 +870,7 @@ mod tests {
                 rates: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             },
         )
+        .await
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -892,6 +910,7 @@ mod tests {
             1,
             None,
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -906,6 +925,7 @@ mod tests {
                 rates: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             },
         )
+        .await
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -935,7 +955,7 @@ mod tests {
     async fn handle_mlme_disassoc_req() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
@@ -946,6 +966,7 @@ mod tests {
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
             },
         )
+        .await
         .expect("expected InfraBss::handle_mlme_disassoc_req ok");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -968,7 +989,7 @@ mod tests {
     async fn handle_mlme_set_controlled_port_req() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_protected_infra_bss(&mut ctx);
+        let mut bss = make_protected_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
@@ -982,6 +1003,7 @@ mod tests {
                 rates: vec![1, 2, 3],
             },
         )
+        .await
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
 
         bss.handle_mlme_set_controlled_port_req(fidl_mlme::SetControlledPortRequest {
@@ -995,7 +1017,7 @@ mod tests {
     async fn handle_mlme_eapol_req() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
@@ -1039,7 +1061,7 @@ mod tests {
     async fn handle_mgmt_frame_auth() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.handle_mgmt_frame(
             &mut ctx,
@@ -1064,6 +1086,7 @@ mod tests {
                 ][..],
             },
         )
+        .await
         .expect("expected OK");
 
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), true);
@@ -1085,12 +1108,13 @@ mod tests {
     async fn handle_mgmt_frame_assoc_req() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
 
         bss.handle_mgmt_frame(
@@ -1119,6 +1143,7 @@ mod tests {
                 ][..],
             },
         )
+        .await
         .expect("expected OK");
 
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), true);
@@ -1144,7 +1169,7 @@ mod tests {
     async fn handle_mgmt_frame_bad_ds_bits_to_ds() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_mgmt_frame(
@@ -1171,6 +1196,7 @@ mod tests {
                     ][..],
                 },
             )
+            .await
             .expect_err("expected error"),
             Rejection::BadDsBits
         );
@@ -1182,7 +1208,7 @@ mod tests {
     async fn handle_mgmt_frame_bad_ds_bits_from_ds() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_mgmt_frame(
@@ -1209,6 +1235,7 @@ mod tests {
                     ][..],
                 },
             )
+            .await
             .expect_err("expected error"),
             Rejection::BadDsBits
         );
@@ -1220,7 +1247,7 @@ mod tests {
     async fn handle_mgmt_frame_no_such_client() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_mgmt_frame(
@@ -1244,6 +1271,7 @@ mod tests {
                     ][..],
                 },
             )
+            .await
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::NotPermitted)
         );
@@ -1255,7 +1283,7 @@ mod tests {
     async fn handle_mgmt_frame_bogus() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_mgmt_frame(
@@ -1277,6 +1305,7 @@ mod tests {
                     body: &[][..],
                 },
             )
+            .await
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::ParseFailed)
         );
@@ -1288,7 +1317,7 @@ mod tests {
     async fn handle_data_frame() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
@@ -1296,6 +1325,7 @@ mod tests {
         // Move the client to associated so it can handle data frames.
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1307,6 +1337,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
 
         bss.handle_data_frame(
@@ -1354,7 +1385,7 @@ mod tests {
     async fn handle_data_frame_bad_ds_bits() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_data_frame(
@@ -1394,7 +1425,7 @@ mod tests {
     async fn handle_client_event() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, mut time_stream) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
@@ -1402,6 +1433,7 @@ mod tests {
         // Move the client to associated so it can handle data frames.
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1413,6 +1445,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
 
         fake_device_state.lock().wlan_queue.clear();
@@ -1424,6 +1457,7 @@ mod tests {
             timed_event.id,
             TimedEvent::ClientEvent(*CLIENT_ADDR, ClientEvent::BssIdleTimeout),
         )
+        .await
         .expect("expected OK");
 
         // Check that we received a disassociation frame.
@@ -1459,7 +1493,7 @@ mod tests {
     async fn handle_data_frame_no_such_client() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_data_frame(
@@ -1515,7 +1549,7 @@ mod tests {
     async fn handle_data_frame_client_not_associated() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
@@ -1524,6 +1558,7 @@ mod tests {
         // permitted.
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
 
         fake_device_state.lock().wlan_queue.clear();
@@ -1582,12 +1617,13 @@ mod tests {
     async fn handle_eth_frame_no_rsn() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1599,6 +1635,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         fake_device_state.lock().wlan_queue.clear();
 
@@ -1638,7 +1675,7 @@ mod tests {
     async fn handle_eth_frame_no_client() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
         assert_variant!(
             bss.handle_eth_frame(
@@ -1662,12 +1699,13 @@ mod tests {
     async fn handle_eth_frame_is_rsn_eapol_controlled_port_closed() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_protected_infra_bss(&mut ctx);
+        let mut bss = make_protected_infra_bss(&mut ctx).await;
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1679,6 +1717,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         fake_device_state.lock().wlan_queue.clear();
 
@@ -1702,12 +1741,13 @@ mod tests {
     async fn handle_eth_frame_is_rsn_eapol_controlled_port_open() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_protected_infra_bss(&mut ctx);
+        let mut bss = make_protected_infra_bss(&mut ctx).await;
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1719,6 +1759,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         fake_device_state.lock().wlan_queue.clear();
 
@@ -1764,12 +1805,13 @@ mod tests {
     async fn handle_data_frame_is_rsn_eapol(controlled_port_open: bool) {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_protected_infra_bss(&mut ctx);
+        let mut bss = make_protected_infra_bss(&mut ctx).await;
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1781,6 +1823,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         fake_device_state.lock().wlan_queue.clear();
 
@@ -1825,7 +1868,7 @@ mod tests {
         }
     }
 
-    fn authenticate_client(
+    async fn authenticate_client(
         fake_device_state: Arc<Mutex<FakeDeviceState>>,
         ctx: &mut Context<FakeDevice>,
         bss: &mut InfraBss,
@@ -1854,6 +1897,7 @@ mod tests {
                 ][..],
             },
         )
+        .await
         .expect("failed to handle auth req frame");
 
         fake_device_state
@@ -1867,12 +1911,13 @@ mod tests {
                 result_code: fidl_mlme::AuthenticateResultCode::Success,
             },
         )
+        .await
         .expect("failed to handle auth resp");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         fake_device_state.lock().wlan_queue.clear();
     }
 
-    fn associate_client(
+    async fn associate_client(
         fake_device_state: Arc<Mutex<FakeDeviceState>>,
         ctx: &mut Context<FakeDevice>,
         bss: &mut InfraBss,
@@ -1905,6 +1950,7 @@ mod tests {
                 ][..],
             },
         )
+        .await
         .expect("expected OK");
         let msg = fake_device_state
             .lock()
@@ -1920,6 +1966,7 @@ mod tests {
                 rates: msg.rates,
             },
         )
+        .await
         .expect("failed to handle assoc resp");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         fake_device_state.lock().wlan_queue.clear();
@@ -1947,13 +1994,13 @@ mod tests {
     async fn handle_multiple_complete_associations() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
 
-        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR);
-        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR2);
+        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR).await;
+        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR2).await;
 
-        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR, 1);
-        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR2, 2);
+        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR, 1).await;
+        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR2, 2).await;
 
         assert!(bss.clients.contains_key(&CLIENT_ADDR));
         assert!(bss.clients.contains_key(&CLIENT_ADDR2));
@@ -1968,12 +2015,13 @@ mod tests {
     async fn handle_ps_poll() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -1985,6 +2033,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         client.set_power_state(&mut ctx, mac::PowerState::DOZE).expect("expected doze ok");
         fake_device_state.lock().wlan_queue.clear();
@@ -2038,7 +2087,7 @@ mod tests {
     async fn handle_mlme_setkeys_req() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_protected_infra_bss(&mut ctx);
+        let mut bss = make_protected_infra_bss(&mut ctx).await;
         bss.handle_mlme_setkeys_req(
             &mut ctx,
             vec![fidl_mlme::SetKeyDescriptor {
@@ -2051,6 +2100,7 @@ mod tests {
                 rsc: 8,
             }],
         )
+        .await
         .expect("expected InfraBss::handle_mlme_setkeys_req OK");
         assert_eq!(
             fake_device_state.lock().keys,
@@ -2072,7 +2122,7 @@ mod tests {
     async fn handle_mlme_setkeys_req_no_rsne() {
         let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
         assert_variant!(
             bss.handle_mlme_setkeys_req(
                 &mut ctx,
@@ -2087,6 +2137,7 @@ mod tests {
                     rsc: 8,
                 }]
             )
+            .await
             .expect_err("expected InfraBss::handle_mlme_setkeys_req error"),
             Error::Status(_, zx::Status::BAD_STATE)
         );
@@ -2107,6 +2158,7 @@ mod tests {
             1,
             Some(vec![48, 2, 77, 88]),
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         bss.handle_probe_req(&mut ctx, *CLIENT_ADDR)
@@ -2155,6 +2207,7 @@ mod tests {
             1,
             Some(vec![48, 2, 77, 88]),
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         bss.handle_mgmt_frame(
@@ -2175,6 +2228,7 @@ mod tests {
                 body: &[][..],
             },
         )
+        .await
         .expect_err("expected InfraBss::handle_mgmt_frame error");
     }
 
@@ -2192,6 +2246,7 @@ mod tests {
             1,
             Some(vec![48, 2, 77, 88]),
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         bss.handle_mgmt_frame(
@@ -2214,6 +2269,7 @@ mod tests {
                 ][..],
             },
         )
+        .await
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -2254,6 +2310,7 @@ mod tests {
             1,
             Some(vec![48, 2, 77, 88]),
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         bss.handle_mgmt_frame(
@@ -2274,6 +2331,7 @@ mod tests {
                 body: &[0, 5, 1, 2, 3, 4, 5][..],
             },
         )
+        .await
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -2314,6 +2372,7 @@ mod tests {
             1,
             Some(vec![48, 2, 77, 88]),
         )
+        .await
         .expect("expected InfraBss::new ok");
 
         assert_variant!(
@@ -2335,6 +2394,7 @@ mod tests {
                     body: &[0, 5, 1, 2, 3, 4, 6][..],
                 },
             )
+            .await
             .expect_err("expected InfraBss::handle_mgmt_frame error"),
             Rejection::OtherBss
         );
@@ -2344,12 +2404,13 @@ mod tests {
     async fn make_tim() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let mut bss = make_infra_bss(&mut ctx);
+        let mut bss = make_infra_bss(&mut ctx).await;
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
+            .await
             .expect("expected OK");
         client
             .handle_mlme_assoc_resp(
@@ -2361,6 +2422,7 @@ mod tests {
                 1,
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
+            .await
             .expect("expected OK");
         client.set_power_state(&mut ctx, mac::PowerState::DOZE).expect("expected doze OK");
 
@@ -2386,7 +2448,7 @@ mod tests {
     async fn make_tim_empty() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
-        let bss = make_infra_bss(&mut ctx);
+        let bss = make_infra_bss(&mut ctx).await;
 
         let tim = bss.make_tim();
         let (pvb_offset, pvb_bitmap) = tim.make_partial_virtual_bitmap();
