@@ -21,7 +21,9 @@ use {
         object_handle::{ReadObjectHandle, WriteObjectHandle},
         object_store::ObjectDescriptor,
     },
+    linked_hash_map::LinkedHashMap,
     std::{
+        cmp::{Eq, PartialEq},
         collections::btree_map::{BTreeMap, Entry},
         mem::size_of,
         sync::{
@@ -32,16 +34,19 @@ use {
 };
 
 const REPLAY_THREADS: usize = 2;
+// The number of messages to buffer before sending to record. They are chunked up to reduce the
+// number of allocations in the serving threads.
+const MESSAGE_CHUNK_SIZE: usize = 64;
 
 /// Paired with a ProfileState that is currently recording, takes messages to be written into the
 /// current profile. This should be dropped before the recording is stopped to ensure that all
 /// messages have been flushed to the writer.
 pub struct Recorder {
-    sender: async_channel::Sender<Vec<u8>>,
-    buffer: Vec<u8>,
-    offset: usize,
+    sender: async_channel::Sender<Vec<Message>>,
+    buffer: Vec<Message>,
 }
 
+#[derive(Eq, std::hash::Hash, PartialEq)]
 struct Message {
     hash: Hash,
     // Don't bother with offset+length. The kernel is going split up and align it one way and then
@@ -50,9 +55,10 @@ struct Message {
 }
 
 impl Message {
-    fn encode_to(hash: &Hash, offset: u64, dest: &mut [u8]) {
-        dest[..size_of::<Hash>()].clone_from_slice(hash.as_bytes());
-        dest[size_of::<Hash>()..].clone_from_slice(offset.to_le_bytes().as_ref());
+    fn encode_to(&self, dest: &mut [u8]) {
+        dest[..size_of::<Hash>()].clone_from_slice(self.hash.as_bytes());
+        dest[size_of::<Hash>()..size_of::<Message>()]
+            .clone_from_slice(self.offset.to_le_bytes().as_ref());
     }
 
     fn decode_from(src: &[u8; size_of::<Message>()]) -> Self {
@@ -67,21 +73,14 @@ impl Message {
 
 impl Recorder {
     /// Record a blob page in request, for the given hash and offset.
-    pub fn record(&mut self, hash: Hash, offset: u64) -> Result<(), Error> {
-        // Encode `Message` into the buffer.
-        let offset_next = self.offset + size_of::<Message>();
-        Message::encode_to(
-            &hash,
-            offset,
-            &mut self.buffer.as_mut_slice()[self.offset..offset_next],
-        );
-        self.offset = offset_next;
-
-        if self.offset + size_of::<Message>() > self.buffer.len() {
+    pub fn record(&mut self, hash: &Hash, offset: u64) -> Result<(), Error> {
+        self.buffer.push(Message { hash: *hash, offset });
+        if self.buffer.len() >= MESSAGE_CHUNK_SIZE {
             // try_send to avoid async await, we use an unbounded channel anyways.
-            let len = self.buffer.len();
-            self.sender.try_send(std::mem::replace(&mut self.buffer, vec![0u8; len]))?;
-            self.offset = 0;
+            self.sender.try_send(std::mem::replace(
+                &mut self.buffer,
+                Vec::with_capacity(MESSAGE_CHUNK_SIZE),
+            ))?;
         }
         Ok(())
     }
@@ -93,7 +92,7 @@ impl Drop for Recorder {
         // already shut down the receiver.
         debug_assert!(!self.sender.is_closed());
         // Best effort sending what messages have already been queued.
-        if self.offset > 0 {
+        if self.buffer.len() > 0 {
             let buffer = std::mem::take(&mut self.buffer);
             let _ = self.sender.try_send(buffer);
         }
@@ -107,11 +106,11 @@ struct Request {
 
 struct RecordingState {
     stopped_listener: EventListener,
-    sender_clone: async_channel::Sender<Vec<u8>>,
+    sender_clone: async_channel::Sender<Vec<Message>>,
 }
 
 struct ReplayState {
-    // Using a DropEvent to trigger Take shutdown if this goes out of scope.
+    // Using a DropEvent to trigger task shutdown if this goes out of scope.
     stop_on_drop: DropEvent,
     stopped_listener: EventListener,
 }
@@ -141,21 +140,44 @@ impl ProfileState {
     pub fn record_new<T: WriteObjectHandle>(&mut self, handle: T) -> Recorder {
         self.stop_profiler();
         let finished_event = DropEvent::new();
-        let (sender, receiver) = async_channel::unbounded::<Vec<u8>>();
+        let (sender, receiver) = async_channel::unbounded::<Vec<Message>>();
         let sender_clone = sender.clone();
         let stopped_listener = (*finished_event).listen();
-        let buffer = vec![0u8; handle.block_size() as usize];
         fasync::Task::spawn(async move {
             // DropEvent should fire when this task is done.
             let _finished_event = finished_event;
+            let mut recording = LinkedHashMap::<Message, ()>::new();
             while let Ok(buffer) = receiver.recv().await {
-                let mut io_buf = handle.allocate_buffer(buffer.len()).await;
-                // While I'd prefer to avoid this memcpy, making the io Buffer `Send` was going to
-                // very messy.
-                io_buf.as_mut_slice().clone_from_slice(buffer.as_slice());
+                for message in buffer {
+                    recording.insert(message, ());
+                }
+            }
+
+            let block_size = handle.block_size() as usize;
+            let mut offset = 0;
+            let mut io_buf = handle.allocate_buffer(block_size).await;
+            for (message, _) in recording {
+                let mut next_offset = offset + size_of::<Message>();
+                // The buffer is full.
+                if next_offset >= block_size {
+                    // Zero the remainder of the buffer.
+                    io_buf.as_mut_slice()[offset..block_size].fill(0);
+                    // Write it out.
+                    if let Err(e) = handle.write_or_append(None, io_buf.as_ref()).await {
+                        error!("Failed to write profile block: {:?}", e);
+                        return;
+                    }
+                    offset = 0;
+                    next_offset = size_of::<Message>();
+                }
+                message.encode_to(&mut io_buf.as_mut_slice()[offset..]);
+                offset = next_offset;
+            }
+            if offset > 0 {
+                io_buf.as_mut_slice()[offset..block_size].fill(0);
+                // Write it out.
                 if let Err(e) = handle.write_or_append(None, io_buf.as_ref()).await {
                     error!("Failed to write profile block: {:?}", e);
-                    break;
                 }
             }
         })
@@ -163,7 +185,7 @@ impl ProfileState {
 
         self.0 = State::Recording(RecordingState { stopped_listener, sender_clone });
 
-        Recorder { sender, buffer, offset: 0 }
+        Recorder { sender, buffer: Vec::with_capacity(MESSAGE_CHUNK_SIZE) }
     }
 
     /// Stop in-flight recording and replaying. This method will block until the resources have been
@@ -443,7 +465,7 @@ mod tests {
         {
             // Drop recorder when finished writing to flush data.
             let mut recorder = state.record_new(handle);
-            recorder.record(Hash::from_array([88u8; size_of::<Hash>()]), 0).unwrap();
+            recorder.record(&Hash::from_array([88u8; size_of::<Hash>()]), 0).unwrap();
         }
         state.stop_profiler();
         assert_eq!(inner.lock().unwrap().data.len(), BLOCK_SIZE);
@@ -464,8 +486,8 @@ mod tests {
             hash = fixture.write_blob(&[88u8], CompressionMode::Never).await;
             // Drop recorder when finished writing to flush data.
             let mut recorder = state.record_new(handle);
-            for _ in 0..message_count {
-                recorder.record(hash, 4096).unwrap();
+            for i in 0..message_count {
+                recorder.record(&hash, 4096 * i as u64).unwrap();
             }
         }
         state.stop_profiler();
@@ -486,12 +508,12 @@ mod tests {
 
         let mut recv_count = 0;
         while let Ok(msg) = receiver.recv().await {
-            recv_count += 1;
             assert_eq!(msg.file.root(), hash);
-            assert_eq!(msg.offset, 4096);
+            assert_eq!(msg.offset, 4096 * recv_count);
+            recv_count += 1;
         }
         task.await;
-        assert_eq!(recv_count, message_count);
+        assert_eq!(recv_count, message_count as u64);
 
         fixture.close().await;
     }
@@ -516,7 +538,7 @@ mod tests {
                 let hash =
                     fixture.write_blob(i.to_le_bytes().as_slice(), CompressionMode::Never).await;
                 hashes.push(hash);
-                recorder.record(hash, 0).unwrap();
+                recorder.record(&hash, 0).unwrap();
             }
             fixture.close().await
         };
@@ -577,7 +599,7 @@ mod tests {
             assert_eq!(BLOCK_SIZE as u64, fixture.fs().block_size());
             let message_count = (fixture.fs().block_size() as usize / size_of::<Message>()) * 2 + 1;
             for _ in 0..message_count {
-                recorder.record(hash, 0).unwrap();
+                recorder.record(&hash, 0).unwrap();
             }
         }
         state.stop_profiler();

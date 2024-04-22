@@ -201,7 +201,7 @@ impl Pager {
             let mut recorder_holder = self.recorder.lock().unwrap();
             if let Some(recorder) = &mut (*recorder_holder) {
                 // If the message fails to send, so will all the rest.
-                if let Err(_) = recorder.record(blob.root(), range.start) {
+                if let Err(_) = recorder.record(&blob.root(), range.start) {
                     *recorder_holder = None;
                 }
             }
