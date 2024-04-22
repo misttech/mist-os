@@ -60,7 +60,7 @@ impl FshostShutdownResponder {
     }
 }
 
-const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
+const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(20);
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
