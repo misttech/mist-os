@@ -203,7 +203,7 @@ std::string UsbPeripheral::GetSerialNumber() {
   if (status == ZX_OK && actual == sizeof(raw_mac_addr)) {
     snprintf(buffer, sizeof(buffer), "%02X%02X%02X%02X%02X%02X", raw_mac_addr[0], raw_mac_addr[1],
              raw_mac_addr[2], raw_mac_addr[3], raw_mac_addr[4], raw_mac_addr[5]);
-    return {buffer, actual};
+    return {buffer};
   }
 
   zxlogf(INFO, "Serial number/MAC address not found. Using generic (non-unique) serial number.\n");
