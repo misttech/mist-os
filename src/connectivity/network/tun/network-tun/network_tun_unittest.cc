@@ -165,6 +165,11 @@ zx::result<fuchsia_hardware_network::PortInfo> GetPortInfo(
     return zx::error(status);
   }
 
+  // We want to return PortInfo from this function, which has out-of-band
+  // members. This means we have to deviate from the rest of this file and use
+  // Natural rather than Wire FIDL types, as the Wire types don't own their
+  // allocation, so we'd end up deallocating the backing memory of PortInfo once
+  // the WireResult is dropped.
   fidl::SyncClient<fuchsia_hardware_network::Port> client{std::move(client_end)};
   fidl::Result result = client->GetInfo();
 
