@@ -870,6 +870,9 @@ if (!is_efi_toolchain) {
 
     if (is_mistos) {
       deps -= [ "//zircon/kernel/lib/userabi/userboot/tests:boot_tests" ]
+      if (register_zxtest) {
+        deps += [ ":kernel-zxtest" ]
+      }
     }
 
     if (all_cpu_kernel_boot_tests) {
@@ -889,6 +892,17 @@ if (!is_efi_toolchain) {
       "graceful-shutdown",
     ]
   }
+
+  if (is_mistos && register_zxtest) {
+    kernel_shell_script_test("kernel-zxtest") {
+      device_types = kernel_test_device_types
+      script = [
+        "zx_run_all_test",
+        "boot-test-success",
+        "graceful-shutdown",
+      ]
+    }
+  }
 }
 
 foreach(cpu, standard_fuchsia_cpus) {
@@ -896,6 +910,7 @@ foreach(cpu, standard_fuchsia_cpus) {
     testonly = true
     deps = [
       ":kernel-unittests-boot-test(:kernel_$cpu)",
+      ":kernel-zxtest(:kernel_$cpu)",
       "phys/test:$cpu",
     ]
   }

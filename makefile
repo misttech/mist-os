@@ -49,5 +49,16 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 	-z $(OUTPUT)/kernel_x64/kernel.zbi -c "kernel.shell=true" -- -no-reboot
 .PHONY: rain
 
+test: ## Run test ZBI with KASAN enabled
+	$(NOECHO)echo "target_os=\"mistos\"" > $(OUTPUT)/args.gn
+	$(NOECHO)echo "register_zxtest=true" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
+	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-zxtest.zbi
+	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
+	-t $(OUTPUT)/multiboot.bin \
+	-z $(OUTPUT)/obj/zircon/kernel/kernel-zxtest.zbi -s1 \
+	-- -no-reboot
+.PHONY: test
+
 %: ## Make any ninja target
 	$(NOECHO)$(NINJA) -C $(OUTPUT) $@

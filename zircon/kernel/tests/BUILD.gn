@@ -134,7 +134,9 @@ if (toolchain_environment == "kernel") {
     ]
     if (!kernel_no_userabi) {
       if (is_mistos) {
-        deps += [ "//zircon/system/ulib/zxtest/test:tests-mistos" ]
+        if (register_zxtest) {
+          deps += [ "//zircon/system/ulib/zxtest/test:tests-mistos" ]
+        }
       } else {
         sources += [ "userboot_tests.cc" ]
         deps += [ "//zircon/kernel/lib/userabi" ]

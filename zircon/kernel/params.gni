@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -145,6 +146,9 @@ declare_args() {
 
   # Include a mechanism for the kernel to sample threads and write the results to a buffer
   experimental_thread_sampler_enabled = false
+
+  # Register TESTS from ZXTEST to run in kernel (mist-os)
+  register_zxtest = false
 }
 
 declare_args() {
