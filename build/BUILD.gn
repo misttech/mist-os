@@ -222,6 +222,10 @@ group("non_hermetic_deps") {
   # TODO(https://fxbug.dev/331492588): Template driver example wraps Bazel output in Ninja, and
   # depends on non_hermetic_deps.
   visibility += [ "////examples/drivers/template:*" ]
+
+  # This action falls back to parsing //integration/.git/... content if
+  # Jiri hook files are not available.
+  visibility += [ "//build/info:latest-commit-date-and-hash" ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates

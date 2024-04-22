@@ -24,11 +24,12 @@ from datetime import datetime, timezone
 import os
 import sys
 import subprocess
+from typing import Dict, List
 
 _SCRIPT_DIR = os.path.dirname(__file__)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Tool for extracting the latest commit date and hash from integration.git"
     )
@@ -55,11 +56,15 @@ def main():
         action="store_true",
         help="truncate the date to midnight UTC and use a fake commit hash",
     )
+    parser.add_argument("--depfile", help="Ninja depfile path.")
 
     args = parser.parse_args()
 
-    latest_commit_hash = None
-    latest_commit_date_unix = 0
+    outputs: List[str] = []
+    inputs: List[str] = []
+
+    latest_commit_hash: None | str = None
+    latest_commit_date_unix: None | int = None
     # First look at files in the jiri_generated/ directory, and use them
     # if they exist, unless the --force-git option is used.
 
@@ -69,10 +74,11 @@ def main():
         # These files a normally created by a Jiri hook that invokes
         # //build/info/create_jiri_hook_files.sh.
         #
-        # However, before the hook is active, they are created with
-        # explicit values ("" and "0" respecitively). Which will force
-        # the use of git after they are loaded.
-        repo_name = os.path.basename(args.repo)
+        # However, before the hook is active these files will not exist, so
+        # fallback by invoking the git command below.
+
+        # NOTE: args.repo may have a trailing separator, e.g. '../../integration/'
+        repo_name = os.path.basename(args.repo.removesuffix("/"))
         hash_file = os.path.join(generated_dir, f"{repo_name}_commit_hash.txt")
         date_file = os.path.join(generated_dir, f"{repo_name}_commit_stamp.txt")
         if os.path.exists(hash_file) and os.path.exists(date_file):
@@ -80,6 +86,8 @@ def main():
                 latest_commit_hash = f.read().strip()
             with open(date_file) as f:
                 latest_commit_date_unix = int(f.read().strip())
+
+            inputs += [hash_file, date_file]
 
         if not latest_commit_hash:
             print(
@@ -114,7 +122,7 @@ def main():
                 "-n",
                 "1",
             ]
-            git_env = {}
+            git_env: Dict[str, str] = {}
             git_env.update(os.environ)
             git_env["GIT_CONFIG_NOSYSTEM"] = "1"
             result = subprocess.run(
@@ -123,9 +131,18 @@ def main():
 
             # Take the hash and timestamp lines, split and parse/convert them.
             output_lines = result.stdout.split()
+            assert (
+                len(output_lines) == 2
+            ), f"Unexpected git command output (expected two lines): [{result.stdout}]"
 
             latest_commit_hash = output_lines[0]
             latest_commit_date_unix = int(output_lines[1])
+
+            inputs += [f"{args.repo}/.git/HEAD"]
+
+    assert (
+        latest_commit_date_unix is not None
+    ), f"Could not determine latest integration commit date! This script is probably buggy!"
 
     latest_commit_date = datetime.fromtimestamp(
         latest_commit_date_unix, timezone.utc
@@ -139,20 +156,35 @@ def main():
         latest_commit_hash = f"{int(latest_commit_date.timestamp())}fedcba9876543210fedcba98765432"
 
     write_file_if_changed(
-        args.timestamp_file, str(int(latest_commit_date.timestamp()))
+        args.timestamp_file, str(int(latest_commit_date.timestamp())), outputs
     )
-    write_file_if_changed(args.date_file, latest_commit_date.isoformat())
-    write_file_if_changed(args.commit_hash_file, latest_commit_hash)
+    write_file_if_changed(
+        args.date_file, latest_commit_date.isoformat(), outputs
+    )
+    write_file_if_changed(args.commit_hash_file, latest_commit_hash, outputs)
+
+    if args.depfile:
+        assert outputs, "Using --depfile requires at least one output file!"
+        with open(args.depfile, "w") as f:
+            f.write(
+                "{outputs}: {inputs}\n".format(
+                    outputs=" ".join(os.path.relpath(o) for o in outputs),
+                    inputs=" ".join(os.path.relpath(i) for i in inputs),
+                )
+            )
+
+    return 0
 
 
-def write_file_if_changed(path: str, contents: str):
+def write_file_if_changed(path: str, contents: str, outputs: List[str]) -> None:
     if path:
+        outputs.append(path)
         if contents_changed(path, contents):
             with open(path, "w") as file:
                 file.write(contents)
 
 
-def contents_changed(path: str, contents: str):
+def contents_changed(path: str, contents: str) -> bool:
     try:
         with open(path, "r") as file:
             existing_contents = file.read()

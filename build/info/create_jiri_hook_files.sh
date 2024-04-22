@@ -31,47 +31,9 @@ if [[ ! -f "${FUCHSIA_DIR}/.jiri_manifest" ]]; then
   fatal "Cannot locate proper FUCHSIA_DIR, got: ${FUCHSIA_DIR}"
 fi
 
-# Use the OSTYPE and MACHTYPE Bash builtin variables to determine host
-# machine type.
-case "$OSTYPE" in
-  linux*)
-    readonly HOST_OS="linux"
-    ;;
-  darwin*)
-    readonly HOST_OS="mac"
-    ;;
-  *)
-    echo >&2 "Unknown operating system: $OSTYPE."
-    exit 1
-    ;;
-esac
-
-case "$MACHTYPE" in
-  x86_64*)
-    readonly HOST_CPU="x64"
-    ;;
-  aarch64*|arm64*)
-    readonly HOST_CPU="arm64"
-    ;;
-  *)
-    echo >&2 "Unknown architecture: $MACHTYPE."
-    exit 1
-    ;;
-esac
-
-# Locate prebuilt python interpreter.
-PREBUILT_PYTHON="$FUCHSIA_DIR/prebuilt/third_party/python3/${HOST_OS}-${HOST_CPU}/bin/python3"
-if [[ ! -f "${PREBUILT_PYTHON}" ]]; then
-  fatal "Cannot locate PREBUILT_PYTHON: $PREBUILT_PYTHON"
-fi
-
 # LINT.IfChange
-OUTPUT_DIR="${_SCRIPT_DIR}/jiri_generated"
-mkdir -p "${OUTPUT_DIR}"
-
-"$PREBUILT_PYTHON" -S \
-  "${_SCRIPT_DIR}/gen_latest_commit_date.py" \
-  --repo "${FUCHSIA_DIR}/integration" \
-  --timestamp-file "$OUTPUT_DIR/integration_commit_stamp.txt" \
-  --commit-hash-file "${OUTPUT_DIR}/integration_commit_hash.txt"
+# Call git directly, as Python is not available when Jiri hooks run on infra bots.
+export GIT_OPTIONAL_LOCKS=0
+git -C "${FUCHSIA_DIR}/integration" rev-parse HEAD > "${FUCHSIA_DIR}/build/info/jiri_generated/integration_commit_hash.txt"
+git -C "${FUCHSIA_DIR}/integration" log -n1 --date=unix --format=%cd > "${FUCHSIA_DIR}/build/info/jiri_generated/integration_commit_stamp.txt"
 # LINT.ThenChange(//build/info/gen_latest_commit_date.py)
