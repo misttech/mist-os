@@ -95,6 +95,9 @@ pub struct PlatformWlanConfig {
     pub recovery_profile: Option<WlanRecoveryProfile>,
     #[serde(default)]
     pub recovery_enabled: bool,
+    /// Defines roaming features/triggers enabled for device.
+    #[serde(default)]
+    pub roaming_profile: Option<WlanRoamingProfile>,
     #[serde(default)]
     pub policy_layer: WlanPolicyLayer,
 }
@@ -117,6 +120,14 @@ pub enum WlanRecoveryProfile {
     ThresholdedRecovery,
 }
 
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum WlanRoamingProfile {
+    #[default]
+    RoamingOff,
+    MetricsOnly,
+    StationaryRoaming,
+}
 /// Platform configuration options to use for the mdns area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]

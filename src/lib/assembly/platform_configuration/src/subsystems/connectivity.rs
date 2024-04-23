@@ -8,7 +8,7 @@ use anyhow::bail;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
-    WlanRecoveryProfile,
+    WlanRecoveryProfile, WlanRoamingProfile,
 };
 use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
@@ -183,6 +183,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                                 "wlan.recovery_enabled is invalid with wlan.policy_layer ViaWlanix"
                             )
                         }
+
+                        // Ensure we don't have invalid roaming settings
+                        if connectivity_config.wlan.roaming_profile.is_some() {
+                            bail!(
+                                "wlan.roaming_profile is invalid with wlan.policy_layer ViaWlanix"
+                            )
+                        }
                     }
                     WlanPolicyLayer::Platform => {
                         builder.platform_bundle("wlan_policy");
@@ -206,6 +213,23 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                             Config::new(
                                 ConfigValueType::String { max_size: 512 },
                                 recovery_profile.into(),
+                            ),
+                        )?;
+
+                        let roaming_profile = match connectivity_config.wlan.roaming_profile {
+                            Some(WlanRoamingProfile::StationaryRoaming) => {
+                                String::from("stationary_roaming")
+                            }
+                            Some(WlanRoamingProfile::MetricsOnly) => String::from("metrics_only"),
+                            Some(WlanRoamingProfile::RoamingOff) | None => {
+                                String::from("roaming_off")
+                            }
+                        };
+                        builder.set_config_capability(
+                            "fuchsia.wlan.RoamingProfile",
+                            Config::new(
+                                ConfigValueType::String { max_size: 512 },
+                                roaming_profile.into(),
                             ),
                         )?;
                     }

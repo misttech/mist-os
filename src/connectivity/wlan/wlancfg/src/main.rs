@@ -221,6 +221,8 @@ async fn run_regulatory_manager(
 }
 
 async fn run_all_futures() -> Result<(), Error> {
+    // Get wlancfg product config data.
+    let cfg = wlancfg_config::Config::take_from_startup_handle();
     let monitor_svc = fuchsia_component::client::connect_to_protocol::<DeviceMonitorMarker>()
         .context("failed to connect to device monitor")?;
     let persistence_proxy = fuchsia_component::client::connect_to_protocol_at_path::<
@@ -300,13 +302,14 @@ async fn run_all_futures() -> Result<(), Error> {
     let connection_selection_requester =
         ConnectionSelectionRequester::new(connection_selection_request_sender);
 
-    let (roam_stats_sender, roam_stats_receiver) = mpsc::unbounded();
+    info!("Roaming profile: {}", cfg.roaming_profile);
+    let (roam_search_sender, roam_search_receiver) = mpsc::unbounded();
     let local_roam_manager = Arc::new(Mutex::new(local_roam_manager::LocalRoamManager::new(
-        roam_stats_sender,
+        roam_search_sender,
         telemetry_sender.clone(),
     )));
     let roam_manager_service = local_roam_manager::LocalRoamManagerService::new(
-        roam_stats_receiver,
+        roam_search_receiver,
         telemetry_sender.clone(),
         connection_selection_requester.clone(),
     );
@@ -315,7 +318,6 @@ async fn run_all_futures() -> Result<(), Error> {
     let (recovery_sender, recovery_receiver) =
         mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
     // Get the recovery settings.
-    let cfg = wlancfg_config::Config::take_from_startup_handle();
     info!("Recovery Profile: {}", cfg.recovery_profile);
     info!("Recovery Enabled: {}", cfg.recovery_enabled);
 
