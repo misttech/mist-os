@@ -109,6 +109,11 @@ type Element = table {
     /// If not included or false, the processing element is always enabled.
     ///
     /// Optional.
+    ///
+    /// # Deprecation
+    ///
+    /// Use `can_bypass` instead.
+    @available(deprecated=20)
     4: can_disable bool;
 
     /// If included, a textual description of the processing element.
@@ -122,6 +127,13 @@ type Element = table {
     /// Optional.
     @available(added=20)
     6: can_stop bool;
+
+    /// If included and true, the processing element can be bypassed via `ElementSetState`.
+    /// If not included or false, the processing element cannot be bypassed.
+    ///
+    /// Optional.
+    @available(added=20)
+    7: can_bypass bool;
 };
 
 /// Type-specific processing element state.
@@ -164,6 +176,11 @@ type ElementState = table {
     /// element is currently enabled.
     ///
     /// Optional.
+    ///
+    /// # Deprecation
+    ///
+    /// Use `bypassed` instead.
+    @available(deprecated=20)
     2: enabled bool;
 
     /// If included, how much latency is added to the pipeline if this processing element is
@@ -193,6 +210,19 @@ type ElementState = table {
     /// Required.
     @available(added=20)
     5: started bool;
+
+    /// The bypassed state for this processing element.
+    /// If true, the hardware associated with the element is bypassed. If false, not bypassed.
+    ///
+    /// By default processing elements are not bypassed.
+    /// If the corresponding `Element` returned `can_bypass` equals to `false`, then
+    /// this field can't be set to `true`.
+    ///
+    /// A bypassed element does not affect the flow of audio through the topology.
+    ///
+    /// Optional.
+    @available(added=20)
+    6: bypassed bool;
 };
 
 /// Edge pairs between processing elements used to define ordering in processing elements

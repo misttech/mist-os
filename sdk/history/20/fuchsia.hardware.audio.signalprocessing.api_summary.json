@@ -217,6 +217,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/Element.can_bypass",
+        "ordinal": "7",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Element.can_disable",
         "ordinal": "4",
         "type": "bool"
@@ -254,6 +260,12 @@
     {
         "kind": "table",
         "name": "fuchsia.hardware.audio.signalprocessing/Element"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.bypassed",
+        "ordinal": "6",
+        "type": "bool"
     },
     {
         "kind": "table/member",
