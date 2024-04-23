@@ -42,9 +42,17 @@ trait Store: Send + Sync {
 mod tests {
     use {
         fuchsia_zircon::AsHandleRef,
+        rand::{
+            distributions::{Alphanumeric, DistString as _},
+            thread_rng,
+        },
         std::sync::atomic::{AtomicU64, Ordering},
         wlan_stash_constants::{NetworkIdentifier, SecurityType, StashedSsid},
     };
+
+    pub fn rand_string() -> String {
+        Alphanumeric.sample_string(&mut thread_rng(), 20)
+    }
 
     /// Returns a new ID that is guaranteed to be unique (which is required since the tests run in
     /// parallel).

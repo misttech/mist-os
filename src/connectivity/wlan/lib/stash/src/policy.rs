@@ -12,78 +12,82 @@ use {
 };
 
 pub use wlan_stash_constants::{
-    Credential, NetworkIdentifier, PersistentData, SecurityType, POLICY_STASH_ID,
+    self, Credential, NetworkIdentifier, PersistentData, PersistentStorageData, SecurityType,
+    POLICY_STORAGE_ID,
 };
 
 /// Manages access to the persistent storage or saved network configs through Stash
 pub struct PolicyStorage {
-    root: Box<dyn Store>,
+    root: StashStore,
 }
 
 impl PolicyStorage {
     /// Initialize new store with the ID provided by the Saved Networks Manager. The ID will
     /// identify stored values as being part of the same persistent storage.  `proxy_fn` is used to
-    /// connect to stash if necessary.  If `only_stash` is true, only use a store backed by Stash
-    /// rather than a file under '/data'.
+    /// connect to stash if necessary.
     pub async fn new_with_id_and_proxy(
         id: &str,
         proxy_fn: impl FnOnce() -> Result<fidl_stash::SecureStoreProxy, Error>,
-        only_stash: bool,
     ) -> Result<Self, Error> {
-        let root = if only_stash {
-            Box::new(StashStore::from_secure_store_proxy(id, proxy_fn()?)?) as Box<dyn Store>
-        } else {
-            let path = format!("/data/network-data.{id}");
-            match StorageStore::new(&path) {
-                Ok(store) => Box::new(store),
-                Err(error) => {
-                    // Try and read from Stash
-                    let mut stash_store = StashStore::from_secure_store_proxy(id, proxy_fn()?)?;
-
-                    let store = StorageStore::empty(&path);
-
-                    if let Ok(config) = stash_store.load().await {
-                        for (id, data) in &config {
-                            store.write(id, data).await?;
-                        }
-                        if let Err(error) = store.flush().await {
-                            tracing::info!(?error, "Failed to write migrated saved networks");
-                        } else {
-                            // Delete from stash.
-                            stash_store
-                                .delete_store()
-                                .await
-                                .context("Failed to delete stash store after migration")?;
-                            tracing::info!("Migrated saved networks from stash");
-                        }
-                    } else {
-                        tracing::info!(
-                            ?error,
-                            "Failed to read saved networks from {path:?}, will create new"
-                        );
-                    }
-                    Box::new(store)
-                }
-            }
-        };
+        let root = StashStore::from_secure_store_proxy(id, proxy_fn()?)?;
         Ok(Self { root })
+    }
+
+    #[allow(unused)]
+    /// The id is both the ID for the new file backed storage and for stash.
+    async fn load_storage_or_migrate(
+        id: &str,
+        proxy_fn: impl FnOnce() -> Result<fidl_stash::SecureStoreProxy, Error>,
+    ) -> Result<Vec<PersistentStorageData>, Error> {
+        let path = format!("/data/network-data.{id}");
+        let store = StorageStore::new(&path);
+
+        // If there is an error loading from the new version of storage, it means it hasn't been
+        // create and should be loaded from stash.
+        let load_err = match store.load() {
+            Ok(networks) => return Ok(networks),
+            Err(e) => e,
+        };
+        let mut stash_store = StashStore::from_secure_store_proxy(id, proxy_fn()?)?;
+        // Try and read from Stash since store doesn't exist yet
+        if let Ok(config) = stash_store.load().await {
+            // Read the stash data and convert it to a flattened list of config data.
+            let mut networks_list = Vec::new();
+            for (id, legacy_configs) in config.into_iter() {
+                let mut new_configs = legacy_configs
+                    .into_iter()
+                    .map(|c| PersistentStorageData::new_from_legacy_data(id.clone(), c));
+                networks_list.extend(&mut new_configs);
+            }
+
+            // Write the data to the new storage.
+            let write_succeeded = store
+                .write(networks_list.clone())
+                .inspect_err(|e| tracing::info!(?e, "Failed to write migrated saved networks"))
+                .is_ok();
+            if write_succeeded {
+                // Delete from stash if writing was successful.
+                stash_store
+                    .delete_store()
+                    .await
+                    .context("Failed to delete stash store after migration")?;
+                tracing::info!("Migrated saved networks from stash");
+            }
+            Ok(networks_list)
+        } else {
+            tracing::info!(?load_err, "Failed to read saved networks from file, will create new. ",);
+            Ok(Vec::new())
+        }
     }
 
     /// Like `new_with_id_and_proxy` but provides a default `proxy_fn`.
     pub async fn new_with_id(id: &str) -> Result<Self, Error> {
-        Self::new_with_id_and_proxy(
-            id,
-            default_stash_proxy,
-            // TODO(https://fxbug.dev/42086019): For now, always use stash.
-            /* only_stash: */
-            true,
-        )
-        .await
+        Self::new_with_id_and_proxy(id, default_stash_proxy).await
     }
 
     /// Initialize new Stash with a provided proxy in order to mock stash in unit tests.
     pub fn new_with_stash(proxy: fidl_stash::StoreAccessorProxy) -> Self {
-        Self { root: Box::new(StashStore::new(proxy, POLICY_STASH_PREFIX)) }
+        Self { root: StashStore::new(proxy, POLICY_STASH_PREFIX) }
     }
 
     /// Update the network configs of a given network identifier to persistent storage, deleting
@@ -375,28 +379,33 @@ mod tests {
         let (store_proxy, accessor_server) =
             create_proxy().expect("failed to create accessor proxy");
         store_client.create_accessor(false, accessor_server).expect("failed to create accessor");
-        let network_id = network_id("foo", SecurityType::Wpa2);
-        let network_config = vec![PersistentData {
-            credential: Credential::Password(b"password".to_vec()),
-            has_ever_connected: false,
+
+        let ssid = "foo";
+        let security_type = SecurityType::Wpa2;
+        let credential = Credential::Password(b"password".to_vec());
+        let has_ever_connected = false;
+        // This is the version used by the previous storage mechanism.
+        let network_id = network_id(ssid, security_type);
+        let previous_data = PersistentData { credential: credential.clone(), has_ever_connected };
+
+        let expected = vec![PersistentStorageData {
+            ssid: ssid.into(),
+            security_type: security_type,
+            credential: credential.clone(),
+            has_ever_connected,
         }];
+
         {
             let stash = PolicyStorage::new_with_stash(store_proxy);
-            stash.write(&network_id, &network_config).await.expect("write failed");
+            stash.write(&network_id, &vec![previous_data]).await.expect("write failed");
         }
-
-        let expected = HashMap::from([(network_id, network_config)]);
 
         // Migrate the config.
         {
-            let stash = PolicyStorage::new_with_id_and_proxy(
-                &stash_id,
-                default_stash_proxy,
-                /* only_stash: */ false,
-            )
-            .await
-            .expect("new_with_id failed");
-            assert_eq!(&stash.load().await.expect("load failed"), &expected);
+            let data = PolicyStorage::load_storage_or_migrate(&stash_id, default_stash_proxy)
+                .await
+                .expect("migrating stash data to create store failed");
+            assert_eq!(data, expected);
         }
 
         // The config should have been deleted from Stash.
@@ -412,14 +421,10 @@ mod tests {
 
         // And once more, but this time there should be no migration.
         {
-            let stash = PolicyStorage::new_with_id_and_proxy(
-                &stash_id,
-                default_stash_proxy,
-                /* only_stash: */ false,
-            )
-            .await
-            .expect("new_with_id failed");
-            assert_eq!(&stash.load().await.expect("load failed"), &expected);
+            let configs = PolicyStorage::load_storage_or_migrate(&stash_id, default_stash_proxy)
+                .await
+                .expect("load failed");
+            assert_eq!(configs, expected);
         }
     }
 
@@ -461,14 +466,11 @@ mod tests {
         };
 
         // Try and load the config.  It should provide empty config.
-        let stash = PolicyStorage::new_with_id_and_proxy(
-            &stash_id,
-            || Ok(client.into_proxy().unwrap()),
-            /* only_stash: */ false,
-        )
-        .await
-        .expect("new_with_id_and_proxy failed");
-        assert_eq!(&stash.load().await.expect("load failed"), &HashMap::new());
+        let loaded_configs =
+            PolicyStorage::load_storage_or_migrate(&stash_id, || Ok(client.into_proxy().unwrap()))
+                .await
+                .expect("new_with_id_and_proxy failed");
+        assert_eq!(loaded_configs, Vec::new());
 
         // Make sure there was an attempt to actually read from stash.
         assert!(read_from_stash.load(Ordering::Relaxed));
