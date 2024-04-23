@@ -9,6 +9,8 @@
 #include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/sync/completion.h>
+#include <lib/zx/time.h>
 
 #include <thread>
 
@@ -74,11 +76,21 @@ constexpr uint8_t kFtdiSioReadEepromRequest = 0x90;
 constexpr uint8_t kFtdiSioWriteEepromRequest = 0x91;
 constexpr uint8_t kFtdiSioEraseEepromRequest = 0x92;
 
+class FtdiSerial {
+ public:
+  // Synchronously read len bytes into buf.
+  virtual zx_status_t Read(uint8_t* buf, size_t len) = 0;
+
+  // Synchronously write len bytes from buf.
+  virtual zx_status_t Write(uint8_t* buf, size_t len) = 0;
+};
+
 class FtdiDevice;
 using DeviceType = ddk::Device<FtdiDevice, ddk::Unbindable,
                                ddk::Messageable<fuchsia_hardware_ftdi::Device>::Mixin>;
 class FtdiDevice : public DeviceType,
-                   public ddk::SerialImplProtocol<FtdiDevice, ddk::base_protocol> {
+                   public ddk::SerialImplProtocol<FtdiDevice, ddk::base_protocol>,
+                   public FtdiSerial {
  public:
   explicit FtdiDevice(zx_device_t* parent) : DeviceType(parent), usb_client_(parent) {}
   ~FtdiDevice();
@@ -109,7 +121,15 @@ class FtdiDevice : public DeviceType,
   // |ddk::SerialImpl|
   zx_status_t SerialImplSetNotifyCallback(const serial_notify_t* cb);
 
+  // |FtdiSerial::Read|
+  zx_status_t Read(uint8_t* buf, size_t len) override;
+
+  // |FtdiSerial::Write|
+  zx_status_t Write(uint8_t* buf, size_t len) override;
+
  private:
+  static constexpr zx::duration kSerialReadWriteTimeout = zx::sec(1);
+
   void CreateI2C(CreateI2CRequestView request, CreateI2CCompleter::Sync& _completer) override;
 
   static zx_status_t FidlCreateI2c(void* ctx,
@@ -158,6 +178,9 @@ class FtdiDevice : public DeviceType,
   bool need_to_notify_cb_ = false;
   serial_notify_t notify_cb_ = {};
   std::thread cancel_thread_;
+
+  sync_completion_t serial_readable_;
+  sync_completion_t serial_writable_;
 };
 
 }  // namespace ftdi_serial
