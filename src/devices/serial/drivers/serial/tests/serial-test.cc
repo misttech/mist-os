@@ -4,13 +4,11 @@
 
 #include "serial.h"
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/zircon-internal/thread_annotations.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/fit/function.h>
 
 #include <memory>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -22,85 +20,87 @@ constexpr size_t kBufferLength = 16;
 constexpr zx_signals_t kEventWrittenSignal = ZX_USER_SIGNAL_0;
 
 // Fake for the SerialImpl protocol.
-class FakeSerialImpl : public ddk::SerialImplProtocol<FakeSerialImpl> {
+class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
-  FakeSerialImpl() : proto_({&serial_impl_protocol_ops_, this}) {
-    zx::event::create(0, &write_event_);
-  }
+  FakeSerialImpl() { zx::event::create(0, &write_event_); }
 
   // Getters.
-  const serial_impl_protocol_t* proto() const { return &proto_; }
   bool enabled() const { return enabled_; }
+  void set_enabled(bool enabled) { enabled_ = enabled; }
 
-  const serial_notify_t* callback() {
-    fbl::AutoLock al(&cb_lock_);
-    return &callback_;
-  }
-
-  char* read_buffer() { return read_buffer_; }
-  const char* write_buffer() { return write_buffer_; }
+  uint8_t* read_buffer() { return read_buffer_; }
+  const uint8_t* write_buffer() { return write_buffer_; }
   size_t write_buffer_length() const { return write_buffer_length_; }
 
   size_t total_written_bytes() const { return total_written_bytes_; }
 
   // Test utility methods.
-  void set_state_and_notify(serial_state_t state) {
-    fbl::AutoLock al(&cb_lock_);
-
+  void set_state_and_notify(fuchsia_hardware_serialimpl::SerialState state) {
     state_ = state;
-    if (callback_.callback) {
-      callback_.callback(callback_.ctx, state_);
-    }
+
+    bindings_.ForEachBinding([this](const auto& binding) {
+      fdf::Arena arena('FTDI');
+      [[maybe_unused]] auto status =
+          fdf::WireSendEvent(binding).buffer(arena)->OnSerialStateChanged(state_);
+    });
   }
 
   zx_status_t wait_for_write(zx::time deadline, zx_signals_t* pending) {
     return write_event_.wait_one(kEventWrittenSignal, deadline, pending);
   }
 
-  zx_status_t SerialImplGetInfo(serial_port_info_t* info) { return ZX_OK; }
-
-  zx_status_t SerialImplConfig(uint32_t baud_rate, uint32_t flags) { return ZX_OK; }
-
-  zx_status_t SerialImplEnable(bool enable) {
-    enabled_ = enable;
-    return ZX_OK;
+  void Bind(fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> server) {
+    bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->get(), std::move(server), this,
+                         fidl::kIgnoreBindingClosure);
   }
 
-  zx_status_t SerialImplRead(uint8_t* buf, size_t length, size_t* out_actual) {
-    if (!(state_ & SERIAL_STATE_READABLE)) {
-      *out_actual = 0;
-      return ZX_ERR_SHOULD_WAIT;
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess({fuchsia_hardware_serial::Class::kGeneric});
+  }
+
+  void Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  void Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override {
+    enabled_ = request->enable;
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override {
+    if (!(state_ & fuchsia_hardware_serialimpl::SerialState::kReadable)) {
+      return completer.buffer(arena).ReplyError(ZX_ERR_SHOULD_WAIT);
     }
 
-    char* buffer = reinterpret_cast<char*>(buf);
+    fidl::VectorView<uint8_t> buffer(arena, kBufferLength);
     size_t i;
 
-    for (i = 0; i < length && i < kBufferLength && read_buffer_[i]; ++i) {
+    for (i = 0; i < kBufferLength && read_buffer_[i]; ++i) {
       buffer[i] = read_buffer_[i];
     }
-    *out_actual = i;
+    buffer.set_count(i);
 
     if (i == kBufferLength || !read_buffer_[i]) {
       // Simply reset the state, no advanced state machine.
-      set_state_and_notify(0);
+      set_state_and_notify({});
     }
 
-    return ZX_OK;
+    completer.buffer(arena).ReplySuccess(buffer);
   }
 
-  zx_status_t SerialImplWrite(const uint8_t* buf, size_t length, size_t* out_actual) {
-    if (!(state_ & SERIAL_STATE_WRITABLE)) {
-      *out_actual = 0;
-      return ZX_ERR_SHOULD_WAIT;
+  void Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request, fdf::Arena& arena,
+             WriteCompleter::Sync& completer) override {
+    if (!(state_ & fuchsia_hardware_serialimpl::SerialState::kWritable)) {
+      return completer.buffer(arena).ReplyError(ZX_ERR_SHOULD_WAIT);
     }
 
-    const char* buffer = reinterpret_cast<const char*>(buf);
     size_t i;
 
-    for (i = 0; i < length && i < kBufferLength; ++i) {
-      write_buffer_[i] = buffer[i];
+    for (i = 0; i < request->data.count() && i < kBufferLength; ++i) {
+      write_buffer_[i] = request->data[i];
     }
-    *out_actual = i;
 
     // Signal that the write_buffer has been written to.
     if (i > 0) {
@@ -109,44 +109,56 @@ class FakeSerialImpl : public ddk::SerialImplProtocol<FakeSerialImpl> {
       write_event_.signal(0, kEventWrittenSignal);
     }
 
-    return ZX_OK;
+    completer.buffer(arena).ReplySuccess();
   }
 
-  zx_status_t SerialImplSetNotifyCallback(const serial_notify_t* cb) {
-    fbl::AutoLock al(&cb_lock_);
-    callback_.callback = cb->callback;
-    callback_.ctx = cb->ctx;
-    return ZX_OK;
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply();
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL();
   }
 
  private:
-  serial_impl_protocol_t proto_;
   bool enabled_;
 
-  fbl::Mutex cb_lock_;
-  serial_notify_t callback_ TA_GUARDED(cb_lock_) = {nullptr, nullptr};
-  serial_state_t state_;
+  fuchsia_hardware_serialimpl::SerialState state_;
 
-  char read_buffer_[kBufferLength];
-  char write_buffer_[kBufferLength];
+  uint8_t read_buffer_[kBufferLength];
+  uint8_t write_buffer_[kBufferLength];
   size_t write_buffer_length_;
   size_t total_written_bytes_ = 0;
 
   zx::event write_event_;
+
+  fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> bindings_;
 };
 
 class SerialTester {
  public:
-  SerialTester() {
-    fake_parent_->AddProtocol(ZX_PROTOCOL_SERIAL_IMPL, serial_impl_.proto()->ops,
-                              serial_impl_.proto()->ctx);
-  }
-  FakeSerialImpl& serial_impl() { return serial_impl_; }
+  SerialTester()
+      : runtime_(mock_ddk::GetDriverRuntime()),
+        incoming_dispatcher_(runtime_->StartBackgroundDispatcher()),
+        serial_impl_(incoming_dispatcher_->async_dispatcher(), std::in_place) {}
+
+  auto& serial_impl() { return serial_impl_; }
   zx_device_t* fake_parent() { return fake_parent_.get(); }
+  auto& runtime() { return *runtime_; }
+
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateSerialImplClient() {
+    auto [client, server] = fdf::Endpoints<fuchsia_hardware_serialimpl::Device>::Create();
+    serial_impl_.SyncCall(&FakeSerialImpl::Bind, std::move(server));
+    return fdf::WireClient(std::move(client), fdf::Dispatcher::GetCurrent()->get());
+  }
 
  private:
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
+  fdf::UnownedSynchronizedDispatcher incoming_dispatcher_;
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  FakeSerialImpl serial_impl_;
+  async_patterns::TestDispatcherBound<FakeSerialImpl> serial_impl_;
 };
 
 TEST(SerialTest, InitNoProtocolParent) {
@@ -159,14 +171,14 @@ TEST(SerialTest, InitNoProtocolParent) {
 
 TEST(SerialTest, Init) {
   SerialTester tester;
-  serial::SerialDevice device(tester.fake_parent(), tester.fake_parent());
+  serial::SerialDevice device(tester.fake_parent(), tester.CreateSerialImplClient());
   ASSERT_EQ(ZX_OK, device.Init());
 }
 
 TEST(SerialTest, DdkLifetime) {
   SerialTester tester;
   serial::SerialDevice* device(
-      new serial::SerialDevice(tester.fake_parent(), tester.fake_parent()));
+      new serial::SerialDevice(tester.fake_parent(), tester.CreateSerialImplClient()));
 
   ASSERT_EQ(ZX_OK, device->Init());
   ASSERT_EQ(ZX_OK, device->Bind());
@@ -178,19 +190,15 @@ TEST(SerialTest, DdkLifetime) {
 TEST(SerialTest, DdkRelease) {
   SerialTester tester;
   serial::SerialDevice* device(
-      new serial::SerialDevice(tester.fake_parent(), tester.fake_parent()));
-  FakeSerialImpl& serial_impl = tester.serial_impl();
-
+      new serial::SerialDevice(tester.fake_parent(), tester.CreateSerialImplClient()));
   ASSERT_EQ(ZX_OK, device->Init());
 
   // Manually set enabled to true.
-  serial_impl.SerialImplEnable(true);
-  EXPECT_TRUE(serial_impl.enabled());
+  tester.serial_impl().SyncCall(&FakeSerialImpl::set_enabled, true);
 
   device->DdkRelease();
 
-  EXPECT_FALSE(serial_impl.enabled());
-  ASSERT_EQ(nullptr, serial_impl.callback()->callback);
+  EXPECT_FALSE(tester.serial_impl().SyncCall(&FakeSerialImpl::enabled));
 }
 
 // Provides control primitives for tests that issue IO requests to the device.
@@ -200,7 +208,8 @@ class SerialDeviceTest : public zxtest::Test {
   ~SerialDeviceTest() override;
 
   serial::SerialDevice* device() { return device_; }
-  FakeSerialImpl& serial_impl() { return tester_.serial_impl(); }
+  auto& serial_impl() { return tester_.serial_impl(); }
+  auto& runtime() { return tester_.runtime(); }
 
   // DISALLOW_COPY_ASSIGN_AND_MOVE(SerialDeviceTest);
 
@@ -210,7 +219,7 @@ class SerialDeviceTest : public zxtest::Test {
 };
 
 SerialDeviceTest::SerialDeviceTest() {
-  device_ = new serial::SerialDevice(tester_.fake_parent(), tester_.fake_parent());
+  device_ = new serial::SerialDevice(tester_.fake_parent(), tester_.CreateSerialImplClient());
 
   if (ZX_OK != device_->Init()) {
     delete device_;
@@ -221,42 +230,45 @@ SerialDeviceTest::SerialDeviceTest() {
 SerialDeviceTest::~SerialDeviceTest() { device_->DdkRelease(); }
 
 TEST_F(SerialDeviceTest, Read) {
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
-  fidl::BindServer(loop.dispatcher(), std::move(server), device());
-  fidl::WireClient client(std::move(client_end), loop.dispatcher());
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), device());
+  fidl::WireClient client(std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   constexpr std::string_view data = "test";
 
   // Test set up.
-  *std::copy(data.begin(), data.end(), serial_impl().read_buffer()) = 0;
-  serial_impl().set_state_and_notify(SERIAL_STATE_READABLE);
+  serial_impl().SyncCall([&data](FakeSerialImpl* serial_impl) {
+    *std::copy(data.begin(), data.end(), serial_impl->read_buffer()) = 0;
+    serial_impl->set_state_and_notify(fuchsia_hardware_serialimpl::SerialState::kReadable);
+  });
 
   // Test.
   client->Read().ThenExactlyOnce(
-      [want = data](fidl::WireUnownedResult<fuchsia_hardware_serial::Device::Read>& result) {
+      [this, want = data](fidl::WireUnownedResult<fuchsia_hardware_serial::Device::Read>& result) {
         ASSERT_OK(result.status());
         const fit::result response = result.value();
         ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
         const cpp20::span data = response.value()->data.get();
         const std::string_view got{reinterpret_cast<const char*>(data.data()), data.size_bytes()};
         ASSERT_EQ(got, want);
+        runtime().Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime().Run();
 }
 
 TEST_F(SerialDeviceTest, Write) {
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
-  fidl::BindServer(loop.dispatcher(), std::move(server), device());
-  fidl::WireClient client(std::move(client_end), loop.dispatcher());
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), device());
+  fidl::WireClient client(std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   constexpr std::string_view data = "test";
   uint8_t payload[data.size()];
   std::copy(data.begin(), data.end(), payload);
 
   // Test set up.
-  serial_impl().set_state_and_notify(SERIAL_STATE_WRITABLE);
+  serial_impl().SyncCall([](FakeSerialImpl* serial_impl) {
+    serial_impl->set_state_and_notify(fuchsia_hardware_serialimpl::SerialState::kWritable);
+  });
 
   // Test.
   client->Write(fidl::VectorView<uint8_t>::FromExternal(payload))
@@ -266,11 +278,13 @@ TEST_F(SerialDeviceTest, Write) {
             ASSERT_OK(result.status());
             const fit::result response = result.value();
             ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-            const std::string_view got{serial_impl().write_buffer(),
-                                       serial_impl().write_buffer_length()};
-            ASSERT_EQ(got, want);
+            serial_impl().SyncCall([&want](FakeSerialImpl* serial_impl) {
+              ASSERT_EQ(serial_impl->write_buffer_length(), want.size());
+              ASSERT_BYTES_EQ(serial_impl->write_buffer(), want.data(), want.size());
+            });
+            runtime().Quit();
           });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime().Run();
 }
 
 }  // namespace
