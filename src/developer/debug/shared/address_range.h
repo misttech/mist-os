@@ -49,7 +49,10 @@ class AddressRange {
     return other.begin_ >= begin_ && other.end_ <= end_;
   }
   constexpr bool Overlaps(const AddressRange& other) const {
-    return other.begin_ < end_ && other.end_ >= begin_;
+    return other.begin_ < end_ && other.end_ > begin_;
+  }
+  constexpr bool OverlapsOrAdjacent(const AddressRange& other) const {
+    return other.begin_ <= end_ && other.end_ >= begin_;
   }
 
   // Returns a new range covering both inputs (|this| and |other|). If the inputs don't touch, the

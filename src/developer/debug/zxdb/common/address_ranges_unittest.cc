@@ -46,9 +46,10 @@ TEST(AddressRanges, NonCanonical) {
   EXPECT_EQ("{[0x100, 0x400), [0x500, 0x600)}", d.ToString());
 
   // Non-sorted and overlapping.
-  AddressRanges e(AddressRanges::kNonCanonical,
-                  {AddressRange(0x500, 0x600), AddressRange(0x100, 0x200),
-                   AddressRange(0x150, 0x300), AddressRange(0x250, 0x400)});
+  AddressRanges e(
+      AddressRanges::kNonCanonical,
+      {AddressRange(0x500, 0x550), AddressRange(0x550, 0x600), AddressRange(0x100, 0x200),
+       AddressRange(0x150, 0x300), AddressRange(0x250, 0x400)});
   ASSERT_EQ(2u, e.size());
   EXPECT_EQ(AddressRange(0x100, 0x400), e[0]);
   EXPECT_EQ(AddressRange(0x500, 0x600), e[1]);

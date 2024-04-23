@@ -75,7 +75,7 @@ void AddressRanges::Canonicalize() {
     if (ranges_[i].empty() || (i > 0 && ranges_[i - 1].Contains(ranges_[i]))) {
       // New range is unnecessary, delete it.
       ranges_.erase(ranges_.begin() + i);
-    } else if (i > 0 && ranges_[i - 1].Overlaps(ranges_[i])) {
+    } else if (i > 0 && ranges_[i - 1].OverlapsOrAdjacent(ranges_[i])) {
       // Extend the existing range to encompass this new one.
       ranges_[i - 1] = ranges_[i - 1].Union(ranges_[i]);
       ranges_.erase(ranges_.begin() + i);
