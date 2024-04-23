@@ -6,7 +6,7 @@ use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
-use ffx_audio_device_args::{DeviceCommand, RecordCommand, SubCommand};
+use ffx_audio_device_args::{DeviceCommand, RecordCommand, SetCommand, SetSubCommand, SubCommand};
 use ffx_command::user_error;
 use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::{
@@ -23,13 +23,15 @@ use fuchsia_zircon_status::Status;
 use futures::{AsyncWrite, FutureExt};
 use prettytable::Table;
 use serde::Serialize;
-use std::io::Read;
+use std::io::{Read, Write};
 
 mod connect;
+mod control;
 mod info;
 pub mod list;
 mod serde_ext;
 
+use control::DeviceControl;
 use list::QueryExt;
 
 #[derive(Debug, Serialize)]
@@ -54,6 +56,8 @@ pub struct DeviceTool {
     dev_class: fio::DirectoryProxy,
     #[with(optional_moniker("/core/audio_device_registry"))]
     registry: Option<fadevice::RegistryProxy>,
+    #[with(optional_moniker("/core/audio_device_registry"))]
+    control_creator: Option<fadevice::ControlCreatorProxy>,
 }
 
 fho::embedded_plugin!(DeviceTool);
@@ -157,6 +161,16 @@ impl FfxMain for DeviceTool {
                 }
 
                 device_set_gain_state(self.device_controller, selector, gain_state).await
+            }
+            SubCommand::Set(set_command) => {
+                let device_control = connect::connect_device_control(
+                    &self.dev_class,
+                    self.control_creator.as_ref(),
+                    selector,
+                )
+                .await?;
+
+                device_set(device_control, set_command, writer).await
             }
         }
     }
@@ -314,6 +328,21 @@ pub fn device_list_untagged(
         .bug_context("Failed to write result")
 }
 
+async fn device_set(
+    device_control: Box<dyn DeviceControl>,
+    set_command: SetCommand,
+    mut writer: MachineWriter<DeviceResult>,
+) -> fho::Result<()> {
+    match set_command.subcommand {
+        SetSubCommand::DaiFormat(dai_format_cmd) => {
+            device_control.set_dai_format(dai_format_cmd.format, dai_format_cmd.element_id).await?;
+            writeln!(writer, "Set DAI format.").bug_context("Failed to write result")?;
+        }
+    };
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,7 +353,6 @@ mod tests {
     use fidl_fuchsia_audio_device as fadevice;
     use fuchsia_audio::{device::DevfsSelector, format::SampleType, Format};
     use std::fs;
-    use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;
 

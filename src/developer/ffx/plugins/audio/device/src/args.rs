@@ -6,6 +6,7 @@ use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_audio::{
+    dai::DaiFormat,
     device::{Direction, HardwareType},
     Format,
 };
@@ -80,6 +81,7 @@ pub enum SubCommand {
     Mute(MuteCommand),
     Unmute(UnmuteCommmand),
     Agc(AgcCommand),
+    Set(SetCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -172,6 +174,73 @@ pub struct AgcCommand {
         from_str_fn(string_to_enable)
     )]
     pub enable: bool,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "set", description = "Set a device property.")]
+pub struct SetCommand {
+    #[argh(subcommand)]
+    pub subcommand: SetSubCommand,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum SetSubCommand {
+    DaiFormat(SetDaiFormatCommand),
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "dai-format",
+    description = "Set the DAI format of device or signal processing element.",
+    example = "Set the DAI format for a specific Dai Endpoint signal processing element:
+
+    $ ffx audio device --id 1 set dai-format --element-id 2 48000,2ch,0x3,pcm_signed,16in16,i2s",
+    note = r"This command accepts a DAI format as a comma separated string:
+
+<FrameRate>,<NumChannels>,<ChannelsToUseBitmask>,<DaiSampleFormat>,<SampleSize>,<DaiFrameFormat>
+
+Where:
+    <FrameRate>: integer frame rate in Hz, e.g. 48000
+    <NumChannels>ch: number of channels, e.g. 2ch
+    <ChannelsToUseBitmask>: bitmask for channels that are in use,
+        as a hexadecimal number prefixed with 0x,
+        e.g. 0x3 for the first two channels, usually stereo left/right
+    <DaiSampleFormat>: sample format, one of:
+        pdm, pcm_signed, pcm_unsigned, pcm_float
+    <SampleSize>: sample and slot size in bits as: <ValidBits>in<TotalBits>
+        e.g. 16in32 for 16 valid sample bits in a 32 bit slot
+    <DaiFrameFormat>: frame format, either:
+        a standard format, one of:
+            none, i2s, stereo_left, stereo_right, tdm1, tdm2, tdm3
+        or a custom format:
+                custom:<Justification>;<Clocking>;<FrameSyncOffset>;<FrameSyncSize>
+            where:
+            <Justification>: justification of samples within a slot, one of:
+                left_justified, right_justified
+            <Clocking>: clocking of data samples, one of:
+                raising_sclk, falling_sclk
+            <FrameSyncOffset>: number of sclks between the beginning of a
+                frame sync change and audio samples.
+                e.g. 1 for i2s, 0 for left justified
+            <FrameSyncSize>: number of sclks that the frame sync is high.
+                e.g. 1
+
+Examples:
+    48000,2ch,0x3,pcm_signed,16in32,i2s
+    96000,1ch,0x1,pcm_float,32in32,custom:right_justified;falling_sclk;-1;0"
+)]
+pub struct SetDaiFormatCommand {
+    #[argh(positional, description = "DAI format")]
+    pub format: DaiFormat,
+
+    #[argh(
+        option,
+        description = "signal processing element ID, \
+        for an Endpoint element of type Dai"
+    )]
+    pub element_id: Option<fadevice::ElementId>,
 }
 
 fn string_to_enable(value: &str) -> Result<bool, String> {

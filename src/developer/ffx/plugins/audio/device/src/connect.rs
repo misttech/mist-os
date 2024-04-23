@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ffx_command::FfxContext;
+use crate::control::{self as control, DeviceControl};
+use ffx_command::{bug, FfxContext};
+use fho::return_bug;
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
+use fuchsia_audio::device::Selector;
 
 /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `path`.
 // This is essentially the same as `fuchsia_component::client::connect_to_named_protocol_at_dir_root`.
@@ -84,4 +88,65 @@ pub fn connect_hw_streamconfig(
     connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
 
     Ok(proxy)
+}
+
+/// Connects to the `fuchsia.audio.device.Control` protocol for a device in the registry.
+pub async fn connect_registry_control(
+    control_creator: &fadevice::ControlCreatorProxy,
+    token_id: fadevice::TokenId,
+) -> fho::Result<fadevice::ControlProxy> {
+    let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>().unwrap();
+
+    control_creator
+        .create(fadevice::ControlCreatorCreateRequest {
+            token_id: Some(token_id),
+            control_server: Some(server_end),
+            ..Default::default()
+        })
+        .await
+        .bug_context("Failed to call ControlCreator.Create")?
+        .map_err(|err| bug!("Failed to create Control: {:?}", err))?;
+
+    Ok(proxy)
+}
+
+/// Connects to the control protocol of the device identified by `selector`.
+pub async fn connect_device_control(
+    dev_class: &fio::DirectoryProxy,
+    control_creator: Option<&fadevice::ControlCreatorProxy>,
+    selector: Selector,
+) -> fho::Result<Box<dyn DeviceControl>> {
+    let device_control: Box<dyn DeviceControl> = match selector {
+        Selector::Devfs(devfs_selector) => {
+            let protocol_path = devfs_selector.relative_path();
+
+            match devfs_selector.0.device_type {
+                fadevice::DeviceType::Codec => {
+                    let codec = connect_hw_codec(dev_class, protocol_path.as_str())?;
+                    Box::new(control::HardwareCodec(codec))
+                }
+                fadevice::DeviceType::Composite => {
+                    let composite = connect_hw_composite(dev_class, protocol_path.as_str())?;
+                    Box::new(control::HardwareComposite(composite))
+                }
+                fadevice::DeviceType::Dai => {
+                    let dai = connect_hw_dai(dev_class, protocol_path.as_str())?;
+                    Box::new(control::HardwareDai(dai))
+                }
+                fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
+                    let streamconfig = connect_hw_streamconfig(dev_class, protocol_path.as_str())?;
+                    Box::new(control::HardwareStreamConfig(streamconfig))
+                }
+                _ => return_bug!("Unknown device type: {:?}", devfs_selector.0.device_type),
+            }
+        }
+        Selector::Registry(registry_selector) => {
+            let control_creator =
+                control_creator.ok_or_else(|| bug!("ControlCreator is not available"))?;
+            let control =
+                connect_registry_control(&control_creator, registry_selector.token_id()).await?;
+            Box::new(control::Registry(control))
+        }
+    };
+    Ok(device_control)
 }

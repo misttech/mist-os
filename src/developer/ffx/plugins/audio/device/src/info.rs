@@ -236,13 +236,13 @@ impl Display for DaiFrameFormatsText<'_> {
         table.set_format(*TABLE_FORMAT_EMPTY);
         for dai_frame_format in self.0 {
             match dai_frame_format {
-                DaiFrameFormat::Standard(standard_format) => {
-                    table.add_row(row![standard_format.to_string()]);
+                DaiFrameFormat::Standard(_) => {
+                    table.add_row(row![dai_frame_format.to_string()]);
                 }
                 DaiFrameFormat::Custom(custom_format) => {
                     let mut format_table = Table::new();
                     format_table.set_format(*TABLE_FORMAT_NORMAL);
-                    table.set_titles(row![format!("Custom format: {}", custom_format)]);
+                    table.set_titles(row![dai_frame_format.to_string()]);
                     format_table.add_row(row![
                         r->"Justification:",
                         match custom_format.justification {
@@ -1030,7 +1030,7 @@ mod test {
                         ┌──────────────────────────────────────────────────────────────────────┐
                         │ Number of channels:  1                                               │
                         │     Sample formats:  pcm_float                                       │
-                        │      Frame formats:  Custom format: right_justified,raising_sclk,1,2 │
+                        │      Frame formats:  custom:right_justified;raising_sclk;1;2         │
                         │                                    Justification:  Right             │
                         │                                         Clocking:  Raising sclk      │
                         │                        Frame sync offset (sclks):  1                 │
@@ -1119,7 +1119,7 @@ mod test {
                     {
                         "number_of_channels": [1],
                         "sample_formats": ["pcm_float"],
-                        "frame_formats": ["custom:right_justified,raising_sclk,1,2"],
+                        "frame_formats": ["custom:right_justified;raising_sclk;1;2"],
                         "frame_rates": [16000, 22050, 32000, 44100, 48000, 88200, 96000],
                         "bits_per_slot": [16, 32],
                         "bits_per_sample": [16]

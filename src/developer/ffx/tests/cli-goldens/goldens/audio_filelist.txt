@@ -7,6 +7,8 @@ ffx/audio/device/list.golden
 ffx/audio/device/mute.golden
 ffx/audio/device/play.golden
 ffx/audio/device/record.golden
+ffx/audio/device/set.golden
+ffx/audio/device/set/dai-format.golden
 ffx/audio/device/unmute.golden
 ffx/audio/gen.golden
 ffx/audio/gen/pink-noise.golden
