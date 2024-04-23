@@ -297,6 +297,11 @@ def main():
         help="Which target to invoke with `bazel test` (default is '//:tests')",
     )
     parser.add_argument(
+        "--test_output",
+        default="",
+        help="See `bazel test --help` for the `test_output` argument.",
+    )
+    parser.add_argument(
         "--bazelrc",
         help="Additional Bazel configuration file to load",
         type=Path,
@@ -648,6 +653,8 @@ def main():
             "--test_output=errors",
             "--test_summary=none",
         ]
+    elif args.test_output:
+        bazel_test_args += [f"--test_output={args.test_output}"]
 
     # Detect when to use remote service endpoint overrides from infra.
     for config_arg, env_var, bazel_flag in (
