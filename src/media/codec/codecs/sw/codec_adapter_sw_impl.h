@@ -35,11 +35,11 @@ class CodecAdapterSWImpl : public CodecAdapterSW<fit::deferred_action<fit::closu
       : CodecAdapterSW(lock, codec_adapter_events) {}
   ~CodecAdapterSWImpl() = default;
 
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override {
     std::lock_guard<std::mutex> lock(lock_);
-    fuchsia::sysmem::BufferCollectionConstraints result;
+    fuchsia_sysmem2::BufferCollectionConstraints result;
 
     // The CodecImpl won't hand us the sysmem token, so we shouldn't expect to
     // have the token here.
@@ -47,35 +47,30 @@ class CodecAdapterSWImpl : public CodecAdapterSW<fit::deferred_action<fit::closu
 
     const auto constraints = BufferCollectionConstraints(port);
 
-    result.min_buffer_count_for_camping = constraints.min_buffer_count_for_camping;
+    result.min_buffer_count_for_camping() = constraints.min_buffer_count_for_camping;
 
-    ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
-    ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
+    ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
+    ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
 
-    result.buffer_memory_constraints.min_size_bytes =
-        constraints.buffer_memory_constraints.min_size_bytes;
-    result.buffer_memory_constraints.max_size_bytes =
-        constraints.buffer_memory_constraints.max_size_bytes;
-    result.has_buffer_memory_constraints = true;
+    auto& bmc = result.buffer_memory_constraints().emplace();
+    bmc.min_size_bytes() = constraints.buffer_memory_constraints.min_size_bytes;
+    bmc.max_size_bytes() = constraints.buffer_memory_constraints.max_size_bytes;
 
     // These are all false because SW encode.
-    result.buffer_memory_constraints.physically_contiguous_required = false;
-    result.buffer_memory_constraints.secure_required = false;
+    bmc.physically_contiguous_required() = false;
+    bmc.secure_required() = false;
 
-    ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+    ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
 
     // We don't have to fill out usage - CodecImpl takes care of that.
-    ZX_DEBUG_ASSERT(!result.usage.cpu);
-    ZX_DEBUG_ASSERT(!result.usage.display);
-    ZX_DEBUG_ASSERT(!result.usage.vulkan);
-    ZX_DEBUG_ASSERT(!result.usage.video);
+    ZX_DEBUG_ASSERT(!result.usage().has_value());
 
     return result;
   }
 
   void CoreCodecSetBufferCollectionInfo(
       CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override {}
+      const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override {}
 
   void CoreCodecStopStream() override {
     PostSerial(input_processing_loop_.dispatcher(), [this] {

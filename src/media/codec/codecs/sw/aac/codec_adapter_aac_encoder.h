@@ -47,12 +47,11 @@ class CodecAdapterAacEncoder : public CodecAdapter {
   std::unique_ptr<const fuchsia::media::StreamOutputConstraints> CoreCodecBuildNewOutputConstraints(
       uint64_t stream_lifetime_ordinal, uint64_t new_output_buffer_constraints_version_ordinal,
       bool buffer_constraints_action_required) override;
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
   void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
   fuchsia::media::StreamOutputFormat CoreCodecGetOutputFormat(
       uint64_t stream_lifetime_ordinal,
       uint64_t new_output_format_details_version_ordinal) override;

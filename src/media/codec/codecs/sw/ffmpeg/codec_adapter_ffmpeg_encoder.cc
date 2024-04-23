@@ -14,15 +14,15 @@ CodecAdapterFfmpegEncoder::CodecAdapterFfmpegEncoder(std::mutex& lock,
 
 CodecAdapterFfmpegEncoder::~CodecAdapterFfmpegEncoder() = default;
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterFfmpegEncoder::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterFfmpegEncoder::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
   ZX_ASSERT_MSG(false, "Not implemented.");
 }
 
 void CodecAdapterFfmpegEncoder::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   ZX_ASSERT(false && "not yet implemented");
 }
 

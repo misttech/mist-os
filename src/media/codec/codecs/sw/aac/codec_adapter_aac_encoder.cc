@@ -63,19 +63,19 @@ void CodecAdapterAacEncoder::CoreCodecInit(
                        /*writer_thread=*/input_processing_thread);
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterAacEncoder::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterAacEncoder::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
-  auto constraints = fuchsia::sysmem::BufferCollectionConstraints{
-      .has_buffer_memory_constraints = true,
-  };
+  fuchsia_sysmem2::BufferCollectionConstraints constraints;
 
   if (port == kOutputPort) {
-    constraints.min_buffer_count_for_camping = kOutputMinBufferCountForCamping;
+    constraints.min_buffer_count_for_camping() = kOutputMinBufferCountForCamping;
   } else {
-    constraints.min_buffer_count_for_camping = kInputMinBufferCountForCamping;
+    constraints.min_buffer_count_for_camping() = kInputMinBufferCountForCamping;
   }
+
+  auto& bmc = constraints.buffer_memory_constraints().emplace();
 
   if (port == kOutputPort) {
     std::lock_guard<std::mutex> lock(lock_);
@@ -83,20 +83,20 @@ CodecAdapterAacEncoder::CoreCodecGetBufferCollectionConstraints(
                         "The input thread triggered this call to generate "
                         "buffer constraints, so "
                         "it should have prepared the format configuration.");
-    constraints.buffer_memory_constraints.min_size_bytes =
+    bmc.min_size_bytes() =
         static_cast<uint32_t>(format_configuration_->recommended_output_buffer_size);
   } else {
     // TODO(turnage): Allow codec adapters to specify that input format details
     // are required before buffer collection constraints can be provided, so
     // that a stream-specific recommendation can be made here.
-    constraints.buffer_memory_constraints.min_size_bytes = 2048;
+    bmc.min_size_bytes() = 2048;
   }
 
   return constraints;
 }
 
 void CodecAdapterAacEncoder::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   // Nothing to do here.
 }
 
