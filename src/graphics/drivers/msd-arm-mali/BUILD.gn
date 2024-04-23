@@ -5,6 +5,7 @@
 import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
+import("//build/packages/prebuilt_package.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 driver_bind_rules("msd_arm_bind") {
@@ -113,13 +114,23 @@ group("msd-system") {
   deps = [ ":msd-arm-mali" ]
 }
 
-group("msd-config") {
-}
-
 fuchsia_driver_package("msd-arm-mali") {
   driver_components = [ ":msd_arm" ]
 }
 
 export_fuchsia_package_to_bazel("msd-arm-mali_for_bazel") {
   package = ":msd-arm-mali"
+}
+
+# This is the OOT built msd-arm-mali driver.
+# See https://fuchsia.googlesource.com/drivers/graphics/gpu/+/HEAD/drivers/msd-arm-mali/.
+prebuilt_package("msd-arm-mali-oot") {
+  package_name = "msd-arm-mali"
+
+  if (is_debug) {
+    variant = "debug"
+  } else {
+    variant = "release"
+  }
+  archive = "//prebuilt/drivers/msd-arm-mali-$variant/msd-arm-mali"
 }

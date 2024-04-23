@@ -206,6 +206,7 @@ group("non_hermetic_deps") {
     "//src/devices/rtc/drivers/nxp:pcf8563",
     "//src/diagnostics/archivist/tests/pipeline_test:*",
     "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0",
+    "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-oot",
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
   ]
 
