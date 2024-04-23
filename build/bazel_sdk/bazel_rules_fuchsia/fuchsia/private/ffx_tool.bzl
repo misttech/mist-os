@@ -62,6 +62,7 @@ def get_ffx_product_bundle_inputs(fuchsia_toolchain):
 
 def get_ffx_scrutiny_inputs(fuchsia_toolchain):
     """Return the list of inputs needed to run `ffx scrutiny` commands.
+
     Args:
       fuchsia_toolchain: A fuchsia_toolchain() instance used to locate
          all host tools, including the 'ffx' one.
