@@ -136,6 +136,7 @@ if (toolchain_environment == "kernel") {
       if (is_mistos) {
         if (register_zxtest) {
           deps += [
+            "//zircon/kernel/lib/mistos/elfldltl/test:tests-mistos",
             "//zircon/kernel/lib/mistos/zbitl/tests",
             "//zircon/kernel/lib/mistos/zx/tests:tests",
             "//zircon/system/ulib/fbl/test:tests-mistos",

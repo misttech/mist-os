@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,7 +6,11 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ZIRCON_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ZIRCON_H_
 
+#if _KERNEL_MISTOS
+#include <lib/mistos/util/status.h>
+#else
 #include <zircon/status.h>
+#endif
 
 #include <string_view>
 

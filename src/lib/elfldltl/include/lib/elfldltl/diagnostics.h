@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -384,13 +385,13 @@ constexpr auto FprintfDiagnosticsReport(FILE* stream, Prefix&&... prefix) {
 // This is PrintfDiagnosticsReport but using ZX_PANIC for printf.
 template <typename... Prefix>
 constexpr auto PanicDiagnosticsReport(Prefix&&... prefix) {
-  constexpr auto panic = [](const char* format, auto&&... args) {
+  constexpr auto panic_ = [](const char* format, auto&&... args) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
     ZX_PANIC(format, std::forward<decltype(args)>(args)...);
 #pragma GCC diagnostic pop
   };
-  return PrintfDiagnosticsReport(panic, std::forward<Prefix>(prefix)...);
+  return PrintfDiagnosticsReport(panic_, std::forward<Prefix>(prefix)...);
 }
 
 // This returns a Diagnostics object that crashes immediately for any error or

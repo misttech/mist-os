@@ -1,0 +1,16 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("tests-mistos") {
+  sources = [
+    "file-tests.cc",
+    "mapped-vmo-file-tests.cc",
+    "segment-with-vmo-tests.cc",
+  ]
+  deps = [
+    "..",
+    "../testing",
+    "//zircon/system/ulib/zxtest:zxtest-mistos",
+  ]
+}
