@@ -24,9 +24,11 @@ if (current_toolchain == default_toolchain) {
 
   # Ensure this action is invoked if integration HEAD moves
   _inputs = [
-    # https://fxbug.dev/336443040. Remove the line below once
-    # the Jiri hook has been added to //integration/fuchsia/stem.
-    "//integration/.git/HEAD",
+    # LINT.IfChange
+    "//build/info/jiri_generated/integration_commit_hash.txt",
+    "//build/info/jiri_generated/integration_commit_stamp.txt",
+
+    # LINT.ThenChange(//build/info/create_jiri_hook_files.sh)
   ]
 
   # LINT.IfChange
@@ -44,8 +46,10 @@ if (current_toolchain == default_toolchain) {
     ]
     script = "gen_latest_commit_date.py"
     args = [
-      "--repo",
-      rebase_path("//integration/", root_build_dir),
+      "--input-hash-file",
+      rebase_path(inputs[0], root_build_dir),
+      "--input-stamp-file",
+      rebase_path(inputs[1], root_build_dir),
       "--timestamp-file",
       rebase_path(build_info_files.minimum_utc_stamp, root_build_dir),
       "--date-file",

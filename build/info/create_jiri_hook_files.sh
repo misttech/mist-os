@@ -37,6 +37,8 @@ if [[ ! -f "${OUTPUT_DIR}/README.md" ]]; then
 fi
 
 # Call git directly, as Python is not available when Jiri hooks run on infra bots.
+# LINT.IfChange
 export GIT_OPTIONAL_LOCKS=0
 git -C "${FUCHSIA_DIR}/integration" rev-parse HEAD > "${OUTPUT_DIR}/integration_commit_hash.txt"
 git -C "${FUCHSIA_DIR}/integration" log -n1 --date=unix --format=%cd > "${OUTPUT_DIR}/integration_commit_stamp.txt"
+# LINT.ThenChange(//build/info/BUILD.gn)

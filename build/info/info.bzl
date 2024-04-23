@@ -42,23 +42,26 @@ def _gen_latest_date_and_timestamp_impl(ctx):
     # Build command line arguments.
     cmd_args = [
         ctx.file._py_script.path,
-        "--git",
-        ctx.file._git.path,
+        "--input-hash-file",
+        ctx.file._commit_hash_file.path,
+        "--input-stamp-file",
+        ctx.file._commit_stamp_file.path,
         "--timestamp-file",
         stamp_file.path,
         "--date-file",
         commit_date.path,
         "--commit-hash-file",
         commit_hash.path,
-        "--repo",
-        "integration",
     ]
 
     if truncate_build_info_commit_date:
         cmd_args += ["--truncate"]
 
     runfiles = ctx.runfiles(
-        files = [ctx.file._integration_git_head],
+        files = [
+            ctx.file._commit_hash_file,
+            ctx.file._commit_stamp_file,
+        ],
         transitive_files = python3_runfiles.files,
     )
 
@@ -81,16 +84,13 @@ gen_latest_date_and_timestamp = rule(
             allow_single_file = True,
             default = "//build/info:gen_latest_commit_date.py",
         ),
-        "_git": attr.label(
+        "_commit_hash_file": attr.label(
             allow_single_file = True,
-            doc = "Git binary to use.",
-            # LINT.IfChange
-            default = "//:fuchsia_build_generated/git",
-            # LINT.ThenChange(//build/bazel/scripts/update_workspace.py)
+            default = "//build/info:jiri_generated/integration_commit_hash.txt",
         ),
-        "_integration_git_head": attr.label(
+        "_commit_stamp_file": attr.label(
             allow_single_file = True,
-            default = "//:integration/.git/HEAD",
+            default = "//build/info:jiri_generated/integration_commit_stamp.txt",
         ),
     } | PY_TOOLCHAIN_DEPS,
 )

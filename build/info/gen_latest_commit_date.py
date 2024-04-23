@@ -32,9 +32,15 @@ def main():
     parser = argparse.ArgumentParser(
         description="Tool for extracting the latest commit date and hash from integration.git"
     )
-    parser.add_argument("--repo", help="path to the repository", required=True)
     parser.add_argument(
-        "--git", default="git", help="path to git binary to use"
+        "--input-hash-file",
+        required=True,
+        help="Path to input commit hash file.",
+    )
+    parser.add_argument(
+        "--input-stamp-file",
+        required=True,
+        help="Path to input commit stamp file.",
     )
     parser.add_argument(
         "--timestamp-file", help="path to write the unix-style timestamp to"
@@ -53,46 +59,20 @@ def main():
 
     args = parser.parse_args()
 
-    # This script fails mysteriously when invoked in our CI build environment
-    # (though it does work locally). Since it is very hard to debug, and that
-    # MacOS support is now deprecated and soon will be removed, just fake the
-    # values here instead.
-    if sys.platform == "darwin":
-        latest_commit_hash = "254f018638fdf35e91a72b26c030c453bfd0238e"
-        latest_commit_date_unix = 1712566485
-    else:
-        # Use git to extract the values directly.
-        # Set the following options to make the output as stable as possible:
-        # - GIT_CONFIG_NOSYSTEM=1   - Don't check /etc/gitconfig
-        # - --no-optional-locks     - Do not update the git index during read-only operations
-        #                             (see https://fxbug.dev/42175708).
-        # - --date=unix             - Format date as a unix timestamp
-        # - --format=%H\n%cd        - Print the hash and CommitDate fields only, on separate lines
-        git_cmd = [
-            args.git,
-            "--no-optional-locks",
-            f"--git-dir={args.repo}/.git",
-            "log",
-            "--date=unix",
-            "--format=%H\n%cd",
-            "-n",
-            "1",
-        ]
-        git_env = {}
-        git_env.update(os.environ)
-        git_env["GIT_CONFIG_NOSYSTEM"] = "1"
-        result = subprocess.run(
-            git_cmd, env=git_env, check=True, capture_output=True, text=True
-        )
+    with open(args.input_hash_file) as f:
+        latest_commit_hash = f.read().strip()
+        assert (
+            latest_commit_hash != ""
+        ), f"Input hash file is empty!: {args.input_hash_file}"
 
-        # Take the hash and timestamp lines, split and parse/convert them.
-        output_lines = result.stdout.split()
-
-        latest_commit_hash = output_lines[0]
-        latest_commit_date_unix = int(output_lines[1])
+    with open(args.input_stamp_file) as f:
+        latest_commit_date_unix = f.read().strip()
+        assert (
+            latest_commit_date_unix != ""
+        ), f"Input stamp file is empty!: {args.input_stamp_file}"
 
     latest_commit_date = datetime.fromtimestamp(
-        latest_commit_date_unix, timezone.utc
+        int(latest_commit_date_unix), timezone.utc
     )
 
     # Truncate the date if asked to do so, and replace the hash with one synthesized from the date
