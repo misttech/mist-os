@@ -19,6 +19,7 @@ group("tests") {
     "fuzzing:tests",
     "host-target-testing:tests",
     "loadbench:tests",
+    "realm_client:tests",
     "sl4f:tests",
   ]
 }

@@ -1,0 +1,39 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+import("//tools/cmc/build/expect_includes.gni")
+
+rustc_library("rust") {
+  name = "realm_client"
+  testonly = true
+  edition = "2021"
+  sources = [
+    "src/error.rs",
+    "src/lib.rs",
+  ]
+  deps = [
+    ":includes",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-component",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:uuid",
+  ]
+}
+
+expect_includes("includes") {
+  includes = [ "//src/testing/realm_client/meta/realm_client.shard.cml" ]
+}
+
+group("tests") {
+  testonly = true
+
+  # Ensure this library builds only.
+  deps = [ ":rust" ]
+}
