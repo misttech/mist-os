@@ -497,22 +497,12 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       }
 
       zx_info_task_runtime_t info = {};
-
       if (auto thread = DownCastDispatcher<ThreadDispatcher>(&dispatcher)) {
-        err = thread->AccumulateRuntimeTo(&info);
-        if (err != ZX_OK) {
-          return err;
-        }
+        info = thread->GetCompensatedTaskRuntimeStats();
       } else if (auto process = DownCastDispatcher<ProcessDispatcher>(&dispatcher)) {
-        err = process->AccumulateRuntimeTo(&info);
-        if (err != ZX_OK) {
-          return err;
-        }
+        info = process->GetTaskRuntimeStats();
       } else if (auto job = DownCastDispatcher<JobDispatcher>(&dispatcher)) {
-        err = job->AccumulateRuntimeTo(&info);
-        if (err != ZX_OK) {
-          return err;
-        }
+        info = job->GetTaskRuntimeStats();
       } else {
         return ZX_ERR_WRONG_TYPE;
       }

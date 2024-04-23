@@ -1943,9 +1943,9 @@ void ktrace_report_live_threads() {
   }
 }
 
-void Thread::UpdateSchedulerStats(const RuntimeStats::SchedulerStats& stats) {
+void Thread::UpdateRuntimeStats(thread_state new_state) {
   if (user_thread_) {
-    user_thread_->UpdateSchedulerStats(stats);
+    user_thread_->UpdateRuntimeStats(new_state);
   }
 }
 

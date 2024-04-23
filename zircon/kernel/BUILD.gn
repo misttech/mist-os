@@ -87,6 +87,10 @@ if (current_toolchain == default_toolchain) {
         # <kernel/{scheduler.h,scheduler_state.h> has #include <ffl/fixed.h>.
         "//zircon/system/ulib/ffl:headers.config",
 
+        # <kernel/thread.h> has #include <lib/kconcurrent/*.h>.
+        "//zircon/kernel/lib/kconcurrent:headers.config",
+        "//zircon/system/ulib/concurrent:headers.config",
+
         # <kernel/thread.h> has #include <vm/kstack.h>.
         "//zircon/kernel/vm:headers.config",
 

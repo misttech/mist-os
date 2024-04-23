@@ -483,16 +483,15 @@ void ProcessDispatcher::RemoveThread(ThreadDispatcher* t) {
     DEBUG_ASSERT(t != nullptr);
     thread_list_.erase(*t);
 
+    // Remember how much time this thread spent running/ready/etc while it was
+    // still a member of this process.
+    accumulated_stats_ += t->GetCompensatedTaskRuntimeStats();
+
     // if this was the last thread, transition directly to DEAD state
     if (thread_list_.is_empty()) {
       LTRACEF("last thread left the process %p, entering DEAD state\n", this);
       SetStateLocked(State::DEAD);
       became_dead = true;
-    }
-
-    TaskRuntimeStats child_runtime;
-    if (t->GetRuntimeStats(&child_runtime) == ZX_OK) {
-      aggregated_runtime_stats_.Add(child_runtime);
     }
   }
 
@@ -709,17 +708,15 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
   return ZX_OK;
 }
 
-zx_status_t ProcessDispatcher::AccumulateRuntimeTo(zx_info_task_runtime_t* info) const {
+TaskRuntimeStats ProcessDispatcher::GetTaskRuntimeStats() const {
   Guard<CriticalMutex> guard{get_lock()};
-  aggregated_runtime_stats_.AccumulateRuntimeTo(info);
-  for (const auto& thread : thread_list_) {
-    zx_status_t err = thread.AccumulateRuntimeTo(info);
-    if (err != ZX_OK) {
-      return err;
-    }
+
+  TaskRuntimeStats accumulator{accumulated_stats_};
+  for (const ThreadDispatcher& td : thread_list_) {
+    accumulator += td.GetCompensatedTaskRuntimeStats();
   }
 
-  return ZX_OK;
+  return accumulator;
 }
 
 zx_status_t ProcessDispatcher::GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t max,
@@ -971,11 +968,6 @@ zx_status_t ProcessDispatcher::EnforceBasicPolicy(uint32_t condition) {
 }
 
 TimerSlack ProcessDispatcher::GetTimerSlackPolicy() const { return policy_.GetTimerSlack(); }
-
-TaskRuntimeStats ProcessDispatcher::GetAggregatedRuntime() const {
-  Guard<CriticalMutex> guard{get_lock()};
-  return aggregated_runtime_stats_;
-}
 
 uintptr_t ProcessDispatcher::cache_vdso_code_address() {
   Guard<CriticalMutex> guard{get_lock()};

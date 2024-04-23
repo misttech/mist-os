@@ -196,13 +196,19 @@ LOCK_DEP_POLICY_OPTION(SeqLock<::concurrent::SyncOpt::Fence>, SharedNoIrqSave,
   LOCK_DEP_INSTRUMENT(containing_type, SeqLock<::concurrent::SyncOpt::AcqRelOps>, ##__VA_ARGS__)
 
 #define DECLARE_SINGLETON_SEQLOCK_ACQREL_SYNC(name, ...) \
-  LOCK_DEP_SINGLETON_LOCK(name, SeqLock < ::concurrent::SyncOpt::AcqRelOps, ##__VA_ARGS__)
+  LOCK_DEP_SINGLETON_LOCK(name, SeqLock<::concurrent::SyncOpt::AcqRelOps>, ##__VA_ARGS__)
 
 #define DECLARE_SEQLOCK_FENCE_SYNC(containing_type, ...) \
   LOCK_DEP_INSTRUMENT(containing_type, SeqLock<::concurrent::SyncOpt::Fence>, ##__VA_ARGS__)
 
 #define DECLARE_SINGLETON_SEQLOCK_FENCE_SYNC(name, ...) \
-  LOCK_DEP_SINGLETON_LOCK(name, SeqLock < ::concurrent::SyncOpt::Fence, ##__VA_ARGS__)
+  LOCK_DEP_SINGLETON_LOCK(name, SeqLock<::concurrent::SyncOpt::Fence>, ##__VA_ARGS__)
+
+#define DECLARE_SEQLOCK_EXPLICIT_SYNC(containing_type, sync_type, ...) \
+  LOCK_DEP_INSTRUMENT(containing_type, SeqLock<sync_type>, ##__VA_ARGS__)
+
+#define DECLARE_SINGLETON_SEQLOCK_EXPLICIT_SYNC(name, sync_type, ...) \
+  LOCK_DEP_SINGLETON_LOCK(name, SeqLock<sync_type>, ##__VA_ARGS__)
 
 // Default to Acq/Rel sync
 #define DECLARE_SEQLOCK(T, ...) DECLARE_SEQLOCK_ACQREL_SYNC(T, ##__VA_ARGS__)

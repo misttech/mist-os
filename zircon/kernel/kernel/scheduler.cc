@@ -1026,9 +1026,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   const SchedDuration actual_runtime_ns = now - current_state->last_started_running_;
   current_state->last_started_running_ = now;
   thread_lock.AssertHeld();  // TODO(eieio): HACK!
-  current_thread->UpdateSchedulerStats({.state = current_thread->state(),
-                                        .state_time = now.raw_value(),
-                                        .cpu_time = actual_runtime_ns.raw_value()});
+  current_thread->UpdateRuntimeStats(current_thread->state());
 
   // Update the runtime accounting for the thread that just ran.
   current_state->runtime_ns_ += actual_runtime_ns;
@@ -1206,16 +1204,9 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     // latest state.
     target_preemption_time_ns_ = NextThreadTimeslice(next_thread, now);
 
-    // Compute the time the next thread spent in the run queue. The value of
-    // last_started_running for the current thread is updated at the top of
-    // this method: when the current and next thread are the same, the queue
-    // time is zero. Otherwise, last_started_running is the time the next thread
-    // entered the run queue.
-    const SchedDuration queue_time_ns = now - next_state->last_started_running_;
-
-    next_thread->UpdateSchedulerStats({.state = next_thread->state(),
-                                       .state_time = now.raw_value(),
-                                       .queue_time = queue_time_ns.raw_value()});
+    // Update the thread's runtime stats to record the amount of time that it spent in the run
+    // queue.
+    next_thread->UpdateRuntimeStats(next_thread->state());
 
     next_state->last_started_running_ = now;
     start_of_current_time_slice_ns_ = now;
@@ -1744,6 +1735,7 @@ void Scheduler::Unblock(Thread* thread) {
 
   thread->set_ready();
   TraceWakeup(thread, target_cpu);
+  thread->UpdateRuntimeStats(thread->state());
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
     target->Insert(now, thread);
@@ -1769,6 +1761,7 @@ void Scheduler::Unblock(Thread::UnblockList list) {
 
     thread->set_ready();
     TraceWakeup(thread, target_cpu);
+    thread->UpdateRuntimeStats(thread->state());
     {
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
       target->Insert(now, thread);

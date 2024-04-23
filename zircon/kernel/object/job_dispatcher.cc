@@ -245,7 +245,7 @@ void JobDispatcher::RemoveChildProcess(ProcessDispatcher* process) {
     should_die = IsReadyForDeadTransitionLocked();
 
     // Aggregate runtime stats from exiting process.
-    aggregated_runtime_stats_.Add(process->GetAggregatedRuntime());
+    exited_process_runtime_stats_ += process->GetTaskRuntimeStats();
   }
 
   if (should_die)
@@ -772,21 +772,14 @@ void JobDispatcher::GetInfo(zx_info_job_t* info) const {
   info->debugger_attached = !debug_exceptionates_.is_empty();
 }
 
-zx_status_t JobDispatcher::AccumulateRuntimeTo(zx_info_task_runtime_t* info) const {
+TaskRuntimeStats JobDispatcher::GetTaskRuntimeStats() const {
   canary_.Assert();
-
   Guard<CriticalMutex> guard{get_lock()};
-  aggregated_runtime_stats_.AccumulateRuntimeTo(info);
-
-  // At this point, the process in question may be in its destructor waiting to acquire the lock and
-  // remove itself from this job, but its aggregated runtime is not yet part of this job's data.
-  //
-  // AccumulateRuntimeTo must be safe to be called even when the process is in its destructor.
+  // Sample the exited process runtime stats inside the lock to ensure consistency with destructing
+  // process dispatchers that are sill in the process list.
+  TaskRuntimeStats stats = exited_process_runtime_stats_;
   for (const auto& proc : procs_) {
-    zx_status_t err = proc.AccumulateRuntimeTo(info);
-    if (err != ZX_OK) {
-      return err;
-    }
+    stats += proc.GetTaskRuntimeStats();
   }
-  return ZX_OK;
+  return stats;
 }
