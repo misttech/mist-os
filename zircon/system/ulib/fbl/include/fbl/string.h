@@ -137,6 +137,8 @@ class __OWNER(char) String {
     return *this;
   }
 
+  String& operator+=(const String& other);
+
   // Create a std::string_view backed by the string.
   // The view does not take ownership of the data so the string
   // must outlast the std::string_view.

@@ -74,6 +74,12 @@ String& String::operator=(String&& other) noexcept {
   return *this;
 }
 
+String& String::operator+=(const String& other) {
+  String tmp = String::Concat({*this, other});
+  Set(tmp.data(), tmp.length());
+  return *this;
+}
+
 void String::Set(const char* data, size_t length) {
   char* temp_data = data_;
   Init(data, length);

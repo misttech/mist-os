@@ -379,6 +379,13 @@ TEST(StringTest, Concat) {
     EXPECT_STREQ("abcdefghijklmnop", str.c_str());
     EXPECT_EQ(16u, str.length());
   }
+
+  {
+    fbl::String str("Hey");
+    str += fbl::String(" Jude");
+    EXPECT_STREQ("Hey Jude", str.c_str());
+    EXPECT_EQ(8u, str.length());
+  }
 }
 
 TEST(StringTest, ToString) {
