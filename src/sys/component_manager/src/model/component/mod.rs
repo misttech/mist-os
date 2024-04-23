@@ -2622,7 +2622,7 @@ pub mod tests {
     async fn open_outgoing_failed_to_start_component() {
         let components = vec![(
             "root",
-            ComponentDeclBuilder::new_empty_component().add_program("invalid").build(),
+            ComponentDeclBuilder::new_empty_component().program_runner("invalid").build(),
         )];
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
 

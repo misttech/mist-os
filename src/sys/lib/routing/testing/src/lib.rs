@@ -3502,7 +3502,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .runner_default("elf")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let model = T::new("a", components).build().await;
@@ -3581,7 +3581,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .build(),
             ),
-            ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let model = T::new("a", components).build().await;
@@ -3656,7 +3656,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .runner_default("elf")
                     .build(),
             ),
-            ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let model = T::new("a", components).build().await;
@@ -3730,7 +3730,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .environment(EnvironmentBuilder::new().name("env"))
                     .build(),
             ),
-            ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let model = T::new("a", components).build().await;
@@ -3793,7 +3793,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .runner_default("elf")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let model = T::new("a", components).build().await;
@@ -3843,7 +3843,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let mut builder = T::new("a", components);
@@ -3951,7 +3951,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     }))
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let mut builder = T::new("a", components);

@@ -1279,7 +1279,7 @@ async fn use_runner_from_parent_environment() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1337,7 +1337,7 @@ async fn use_runner_from_environment_in_collection() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1420,7 +1420,7 @@ async fn use_runner_from_grandparent_environment() {
                 }))
                 .build(),
         ),
-        ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1485,7 +1485,7 @@ async fn use_runner_from_sibling_environment() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1548,7 +1548,7 @@ async fn use_runner_from_inherited_environment() {
                 .environment(EnvironmentBuilder::new().name("env"))
                 .build(),
         ),
-        ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1604,7 +1604,7 @@ async fn use_runner_from_environment_failed() {
                 .use_(UseBuilder::event_stream().name("stopped").path("/events/stopped"))
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("runner").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("runner").build()),
     ];
 
     let runner_service = service::endpoint(|_scope, _channel| {});
@@ -1680,7 +1680,7 @@ async fn use_runner_from_environment_not_found() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.

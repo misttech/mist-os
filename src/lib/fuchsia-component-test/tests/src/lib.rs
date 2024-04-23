@@ -6,6 +6,7 @@ use {
     anyhow::{format_err, Error},
     assert_matches::assert_matches,
     cm_rust::FidlIntoNative,
+    cm_rust_testing::*,
     fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker},
     fidl_fuchsia_component::{self as fcomponent, EventStreamMarker},
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_test as ftest,
@@ -339,14 +340,9 @@ async fn get_and_replace_realm_decl() -> Result<(), Error> {
     let builder = RealmBuilder::new().await?;
     let mut root_decl = builder.get_realm_decl().await?;
     assert_eq!(root_decl, cm_rust::ComponentDecl::default());
-    root_decl.children.push(cm_rust::ChildDecl {
-        name: "example-child".parse().unwrap(),
-        url: "example://url".to_string(),
-        startup: fcdecl::StartupMode::Eager,
-        on_terminate: None,
-        environment: None,
-        config_overrides: None,
-    });
+    root_decl
+        .children
+        .push(ChildBuilder::new().name("example-child").url("example://url").eager().build());
     builder.replace_realm_decl(root_decl.clone()).await?;
     assert_eq!(root_decl, builder.get_realm_decl().await?);
     Ok(())
@@ -358,14 +354,9 @@ async fn get_and_replace_component_decl() -> Result<(), Error> {
     let child =
         builder.add_local_child("child", |_| pending().boxed(), ChildOptions::new()).await?;
     let mut child_decl = builder.get_component_decl(&child).await?;
-    child_decl.children.push(cm_rust::ChildDecl {
-        name: "example-grand-child".parse().unwrap(),
-        url: "example://url".to_string(),
-        startup: fcdecl::StartupMode::Eager,
-        on_terminate: None,
-        environment: None,
-        config_overrides: None,
-    });
+    child_decl
+        .children
+        .push(ChildBuilder::new().name("example-grand-child").url("example://url").eager().build());
     builder.replace_component_decl(&child, child_decl.clone()).await?;
     assert_eq!(child_decl, builder.get_component_decl(&child).await?);
     Ok(())
@@ -588,8 +579,8 @@ async fn examples() -> Result<(), Error> {
 async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     let (send_echo_client_results, mut receive_echo_client_results) = mpsc::channel(1);
 
-    let collection_name = "dynamic-children".to_string();
-    let collection_name_for_mock = collection_name.clone();
+    let collection_name = "dynamic-children";
+    let collection_name_for_mock = collection_name.to_string();
 
     let builder = RealmBuilder::new().await?;
     let echo_client = builder
@@ -643,36 +634,23 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
         )
         .await?;
     let mut echo_client_decl = builder.get_component_decl(&echo_client).await?;
-    echo_client_decl.collections.push(cm_rust::CollectionDecl {
-        name: collection_name.parse().unwrap(),
-        durability: fcdecl::Durability::Transient,
-        environment: None,
-        allowed_offers: cm_types::AllowedOffers::StaticOnly,
-        allow_long_names: false,
-        persistent_storage: None,
-    });
-    echo_client_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-        name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        source_path: Some("/svc/fidl.examples.routing.echo.Echo".parse().unwrap()),
-        delivery: Default::default(),
-    }));
-    echo_client_decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-        source: cm_rust::OfferSource::Self_,
-        source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target: cm_rust::OfferTarget::Collection(collection_name.parse().unwrap()),
-        target_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
-    echo_client_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-        source: cm_rust::UseSource::Framework,
-        source_name: "fuchsia.component.Realm".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
+    echo_client_decl.collections.push(CollectionBuilder::new().name(collection_name).build());
+    echo_client_decl
+        .capabilities
+        .push(CapabilityBuilder::protocol().name("fidl.examples.routing.echo.Echo").build());
+    echo_client_decl.offers.push(
+        OfferBuilder::protocol()
+            .name("fidl.examples.routing.echo.Echo")
+            .source(cm_rust::OfferSource::Self_)
+            .target(cm_rust::OfferTarget::Collection(collection_name.parse().unwrap()))
+            .build(),
+    );
+    echo_client_decl.uses.push(
+        UseBuilder::protocol()
+            .name("fuchsia.component.Realm")
+            .source(cm_rust::UseSource::Framework)
+            .build(),
+    );
     builder.replace_component_decl(&echo_client, echo_client_decl).await?;
 
     let _instance = builder.build().await?;
@@ -1704,17 +1682,13 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
         builder
             .replace_component_decl(
                 &child_b,
-                cm_rust::ComponentDecl {
-                    exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                        source: cm_rust::ExposeSource::Child("does-not-exist".parse().unwrap()),
-                        source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: cm_rust::ExposeTarget::Parent,
-                        target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                        availability: cm_rust::Availability::Required,
-                    })],
-                    ..cm_rust::ComponentDecl::default()
-                }
+                ComponentDeclBuilder::new_empty_component()
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("fuchsia.examples.Echo")
+                            .source_static_child("does-not-exist")
+                    )
+                    .build()
             )
             .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::InvalidComponentDecl))
@@ -1723,17 +1697,15 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
     // We cannot replace the realm's decl with an invalid decl (references a non-existent child)
     assert_matches!(
         builder
-            .replace_realm_decl(cm_rust::ComponentDecl {
-                exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                    source: cm_rust::ExposeSource::Child("does-not-exist".parse().unwrap()),
-                    source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target: cm_rust::ExposeTarget::Parent,
-                    target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                    availability: cm_rust::Availability::Required,
-                })],
-                ..cm_rust::ComponentDecl::default()
-            })
+            .replace_realm_decl(
+                ComponentDeclBuilder::new_empty_component()
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("fuchsia.examples.Echo")
+                            .source_static_child("does-not-exist")
+                    )
+                    .build()
+            )
             .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::InvalidComponentDecl))
     );
@@ -1741,14 +1713,9 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
     // We _can_ replace the realm's decl with a decl that references children added with the
     // 'add_child' calls, and thus don't yet have a valid ChildDecl in the manifest.
     let mut realm_decl = builder.get_realm_decl().await?;
-    realm_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-        source: cm_rust::ExposeSource::Child("b".parse().unwrap()),
-        source_name: "fuchsia.examples.Echo".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target: cm_rust::ExposeTarget::Parent,
-        target_name: "fuchsia.examples.Echo".parse().unwrap(),
-        availability: cm_rust::Availability::Required,
-    }));
+    realm_decl.exposes.push(
+        ExposeBuilder::protocol().name("fuchsia.examples.Echo").source_static_child("b").build(),
+    );
     assert_matches!(builder.replace_realm_decl(realm_decl).await, Ok(()));
 
     Ok(())

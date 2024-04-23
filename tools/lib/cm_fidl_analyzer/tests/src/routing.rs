@@ -728,7 +728,7 @@ mod tests {
                     .environment(EnvironmentBuilder::new().name("env"))
                     .build(),
             ),
-            ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
@@ -940,7 +940,7 @@ mod tests {
                     .runner_default("elf")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
@@ -1355,7 +1355,7 @@ mod tests {
                     .capability(runner_decl.clone())
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
@@ -1821,7 +1821,8 @@ mod tests {
             name: "elf".parse().unwrap(),
             source_path: Some("/builtin/source/path".parse().unwrap()),
         });
-        let component_decl = ComponentDeclBuilder::new_empty_component().add_program("elf").build();
+        let component_decl =
+            ComponentDeclBuilder::new_empty_component().program_runner("elf").build();
 
         let components = vec![("a", component_decl.clone())];
 
@@ -1917,7 +1918,7 @@ mod tests {
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
-                    .add_program("dwarf")
+                    .program_runner("dwarf")
                     .expose(expose_protocol_decl.clone())
                     .use_(use_directory_decl.clone())
                     .use_(use_event_decl)
@@ -2059,7 +2060,7 @@ mod tests {
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
-                    .add_program("dwarf")
+                    .program_runner("dwarf")
                     .use_(use_protocol_decl.clone())
                     .build(),
             ),
@@ -2104,7 +2105,7 @@ mod tests {
                     .offer(offer_protocol_decl.clone())
                     .build(),
             ),
-            (b_url, ComponentDeclBuilder::new_empty_component().add_program("dwarf").build()),
+            (b_url, ComponentDeclBuilder::new_empty_component().program_runner("dwarf").build()),
         ];
 
         let test =

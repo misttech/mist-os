@@ -41,7 +41,7 @@ impl ComponentDeclBuilder {
     /// A ComponentDeclBuilder prefilled with a program and using a runner named "test_runner",
     /// which we assume is offered to us.
     pub fn new() -> Self {
-        Self::new_empty_component().add_program(TEST_RUNNER_NAME)
+        Self::new_empty_component().program_runner(TEST_RUNNER_NAME)
     }
 
     /// Add a child element.
@@ -67,12 +67,16 @@ impl ComponentDeclBuilder {
     }
 
     /// Add a "program" clause, using the given runner.
-    pub fn add_program(mut self, runner: &str) -> Self {
+    pub fn program_runner(self, runner: &str) -> Self {
         assert!(self.result.program.is_none(), "tried to add program twice");
-        self.result.program = Some(cm_rust::ProgramDecl {
+        self.program(cm_rust::ProgramDecl {
             runner: Some(runner.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
-        });
+        })
+    }
+
+    pub fn program(mut self, program: cm_rust::ProgramDecl) -> Self {
+        self.result.program = Some(program);
         self
     }
 
@@ -95,17 +99,12 @@ impl ComponentDeclBuilder {
     }
 
     // Add a use decl for fuchsia.component.Realm.
-    pub fn use_realm(mut self) -> Self {
-        let use_ = cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-            dependency_type: cm_rust::DependencyType::Strong,
-            source: cm_rust::UseSource::Framework,
-            source_name: "fuchsia.component.Realm".parse().unwrap(),
-            source_dictionary: Default::default(),
-            target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-        self.result.uses.push(use_);
-        self
+    pub fn use_realm(self) -> Self {
+        self.use_(
+            UseBuilder::protocol()
+                .name("fuchsia.component.Realm")
+                .source(cm_rust::UseSource::Framework),
+        )
     }
 
     /// Add a capability declaration.

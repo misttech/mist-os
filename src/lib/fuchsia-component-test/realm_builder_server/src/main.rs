@@ -2134,18 +2134,11 @@ mod tests {
 
         fn add_recursive_automatic_decls(&mut self) {
             let create_offer_decl = |child_name: &str, protocol: cm_types::Name| {
-                cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                    source: cm_rust::OfferSource::Parent,
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child_name.parse().unwrap(),
-                        collection: None,
-                    }),
-                    source_name: protocol.clone(),
-                    source_dictionary: Default::default(),
-                    target_name: protocol,
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Required,
-                })
+                OfferBuilder::protocol()
+                    .name(protocol.as_str())
+                    .source(cm_rust::OfferSource::Parent)
+                    .target_static_child(child_name)
+                    .build()
             };
 
             for child in &self.decl.children {
@@ -2411,23 +2404,15 @@ mod tests {
     #[fuchsia::test]
     async fn building_invalid_realm_errors() {
         let mut tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                offers: vec![cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                    source: cm_rust::OfferSource::Parent,
-                    source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-
-                    // This doesn't exist
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "a".parse().unwrap(),
-                        collection: None,
-                    }),
-                    availability: cm_rust::Availability::Required,
-                })],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new()
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(LogSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        // This doesn't exist
+                        .target_static_child("a"),
+                )
+                .build(),
             children: vec![],
         };
         let error = build_tree(&mut tree).await.expect_err("builder didn't notice invalid decl");
@@ -2437,132 +2422,64 @@ mod tests {
     #[fuchsia::test]
     async fn build_realm_expect_automatic_routing() {
         let mut expected_output_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                ],
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test://a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new()
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(LogSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(InspectSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(LogSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(InspectSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b"),
+                )
+                .child_default("a")
+                .build(),
             children: vec![(
                 "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
-                    decl: cm_rust::ComponentDecl {
-                        offers: vec![
-                            cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                                source: cm_rust::OfferSource::Parent,
-                                target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_static".parse().unwrap(),
-                                    collection: None,
-                                }),
-                                source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                source_dictionary: Default::default(),
-                                target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                dependency_type: cm_rust::DependencyType::Strong,
-                                availability: cm_rust::Availability::Required,
-                            }),
-                            cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                                source: cm_rust::OfferSource::Parent,
-                                target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_static".parse().unwrap(),
-                                    collection: None,
-                                }),
-                                source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                source_dictionary: Default::default(),
-                                target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                dependency_type: cm_rust::DependencyType::Strong,
-                                availability: cm_rust::Availability::Required,
-                            }),
-                            cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                                source: cm_rust::OfferSource::Parent,
-                                target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_dynamic".parse().unwrap(),
-                                    collection: None,
-                                }),
-                                source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                source_dictionary: Default::default(),
-                                target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                dependency_type: cm_rust::DependencyType::Strong,
-                                availability: cm_rust::Availability::Required,
-                            }),
-                            cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                                source: cm_rust::OfferSource::Parent,
-                                target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_dynamic".parse().unwrap(),
-                                    collection: None,
-                                }),
-                                source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                source_dictionary: Default::default(),
-                                target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                                dependency_type: cm_rust::DependencyType::Strong,
-                                availability: cm_rust::Availability::Required,
-                            }),
-                        ],
-                        children: vec![cm_rust::ChildDecl {
-                            name: "b_child_static".parse().unwrap(),
-                            url: "test://b_child_static".to_string(),
-                            startup: fcdecl::StartupMode::Lazy,
-                            on_terminate: None,
-                            environment: None,
-                            config_overrides: None,
-                        }],
-                        ..cm_rust::ComponentDecl::default()
-                    },
+                    decl: ComponentDeclBuilder::new()
+                        .offer(
+                            OfferBuilder::protocol()
+                                .name(LogSinkMarker::PROTOCOL_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_static"),
+                        )
+                        .offer(
+                            OfferBuilder::protocol()
+                                .name(InspectSinkMarker::PROTOCOL_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_static"),
+                        )
+                        .offer(
+                            OfferBuilder::protocol()
+                                .name(LogSinkMarker::PROTOCOL_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_dynamic"),
+                        )
+                        .offer(
+                            OfferBuilder::protocol()
+                                .name(InspectSinkMarker::PROTOCOL_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_dynamic"),
+                        )
+                        .child_default("b_child_static")
+                        .build(),
                     children: vec![(
                         "b_child_dynamic".parse().unwrap(),
                         ftest::ChildOptions::default(),
@@ -2580,34 +2497,12 @@ mod tests {
         expected_output_tree.add_binder_expose();
 
         let mut input_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                offers: vec![],
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test://a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new().child_default("a").build(),
             children: vec![(
                 "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
-                    decl: cm_rust::ComponentDecl {
-                        offers: vec![],
-                        children: vec![cm_rust::ChildDecl {
-                            name: "b_child_static".parse().unwrap(),
-                            url: "test://b_child_static".to_string(),
-                            startup: fcdecl::StartupMode::Lazy,
-                            on_terminate: None,
-                            environment: None,
-                            config_overrides: None,
-                        }],
-                        ..cm_rust::ComponentDecl::default()
-                    },
+                    decl: ComponentDeclBuilder::new().child_default("b_child_static").build(),
                     children: vec![(
                         "b_child_dynamic".parse().unwrap(),
                         ftest::ChildOptions::default(),
@@ -2629,14 +2524,7 @@ mod tests {
     async fn build_realm_with_child_decl() {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test://a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
+                children: vec![ChildBuilder::new().name("a").build()],
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![],
@@ -2665,14 +2553,7 @@ mod tests {
     async fn build_realm_with_child_decl_and_mutable_child() {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test://a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
+                children: vec![ChildBuilder::new().name("a").build()],
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
@@ -2729,21 +2610,19 @@ mod tests {
     #[fuchsia::test]
     async fn build_realm_with_mutable_child_in_a_new_environment() {
         let mut tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                environments: vec![cm_rust::EnvironmentDecl {
-                    name: "new-env".parse().unwrap(),
-                    extends: fcdecl::EnvironmentExtends::None,
-                    resolvers: vec![cm_rust::ResolverRegistration {
-                        resolver: "test".parse().unwrap(),
-                        source: cm_rust::RegistrationSource::Parent,
-                        scheme: "test".to_string(),
-                    }],
-                    runners: vec![],
-                    debug_capabilities: vec![],
-                    stop_timeout_ms: Some(1),
-                }],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new()
+                .environment(
+                    EnvironmentBuilder::new()
+                        .name("new-env")
+                        .extends(fcdecl::EnvironmentExtends::None)
+                        .resolver(cm_rust::ResolverRegistration {
+                            resolver: "test".parse().unwrap(),
+                            source: cm_rust::RegistrationSource::Parent,
+                            scheme: "test".to_string(),
+                        })
+                        .stop_timeout(1),
+                )
+                .build(),
             children: vec![(
                 "a".parse().unwrap(),
                 ftest::ChildOptions {
@@ -2872,17 +2751,7 @@ mod tests {
             .expect("add_child returned an error");
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test:///a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component().child_default("a").build(),
             children: vec![],
         };
         expected_tree.add_auto_decls();
@@ -3056,35 +2925,20 @@ mod tests {
             .fidl_into_native();
 
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "realm_with_child".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "realm_with_child".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                ],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(LogSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("realm_with_child"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name(InspectSinkMarker::PROTOCOL_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("realm_with_child"),
+                )
+                .build(),
             children: vec![(
                 "realm_with_child".parse().unwrap(),
                 ftest::ChildOptions {
@@ -3108,21 +2962,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn add_child_from_decl() {
-        let a_decl = cm_rust::ComponentDecl {
-            program: Some(cm_rust::ProgramDecl {
+        let a_decl = ComponentDeclBuilder::new()
+            .program(cm_rust::ProgramDecl {
                 runner: Some("hippo".parse().unwrap()),
                 info: fdata::Dictionary::default(),
-            }),
-            uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-                source: cm_rust::UseSource::Parent,
-                source_name: "example.Hippo".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_path: "/svc/example.Hippo".parse().unwrap(),
-                dependency_type: cm_rust::DependencyType::Strong,
-                availability: cm_rust::Availability::Required,
-            })],
-            ..cm_rust::ComponentDecl::default()
-        };
+            })
+            .use_(UseBuilder::protocol().name("example.Hippo"))
+            .build();
 
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
@@ -3198,22 +3044,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn add_route_does_not_mutate_children_added_from_decl() {
-        let a_decl = cm_rust::ComponentDecl {
-            program: Some(cm_rust::ProgramDecl {
+        let a_decl = ComponentDeclBuilder::new()
+            .program(cm_rust::ProgramDecl {
                 runner: Some("hippo".parse().unwrap()),
                 info: fdata::Dictionary::default(),
-            }),
-            uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-                source: cm_rust::UseSource::Parent,
-                source_name: "example.Hippo".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_path: "/svc/non-default-path".parse().unwrap(),
-                dependency_type: cm_rust::DependencyType::Strong,
-                availability: cm_rust::Availability::Required,
-            })],
-            ..cm_rust::ComponentDecl::default()
-        }
-        .native_into_fidl();
+            })
+            .use_(UseBuilder::protocol().name("example.Hippo").path("/svc/non-default-path"))
+            .build()
+            .native_into_fidl();
 
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
@@ -3255,8 +3093,8 @@ mod tests {
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
-        let a_decl = cm_rust::ComponentDecl {
-            program: Some(cm_rust::ProgramDecl {
+        let a_decl = ComponentDeclBuilder::new()
+            .program(cm_rust::ProgramDecl {
                 runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
@@ -3271,9 +3109,8 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
-            }),
-            ..cm_rust::ComponentDecl::default()
-        };
+            })
+            .build();
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
@@ -3417,91 +3254,58 @@ mod tests {
 
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![
-                    cm_rust::ChildDecl {
-                        name: "a".parse().unwrap(),
-                        url: "test:///a".to_string(),
-                        startup: fcdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                    cm_rust::ChildDecl {
-                        name: "b".parse().unwrap(),
-                        url: "test:///b".to_string(),
-                        startup: fcdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                ],
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "config-data".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: "component".parse().unwrap(),
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".parse().unwrap(),
-                        target: offer_target_static_child("a"),
-                        target_name: "data".parse().unwrap(),
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::EventStream(cm_rust::OfferEventStreamDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        scope: None,
-                        target: offer_target_static_child("a"),
-                        target_name: "started_event".parse().unwrap(),
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: offer_source_static_child("a"),
-                        source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("b"),
-                        target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                ],
-                exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                    source: cm_rust::ExposeSource::Child("a".parse().unwrap()),
-                    source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target: cm_rust::ExposeTarget::Parent,
-                    target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                    availability: cm_rust::Availability::Required,
-                })],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .child_default("a")
+                .child_default("b")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Hippo")
+                        .target_name("fuchsia.examples.Elephant")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::directory()
+                        .name("config-data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .rights(fio::RW_STAR_DIR)
+                        .subdir("component"),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("temp")
+                        .target_name("data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("fuchsia.examples.Whale")
+                        .target_name("fuchsia.examples.Orca")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::event_stream()
+                        .name("started")
+                        .target_name("started_event")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Echo")
+                        .source_static_child("a")
+                        .target_static_child("b"),
+                )
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("fuchsia.examples.Echo")
+                        .source_static_child("a")
+                        .target(cm_rust::ExposeTarget::Parent),
+                )
+                .build(),
             children: vec![],
         };
         expected_tree.add_auto_decls();
@@ -3569,8 +3373,8 @@ mod tests {
             .await;
 
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
-        let b_decl = cm_rust::ComponentDecl {
-            program: Some(cm_rust::ProgramDecl {
+        let b_decl = ComponentDeclBuilder::new_empty_component()
+            .program(cm_rust::ProgramDecl {
                 runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
@@ -3585,130 +3389,101 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
-            }),
-            uses: vec![
-                cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-                    source: cm_rust::UseSource::Parent,
-                    source_name: "fuchsia.examples.Elephant".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_path: "/svc/fuchsia.examples.Elephant".parse().unwrap(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Optional,
-                }),
-                cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
-                    source: cm_rust::UseSource::Parent,
-                    source_name: "config-data".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_path: "/config-data".parse().unwrap(),
-                    rights: fio::RW_STAR_DIR,
-                    subdir: Default::default(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Optional,
-                }),
-                cm_rust::UseDecl::Storage(cm_rust::UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: cm_rust::Availability::Optional,
-                }),
-                cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
-                    source: cm_rust::UseSource::Parent,
-                    source_name: "fuchsia.examples.Orca".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_path: "/svc/fuchsia.examples.Orca".parse().unwrap(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Optional,
-                }),
-            ],
-            ..cm_rust::ComponentDecl::default()
-        };
+            })
+            .use_(
+                UseBuilder::protocol()
+                    .name("fuchsia.examples.Elephant")
+                    .availability(cm_rust::Availability::Optional),
+            )
+            .use_(
+                UseBuilder::directory()
+                    .name("config-data")
+                    .path("/config-data")
+                    .rights(fio::RW_STAR_DIR)
+                    .availability(cm_rust::Availability::Optional),
+            )
+            .use_(
+                UseBuilder::storage()
+                    .name("data")
+                    .path("/data")
+                    .availability(cm_rust::Availability::Optional),
+            )
+            .use_(
+                UseBuilder::service()
+                    .name("fuchsia.examples.Orca")
+                    .availability(cm_rust::Availability::Optional),
+            )
+            .build();
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test:///a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("b"),
-                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "config-data".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: "component".parse().unwrap(),
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("b"),
-                        target_name: "config-data".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: "component".parse().unwrap(),
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".parse().unwrap(),
-                        target: offer_target_static_child("a"),
-                        target_name: "data".parse().unwrap(),
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".parse().unwrap(),
-                        target: offer_target_static_child("b"),
-                        target_name: "data".parse().unwrap(),
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                    cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("b"),
-                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: cm_rust::Availability::Optional,
-                    }),
-                ],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .child_default("a")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Hippo")
+                        .target_name("fuchsia.examples.Elephant")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Hippo")
+                        .target_name("fuchsia.examples.Elephant")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::directory()
+                        .name("config-data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .rights(fio::RW_STAR_DIR)
+                        .subdir("component")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::directory()
+                        .name("config-data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b")
+                        .rights(fio::RW_STAR_DIR)
+                        .subdir("component")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("temp")
+                        .target_name("data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("temp")
+                        .target_name("data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("fuchsia.examples.Whale")
+                        .target_name("fuchsia.examples.Orca")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("fuchsia.examples.Whale")
+                        .target_name("fuchsia.examples.Orca")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b")
+                        .availability(cm_rust::Availability::Optional),
+                )
+                .build(),
             children: vec![(
                 "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
@@ -3769,56 +3544,42 @@ mod tests {
 
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test:///a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    on_terminate: None,
-                    environment: None,
-                    config_overrides: None,
-                }],
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "fuchsia.examples.Elephant".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::SameAsTarget,
-                    }),
-                    cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "config-data".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "config-data".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: "component".parse().unwrap(),
-                        availability: cm_rust::Availability::SameAsTarget,
-                    }),
-                    cm_rust::OfferDecl::Storage(cm_rust::OfferStorageDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "temp".parse().unwrap(),
-                        target: offer_target_static_child("a"),
-                        target_name: "data".parse().unwrap(),
-                        availability: cm_rust::Availability::SameAsTarget,
-                    }),
-                    cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
-                        source: cm_rust::OfferSource::Parent,
-                        source_name: "fuchsia.examples.Whale".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("a"),
-                        target_name: "fuchsia.examples.Orca".parse().unwrap(),
-                        source_instance_filter: None,
-                        renamed_instances: None,
-                        availability: cm_rust::Availability::SameAsTarget,
-                    }),
-                ],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .child_default("a")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Hippo")
+                        .target_name("fuchsia.examples.Elephant")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .availability(cm_rust::Availability::SameAsTarget),
+                )
+                .offer(
+                    OfferBuilder::directory()
+                        .name("config-data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .rights(fio::RW_STAR_DIR)
+                        .subdir("component")
+                        .availability(cm_rust::Availability::SameAsTarget),
+                )
+                .offer(
+                    OfferBuilder::storage()
+                        .name("temp")
+                        .target_name("data")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .availability(cm_rust::Availability::SameAsTarget),
+                )
+                .offer(
+                    OfferBuilder::service()
+                        .name("fuchsia.examples.Whale")
+                        .target_name("fuchsia.examples.Orca")
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a")
+                        .availability(cm_rust::Availability::SameAsTarget),
+                )
+                .build(),
             children: vec![],
         };
         expected_tree.add_auto_decls();
@@ -3908,65 +3669,28 @@ mod tests {
 
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![
-                    cm_rust::ChildDecl {
-                        name: "b".parse().unwrap(),
-                        url: "test:///b".to_string(),
-                        startup: fcdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                    cm_rust::ChildDecl {
-                        name: "c".parse().unwrap(),
-                        url: "test:///c".to_string(),
-                        startup: fcdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                ],
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".parse().unwrap(),
-                            collection: None,
-                        }),
-                        target_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "c".parse().unwrap(),
-                            collection: None,
-                        }),
-                        target_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                ],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .child_default("b")
+                .child_default("c")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Hippo")
+                        .source_static_child("a")
+                        .target_static_child("b"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Hippo")
+                        .source_static_child("a")
+                        .target_static_child("c"),
+                )
+                .build(),
             children: vec![(
                 "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
-                    decl: cm_rust::ComponentDecl {
-                        program: Some(cm_rust::ProgramDecl {
+                    decl: ComponentDeclBuilder::new_empty_component()
+                        .program(cm_rust::ProgramDecl {
                             runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                             info: fdata::Dictionary {
                                 entries: Some(vec![
@@ -3985,24 +3709,14 @@ mod tests {
                                 ]),
                                 ..Default::default()
                             },
-                        }),
-                        capabilities: vec![cm_rust::CapabilityDecl::Protocol(
-                            cm_rust::ProtocolDecl {
-                                name: "fuchsia.examples.Hippo".parse().unwrap(),
-                                source_path: Some("/svc/fuchsia.examples.Hippo".parse().unwrap()),
-                                delivery: Default::default(),
-                            },
-                        )],
-                        exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                            source: cm_rust::ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                            source_dictionary: Default::default(),
-                            target: cm_rust::ExposeTarget::Parent,
-                            target_name: "fuchsia.examples.Hippo".parse().unwrap(),
-                            availability: cm_rust::Availability::Required,
-                        })],
-                        ..cm_rust::ComponentDecl::default()
-                    },
+                        })
+                        .protocol_default("fuchsia.examples.Hippo")
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Hippo")
+                                .source(cm_rust::ExposeSource::Self_),
+                        )
+                        .build(),
                     children: vec![],
                 },
             )],
@@ -4143,65 +3857,28 @@ mod tests {
 
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![
-                    cm_rust::ChildDecl {
-                        name: "b".parse().unwrap(),
-                        url: "test:///b".to_owned(),
-                        startup: fcdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                    cm_rust::ChildDecl {
-                        name: "c".parse().unwrap(),
-                        url: "test:///c".to_owned(),
-                        startup: fcdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                ],
-                offers: vec![
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".parse().unwrap(),
-                            collection: None,
-                        }),
-                        target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                        source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "c".parse().unwrap(),
-                            collection: None,
-                        }),
-                        source_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".parse().unwrap(),
-                            collection: None,
-                        }),
-                        target_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
-                        dependency_type: cm_rust::DependencyType::Strong,
-                        availability: cm_rust::Availability::Required,
-                    }),
-                ],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .child_default("b")
+                .child_default("c")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Echo")
+                        .source_static_child("a")
+                        .target_static_child("b"),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.RandonNumberGenerator")
+                        .source_static_child("c")
+                        .target_static_child("a"),
+                )
+                .build(),
             children: vec![(
                 "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
-                    decl: cm_rust::ComponentDecl {
-                        program: Some(cm_rust::ProgramDecl {
+                    decl: ComponentDeclBuilder::new_empty_component()
+                        .program(cm_rust::ProgramDecl {
                             runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                             info: fdata::Dictionary {
                                 entries: Some(vec![
@@ -4220,34 +3897,15 @@ mod tests {
                                 ]),
                                 ..Default::default()
                             },
-                        }),
-                        capabilities: vec![cm_rust::CapabilityDecl::Protocol(
-                            cm_rust::ProtocolDecl {
-                                name: "fuchsia.examples.Echo".parse().unwrap(),
-                                source_path: Some("/svc/fuchsia.examples.Echo".parse().unwrap()),
-                                delivery: Default::default(),
-                            },
-                        )],
-                        uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-                            source: cm_rust::UseSource::Parent,
-                            source_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
-                            source_dictionary: Default::default(),
-                            target_path: "/svc/fuchsia.examples.RandonNumberGenerator"
-                                .parse()
-                                .unwrap(),
-                            dependency_type: cm_rust::DependencyType::Strong,
-                            availability: cm_rust::Availability::Required,
-                        })],
-                        exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                            source: cm_rust::ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: Default::default(),
-                            target: cm_rust::ExposeTarget::Parent,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            availability: cm_rust::Availability::Required,
-                        })],
-                        ..cm_rust::ComponentDecl::default()
-                    },
+                        })
+                        .protocol_default("fuchsia.examples.Echo")
+                        .use_(UseBuilder::protocol().name("fuchsia.examples.RandonNumberGenerator"))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(cm_rust::ExposeSource::Self_),
+                        )
+                        .build(),
                     children: vec![],
                 },
             )],
@@ -4279,17 +3937,7 @@ mod tests {
                 "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
-                    decl: cm_rust::ComponentDecl {
-                        children: vec![cm_rust::ChildDecl {
-                            name: "b".parse().unwrap(),
-                            url: "test:///b".to_string(),
-                            startup: fcdecl::StartupMode::Lazy,
-                            on_terminate: None,
-                            environment: None,
-                            config_overrides: None,
-                        }],
-                        ..cm_rust::ComponentDecl::default()
-                    },
+                    decl: ComponentDeclBuilder::new_empty_component().child_default("b").build(),
                     children: vec![],
                 },
             )],
@@ -4315,8 +3963,8 @@ mod tests {
             .expect("get_component_decl returned an error");
         assert_eq!(
             a_decl,
-            cm_rust::ComponentDecl {
-                program: Some(cm_rust::ProgramDecl {
+            ComponentDeclBuilder::new_empty_component()
+                .program(cm_rust::ProgramDecl {
                     runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                     info: fdata::Dictionary {
                         entries: Some(vec![
@@ -4331,10 +3979,9 @@ mod tests {
                         ]),
                         ..Default::default()
                     },
-                }),
-                ..cm_rust::ComponentDecl::default()
-            }
-            .native_into_fidl(),
+                })
+                .build()
+                .native_into_fidl(),
         );
     }
 
@@ -4384,14 +4031,7 @@ mod tests {
             .expect("failed to call get_component_decl")
             .expect("get_component_decl returned an error")
             .fidl_into_native();
-        a_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-            source: cm_rust::UseSource::Parent,
-            source_name: "example.Hippo".parse().unwrap(),
-            source_dictionary: Default::default(),
-            target_path: "/svc/example.Hippo".parse().unwrap(),
-            dependency_type: cm_rust::DependencyType::Strong,
-            availability: cm_rust::Availability::Required,
-        }));
+        a_decl.uses.push(UseBuilder::protocol().name("example.Hippo").build());
         realm_and_builder_task
             .realm_proxy
             .replace_component_decl("a", &a_decl.clone().native_into_fidl())
@@ -4494,8 +4134,8 @@ mod tests {
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
-        let b_decl = cm_rust::ComponentDecl {
-            program: Some(cm_rust::ProgramDecl {
+        let b_decl = ComponentDeclBuilder::new_empty_component()
+            .program(cm_rust::ProgramDecl {
                 runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
@@ -4510,9 +4150,8 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
-            }),
-            ..cm_rust::ComponentDecl::default()
-        };
+            })
+            .build();
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
@@ -4690,7 +4329,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test://a", &ftest::ChildOptions::default())
+            .add_child("a", "test:///a", &ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4719,8 +4358,8 @@ mod tests {
             .expect("failed to call read_only_directory")
             .expect("read_only_directory returned an error");
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
-        let read_only_dir_decl = cm_rust::ComponentDecl {
-            program: Some(cm_rust::ProgramDecl {
+        let read_only_dir_decl = ComponentDeclBuilder::new_empty_component()
+            .program(cm_rust::ProgramDecl {
                 runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![fdata::DictionaryEntry {
@@ -4729,53 +4368,26 @@ mod tests {
                     }]),
                     ..Default::default()
                 },
-            }),
-            capabilities: vec![cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
-                name: "data".parse().unwrap(),
-                source_path: Some("/data".parse().unwrap()),
-                rights: fio::R_STAR_DIR,
-            })],
-            exposes: vec![cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
-                source: cm_rust::ExposeSource::Self_,
-                source_name: "data".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target: cm_rust::ExposeTarget::Parent,
-                target_name: "data".parse().unwrap(),
-                rights: Some(fio::R_STAR_DIR),
-                subdir: Default::default(),
-                availability: cm_rust::Availability::Required,
-            })],
-            ..cm_rust::ComponentDecl::default()
-        };
+            })
+            .capability(CapabilityBuilder::directory().name("data").path("/data"))
+            .expose(
+                ExposeBuilder::directory()
+                    .name("data")
+                    .source(cm_rust::ExposeSource::Self_)
+                    .rights(fio::R_STAR_DIR),
+            )
+            .build();
         let mut expected_tree = ComponentTree {
-            decl: cm_rust::ComponentDecl {
-                children: vec![cm_rust::ChildDecl {
-                    name: "a".parse().unwrap(),
-                    url: "test://a".to_string(),
-                    startup: fcdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                }],
-                offers: vec![cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
-                    source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                        name: "read-only-directory-0".parse().unwrap(),
-                        collection: None,
-                    }),
-                    source_name: "data".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "a".parse().unwrap(),
-                        collection: None,
-                    }),
-                    target_name: "data".parse().unwrap(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: Default::default(),
-                    availability: cm_rust::Availability::Required,
-                })],
-                ..cm_rust::ComponentDecl::default()
-            },
+            decl: ComponentDeclBuilder::new_empty_component()
+                .child_default("a")
+                .offer(
+                    OfferBuilder::directory()
+                        .name("data")
+                        .source_static_child("read-only-directory-0")
+                        .target_static_child("a")
+                        .rights(fio::R_STAR_DIR),
+                )
+                .build(),
             children: vec![(
                 "read-only-directory-0".parse().unwrap(),
                 ftest::ChildOptions::default(),

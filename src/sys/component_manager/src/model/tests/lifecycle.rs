@@ -371,7 +371,7 @@ async fn bind_eager_children_reentrant() {
                     }))
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("foo").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("foo").build()),
         ],
         hook.hooks(),
     )
