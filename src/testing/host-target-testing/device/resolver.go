@@ -20,9 +20,6 @@ type DeviceResolver interface {
 	// Resolve the device's nodename into a hostname.
 	ResolveName(ctx context.Context) (string, error)
 
-	// Resolve the device's nodename into an ssh port.
-	ResolveSshPort(ctx context.Context) (int, error)
-
 	// Block until the device appears to be in fastboot.
 	WaitToFindDeviceInFastboot(ctx context.Context) (string, error)
 
@@ -34,20 +31,13 @@ type DeviceResolver interface {
 type ConstantHostResolver struct {
 	nodeName string
 	host     string
-	sshPort  int
 }
 
 // NewConstantAddressResolver constructs a fixed host.
-func NewConstantHostResolver(
-	ctx context.Context,
-	nodeName string,
-	host string,
-	sshPort int,
-) ConstantHostResolver {
+func NewConstantHostResolver(ctx context.Context, nodeName string, host string) ConstantHostResolver {
 	return ConstantHostResolver{
 		nodeName: nodeName,
 		host:     host,
-		sshPort:  sshPort,
 	}
 }
 
@@ -57,10 +47,6 @@ func (r ConstantHostResolver) NodeName() string {
 
 func (r ConstantHostResolver) ResolveName(ctx context.Context) (string, error) {
 	return r.host, nil
-}
-
-func (r ConstantHostResolver) ResolveSshPort(ctx context.Context) (int, error) {
-	return r.sshPort, nil
 }
 
 func (r ConstantHostResolver) WaitToFindDeviceInFastboot(ctx context.Context) (string, error) {
@@ -113,7 +99,7 @@ func (r *FfxResolver) NodeName() string {
 
 func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 	nodeName := r.NodeName()
-	logger.Infof(ctx, "resolving the hostname of nodename %v", nodeName)
+	logger.Infof(ctx, "resolving the nodename %v", nodeName)
 
 	targets, err := r.ffx.TargetListForNode(ctx, nodeName)
 	if err != nil {
@@ -137,24 +123,6 @@ func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 	}
 
 	return target.Addresses[0], nil
-}
-
-func (r *FfxResolver) ResolveSshPort(ctx context.Context) (int, error) {
-	nodeName := r.NodeName()
-	logger.Infof(ctx, "resolving the ssh port of nodename %v", nodeName)
-
-	target, err := r.ffx.TargetShow(ctx, nodeName)
-	if err != nil {
-		return 0, err
-	}
-
-	logger.Infof(ctx, "resolved the nodename %v ssh address to %+v", nodeName, target.Target.SshAddress)
-
-	if target.Target.SshAddress.Host == "" || target.Target.SshAddress.Port == 0 {
-		return 0, fmt.Errorf("no ssh address found for nodename %v: %v", nodeName, target)
-	}
-
-	return target.Target.SshAddress.Port, nil
 }
 
 func (r *FfxResolver) WaitToFindDeviceInFastboot(ctx context.Context) (string, error) {

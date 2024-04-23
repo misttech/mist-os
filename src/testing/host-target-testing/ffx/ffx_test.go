@@ -26,7 +26,7 @@ func createScript(t *testing.T, contents string) string {
 }
 
 func TestTargetListEmpty(t *testing.T) {
-	data, err := json.Marshal([]TargetListEntry{})
+	data, err := json.Marshal([]targetEntry{})
 	if err != nil {
 		t.Fatalf("Failed to marshal: %s", err)
 	}
@@ -48,7 +48,7 @@ func TestTargetListEmpty(t *testing.T) {
 }
 
 func TestTargetList(t *testing.T) {
-	expected_entries := []TargetListEntry{
+	expected_entries := []targetEntry{
 		{NodeName: "1", Addresses: []string{"127.0.0.1"}, TargetState: "Product"},
 		{NodeName: "2", Addresses: []string{"127.0.0.1"}, TargetState: "Product"},
 	}
