@@ -56,7 +56,7 @@ test: info gen ## Run test ZBI with KASAN enabled
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-zxtest.zbi -s1 \
-	-- -no-reboot
+	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: test
 
 %: ## Make any ninja target
