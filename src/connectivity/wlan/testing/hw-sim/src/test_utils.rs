@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, FutureExt, StreamExt},
     ieee80211::{MacAddr, MacAddrBytes},
-    realm_proxy_client::{extend_namespace, InstalledNamespace},
+    realm_client::{extend_namespace, InstalledNamespace},
     std::{
         fmt::Display,
         future::Future,

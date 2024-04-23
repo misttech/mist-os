@@ -27,3 +27,8 @@ rustc_library("realm_proxy") {
     "//third_party/rust_crates:tracing",
   ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ ":realm_proxy" ]
+}

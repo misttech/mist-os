@@ -12,7 +12,7 @@ use fidl_fuchsia_samplertestcontroller::SamplerTestControllerMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
 use fuchsia_zircon as zx;
-use realm_proxy_client::InstalledNamespace;
+use realm_client::InstalledNamespace;
 
 mod test_topology;
 mod utils;

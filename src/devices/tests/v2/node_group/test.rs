@@ -12,7 +12,7 @@ use {
     fuchsia_zircon as zx,
     futures::prelude::*,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
-    realm_proxy_client::{extend_namespace, InstalledNamespace},
+    realm_client::{extend_namespace, InstalledNamespace},
     tracing::info,
 };
 
@@ -45,7 +45,7 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
     realm_factory
         .create_realm2(options, dict_server)
         .await?
-        .map_err(realm_proxy_client::Error::OperationError)?;
+        .map_err(realm_client::Error::OperationError)?;
     let ns = extend_namespace(realm_factory, dict_client).await?;
     Ok(ns)
 }

@@ -36,6 +36,7 @@ async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
         .await
         .expect("Dictionary/Get fidl failed")
         .expect("Dictionary/Get failed");
+
     let fsandbox::Capability::Directory(directory) = cap else {
         panic!("unexpected capability at pkg");
     };

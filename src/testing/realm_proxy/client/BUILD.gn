@@ -13,22 +13,13 @@ rustc_library("realm_proxy_client") {
     "src/lib.rs",
   ]
   deps = [
-    ":includes",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:uuid",
   ]
-}
-
-expect_includes("includes") {
-  includes = [ "//src/testing/realm_proxy/client/meta/realm_proxy.shard.cml" ]
 }
 
 group("client") {

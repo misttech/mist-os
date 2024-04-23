@@ -16,7 +16,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::WatchEvent;
 use futures::channel::mpsc;
 use futures::prelude::*;
-use realm_proxy_client::{extend_namespace, InstalledNamespace};
+use realm_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
 
 async fn run_waiter_server(mut stream: ctf::WaiterRequestStream, mut sender: mpsc::Sender<()>) {
@@ -46,7 +46,7 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
     realm_factory
         .create_realm2(options, dict_server)
         .await?
-        .map_err(realm_proxy_client::Error::OperationError)?;
+        .map_err(realm_client::Error::OperationError)?;
     let ns = extend_namespace(realm_factory, dict_client).await?;
     Ok(ns)
 }
