@@ -153,20 +153,19 @@ TEST(SerialTest, InitNoProtocolParent) {
   // SerialTester is intentionally not defined in this scope as it would
   // define the ZX_PROTOCOL_SERIAL_IMPL protocol.
   auto fake_parent = MockDevice::FakeRootParent();
-  serial::SerialDevice device(fake_parent.get(), fake_parent.get());
+  serial::SerialDevice device(fake_parent.get());
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, device.Init());
 }
 
 TEST(SerialTest, Init) {
   SerialTester tester;
-  serial::SerialDevice device(tester.fake_parent(), tester.fake_parent());
+  serial::SerialDevice device(tester.fake_parent());
   ASSERT_EQ(ZX_OK, device.Init());
 }
 
 TEST(SerialTest, DdkLifetime) {
   SerialTester tester;
-  serial::SerialDevice* device(
-      new serial::SerialDevice(tester.fake_parent(), tester.fake_parent()));
+  serial::SerialDevice* device(new serial::SerialDevice(tester.fake_parent()));
 
   ASSERT_EQ(ZX_OK, device->Init());
   ASSERT_EQ(ZX_OK, device->Bind());
@@ -177,8 +176,7 @@ TEST(SerialTest, DdkLifetime) {
 
 TEST(SerialTest, DdkRelease) {
   SerialTester tester;
-  serial::SerialDevice* device(
-      new serial::SerialDevice(tester.fake_parent(), tester.fake_parent()));
+  serial::SerialDevice* device(new serial::SerialDevice(tester.fake_parent()));
   FakeSerialImpl& serial_impl = tester.serial_impl();
 
   ASSERT_EQ(ZX_OK, device->Init());
@@ -210,7 +208,7 @@ class SerialDeviceTest : public zxtest::Test {
 };
 
 SerialDeviceTest::SerialDeviceTest() {
-  device_ = new serial::SerialDevice(tester_.fake_parent(), tester_.fake_parent());
+  device_ = new serial::SerialDevice(tester_.fake_parent());
 
   if (ZX_OK != device_->Init()) {
     delete device_;
