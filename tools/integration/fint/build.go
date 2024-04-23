@@ -519,8 +519,7 @@ func constructNinjaTargets(
 		// "build/images/updates" into `extraTargetsForImages`.
 		if staticSpec.IncludeArchives {
 			archivesToBuild := []string{
-				"archive",  // Images and scripts for paving/netbooting.
-				"packages", // Package metadata, blobs, and tools.
+				"archive", // Images and scripts for paving/netbooting.
 			}
 			for _, archive := range modules.Archives() {
 				if contains(archivesToBuild, archive.Name) && archive.Type == "tgz" {
