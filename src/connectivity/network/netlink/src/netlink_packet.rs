@@ -173,7 +173,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use netlink_packet_core::{NetlinkBuffer, NLMSG_DONE, NLMSG_ERROR};
-    use netlink_packet_route::RtnlMessage;
+    use netlink_packet_route::RouteNetlinkMessage;
     use netlink_packet_utils::Parseable as _;
     use test_case::test_case;
 
@@ -191,7 +191,7 @@ mod tests {
         expected_header.sequence_number = sequence_number;
         expected_header.port_number = 0x00000000;
 
-        let error = new_error::<RtnlMessage>(expected_error, expected_header);
+        let error = new_error::<RouteNetlinkMessage>(expected_error, expected_header);
         // `serialize` will panic if the message is malformed.
         let mut buf = vec![0; error.buffer_len()];
         error.serialize(&mut buf);
@@ -221,7 +221,7 @@ mod tests {
         let mut req_header = NetlinkHeader::default();
         req_header.sequence_number = sequence_number;
 
-        let done = new_done::<RtnlMessage>(req_header);
+        let done = new_done::<RouteNetlinkMessage>(req_header);
         // `serialize` will panic if the message is malformed.
         let mut buf = vec![0; done.buffer_len()];
         done.serialize(&mut buf);

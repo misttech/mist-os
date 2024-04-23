@@ -527,7 +527,7 @@ group("netlink-packet-generic") {
 }
 
 group("netlink-packet-route") {
-  public_deps = [ ":netlink-packet-route-v0_17_0" ]
+  public_deps = [ ":netlink-packet-route-v0_20_0" ]
 }
 
 group("netlink-packet-sock-diag") {
@@ -8535,25 +8535,26 @@ rust_library("netlink-packet-generic-v0_3_3") {
   applicable_licenses = [ ":netlink-packet-generic-v0_3_3.license" ]
 }
 
-license("netlink-packet-route-v0_17_0.license") {
+license("netlink-packet-route-v0_20_0.license") {
   public_package_name = "netlink_packet_route"
   license_files = [
-    "//third_party/rust_crates/vendor/netlink-packet-route-0.17.0/LICENSE-MIT",
+    "//third_party/rust_crates/forks/netlink-packet-route-0.20.0/LICENSE-MIT",
   ]
 }
 
-rust_library("netlink-packet-route-v0_17_0") {
+rust_library("netlink-packet-route-v0_20_0") {
   crate_name = "netlink_packet_route"
   crate_root =
-      "//third_party/rust_crates/vendor/netlink-packet-route-0.17.0/src/lib.rs"
-  output_name = "netlink_packet_route-d849b6a48212c1f2"
+      "//third_party/rust_crates/forks/netlink-packet-route-0.20.0/src/lib.rs"
+  output_name = "netlink_packet_route-6a6f82783dbd978e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":anyhow-v1_0_75" ]
-  deps += [ ":bitflags-v1_3_2" ]
+  deps += [ ":bitflags-v2_4_1" ]
   deps += [ ":libc-v0_2_149" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":netlink-packet-core-v0_7_0" ]
   deps += [ ":netlink-packet-utils-v0_5_2" ]
 
@@ -8561,14 +8562,14 @@ rust_library("netlink-packet-route-v0_17_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=d849b6a48212c1f2",
-    "-Cextra-filename=-d849b6a48212c1f2",
+    "--edition=2021",
+    "-Cmetadata=6a6f82783dbd978e",
+    "-Cextra-filename=-6a6f82783dbd978e",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":netlink-packet-route-v0_17_0.license" ]
+  applicable_licenses = [ ":netlink-packet-route-v0_20_0.license" ]
 }
 
 license("netlink-packet-sock-diag-v0_4_2.license") {

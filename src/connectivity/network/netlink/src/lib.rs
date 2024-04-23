@@ -35,7 +35,7 @@ use futures::{
     FutureExt as _, StreamExt as _,
 };
 use net_types::ip::{Ipv4, Ipv6};
-use netlink_packet_route::RtnlMessage;
+use netlink_packet_route::RouteNetlinkMessage;
 
 use crate::{
     client::{ClientIdGenerator, ClientTable, InternalClient},
@@ -92,8 +92,8 @@ impl<P: SenderReceiverProvider> Netlink<P> {
     /// Closing the `receiver` will close this client, disconnecting `sender`.
     pub fn new_route_client(
         &self,
-        sender: P::Sender<RtnlMessage>,
-        receiver: P::Receiver<RtnlMessage>,
+        sender: P::Sender<RouteNetlinkMessage>,
+        receiver: P::Receiver<RouteNetlinkMessage>,
     ) -> Result<NetlinkRouteClient, NewClientError> {
         let Netlink { id_generator, route_client_sender } = self;
         let (external_client, internal_client) =

@@ -24,16 +24,23 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
 use derivative::Derivative;
 use futures::{channel::oneshot, StreamExt as _};
+use linux_uapi::{
+    rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
+    rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
+};
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
     SpecifiedAddr, SpecifiedAddress as _, Witness as _,
 };
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
-    RouteHeader, RouteMessage, RtnlMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
-    RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN,
+    route::{
+        RouteAddress, RouteAttribute, RouteHeader, RouteMessage, RouteProtocol, RouteScope,
+        RouteType,
+    },
+    AddressFamily, RouteNetlinkMessage,
 };
-use netlink_packet_utils::nla::Nla;
+use netlink_packet_utils::{nla::Nla, DecodeError, Emitable};
 
 use crate::{
     client::{ClientTable, InternalClient},
@@ -448,10 +455,10 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
 
         let NetlinkRouteMessage(route) = route_to_delete;
         let interface_id = route
-            .nlas
+            .attributes
             .iter()
             .filter_map(|nla| match nla {
-                netlink_packet_route::route::Nla::Oif(interface) => Some(*interface as u64),
+                RouteAttribute::Oif(interface) => Some(*interface as u64),
                 _nla => None,
             })
             .next()
@@ -685,8 +692,8 @@ fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>:
     };
     if let Some(message_for_clients) = message_for_clients {
         let route_group = match I::VERSION {
-            IpVersion::V4 => ModernGroup(RTNLGRP_IPV4_ROUTE),
-            IpVersion::V6 => ModernGroup(RTNLGRP_IPV6_ROUTE),
+            IpVersion::V4 => ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+            IpVersion::V6 => ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
         };
         route_clients.send_message_to_group(message_for_clients, route_group);
     }
@@ -728,6 +735,10 @@ impl NetlinkRouteMessage {
                 log_warn!("Invalid interface id found in routing table route: {:?}", id);
                 None
             }
+            Err(NetlinkRouteMessageConversionError::FailedToDecode(err)) => {
+                log_warn!("Unable to decode route address: {:?}", err);
+                None
+            }
         }
     }
 
@@ -736,9 +747,10 @@ impl NetlinkRouteMessage {
         self,
         sequence_number: u32,
         is_dump: bool,
-    ) -> NetlinkMessage<RtnlMessage> {
+    ) -> NetlinkMessage<RouteNetlinkMessage> {
         let NetlinkRouteMessage(message) = self;
-        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewRoute(message).into();
+        let mut msg: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::NewRoute(message).into();
         msg.header.sequence_number = sequence_number;
         if is_dump {
             msg.header.flags |= NLM_F_MULTIPART;
@@ -748,9 +760,10 @@ impl NetlinkRouteMessage {
     }
 
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::DelRoute`].
-    fn into_rtnl_del_route(self) -> NetlinkMessage<RtnlMessage> {
+    fn into_rtnl_del_route(self) -> NetlinkMessage<RouteNetlinkMessage> {
         let NetlinkRouteMessage(message) = self;
-        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::DelRoute(message).into();
+        let mut msg: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::DelRoute(message).into();
         msg.finalize();
         msg
     }
@@ -760,7 +773,7 @@ impl Hash for NetlinkRouteMessage {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let NetlinkRouteMessage(message) = self;
         message.header.hash(state);
-        message.nlas.iter().for_each(|nla| {
+        message.attributes.iter().for_each(|nla| {
             let mut buffer = vec![0u8; nla.value_len() as usize];
             nla.emit_value(&mut buffer);
             buffer.hash(state);
@@ -775,6 +788,25 @@ pub(crate) enum NetlinkRouteMessageConversionError {
     RouteActionNotForwarding,
     // Interface id could not be downcasted to fit into the expected u32.
     InvalidInterfaceId(u64),
+    // Failed to decode route address
+    FailedToDecode(DecodeErrorWrapper),
+}
+
+#[derive(Debug)]
+pub(crate) struct DecodeErrorWrapper(DecodeError);
+
+impl PartialEq for DecodeErrorWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        // DecodeError contains anyhow::Error which unfortunately
+        // can't be compared without a call to format!;
+        return format!("{:?}", self.0) == format!("{:?}", other.0);
+    }
+}
+
+impl From<DecodeError> for NetlinkRouteMessageConversionError {
+    fn from(err: DecodeError) -> Self {
+        NetlinkRouteMessageConversionError::FailedToDecode(DecodeErrorWrapper(err))
+    }
 }
 
 // Implement conversions from `InstalledRoute` to `NetlinkRouteMessage`
@@ -798,8 +830,8 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         // Both possible constants are in the range of u8-accepted values, so they can be
         // safely casted to a u8.
         route_header.address_family = match I::VERSION {
-            IpVersion::V4 => AF_INET,
-            IpVersion::V6 => AF_INET6,
+            IpVersion::V4 => AddressFamily::Inet,
+            IpVersion::V6 => AddressFamily::Inet6,
         }
         .try_into()
         .expect("should fit into u8");
@@ -812,12 +844,14 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         //
         // length of source prefix
         // tos filter (type of service)
-        route_header.table = RT_TABLE_MAIN;
-        route_header.protocol = RTPROT_UNSPEC;
+        // This downcast is safe as rt_class_t_RT_TABLE_MAIN has a value of
+        // 254 which is less than 255, and safely fits in a u8.
+        route_header.table = rt_class_t_RT_TABLE_MAIN as u8;
+        route_header.protocol = RouteProtocol::Unspec;
         // Universe for routes with next_hop. Valid as long as route action
         // is forwarding.
-        route_header.scope = RT_SCOPE_UNIVERSE;
-        route_header.kind = RTN_UNICAST;
+        route_header.scope = RouteScope::Universe;
+        route_header.kind = RouteType::Unicast;
 
         // The NLA order follows the list that attributes are listed on the
         // rtnetlink man page.
@@ -844,9 +878,10 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         // A prefix length of 0 indicates it is the default route. Specifying
         // destination NLA does not provide useful information.
         if route_header.destination_prefix_length > 0 {
-            let destination_nla = netlink_packet_route::route::Nla::Destination(
-                destination.network().bytes().to_vec(),
-            );
+            let destination_nla = RouteAttribute::Destination(RouteAddress::parse(
+                route_header.address_family,
+                destination.network().bytes(),
+            )?);
             nlas.push(destination_nla);
         }
 
@@ -859,21 +894,21 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
             }
             Ok(id) => id,
         };
-        let oif_nla = netlink_packet_route::route::Nla::Oif(outbound_id);
+        let oif_nla = RouteAttribute::Oif(outbound_id);
         nlas.push(oif_nla);
 
         if let Some(next_hop) = next_hop {
-            let bytes = next_hop.bytes().iter().cloned().collect();
-            let gateway_nla = netlink_packet_route::route::Nla::Gateway(bytes);
+            let bytes = RouteAddress::parse(route_header.address_family, next_hop.bytes())?;
+            let gateway_nla = RouteAttribute::Gateway(bytes);
             nlas.push(gateway_nla);
         }
 
-        let priority_nla = netlink_packet_route::route::Nla::Priority(metric);
+        let priority_nla = RouteAttribute::Priority(metric);
         nlas.push(priority_nla);
 
         let mut route_message = RouteMessage::default();
         route_message.header = route_header;
-        route_message.nlas = nlas;
+        route_message.attributes = nlas;
         Ok(NetlinkRouteMessage(route_message))
     }
 }
@@ -908,9 +943,13 @@ impl<I: Ip> From<NetlinkRouteMessage> for fnet_routes_ext::Route<I> {
         let NetlinkRouteMessage(route_message) = netlink_route_message;
         let RouteNlaView { subnet: subnet_bytes, metric, interface_id, next_hop: next_hop_bytes } =
             view_existing_route_nlas(&route_message);
-
         let subnet_bytes = match subnet_bytes {
-            Some(bytes) => ip_addr_from_bytes::<I>(bytes).expect("should be valid addr"),
+            Some(bytes) => {
+                // TODO(b/336360759): Convert to map_ip.
+                let mut address_bytes = vec![0; bytes.buffer_len()];
+                bytes.emit(&mut address_bytes);
+                ip_addr_from_bytes::<I>(&address_bytes).expect("should be valid addr")
+            }
             None => I::UNSPECIFIED_ADDRESS,
         };
 
@@ -918,9 +957,14 @@ impl<I: Ip> From<NetlinkRouteMessage> for fnet_routes_ext::Route<I> {
             .expect("should be valid subnet");
 
         let next_hop = match next_hop_bytes {
-            Some(bytes) => ip_addr_from_bytes::<I>(bytes)
-                .map(|addr| SpecifiedAddr::new(addr))
-                .expect("should be valid addr if present"),
+            Some(bytes) => {
+                // TODO(b/336360759): Convert to map_ip.
+                let mut address_bytes = vec![0; bytes.buffer_len()];
+                bytes.emit(&mut address_bytes);
+                ip_addr_from_bytes::<I>(&address_bytes)
+            }
+            .map(|addr| SpecifiedAddr::new(addr))
+            .expect("should be valid addr if present"),
             None => None,
         };
 
@@ -941,10 +985,10 @@ impl<I: Ip> From<NetlinkRouteMessage> for fnet_routes_ext::Route<I> {
 
 /// A view into the NLA's held by a `NetlinkRouteMessage`.
 struct RouteNlaView<'a> {
-    subnet: Option<&'a Vec<u8>>,
+    subnet: Option<&'a RouteAddress>,
     metric: &'a u32,
     interface_id: &'a u32,
-    next_hop: Option<&'a Vec<u8>>,
+    next_hop: Option<&'a RouteAddress>,
 }
 
 /// Extract and return a view of the Nlas from the given route.
@@ -964,20 +1008,20 @@ fn view_existing_route_nlas(route: &RouteMessage) -> RouteNlaView<'_> {
     let mut metric = None;
     let mut interface_id = None;
     let mut next_hop = None;
-    route.nlas.iter().for_each(|nla| match nla {
-        netlink_packet_route::route::Nla::Destination(dst) => {
+    route.attributes.iter().for_each(|nla| match nla {
+        RouteAttribute::Destination(dst) => {
             assert_eq!(subnet, None, "existing route has multiple `Destination` NLAs");
             subnet = Some(dst)
         }
-        netlink_packet_route::route::Nla::Priority(p) => {
+        RouteAttribute::Priority(p) => {
             assert_eq!(metric, None, "existing route has multiple `Priority` NLAs");
             metric = Some(p)
         }
-        netlink_packet_route::route::Nla::Oif(interface) => {
+        RouteAttribute::Oif(interface) => {
             assert_eq!(interface_id, None, "existing route has multiple `Oif` NLAs");
             interface_id = Some(interface)
         }
-        netlink_packet_route::route::Nla::Gateway(gateway) => {
+        RouteAttribute::Gateway(gateway) => {
             assert_eq!(next_hop, None, "existing route has multiple `Gateway` NLAs");
             next_hop = Some(gateway)
         }
@@ -1021,8 +1065,11 @@ fn new_route_matches_existing<I: Ip>(
             interface_id: _,
             next_hop: _,
         } = view_existing_route_nlas(existing_route);
-        let subnet_matches = existing_subnet
-            .map_or(!subnet.network().is_specified(), |dst| &dst[..] == subnet.network().bytes());
+        let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
+            let mut address_bytes = vec![0; dst.buffer_len()];
+            dst.emit(&mut address_bytes);
+            &address_bytes[..] == subnet.network().bytes()
+        });
         let metric_matches = existing_metric == priority;
         subnet_matches && metric_matches
     })
@@ -1060,13 +1107,22 @@ fn select_route_for_deletion<I: Ip>(
                 next_hop: existing_next_hop,
             } = view_existing_route_nlas(existing_route);
             let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
-                &dst[..] == subnet.network().bytes()
+                let mut bytes = vec![0; dst.buffer_len()];
+                dst.emit(&mut bytes);
+                &bytes[..] == subnet.network().bytes()
             });
             let metric_matches = priority.map_or(true, |p| p.get() == *existing_metric);
             let interface_matches =
                 outbound_interface.map_or(true, |i| i.get() == (*existing_interface).into());
-            let next_hop_matches =
-                next_hop.map_or(true, |n| existing_next_hop.is_some_and(|e| n.get().bytes() == e));
+            let next_hop_matches = next_hop.map_or(true, |n| {
+                existing_next_hop
+                    .map(|e| {
+                        let mut address_bytes = vec![0; e.buffer_len()];
+                        e.emit(&mut address_bytes);
+                        address_bytes
+                    })
+                    .is_some_and(|e| n.get().bytes() == e)
+            });
             if subnet_matches && metric_matches && interface_matches && next_hop_matches {
                 Some((route, *existing_metric))
             } else {
@@ -1093,13 +1149,13 @@ mod tests {
         stream::BoxStream,
         SinkExt as _, Stream,
     };
+    use linux_uapi::rtnetlink_groups_RTNLGRP_LINK;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
         ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
         SpecifiedAddr,
     };
     use netlink_packet_core::NetlinkPayload;
-    use netlink_packet_route::RTNLGRP_LINK;
     use std::pin::pin;
     use test_case::test_case;
 
@@ -1155,23 +1211,25 @@ mod tests {
 
     fn create_netlink_route_message<I: Ip>(
         destination_prefix_length: u8,
-        nlas: Vec<netlink_packet_route::route::Nla>,
+        nlas: Vec<RouteAttribute>,
     ) -> NetlinkRouteMessage {
         let mut route_header = RouteHeader::default();
-        let address_family: u8 = match I::VERSION {
-            IpVersion::V4 => AF_INET,
-            IpVersion::V6 => AF_INET6,
+        let address_family = match I::VERSION {
+            IpVersion::V4 => AddressFamily::Inet,
+            IpVersion::V6 => AddressFamily::Inet6,
         }
         .try_into()
         .expect("should fit into u8");
         route_header.address_family = address_family;
         route_header.destination_prefix_length = destination_prefix_length;
-        route_header.kind = RTN_UNICAST;
-        route_header.table = RT_TABLE_MAIN;
+        route_header.kind = RouteType::Unicast;
+        // Conversion is safe as rt_class_t_RT_TABLE_MAIN has a value of 254
+        // which safely fits into a u8.
+        route_header.table = rt_class_t_RT_TABLE_MAIN as u8;
 
         let mut route_message = RouteMessage::default();
         route_message.header = route_header;
-        route_message.nlas = nlas;
+        route_message.attributes = nlas;
 
         NetlinkRouteMessage(route_message)
     }
@@ -1181,26 +1239,31 @@ mod tests {
         next_hop: Option<I::Addr>,
         outgoing_interface_id: u32,
         metric: u32,
-    ) -> Vec<netlink_packet_route::route::Nla> {
+    ) -> Vec<RouteAttribute> {
         let mut nlas = vec![];
 
+        let family = match I::VERSION {
+            IpVersion::V4 => AddressFamily::Inet,
+            IpVersion::V6 => AddressFamily::Inet6,
+        };
+
         if let Some(destination) = destination {
-            let destination_nla = netlink_packet_route::route::Nla::Destination(
-                destination.network().bytes().to_vec(),
+            let destination_nla = RouteAttribute::Destination(
+                RouteAddress::parse(family, destination.network().bytes()).unwrap(),
             );
             nlas.push(destination_nla);
         }
 
-        let oif_nla = netlink_packet_route::route::Nla::Oif(outgoing_interface_id);
+        let oif_nla = RouteAttribute::Oif(outgoing_interface_id);
         nlas.push(oif_nla);
 
         if let Some(next_hop) = next_hop {
-            let bytes = next_hop.bytes().iter().cloned().collect();
-            let gateway_nla = netlink_packet_route::route::Nla::Gateway(bytes);
+            let bytes = RouteAddress::parse(family, next_hop.bytes()).unwrap();
+            let gateway_nla = RouteAttribute::Gateway(bytes);
             nlas.push(gateway_nla);
         }
 
-        let priority_nla = netlink_packet_route::route::Nla::Priority(metric);
+        let priority_nla = RouteAttribute::Priority(metric);
         nlas.push(priority_nla);
         nlas
     }
@@ -1232,8 +1295,14 @@ mod tests {
 
         // Setup two fake clients: one is a member of the route multicast group.
         let (right_group, wrong_group) = match I::VERSION {
-            IpVersion::V4 => (ModernGroup(RTNLGRP_IPV4_ROUTE), ModernGroup(RTNLGRP_IPV6_ROUTE)),
-            IpVersion::V6 => (ModernGroup(RTNLGRP_IPV6_ROUTE), ModernGroup(RTNLGRP_IPV4_ROUTE)),
+            IpVersion::V4 => (
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
+            ),
+            IpVersion::V6 => (
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+            ),
         };
         let (mut right_sink, right_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
@@ -1429,18 +1498,20 @@ mod tests {
     }
 
     struct Setup<W, R, B> {
-        pub event_loop: crate::eventloop::EventLoop<FakeInterfacesHandler, FakeSender<RtnlMessage>>,
+        pub event_loop:
+            crate::eventloop::EventLoop<FakeInterfacesHandler, FakeSender<RouteNetlinkMessage>>,
         pub watcher_stream: W,
         pub route_set_stream: R,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
-        pub request_sink: mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RtnlMessage>>>,
+        pub request_sink:
+            mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RouteNetlinkMessage>>>,
         pub background_work: B,
     }
 
     fn setup_with_route_clients<
         I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     >(
-        route_clients: ClientTable<NetlinkRoute, FakeSender<RtnlMessage>>,
+        route_clients: ClientTable<NetlinkRoute, FakeSender<RouteNetlinkMessage>>,
     ) -> Setup<
         impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
         impl Stream<Item = <<I::RouteSetMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
@@ -1856,13 +1927,13 @@ mod tests {
             outbound_interface: interface_id.map(NonZeroU64::new).flatten(),
             next_hop: next_hop.map(SpecifiedAddr::new).flatten(),
             priority: priority.map(NonZeroU32::new).flatten(),
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         }
     }
 
     #[derive(Debug, PartialEq)]
     struct TestRequestResult {
-        messages: Vec<SentMessage<RtnlMessage>>,
+        messages: Vec<SentMessage<RouteNetlinkMessage>>,
         waiter_results: Vec<Result<(), RequestError>>,
     }
 
@@ -1890,13 +1961,13 @@ mod tests {
         let (mut route_sink, route_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
             &[ModernGroup(match A::Version::VERSION {
-                IpVersion::V4 => RTNLGRP_IPV4_ROUTE,
-                IpVersion::V6 => RTNLGRP_IPV6_ROUTE,
+                IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
+                IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
             })],
         );
         let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_2,
-            &[ModernGroup(RTNLGRP_LINK)],
+            &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
         );
         let Setup {
             event_loop,
@@ -2042,16 +2113,16 @@ mod tests {
                 test_request_result.messages.sort_by_key(|message| {
                     assert_matches!(
                         &message.message.payload,
-                        NetlinkPayload::InnerMessage(RtnlMessage::NewRoute(m)) => {
+                        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(m)) => {
                             // We expect there to be exactly one Oif NLA present
                             // for the given inputs.
-                            m.nlas.clone().into_iter().filter_map(|nla|
+                            m.attributes.clone().into_iter().filter_map(|nla|
                                 match nla {
-                                    netlink_packet_route::route::Nla::Oif(interface_id) =>
+                                    RouteAttribute::Oif(interface_id) =>
                                         Some((m.header.address_family, interface_id)),
-                                    netlink_packet_route::route::Nla::Destination(_)
-                                    | netlink_packet_route::route::Nla::Gateway(_)
-                                    | netlink_packet_route::route::Nla::Priority(_) => None,
+                                    RouteAttribute::Destination(_)
+                                    | RouteAttribute::Gateway(_)
+                                    | RouteAttribute::Priority(_) => None,
                                     _ => panic!("unexpected NLA {nla:?} present in payload"),
                                 }
                             ).next()
@@ -2310,7 +2381,7 @@ mod tests {
     // inputs and expected values.
     async fn test_route_requests_helper<A: IpAddress>(
         args: impl IntoIterator<Item = RequestArgs<A::Version>>,
-        expected_messages: Vec<SentMessage<RtnlMessage>>,
+        expected_messages: Vec<SentMessage<RouteNetlinkMessage>>,
         route_set_results: Vec<RouteSetResult>,
         waiter_results: Vec<Result<(), RequestError>>,
         subnet: Subnet<A>,
@@ -2355,16 +2426,16 @@ mod tests {
                     let sequence_number = message.message.header.sequence_number;
                     assert_matches!(
                         &message.message.payload,
-                        NetlinkPayload::InnerMessage(RtnlMessage::NewRoute(m)) | NetlinkPayload::InnerMessage(RtnlMessage::DelRoute(m)) => {
+                        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(m)) | NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelRoute(m)) => {
                             // We expect there to be exactly one Priority NLA present
                             // for the given inputs.
-                            m.nlas.clone().into_iter().filter_map(|nla|
+                            m.attributes.clone().into_iter().filter_map(|nla|
                                 match nla {
-                                    netlink_packet_route::route::Nla::Priority(priority) =>
+                                    RouteAttribute::Priority(priority) =>
                                         Some((sequence_number, priority)),
-                                    netlink_packet_route::route::Nla::Destination(_)
-                                    | netlink_packet_route::route::Nla::Gateway(_)
-                                    | netlink_packet_route::route::Nla::Oif(_) => None,
+                                    RouteAttribute::Destination(_)
+                                    | RouteAttribute::Gateway(_)
+                                    | RouteAttribute::Oif(_) => None,
                                     _ => panic!("unexpected NLA {nla:?} present in payload"),
                                 }
                             ).next()
@@ -2638,8 +2709,8 @@ mod tests {
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
         let route_group = match A::Version::VERSION {
-            IpVersion::V4 => ModernGroup(RTNLGRP_IPV4_ROUTE),
-            IpVersion::V6 => ModernGroup(RTNLGRP_IPV6_ROUTE),
+            IpVersion::V4 => ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+            IpVersion::V6 => ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
         };
 
         let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
@@ -2791,8 +2862,8 @@ mod tests {
     /// A test to exercise a `RTM_NEWROUTE` followed by a `RTM_GETROUTE`
     /// route request, ensuring that the new route is included in the
     /// dump request.
-    #[test_case(V4_SUB1, ModernGroup(RTNLGRP_IPV4_ROUTE); "v4_new_dump")]
-    #[test_case(V6_SUB1, ModernGroup(RTNLGRP_IPV6_ROUTE); "v6_new_dump")]
+    #[test_case(V4_SUB1, ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE); "v4_new_dump")]
+    #[test_case(V6_SUB1, ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE); "v6_new_dump")]
     #[fuchsia::test]
     async fn test_new_then_get_dump_request<A: IpAddress>(subnet: Subnet<A>, group: ModernGroup)
     where
@@ -2865,8 +2936,8 @@ mod tests {
     /// A test to exercise a `RTM_NEWROUTE` followed by a `RTM_DELROUTE` for the same route, then a
     /// `RTM_GETROUTE` request, ensuring that the route added created a multicast message, but does
     /// not appear in the dump.
-    #[test_case(V4_SUB1, ModernGroup(RTNLGRP_IPV4_ROUTE); "v4_new_del_dump")]
-    #[test_case(V6_SUB1, ModernGroup(RTNLGRP_IPV6_ROUTE); "v6_new_del_dump")]
+    #[test_case(V4_SUB1, ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE); "v4_new_del_dump")]
+    #[test_case(V6_SUB1, ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE); "v6_new_del_dump")]
     #[fuchsia::test]
     async fn test_new_then_del_then_get_dump_request<A: IpAddress>(
         subnet: Subnet<A>,
@@ -3180,35 +3251,35 @@ mod tests {
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB2, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         false; "subnet_does_not_match_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB3, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         false; "subnet_prefix_len_does_not_match_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         true; "subnet_matches_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         false; "interface_does_not_match_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         true; "interface_matches_v4")]
@@ -3216,7 +3287,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         false; "nexthop_absent_v4")]
@@ -3224,7 +3295,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
         false; "nexthop_does_not_match_v4")]
@@ -3232,7 +3303,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         true; "nexthop_matches_v4")]
@@ -3240,7 +3311,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC2, },
         false; "metric_does_not_match_v4")]
@@ -3248,42 +3319,42 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         true; "metric_matches_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB2, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "subnet_does_not_match_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB3, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "subnet_prefix_len_does_not_match_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         true; "subnet_matches_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "interface_does_not_match_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         true; "interface_matches_v6")]
@@ -3291,7 +3362,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         false; "nexthop_absent_v6")]
@@ -3299,7 +3370,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
         false; "nexthop_does_not_match_v6")]
@@ -3307,7 +3378,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         true; "nexthop_matches_v6")]
@@ -3315,7 +3386,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC2, },
         false; "metric_does_not_match_v6")]
@@ -3323,7 +3394,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         true; "metric_matches_v6")]
@@ -3338,7 +3409,7 @@ mod tests {
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         &[
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC2, },
@@ -3349,7 +3420,7 @@ mod tests {
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
         },
         &[
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC2, },

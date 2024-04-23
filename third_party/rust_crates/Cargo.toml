@@ -145,7 +145,7 @@ memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
 mockall = "0.9"
 netlink-packet-core = "0.7.0"
-netlink-packet-route = "0.17.0"
+netlink-packet-route = "0.20.0"
 netlink-packet-sock-diag = "0.4.2"
 netlink-packet-utils = "0.5.2"
 netlink-packet-generic = "0.3.3"
@@ -375,6 +375,7 @@ pulldown-cmark = { path = "forks/pulldown-cmark" }
 # tokio to 1.x.
 rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
+netlink-packet-route = { path="forks/netlink-packet-route-0.20.0" }
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 zeroize = { path = "forks/zeroize" }
