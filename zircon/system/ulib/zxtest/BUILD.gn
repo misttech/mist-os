@@ -86,7 +86,7 @@ zxtest_deps = [
 if (is_mistos && is_kernel) {
   zxtest_public_deps += [
     "//zircon/kernel/lib/init",
-    "//zircon/kernel/lib/mist-os/util",
+    "//zircon/kernel/lib/mistos/util",
   ]
 
   zxtest_headers -= [ "include/zxtest/cpp/zxtest.h" ]
