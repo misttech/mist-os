@@ -1,0 +1,63 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# We define a translation unit per (src, dest) storage type pair, which
+# parametrize the tests for the copy APIs. The number of test cases is subject
+# to combinatorial explosion and in putting all such cases in a single TU we
+# see a significant build bottleneck arise, as well as stack overflow for
+# certain instrumentation and optimization levels (due to the global
+# constructors defined by the zxtest framework).
+#
+# For each storage type, we expect <type>TestTraits to coincide with the name
+# of its associated test traits type.
+src_storage_types = [
+  #"String",
+  "ByteSpan",
+  "FblByteArray",
+  "Vmo",
+
+  #"UnownedVmo",
+  #"MapOwnedVmo",
+  #"MapUnownedVmo",
+]
+
+# Subtract the non-extensible types.
+dest_storage_types = src_storage_types - [
+                       #"String",
+                       "ByteSpan",
+                     ]
+copy_test_deps = []
+foreach(src, src_storage_types) {
+  foreach(dest, dest_storage_types) {
+    source_set_name = "copy_tests.${src}-to-${dest}"
+    source_set(source_set_name) {
+      sources = [ "copy-tests.cc" ]
+      deps = [
+        "//zircon/kernel/lib/mistos/zbitl",
+        "//zircon/system/ulib/zxtest:zxtest-mistos",
+      ]
+      defines = [
+        "SRC_STORAGE_TYPE=${src}",
+        "DEST_STORAGE_TYPE=${dest}",
+      ]
+    }
+    copy_test_deps += [ ":${source_set_name}" ]
+  }
+}
+
+source_set("tests") {
+  sources = [
+    "array-tests.cc",
+    "span-tests.cc",
+    "tests.cc",
+    "vmo-tests.cc",
+  ]
+  deps = [
+    "//zircon/kernel/lib/mistos/zbitl",
+    "//zircon/system/ulib/zxtest:zxtest-mistos",
+  ]
+
+  deps += copy_test_deps
+}
