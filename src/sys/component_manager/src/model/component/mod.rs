@@ -513,9 +513,7 @@ impl ComponentInstance {
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
-                if let Err(_) =
-                    child_dict_entries.insert(key.clone(), Capability::Router(Box::new(router)))
-                {
+                if let Err(_) = child_dict_entries.insert(key.clone(), router.into()) {
                     return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
                 }
             }

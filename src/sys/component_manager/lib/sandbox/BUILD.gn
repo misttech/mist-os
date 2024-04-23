@@ -26,7 +26,6 @@ rustc_library("sandbox") {
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:scopeguard",
@@ -46,7 +45,6 @@ rustc_library("sandbox") {
   ]
 
   sources = [
-    "src/any.rs",
     "src/capability.rs",
     "src/data.rs",
     "src/dict.rs",

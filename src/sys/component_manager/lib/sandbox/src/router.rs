@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AnyCapability, Capability, CapabilityTrait, Dict};
+use crate::{Capability, CapabilityTrait, Dict};
 use async_trait::async_trait;
 use bedrock_error::BedrockError;
 use cm_types::Availability;
@@ -62,12 +62,6 @@ impl fmt::Debug for Router {
 // TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability
 impl CapabilityTrait for Router {}
 
-impl From<Router> for Capability {
-    fn from(router: Router) -> Self {
-        Capability::Router(Box::new(router))
-    }
-}
-
 /// Syntax sugar within the framework to express custom routing logic using a function
 /// that takes a request and returns such future.
 impl<F> Routable for F
@@ -111,10 +105,6 @@ impl Router {
         Router::new(error)
     }
 
-    pub fn from_any(any: AnyCapability) -> Router {
-        *any.into_any().downcast::<Router>().unwrap()
-    }
-
     /// Obtain a capability from this router, following the description in `request`.
     pub async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         self.routable.route(request).await
@@ -131,7 +121,7 @@ impl From<Router> for fsandbox::Capability {
 impl Routable for Capability {
     async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         match self.clone() {
-            Capability::Router(router) => Router::from_any(router).route(request).await,
+            Capability::Router(router) => router.route(request).await,
             capability => Ok(capability),
         }
     }

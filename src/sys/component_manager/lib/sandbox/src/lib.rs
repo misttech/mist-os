@@ -4,7 +4,6 @@
 
 //! Component sandbox traits and capability types.
 
-mod any;
 mod capability;
 mod data;
 mod dict;
@@ -17,7 +16,6 @@ mod router;
 mod sender;
 mod unit;
 
-pub use self::any::{AnyCapability, AnyCast, ErasedCapability};
 pub use self::capability::{Capability, CapabilityTrait, ConversionError, RemoteError};
 pub use self::data::Data;
 pub use self::dict::{Dict, DictEntries, Key as DictKey};

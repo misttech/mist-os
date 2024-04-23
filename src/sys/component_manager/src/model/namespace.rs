@@ -25,7 +25,7 @@ use {
         channel::mpsc::{unbounded, UnboundedSender},
         FutureExt, StreamExt,
     },
-    sandbox::{Capability, Dict, Directory, Open, Request, Router, WeakComponentToken},
+    sandbox::{Capability, Dict, Directory, Open, Request, WeakComponentToken},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -321,7 +321,7 @@ fn service_or_protocol_use(
                     component.moniker, capability
                 );
             };
-            let router = Router::from_any(router.clone());
+            let router = router.clone();
             let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
 
             // When there are router errors, they are sent to the error handler, which reports

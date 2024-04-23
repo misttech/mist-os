@@ -115,7 +115,7 @@ impl RouterExt for Router {
                     Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, dict))
                 }
                 Capability::Router(r) => {
-                    let router = Router::from_any(r.clone());
+                    let router = r.clone();
                     let request = Request {
                         target: weak_component.clone(),
                         // Use the weakest availability, so that it gets immediately upgraded to

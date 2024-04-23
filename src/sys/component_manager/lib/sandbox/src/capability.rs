@@ -1,7 +1,6 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{AnyCapability, AnyCast};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
 use fuchsia_zircon::{AsHandleRef, HandleRef};
@@ -44,10 +43,7 @@ pub enum Capability {
     Data(crate::Data),
     Directory(crate::Directory),
     OneShotHandle(crate::OneShotHandle),
-    // The Router type is defined outside of this crate, so it needs to still be an
-    // AnyCapability.
-    // TODO(b/324870669): Move Router to the bedrock library.
-    Router(AnyCapability),
+    Router(crate::Router),
 }
 
 impl Capability {
@@ -104,9 +100,9 @@ impl From<Capability> for fsandbox::Capability {
 impl TryFrom<fsandbox::Capability> for Capability {
     type Error = RemoteError;
 
-    /// Converts the FIDL capability back to a Rust AnyCapability.
+    /// Converts the FIDL capability back to a Rust Capability.
     ///
-    /// In most cases, the AnyCapability was previously inserted into the registry when it
+    /// In most cases, the Capability was previously inserted into the registry when it
     /// was converted to a FIDL capability. This method takes it out of the registry.
     fn try_from(capability: fsandbox::Capability) -> Result<Self, Self::Error> {
         match capability {
@@ -152,9 +148,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
 }
 
 /// The capability trait, implemented by all capabilities.
-pub trait CapabilityTrait:
-    AnyCast + Into<fsandbox::Capability> + Clone + Debug + Send + Sync
-{
+pub trait CapabilityTrait: Into<fsandbox::Capability> + Clone + Debug + Send + Sync {
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()
     }
