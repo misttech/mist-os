@@ -7,4 +7,3 @@ include /src/connectivity/wlan/OWNERS
 include /src/starnix/OWNERS
 include /third_party/rust_crates/vendor/netlink-packet-core-0.7.0/OWNERS
 include /third_party/rust_crates/vendor/netlink-packet-generic-0.3.3/OWNERS
-include /third_party/rust_crates/vendor/netlink-packet-route-0.17.0/OWNERS

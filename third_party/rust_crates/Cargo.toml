@@ -376,6 +376,7 @@ pulldown-cmark = { path = "forks/pulldown-cmark" }
 rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
 netlink-packet-route = { path="forks/netlink-packet-route-0.20.0" }
+netlink-packet-utils = { path="forks/netlink-packet-utils-0.5.2" }
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 zeroize = { path = "forks/zeroize" }
