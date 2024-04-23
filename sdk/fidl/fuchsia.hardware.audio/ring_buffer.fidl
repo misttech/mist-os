@@ -57,10 +57,10 @@ type RingBufferProperties = table {
     /// abstracts. External delay must be taken into account when precisely synchronizing
     /// presentation across multiple entities (e.g. devices).
     /// If not included `external_delay` is unknown.
-    //
-    // # Deprecation
-    //
-    // Not needed anymore since the functionality is available via `WatchDelayInfo` below.
+    ///
+    /// # Deprecation
+    ///
+    /// Not needed anymore since the functionality is available via `WatchDelayInfo` below.
     @available(deprecated=9, removed=HEAD)
     1: external_delay zx.Duration;
 
@@ -93,10 +93,10 @@ type RingBufferProperties = table {
     /// delays added by any software interfacing with the audio hardware do not occur under most
     /// scenarios, and must detect and report underruns. How an underrun is reported is not defined
     /// in this API.
-    //
-    // # Deprecation
-    //
-    // Not needed anymore since the functionality is available via `driver_transfer_bytes` below.
+    ///
+    /// # Deprecation
+    ///
+    /// Not needed anymore since the functionality is available via `driver_transfer_bytes` below.
     @available(deprecated=9, removed=HEAD)
     2: fifo_depth uint32;
 
