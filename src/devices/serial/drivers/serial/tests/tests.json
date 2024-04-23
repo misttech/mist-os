@@ -11,13 +11,6 @@
             "fuchsia.BIND_PROTOCOL": "fuchsia.serial.BIND_PROTOCOL.IMPL"
         },
         "expected": "match",
-        "name": "serial Banjo"
-    },
-    {
-        "device": {
-            "fuchsia.hardware.serialimpl.Service": "fuchsia.hardware.serialimpl.Service.DriverTransport"
-        },
-        "expected": "match",
-        "name": "serial FIDL"
+        "name": "serial"
     }
 ]
