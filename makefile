@@ -39,7 +39,7 @@ it: info gen ## Build multiboot(bootloader) and kernel zircon binary image(zbi)
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
 .PHONY: it
 
-all: gen ## Build all targets
+all: info gen ## Build all targets
 	$(NOECHO)$(NINJA) -C $(OUTPUT)
 .PHONY: all
 
@@ -49,8 +49,7 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 	-z $(OUTPUT)/kernel_x64/kernel.zbi -c "kernel.shell=true" -- -no-reboot
 .PHONY: rain
 
-test: ## Run test ZBI with KASAN enabled
-	$(NOECHO)echo "target_os=\"mistos\"" > $(OUTPUT)/args.gn
+test: info gen ## Run test ZBI with KASAN enabled
 	$(NOECHO)echo "register_zxtest=true" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-zxtest.zbi
