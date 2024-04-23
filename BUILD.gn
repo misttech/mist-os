@@ -23,5 +23,20 @@ group("boot_tests") {
 ###
 group("default") {
   testonly = true
-  deps = [ ":boot_tests" ]
+  deps = [ "//bundles/boot_tests" ]
+}
+
+# A GN pool matching the special Ninja 'console' pool. Any action() that
+# uses this pool will be able to send its stdout/stderr directly to the
+# output terminal, instead of being buffered by Ninja until the command
+# completes.
+#
+# This is very useful for long-running commands, e.g. bazel build invocations
+# that can take several dozen seconds to complete, or any other command that
+# prints a _lot_ of output, because our infra bots will timeout if Ninja tries
+# to print too much data at once after command completion for some undetermined
+# reason.
+#
+pool("console") {
+  depth = 1
 }

@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -9,7 +10,7 @@ group("boot_tests") {
   testonly = true
 
   # only define boot_tests if a board is defined.
-  if (has_board) {
+  if (has_board || is_mistos) {
     deps = [ "//bundles/bringup:boot_tests" ]
   }
 }

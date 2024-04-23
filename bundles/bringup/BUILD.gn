@@ -1,8 +1,10 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-assert(is_fuchsia, "These can only be defined in the default toolchain")
+assert(is_fuchsia || is_mistos,
+       "These can only be defined in the default toolchain")
 
 # WARNING: Known to infrastructure
 # DEPRECATED! DO NOT ADD TO THIS GROUP
@@ -26,4 +28,13 @@ group("boot_tests") {
     "//zircon/system/ulib/c:boot_tests",
     "//zircon/system/utest/core:boot_tests",
   ]
+
+  if (is_mistos) {
+    deps -= [
+      "//src/bringup/lib:boot_tests",
+      "//src/lib:boot_tests",
+      "//zircon/system/ulib/c:boot_tests",
+      "//zircon/system/utest/core:boot_tests",
+    ]
+  }
 }
