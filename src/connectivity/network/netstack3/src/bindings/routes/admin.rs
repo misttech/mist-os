@@ -93,6 +93,20 @@ pub(crate) async fn serve_route_table_v4(
                 let set_request_stream = route_set.into_stream()?;
                 spawner.spawn(serve_user_route_set::<Ipv4>(ctx.clone(), set_request_stream));
             }
+            fnet_routes_admin::RouteTableV4Request::GetTableId { responder: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
+            fnet_routes_admin::RouteTableV4Request::Detach { control_handle: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
+            fnet_routes_admin::RouteTableV4Request::Remove { responder: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
+            fnet_routes_admin::RouteTableV4Request::GetAuthorizationForRouteTable {
+                responder: _,
+            } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table")
+            }
         };
     }
 
@@ -114,6 +128,20 @@ pub(crate) async fn serve_route_table_v6(
             } => {
                 let set_request_stream = route_set.into_stream()?;
                 spawner.spawn(serve_user_route_set::<Ipv6>(ctx.clone(), set_request_stream));
+            }
+            fnet_routes_admin::RouteTableV6Request::GetTableId { responder: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
+            fnet_routes_admin::RouteTableV6Request::Detach { control_handle: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
+            fnet_routes_admin::RouteTableV6Request::Remove { responder: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
+            fnet_routes_admin::RouteTableV6Request::GetAuthorizationForRouteTable {
+                responder: _,
+            } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
             }
         };
     }

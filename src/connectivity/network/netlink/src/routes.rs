@@ -1564,6 +1564,11 @@ mod tests {
                             watcher,
                             control_handle: _,
                         } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                        fnet_routes::StateV4Request::GetRuleWatcherV4 {
+                            options: _,
+                            watcher: _,
+                            control_handle: _,
+                        } => todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher"),
                     },
                     |StateRequestWrapper { request }| match request.expect("watcher stream error") {
                         fnet_routes::StateV6Request::GetWatcherV6 {
@@ -1571,6 +1576,11 @@ mod tests {
                             watcher,
                             control_handle: _,
                         } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                        fnet_routes::StateV6Request::GetRuleWatcherV6 {
+                            options: _,
+                            watcher: _,
+                            control_handle: _,
+                        } => todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher"),
                     },
                 );
                 wrapper

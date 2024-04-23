@@ -138,9 +138,30 @@ func (r *routeSet[A]) close() {
 	r.ns.DelRouteSet(r.id)
 }
 
+type routesAdminMainRouteTable struct{}
+
+func (impl *routesAdminMainRouteTable) GetTableId(ctx_ fidl.Context) (uint32, error) {
+	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+}
+
+func (impl *routesAdminMainRouteTable) Detach(ctx_ fidl.Context) error {
+	return nil
+}
+
+func (impl *routesAdminMainRouteTable) Remove(ctx_ fidl.Context) (routesAdmin.BaseRouteTableRemoveResult, error) {
+	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+}
+
+func (impl *routesAdminMainRouteTable) GetAuthorizationForRouteTable(ctx_ fidl.Context) (uint32, zx.Event, error) {
+	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+}
+
+var _ routesAdmin.BaseRouteTableWithCtx = (*routesAdminMainRouteTable)(nil)
+
 var _ routesAdmin.RouteTableV4WithCtx = (*routesAdminRouteTableV4Impl)(nil)
 
 type routesAdminRouteTableV4Impl struct {
+	routesAdminMainRouteTable
 	ns *Netstack
 }
 
@@ -178,6 +199,7 @@ func bindV4RouteSet(ch zx.Channel, rs routeSet[fuchsianet.Ipv4Address]) error {
 var _ routesAdmin.RouteTableV6WithCtx = (*routesAdminRouteTableV6Impl)(nil)
 
 type routesAdminRouteTableV6Impl struct {
+	routesAdminMainRouteTable
 	ns *Netstack
 }
 

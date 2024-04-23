@@ -664,12 +664,14 @@ func Main() {
 	{
 		stubV4 := routesAdmin.RouteTableV4WithCtxStub{
 			Impl: &routesAdminRouteTableV4Impl{
-				ns: ns,
+				routesAdminMainRouteTable: routesAdminMainRouteTable{},
+				ns:                        ns,
 			},
 		}
 		stubV6 := routesAdmin.RouteTableV6WithCtxStub{
 			Impl: &routesAdminRouteTableV6Impl{
-				ns: ns,
+				routesAdminMainRouteTable: routesAdminMainRouteTable{},
+				ns:                        ns,
 			},
 		}
 		componentCtx.OutgoingService.AddService(

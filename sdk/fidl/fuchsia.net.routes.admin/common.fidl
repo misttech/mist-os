@@ -4,6 +4,10 @@
 
 library fuchsia.net.routes.admin;
 
+using fuchsia.net.interfaces.admin;
+using fuchsia.net.routes;
+using zx;
+
 /// Error type returned when failing to authenticate an interface for a route
 /// set.
 type AuthenticateForInterfaceError = flexible enum {
@@ -43,4 +47,88 @@ type RouteSetError = flexible enum {
     /// The route set attempted to add/remove a route that was missing a
     /// metric.
     MISSING_METRIC = 7;
+};
+
+/// Common base for `RouteTable` protocol that is IP version agnostic. This
+/// helps reduce FIDL duplication.
+closed protocol BaseRouteTable {
+    /// Gets the table ID for this table.
+    strict GetTableId() -> (struct {
+        table_id fuchsia.net.routes.TableId;
+    });
+
+    /// Detaches the lifetime of the route table from the lifetime of the
+    /// client end of the channel.
+    ///
+    /// After this method is called, the route table will not be removed
+    /// if the client end is closed. It's a no-op if called on the main table.
+    strict Detach();
+
+    /// Removes the route table explicitly.
+    ///
+    /// This method cannot be called on the main table, an error will be
+    /// returned if called. The server will close the channel after this
+    /// method successfully returns.
+    strict Remove() -> () error flexible enum : uint32 {
+        INVALID_OP_ON_MAIN_TABLE = 1;
+    };
+
+    /// Gets an authentication credential for this table.
+    ///
+    /// The credential contains a [`zx::handle::EVENT`], whose duplicate is
+    /// held by the server. This credential can be passed into
+    /// `fuchsia.net.routes.admin` API calls to prove ownership of this route
+    /// table. The `EVENT` is stable throughout the lifetime of the route table.
+    /// Clients may duplicate this `EVENT` to make multiple API calls, or
+    /// transfer the `EVENT` to other clients.
+    ///
+    /// - response `table_id` the table ID of the table.
+    /// - response `token` the kernel event object used to authenticate.
+    strict GetAuthorizationForRouteTable() -> (@generated_name("GrantForRouteTableAuthorization") resource struct {
+        /// The ID of the table this credential is authenticating.
+        table_id fuchsia.net.routes.TableId;
+        /// The `EVENT` providing authentication over this route table.
+        token zx.Handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
+    });
+};
+
+/// Common base for `RuleSet` protocol that is IP version agnostic. This
+/// helps reduce FIDL duplication.
+closed protocol BaseRuleSet {
+    /// Authenticates for a route table that will be used in an action.
+    strict AuthenticateForRouteTable(@generated_name("ProofOfRouteTableAuthorization") resource struct {
+        table fuchsia.net.routes.TableId;
+        token zx.Handle:<EVENT>;
+    }) -> () error RuleSetError;
+
+    /// Authenticates for an interface that will be used in a selector.
+    strict AuthenticateForInterface(resource struct {
+        credential fuchsia.net.interfaces.admin.ProofOfInterfaceAuthorization;
+    }) -> () error RuleSetError;
+
+    /// Removes a rule from this rule set.
+    ///
+    /// If the client tries to remove from an index that does not have a rule,
+    /// the error `RULE_DOES_NOT_EXIST` will be returned.
+    ///
+    /// + request `index` the index of the rule.
+    strict RemoveRule(struct {
+        index fuchsia.net.routes.RuleIndex;
+    }) -> () error RuleSetError;
+};
+
+/// Possible errors for operating the rule set.
+type RuleSetError = flexible enum : uint32 {
+    /// Cannot perform the authentication for an interface or a route table.
+    BAD_AUTHENTICATION = 1;
+    /// Tried to install a rule that mentions a route table or an interface that
+    /// this `RuleSet` was never authorized.
+    UNAUTHENTICATED = 2;
+    /// The action is invalid, for example, the action contains an invalid route
+    /// table.
+    INVALID_ACTION = 3;
+    /// Tried to install a rule at an index that already has an existing rule.
+    RULE_ALREADY_EXISTS = 4;
+    /// Tried to remove a rule at an index that does not have an existing rule.
+    RULE_DOES_NOT_EXIST = 5;
 };

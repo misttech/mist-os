@@ -97,6 +97,11 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
                 Box::into_pin(event_stream),
                 watcher,
             ))),
+            fnet_routes::StateV4Request::GetRuleWatcherV4 {
+                options: _,
+                watcher: _,
+                control_handle: _,
+            } => todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher"),
         },
         |GetWatcherInputs { request, event_stream }| match request
             .expect("failed to receive `GetWatcherV6` request")
@@ -109,6 +114,11 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
                 Box::into_pin(event_stream),
                 watcher,
             ))),
+            fnet_routes::StateV6Request::GetRuleWatcherV6 {
+                options: _,
+                watcher: _,
+                control_handle: _,
+            } => todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher"),
         },
     );
     watcher_fut.await
@@ -180,12 +190,14 @@ pub mod admin {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
+                        req => unreachable!("unexpected request: {:?}", req),
                     },
                     |In(item)| match item.expect("set provider FIDL error") {
                         fnet_routes_admin::RouteTableV6Request::NewRouteSet {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
+                        req => unreachable!("unexpected request: {:?}", req),
                     },
                 );
                 route_set_server_end.into_stream().expect("into stream")
@@ -218,12 +230,14 @@ pub mod admin {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
+                        req => unreachable!("unexpected request: {:?}", req),
                     },
                     |In(item)| match item.expect("set provider FIDL error") {
                         fnet_routes_admin::RouteTableV6Request::NewRouteSet {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
+                        req => unreachable!("unexpected request: {:?}", req),
                     },
                 );
                 serve_noop_route_set::<I>(route_set_server_end).await;
