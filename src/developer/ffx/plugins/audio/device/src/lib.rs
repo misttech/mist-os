@@ -172,6 +172,28 @@ impl FfxMain for DeviceTool {
 
                 device_set(device_control, set_command, writer).await
             }
+            SubCommand::Start(_) => {
+                let device_control = connect::connect_device_control(
+                    &self.dev_class,
+                    self.control_creator.as_ref(),
+                    selector,
+                )
+                .await?;
+
+                let start_time = device_control.start().await?;
+                writeln!(writer, "Started at {}.", start_time).bug_context("Failed to write result")
+            }
+            SubCommand::Stop(_) => {
+                let device_control = connect::connect_device_control(
+                    &self.dev_class,
+                    self.control_creator.as_ref(),
+                    selector,
+                )
+                .await?;
+
+                let stop_time = device_control.stop().await?;
+                writeln!(writer, "Stopped at {}.", stop_time).bug_context("Failed to write result")
+            }
         }
     }
 }

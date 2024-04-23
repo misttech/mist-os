@@ -82,6 +82,8 @@ pub enum SubCommand {
     Unmute(UnmuteCommmand),
     Agc(AgcCommand),
     Set(SetCommand),
+    Start(StartCommand),
+    Stop(StopCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -242,6 +244,14 @@ pub struct SetDaiFormatCommand {
     )]
     pub element_id: Option<fadevice::ElementId>,
 }
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "start", description = "Start device hardware.")]
+pub struct StartCommand {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "stop", description = "Stop device hardware.")]
+pub struct StopCommand {}
 
 fn string_to_enable(value: &str) -> Result<bool, String> {
     if value == "on" {
