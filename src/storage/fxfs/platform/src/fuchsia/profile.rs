@@ -328,11 +328,6 @@ impl ProfileState {
         Self { recording: None, replay: None }
     }
 
-    /// Returns true if currently recording or replaying.
-    pub fn busy(&self) -> bool {
-        self.recording.is_some() || self.replay.is_some()
-    }
-
     /// Creates a new recording and returns the `Recorder` object to record to. The recording starts
     /// shutdown when the associated `Recorder` is dropped, and shutdown is completed when
     /// `stop_profiler()` is called. Stops any recording currently in progress.

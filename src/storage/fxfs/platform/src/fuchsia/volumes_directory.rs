@@ -285,6 +285,15 @@ impl VolumesDirectory {
         Err(zx::Status::NOT_FOUND)
     }
 
+    async fn finish_profiling(self: &Arc<Self>) {
+        let volumes = self.mounted_volumes.lock().await;
+        let mut state = self.profiling_state.lock().await;
+        for (_, (_, volume_and_root)) in &*volumes {
+            volume_and_root.volume().finish_profiling().await;
+        }
+        *state = None;
+    }
+
     pub async fn record_or_replay_profile(
         self: Arc<Self>,
         name: String,
@@ -308,12 +317,7 @@ impl VolumesDirectory {
             let this = self.clone();
             let timer_task = fasync::Task::spawn(async move {
                 fasync::Timer::new(fasync::Duration::from_seconds(duration_secs.into())).await;
-                let volumes = this.mounted_volumes.lock().await;
-                let mut state = this.profiling_state.lock().await;
-                for (_, (_, volume_and_root)) in &*volumes {
-                    volume_and_root.volume().stop_profiler();
-                }
-                *state = None;
+                this.finish_profiling().await;
             });
             *state = Some((name, timer_task));
             Ok(())
@@ -389,7 +393,7 @@ impl VolumesDirectory {
 
     /// Terminates all opened volumes.
     pub async fn terminate(self: &Arc<Self>) {
-        *self.profiling_state.lock().await = None;
+        self.finish_profiling().await;
         self.lock().await.terminate().await
     }
 
@@ -1707,6 +1711,13 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_profile_start() {
+        const PREMOUNT_BLOB: &str = "premount_blob";
+        const PREMOUNT_NOBLOB: &str = "premount_noblob";
+        const LIVE_BLOB: &str = "live_blob";
+        const LIVE_NOBLOB: &str = "live_noblob";
+
+        const RECORDING_NAME: &str = "foo";
+
         let device = {
             let device = DeviceHolder::new(FakeDevice::new(8192, 512));
             let filesystem = FxFilesystem::new_empty(device).await.unwrap();
@@ -1717,13 +1728,10 @@ mod tests {
             )
             .await
             .unwrap();
-            volumes_directory.create_and_mount_volume("premount_blob", None, true).await.unwrap();
-            volumes_directory
-                .create_and_mount_volume("premount_noblob", None, false)
-                .await
-                .unwrap();
-            volumes_directory.create_and_mount_volume("live_blob", None, true).await.unwrap();
-            volumes_directory.create_and_mount_volume("live_noblob", None, false).await.unwrap();
+            volumes_directory.create_and_mount_volume(PREMOUNT_BLOB, None, true).await.unwrap();
+            volumes_directory.create_and_mount_volume(PREMOUNT_NOBLOB, None, false).await.unwrap();
+            volumes_directory.create_and_mount_volume(LIVE_BLOB, None, true).await.unwrap();
+            volumes_directory.create_and_mount_volume(LIVE_NOBLOB, None, false).await.unwrap();
 
             volumes_directory.terminate().await;
             std::mem::drop(volumes_directory);
@@ -1732,7 +1740,51 @@ mod tests {
         };
 
         device.ensure_unique();
+        device.reopen(false);
+        let device = {
+            let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
 
+            // Premount two volumes.
+            let _premount_blob = volumes_directory
+                .mount_volume(PREMOUNT_BLOB, None, true)
+                .await
+                .expect("Reopen volume");
+            let _premount_noblob = volumes_directory
+                .mount_volume(PREMOUNT_NOBLOB, None, false)
+                .await
+                .expect("Reopen volume");
+
+            // Start the recording, let it run a really long time, it doesn't need to end for this
+            // test. If it does wait this long then it should trigger test timeouts.
+            volumes_directory
+                .clone()
+                .record_or_replay_profile(RECORDING_NAME.to_owned(), 600)
+                .await
+                .expect("Recording");
+
+            // Live mount two volumes.
+            let _live_blob =
+                volumes_directory.mount_volume(LIVE_BLOB, None, true).await.expect("Reopen volume");
+            let _live_noblob = volumes_directory
+                .mount_volume(LIVE_NOBLOB, None, false)
+                .await
+                .expect("Reopen volume");
+
+            // Don't explicitly stop the recording, ensure that terminate is able to progress.
+            volumes_directory.terminate().await;
+            std::mem::drop(volumes_directory);
+            filesystem.close().await.expect("Filesystem close");
+            filesystem.take_device().await
+        };
+
+        device.ensure_unique();
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
         let volumes_directory = VolumesDirectory::new(
@@ -1742,42 +1794,34 @@ mod tests {
         )
         .await
         .unwrap();
-
-        // Premount two volumes.
-        let premount_blob = volumes_directory
-            .mount_volume("premount_blob", None, true)
+        let _premount_blob =
+            volumes_directory.mount_volume(PREMOUNT_BLOB, None, true).await.expect("Reopen volume");
+        let _premount_noblob = volumes_directory
+            .mount_volume(PREMOUNT_NOBLOB, None, false)
             .await
             .expect("Reopen volume");
-        let premount_noblob = volumes_directory
-            .mount_volume("premount_noblob", None, false)
-            .await
-            .expect("Reopen volume");
+        let _live_blob =
+            volumes_directory.mount_volume(LIVE_BLOB, None, true).await.expect("Reopen volume");
+        let _live_noblob =
+            volumes_directory.mount_volume(LIVE_NOBLOB, None, false).await.expect("Reopen volume");
 
-        // Start the recording, let it run a really long time, it doesn't need to end for this test.
-        // If it does wait this long then it should trigger test timeouts.
+        // Verify which recordings ran based on the saved recordings.
         volumes_directory
-            .clone()
-            .record_or_replay_profile("foo".to_owned(), 600)
+            .delete_profile(PREMOUNT_BLOB, RECORDING_NAME)
             .await
-            .expect("Recording");
-
-        // Live mount two volumes.
-        let live_blob =
-            volumes_directory.mount_volume("live_blob", None, true).await.expect("Reopen volume");
-        let live_noblob = volumes_directory
-            .mount_volume("live_noblob", None, false)
+            .expect("Finding profile to delete.");
+        volumes_directory
+            .delete_profile(PREMOUNT_NOBLOB, RECORDING_NAME)
             .await
-            .expect("Reopen volume");
-
-        // Only activated for blob volumes.
-        assert!(premount_blob.into_volume().profile_state_mut().busy());
-        assert!(live_blob.into_volume().profile_state_mut().busy());
-        assert!(!premount_noblob.into_volume().profile_state_mut().busy());
-        assert!(!live_noblob.into_volume().profile_state_mut().busy());
-
-        volumes_directory.terminate().await;
-        std::mem::drop(volumes_directory);
-        filesystem.close().await.expect("Filesystem close");
+            .expect_err("Profile should not exist");
+        volumes_directory
+            .delete_profile(LIVE_BLOB, RECORDING_NAME)
+            .await
+            .expect("Finding profile to delete.");
+        volumes_directory
+            .delete_profile(LIVE_NOBLOB, RECORDING_NAME)
+            .await
+            .expect_err("Profile should not exist");
     }
 
     #[fuchsia::test(threads = 10)]
@@ -1799,7 +1843,9 @@ mod tests {
             .record_or_replay_profile("foo".to_owned(), 0)
             .await
             .expect("Recording");
-        while volume.volume().profile_state_mut().busy() {
+
+        // Delete will succeed once the profile is completed.
+        while volumes_directory.delete_profile("foo", "foo").await.is_err() {
             fasync::Timer::new(Duration::from_millis(10)).await;
         }
 
@@ -1840,11 +1886,18 @@ mod tests {
             Status::NOT_FOUND
         );
 
-        // You can delete an in-flight profile, the file is created in a blocking method above and
-        // the recording will continue to run despite the file being unlinked.
+        // Deletion fails as the file is not visible until after the recording completes.
+        assert_eq!(
+            volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
+            Status::NOT_FOUND
+        );
+
+        volumes_directory.finish_profiling().await;
+
+        // Deletion should now succeed as the profile will be placed as part of `finish_profiling()`
         volumes_directory.delete_profile("foo", "foo").await.expect("Deleting");
 
-        // Second deletion should fail with not found error.
+        // Deletion fails as the file shouldn't exist anymore.
         assert_eq!(
             volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
             Status::NOT_FOUND
