@@ -5,7 +5,6 @@
 package bazel_docgen
 
 import (
-	tmpls "go.fuchsia.dev/fuchsia/tools/bazel-docgen/templates"
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 	"io"
 	"text/template"
@@ -18,19 +17,19 @@ func NewMarkdownRenderer() MarkdownRenderer {
 }
 
 func (r MarkdownRenderer) RenderRuleInfo(rule *pb.RuleInfo, out io.Writer) error {
-	return render(rule, out, tmpls.NewRuleTemplate)
+	return render(rule, out, NewRuleTemplate)
 }
 
 func (r MarkdownRenderer) RenderProviderInfo(rule *pb.ProviderInfo, out io.Writer) error {
-	return render(rule, out, tmpls.NewProviderTemplate)
+	return render(rule, out, NewProviderTemplate)
 }
 
 func (r MarkdownRenderer) RenderStarlarkFunctionInfo(rule *pb.StarlarkFunctionInfo, out io.Writer) error {
-	return render(rule, out, tmpls.NewStarlarkFunctionTemplate)
+	return render(rule, out, NewStarlarkFunctionTemplate)
 }
 
 func (r MarkdownRenderer) RenderRepositoryRuleInfo(rule *pb.RepositoryRuleInfo, out io.Writer) error {
-	return render(rule, out, tmpls.NewRepositoryRuleTemplate)
+	return render(rule, out, NewRepositoryRuleTemplate)
 }
 
 func render(v interface{}, out io.Writer, templateFunc func() (*template.Template, error)) error {

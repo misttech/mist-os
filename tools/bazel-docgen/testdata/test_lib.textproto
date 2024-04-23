@@ -1,14 +1,36 @@
 rule_info {
-  rule_name: "empty"
-  doc_string: "Just an empty rule"
+  rule_name: "example_rule"
+  doc_string: "The description of a basic rule"
   attribute {
     name: "name"
     doc_string: "A unique name for this target."
     type: NAME
     mandatory: true
   }
+  attribute {
+    name: "deps"
+    doc_string: "the dependencies."
+    type: LABEL_LIST
+    default_value: "[]"
+  }
+  attribute {
+    name: "src"
+    doc_string: "A source file"
+    type: LABEL
+    mandatory: true
+  }
+  attribute {
+    name: "count"
+    type: INT
+    default_value: "0"
+  }
+  attribute {
+    name: "mapping"
+    type: STRING_DICT
+    default_value: "{}"
+  }
   origin_key {
-    name: "empty"
+    name: "example_rule"
     file: "//tools/bazel-docgen/testdata/foo:foo_internal.bzl"
   }
 }

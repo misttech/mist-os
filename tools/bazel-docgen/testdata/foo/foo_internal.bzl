@@ -2,12 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-def _empty_impl(_ctx):
+def _example_rule_impl(_ctx):
     return []
 
-empty = rule(
-    implementation = _empty_impl,
-    doc = "Just an empty rule",
+example_rule = rule(
+    implementation = _example_rule_impl,
+    doc = "The description of a basic rule",
+    attrs = {
+        "deps": attr.label_list(mandatory = False, doc = "the dependencies."),
+        "src": attr.label(doc = "A source file", mandatory = True, allow_single_file = True),
+        "count": attr.int(),
+        "mapping": attr.string_dict(),
+    },
 )
 
 def _empty_repo_impl(_ctx):

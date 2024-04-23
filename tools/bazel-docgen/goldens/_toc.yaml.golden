@@ -5,8 +5,8 @@ toc:
 - section:
   - title: Rules
     section:
-    - title: empty
-      path: rule_empty.md
+    - title: example_rule
+      path: rule_example_rule.md
   - title: Providers
     section:
     - title: FooInfo
