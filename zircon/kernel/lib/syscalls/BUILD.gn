@@ -20,7 +20,7 @@ zx_library("syscalls") {
 
   # Depend on the files generated from the syscall IDL.
   if (is_mistos) {
-    public_deps = [ "//zircon/kernel/lib/mist-os/vdso:private" ]
+    public_deps = [ "//zircon/kernel/lib/mistos/vdso:private" ]
   } else {
     public_deps = [ "//zircon/vdso:private" ]
   }
@@ -117,7 +117,7 @@ if (is_mistos) {
       "//zircon/kernel/lib/io",
       "//zircon/kernel/lib/kpci",
       "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/mist-os/userabi:headers",
+      "//zircon/kernel/lib/mistos/userabi:headers",
       "//zircon/kernel/object",
     ]
     if (current_cpu == "x64") {
@@ -141,6 +141,6 @@ source_set("dispatch") {
 
   if (is_mistos) {
     deps -= [ "//zircon/kernel/lib/userabi:headers" ]
-    deps += [ "//zircon/kernel/lib/mist-os/userabi:headers" ]
+    deps += [ "//zircon/kernel/lib/mistos/userabi:headers" ]
   }
 }

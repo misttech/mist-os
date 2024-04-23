@@ -239,7 +239,7 @@ source_set("syscall") {
   ]
 
   if (is_mistos) {
-    deps += [ "//zircon/kernel/lib/mist-os/syscalls" ]
+    deps += [ "//zircon/kernel/lib/mistos/syscalls" ]
   }
 }
 

@@ -73,7 +73,7 @@ zx_library("vm") {
 
   if (is_mistos) {
     deps -= [ "//zircon/kernel/lib/userabi" ]
-    deps += [ "//zircon/kernel/lib/mist-os/userabi" ]
+    deps += [ "//zircon/kernel/lib/mistos/userabi" ]
   }
 
   defines = [
