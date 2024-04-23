@@ -59,7 +59,6 @@ _tests = [
   {
     name = "input_latency_benchmark"
     expected_metric_filenames = [ "fuchsia.input_latency.simplest_app.txt" ]
-    transport = "sl4f"
   },
   {
     name = "perf_publish_example"

@@ -16,6 +16,7 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
+  # TODO(b/335305248): Remove sl4f impl.
   python_mobly_test("user_input_test_sl4f") {
     main_source = "test_user_input.py"
     libraries = [
@@ -26,11 +27,22 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
+  python_mobly_test("user_input_test_fc") {
+    main_source = "test_user_input.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    transport = "fuchsia-controller"
+    environments = [ emu_env ]
+  }
+
   # Group containing all of the UI affordance functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
       ":screenshot_test_ffx($host_toolchain)",
+      ":user_input_test_fc($host_toolchain)",
       ":user_input_test_sl4f($host_toolchain)",
     ]
   }

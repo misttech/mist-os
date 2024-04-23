@@ -24,7 +24,8 @@ class UserInputSL4FTests(unittest.TestCase):
 
     def test_tap_only_required(self) -> None:
         """Test for UserInput.tap() method with only required params."""
-        self.user_input_obj.tap(location=ui_custom_types.Coordinate(x=1, y=2))
+        touch_device = self.user_input_obj.create_touch_device()
+        touch_device.tap(location=ui_custom_types.Coordinate(x=1, y=2))
         self.sl4f_obj.run.assert_called_once_with(
             method="input_facade.Tap",
             params={
@@ -33,17 +34,19 @@ class UserInputSL4FTests(unittest.TestCase):
                 "width": user_input.DEFAULTS["TOUCH_SCREEN_SIZE"].width,
                 "height": user_input.DEFAULTS["TOUCH_SCREEN_SIZE"].height,
                 "tap_event_count": user_input.DEFAULTS["TAP_EVENT_COUNT"],
-                "duration": user_input.DEFAULTS["DURATION"],
+                "duration": user_input.DEFAULTS["DURATION_MS"],
             },
         )
 
     def test_tap_all_params(self) -> None:
         """Test for UserInput.tap() method with all params."""
-        self.user_input_obj.tap(
-            location=ui_custom_types.Coordinate(x=1, y=2),
+        touch_device = self.user_input_obj.create_touch_device(
             touch_screen_size=ui_custom_types.Size(width=3, height=4),
+        )
+        touch_device.tap(
+            location=ui_custom_types.Coordinate(x=1, y=2),
             tap_event_count=5,
-            duration=6,
+            duration_ms=6,
         )
         self.sl4f_obj.run.assert_called_once_with(
             method="input_facade.Tap",

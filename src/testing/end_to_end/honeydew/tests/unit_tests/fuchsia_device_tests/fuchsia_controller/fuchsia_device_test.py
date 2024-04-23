@@ -22,6 +22,9 @@ from parameterized import param, parameterized
 from honeydew import errors
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
+from honeydew.affordances.fuchsia_controller.ui import (
+    user_input as user_input_fc,
+)
 from honeydew.fuchsia_device.fuchsia_controller import fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
@@ -199,11 +202,23 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             tracing_fc.Tracing,
         )
 
-    def test_user_input(self) -> None:
-        """Test case to make sure fc_fuchsia_device does not support
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "run",
+        autospec=True,
+    )
+    def test_user_input(self, mock_ffx_run) -> None:  # type: ignore[no-untyped-def]
+        """Test case to make sure fc_fuchsia_device supports
         user_input affordance."""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.user_input  # pylint: disable=pointless-statement
+
+        mock_ffx_run.return_value = (
+            user_input_fc._INPUT_HELPER_COMPONENT  # pylint: disable=protected-access
+        )
+
+        self.assertIsInstance(
+            self.fd_obj.user_input,
+            user_input_fc.UserInput,
+        )
 
     def test_wlan_policy(self) -> None:
         """Test case to make sure fc_fuchsia_device does not support

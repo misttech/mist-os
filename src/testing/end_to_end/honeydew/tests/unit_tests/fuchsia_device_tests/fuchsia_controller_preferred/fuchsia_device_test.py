@@ -18,7 +18,6 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_sl4f,
 )
-from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.fuchsia_device.fuchsia_controller_preferred import (
@@ -148,14 +147,6 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
             bluetooth_gap_sl4f.BluetoothGap,
         )
         mock_bluetooth_common_init.assert_called_once()
-
-    def test_user_input(self) -> None:
-        """Test case to make sure fc_preferred_fuchsia_device supports
-        user_input affordance implemented using SL4F transport."""
-        self.assertIsInstance(
-            self.fd_obj.user_input,
-            user_input_sl4f.UserInput,
-        )
 
     def test_wlan_policy(self) -> None:
         """Test case to make sure fc_preferred_fuchsia_device supports

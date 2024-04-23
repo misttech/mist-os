@@ -38,6 +38,8 @@ python_library("honeydew_no_testonly") {
     "affordances/fuchsia_controller/__init__.py",
     "affordances/fuchsia_controller/rtc.py",
     "affordances/fuchsia_controller/tracing.py",
+    "affordances/fuchsia_controller/ui/__init__.py",
+    "affordances/fuchsia_controller/ui/user_input.py",
     "affordances/sl4f/__init__.py",
     "affordances/sl4f/bluetooth/__init__.py",
     "affordances/sl4f/bluetooth/bluetooth_common.py",
@@ -139,6 +141,7 @@ group("honeydew_fidl_ir_and_deps") {
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data",
     "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data",
 
     # Required by Fuchsia Controller itself.
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",

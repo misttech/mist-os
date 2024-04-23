@@ -41,6 +41,8 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         # Add simplest-input-flatland-session-app to session.
         self.dut.session.add_component(TOUCH_APP)
 
+        touch_device = self.dut.user_input.create_touch_device()
+
         with self.dut.tracing.trace_session(
             categories=[
                 "input",
@@ -55,10 +57,10 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             # Each tap will be 33.5ms apart, drifting 0.166ms against regular 60
             # fps vsync interval. 100 taps span the entire vsync interval 1 time at
             # 100 equidistant points.
-            self.dut.user_input.tap(
+            touch_device.tap(
                 location=ui_custom_types.Coordinate(x=500, y=500),
                 tap_event_count=100,
-                duration=3350,
+                duration_ms=3350,
             )
 
         # TODO(b/271467734): Process fxt tracing file.

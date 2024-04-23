@@ -118,3 +118,7 @@ class NotSupportedError(HoneydewError):
 
 class StarnixError(HoneydewError):
     """Exception to be raised if a starnix operation fails."""
+
+
+class UserInputError(HoneydewError):
+    """Exception to be raised by UserInput"""
