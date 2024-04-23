@@ -29,7 +29,7 @@ use fidl_fuchsia_developer_ffx as ffx;
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum FastbootConnectionState {
-    Usb(String),
+    Usb,
     Tcp(Vec<TargetAddr>),
     Udp(Vec<TargetAddr>),
 }
@@ -37,7 +37,7 @@ pub enum FastbootConnectionState {
 impl Display for FastbootConnectionState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
-            Self::Usb(s) => format!("Usb({})", s),
+            Self::Usb => format!("Usb"),
             Self::Tcp(addr) => format!("Tcp({:?})", addr),
             Self::Udp(addr) => format!("Udp({:?})", addr),
         };
@@ -352,9 +352,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or("".to_string());
                 let connection_state = match iface {
-                    ffx::FastbootInterface::Usb => {
-                        FastbootConnectionState::Usb(serial_number.clone())
-                    }
+                    ffx::FastbootInterface::Usb => FastbootConnectionState::Usb,
                     ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addrs),
                     ffx::FastbootInterface::Tcp => FastbootConnectionState::Tcp(addrs),
                 };
@@ -373,7 +371,7 @@ impl From<FastbootEvent> for TargetEvent {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: serial.clone(),
-                        connection_state: FastbootConnectionState::Usb(serial),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 };
                 TargetEvent::Added(handle)
@@ -383,7 +381,7 @@ impl From<FastbootEvent> for TargetEvent {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: serial.clone(),
-                        connection_state: FastbootConnectionState::Usb(serial),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 };
                 TargetEvent::Removed(handle)
@@ -489,7 +487,7 @@ mod test {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "1234".to_string(),
-                        connection_state: FastbootConnectionState::Usb("1234".to_string()),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 })
             );
@@ -504,7 +502,7 @@ mod test {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "1234".to_string(),
-                        connection_state: FastbootConnectionState::Usb("1234".to_string()),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 })
             );
@@ -605,7 +603,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Usb("".to_string())
+                        connection_state: FastbootConnectionState::Usb
                     })
                 }
             );

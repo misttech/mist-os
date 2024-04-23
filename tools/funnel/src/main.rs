@@ -280,9 +280,9 @@ where
                         }
                         TargetState::Fastboot(fb_state) => {
                             match fb_state.connection_state {
-                                FastbootConnectionState::Usb(usb_state) => {
-                                    tracing::warn!("Discovered Target {} in Fastboot USB mode. It cannot be used with `funnel`. Skipping", usb_state);
-                                    writeln!(w, "Discovered Target {} in Fastboot over USB mode, which funnel does not support.", usb_state).context("writing to stdout")?;
+                                FastbootConnectionState::Usb => {
+                                    tracing::warn!("Discovered Target {} in Fastboot USB mode. It cannot be used with `funnel`. Skipping", fb_state.serial_number);
+                                    writeln!(w, "Discovered Target {} in Fastboot over USB mode, which funnel does not support.", fb_state.serial_number).context("writing to stdout")?;
                                 }
                                 FastbootConnectionState::Tcp(tcp_state) => {
                                     // We support fastboot over tcp!
