@@ -185,11 +185,9 @@ mod tests {
     ) {
         let tree = LSMTree::new(merge, Box::new(NullCache {}));
         tree.insert(Item::new(AllocatorKey { device_range: right.0 }, right.1))
-            .await
             .expect("insert error");
-        tree.seal().await;
+        tree.seal();
         tree.insert(Item::new(AllocatorKey { device_range: left.0 }, left.1))
-            .await
             .expect("insert error");
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
@@ -349,28 +347,24 @@ mod tests {
         tree.merge_into(
             Item::new(key.clone(), AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &lower_bound,
-        )
-        .await;
-        tree.seal().await;
+        );
+        tree.seal();
         tree.merge_into(
             Item::new(key.clone(), AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
             &lower_bound,
-        )
-        .await;
-        tree.seal().await;
-        tree.merge_into(Item::new(key.clone(), AllocatorValue::None), &lower_bound).await;
+        );
+        tree.seal();
+        tree.merge_into(Item::new(key.clone(), AllocatorValue::None), &lower_bound);
         tree.merge_into(
             Item::new(key.clone(), AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             &lower_bound,
-        )
-        .await;
-        tree.seal().await;
-        tree.merge_into(Item::new(key.clone(), AllocatorValue::None), &lower_bound).await;
+        );
+        tree.seal();
+        tree.merge_into(Item::new(key.clone(), AllocatorValue::None), &lower_bound);
         tree.merge_into(
             Item::new(key.clone(), AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &lower_bound,
-        )
-        .await;
+        );
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
@@ -389,16 +383,14 @@ mod tests {
             value: AllocatorValue::Abs { count: 1, owner_object_id: INVALID_OBJECT_ID },
             sequence: 1u64,
         })
-        .await
         .expect("insert error");
-        tree.seal().await;
+        tree.seal();
         // |1|0|1-1|
         tree.insert(Item {
             key: AllocatorKey { device_range: 25..50 },
             value: AllocatorValue::None,
             sequence: 2u64,
         })
-        .await
         .expect("insert error");
         // |1|0|1|2|
         tree.insert(Item {
@@ -406,7 +398,6 @@ mod tests {
             value: AllocatorValue::Abs { count: 2, owner_object_id: INVALID_OBJECT_ID },
             sequence: 3u64,
         })
-        .await
         .expect("insert error");
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();

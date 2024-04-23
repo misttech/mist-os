@@ -5,7 +5,6 @@
 use {
     crate::{
         drop_event::DropEvent,
-        lsm_tree::merge,
         object_handle::ReadObjectHandle,
         serialized_types::{Version, Versioned, VersionedLatest},
     },
@@ -260,26 +259,6 @@ pub trait Layer<K, V>: Send + Sync {
     fn get_version(&self) -> Version;
 }
 
-/// MutableLayer is a trait that only mutable layers need to implement.
-#[async_trait]
-pub trait MutableLayer<K, V>: Layer<K, V> {
-    fn as_layer(self: Arc<Self>) -> Arc<dyn Layer<K, V>>;
-
-    /// Merges the given item into the layer. `lower_bound` is the key to search for that should
-    /// provide the first potential item to be merged with.
-    async fn merge_into(&self, item: Item<K, V>, lower_bound: &K, merge_fn: merge::MergeFn<K, V>);
-
-    /// Inserts the given item into the layer.
-    /// Returns an error if item already exist.
-    async fn insert(&self, item: Item<K, V>) -> Result<(), Error>;
-
-    /// Inserts or replaces an item.
-    async fn replace_or_insert(&self, item: Item<K, V>);
-
-    /// Returns the number of items in the layer.
-    fn len(&self) -> usize;
-}
-
 /// Something that implements LayerIterator is returned by the seek function.
 #[async_trait]
 pub trait LayerIterator<K, V>: Send + Sync {
@@ -321,21 +300,25 @@ impl<'iter, K, V> LayerIterator<K, V> for BoxedLayerIterator<'iter, K, V> {
 }
 
 /// Mutable layers need an iterator that implements this in order to make merge_into work.
-#[async_trait]
-pub(super) trait LayerIteratorMut<K, V>: LayerIterator<K, V> {
-    /// Casts to super-traits.
-    fn as_iterator_mut(&mut self) -> &mut dyn LayerIterator<K, V>;
-    fn as_iterator(&self) -> &dyn LayerIterator<K, V>;
+pub(super) trait LayerIteratorMut<K, V>: Sync {
+    /// Advances the iterator.
+    fn advance(&mut self);
 
-    /// Erases the item that the iterator is currently pointing at. Afterwards, the iterator will
-    /// be pointing at the item that follows.
-    fn erase(&mut self);
+    /// Returns the current item. This will be None if called when the iterator is first crated i.e.
+    /// before either seek or advance has been called, and None if the iterator has reached the end
+    /// of the layer.
+    fn get(&self) -> Option<ItemRef<'_, K, V>>;
 
-    /// Inserts the given item immediately prior to the item the iterator is currently pointing at.
+    /// Inserts the item before the item that the iterator is located at.  The insert won't be
+    /// visible until the changes are committed (see `commit`).
     fn insert(&mut self, item: Item<K, V>);
 
-    /// Commits changes and waits for any existing readers to finish.
-    async fn commit_and_wait(&mut self);
+    /// Erases the current item and positions the iterator on the next item, if any.  The change
+    /// won't be visible until committed (see `commit`).
+    fn erase(&mut self);
+
+    /// Commits the changes.  This does not wait for existing readers to finish.
+    fn commit(&mut self);
 }
 
 /// Trait for writing new layers.

@@ -92,7 +92,6 @@ pub mod strategy;
 
 use {
     crate::{
-        debug_assert_not_too_long,
         drop_event::DropEvent,
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions},
@@ -1497,7 +1496,7 @@ impl ReservationOwner for Allocator {
 
 #[async_trait]
 impl JournalingObject for Allocator {
-    async fn apply_mutation(
+    fn apply_mutation(
         &self,
         mutation: Mutation,
         context: &ApplyContext<'_, '_>,
@@ -1528,7 +1527,7 @@ impl JournalingObject for Allocator {
                 };
                 let len = item.key.device_range.length().unwrap();
                 let lower_bound = item.key.lower_bound_for_merge_into();
-                self.tree.merge_into(item, &lower_bound).await;
+                self.tree.merge_into(item, &lower_bound);
                 let mut inner = self.inner.lock().unwrap();
                 let entry = inner.owner_bytes.entry(owner_object_id).or_default();
                 entry.allocated_bytes = entry.allocated_bytes.saturating_add(len as i64);
@@ -1576,7 +1575,7 @@ impl JournalingObject for Allocator {
                     }
                 }
                 let lower_bound = item.key.lower_bound_for_merge_into();
-                self.tree.merge_into(item, &lower_bound).await;
+                self.tree.merge_into(item, &lower_bound);
             }
             Mutation::Allocator(AllocatorMutation::SetLimit { owner_object_id, bytes }) => {
                 // Journal replay is ordered and each of these calls is idempotent. So the last one
@@ -1586,14 +1585,7 @@ impl JournalingObject for Allocator {
                 self.inner.lock().unwrap().info.limit_bytes.insert(owner_object_id, bytes);
             }
             Mutation::BeginFlush => {
-                {
-                    // After we seal the tree, we will start adding mutations to the new mutable
-                    // layer, but we cannot safely do that whilst we are attempting to allocate
-                    // because there is a chance it might miss an allocation and also not see the
-                    // allocation in temporary_allocations.
-                    let _guard = debug_assert_not_too_long!(self.allocation_mutex.lock());
-                    self.tree.seal().await;
-                }
+                self.tree.seal();
                 // Transfer our running count for allocated_bytes so that it gets written to the new
                 // info file when flush completes.
                 let mut inner = self.inner.lock().unwrap();
@@ -1854,7 +1846,7 @@ mod tests {
             lsm_tree::{
                 cache::NullCache,
                 skip_list_layer::SkipListLayer,
-                types::{Item, ItemRef, Layer, LayerIterator, MutableLayer},
+                types::{Item, ItemRef, Layer, LayerIterator},
                 LSMTree,
             },
             object_store::{
@@ -1887,8 +1879,8 @@ mod tests {
                 AllocatorValue::Abs { count: 1, owner_object_id: 99 },
             ),
         ];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[0].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
         let mut iter =
             CoalescingIterator::new(skip_list.seek(Bound::Unbounded).await.expect("seek failed"))
                 .await
@@ -1913,15 +1905,13 @@ mod tests {
                 AllocatorKey { device_range: 100..200 },
                 AllocatorValue::Abs { count: 1, owner_object_id: 99 },
             ))
-            .await
             .expect("insert error");
-        lsm_tree.seal().await;
+        lsm_tree.seal();
         lsm_tree
             .insert(Item::new(
                 AllocatorKey { device_range: 0..100 },
                 AllocatorValue::Abs { count: 1, owner_object_id: 99 },
             ))
-            .await
             .expect("insert error");
 
         let layer_set = lsm_tree.layer_set();
@@ -1950,15 +1940,13 @@ mod tests {
                 AllocatorKey { device_range: 100..200 },
                 AllocatorValue::Abs { count: 1, owner_object_id: 99 },
             ))
-            .await
             .expect("insert error");
-        lsm_tree.seal().await;
+        lsm_tree.seal();
         lsm_tree
             .insert(Item::new(
                 AllocatorKey { device_range: 0..100 },
                 AllocatorValue::Abs { count: 1, owner_object_id: 98 },
             ))
-            .await
             .expect("insert error");
 
         let layer_set = lsm_tree.layer_set();

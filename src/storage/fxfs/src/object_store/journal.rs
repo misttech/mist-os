@@ -29,7 +29,7 @@ use {
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions},
         log::*,
-        lsm_tree::cache::NullCache,
+        lsm_tree::{cache::NullCache, types::Layer},
         object_handle::{ObjectHandle as _, ReadObjectHandle},
         object_store::{
             allocator::Allocator,
@@ -251,7 +251,7 @@ pub struct Journal {
     handle: OnceCell<DataObjectHandle<ObjectStore>>,
     super_block_manager: SuperBlockManager,
     inner: Mutex<Inner>,
-    writer_mutex: futures::lock::Mutex<()>,
+    writer_mutex: Mutex<()>,
     sync_mutex: futures::lock::Mutex<()>,
     trace: AtomicBool,
 
@@ -425,7 +425,7 @@ impl Journal {
                 discard_offset: None,
                 reclaim_size: options.reclaim_size,
             }),
-            writer_mutex: futures::lock::Mutex::new(()),
+            writer_mutex: Mutex::new(()),
             sync_mutex: futures::lock::Mutex::new(()),
             trace: AtomicBool::new(false),
             reclaim_event: Event::new(),
@@ -720,7 +720,6 @@ impl Journal {
                             &ApplyContext { mode: ApplyMode::Replay, checkpoint },
                             end_offset,
                         )
-                        .await
                         .context("Failed to replay mutations")?;
                 }
                 break reader.journal_file_checkpoint();
@@ -1144,7 +1143,7 @@ impl Journal {
         }
 
         self.pre_commit(transaction).await?;
-        Ok(debug_assert_not_too_long!(self.write_and_apply_mutations(transaction)))
+        Ok(self.write_and_apply_mutations(transaction))
     }
 
     // Before we commit, we might need to extend the journal or write pending records to the
@@ -1211,7 +1210,7 @@ impl Journal {
 
         // We can't use regular transaction commit, because that can cause re-entrancy issues, so
         // instead we just apply the transaction directly here.
-        self.write_and_apply_mutations(&mut transaction).await;
+        self.write_and_apply_mutations(&mut transaction);
 
         let mut inner = self.inner.lock().unwrap();
 
@@ -1253,34 +1252,35 @@ impl Journal {
         let old_layers;
         let old_super_block_offset;
         let mut new_super_block_header;
+        let checkpoint;
+        let borrowed;
+
         {
-            let _write_guard;
-            let (checkpoint, borrowed) = {
-                let _sync_guard = debug_assert_not_too_long!(self.sync_mutex.lock());
-                _write_guard = debug_assert_not_too_long!(self.writer_mutex.lock());
-                let result = self.pad_to_block()?;
-                self.flush_device(result.0.file_offset)
-                    .await
-                    .context("flush failed when writing superblock")?;
-                result
-            };
-
-            new_super_block_header = self.inner.lock().unwrap().super_block_header.clone();
-
-            old_super_block_offset = new_super_block_header.journal_checkpoint.file_offset;
-
-            let (journal_file_offsets, min_checkpoint) = self.objects.journal_file_offsets();
-
-            new_super_block_header.generation =
-                new_super_block_header.generation.checked_add(1).ok_or(FxfsError::Inconsistent)?;
-            new_super_block_header.super_block_journal_file_offset = checkpoint.file_offset;
-            new_super_block_header.journal_checkpoint = min_checkpoint.unwrap_or(checkpoint);
-            new_super_block_header.journal_checkpoint.version = LATEST_VERSION;
-            new_super_block_header.journal_file_offsets = journal_file_offsets;
-            new_super_block_header.borrowed_metadata_space = borrowed;
-
-            old_layers = super_block::compact_root_parent(&*root_parent_store).await?;
+            let _sync_guard = debug_assert_not_too_long!(self.sync_mutex.lock());
+            {
+                let _write_guard = self.writer_mutex.lock().unwrap();
+                (checkpoint, borrowed) = self.pad_to_block()?;
+                old_layers = super_block::compact_root_parent(&*root_parent_store)?;
+            }
+            self.flush_device(checkpoint.file_offset)
+                .await
+                .context("flush failed when writing superblock")?;
         }
+
+        new_super_block_header = self.inner.lock().unwrap().super_block_header.clone();
+
+        old_super_block_offset = new_super_block_header.journal_checkpoint.file_offset;
+
+        let (journal_file_offsets, min_checkpoint) = self.objects.journal_file_offsets();
+
+        new_super_block_header.generation =
+            new_super_block_header.generation.checked_add(1).ok_or(FxfsError::Inconsistent)?;
+        new_super_block_header.super_block_journal_file_offset = checkpoint.file_offset;
+        new_super_block_header.journal_checkpoint = min_checkpoint.unwrap_or(checkpoint);
+        new_super_block_header.journal_checkpoint.version = LATEST_VERSION;
+        new_super_block_header.journal_file_offsets = journal_file_offsets;
+        new_super_block_header.borrowed_metadata_space = borrowed;
+
         self.super_block_manager
             .save(
                 new_super_block_header.clone(),
@@ -1318,7 +1318,7 @@ impl Journal {
 
             // This guard is required so that we don't insert an EndBlock record in the middle of a
             // transaction.
-            let _guard = debug_assert_not_too_long!(self.writer_mutex.lock());
+            let _guard = self.writer_mutex.lock().unwrap();
 
             self.pad_to_block()?
         };
@@ -1439,11 +1439,11 @@ impl Journal {
         CHUNK_SIZE
     }
 
-    async fn write_and_apply_mutations(&self, transaction: &mut Transaction<'_>) -> u64 {
+    fn write_and_apply_mutations(&self, transaction: &mut Transaction<'_>) -> u64 {
         let checkpoint_before;
         let checkpoint_after;
         {
-            let _guard = debug_assert_not_too_long!(self.writer_mutex.lock());
+            let _guard = self.writer_mutex.lock().unwrap();
             checkpoint_before = {
                 let mut inner = self.inner.lock().unwrap();
                 let checkpoint = inner.writer.journal_file_checkpoint();
@@ -1461,7 +1461,7 @@ impl Journal {
             // the potential to fire assertions.  With that said, this should only occur if there
             // has been another panic, since we take care not to drop futures at other other times.
             let maybe_mutation =
-                self.objects.apply_transaction(transaction, &checkpoint_before).await.expect(
+                self.objects.apply_transaction(transaction, &checkpoint_before).expect(
                     "apply_transaction should not fail in live mode;\
                      filesystem will be in an inconsistent state",
                 );

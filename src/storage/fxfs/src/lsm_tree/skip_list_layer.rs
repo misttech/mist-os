@@ -13,23 +13,22 @@ use {
             merge::{self, MergeFn},
             types::{
                 BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut,
-                MutableLayer, OrdLowerBound, OrdUpperBound, Value,
+                OrdLowerBound, OrdUpperBound, Value,
             },
         },
         serialized_types::{Version, LATEST_VERSION},
     },
     anyhow::{bail, Error},
     async_trait::async_trait,
-    futures::future::poll_fn,
     std::{
         cell::UnsafeCell,
         cmp::{min, Ordering},
+        collections::BTreeMap,
         ops::{Bound, Range},
         sync::{
             atomic::{self, AtomicPtr, AtomicU32},
-            Arc, Mutex,
+            Arc, Mutex, MutexGuard,
         },
-        task::{Poll, Waker},
     },
 };
 
@@ -94,10 +93,10 @@ pub struct SkipListLayer<K, V> {
     // These are the head pointers for the list.
     pointers: PointerList<K, V>,
 
-    inner: std::sync::Mutex<Inner<K, V>>,
+    inner: Mutex<Inner<K, V>>,
 
     // Writes are locked using this lock.
-    writer_lock: futures::lock::Mutex<()>,
+    write_lock: Mutex<()>,
 
     // The number of nodes that have been allocated.  This is only used for debugging purposes.
     allocated: AtomicU32,
@@ -116,39 +115,46 @@ struct Inner<K, V> {
     // can be freed.
     epoch: u64,
 
-    // We only allow two epochs to be live at any point in time.  These are the counts of active
-    // readers for each of those two epochs, and this is indexed by the lowest bit of epoch.
-    counts: [u16; 2],
-
-    // A waker waiting for the read count to drop to zero.
-    waker: Option<Waker>,
+    // The number of readers on the current epoch.
+    current_count: u16,
 
     // A list of nodes to be freed once the read counts have reached zero.
-    erase_list: Range<*mut SkipListNode<K, V>>,
+    erase_lists: BTreeMap<u64, EpochEraseList<K, V>>,
 
     // The number of items in the skip-list.
     item_count: usize,
 }
 
-// Required because of `erase_list` which holds pointers.
+// After a mutation that involves erasing nodes, we must keep the nodes alive until there are no
+// more readers in any of the epochs prior to the mutation.  To deal with this, we track the number
+// of outstanding readers in each epoch so that when the count reaches zero, we know it is safe to
+// free the nodes.
+struct EpochEraseList<K, V> {
+    // The number of readers still associated with this epoch.  When this reaches zero, the list can
+    // be freed once all previous epochs have been freed.
+    count: u16,
+    // We represent the list by storing the head and tail of the list which each node chained to the
+    // next.
+    range: Range<*mut SkipListNode<K, V>>,
+}
+
+// Required because of `erase_lists` which holds pointers.
 unsafe impl<K, V> Send for Inner<K, V> {}
 
 impl<K, V> Inner<K, V> {
     fn new() -> Self {
-        Inner {
-            epoch: 0,
-            counts: [0, 0],
-            waker: None,
-            erase_list: std::ptr::null_mut()..std::ptr::null_mut(),
-            item_count: 0,
-        }
+        Inner { epoch: 0, current_count: 0, erase_lists: BTreeMap::new(), item_count: 0 }
     }
 
-    fn free_erase_list(&mut self, owner: &SkipListLayer<K, V>) {
-        let mut maybe_node = unsafe { self.erase_list.start.as_mut() };
+    fn free_erase_list(
+        &mut self,
+        owner: &SkipListLayer<K, V>,
+        list: Range<*mut SkipListNode<K, V>>,
+    ) {
+        let mut maybe_node = unsafe { list.start.as_mut() };
         loop {
             match maybe_node {
-                Some(node) if node as *const _ != self.erase_list.end => {
+                Some(node) if node as *const _ != list.end => {
                     maybe_node = owner.free_node(node);
                 }
                 _ => break,
@@ -161,11 +167,15 @@ impl<K, V> SkipListLayer<K, V> {
     pub fn new(max_item_count: usize) -> Arc<SkipListLayer<K, V>> {
         Arc::new(SkipListLayer {
             pointers: PointerList::new((max_item_count as f32).log2() as usize + 1),
-            inner: std::sync::Mutex::new(Inner::new()),
-            writer_lock: futures::lock::Mutex::new(()),
+            inner: Mutex::new(Inner::new()),
+            write_lock: Mutex::new(()),
             allocated: AtomicU32::new(0),
             close_event: Mutex::new(Some(Arc::new(DropEvent::new()))),
         })
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().item_count
     }
 
     fn alloc_node(&self, item: Item<K, V>, pointer_count: usize) -> Box<SkipListNode<K, V>> {
@@ -180,13 +190,13 @@ impl<K, V> SkipListLayer<K, V> {
     }
 }
 
-impl<K: Key, V: Value> SkipListLayer<K, V> {
+impl<K: Eq + Key + OrdLowerBound, V: Value> SkipListLayer<K, V> {
     // Erases the given item. Does nothing if the item doesn't exist.
-    pub async fn erase(&self, key: &K)
+    pub fn erase(&self, key: &K)
     where
         K: std::cmp::Eq,
     {
-        let mut iter = SkipListLayerIterMut::new(self, Bound::Included(key)).await;
+        let mut iter = SkipListLayerIterMut::new(self, Bound::Included(key));
         if let Some(ItemRef { key: k, .. }) = iter.get() {
             if k == key {
                 iter.erase();
@@ -194,7 +204,40 @@ impl<K: Key, V: Value> SkipListLayer<K, V> {
                 warn!("Attempt to erase key not present!");
             }
         }
-        iter.commit_and_wait().await;
+        iter.commit();
+    }
+
+    /// Inserts the given item.
+    pub fn insert(&self, item: Item<K, V>) -> Result<(), Error> {
+        let mut iter = SkipListLayerIterMut::new(self, Bound::Included(&item.key));
+        if let Some(found_item) = iter.get() {
+            if found_item.key == &item.key {
+                bail!("Attempted to insert an existing key");
+            }
+        }
+        iter.insert(item);
+        Ok(())
+    }
+
+    /// Replaces or inserts the given item.
+    pub fn replace_or_insert(&self, item: Item<K, V>) {
+        let mut iter = SkipListLayerIterMut::new(self, Bound::Included(&item.key));
+        if let Some(found_item) = iter.get() {
+            if found_item.key == &item.key {
+                iter.erase();
+            }
+        }
+        iter.insert(item);
+    }
+
+    /// Merges the item into the layer.
+    pub fn merge_into(&self, item: Item<K, V>, lower_bound: &K, merge_fn: MergeFn<K, V>) {
+        merge::merge_into(
+            Box::new(SkipListLayerIterMut::new(self, Bound::Included(lower_bound))),
+            item,
+            merge_fn,
+        )
+        .unwrap();
     }
 }
 
@@ -235,55 +278,6 @@ impl<K: Key, V: Value> Layer<K, V> for SkipListLayer<K, V> {
     }
 }
 
-// The methods here all use commit_and_wait (rather than just using commit via drop) for now because
-// it provides a barrier such that upon return, callers can assume that all other threads will see
-// the mutation.
-#[async_trait]
-impl<K: Eq + Key + OrdLowerBound, V: Value> MutableLayer<K, V> for SkipListLayer<K, V> {
-    fn as_layer(self: Arc<Self>) -> Arc<dyn Layer<K, V>> {
-        self
-    }
-
-    // Inserts the given item.
-    async fn insert(&self, item: Item<K, V>) -> Result<(), Error> {
-        let mut iter = SkipListLayerIterMut::new(self, Bound::Included(&item.key)).await;
-        if let Some(found_item) = iter.get() {
-            if found_item.key == &item.key {
-                bail!("Attempted to insert an existing key");
-            }
-        }
-        iter.insert(item);
-        iter.commit_and_wait().await;
-        Ok(())
-    }
-
-    /// Replaces or inserts the given item.
-    async fn replace_or_insert(&self, item: Item<K, V>) {
-        let mut iter = SkipListLayerIterMut::new(self, Bound::Included(&item.key)).await;
-        if let Some(found_item) = iter.get() {
-            if found_item.key == &item.key {
-                iter.erase();
-            }
-        }
-        iter.insert(item);
-        iter.commit_and_wait().await;
-    }
-
-    async fn merge_into(&self, item: Item<K, V>, lower_bound: &K, merge_fn: MergeFn<K, V>) {
-        merge::merge_into(
-            Box::new(SkipListLayerIterMut::new(self, Bound::Included(lower_bound)).await),
-            item,
-            merge_fn,
-        )
-        .await
-        .unwrap();
-    }
-
-    fn len(&self) -> usize {
-        self.inner.lock().unwrap().item_count
-    }
-}
-
 // -- SkipListLayerIter --
 
 struct SkipListLayerIter<'a, K, V> {
@@ -300,8 +294,7 @@ impl<'a, K: OrdUpperBound, V> SkipListLayerIter<'a, K, V> {
     fn new(skip_list: &'a SkipListLayer<K, V>, bound: Bound<&K>) -> Self {
         let epoch = {
             let mut inner = skip_list.inner.lock().unwrap();
-            let index = (inner.epoch & 1) as usize;
-            inner.counts[index] += 1;
+            inner.current_count += 1;
             inner.epoch
         };
         let (included, key) = match bound {
@@ -340,12 +333,21 @@ impl<'a, K: OrdUpperBound, V> SkipListLayerIter<'a, K, V> {
 impl<K, V> Drop for SkipListLayerIter<'_, K, V> {
     fn drop(&mut self) {
         let mut inner = self.skip_list.inner.lock().unwrap();
-        let index = (self.epoch & 1) as usize;
-        inner.counts[index] -= 1;
-        if inner.counts[index] == 0 && inner.epoch != self.epoch {
-            inner.free_erase_list(self.skip_list);
-            if let Some(waker) = inner.waker.take() {
-                waker.wake();
+        if self.epoch == inner.epoch {
+            inner.current_count -= 1;
+        } else {
+            if let Some(erase_list) = inner.erase_lists.get_mut(&self.epoch) {
+                erase_list.count -= 1;
+                if erase_list.count == 0 {
+                    while let Some(entry) = inner.erase_lists.first_entry() {
+                        if entry.get().count == 0 {
+                            let range = entry.remove_entry().1.range;
+                            inner.free_erase_list(self.skip_list, range);
+                        } else {
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
@@ -375,7 +377,7 @@ type PointerListRefArray<'a, K, V> = Box<[&'a PointerList<K, V>]>;
 // release memory for any nodes that might have been erased.  In the case that we are only erasing
 // elements, there will be no insertion chain, in which case we just atomically remove the elements
 // from the chain.
-struct SkipListLayerIterMut<'a, K, V> {
+pub struct SkipListLayerIterMut<'a, K: Key, V: Value> {
     skip_list: &'a SkipListLayer<K, V>,
 
     // Since this is a mutable iterator, we need to keep pointers to all the nodes that precede the
@@ -393,31 +395,16 @@ struct SkipListLayerIterMut<'a, K, V> {
     // Only one write can proceed at a time.  We only need a place to keep the mutex guard, which is
     // why Rust thinks this is unused.
     #[allow(dead_code)]
-    write_guard: futures::lock::MutexGuard<'a, ()>,
+    write_guard: MutexGuard<'a, ()>,
 
     // The change in item count as a result of this mutation.
     item_delta: isize,
 }
 
-impl<K: OrdUpperBound, V> SkipListLayerIterMut<'_, K, V> {
-    async fn new<'a>(
-        skip_list: &'a SkipListLayer<K, V>,
-        bound: std::ops::Bound<&K>,
-    ) -> SkipListLayerIterMut<'a, K, V> {
+impl<'a, K: Key, V: Value> SkipListLayerIterMut<'a, K, V> {
+    pub fn new(skip_list: &'a SkipListLayer<K, V>, bound: std::ops::Bound<&K>) -> Self {
+        let write_guard = skip_list.write_lock.lock().unwrap();
         let len = skip_list.pointers.len();
-        let write_guard = skip_list.writer_lock.lock().await;
-
-        // Before we proceed, we should wait for any old readers on the other epoch to finish.
-        poll_fn(|cx| {
-            let mut inner = skip_list.inner.lock().unwrap();
-            if inner.counts[(inner.epoch & 1 ^ 1) as usize] == 0 {
-                Poll::Ready(())
-            } else {
-                inner.waker = Some(cx.waker().clone());
-                Poll::Pending
-            }
-        })
-        .await;
 
         // Start by setting all the previous pointers to the head.
         //
@@ -467,72 +454,14 @@ impl<K: OrdUpperBound, V> SkipListLayerIterMut<'_, K, V> {
     }
 }
 
-impl<K, V> SkipListLayerIterMut<'_, K, V> {
-    // Commits the changes but doesn't wait for readers to finish.  Returns the new epoch if the
-    // epoch changed.  If `force_epoch_change` is true, the epoch will be changed if there are
-    // existing readers even if it is not necessary (because no elements need to be freed); this
-    // gives callers a mechanism to wait for existing readers to finish.
-    fn commit(&mut self, force_epoch_change: bool) -> Option<u64> {
-        // Splice the changes into the list.
-        let prev_pointers = match self.insertion_point.take() {
-            Some(prev_pointers) => prev_pointers,
-            None => return None,
-        };
-
-        // Keep track of the first node that we might need to erase later.
-        let maybe_erase = prev_pointers[0].get_mut(0);
-
-        // If there are no insertion nodes, then it means that we're only erasing nodes.
-        if self.insertion_nodes.get(0).is_none() {
-            // Erase all elements between the insertion point and the current element. The
-            // pointers for levels > 0 should already have been done, so it's only level 0 we
-            // need to worry about.
-            prev_pointers[0].set(0, self.prev_pointers[0].get(0));
-        } else {
-            // Switch the pointers over so that the insertion chain is spliced in.  This is safe
-            // so long as the bottom pointer is done first because that guarantees the new nodes
-            // will be found, just maybe not as efficiently.
-            for i in 0..self.insertion_nodes.len() {
-                if let Some(node) = self.insertion_nodes.get_mut(i) {
-                    prev_pointers[i].set(i, Some(node));
-                }
-            }
-        }
-
-        // Switch the epoch so that we can track when existing readers have finished.
-        let mut inner = self.skip_list.inner.lock().unwrap();
-        inner.item_count = inner.item_count.wrapping_add(self.item_delta as usize);
-        let has_readers = inner.counts[(inner.epoch & 1) as usize] > 0;
-        if let Some(start) = maybe_erase {
-            let end = self.prev_pointers[0].get_ptr(0);
-            if start as *mut _ != end {
-                inner.erase_list = start..end;
-                if has_readers {
-                    inner.epoch = inner.epoch.wrapping_add(1);
-                    return Some(inner.epoch);
-                } else {
-                    inner.free_erase_list(self.skip_list);
-                }
-            }
-        }
-        if force_epoch_change && has_readers {
-            inner.erase_list = std::ptr::null_mut()..std::ptr::null_mut();
-            inner.epoch = inner.epoch.wrapping_add(1);
-            return Some(inner.epoch);
-        }
-        None
-    }
-}
-
-impl<K, V> Drop for SkipListLayerIterMut<'_, K, V> {
+impl<K: Key, V: Value> Drop for SkipListLayerIterMut<'_, K, V> {
     fn drop(&mut self) {
-        self.commit(false);
+        self.commit();
     }
 }
 
-#[async_trait]
-impl<K: Key + Clone, V: Value + Clone> LayerIterator<K, V> for SkipListLayerIterMut<'_, K, V> {
-    async fn advance(&mut self) -> Result<(), Error> {
+impl<K: Key, V: Value> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, K, V> {
+    fn advance(&mut self) {
         if self.insertion_point.is_some() {
             if let Some(item) = self.get() {
                 // Copy the current item into the insertion chain.
@@ -548,21 +477,10 @@ impl<K: Key + Clone, V: Value + Clone> LayerIterator<K, V> for SkipListLayerIter
                 }
             }
         }
-        Ok(())
     }
 
     fn get(&self) -> Option<ItemRef<'_, K, V>> {
         self.prev_pointers[0].get(0).map(|node| node.item.as_item_ref())
-    }
-}
-
-#[async_trait]
-impl<K: Key + Clone, V: Value + Clone> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, K, V> {
-    fn as_iterator_mut(&mut self) -> &mut dyn LayerIterator<K, V> {
-        self
-    }
-    fn as_iterator(&self) -> &dyn LayerIterator<K, V> {
-        self
     }
 
     fn insert(&mut self, item: Item<K, V>) {
@@ -624,18 +542,50 @@ impl<K: Key + Clone, V: Value + Clone> LayerIteratorMut<K, V> for SkipListLayerI
         self.item_delta -= 1;
     }
 
-    async fn commit_and_wait(&mut self) {
-        if let Some(epoch) = self.commit(true) {
-            poll_fn(|cx| {
-                let mut inner = self.skip_list.inner.lock().unwrap();
-                if inner.counts[(epoch & 1 ^ 1) as usize] > 0 {
-                    inner.waker = Some(cx.waker().clone());
-                    Poll::Pending
-                } else {
-                    Poll::Ready(())
+    // Commits the changes.  Note that this doesn't wait for readers to finish; any barrier that be
+    // required should be handled by the caller.
+    fn commit(&mut self) {
+        // Splice the changes into the list.
+        let prev_pointers = match self.insertion_point.take() {
+            Some(prev_pointers) => prev_pointers,
+            None => return,
+        };
+
+        // Keep track of the first node that we might need to erase later.
+        let maybe_erase = prev_pointers[0].get_mut(0);
+
+        // If there are no insertion nodes, then it means that we're only erasing nodes.
+        if self.insertion_nodes.get(0).is_none() {
+            // Erase all elements between the insertion point and the current element. The
+            // pointers for levels > 0 should already have been done, so it's only level 0 we
+            // need to worry about.
+            prev_pointers[0].set(0, self.prev_pointers[0].get(0));
+        } else {
+            // Switch the pointers over so that the insertion chain is spliced in.  This is safe
+            // so long as the bottom pointer is done first because that guarantees the new nodes
+            // will be found, just maybe not as efficiently.
+            for i in 0..self.insertion_nodes.len() {
+                if let Some(node) = self.insertion_nodes.get_mut(i) {
+                    prev_pointers[i].set(i, Some(node));
                 }
-            })
-            .await;
+            }
+        }
+
+        // Switch the epoch so that we can track when existing readers have finished.
+        let mut inner = self.skip_list.inner.lock().unwrap();
+        inner.item_count = inner.item_count.checked_add_signed(self.item_delta).unwrap();
+        if let Some(start) = maybe_erase {
+            let end = self.prev_pointers[0].get_ptr(0);
+            if start as *mut _ != end {
+                if inner.current_count > 0 || !inner.erase_lists.is_empty() {
+                    let count = std::mem::take(&mut inner.current_count);
+                    let epoch = inner.epoch;
+                    inner.erase_lists.insert(epoch, EpochEraseList { count, range: start..end });
+                    inner.epoch = inner.epoch.wrapping_add(1);
+                } else {
+                    inner.free_erase_list(self.skip_list, start..end);
+                }
+            }
         }
     }
 }
@@ -643,7 +593,7 @@ impl<K: Key + Clone, V: Value + Clone> LayerIteratorMut<K, V> for SkipListLayerI
 #[cfg(test)]
 mod tests {
     use {
-        super::{SkipListLayer, SkipListLayerIterMut},
+        super::{SkipListLayer, SkipListLayerIter, SkipListLayerIterMut},
         crate::{
             lsm_tree::{
                 merge::{
@@ -652,20 +602,20 @@ mod tests {
                 },
                 types::{
                     DefaultOrdLowerBound, DefaultOrdUpperBound, Item, ItemRef, Layer,
-                    LayerIterator, LayerIteratorMut, MutableLayer, SortByU64,
+                    LayerIterator, LayerIteratorMut, SortByU64,
                 },
             },
             serialized_types::{
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
             },
         },
+        assert_matches::assert_matches,
         fprint::TypeFingerprint,
         fuchsia_async as fasync,
-        futures::{channel::oneshot::channel, future::join_all, join},
+        futures::{future::join_all, join, FutureExt},
         std::{
             hash::Hash,
             ops::Bound,
-            sync::Mutex,
             time::{Duration, Instant},
         },
     };
@@ -701,8 +651,8 @@ mod tests {
         // Insert two items and make sure we can iterate back in the correct order.
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[0].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
         let mut iter = skip_list.seek(Bound::Unbounded).await.unwrap();
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[0].key, &items[0].value));
@@ -718,7 +668,7 @@ mod tests {
         // Seek for an exact match.
         let skip_list = SkipListLayer::new(100);
         for i in (0..100).rev() {
-            skip_list.insert(Item::new(TestKey(i), i)).await.expect("insert error");
+            skip_list.insert(Item::new(TestKey(i), i)).expect("insert error");
         }
         let mut iter = skip_list.seek(Bound::Included(&TestKey(57))).await.unwrap();
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -735,7 +685,7 @@ mod tests {
         // Seek for a non-exact match.
         let skip_list = SkipListLayer::new(100);
         for i in (0..100).rev() {
-            skip_list.insert(Item::new(TestKey(i * 3), i * 3)).await.expect("insert error");
+            skip_list.insert(Item::new(TestKey(i * 3), i * 3)).expect("insert error");
         }
         let mut expected_index = 57 * 3;
         let mut iter = skip_list.seek(Bound::Included(&TestKey(expected_index - 1))).await.unwrap();
@@ -753,10 +703,10 @@ mod tests {
     async fn test_replace_or_insert_replaces() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[0].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
         let replacement_value = 3;
-        skip_list.replace_or_insert(Item::new(items[1].key.clone(), replacement_value)).await;
+        skip_list.replace_or_insert(Item::new(items[1].key.clone(), replacement_value));
 
         let mut iter = skip_list.seek(Bound::Unbounded).await.unwrap();
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -772,9 +722,9 @@ mod tests {
     async fn test_replace_or_insert_inserts() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2), Item::new(TestKey(3), 3)];
-        skip_list.insert(items[2].clone()).await.expect("insert error");
-        skip_list.insert(items[0].clone()).await.expect("insert error");
-        skip_list.replace_or_insert(items[1].clone()).await;
+        skip_list.insert(items[2].clone()).expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
+        skip_list.replace_or_insert(items[1].clone());
 
         let mut iter = skip_list.seek(Bound::Unbounded).await.unwrap();
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -793,12 +743,12 @@ mod tests {
     async fn test_erase() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[0].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
 
         assert_eq!(skip_list.len(), 2);
 
-        skip_list.erase(&items[1].key).await;
+        skip_list.erase(&items[1].key);
 
         assert_eq!(skip_list.len(), 1);
 
@@ -810,7 +760,7 @@ mod tests {
             assert!(iter.get().is_none());
         }
 
-        skip_list.erase(&items[0].key).await;
+        skip_list.erase(&items[0].key);
 
         assert_eq!(skip_list.len(), 0);
 
@@ -833,7 +783,7 @@ mod tests {
         let time = loop {
             let skip_list = SkipListLayer::new(n as usize);
             for i in 0..n {
-                skip_list.insert(Item::new(TestKey(i), i)).await.expect("insert error");
+                skip_list.insert(Item::new(TestKey(i), i)).expect("insert error");
             }
             let start = Instant::now();
             for i in 0..n {
@@ -851,7 +801,7 @@ mod tests {
         n >>= loops / 2; // This should, in theory, result in 50% seek time.
         let skip_list = SkipListLayer::new(n as usize);
         for i in 0..n {
-            skip_list.insert(Item::new(TestKey(i), i)).await.expect("insert error");
+            skip_list.insert(Item::new(TestKey(i), i)).expect("insert error");
         }
         let start = Instant::now();
         for i in 0..seek_count {
@@ -878,7 +828,7 @@ mod tests {
         let item_count = 1000;
         let skip_list = SkipListLayer::new(1000);
         for i in 1..item_count {
-            skip_list.insert(Item::new(TestKey(i), 1)).await.expect("insert error");
+            skip_list.insert(Item::new(TestKey(i), 1)).expect("insert error");
         }
         let mut iter = skip_list.seek(Bound::Included(&TestKey(item_count - 10))).await.unwrap();
         for i in item_count - 10..item_count {
@@ -892,8 +842,8 @@ mod tests {
     async fn test_multiple_readers_allowed() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[0].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
 
         // Create the first iterator and check the first item.
         let mut iter = skip_list.seek(Bound::Unbounded).await.unwrap();
@@ -925,9 +875,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_merge_into() {
         let skip_list = SkipListLayer::new(100);
-        skip_list.insert(Item::new(TestKey(1), 1)).await.expect("insert error");
+        skip_list.insert(Item::new(TestKey(1), 1)).expect("insert error");
 
-        skip_list.merge_into(Item::new(TestKey(2), 2), &TestKey(1), merge).await;
+        skip_list.merge_into(Item::new(TestKey(2), 2), &TestKey(1), merge);
 
         let mut iter = skip_list.seek(Bound::Unbounded).await.unwrap();
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -941,7 +891,7 @@ mod tests {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
         {
-            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
+            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded);
             iter.insert(items[0].clone());
             iter.insert(items[1].clone());
         }
@@ -958,9 +908,9 @@ mod tests {
     async fn test_erase_after_insert() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
         {
-            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
+            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded);
             iter.insert(items[0].clone());
             iter.erase();
         }
@@ -976,9 +926,9 @@ mod tests {
     async fn test_insert_after_erase() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
         {
-            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
+            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded);
             iter.erase();
             iter.insert(items[0].clone());
         }
@@ -994,9 +944,9 @@ mod tests {
     async fn test_insert_erase_insert() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2), Item::new(TestKey(3), 3)];
-        skip_list.insert(items[0].clone()).await.expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
         {
-            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
+            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded);
             iter.insert(items[1].clone());
             iter.erase();
             iter.insert(items[2].clone());
@@ -1014,11 +964,11 @@ mod tests {
     async fn test_two_erase_erases() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2), Item::new(TestKey(3), 3)];
-        skip_list.insert(items[0].clone()).await.expect("insert error");
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[2].clone()).await.expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[2].clone()).expect("insert error");
         {
-            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
+            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded);
             iter.erase();
             iter.erase();
         }
@@ -1034,7 +984,7 @@ mod tests {
     async fn test_readers_not_blocked_by_writers() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
 
         let mut iter = skip_list.seek(Bound::Unbounded).await.unwrap();
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -1044,7 +994,7 @@ mod tests {
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[1].key, &items[1].value));
 
-        join!(async { skip_list.insert(items[0].clone()).await.expect("insert error") }, async {
+        join!(async { skip_list.insert(items[0].clone()).expect("insert error") }, async {
             loop {
                 let iter = skip_list.seek(Bound::Unbounded).await.unwrap();
                 let ItemRef { key, .. } = iter.get().expect("missing item");
@@ -1072,7 +1022,6 @@ mod tests {
                         for j in 0..10 {
                             skip_list_clone
                                 .insert(Item::new(TestKey(i * 100 + j), i))
-                                .await
                                 .expect("insert error");
                         }
                     })
@@ -1102,15 +1051,15 @@ mod tests {
     async fn test_insert_advance_erase() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2), Item::new(TestKey(3), 3)];
-        skip_list.insert(items[1].clone()).await.expect("insert error");
-        skip_list.insert(items[2].clone()).await.expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
+        skip_list.insert(items[2].clone()).expect("insert error");
 
         assert_eq!(skip_list.len(), 2);
 
         {
-            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
+            let mut iter = SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded);
             iter.insert(items[0].clone());
-            iter.advance().await.expect("advance failed");
+            iter.advance();
             iter.erase();
         }
 
@@ -1130,57 +1079,64 @@ mod tests {
     async fn test_seek_excluded() {
         let skip_list = SkipListLayer::new(100);
         let items = [Item::new(TestKey(1), 1), Item::new(TestKey(2), 2)];
-        skip_list.insert(items[0].clone()).await.expect("insert error");
-        skip_list.insert(items[1].clone()).await.expect("insert error");
+        skip_list.insert(items[0].clone()).expect("insert error");
+        skip_list.insert(items[1].clone()).expect("insert error");
         let iter = skip_list.seek(Bound::Excluded(&items[0].key)).await.expect("seek failed");
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[1].key, &items[1].value));
     }
 
-    #[fuchsia::test(threads = 10)]
-    async fn test_insert_race() {
+    #[fuchsia::test]
+    fn test_insert_race() {
         for _ in 0..1000 {
             let skip_list = SkipListLayer::new(100);
-            skip_list.insert(Item::new(TestKey(2), 2)).await.expect("insert error");
+            skip_list.insert(Item::new(TestKey(2), 2)).expect("insert error");
 
             let skip_list_clone = skip_list.clone();
-            join!(
-                fasync::Task::spawn(async move {
-                    skip_list_clone.insert(Item::new(TestKey(1), 1)).await.expect("insert error");
-                }),
-                fasync::Task::spawn(async move {
-                    let iter =
-                        skip_list.seek(Bound::Included(&TestKey(2))).await.expect("seek failed");
-                    match iter.get() {
-                        Some(ItemRef { key: TestKey(2), .. }) => {}
-                        result => assert!(false, "{:?}", result),
-                    }
-                })
-            );
+            let thread1 = std::thread::spawn(move || {
+                skip_list_clone.insert(Item::new(TestKey(1), 1)).expect("insert error")
+            });
+            let thread2 = std::thread::spawn(move || {
+                let iter = SkipListLayerIter::new(&skip_list, Bound::Included(&TestKey(2)));
+                match iter.get() {
+                    Some(ItemRef { key: TestKey(2), .. }) => {}
+                    result => assert!(false, "{:?}", result),
+                }
+            });
+            thread1.join().unwrap();
+            thread2.join().unwrap();
         }
     }
 
-    #[fuchsia::test(threads = 10)]
-    async fn test_commit_and_wait_waits() {
+    #[fuchsia::test]
+    fn test_replace_or_insert_multi_thread() {
         let skip_list = SkipListLayer::new(100);
-        let (send, recv) = channel();
-        let writer_done = Mutex::new(false);
-        join!(
-            async {
-                recv.await.unwrap();
-                let mut iter =
-                    SkipListLayerIterMut::new(&skip_list, std::ops::Bound::Unbounded).await;
-                iter.insert(Item::new(TestKey(1), 2));
-                iter.commit_and_wait().await;
-                *writer_done.lock().unwrap() = true;
-            },
-            async {
-                let _iter = skip_list.seek(Bound::Unbounded).await.unwrap();
-                send.send(()).unwrap();
-                // This is a halting problem so all we can do is sleep.
-                fasync::Timer::new(Duration::from_millis(100)).await;
-                assert_eq!(*writer_done.lock().unwrap(), false);
-            }
-        );
+        skip_list.insert(Item::new(TestKey(1), 1)).expect("insert error");
+        skip_list.insert(Item::new(TestKey(2), 2)).expect("insert error");
+        skip_list.insert(Item::new(TestKey(3), 3)).expect("insert error");
+        skip_list.insert(Item::new(TestKey(4), 4)).expect("insert error");
+
+        // Set up a number of threads that are repeatedly replacing the '3' key.
+        let mut threads = Vec::new();
+        for i in 0..200 {
+            let skip_list_clone = skip_list.clone();
+            threads.push(std::thread::spawn(move || {
+                skip_list_clone.replace_or_insert(Item::new(TestKey(3), i));
+            }));
+        }
+
+        // Have one thread repeatedly checking the list.
+        let _checker_thread = std::thread::spawn(move || loop {
+            let mut iter = SkipListLayerIter::new(&skip_list, Bound::Included(&TestKey(2)));
+            assert_matches!(iter.get(), Some(ItemRef { key: TestKey(2), .. }));
+            iter.advance().now_or_never().unwrap().unwrap();
+            assert_matches!(iter.get(), Some(ItemRef { key: TestKey(3), .. }));
+            iter.advance().now_or_never().unwrap().unwrap();
+            assert_matches!(iter.get(), Some(ItemRef { key: TestKey(4), .. }));
+        });
+
+        for thread in threads {
+            thread.join().unwrap();
+        }
     }
 }
