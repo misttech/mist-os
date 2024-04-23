@@ -39,9 +39,9 @@ const REPLAY_THREADS: usize = 2;
 // number of allocations in the serving threads.
 const MESSAGE_CHUNK_SIZE: usize = 64;
 
-/// Paired with a ProfileState that is currently recording, takes messages to be written into the
-/// current profile. This should be dropped before the recording is stopped to ensure that all
-/// messages have been flushed to the writer.
+/// Paired with a RecordingState, takes messages to be written into the current profile. This
+/// should be dropped before the recording is stopped to ensure that all messages have been
+/// flushed to the writer thread.
 pub struct Recorder {
     sender: async_channel::Sender<Vec<Message>>,
     buffer: Vec<Message>,
@@ -77,7 +77,8 @@ impl Recorder {
     pub fn record(&mut self, hash: &Hash, offset: u64) -> Result<(), Error> {
         self.buffer.push(Message { hash: *hash, offset });
         if self.buffer.len() >= MESSAGE_CHUNK_SIZE {
-            // try_send to avoid async await, we use an unbounded channel anyways.
+            // try_send to avoid async await, we use an unbounded channel anyways so any failure
+            // here should only be if the channel is closed, which is permanent anyways.
             self.sender.try_send(std::mem::replace(
                 &mut self.buffer,
                 Vec::with_capacity(MESSAGE_CHUNK_SIZE),
@@ -115,39 +116,11 @@ struct Request {
 
 struct RecordingState {
     stopped_listener: EventListener,
-    sender_clone: async_channel::Sender<Vec<Message>>,
+    sender: async_channel::Sender<Vec<Message>>,
 }
 
-struct ReplayState {
-    // Using a DropEvent to trigger task shutdown if this goes out of scope.
-    stop_on_drop: DropEvent,
-    stopped_listener: EventListener,
-}
-
-enum State {
-    None,
-    Recording(RecordingState),
-    Replaying(ReplayState),
-}
-
-/// Holds the current profile recording or replay state, and provides methods for state transitions.
-pub struct ProfileState(State);
-
-impl ProfileState {
-    pub fn new() -> Self {
-        Self(State::None)
-    }
-
-    /// Returns true if currently recording or replaying.
-    pub fn busy(&self) -> bool {
-        !matches!(self.0, State::None)
-    }
-
-    /// Creates a new recording and returns the `Recorder` object to record to. The recording starts
-    /// shutdown when the associated `Recorder` is dropped, and shutdown is completed when
-    /// `stop_profiler()` is called.
-    pub fn record_new<T: WriteObjectHandle>(&mut self, handle: T) -> Recorder {
-        self.stop_profiler();
+impl RecordingState {
+    fn new<T: WriteObjectHandle>(handle: T) -> Self {
         let finished_event = DropEvent::new();
         let (sender, receiver) = async_channel::unbounded::<Vec<Message>>();
         let stopped_listener = (*finished_event).listen();
@@ -194,7 +167,6 @@ impl ProfileState {
             }
             if offset > 0 {
                 io_buf.as_mut_slice()[offset..block_size].fill(0);
-                // Write it out.
                 if let Err(e) = handle.write_or_append(None, io_buf.as_ref()).await {
                     error!("Failed to write profile block: {:?}", e);
                 }
@@ -202,31 +174,62 @@ impl ProfileState {
         })
         .detach();
 
-        let recorder = Recorder { sender, buffer: Vec::with_capacity(MESSAGE_CHUNK_SIZE) };
-        self.0 = State::Recording(RecordingState {
-            stopped_listener,
-            sender_clone: recorder.sender.clone(),
-        });
-        recorder
+        RecordingState { stopped_listener, sender }
     }
 
-    /// Stop in-flight recording and replaying. This method will block until the resources have been
-    /// cleaned up.
-    pub fn stop_profiler(&mut self) {
-        let old = std::mem::replace(&mut self.0, State::None);
-        match old {
-            State::Recording(recording) => {
-                // This closes the channel for *all* senders, which starts shutting down.
-                recording.sender_clone.close();
-                recording.stopped_listener.wait();
-            }
-            State::Replaying(replaying) => {
-                let ReplayState { stop_on_drop, stopped_listener } = replaying;
-                std::mem::drop(stop_on_drop);
-                stopped_listener.wait();
-            }
-            State::None => {}
+    fn close(self) {
+        // This closes the channel for *all* senders, which starts shutting down.
+        self.sender.close();
+        self.stopped_listener.wait();
+    }
+}
+
+struct ReplayState {
+    // Using a DropEvent to trigger task shutdown if this goes out of scope.
+    stop_on_drop: DropEvent,
+    stopped_listener: EventListener,
+}
+
+impl ReplayState {
+    fn new<T: ReadObjectHandle>(handle: T, volume: Arc<FxVolume>) -> Self {
+        let stop_on_drop = DropEvent::new();
+        let (sender, receiver) = async_channel::unbounded::<Request>();
+        let shutting_down = Arc::new(AtomicBool::new(false));
+
+        // Create async_channel. An async thread reads and populates the channel, then N threads
+        // consume it and touch pages.
+        let mut replay_threads = Vec::with_capacity(REPLAY_THREADS);
+        for _ in 0..REPLAY_THREADS {
+            let stop_processing = shutting_down.clone();
+            let queue = receiver.clone();
+            replay_threads.push(std::thread::spawn(move || {
+                Self::page_in_thread(queue, stop_processing);
+            }));
         }
+
+        let stopped_event = DropEvent::new();
+        let stopped_listener = stopped_event.listen();
+        let start_shutdown = stop_on_drop.listen();
+        fasync::Task::spawn(async move {
+            // Move the drop event in
+            let _stopped_event = stopped_event;
+            // Hold the items in cache until replay is stopped.
+            let mut local_cache: BTreeMap<Hash, Arc<FxBlob>> = BTreeMap::new();
+            if let Err(e) = Self::read_and_queue(handle, volume, &sender, &mut local_cache).await {
+                error!("Failed to read back profile: {:?}", e);
+            }
+
+            sender.close();
+            start_shutdown.await;
+
+            shutting_down.store(true, Ordering::Relaxed);
+            for thread in replay_threads {
+                let _ = thread.join();
+            }
+        })
+        .detach();
+
+        ReplayState { stop_on_drop, stopped_listener }
     }
 
     fn page_in_thread(queue: async_channel::Receiver<Request>, stop_processing: Arc<AtomicBool>) {
@@ -306,48 +309,65 @@ impl ProfileState {
         Ok(())
     }
 
-    /// Reads given handle to parse a profile and replay it by requesting pages via
-    /// ZX_VMO_OP_COMMIT in blocking background threads.
-    pub fn replay_profile<T: ReadObjectHandle>(&mut self, handle: T, volume: Arc<FxVolume>) {
-        self.stop_profiler();
-        let stop_on_drop = DropEvent::new();
-        let (sender, receiver) = async_channel::unbounded::<Request>();
-        let shutting_down = Arc::new(AtomicBool::new(false));
+    fn close(self) {
+        let ReplayState { stop_on_drop, stopped_listener } = self;
+        std::mem::drop(stop_on_drop);
+        stopped_listener.wait();
+    }
+}
 
-        // Create (bounded) async_channel, async thread reads and populates the channel, then N threads
-        // consume it and touch pages.
-        let mut replay_threads = Vec::with_capacity(REPLAY_THREADS);
-        for _ in 0..REPLAY_THREADS {
-            let stop_processing = shutting_down.clone();
-            let queue = receiver.clone();
-            replay_threads.push(std::thread::spawn(move || {
-                Self::page_in_thread(queue, stop_processing);
-            }));
+/// Holds the current profile recording and/or replay state, and provides methods for state
+/// transitions.
+pub struct ProfileState {
+    recording: Option<RecordingState>,
+    replay: Option<ReplayState>,
+}
+
+impl ProfileState {
+    pub fn new() -> Self {
+        Self { recording: None, replay: None }
+    }
+
+    /// Returns true if currently recording or replaying.
+    pub fn busy(&self) -> bool {
+        self.recording.is_some() || self.replay.is_some()
+    }
+
+    /// Creates a new recording and returns the `Recorder` object to record to. The recording starts
+    /// shutdown when the associated `Recorder` is dropped, and shutdown is completed when
+    /// `stop_profiler()` is called. Stops any recording currently in progress.
+    pub fn record_new<T: WriteObjectHandle>(&mut self, handle: T) -> Recorder {
+        if let Some(recording) = std::mem::take(&mut self.recording) {
+            recording.close();
         }
+        let state = RecordingState::new(handle);
+        let recorder = Recorder {
+            sender: state.sender.clone(),
+            buffer: Vec::with_capacity(MESSAGE_CHUNK_SIZE),
+        };
+        self.recording = Some(state);
+        recorder
+    }
 
-        let stopped_event = DropEvent::new();
-        let stopped_listener = stopped_event.listen();
-        let start_shutdown = stop_on_drop.listen();
-        fasync::Task::spawn(async move {
-            // Move the drop event in
-            let _stopped_event = stopped_event;
-            // Hold the items in cache until replay is stopped.
-            let mut local_cache: BTreeMap<Hash, Arc<FxBlob>> = BTreeMap::new();
-            if let Err(e) = Self::read_and_queue(handle, volume, &sender, &mut local_cache).await {
-                error!("Failed to read back profile: {:?}", e);
-            }
+    /// Stop in-flight recording and replaying. This method will block until the resources have been
+    /// cleaned up.
+    pub fn stop_profiler(&mut self) {
+        // Stop replay first to let the recording likely capture it all if necessary.
+        if let Some(replay) = std::mem::take(&mut self.replay) {
+            replay.close();
+        }
+        if let Some(recording) = std::mem::take(&mut self.recording) {
+            recording.close();
+        }
+    }
 
-            sender.close();
-            start_shutdown.await;
-
-            shutting_down.store(true, Ordering::Relaxed);
-            for thread in replay_threads {
-                let _ = thread.join();
-            }
-        })
-        .detach();
-
-        self.0 = State::Replaying(ReplayState { stop_on_drop, stopped_listener });
+    /// Reads given handle to parse a profile and replay it by requesting pages via
+    /// ZX_VMO_OP_COMMIT in blocking background threads. Stops any replay currently in progress.
+    pub fn replay_profile<T: ReadObjectHandle>(&mut self, handle: T, volume: Arc<FxVolume>) {
+        if let Some(replay) = std::mem::take(&mut self.replay) {
+            replay.close();
+        }
+        self.replay = Some(ReplayState::new(handle, volume));
     }
 }
 
@@ -360,7 +380,7 @@ impl Drop for ProfileState {
 #[cfg(test)]
 mod tests {
     use {
-        super::{Message, ProfileState, Request},
+        super::{Message, ProfileState, ReplayState, Request},
         crate::fuchsia::{
             fxblob::{
                 blob::FxBlob,
@@ -554,7 +574,7 @@ mod tests {
 
         let volume = fixture.volume().volume().clone();
         let task = fasync::Task::spawn(async move {
-            ProfileState::read_and_queue(result, volume, &sender, &mut local_cache).await.unwrap();
+            ReplayState::read_and_queue(result, volume, &sender, &mut local_cache).await.unwrap();
         });
 
         let mut recv_count = 0;
@@ -631,6 +651,74 @@ mod tests {
             }
             state.stop_profiler();
         }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_recording_during_replay() {
+        let mut state = ProfileState::new();
+        let handle = FakeReaderWriter::new();
+        let data_original = handle.inner.clone();
+
+        let hash;
+        // First make a simple recording.
+        let device = {
+            let fixture = testing::new_blob_fixture().await;
+            let mut recorder = state.record_new(handle);
+            hash = fixture.write_blob(&[0, 1, 2, 3], CompressionMode::Never).await;
+            recorder.record_open(&hash).unwrap();
+            recorder.record(&hash, 0).unwrap();
+            fixture.close().await
+        };
+        device.ensure_unique();
+        state.stop_profiler();
+        assert_ne!(data_original.lock().unwrap().data.len(), 0);
+
+        let recording_handle = FakeReaderWriter::new();
+        let data_second = recording_handle.inner.clone();
+        device.reopen(false);
+        let fixture = testing::open_blob_fixture(device).await;
+        {
+            // Need to get the root vmo to check committed bytes.
+            let dir = fixture
+                .volume()
+                .root()
+                .clone()
+                .into_any()
+                .downcast::<BlobDirectory>()
+                .expect("Root should be BlobDirectory");
+            // Ensure that nothing is paged in right now.
+            {
+                let blob = dir.lookup_blob((*hash).into()).await.expect("Opening blob");
+                assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
+            }
+
+            // Start recording
+            let mut recorder = state.record_new(recording_handle);
+            recorder.record(&hash, 4096).unwrap();
+
+            // Replay the original recording.
+            let mut replaying_handle = FakeReaderWriter::new();
+            replaying_handle.inner = data_original.clone();
+            state.replay_profile(replaying_handle, fixture.volume().volume().clone());
+
+            // Await all data being played back by checking that things have paged in.
+            {
+                let blob = dir.lookup_blob((*hash).into()).await.expect("Opening blob");
+                while blob.vmo().info().unwrap().committed_bytes == 0 {
+                    fasync::Timer::new(Duration::from_millis(25)).await;
+                }
+            }
+
+            // Record the open after the replay. Needs both the before and after action to
+            // capture anything ensuring that the two procedures overlapped.
+            recorder.record_open(&hash).unwrap();
+        }
+        state.stop_profiler();
+
+        assert_ne!(data_original.lock().unwrap().data.len(), 0);
+        assert_ne!(data_second.lock().unwrap().data.len(), 0);
+        assert_ne!(data_second.lock().unwrap().data, data_original.lock().unwrap().data);
         fixture.close().await;
     }
 
