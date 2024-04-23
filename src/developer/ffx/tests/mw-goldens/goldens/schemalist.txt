@@ -1,2 +1,3 @@
 target_list.json
+target_screenshot.json
 target_show.json
