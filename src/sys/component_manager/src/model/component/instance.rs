@@ -29,6 +29,7 @@ use {
             routing::{
                 self,
                 router::{Request, Routable, Router},
+                router_ext::RouterExt,
                 router_ext::WeakComponentTokenExt,
                 service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
                 RoutingError,

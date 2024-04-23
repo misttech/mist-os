@@ -11,6 +11,7 @@ use {
             routing::{
                 self, route_and_open_capability,
                 router::{Request, Router},
+                router_ext::RouterExt,
             },
         },
         sandbox_util::DictExt,

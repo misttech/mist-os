@@ -6,7 +6,7 @@ use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
         routing::router::{Request, Routable, Router},
-        routing::router_ext::WeakComponentTokenExt,
+        routing::router_ext::{RouterExt, WeakComponentTokenExt},
     },
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
