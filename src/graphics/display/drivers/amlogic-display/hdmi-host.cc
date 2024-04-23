@@ -16,6 +16,7 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/encoder-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
@@ -482,6 +483,36 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
   }
 
   return true;
+}
+
+void HdmiHost::ReplaceEncoderPixelColorWithBlack(bool enabled) {
+  if (enabled) {
+    EncoderBuiltInSelfTestModeSelection::Get()
+        .FromValue(0)
+        .set_mode(EncoderBuiltInSelfTestMode::kFixedColor)
+        .WriteTo(&vpu_mmio_);
+
+    // Sets the 10-bit YCbCr color value that replaces the Video Input Unit
+    // output.
+    //
+    // Black (R = 0, G = 0, B = 0) is (Y = 0, Cb = 512, Cr = 512) in YCbCr.
+    EncoderBuiltInSelfTestFixedColorLuminance::Get().FromValue(0).set_luminance(0).WriteTo(
+        &vpu_mmio_);
+    EncoderBuiltInSelfTestFixedColorChrominanceBlue::Get()
+        .FromValue(0)
+        .set_chrominance_blue(0x200)
+        .WriteTo(&vpu_mmio_);
+    EncoderBuiltInSelfTestFixedColorChrominanceRed::Get()
+        .FromValue(0)
+        .set_chrominance_red(0x200)
+        .WriteTo(&vpu_mmio_);
+  }
+
+  HdmiEncoderAdvancedModeConfig::Get()
+      .ReadFrom(&vpu_mmio_)
+      .set_viu_fifo_enabled(!enabled)
+      .WriteTo(&vpu_mmio_);
+  EncoderBuiltInSelfTestEnabled::Get().FromValue(0).set_enabled(enabled).WriteTo(&vpu_mmio_);
 }
 
 void HdmiHost::ConfigEncoder(const display::DisplayTiming& timing) {

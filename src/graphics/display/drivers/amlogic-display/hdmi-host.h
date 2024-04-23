@@ -88,6 +88,10 @@ class HdmiHost {
   // and can be used in a display configuration.
   bool IsDisplayTimingSupported(const display::DisplayTiming& timing) const;
 
+  // Configures the video encoder to replace the output pixels of the Video
+  // Input Unit (VIU) with black pixels iff `enabled` is true.
+  void ReplaceEncoderPixelColorWithBlack(bool enabled);
+
  private:
   void ConfigurePll(const pll_param& pll_params);
   void ConfigEncoder(const display::DisplayTiming& timings);

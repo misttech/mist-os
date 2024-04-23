@@ -709,6 +709,33 @@ zx_status_t DisplayEngine::DisplayControllerImplSetDisplayPower(uint64_t display
   if (display::ToDisplayId(display_id) != display_id_ || !display_attached_) {
     return ZX_ERR_NOT_FOUND;
   }
+
+  if (vout_->type() == VoutType::kHdmi) {
+    // TODO(https://fxbug.dev/335303016): This is a workaround to not trigger
+    // display disconnection interrupts on HDMI display power off. It doesn't
+    // enable or disable the display hardware. Instead, it only enables /
+    // disables the Vsync interrupt delivery and shows / hides the current
+    // frame on the display.
+
+    zx::result<> set_receiving_state_result =
+        vsync_receiver_->SetReceivingState(/*receiving=*/power_on);
+    if (set_receiving_state_result.is_error()) {
+      zxlogf(ERROR, "Failed to begin receiving Vsync interrupts: %s",
+             set_receiving_state_result.status_string());
+      return set_receiving_state_result.status_value();
+    }
+
+    zx::result<> set_frame_visibility_result =
+        vout_->SetFrameVisibility(/*frame_visible=*/power_on);
+    if (set_frame_visibility_result.is_error()) {
+      zxlogf(ERROR, "Failed to set frame visibility: %s",
+             set_frame_visibility_result.status_string());
+      return set_frame_visibility_result.status_value();
+    }
+    return ZX_OK;
+  }
+
+  ZX_DEBUG_ASSERT(vout_->type() == VoutType::kDsi);
   if (power_on) {
     zx::result<> power_on_result = vout_->PowerOn();
     if (power_on_result.is_ok()) {
