@@ -8,7 +8,7 @@ import("//build/testing/bootfs_test.gni")
 test("mtrace") {
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/zircon-internal",

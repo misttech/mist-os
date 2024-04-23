@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <cpuid.h>
-#include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
@@ -18,19 +18,19 @@
 
 namespace {
 
-zx::result<zx::resource> GetRootResource() {
-  zx::result<fidl::ClientEnd<fuchsia_boot::RootResource>> client_end =
-      component::Connect<fuchsia_boot::RootResource>();
+zx::result<zx::resource> GetDebugResource() {
+  zx::result<fidl::ClientEnd<fuchsia_kernel::DebugResource>> client_end =
+      component::Connect<fuchsia_kernel::DebugResource>();
   if (client_end.is_error()) {
-    printf("mtrace: Could not connect to RootResource service: %s\n", client_end.status_string());
+    printf("mtrace: Could not connect to DebugResource service: %s\n", client_end.status_string());
     return zx::error(client_end.error_value());
   }
 
-  fidl::WireSyncClient<fuchsia_boot::RootResource> client =
+  fidl::WireSyncClient<fuchsia_kernel::DebugResource> client =
       fidl::WireSyncClient(std::move(client_end.value()));
-  fidl::WireResult<fuchsia_boot::RootResource::Get> result = client->Get();
+  fidl::WireResult<fuchsia_kernel::DebugResource::Get> result = client->Get();
   if (result.status() != ZX_OK) {
-    printf("mtrace: Could not retrieve RootResource: %s\n", zx_status_get_string(result.status()));
+    printf("mtrace: Could not retrieve DebugResource: %s\n", zx_status_get_string(result.status()));
     return zx::error(result.status());
   }
   return zx::ok(std::move(result->resource));
@@ -55,12 +55,12 @@ bool IsIntelPMUSupported() {
 
 TEST(X86MtraceTestCase, GetProperties) {
   perfmon::X86PmuProperties properties;
-  zx::result<zx::resource> root_resource_or_error = GetRootResource();
-  zx::resource root_resource = std::move(root_resource_or_error.value());
-  ASSERT_TRUE(root_resource_or_error.is_ok(), "failed to get root resource: %s",
-              zx_status_get_string(root_resource_or_error.error_value()));
+  zx::result<zx::resource> debug_resource_or_error = GetDebugResource();
+  zx::resource debug_resource = std::move(debug_resource_or_error.value());
+  ASSERT_TRUE(debug_resource_or_error.is_ok(), "failed to get debug resource: %s",
+              zx_status_get_string(debug_resource_or_error.error_value()));
   zx_status_t status =
-      zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_GET_PROPERTIES, 0,
+      zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_GET_PROPERTIES, 0,
                         &properties, sizeof(properties));
   if (IsIntelPMUSupported()) {
     EXPECT_EQ(status, ZX_OK);
@@ -77,12 +77,12 @@ TEST(X86MtraceTestCase, GetProperties) {
 // Note that MTRACE_KIND_PERFMON is currently single-master; only a single agent needs to or can
 // invoke MTRACE_PERFMON_INIT / MTRACE_PERFMON_FINI at a time.
 TEST(X86MtraceTestCase, InitFini) {
-  zx::result<zx::resource> root_resource_or_error = GetRootResource();
-  ASSERT_TRUE(root_resource_or_error.is_ok(), "failed to get root resource: %s",
-              zx_status_get_string(root_resource_or_error.error_value()));
-  zx::resource root_resource = std::move(root_resource_or_error.value());
+  zx::result<zx::resource> debug_resource_or_error = GetDebugResource();
+  ASSERT_TRUE(debug_resource_or_error.is_ok(), "failed to get debug resource: %s",
+              zx_status_get_string(debug_resource_or_error.error_value()));
+  zx::resource debug_resource = std::move(debug_resource_or_error.value());
 
-  zx_status_t status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON,
+  zx_status_t status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON,
                                          MTRACE_PERFMON_INIT, 0, nullptr, 0);
   if (!IsIntelPMUSupported()) {
     EXPECT_EQ(status, ZX_ERR_NOT_SUPPORTED);
@@ -92,26 +92,26 @@ TEST(X86MtraceTestCase, InitFini) {
   EXPECT_EQ(status, ZX_OK);
 
   // Double init doesn't work.
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_INIT, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_INIT, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_ERR_BAD_STATE);
 
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
 
   // Double-fini appears to work.
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
 }
 
 TEST(X86MtraceTestCase, AssignBuffer) {
-  zx::result<zx::resource> root_resource_or_error = GetRootResource();
-  ASSERT_TRUE(root_resource_or_error.is_ok(), "failed to get root resource: %s",
-              zx_status_get_string(root_resource_or_error.error_value()));
-  zx::resource root_resource = std::move(root_resource_or_error.value());
-  zx_status_t status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON,
+  zx::result<zx::resource> debug_resource_or_error = GetDebugResource();
+  ASSERT_TRUE(debug_resource_or_error.is_ok(), "failed to get debug resource: %s",
+              zx_status_get_string(debug_resource_or_error.error_value()));
+  zx::resource debug_resource = std::move(debug_resource_or_error.value());
+  zx_status_t status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON,
                                          MTRACE_PERFMON_INIT, 0, nullptr, 0);
   if (!IsIntelPMUSupported()) {
     EXPECT_EQ(status, ZX_ERR_NOT_SUPPORTED);
@@ -133,13 +133,13 @@ TEST(X86MtraceTestCase, AssignBuffer) {
     ASSERT_EQ(zx_vmo_create(PAGE_SIZE, 0, &vmos[i]), ZX_OK);
     int cpu = i;
     zx_pmu_buffer_t buffer = {.vmo = vmos[i]};
-    status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON,
+    status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON,
                                MTRACE_PERFMON_ASSIGN_BUFFER, cpu, &buffer, sizeof(buffer));
     EXPECT_EQ(status, ZX_OK);
   }
 
   // Cleanup.
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
 }
@@ -149,12 +149,13 @@ TEST(X86MtraceTestCase, AssignBuffer) {
 // counter - the Intel Architectural PMU Fixed-Function Counter 0, 'Instructions Retired'.
 TEST(X86MtraceTestCase, InstructionsRetiredFixedCounterTest) {
   perfmon::X86PmuProperties properties;
-  zx::result<zx::resource> root_resource_or_error = GetRootResource();
-  zx::resource root_resource = std::move(root_resource_or_error.value());
-  ASSERT_TRUE(root_resource_or_error.is_ok(), "failed to get root resource: %s",
-              zx_status_get_string(root_resource_or_error.error_value()));
+  zx::result<zx::resource> debug_resource_or_error = GetDebugResource();
+  ASSERT_TRUE(debug_resource_or_error.is_ok(), "failed to get debug resource: %s",
+              zx_status_get_string(debug_resource_or_error.error_value()));
+  zx::resource debug_resource = std::move(debug_resource_or_error.value());
+
   zx_status_t status =
-      zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_GET_PROPERTIES, 0,
+      zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_GET_PROPERTIES, 0,
                         &properties, sizeof(properties));
   if (!IsIntelPMUSupported()) {
     EXPECT_EQ(status, ZX_ERR_NOT_SUPPORTED);
@@ -162,7 +163,7 @@ TEST(X86MtraceTestCase, InstructionsRetiredFixedCounterTest) {
     return;
   }
   ASSERT_EQ(status, ZX_OK);
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_INIT, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_INIT, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
   uint32_t num_cpus = zx_system_get_num_cpus();
@@ -171,7 +172,7 @@ TEST(X86MtraceTestCase, InstructionsRetiredFixedCounterTest) {
     ASSERT_EQ(zx_vmo_create(PAGE_SIZE, 0, &vmos[i]), ZX_OK);
     int cpu = i;
     zx_pmu_buffer_t buffer = {.vmo = vmos[i]};
-    status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON,
+    status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON,
                                MTRACE_PERFMON_ASSIGN_BUFFER, cpu, &buffer, sizeof(buffer));
     EXPECT_EQ(status, ZX_OK);
   }
@@ -181,19 +182,19 @@ TEST(X86MtraceTestCase, InstructionsRetiredFixedCounterTest) {
   config.global_ctrl = (1ul << 32);          // Enable fixed counter 0.
   config.fixed_ctrl = 1;                     // Enabled fixed counter 0 at CPL=0.
   config.fixed_events[0] = (2ul << 11) | 1;  // kGroupFixed | Instructions retired.
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_STAGE_CONFIG,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_STAGE_CONFIG,
                              0, &config, sizeof(config));
   EXPECT_EQ(status, ZX_OK);
 
   // Start and stop tracing. Each will execute some code at CPL=0.
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_START, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_START, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_STOP, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_STOP, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
 
-  status = zx_mtrace_control(root_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
+  status = zx_mtrace_control(debug_resource.get(), MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0,
                              nullptr, 0);
   EXPECT_EQ(status, ZX_OK);
   // Examine the buffers; each buffer should have a fixed length BufferHeader followed by one or

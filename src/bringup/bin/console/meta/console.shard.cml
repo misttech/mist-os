@@ -53,6 +53,7 @@
         },
         {
             protocol: [
+                "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.ProfileResource",
             ],

@@ -38,6 +38,7 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console",
+                    "/bootstrap/console-launcher",
                     "/bootstrap/kernel_debug_broker",
                 ],
             },
