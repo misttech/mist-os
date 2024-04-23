@@ -14,7 +14,9 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y rsync
       - restore_cache:
           name: Restore Jiri Cache
-          keys: &jiri-cache jiri-packages-{{ checksum "meta/jiri/jiri.lock" }}
+          keys:
+            - &jiri-cache jiri-packages-{{ checksum "meta/jiri/jiri.lock" }}
+            - jiri-packages
       - run:
           command: |
             curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
