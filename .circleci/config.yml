@@ -26,7 +26,8 @@ jobs:
           name: Save Jiri Package Cache
           key: *jiri-cache
           paths:
-            - prebuilt
+            - .cipd
+            - prebuild
       - run: make test
 
 workflows:
