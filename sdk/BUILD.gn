@@ -880,30 +880,6 @@ pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
 }
 
-# An SDK collection providing SDK atoms used for driver development.
-# Their API/ABI is not stable at all. Note: this cannot contain
-# testonly atoms.
-sdk_collection("driver") {
-  visibility += [ "*" ]
-
-  id = sdk_id
-  category = "experimental"
-
-  deps = [
-    # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
-    # ":fuchsia_idk_atoms" or ":driver_atoms" sdk_molecules.
-    ":driver_atoms",
-  ]
-}
-
-# An SDK molecule providing SDK atoms used for driver development. Their API/ABI
-# is not stable at all. Note: this cannot contain testonly atoms.
-sdk_molecule("driver_atoms") {
-  category = "experimental"
-
-  deps = [ ":fuchsia_idk_atoms" ]
-}
-
 # These markers are used to define dependencies on FIDL bindings
 # so host tools can assert_no_deps to make sure all host tools
 # in the SDK are only using FIDL libraries included in the SDK.

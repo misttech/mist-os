@@ -795,11 +795,7 @@ build_api_module("images") {
 build_api_module("sdk_archives") {
   testonly = true
   data_keys = [ "sdk_archives" ]
-  deps = [
-           # WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
-           "//sdk:driver_archive",
-           "//sdk:final_fuchsia_idk",
-         ] + sdk_archive_labels
+  deps = [ "//sdk:final_fuchsia_idk" ] + sdk_archive_labels
 }
 
 # Describes the `exported_package_archive`s labels specified by the gn arg
