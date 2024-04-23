@@ -25,6 +25,7 @@ ffx_plugin("ffx_list") {
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
