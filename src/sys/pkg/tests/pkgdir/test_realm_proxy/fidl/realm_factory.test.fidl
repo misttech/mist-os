@@ -5,16 +5,20 @@
 library fuchsia.pkg.test;
 
 using fuchsia.component.sandbox;
+using fuchsia.io;
 using fuchsia.testing.harness;
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
-type RealmOptions = resource table {};
+type RealmOptions = resource table {
+    1: pkg_directory_server server_end:fuchsia.io.Directory;
+};
 
 @discoverable
 open protocol RealmFactory {
     /// Creates a new realm and returns a dictionary containing its exposed capabilities.
     flexible CreateRealm(resource struct {
         options RealmOptions;
-        dictionary server_end:fuchsia.component.sandbox.Dictionary;
-    }) -> () error fuchsia.testing.harness.OperationError;
+    }) -> (resource struct {
+        dictionary client_end:fuchsia.component.sandbox.Dictionary;
+    }) error fuchsia.testing.harness.OperationError;
 };

@@ -5,10 +5,9 @@
 #![allow(clippy::let_unit_value)]
 
 use {
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_test::{RealmFactoryMarker, RealmOptions},
+    fio::DirectoryMarker,
     fuchsia_component::client::connect_to_protocol,
 };
 
@@ -25,29 +24,15 @@ async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
     let _ = connect_to_protocol::<fcomponent::BinderMarker>().unwrap();
     let realm_factory =
         connect_to_protocol::<RealmFactoryMarker>().expect("connect to realm_factory");
-    let (dictionary, dict_server) = create_proxy().expect("create_proxy");
+    let (directory, server_end) =
+        fidl::endpoints::create_proxy::<DirectoryMarker>().expect("create proxy");
     realm_factory
-        .create_realm(RealmOptions::default(), dict_server)
+        .create_realm(RealmOptions { pkg_directory_server: Some(server_end), ..Default::default() })
         .await
         .expect("create_realm fidl failed")
         .expect("create_realm failed");
-    let cap = dictionary
-        .get("pkg")
-        .await
-        .expect("Dictionary/Get fidl failed")
-        .expect("Dictionary/Get failed");
 
-    let fsandbox::Capability::Directory(directory) = cap else {
-        panic!("unexpected capability at pkg");
-    };
-    let directory = directory.into_proxy().unwrap();
-    let connect = || async move {
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
-        directory
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
-            .expect("clone failed");
-        PackageSource { dir: client }
-    };
+    let connect = || async move { PackageSource { dir: directory } };
     IntoIterator::into_iter([connect().await])
 }
 
