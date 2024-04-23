@@ -13,7 +13,7 @@
         colocate: "true",
         compat: "driver/serial.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
+        fallback: "true",
     },
     use: [],
 }
