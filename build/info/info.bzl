@@ -42,7 +42,6 @@ def _gen_latest_date_and_timestamp_impl(ctx):
     # Build command line arguments.
     cmd_args = [
         ctx.file._py_script.path,
-        "--use-jiri-values",
         "--git",
         ctx.file._git.path,
         "--timestamp-file",
@@ -59,11 +58,7 @@ def _gen_latest_date_and_timestamp_impl(ctx):
         cmd_args += ["--truncate"]
 
     runfiles = ctx.runfiles(
-        files = [
-            ctx.file._integration_git_head,
-            ctx.file._integration_commit_hash,
-            ctx.file._integration_commit_stamp,
-        ],
+        files = [ctx.file._integration_git_head],
         transitive_files = python3_runfiles.files,
     )
 
@@ -82,16 +77,10 @@ def _gen_latest_date_and_timestamp_impl(ctx):
 gen_latest_date_and_timestamp = rule(
     implementation = _gen_latest_date_and_timestamp_impl,
     attrs = {
-        "_integration_git_head": attr.label(
-            allow_single_file = True,
-            default = "//:integration/.git/HEAD",
-        ),
         "_py_script": attr.label(
             allow_single_file = True,
             default = "//build/info:gen_latest_commit_date.py",
         ),
-        # https://fxbug.dev/335391299: Remove this once the Jiri hook
-        # has been enabled.
         "_git": attr.label(
             allow_single_file = True,
             doc = "Git binary to use.",
@@ -99,13 +88,9 @@ gen_latest_date_and_timestamp = rule(
             default = "//:fuchsia_build_generated/git",
             # LINT.ThenChange(//build/bazel/scripts/update_workspace.py)
         ),
-        "_integration_commit_hash": attr.label(
+        "_integration_git_head": attr.label(
             allow_single_file = True,
-            default = "//build/info:jiri_generated/integration_commit_hash.txt",
-        ),
-        "_integration_commit_stamp": attr.label(
-            allow_single_file = True,
-            default = "//build/info:jiri_generated/integration_commit_stamp.txt",
+            default = "//:integration/.git/HEAD",
         ),
     } | PY_TOOLCHAIN_DEPS,
 )
