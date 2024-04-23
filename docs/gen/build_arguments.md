@@ -331,18 +331,6 @@ to save about 3 minutes of build time when they are not needed.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_fuchsia_sdk.gni:17
-
-### bazel_fuchsia_sdk_content
-
-Determines which set of SDK atoms are used to populage the @fuchsia_sdk
-Bazel external repository in the current build configuration. Possible
-values are "core" or "driver", see below for a description of each set.
-Note: this value will be changed to "core" once CI builders for the
-Fuchsia Bazel DDK are in place.
-
-**Current value (from the default):** `"driver"`
-
 From //build/bazel/bazel_fuchsia_sdk.gni:11
 
 ### bazel_product_bundle_board
@@ -877,6 +865,12 @@ An action that accesses undeclared inputs or outputs will fail the build.
 **Current value (from the default):** `false`
 
 From //build/tracer/tracer.gni:12
+
+### build_time_supported_api_levels
+
+**Current value (from the default):** `[15, 16, 17, 18, 19, 20]`
+
+From //build/bazel/bazel_fuchsia_sdk.gni:18
 
 ### build_uefi_disk
 
@@ -7107,15 +7101,13 @@ From //build/rust/config.gni:47
 ### rust_one_rlib_per_dir
 
 To avoid build nondeterminism due to extern search paths resolving
-to more than one path during a build, enable this option to place
-every rlib into its own exclusive directory.
-This requires `rustc_use_response_file = true` due to the command-line
-bloat this causes.
-See http://g-issues.fuchsia.dev/issues/319148874 for more details.
+to more than one path during a build, this option places every rlib
+into its own exclusive directory. This requires
+`rustc_use_response_file = true` due to the command-line bloat this causes.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/rust/build.gni:19
+From //build/rust/build.gni:16
 
 ### rust_parallel_frontend_threads
 
@@ -7260,11 +7252,10 @@ Place lengthy rustdeps and externs (GN) into ninja response files.
 Response files are needed to get around command line length limitations.
 rustc support for response files (as needed in our GN build) was
 added with revision 'git_revision:dfe53afaebd817f334d8ef9dc75a5cd2562cf6e6'.
-This optional will eventually become permanently true.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/rust/build.gni:11
+From //build/rust/build.gni:10
 
 ### rustc_version_description
 
