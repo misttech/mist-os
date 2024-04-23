@@ -19,7 +19,6 @@ group("tests") {
   deps = [
     "ebpf:tests",
     "extended_pstate:tests",
-    "kill_job_on_panic:tests",
     "range_map:tests",
     "selinux:tests",
     "starnix-uapi:tests",
