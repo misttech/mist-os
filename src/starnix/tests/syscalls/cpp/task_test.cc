@@ -308,6 +308,41 @@ TEST(Task, CloneVfork_exit) {
   EXPECT_GT(elapsed_us, kCloneVforkSleepUS);
 }
 
+TEST(Task, BrkReturnsCurrentBreakOnFailure) {
+  // Tests that the brk system call doesn't return an error, instead it returns
+  // the current value of the program break.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    // Some libc implementations wrap brk so that it returns an error.
+    // The Linux system call returns the current break on failure.
+    auto brk = [](uintptr_t addr) { return syscall(SYS_brk, addr); };
+
+    const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+    // This should always fail, returning the program_break
+    uintptr_t program_break = brk(UINTPTR_MAX);
+
+    // Try to reserve something beyond the program break, aligned to page size.
+    uintptr_t map_addr = (program_break & ~(page_size - 1)) + page_size;
+    void* res = mmap(reinterpret_cast<void*>(map_addr), page_size, PROT_NONE,
+                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+
+    // It's OK if there's already a mapping: brk should also fail in that case.
+    ASSERT_TRUE(res != MAP_FAILED || errno == EEXIST)
+        << "unexpected mmap error: " << std::strerror(errno);
+
+    uintptr_t new_break = brk(map_addr + page_size);
+    // brk should fail.
+    EXPECT_EQ(new_break, program_break);
+
+    if (res != MAP_FAILED) {
+      SAFE_SYSCALL(munmap(res, page_size));
+    }
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
 TEST(Task, BrkShrinkAfterFork) {
   // Tests that a program can shrink their break after forking.
   const void* SBRK_ERROR = reinterpret_cast<void*>(-1);
