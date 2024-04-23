@@ -15,48 +15,37 @@
 #include <vector>
 
 namespace inspect {
+void TreeNameIterator::StartSelfManagedServer(
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_inspect::TreeNameIterator>&& request,
+    std::vector<std::string> names) {
+  ZX_ASSERT(dispatcher);
 
-class TreeNameIterator final : public fidl::WireServer<fuchsia_inspect::TreeNameIterator> {
- public:
-  // Start a server that deletes itself on unbind.
-  static void StartSelfManagedServer(async_dispatcher_t* dispatcher,
-                                     fidl::ServerEnd<fuchsia_inspect::TreeNameIterator>&& request,
-                                     std::vector<std::string> names) {
-    ZX_ASSERT(dispatcher);
+  auto impl = std::unique_ptr<TreeNameIterator>(new TreeNameIterator(std::move(names)));
+  auto* ptr = impl.get();
+  auto binding_ref = fidl::BindServer(dispatcher, std::move(request), std::move(impl), nullptr);
+  ptr->binding_.emplace(std::move(binding_ref));
+}
 
-    auto impl = std::unique_ptr<TreeNameIterator>(new TreeNameIterator(std::move(names)));
-    auto* ptr = impl.get();
-    auto binding_ref = fidl::BindServer(dispatcher, std::move(request), std::move(impl), nullptr);
-    ptr->binding_.emplace(std::move(binding_ref));
-  }
+// Get the next batch of names. Names are sent in batches of `kMaxTreeNamesListSize`,
+// which is defined with the rest of the FIDL protocol.
+void TreeNameIterator::GetNext(GetNextCompleter::Sync& completer) {
+  ZX_ASSERT(binding_.has_value());
 
-  // Get the next batch of names. Names are sent in batches of `kMaxTreeNamesListSize`,
-  // which is defined with the rest of the FIDL protocol.
-  void GetNext(GetNextCompleter::Sync& completer) {
-    ZX_ASSERT(binding_.has_value());
-
-    std::vector<fidl::StringView> converted_names;
-    converted_names.reserve(names_.size());
-    auto bytes_used = sizeof(fidl_message_header_t) + sizeof(fidl_vector_t);
-    for (; current_index_ < names_.size(); current_index_++) {
-      bytes_used += sizeof(fidl_string_t);
-      bytes_used += FIDL_ALIGN(names_.at(current_index_).length());
-      if (bytes_used > ZX_CHANNEL_MAX_MSG_BYTES) {
-        break;
-      }
-
-      converted_names.emplace_back(fidl::StringView::FromExternal(names_.at(current_index_)));
+  std::vector<fidl::StringView> converted_names;
+  converted_names.reserve(names_.size());
+  auto bytes_used = sizeof(fidl_message_header_t) + sizeof(fidl_vector_t);
+  for (; current_index_ < names_.size(); current_index_++) {
+    bytes_used += sizeof(fidl_string_t);
+    bytes_used += FIDL_ALIGN(names_.at(current_index_).length());
+    if (bytes_used > ZX_CHANNEL_MAX_MSG_BYTES) {
+      break;
     }
 
-    completer.Reply(fidl::VectorView<fidl::StringView>::FromExternal(converted_names));
+    converted_names.emplace_back(fidl::StringView::FromExternal(names_.at(current_index_)));
   }
 
- private:
-  TreeNameIterator(std::vector<std::string>&& names) : names_(std::move(names)) {}
-  cpp17::optional<fidl::ServerBindingRef<fuchsia_inspect::TreeNameIterator>> binding_;
-  std::vector<std::string> names_;
-  uint64_t current_index_ = 0;
-};
+  completer.Reply(fidl::VectorView<fidl::StringView>::FromExternal(converted_names));
+}
 
 void TreeServer::StartSelfManagedServer(std::variant<Inspector, zx::vmo> data,
                                         TreeHandlerSettings settings,

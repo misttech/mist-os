@@ -299,7 +299,6 @@
         // Non-zircon services for archivist, pwrbtn-monitor, and console.
         {
             protocol: [
-                "fuchsia.component.KcounterBinder",
                 "fuchsia.component.PersistenceBinder",
                 "fuchsia.component.SamplerBinder",
                 "fuchsia.exception.Handler",

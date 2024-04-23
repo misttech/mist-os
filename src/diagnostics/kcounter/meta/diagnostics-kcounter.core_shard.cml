@@ -1,20 +1,5 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-{
-    offer: [
-        {
-            protocol: [ "fuchsia.kernel.Counter" ],
-            from: "parent",
-            to: "#diagnostics",
-            availability: "optional",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.component.KcounterBinder",
-            from: "#diagnostics",
-            as: "fuchsia.component.KcounterBinder",
-        },
-    ],
-}
+// TODO(https://fxbug.dev/326315218): remove this file as last step in soft migration
+{}

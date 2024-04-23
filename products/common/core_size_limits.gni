@@ -111,7 +111,6 @@ size_checker_input = {
       component = "Diagnostics"
       pkgs = [
         "diagnostics",
-        "diagnostics-kcounter",
         "diagnostics-persistence",
         "log_listener",
         "log_listener_shell",

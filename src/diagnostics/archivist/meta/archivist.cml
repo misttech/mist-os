@@ -43,13 +43,15 @@
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.component.KcounterBinder",
                 "fuchsia.component.PersistenceBinder",
                 "fuchsia.component.SamplerBinder",
             ],
         },
         {
-            protocol: [ "fuchsia.component.DetectBinder" ],
+            protocol: [
+                "fuchsia.component.DetectBinder",
+                "fuchsia.component.KernelDebugBrokerBinder",
+            ],
             availability: "optional",
         },
         {

@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
       },
       {
           .provider = kcounter_get_service_provider(),
-          .ctx = nullptr,
+          .ctx = reinterpret_cast<void*>(dispatcher),
       },
   };
 

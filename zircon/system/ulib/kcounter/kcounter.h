@@ -24,6 +24,7 @@ class VmoToInspectMapper final {
  public:
   VmoToInspectMapper();
   ~VmoToInspectMapper() = default;
+  VmoToInspectMapper(VmoToInspectMapper&&) = default;
 
   zx_status_t GetInspectVMO(zx::vmo* vmo);
   zx_status_t UpdateInspectVMO();

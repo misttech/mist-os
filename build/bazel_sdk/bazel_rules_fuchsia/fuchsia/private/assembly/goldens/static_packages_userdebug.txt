@@ -26,7 +26,6 @@ build-info-service
 ?dhcpv4-server
 ?dhcpv6-client
 ?diagnostics
-?diagnostics-kcounter
 ?diagnostics-persistence
 ?display-coordinator-connector
 ?dns-resolver

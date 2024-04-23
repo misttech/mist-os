@@ -52,7 +52,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         } = diagnostics_config;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
-            "fuchsia.component.KcounterBinder",
             "fuchsia.component.PersistenceBinder",
             "fuchsia.component.SamplerBinder",
         ]);
@@ -68,10 +67,11 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             | (_, FeatureSupportLevel::Utility) => {
                 bind_services.clear();
             }
-            // Detect isn't present on user builds.
+            // Some services aren't present on user builds.
             (BuildType::User, FeatureSupportLevel::Standard) => {}
             (_, FeatureSupportLevel::Standard) => {
                 bind_services.insert("fuchsia.component.DetectBinder");
+                bind_services.insert("fuchsia.component.KernelDebugBrokerBinder");
             }
         };
 
@@ -297,7 +297,7 @@ mod tests {
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
             Value::Array(vec![
                 "fuchsia.component.DetectBinder".into(),
-                "fuchsia.component.KcounterBinder".into(),
+                "fuchsia.component.KernelDebugBrokerBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
             ])
@@ -457,7 +457,6 @@ mod tests {
         assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
             Value::Array(vec![
-                "fuchsia.component.KcounterBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
             ])

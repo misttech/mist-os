@@ -21,7 +21,6 @@ group("tests") {
     "config:tests",
     "detect:tests",
     "iquery:tests",
-    "kcounter:tests",
     "lib:tests",
     "log_listener:tests",
     "persistence:tests",

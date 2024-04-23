@@ -19,7 +19,6 @@ enum CreateChildArgs {
     Detect(detect::CommandLine),
     Sampler(sampler::Args),
     Persistence(persistence::CommandLine),
-    Kcounter(kcounter::CommandLine),
 }
 
 #[fuchsia::main(logging = false)]
@@ -28,7 +27,6 @@ async fn main() -> Result<(), Error> {
         Some(detect::PROGRAM_NAME) => detect::PROGRAM_NAME,
         Some(sampler::PROGRAM_NAME) => sampler::PROGRAM_NAME,
         Some(persistence::PROGRAM_NAME) => persistence::PROGRAM_NAME,
-        Some(kcounter::PROGRAM_NAME) => kcounter::PROGRAM_NAME,
         // If the name is invalid, don't quit yet - give argh a chance to log
         // help text. Then the program will exit.
         _ => "launcher",
@@ -39,6 +37,5 @@ async fn main() -> Result<(), Error> {
         CreateChildArgs::Detect(_args) => detect::main().await,
         CreateChildArgs::Persistence(args) => persistence::main(args).await,
         CreateChildArgs::Sampler(_args) => sampler::main().await,
-        CreateChildArgs::Kcounter(_args) => kcounter::main().await,
     }
 }
