@@ -326,7 +326,7 @@ impl ResolveCtx {
                     process
                 } else {
                     self.add_warning(ParseWarning::UnknownProcessRef(p));
-                    ProcessKoid(std::u64::MAX)
+                    ProcessKoid(u64::MAX)
                 }
             }
             ProcessRef::Inline(inline) => inline,
@@ -340,7 +340,7 @@ impl ResolveCtx {
                     thread
                 } else {
                     self.warnings.push(ParseWarning::UnknownThreadRef(t));
-                    ThreadKoid(std::u64::MAX)
+                    ThreadKoid(u64::MAX)
                 }
             }
             ThreadRef::Inline(inline) => inline,

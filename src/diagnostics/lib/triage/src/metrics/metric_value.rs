@@ -394,9 +394,9 @@ pub(crate) mod test {
         }
         test_from!(JsonValue::String, MetricValue::String, "Hi World".to_string());
         test_from_int!(JsonValue::Number, MetricValue::Int, 3);
-        test_from_int!(JsonValue::Number, MetricValue::Int, std::i64::MAX);
+        test_from_int!(JsonValue::Number, MetricValue::Int, i64::MAX);
         test_from_int!(JsonValue::Number, MetricValue::Int, std::i64::MIN);
-        test_from_to!(JsonValue::Number, MetricValue::Int, JsonNumber::from(std::u64::MAX), -1);
+        test_from_to!(JsonValue::Number, MetricValue::Int, JsonNumber::from(u64::MAX), -1);
         test_from_float!(JsonValue::Number, MetricValue::Float, 3.14);
         test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::MAX);
         test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::MIN);
@@ -448,10 +448,10 @@ pub(crate) mod test {
         test_from!(DiagnosticProperty::String, MetricValue::String, "Hi World".to_string());
         test_from!(DiagnosticProperty::Bytes, MetricValue::Bytes, vec![1, 2, 3]);
         test_from!(DiagnosticProperty::Int, MetricValue::Int, 3);
-        test_from!(DiagnosticProperty::Int, MetricValue::Int, std::i64::MAX);
+        test_from!(DiagnosticProperty::Int, MetricValue::Int, i64::MAX);
         test_from!(DiagnosticProperty::Int, MetricValue::Int, std::i64::MIN);
         test_from!(DiagnosticProperty::Uint, MetricValue::Int, 3);
-        test_from_to!(DiagnosticProperty::Uint, MetricValue::Int, std::u64::MAX, -1);
+        test_from_to!(DiagnosticProperty::Uint, MetricValue::Int, u64::MAX, -1);
         test_from!(DiagnosticProperty::Double, MetricValue::Float, 3.14);
         test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::MAX);
         test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::MIN);

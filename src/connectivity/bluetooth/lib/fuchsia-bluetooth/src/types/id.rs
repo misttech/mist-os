@@ -120,7 +120,7 @@ mod tests {
             // Normal case without padding.
             (PeerId(2000037777717788818), "1bc18fc31e3b0092"),
             // u64 max test.
-            (PeerId(std::u64::MAX), "ffffffffffffffff"),
+            (PeerId(u64::MAX), "ffffffffffffffff"),
         ];
 
         for (id, expected) in testcases {
@@ -140,7 +140,7 @@ mod tests {
             // Normal case without padding.
             (HostId(2000037777717788818), "1bc18fc31e3b0092"),
             // u64 max test.
-            (HostId(std::u64::MAX), "ffffffffffffffff"),
+            (HostId(u64::MAX), "ffffffffffffffff"),
         ];
 
         for (id, expected) in testcases {

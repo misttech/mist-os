@@ -423,7 +423,7 @@ impl RetryWithBackoff {
             deadline: Time::after(timeout),
             prev_delay: 0.millis(),
             next_delay: 1.millis(),
-            max_delay: std::i64::MAX.nanos(),
+            max_delay: i64::MAX.nanos(),
         }
     }
     pub fn infinite_with_max_interval(max_delay: zx::Duration) -> Self {

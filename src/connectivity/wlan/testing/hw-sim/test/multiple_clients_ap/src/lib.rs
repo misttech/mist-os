@@ -139,7 +139,7 @@ async fn multiple_clients_ap() {
     let (finish_sender, finish_receiver) = oneshot::channel();
     let ap_fut = ap_helper
         .run_until_complete_or_timeout(
-            std::i64::MAX.nanos(),
+            i64::MAX.nanos(),
             "serving as an AP",
             transmit_to_clients([&client1_proxy, &client2_proxy]),
             future::join(client1_confirm_receiver, client2_confirm_receiver).then(|_| {
@@ -164,7 +164,7 @@ async fn multiple_clients_ap() {
 
     let client1_connect_fut = pin!(client1_connect_fut);
     let client1_fut = client1_helper.run_until_complete_or_timeout(
-        std::i64::MAX.nanos(),
+        i64::MAX.nanos(),
         "connecting to AP",
         scan_and_transmit_to_ap(&ap_proxy, &client1_proxy),
         client1_connect_fut,
@@ -185,7 +185,7 @@ async fn multiple_clients_ap() {
 
     let client2_connect_fut = pin!(client2_connect_fut);
     let client2_fut = client2_helper.run_until_complete_or_timeout(
-        std::i64::MAX.nanos(),
+        i64::MAX.nanos(),
         "connecting to AP",
         scan_and_transmit_to_ap(&ap_proxy, &client2_proxy),
         client2_connect_fut,

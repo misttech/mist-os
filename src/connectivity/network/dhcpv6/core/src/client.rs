@@ -41,7 +41,7 @@ const IRT_DEFAULT: Duration = Duration::from_secs(86400);
 ///
 /// NOTE: it is possible for `Duration` to be bigger by filling in the nanos
 /// field, but this value is good enough for the purpose of this crate.
-const MAX_DURATION: Duration = Duration::from_secs(std::u64::MAX);
+const MAX_DURATION: Duration = Duration::from_secs(u64::MAX);
 
 /// Initial Solicit timeout `SOL_TIMEOUT` from [RFC 8415, Section 7.6].
 ///
@@ -6180,7 +6180,7 @@ mod tests {
             let (mut client, actions) = ClientStateMachine::start_stateless(
                 [0, 1, 2],
                 options.clone(),
-                StepRng::new(std::u64::MAX / 2, 0),
+                StepRng::new(u64::MAX / 2, 0),
                 now,
             );
 
@@ -6264,7 +6264,7 @@ mod tests {
         let (mut client, actions) = ClientStateMachine::start_stateless(
             [0, 1, 2],
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             now,
         );
         assert_matches!(
@@ -6290,7 +6290,7 @@ mod tests {
         let (mut client, _) = ClientStateMachine::start_stateless(
             [0, 1, 2],
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
 
@@ -6380,7 +6380,7 @@ mod tests {
                 preferred_delegated_prefixes.into_iter().map(|a| HashSet::from([a])),
             ),
             options_to_request,
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
     }
@@ -7056,7 +7056,7 @@ mod tests {
             ),
             Default::default(),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -7135,7 +7135,7 @@ mod tests {
             ),
             Default::default(),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -7263,7 +7263,7 @@ mod tests {
             ),
             Default::default(),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -7340,7 +7340,7 @@ mod tests {
             ),
             Default::default(),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -7439,7 +7439,7 @@ mod tests {
             CONFIGURED_NON_TEMPORARY_ADDRESSES.into_iter().map(TestIaNa::new_default).collect(),
             CONFIGURED_DELEGATED_PREFIXES.into_iter().map(TestIaPd::new_default).collect(),
             &[],
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
     }
@@ -7471,7 +7471,7 @@ mod tests {
         ]
         .into_iter()
         .collect::<BinaryHeap<_>>();
-        let mut rng = StepRng::new(std::u64::MAX / 2, 0);
+        let mut rng = StepRng::new(u64::MAX / 2, 0);
 
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
@@ -7674,7 +7674,7 @@ mod tests {
             2,
             std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
         );
-        let mut rng = StepRng::new(std::u64::MAX / 2, 0);
+        let mut rng = StepRng::new(u64::MAX / 2, 0);
 
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
@@ -7805,7 +7805,7 @@ mod tests {
     ) {
         let options_to_request = vec![];
         let configured_non_temporary_addresses = testutil::to_configured_addresses(1, vec![]);
-        let mut rng = StepRng::new(std::u64::MAX / 2, 0);
+        let mut rng = StepRng::new(u64::MAX / 2, 0);
 
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
@@ -7891,7 +7891,7 @@ mod tests {
     // Test that T1/T2 are calculated correctly on receiving a Reply to Request.
     #[test]
     fn compute_t1_t2_on_reply_to_request() {
-        let mut rng = StepRng::new(std::u64::MAX / 2, 0);
+        let mut rng = StepRng::new(u64::MAX / 2, 0);
 
         for (
             (ia1_preferred_lifetime, ia1_valid_lifetime, ia1_t1, ia1_t2),
@@ -8085,7 +8085,7 @@ mod tests {
                 CONFIGURED_DELEGATED_PREFIXES.map(|a| HashSet::from([a])),
             ),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -8249,7 +8249,7 @@ mod tests {
             ),
             Default::default(),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -8465,7 +8465,7 @@ mod tests {
                 .map(TestIaPd::new_default)
                 .collect(),
             &[],
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             now,
         );
 
@@ -8532,7 +8532,7 @@ mod tests {
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(), /* delegated_prefixes_to_assign */
             &DNS_SERVERS,
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             now,
         );
         assert_matches!(
@@ -8573,7 +8573,7 @@ mod tests {
     fn update_sol_max_rt_on_reply_to_request() {
         let options_to_request = vec![];
         let configured_non_temporary_addresses = testutil::to_configured_addresses(1, vec![]);
-        let mut rng = StepRng::new(std::u64::MAX / 2, 0);
+        let mut rng = StepRng::new(u64::MAX / 2, 0);
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
             CLIENT_ID,
@@ -8834,7 +8834,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
     }
@@ -8862,7 +8862,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
         assert_eq!(client.get_dns_servers()[..], DNS_SERVERS);
@@ -9021,7 +9021,7 @@ mod tests {
             iana.clone(),
             iapd.clone(),
             &[],
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             now,
         );
         let ClientStateMachine { transaction_id: _, options_to_request: _, state, rng: _ } =
@@ -9099,7 +9099,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state, rng: _ } = &client;
@@ -9243,7 +9243,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state, rng: _ } = &client;
@@ -9443,7 +9443,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -9578,7 +9578,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -9696,7 +9696,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -9891,7 +9891,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -10077,7 +10077,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -10314,7 +10314,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -10616,7 +10616,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state: _, rng: _ } =
@@ -10769,7 +10769,7 @@ mod tests {
         let (mut client, _) = ClientStateMachine::start_stateless(
             [0, 1, 2],
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
 
@@ -10819,7 +10819,7 @@ mod tests {
         let (mut client, _) = ClientStateMachine::start_stateless(
             [0, 1, 2],
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
 
@@ -10834,7 +10834,7 @@ mod tests {
         let (mut client, _) = ClientStateMachine::start_stateless(
             [0, 1, 2],
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
         let ClientStateMachine { transaction_id, options_to_request: _, state, rng: _ } = &client;
@@ -10888,7 +10888,7 @@ mod tests {
             ),
             Default::default(),
             Vec::new(),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -10906,7 +10906,7 @@ mod tests {
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(),
             &[],
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -10925,7 +10925,7 @@ mod tests {
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(), /* delegated_prefixes_to_assign */
             &[],
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -10956,7 +10956,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             time,
         );
 
@@ -11066,7 +11066,7 @@ mod tests {
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
             &[],
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
 
@@ -11109,7 +11109,7 @@ mod tests {
             T1,
             T2,
             v6::NonZeroTimeValue::Finite(VALID_LIFETIME),
-            StepRng::new(std::u64::MAX / 2, 0),
+            StepRng::new(u64::MAX / 2, 0),
             Instant::now(),
         );
 
@@ -11128,7 +11128,7 @@ mod tests {
     // loss from floating point arithmetic.
     #[test]
     fn retransmission_timeout() {
-        let mut rng = StepRng::new(std::u64::MAX / 2, 0);
+        let mut rng = StepRng::new(u64::MAX / 2, 0);
 
         let initial_rt = Duration::from_secs(1);
         let max_rt = Duration::from_secs(100);
@@ -11166,7 +11166,7 @@ mod tests {
         assert_eq!(t.as_millis(), MAX_DURATION.as_millis());
 
         // Steps through the range with deterministic randomness, 20% at a time.
-        let mut rng = StepRng::new(0, std::u64::MAX / 5);
+        let mut rng = StepRng::new(0, u64::MAX / 5);
         [
             (Duration::from_millis(10000), 19000),
             (Duration::from_millis(10000), 19400),

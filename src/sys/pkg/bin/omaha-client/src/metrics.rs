@@ -609,9 +609,9 @@ mod tests {
     fn test_duration_to_cobalt_metrics() {
         assert_eq!(duration_to_cobalt_micros(Duration::from_micros(0), "test"), Some(0));
         assert_eq!(
-            duration_to_cobalt_micros(Duration::from_micros(std::i64::MAX as u64), "test"),
-            Some(std::i64::MAX)
+            duration_to_cobalt_micros(Duration::from_micros(i64::MAX as u64), "test"),
+            Some(i64::MAX)
         );
-        assert_eq!(duration_to_cobalt_micros(Duration::from_micros(std::u64::MAX), "test"), None);
+        assert_eq!(duration_to_cobalt_micros(Duration::from_micros(u64::MAX), "test"), None);
     }
 }

@@ -972,13 +972,13 @@ mod tests {
         // Unsigned 64 bit integers are accepted.
         assert_eq!(Ok(("", 0)), v_number("0"));
         assert_eq!(Ok(("", 1234567890)), v_number("1234567890"));
-        let n = format!("{}", std::u64::MAX);
-        assert_eq!(Ok(("", std::u64::MAX)), v_number(&n));
+        let n = format!("{}", u64::MAX);
+        assert_eq!(Ok(("", u64::MAX)), v_number(&n));
 
         // Unsigned hexadecimal 64 bit integers are accepted.
         assert_eq!(Ok(("", 0)), v_number("0x0"));
         assert_eq!(Ok(("", 1311768467463790320)), v_number("0x123456789abcdef0"));
-        assert_eq!(Ok(("", std::u64::MAX)), v_number("0xffffffffffffffff"));
+        assert_eq!(Ok(("", u64::MAX)), v_number("0xffffffffffffffff"));
 
         // Not hexadecimal chars are rejected
         assert_eq!(Ok(("g", 171)), v_number("0xabg"));

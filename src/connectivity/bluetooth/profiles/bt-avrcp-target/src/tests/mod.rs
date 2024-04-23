@@ -144,7 +144,7 @@ async fn send_get_notification(target_proxy: TargetHandlerProxy) {
         .get_notification(NotificationEvent::TrackChanged)
         .await
         .expect("FIDL call should work");
-    assert_eq!(Ok(Notification { track_id: Some(std::u64::MAX), ..Default::default() }), res);
+    assert_eq!(Ok(Notification { track_id: Some(u64::MAX), ..Default::default() }), res);
 
     // Send a GetNotification request for the current battery status - default is Normal.
     let res = target_proxy
@@ -468,7 +468,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
         // notification.
         let mut watch = target_proxy.watch_notification(
             NotificationEvent::TrackChanged,
-            &Notification { track_id: Some(std::u64::MAX), ..Default::default() },
+            &Notification { track_id: Some(u64::MAX), ..Default::default() },
             0,
         );
         // This should not complete until we send the state update.

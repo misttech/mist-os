@@ -810,7 +810,7 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
             BOARD_NAME_FILE,
             tftp::TftpMode::OCTET,
             [
-                tftp::TftpOption::TransferSize(std::u64::MAX).not_forced(),
+                tftp::TftpOption::TransferSize(u64::MAX).not_forced(),
                 tftp::TftpOption::Timeout(TIMEOUT_OPTION_SECS).not_forced(),
             ],
         )

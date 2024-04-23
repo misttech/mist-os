@@ -344,7 +344,7 @@ trait NumberFormat {
 impl NumberFormat for i64 {
     fn format(&self) -> String {
         match *self {
-            std::i64::MAX => "<max>".to_string(),
+            i64::MAX => "<max>".to_string(),
             std::i64::MIN => "<min>".to_string(),
             x => format!("{}", x),
         }
@@ -354,7 +354,7 @@ impl NumberFormat for i64 {
 impl NumberFormat for u64 {
     fn format(&self) -> String {
         match *self {
-            std::u64::MAX => "<max>".to_string(),
+            u64::MAX => "<max>".to_string(),
             x => format!("{}", x),
         }
     }

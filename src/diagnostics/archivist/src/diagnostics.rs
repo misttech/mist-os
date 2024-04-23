@@ -322,12 +322,8 @@ impl ProcessingTimeTracker {
                 }
             }
             self.longest_times_by_component.remove(&key);
-            self.shortest_time_ns = self
-                .longest_times_by_component
-                .values()
-                .map(|v| v.0)
-                .min()
-                .unwrap_or(std::u64::MAX);
+            self.shortest_time_ns =
+                self.longest_times_by_component.values().map(|v| v.0).min().unwrap_or(u64::MAX);
         }
 
         self.shortest_time_ns = std::cmp::min(self.shortest_time_ns, time_ns);

@@ -587,7 +587,7 @@ mod tests {
 
     #[test]
     fn max_event_time() {
-        let event_time = event_time_or_now(Some(std::i64::MAX));
+        let event_time = event_time_or_now(Some(i64::MAX));
         assert_eq!(event_time, zx::Time::INFINITE);
     }
 

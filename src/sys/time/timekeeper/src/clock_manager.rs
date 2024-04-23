@@ -59,7 +59,7 @@ const ERROR_BOUND_UPDATE: u64 = 100_000_000; // 100ms
 const ERROR_REFRESH_INTERVAL: zx::Duration = zx::Duration::from_minutes(6);
 
 /// Denotes an unknown clock error bound
-const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = std::u64::MAX;
+const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = u64::MAX;
 
 /// Describes how a correction will be made to a clock.
 enum ClockCorrection {
