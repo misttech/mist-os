@@ -398,12 +398,27 @@ def remote_clang_linker_toolchain_inputs(
     unwindlib: str,
     profile: bool,
     sanitizers: FrozenSet[str],
+    want_all_libclang_rt: bool,
 ) -> Iterable[Path]:
     """List linker support libraries.
 
     Kludge: partially hardcode built-in libraries until linker tools can
     quickly discover the needed libraries to link remotely.
     See https://fxbug.dev/42084853
+
+    Args:
+      clang_path_rel: path to clang executable
+      target: target platform triple
+      shared: True if building shared library
+      rtlib: the compiler runtime library name
+      unwindlib: unwind library name
+      profile: True if profile runtime is wanted
+      sanitizers: Set of sanitizers that are enabled (and their runtimes needed)
+      want_all_libclang_rt: if True, grab the entire directory of libclang_rt
+        runtime libraries for all variants without trying to pick based
+        on options.  This ends up including more input files for remote
+        execution, but is less fragile and less prone to compiler driver
+        changes.
 
     Yields:
       Paths to libraries needed for linking.
@@ -412,34 +427,39 @@ def remote_clang_linker_toolchain_inputs(
     libclang_versioned = _versioned_libclang_dir(clang_path_rel)
     target_libdir = clang_target_to_libdir(target)
     libclang_target_dir = libclang_versioned / "lib" / target_libdir
-    if rtlib == "compiler-rt":
-        yield libclang_target_dir / "clang_rt.crtbegin.o"
-        yield libclang_target_dir / "clang_rt.crtend.o"
-
-    yield libclang_target_dir / "libclang_rt.builtins.a"
-
     versioned_share_dir = libclang_versioned / "share"
-    yield from _clang_sanitizer_share_files(versioned_share_dir, sanitizers)
 
-    # Including both static and shared libraries, because one cannot
-    # deduce from the command-line alone which will be needed.
-    if "address" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.asan*")
-    if "hwaddress" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.hwasan*")
-    if "leak" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.lsan*")
-    if "memory" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.msan*")
-    if "fuzzer" in sanitizers or "fuzzer-no-link" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.fuzzer*")
-    if "thread" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.tsan*")
-    if "undefined" in sanitizers:
-        yield from libclang_target_dir.glob("libclang_rt.ubsan*")
+    if want_all_libclang_rt:
+        yield versioned_share_dir
+        yield libclang_target_dir
+    else:  # pick subset of rt libs based on options.
+        if rtlib == "compiler-rt":
+            yield libclang_target_dir / "clang_rt.crtbegin.o"
+            yield libclang_target_dir / "clang_rt.crtend.o"
 
-    if profile:
-        yield from libclang_target_dir.glob("libclang_rt.profile*")
+        yield libclang_target_dir / "libclang_rt.builtins.a"
+
+        yield from _clang_sanitizer_share_files(versioned_share_dir, sanitizers)
+
+        # Including both static and shared libraries, because one cannot
+        # deduce from the command-line alone which will be needed.
+        if "address" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.asan*")
+        if "hwaddress" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.hwasan*")
+        if "leak" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.lsan*")
+        if "memory" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.msan*")
+        if "fuzzer" in sanitizers or "fuzzer-no-link" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.fuzzer*")
+        if "thread" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.tsan*")
+        if "undefined" in sanitizers:
+            yield from libclang_target_dir.glob("libclang_rt.ubsan*")
+
+        if profile:
+            yield from libclang_target_dir.glob("libclang_rt.profile*")
 
     stdlibs_dir = clang_root / "lib" / target_libdir
     # This directory includes variants like asan, noexcept.

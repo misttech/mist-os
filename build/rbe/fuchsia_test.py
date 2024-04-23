@@ -212,7 +212,7 @@ class RemoteClangLinkerToolchainInputsTests(unittest.TestCase):
     def _clang_path(self):
         return Path("../path/to/linux-x64/bin/clang")
 
-    def test_basic(self):
+    def test_select_libclang_rt(self):
         # just test for execution without errors
         with mock.patch.object(
             Path, "glob", return_value=iter([Path("ignore")])
@@ -226,6 +226,26 @@ class RemoteClangLinkerToolchainInputsTests(unittest.TestCase):
                     unwindlib="",
                     profile=True,
                     sanitizers={"address", "leak", "fuzzer"},
+                    want_all_libclang_rt=False,
+                )
+            )
+        mock_glob.assert_called()
+
+    def test_want_all_libclang_rt(self):
+        # just test for execution without errors
+        with mock.patch.object(
+            Path, "glob", return_value=iter([Path("ignore")])
+        ) as mock_glob:
+            inputs = list(
+                fuchsia.remote_clang_linker_toolchain_inputs(
+                    self._clang_path,
+                    target="x86_64-unknown-linux",
+                    shared=False,
+                    rtlib="compiler-rt",
+                    unwindlib="",
+                    profile=True,
+                    sanitizers={"address", "leak", "fuzzer"},
+                    want_all_libclang_rt=True,
                 )
             )
         mock_glob.assert_called()
