@@ -10,15 +10,22 @@ jobs:
       - image: cimg/base:current
 
     steps:
-      # Checkout the code as the first step.
       - checkout
+      - run: sudo apt-get update && sudo apt-get install -y rsync
+      - restore_cache:
+          name: Restore Jiri Cache
+          keys: &jiri-cache jiri-packages-{{ checksum "meta/jiri/jiri.lock" }}
       - run:
           command: |
-            apt-get update && apt-get install -y rsync
             curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
             export PATH=$PWD/.jiri_root/bin:$PATH
             jiri update -v -vv
-            make test
+      - save_cache:
+          name: Save Jiri Package Cache
+          key: *jiri-cache
+          paths:
+            - prebuilt
+      - run: make test
 
 workflows:
   build-workflow:
