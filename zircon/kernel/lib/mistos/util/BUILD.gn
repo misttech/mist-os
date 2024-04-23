@@ -9,9 +9,8 @@ zx_library("util") {
     "process.cc",
     "zx_clock_get_monotonic.cc",
     "zx_status_get_string.cc",
+    "zx_system_get_page_size.cc",
   ]
 
-  deps = [
-    "//zircon/kernel/object",
-  ]
+  deps = [ "//zircon/kernel/object" ]
 }
