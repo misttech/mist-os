@@ -29,7 +29,6 @@
 #include <sdk/lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include "platform-device.h"
-#include "proxy-protocol.h"
 
 namespace platform_bus {
 

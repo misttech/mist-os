@@ -128,10 +128,7 @@ assembly_input_bundle("embeddable") {
   boot_driver_packages = [
     {
       package_target = "//src/devices/bus/drivers/platform:package"
-      driver_components = [
-        "meta/platform-bus.cm",
-        "meta/platform-bus.proxy.cm",
-      ]
+      driver_components = [ "meta/platform-bus.cm" ]
     },
 
     # TODO: Move this to bootstrap after fixing pci to not depend on it.

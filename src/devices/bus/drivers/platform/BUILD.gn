@@ -9,10 +9,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 group("platform") {
-  deps = [
-    ":platform-bus",
-    ":platform-bus.proxy",
-  ]
+  deps = [ ":platform-bus" ]
 }
 
 driver_bind_rules("platform-bus-bind") {
@@ -67,40 +64,13 @@ fuchsia_driver_component("platform-bus") {
 
 fuchsia_driver_package("package") {
   package_name = "platform-bus"
-  driver_components = [
-    ":platform-bus",
-    ":platform-bus.proxy",
-  ]
+  driver_components = [ ":platform-bus" ]
 }
 
 # Define Bazel input resource so it can be used
 export_fuchsia_package_to_bazel("platform-bus-package-bazel") {
   package = ":package"
   package_name = "platform-bus"
-}
-
-fuchsia_driver("platform-bus.proxy-driver") {
-  output_name = "platform-bus.proxy"
-  sources = [ "platform-proxy.cc" ]
-  deps = [
-    ":platform-bus-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("platform-bus.proxy") {
-  visibility = [ ":*" ]
-  component_name = "platform-bus.proxy"
-  deps = [ ":platform-bus.proxy-driver" ]
-  info = "platform-bus.proxy-info.json"
-  manifest = "meta/platform-bus.proxy.cml"
 }
 
 test("platform-bus-unittest") {

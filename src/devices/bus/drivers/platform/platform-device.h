@@ -16,19 +16,7 @@
 #include <ddktl/device.h>
 #include <fbl/vector.h>
 
-#include "proxy-protocol.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
-
-// This class, along with PlatformProxyDevice, represent a platform device.
-// Platform devices run in separate devhosts than the platform bus driver.
-// PlatformDevice exists in the platform bus devhost and PlatformProxyDevice
-// exists in the platform device's devhost. PlatformProxyDevice proxys
-// requests from the platform device via a channel, which are then
-// handled by PlatformDevice::DdkRxrpc and then handled by relevant Rpc* methods.
-//
-// Resource handles passed to the proxy to allow it to access MMIOs and interrupts.
-// This ensures if the proxy driver dies we will release their address space resources
-// back to the kernel if necessary.
 
 namespace platform_bus {
 
@@ -62,8 +50,7 @@ class RestrictPlatformBus : public fdf::WireServer<fuchsia_hardware_platform_bus
 };
 
 class PlatformDevice;
-using PlatformDeviceType =
-    ddk::Device<PlatformDevice, ddk::GetProtocolable, ddk::Rxrpcable, ddk::Initializable>;
+using PlatformDeviceType = ddk::Device<PlatformDevice, ddk::GetProtocolable, ddk::Initializable>;
 
 // This class represents a platform device attached to the platform bus.
 // Instances of this class are created by PlatformBus at boot time when the board driver
@@ -75,13 +62,11 @@ class PlatformDevice : public PlatformDeviceType,
  public:
   enum Type {
     // This platform device is started in a new devhost.
-    // The PDEV protocol is proxied to the PlatformProxy driver in the new devhost.
     Isolated,
     // This platform device is run in the same process as platform bus and provides
     // its protocol to the platform bus.
     Protocol,
     // This platform device is a fragment for a composite device.
-    // The PDEV protocol is proxied by the devmgr "fragment" driver.
     Fragment,
   };
 
@@ -98,7 +83,6 @@ class PlatformDevice : public PlatformDeviceType,
 
   // Device protocol implementation.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-  zx_status_t DdkRxrpc(zx_handle_t channel);
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
@@ -140,17 +124,6 @@ class PlatformDevice : public PlatformDeviceType,
   explicit PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
                           fuchsia_hardware_platform_bus::Node node);
   zx_status_t Init();
-
-  // Handlers for RPCs from PlatformProxy.
-  zx_status_t RpcGetMmio(uint32_t index, zx_paddr_t* out_paddr, size_t* out_length,
-                         zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetInterrupt(uint32_t index, uint32_t* out_irq, uint32_t* out_mode,
-                              zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetBti(uint32_t index, zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetSmc(uint32_t index, zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetDeviceInfo(pdev_device_info_t* out_info);
-  zx_status_t RpcGetMetadata(uint32_t index, uint32_t* out_type, uint8_t* buf, uint32_t buf_size,
-                             uint32_t* actual);
 
   zx_status_t CreateInterruptFragments();
 
