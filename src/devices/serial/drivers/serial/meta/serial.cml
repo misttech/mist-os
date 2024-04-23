@@ -15,5 +15,16 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    capabilities: [
+        { service: 'fuchsia.hardware.serial.Service' },
+    ],
+    use: [
+        { service: "fuchsia.hardware.serialimpl.Service" },
+    ],
+    expose: [
+        {
+            service: 'fuchsia.hardware.serial.Service',
+            from: 'self',
+        },
+    ],
 }
