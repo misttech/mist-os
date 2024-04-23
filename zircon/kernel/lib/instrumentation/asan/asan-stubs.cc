@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA
 // Copyright 2020 The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
@@ -24,7 +25,11 @@
 // (see llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp and
 // compiler-rt/lib/asan/*).
 
+#if _KERNEL_MISTOS
+constexpr size_t kAsanMaxGlobalsRegions = 900;
+#else
 constexpr size_t kAsanMaxGlobalsRegions = 450;
+#endif
 static asan_global* g_globals_regions[kAsanMaxGlobalsRegions];
 static size_t g_globals_regions_sizes[kAsanMaxGlobalsRegions];
 static size_t g_total_globals;

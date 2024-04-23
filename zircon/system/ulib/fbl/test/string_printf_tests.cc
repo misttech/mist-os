@@ -59,11 +59,19 @@ TEST(StringPrintfTest, Boundary) {
   for (size_t i = 800; i < 1200; i++) {
     fbl::String stuff(i, 'x');
     fbl::String format = fbl::String::Concat({stuff, "%d", "%s", " world"});
+#if _KERNEL_MISTOS
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#endif
     EXPECT_STREQ(fbl::String::Concat({stuff, "123", "hello world"}).c_str(),
                  fbl::StringPrintf(format.c_str(), 123, "hello").c_str());
+#if _KERNEL_MISTOS
+#pragma GCC diagnostic pop
+#endif
   }
 }
 
+#if !_KERNEL_MISTOS
 TEST(StringPrintfTest, VeryBigString) {
   // 4 megabytes of exes (we'll generate 5 times this).
   fbl::String stuff(4u << 20u, 'x');
@@ -72,5 +80,6 @@ TEST(StringPrintfTest, VeryBigString) {
       fbl::String::Concat({stuff, stuff, stuff, stuff, stuff}).c_str(),
       fbl::StringPrintf(format.c_str(), stuff.c_str(), stuff.c_str(), stuff.c_str()).c_str());
 }
+#endif
 
 }  // namespace

@@ -696,7 +696,7 @@ void CopyTestHelper() {
       ASSERT_NO_FAILURES(SanityCheckABC());
     } else {
       // ASSERT_DEATH is only defined for __Fuchsia__
-#ifdef __Fuchsia__
+#if defined(__Fuchsia__) && !defined(_KERNEL_MISTOS)
       // Do tests we did in the other half of this `if`, but this time, expect
       // them to result in death.  The NodeOptions do not allow us to do these
       // copies, and DEBUG_ASSERTs are enabled.
@@ -814,7 +814,7 @@ void MoveTestHelper() {
       ASSERT_NO_FAILURES(SanityCheckABC());
     } else {
       // ASSERT_DEATH is only defined for __Fuchsia__
-#ifdef __Fuchsia__
+#if defined(__Fuchsia__) && !defined(_KERNEL_MISTOS)
       // Do tests we did in the other half of this `if`, but this time, expect
       // them to result in death.  The NodeOptions do not allow us to do these
       // copies, and DEBUG_ASSERTs are enabled.
