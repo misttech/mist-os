@@ -534,7 +534,8 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrReplacedWithoutReplacement, "member", Version::From(6).value());
+  library.ExpectFail(ErrAvailabilityConflictsWithParent, "replaced", "6", "removed", "6",
+                     "example.fidl:5:35", "replaced", "after", "removed");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -553,7 +554,8 @@ type Foo = struct {
 type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrReplacedWithoutReplacement, "member", Version::From(6).value());
+  library.ExpectFail(ErrAvailabilityConflictsWithParent, "replaced", "6", "replaced", "6",
+                     "example.fidl:5:35", "replaced", "after", "replaced");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -176,6 +176,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
       .deprecated = GetVersion(deprecated),
       .removed = GetVersion(removed_or_replaced),
       .legacy = GetLegacy(legacy),
+      .replaced = replaced != nullptr,
   };
   if (is_library) {
     const auto library_platform = GetPlatform(platform).value_or(GetDefaultPlatform());
@@ -364,15 +365,12 @@ struct CmpAvailability {
   }
 };
 
-// Helper class that validates:
-// * No canonical name collisions on elements with overlapping availabilities
-// * For each @available(replaced=N) there IS a corresponding @available(added=N)
-// * For each @available(removed=N) there IS NOT a corresponding @available(added=N)
-class Validator {
+// Helper that checks for canonical name collisions on overlapping elements.
+class NameValidator {
  public:
-  Validator(Reporter* reporter, const Platform& platform)
+  NameValidator(Reporter* reporter, const Platform& platform)
       : reporter_(reporter), platform_(platform) {}
-  Validator(const Validator&) = delete;
+  NameValidator(const NameValidator&) = delete;
 
   void Insert(const Element* element) {
     // Skip elements whose availabilities we failed to compile.
@@ -380,28 +378,12 @@ class Validator {
       return;
     }
     auto set = element->availability.set();
-    auto added = set.ranges().first.pair().first;
     auto name = element->GetName();
     auto canonical_name = Canonicalize(name);
     auto& same_canonical_name = by_canonical_name_[canonical_name];
-    CheckForNameCollisions(element, set, name, canonical_name, same_canonical_name);
-    same_canonical_name.insert(element);
-    by_added_by_name_[name].emplace(added, element);
-  }
 
-  ~Validator() {
-    for (auto& [name, by_added] : by_added_by_name_) {
-      CheckRemovedAndReplacedArguments(name, by_added);
-    }
-  }
-
- private:
-  // Note: This algorithm is worst-case O(n^2) in the number of elements
-  // having the same name. It could be optimized to O(n*log(n)).
-  void CheckForNameCollisions(
-      const Element* element, const VersionSet& set, std::string_view name,
-      std::string_view canonical_name,
-      const std::set<const Element*, CmpAvailability>& same_canonical_name) {
+    // Note: This algorithm is worst-case O(n^2) in the number of elements
+    // having the same name. It could be optimized to O(n*log(n)).
     for (auto other : same_canonical_name) {
       auto other_set = other->availability.set();
       auto overlap = VersionSet::Intersect(set, other_set);
@@ -431,34 +413,13 @@ class Validator {
       // Report at most one error per element to avoid noisy redundant errors.
       break;
     }
+    same_canonical_name.insert(element);
   }
 
-  void CheckRemovedAndReplacedArguments(std::string_view name,
-                                        const std::map<Version, const Element*>& by_added) {
-    for (auto& [_added, element] : by_added) {
-      if (auto attribute = element->attributes->Get("available")) {
-        auto removed_arg = attribute->GetArg("removed");
-        auto replaced_arg = attribute->GetArg("replaced");
-        if (!removed_arg && !replaced_arg) {
-          continue;
-        }
-        auto version = element->availability.set().ranges().first.pair().second;
-        auto it = by_added.find(version);
-        auto replacement = it != by_added.end() ? it->second : nullptr;
-        if (removed_arg && replacement) {
-          reporter_->Fail(ErrRemovedWithReplacement, removed_arg->span, name, version,
-                          replacement->GetNameSource());
-        } else if (replaced_arg && !replacement) {
-          reporter_->Fail(ErrReplacedWithoutReplacement, replaced_arg->span, name, version);
-        }
-      }
-    }
-  }
-
+ private:
   Reporter* reporter_;
   const Platform& platform_;
   std::map<std::string, std::set<const Element*, CmpAvailability>> by_canonical_name_;
-  std::map<std::string_view, std::map<Version, const Element*>> by_added_by_name_;
 };
 
 }  // namespace
@@ -469,10 +430,10 @@ void AvailabilityStep::ValidateAvailabilities() {
     // We failed to compile the library declaration's @available attribute.
     return;
   }
-  Validator decl_validator(reporter(), *platform);
+  NameValidator decl_validator(reporter(), *platform);
   for (auto& [name, decl] : library()->declarations.all) {
     decl_validator.Insert(decl);
-    Validator member_validator(reporter(), *platform);
+    NameValidator member_validator(reporter(), *platform);
     decl->ForEachMember([&](const Element* member) { member_validator.Insert(member); });
   }
 }

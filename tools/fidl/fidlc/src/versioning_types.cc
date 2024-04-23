@@ -180,6 +180,7 @@ void Availability::Fail() {
 bool Availability::Init(InitArgs args) {
   ZX_ASSERT_MSG(state_ == State::kUnset, "called Init in the wrong order");
   ZX_ASSERT_MSG(args.legacy != Legacy::kNotApplicable, "legacy cannot be kNotApplicable");
+  ZX_ASSERT_MSG(args.removed || !args.replaced, "cannot set replaced without removed");
   for (auto version : {args.added, args.deprecated, args.removed}) {
     ZX_ASSERT(version != Version::NegInf());
     ZX_ASSERT(version != Version::PosInf());
@@ -189,6 +190,9 @@ bool Availability::Init(InitArgs args) {
   deprecated_ = args.deprecated;
   removed_ = args.removed;
   legacy_ = args.legacy;
+  if (args.removed) {
+    ending_ = args.replaced ? Ending::kReplaced : Ending::kRemoved;
+  }
   bool valid = ValidOrder();
   state_ = valid ? State::kInitialized : State::kFailed;
   return valid;
@@ -246,6 +250,12 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
   } else if (parent.deprecated_ && deprecated_.value() > parent.deprecated_.value()) {
     result.deprecated = InheritResult::Status::kAfterParentDeprecated;
   }
+  // Inherit and validate `ending`.
+  if (!ending_) {
+    ending_ = parent.ending_.value() == Ending::kNone ? Ending::kNone : Ending::kInherited;
+  } else if (ending_.value() == Ending::kReplaced && removed_.value() == parent.removed_.value()) {
+    result.removed = InheritResult::Status::kAfterParentRemoved;
+  }
   // Inherit and validate `legacy`.
   if (!legacy_) {
     if (removed_.value() == parent.removed_.value()) {
@@ -286,7 +296,7 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
   }
 
   if (result.Ok()) {
-    ZX_ASSERT(added_ && removed_ && legacy_);
+    ZX_ASSERT(added_ && removed_ && ending_ && legacy_);
     ZX_ASSERT(added_.value() != Version::NegInf());
     ZX_ASSERT(ValidOrder());
     state_ = State::kInherited;
@@ -304,6 +314,11 @@ void Availability::Narrow(VersionRange range) {
     ZX_ASSERT_MSG(legacy_.value() != Legacy::kNo, "must be present at LEGACY");
   } else {
     ZX_ASSERT_MSG(a >= added_ && b <= removed_, "must narrow to a subrange");
+  }
+  if (b == Version::PosInf()) {
+    ending_ = Ending::kNone;
+  } else if (removed_ != b) {
+    ending_ = Ending::kSplit;
   }
   added_ = a;
   removed_ = b;

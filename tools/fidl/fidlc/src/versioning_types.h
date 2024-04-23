@@ -219,6 +219,7 @@ class Availability final {
     Availability unbounded(State::kInherited);
     unbounded.added_ = Version::NegInf();
     unbounded.removed_ = Version::PosInf();
+    unbounded.ending_ = Ending::kNone;
     unbounded.legacy_ = Legacy::kNotApplicable;
     return unbounded;
   }
@@ -231,7 +232,7 @@ class Availability final {
     kUnset,
     // 2. `Init` succeeded. Some fields might be set, and they are in order.
     kInitialized,
-    // 3. `Inherit` succeeded. Now `added`, `removed`, and `legacy` are always set.
+    // 3. `Inherit` succeeded. Now `added`, `removed`, `ending`, and `legacy` are always set.
     kInherited,
     // 4. `Narrow` succeeded. Now `deprecated` is unset or equal to `added`, and
     //    `legacy` is either kNotApplicable or kNo.
@@ -272,10 +273,32 @@ class Availability final {
     kYes,
   };
 
+  // Meaning of the `removed` version, how this availability ends.
+  enum class Ending : uint8_t {
+    // This availability never ends, i.e. `removed` is +inf.
+    kNone,
+    // Directly marked removed=N. Validate that there IS NOT an added=N replacement.
+    kRemoved,
+    // Directly marked replaced=N. Validate that there IS an added=N replacement.
+    kReplaced,
+    // The availability ends because an ancestor was kRemoved or kReplaced.
+    kInherited,
+    // During decomposition, only the last piece keeps the original ending.
+    // All the others get the kSplit ending.
+    kSplit,
+  };
+
+  // Returns the availability's ending. Must be in the kNarrowed state.
+  Ending ending() const {
+    ZX_ASSERT(state_ == State::kNarrowed);
+    return ending_.value();
+  }
+
   // Named arguments for Init.
   struct InitArgs {
     std::optional<Version> added, deprecated, removed;
     std::optional<Legacy> legacy;
+    bool replaced;
   };
 
   // Must be called first. Initializes the availability from @available fields.
@@ -332,6 +355,7 @@ class Availability final {
 
   State state_ = State::kUnset;
   std::optional<Version> added_, deprecated_, removed_;
+  std::optional<Ending> ending_;
   std::optional<Legacy> legacy_;
 };
 

@@ -18,6 +18,7 @@
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/names.h"
+#include "tools/fidl/fidlc/src/replacement_step.h"
 #include "tools/fidl/fidlc/src/resolve_step.h"
 #include "tools/fidl/fidlc/src/type_shape_step.h"
 #include "tools/fidl/fidlc/src/verify_steps.h"
@@ -65,6 +66,8 @@ bool Compiler::Compile() {
   if (!ResolveStep(this).Run())
     return false;
   if (!CompileStep(this).Run())
+    return false;
+  if (!ReplacementStep(this).Run())
     return false;
   if (!TypeShapeStep(this).Run())
     return false;

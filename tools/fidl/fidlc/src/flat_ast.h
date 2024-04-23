@@ -702,7 +702,7 @@ struct Protocol final : public Decl {
   // Method pointers here are set after composed_protocols are compiled, and
   // are owned by the corresponding composed_protocols.
   struct MethodWithInfo {
-    const Method* method;
+    Method* method;
     const bool is_composed;
   };
 
@@ -887,7 +887,9 @@ struct Library final : public Element {
     // Looks up a builtin. Must have inserted it already with InsertBuiltin.
     Builtin* LookupBuiltin(Builtin::Identity id) const;
 
-    // Contains all the declarations owned by the vectors below.
+    // Contains all the declarations owned by the vectors below. It preserves
+    // insertion order for equal keys, which is source order (ConsumeStep) and
+    // then decomposed version range order (ResolveStep).
     std::multimap<std::string_view, Decl*> all;
 
     std::vector<std::unique_ptr<Alias>> aliases;

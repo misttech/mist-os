@@ -31,6 +31,7 @@ source_set("lib") {
     "src/parser.cc",
     "src/raw_ast.cc",
     "src/reference.cc",
+    "src/replacement_step.cc",
     "src/reporter.cc",
     "src/resolve_step.cc",
     "src/source_file.cc",
