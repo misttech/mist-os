@@ -38,6 +38,7 @@ class VsyncReceiver {
   using VsyncHandler = fit::inline_function<void(zx::time timestamp), kOnVsyncTargetSize>;
 
   // Factory method intended for production use.
+  // Creates a VsyncReceiver that is receiving Vsync interrupts.
   //
   // `platform_device` must be valid.
   //
@@ -61,12 +62,26 @@ class VsyncReceiver {
 
   ~VsyncReceiver();
 
-  // Initialization work that is not suitable for the constructor.
+  // If `receiving` is true, starts receiving Vsync interrupts; otherwise, stops
+  // receiving Vsync interrupts.
   //
-  // Called by Create().
-  zx::result<> Init();
+  // This method is idempotent.
+  zx::result<> SetReceivingState(bool receiving);
 
  private:
+  // Start receiving Vsync interrupts.
+  //
+  // The VsyncReceiver must not be receiving Vsync interrupts before it's
+  // called.
+  zx::result<> Start();
+
+  // Stop receiving Vsync interrupts.
+  //
+  // Unhandled Vysnc interrupts queued in the dispatcher will be canceled.
+  //
+  // The VsyncReceiver must be receiving Vsync interrupts before it's called.
+  zx::result<> Stop();
+
   void OnVsync(zx::time timestamp);
 
   void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
@@ -75,6 +90,8 @@ class VsyncReceiver {
   const zx::interrupt vsync_irq_;
 
   const VsyncHandler on_vsync_;
+
+  bool is_receiving_ = false;
 
   // The `irq_handler_dispatcher_` and `irq_handler_` are constant between
   // Init() and instance destruction. Only accessed on the threads used for
