@@ -5,11 +5,6 @@
 use crate::capability::CapabilitySource;
 use crate::model::component::ComponentInstance;
 use crate::model::component::WeakComponentInstance;
-use crate::model::routing::router::Request;
-use crate::model::routing::router::Routable;
-use crate::model::routing::router::Router;
-use crate::model::routing::router::WeakComponentToken;
-use crate::model::routing::router::WeakComponentTokenAny;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
@@ -19,7 +14,13 @@ use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use routing::error::ComponentInstanceError;
-use sandbox::{Capability, Dict, Open};
+use sandbox::Capability;
+use sandbox::Dict;
+use sandbox::Open;
+use sandbox::Request;
+use sandbox::Routable;
+use sandbox::Router;
+use sandbox::WeakComponentToken;
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
 use vfs::execution_scope::ExecutionScope;
@@ -249,6 +250,9 @@ impl Routable for PolicyCheckRouter {
 /// A trait to add functions WeakComponentInstancethat know about the component
 /// manager types.
 pub trait WeakComponentTokenExt {
+    /// Create a new token.
+    fn new(instance: WeakComponentInstance) -> WeakComponentToken;
+
     /// Upgrade this token to the underlying instance.
     fn to_instance(self) -> WeakComponentInstance;
 
@@ -260,16 +264,37 @@ pub trait WeakComponentTokenExt {
 
     /// Get the moniker for this component.
     fn moniker(&self) -> moniker::Moniker;
+
+    #[cfg(test)]
+    fn invalid() -> WeakComponentToken {
+        WeakComponentToken::new(WeakComponentInstance::invalid())
+    }
+}
+
+// We need this extra struct because WeakComponentInstance isn't defined in this
+// crate so we can't implement WeakComponentTokenAny for it.
+#[derive(Debug)]
+struct WeakComponentInstanceExt {
+    inner: WeakComponentInstance,
+}
+impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl WeakComponentTokenExt for WeakComponentToken {
+    fn new(instance: WeakComponentInstance) -> WeakComponentToken {
+        WeakComponentToken { inner: Arc::new(WeakComponentInstanceExt { inner: instance }) }
+    }
+
     fn to_instance(self) -> WeakComponentInstance {
-        self.into()
+        self.as_ref().clone()
     }
 
     fn as_ref(&self) -> &WeakComponentInstance {
-        match self.inner.as_any().downcast_ref::<WeakComponentInstance>() {
-            Some(instance) => instance,
+        match self.inner.as_any().downcast_ref::<WeakComponentInstanceExt>() {
+            Some(instance) => &instance.inner,
             None => panic!(),
         }
     }
@@ -280,24 +305,6 @@ impl WeakComponentTokenExt for WeakComponentToken {
 
     fn moniker(&self) -> moniker::Moniker {
         self.as_ref().moniker.clone()
-    }
-}
-
-impl From<WeakComponentInstance> for WeakComponentToken {
-    fn from(instance: WeakComponentInstance) -> Self {
-        WeakComponentToken { inner: Arc::new(instance) }
-    }
-}
-
-impl From<WeakComponentToken> for WeakComponentInstance {
-    fn from(instance: WeakComponentToken) -> Self {
-        instance.as_ref().clone()
-    }
-}
-
-impl WeakComponentTokenAny for WeakComponentInstance {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 
@@ -317,7 +324,7 @@ mod tests {
         }
     }
 
-    impl WeakComponentTokenAny for FakeComponentToken {
+    impl sandbox::WeakComponentTokenAny for FakeComponentToken {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }

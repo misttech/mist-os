@@ -22,7 +22,9 @@ rustc_library("sandbox") {
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
+    "//src/sys/component_manager/lib/bedrock_error",
     "//src/sys/lib/cm_types",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:futures",
@@ -54,6 +56,7 @@ rustc_library("sandbox") {
     "src/open.rs",
     "src/receiver.rs",
     "src/registry.rs",
+    "src/router.rs",
     "src/sender.rs",
     "src/unit.rs",
   ]

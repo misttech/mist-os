@@ -247,7 +247,6 @@ pub enum EventPayload {
     Resolved {
         component: WeakComponentInstance,
         decl: ComponentDecl,
-        package_dir: Option<fio::DirectoryProxy>,
     },
     Unresolved,
     Started {

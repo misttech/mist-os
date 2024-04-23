@@ -214,7 +214,6 @@ rustc_binary("bin") {
     "src/model/routing/mod.rs",
     "src/model/routing/open.rs",
     "src/model/routing/providers.rs",
-    "src/model/routing/router.rs",
     "src/model/routing/router_ext.rs",
     "src/model/routing/service.rs",
     "src/model/routing_fns.rs",

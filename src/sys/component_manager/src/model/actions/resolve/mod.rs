@@ -16,7 +16,6 @@ use {
     },
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
-    cm_util::io::clone_dir,
     cm_util::{AbortError, AbortHandle, AbortableScope},
     std::{ops::DerefMut, sync::Arc},
 };
@@ -173,10 +172,6 @@ async fn do_resolve(
         EventPayload::Resolved {
             component: WeakComponentInstance::from(component),
             decl: component_info.decl.clone(),
-            package_dir: component_info
-                .package
-                .as_ref()
-                .and_then(|pkg| clone_dir(Some(&pkg.package_dir))),
         },
     );
     component.hooks.dispatch(&event).await;

@@ -8,11 +8,8 @@ use {
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
             error::CreateNamespaceError,
-            routing::{
-                self, route_and_open_capability,
-                router::{Request, Router},
-                router_ext::RouterExt,
-            },
+            routing::router_ext::{RouterExt, WeakComponentTokenExt},
+            routing::{self, route_and_open_capability},
         },
         sandbox_util::DictExt,
     },
@@ -28,7 +25,7 @@ use {
         channel::mpsc::{unbounded, UnboundedSender},
         FutureExt, StreamExt,
     },
-    sandbox::{Capability, Dict, Directory, Open},
+    sandbox::{Capability, Dict, Directory, Open, Request, Router, WeakComponentToken},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -306,7 +303,7 @@ fn service_or_protocol_use(
         UseDecl::Protocol(use_protocol_decl) => {
             let request = Request {
                 availability: use_protocol_decl.availability.clone(),
-                target: component.as_weak().into(),
+                target: WeakComponentToken::new(component.as_weak()),
             };
             let Some(capability) =
                 program_input_dict.get_capability(&use_protocol_decl.target_path)

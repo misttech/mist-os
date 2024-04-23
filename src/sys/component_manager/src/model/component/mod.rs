@@ -22,11 +22,7 @@ use {
                 StopActionError, StructuredConfigError,
             },
             hooks::{Event, EventPayload, Hooks},
-            routing::{
-                self,
-                router::{Request, Routable, Router},
-                RoutingError,
-            },
+            routing::{self, RoutingError},
             start::Start,
         },
     },
@@ -61,7 +57,7 @@ use {
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, DictEntries, Open},
+    sandbox::{Capability, Dict, DictEntries, Open, Request, Routable, Router},
     std::{
         clone::Clone,
         collections::{HashMap, HashSet},
@@ -190,7 +186,7 @@ impl Component {
 #[derive(Clone, Debug)]
 pub struct Package {
     /// The URL of the package itself.
-    pub package_url: String,
+    pub _package_url: String,
     /// The package that this resolved component belongs to
     pub package_dir: fio::DirectoryProxy,
 }
@@ -200,7 +196,7 @@ impl TryFrom<ResolvedPackage> for Package {
 
     fn try_from(package: ResolvedPackage) -> Result<Self, Self::Error> {
         Ok(Self {
-            package_url: package.url,
+            _package_url: package.url,
             package_dir: package
                 .directory
                 .into_proxy()

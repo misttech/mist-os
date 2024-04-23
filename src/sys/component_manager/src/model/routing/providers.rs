@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    super::router::Request,
     crate::{
         capability::CapabilityProvider,
         model::{
             component::WeakComponentInstance,
             error::{CapabilityProviderError, OpenError},
+            routing::router_ext::WeakComponentTokenExt,
         },
         sandbox_util::DictExt,
     },
@@ -18,6 +18,8 @@ use {
     cm_rust::Availability,
     cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
     cm_util::TaskGroup,
+    sandbox::Request,
+    sandbox::WeakComponentToken,
     std::sync::Arc,
     vfs::{directory::entry::OpenRequest, path::Path as VfsPath, remote::remote_dir},
 };
@@ -54,7 +56,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 // request to run hooks.
                 Request {
                     availability: Availability::Transitional,
-                    target: self.target.clone().into(),
+                    target: WeakComponentToken::new(self.target.clone()),
                 },
             )
             .await?

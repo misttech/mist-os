@@ -13,6 +13,7 @@ mod handle;
 mod open;
 mod receiver;
 mod registry;
+mod router;
 mod sender;
 mod unit;
 
@@ -24,5 +25,6 @@ pub use self::directory::Directory;
 pub use self::handle::OneShotHandle;
 pub use self::open::Open;
 pub use self::receiver::Receiver;
+pub use self::router::{Request, Routable, Router, WeakComponentToken, WeakComponentTokenAny};
 pub use self::sender::{Message, Sendable, Sender};
 pub use self::unit::Unit;

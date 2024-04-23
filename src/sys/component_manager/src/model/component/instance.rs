@@ -28,7 +28,6 @@ use {
             namespace::create_namespace,
             routing::{
                 self,
-                router::{Request, Routable, Router},
                 router_ext::RouterExt,
                 router_ext::WeakComponentTokenExt,
                 service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
@@ -65,7 +64,9 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::{BoxFuture, FutureExt},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, CapabilityTrait, Dict, Open},
+    sandbox::{
+        Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
+    },
     std::{
         collections::{HashMap, HashSet},
         fmt,
@@ -622,7 +623,7 @@ impl ResolvedInstanceState {
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
         let dict = Router::dict_routers_to_open(
-            &self.weak_component.clone().into(),
+            &WeakComponentToken::new(self.weak_component.clone()),
             &self.weak_component.upgrade().unwrap().execution_scope,
             &self.component_output_dict,
         );

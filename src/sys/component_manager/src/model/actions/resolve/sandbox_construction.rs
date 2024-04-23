@@ -8,8 +8,8 @@ use {
         model::{
             component::instance::ResolvedInstanceState,
             component::{ComponentInstance, WeakComponentInstance},
-            routing::router::{Request, Router},
             routing::router_ext::RouterExt,
+            routing::router_ext::WeakComponentTokenExt,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
@@ -27,7 +27,8 @@ use {
     futures::FutureExt,
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Capability, Dict, Unit},
+    sandbox::WeakComponentToken,
+    sandbox::{Capability, Dict, Request, Router, Unit},
     std::{collections::HashMap, fmt::Debug, sync::Arc},
     tracing::warn,
 };
@@ -338,7 +339,7 @@ fn make_dict_extending_router(
             // Otherwise combine the two.
             let source_request = Request {
                 availability: cm_types::Availability::Required,
-                target: component.into(),
+                target: WeakComponentToken::new(component),
             };
             let source_dict = match source_dict_router.route(source_request).await? {
                 Capability::Dictionary(d) => d,

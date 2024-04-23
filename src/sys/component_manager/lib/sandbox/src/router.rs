@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{AnyCapability, Capability, CapabilityTrait, Dict};
 use async_trait::async_trait;
 use bedrock_error::BedrockError;
 use cm_types::Availability;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::future::BoxFuture;
-use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict};
 use std::fmt::Debug;
 use std::{any::Any, fmt, sync::Arc};
 
@@ -154,8 +154,8 @@ impl Routable for BedrockError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Message, Receiver};
     use fuchsia_zircon as zx;
-    use sandbox::{Message, Receiver};
 
     #[derive(Debug)]
     struct FakeComponentToken {}
