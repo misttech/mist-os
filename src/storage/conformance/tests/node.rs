@@ -203,13 +203,7 @@ async fn test_open_node_with_attributes() {
             && immutable_attributes
                 == fio::ImmutableNodeAttributes {
                     protocols: Some(fio::NodeProtocolKinds::DIRECTORY),
-                    abilities: Some(
-                        fio::Operations::GET_ATTRIBUTES
-                            | fio::Operations::UPDATE_ATTRIBUTES
-                            | fio::Operations::ENUMERATE
-                            | fio::Operations::TRAVERSE
-                            | fio::Operations::MODIFY_DIRECTORY
-                    ),
+                    abilities: Some(harness.supported_dir_abilities()),
                     ..Default::default()
                 }
     );

@@ -186,45 +186,6 @@ pub fn decode_extended_attribute_value(
     }
 }
 
-// TODO(https://fxbug.dev/42075328): Consolidate with other implementations that do the same thing.
-pub(crate) mod io2_conversions {
-    use super::fio;
-
-    // This code is adapted from /src/sys/lib/routing/src/rights.rs.
-    //
-    // Unlike that implementation, this is stricter: a particular io1 right is present iff all its
-    // constituent io2 rights are present.
-    pub fn io2_to_io1(rights: fio::Operations) -> fio::OpenFlags {
-        let mut flags = fio::OpenFlags::empty();
-        if rights.contains(fio::R_STAR_DIR) {
-            flags |= fio::OpenFlags::RIGHT_READABLE;
-        }
-        if rights.contains(fio::W_STAR_DIR) {
-            flags |= fio::OpenFlags::RIGHT_WRITABLE;
-        }
-        if rights.contains(fio::X_STAR_DIR) {
-            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
-        }
-        flags
-    }
-
-    pub fn io1_to_io2(flags: fio::OpenFlags) -> fio::Operations {
-        // Using Open1 requires GET_ATTRIBUTES as this is not expressible via [`fio::OpenFlags`].
-        // TODO(https://fxbug.dev/324080764): Restrict GET_ATTRIBUTES.
-        let mut operations = fio::Operations::GET_ATTRIBUTES;
-        if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-            operations |= fio::R_STAR_DIR;
-        }
-        if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-            operations |= fio::W_STAR_DIR;
-        }
-        if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-            operations |= fio::X_STAR_DIR;
-        }
-        operations
-    }
-}
-
 /// Helper for building [`fio::NodeAttributes2`]` given `requested` attributes. Code will only run
 /// for `requested` attributes.
 ///

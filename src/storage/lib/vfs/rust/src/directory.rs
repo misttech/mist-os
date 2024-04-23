@@ -5,10 +5,7 @@
 //! Module holding different kinds of pseudo directories and their building blocks.
 
 use {
-    crate::{
-        common::io2_conversions, directory::entry_container::Directory,
-        execution_scope::ExecutionScope, path::Path,
-    },
+    crate::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl_fuchsia_io as fio,
     std::sync::Arc,
@@ -40,7 +37,21 @@ pub struct DirectoryOptions {
 
 impl DirectoryOptions {
     pub(crate) fn to_io1(&self) -> fio::OpenFlags {
-        io2_conversions::io2_to_io1(self.rights)
+        // Note that rights in io1 correspond to several different rights in io2. The *_STAR_DIR
+        // constants defined in the protocol indicate which rights these flags map to. Note that
+        // this is more strict than the checks in FileOptions::to_io1, as OpenFlags map to several
+        // different io2 directory rights.
+        let mut flags = fio::OpenFlags::empty();
+        if self.rights.contains(fio::R_STAR_DIR) {
+            flags |= fio::OpenFlags::RIGHT_READABLE;
+        }
+        if self.rights.contains(fio::W_STAR_DIR) {
+            flags |= fio::OpenFlags::RIGHT_WRITABLE;
+        }
+        if self.rights.contains(fio::X_STAR_DIR) {
+            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+        }
+        flags
     }
 
     /// Creates a copy of these options with new [rights].

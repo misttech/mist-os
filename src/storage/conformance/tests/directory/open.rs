@@ -423,6 +423,8 @@ async fn open2_rights() {
     assert_eq!(status, zx::Status::ACCESS_DENIED);
 
     // Check that empty rights get copied from the parent if we don't specify any rights.
+    // TODO(https://fxbug.dev/324932108): We should always require rights for an open request, even
+    // if the set of rights are empty.
     let proxy = test_dir
         .open2_node::<fio::FileMarker>(
             &TEST_FILE,
@@ -439,7 +441,7 @@ async fn open2_rights() {
 
     assert_eq!(
         proxy.get_connection_info().await.expect("get_connection_info failed").rights,
-        test_dir.get_connection_info().await.expect("get_connection_info failed").rights
+        Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES)
     );
 
     // We should be able to read from the file, but not write.
@@ -823,13 +825,7 @@ async fn open2_directory_get_representation() {
             && immutable_attributes
                 == fio::ImmutableNodeAttributes {
                     protocols: Some(fio::NodeProtocolKinds::DIRECTORY),
-                    abilities: Some(
-                        fio::Operations::GET_ATTRIBUTES
-                            | fio::Operations::UPDATE_ATTRIBUTES
-                            | fio::Operations::ENUMERATE
-                            | fio::Operations::TRAVERSE
-                            | fio::Operations::MODIFY_DIRECTORY
-                    ),
+                    abilities: Some(harness.supported_dir_abilities()),
                     ..Default::default()
                 }
     );
@@ -878,12 +874,7 @@ async fn open2_file_get_representation() {
             && immutable_attributes
                 == fio::ImmutableNodeAttributes {
                     protocols: Some(fio::NodeProtocolKinds::FILE),
-                    abilities: Some(
-                        fio::Operations::GET_ATTRIBUTES
-                            | fio::Operations::UPDATE_ATTRIBUTES
-                            | fio::Operations::READ_BYTES
-                            | fio::Operations::WRITE_BYTES,
-                    ),
+                    abilities: Some(harness.supported_file_abilities()),
                     ..Default::default()
                 }
             && is_append == Some(file_protocols == Some(fio::FileProtocolFlags::APPEND))
