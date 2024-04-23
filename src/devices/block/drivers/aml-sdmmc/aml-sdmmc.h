@@ -87,7 +87,9 @@ class AmlSdmmc : public fdf::DriverBase,
   zx_status_t SdmmcHwReset() TA_EXCL(lock_);
   zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(tuning_lock_);
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
-  void SdmmcAckInBandInterrupt() {}
+  void SdmmcAckInBandInterrupt() {
+    // Mirroring AmlSdmmc::AckInBandInterrupt().
+  }
   zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
                                uint64_t size, uint32_t vmo_rights) TA_EXCL(lock_);
   zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo)
@@ -110,9 +112,7 @@ class AmlSdmmc : public fdf::DriverBase,
   void RegisterInBandInterrupt(RegisterInBandInterruptRequestView request, fdf::Arena& arena,
                                RegisterInBandInterruptCompleter::Sync& completer) override;
   void AckInBandInterrupt(fdf::Arena& arena,
-                          AckInBandInterruptCompleter::Sync& completer) override {
-    // Mirroring AmlSdmmc::SdmmcAckInBandInterrupt().
-  }
+                          AckInBandInterruptCompleter::Sync& completer) override {}
   void RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
                    RegisterVmoCompleter::Sync& completer) override;
   void UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena,
@@ -124,7 +124,8 @@ class AmlSdmmc : public fdf::DriverBase,
   zx_status_t ResumePower() TA_REQ(lock_);
 
   // Visible for tests
-  zx_status_t Init(const pdev_device_info_t& device_info) TA_EXCL(lock_);
+  zx_status_t Init(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info)
+      TA_EXCL(lock_);
 
  protected:
   virtual zx_status_t WaitForInterruptImpl();
@@ -192,8 +193,8 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty wake_on_request_count;
     inspect::ExponentialUintHistogram wake_on_request_latency_us;
 
-    void Init(const pdev_device_info_t& device_info, inspect::Node& parent,
-              bool is_power_suspended);
+    void Init(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info,
+              inspect::Node& parent, bool is_power_suspended);
   };
 
   struct TuneContext {
@@ -242,12 +243,14 @@ class AmlSdmmc : public fdf::DriverBase,
     return static_cast<aml_sdmmc_desc_t*>(descs_buffer_->virt());
   }
 
-  zx_status_t SdmmcSetBusWidthLocked(sdmmc_bus_width_t bus_width) TA_REQ(lock_);
+  zx_status_t SdmmcSetBusWidthLocked(fuchsia_hardware_sdmmc::wire::SdmmcBusWidth bus_width)
+      TA_REQ(lock_);
   zx_status_t SdmmcSetBusFreqLocked(uint32_t freq) TA_REQ(lock_);
-  zx_status_t SdmmcSetTimingLocked(sdmmc_timing_t timing) TA_REQ(lock_);
+  zx_status_t SdmmcSetTimingLocked(fuchsia_hardware_sdmmc::wire::SdmmcTiming timing) TA_REQ(lock_);
   zx_status_t SdmmcHwResetLocked() TA_REQ(lock_);
   zx_status_t SdmmcPerformTuningLocked(uint32_t tuning_cmd_idx) TA_REQ(tuning_lock_);
-  zx_status_t SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) TA_REQ(lock_);
+  zx_status_t SdmmcRequestLocked(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+                                 uint32_t out_response[4]) TA_REQ(lock_);
 
   template <typename T>
   void DoTaskAndComplete(fit::function<zx_status_t()>, fdf::Arena& arena, T& completer);
@@ -269,26 +272,27 @@ class AmlSdmmc : public fdf::DriverBase,
   TuneSettings GetTuneSettings() TA_REQ(lock_);
 
   void ConfigureDefaultRegs() TA_REQ(lock_);
-  aml_sdmmc_desc_t* SetupCmdDesc(const sdmmc_req_t& req) TA_REQ(lock_);
+  aml_sdmmc_desc_t* SetupCmdDesc(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req) TA_REQ(lock_);
   // Returns a pointer to the LAST descriptor used.
   zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> SetupDataDescs(
-      const sdmmc_req_t& req, aml_sdmmc_desc_t* cur_desc) TA_REQ(lock_);
+      const fuchsia_hardware_sdmmc::wire::SdmmcReq& req, aml_sdmmc_desc_t* cur_desc) TA_REQ(lock_);
   // These return pointers to the NEXT descriptor to use.
-  zx::result<aml_sdmmc_desc_t*> SetupOwnedVmoDescs(const sdmmc_req_t& req,
-                                                   const sdmmc_buffer_region_t& buffer,
-                                                   vmo_store::StoredVmo<OwnedVmoInfo>& vmo,
-                                                   aml_sdmmc_desc_t* cur_desc) TA_REQ(lock_);
+  zx::result<aml_sdmmc_desc_t*> SetupOwnedVmoDescs(
+      const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+      const fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion& buffer,
+      vmo_store::StoredVmo<OwnedVmoInfo>& vmo, aml_sdmmc_desc_t* cur_desc) TA_REQ(lock_);
   zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> SetupUnownedVmoDescs(
-      const sdmmc_req_t& req, const sdmmc_buffer_region_t& buffer, aml_sdmmc_desc_t* cur_desc)
+      const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+      const fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion& buffer, aml_sdmmc_desc_t* cur_desc)
       TA_REQ(lock_);
-  zx::result<aml_sdmmc_desc_t*> PopulateDescriptors(const sdmmc_req_t& req,
-                                                    aml_sdmmc_desc_t* cur_desc,
-                                                    fzl::PinnedVmo::Region region) TA_REQ(lock_);
-  zx_status_t FinishReq(const sdmmc_req_t& req);
+  zx::result<aml_sdmmc_desc_t*> PopulateDescriptors(
+      const fuchsia_hardware_sdmmc::wire::SdmmcReq& req, aml_sdmmc_desc_t* cur_desc,
+      fzl::PinnedVmo::Region region) TA_REQ(lock_);
+  zx_status_t FinishReq(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req);
 
   void ClearStatus() TA_REQ(lock_);
-  zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req)
-      TA_REQ(lock_);
+  zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(
+      const fuchsia_hardware_sdmmc::wire::SdmmcReq& req) TA_REQ(lock_);
 
   // Acquires a lease on a power element via the supplied |lessor_client|, storing the resulting
   // lease control client end in |lease_control_client_end|. That is unless
@@ -310,6 +314,11 @@ class AmlSdmmc : public fdf::DriverBase,
 
   void AdjustHardwarePowerLevel();
 
+  // Translates a Banjo sdmmc request (sdmmc_req_t) into a FIDL one
+  // (fuchsia_hardware_sdmmc::wire::SdmmcReq).
+  zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> BanjoToFidlReq(const sdmmc_req_t& banjo_req,
+                                                                    fdf::Arena* arena);
+
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
 
   zx::bti bti_;
@@ -318,7 +327,7 @@ class AmlSdmmc : public fdf::DriverBase,
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   zx::interrupt irq_;
 
-  sdmmc_host_info_t dev_info_;
+  fuchsia_hardware_sdmmc::wire::SdmmcHostInfo dev_info_;
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   bool power_suspended_ TA_GUARDED(lock_) = false;
   trace_async_id_t trace_async_id_;

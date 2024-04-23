@@ -53,46 +53,46 @@ zx_paddr_t PageMask() {
   return page_size - 1;
 }
 
-zx::result<pdev_device_info_t> FidlToBanjoDeviceInfo(
-    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& wire_dev_info) {
-  pdev_device_info_t banjo_dev_info = {};
-  if (wire_dev_info.has_vid()) {
-    banjo_dev_info.vid = wire_dev_info.vid();
-  }
-  if (wire_dev_info.has_pid()) {
-    banjo_dev_info.pid = wire_dev_info.pid();
-  }
-  if (wire_dev_info.has_did()) {
-    banjo_dev_info.did = wire_dev_info.did();
-  }
-  if (wire_dev_info.has_mmio_count()) {
-    banjo_dev_info.mmio_count = wire_dev_info.mmio_count();
-  }
-  if (wire_dev_info.has_irq_count()) {
-    banjo_dev_info.irq_count = wire_dev_info.irq_count();
-  }
-  if (wire_dev_info.has_bti_count()) {
-    banjo_dev_info.bti_count = wire_dev_info.bti_count();
-  }
-  if (wire_dev_info.has_smc_count()) {
-    banjo_dev_info.smc_count = wire_dev_info.smc_count();
-  }
-  if (wire_dev_info.has_metadata_count()) {
-    banjo_dev_info.metadata_count = wire_dev_info.metadata_count();
-  }
-  if (wire_dev_info.has_name()) {
-    std::string name = std::string(wire_dev_info.name().get());
-    if (name.size() > sizeof(banjo_dev_info.name)) {
-      return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
-    }
-    strncpy(banjo_dev_info.name, name.c_str(), sizeof(banjo_dev_info.name));
-  }
-  return zx::ok(banjo_dev_info);
-}
-
 }  // namespace
 
 namespace aml_sdmmc {
+
+zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> AmlSdmmc::BanjoToFidlReq(
+    const sdmmc_req_t& banjo_req, fdf::Arena* arena) {
+  fuchsia_hardware_sdmmc::wire::SdmmcReq wire_req;
+
+  wire_req.cmd_idx = banjo_req.cmd_idx;
+  wire_req.cmd_flags = banjo_req.cmd_flags;
+  wire_req.arg = banjo_req.arg;
+  wire_req.blocksize = banjo_req.blocksize;
+  wire_req.suppress_error_messages = banjo_req.suppress_error_messages;
+  wire_req.client_id = banjo_req.client_id;
+
+  wire_req.buffers.Allocate(*arena, banjo_req.buffers_count);
+  for (size_t i = 0; i < banjo_req.buffers_count; i++) {
+    if (banjo_req.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
+      wire_req.buffers[i].buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmoId(
+          banjo_req.buffers_list[i].buffer.vmo_id);
+    } else {
+      if (banjo_req.buffers_list[i].type != SDMMC_BUFFER_TYPE_VMO_HANDLE) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      zx::vmo dup;
+      zx_status_t status = zx_handle_duplicate(banjo_req.buffers_list[i].buffer.vmo,
+                                               ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
+      if (status != ZX_OK) {
+        FDF_LOGL(ERROR, logger(), "Failed to duplicate vmo: %s", zx_status_get_string(status));
+        return zx::error(status);
+      }
+      wire_req.buffers[i].buffer =
+          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
+    }
+
+    wire_req.buffers[i].offset = banjo_req.buffers_list[i].offset;
+    wire_req.buffers[i].size = banjo_req.buffers_list[i].size;
+  }
+  return zx::ok(std::move(wire_req));
+}
 
 zx_status_t AmlSdmmc::AcquireLease(
     const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
@@ -319,12 +319,7 @@ zx::result<> AmlSdmmc::InitResources(
       return zx::error(result->error_value());
     }
 
-    zx::result dev_info = FidlToBanjoDeviceInfo(*result->value());
-    if (dev_info.is_error()) {
-      return dev_info.take_error();
-    }
-
-    zx_status_t status = Init(dev_info.value());
+    zx_status_t status = Init(*result->value());
     if (status != ZX_OK) {
       return zx::error(status);
     }
@@ -630,16 +625,20 @@ void AmlSdmmc::ClearStatus() {
       .WriteTo(&*mmio_);
 }
 
-void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Node& parent,
-                             bool is_power_suspended) {
+void AmlSdmmc::Inspect::Init(
+    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info,
+    inspect::Node& parent, bool is_power_suspended) {
   std::string root_name = "aml-sdmmc-port";
-  if (device_info.did == PDEV_DID_AMLOGIC_SDMMC_A) {
-    root_name += 'A';
-  } else if (device_info.did == PDEV_DID_AMLOGIC_SDMMC_B) {
-    root_name += 'B';
-  } else if (device_info.did == PDEV_DID_AMLOGIC_SDMMC_C) {
-    root_name += 'C';
-  } else {
+  if (device_info.has_did()) {
+    if (device_info.did() == PDEV_DID_AMLOGIC_SDMMC_A) {
+      root_name += 'A';
+    } else if (device_info.did() == PDEV_DID_AMLOGIC_SDMMC_B) {
+      root_name += 'B';
+    } else if (device_info.did() == PDEV_DID_AMLOGIC_SDMMC_C) {
+      root_name += 'C';
+    }
+  }
+  if (root_name == "aml-sdmmc-port") {
     root_name += "-unknown";
   }
 
@@ -663,7 +662,7 @@ void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Nod
 }
 
 zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInterrupt(
-    const sdmmc_req_t& req) {
+    const fuchsia_hardware_sdmmc::wire::SdmmcReq& req) {
   zx_status_t status = WaitForInterruptImpl();
 
   if (status != ZX_OK) {
@@ -768,48 +767,23 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
 }
 
 void AmlSdmmc::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
-  sdmmc_host_info_t info;
-  zx_status_t status = SdmmcHostInfo(&info);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-
-  fuchsia_hardware_sdmmc::wire::SdmmcHostInfo wire_info;
-  wire_info.caps = info.caps;
-  wire_info.max_transfer_size = info.max_transfer_size;
-  wire_info.max_transfer_size_non_dma = info.max_transfer_size_non_dma;
-  wire_info.max_buffer_regions = info.max_buffer_regions;
-  completer.buffer(arena).ReplySuccess(wire_info);
+  completer.buffer(arena).ReplySuccess(dev_info_);
 }
 
 zx_status_t AmlSdmmc::SdmmcHostInfo(sdmmc_host_info_t* info) {
-  memcpy(info, &dev_info_, sizeof(dev_info_));
+  info->caps = dev_info_.caps;
+  info->max_transfer_size = dev_info_.max_transfer_size;
+  info->max_transfer_size_non_dma = dev_info_.max_transfer_size_non_dma;
+  info->max_buffer_regions = dev_info_.max_buffer_regions;
   return ZX_OK;
 }
 
 void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
                            SetBusWidthCompleter::Sync& completer) {
-  sdmmc_bus_width_t bus_width;
-  switch (request->bus_width) {
-    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight:
-      bus_width = SDMMC_BUS_WIDTH_EIGHT;
-      break;
-    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour:
-      bus_width = SDMMC_BUS_WIDTH_FOUR;
-      break;
-    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne:
-      bus_width = SDMMC_BUS_WIDTH_ONE;
-      break;
-    default:
-      bus_width = SDMMC_BUS_WIDTH_MAX;
-      break;
-  }
-
   // This function is run after acquiring lock_, but the compiler doesn't recognize this.
-  fit::function<zx_status_t()> task = [this, bus_width]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    return SdmmcSetBusWidthLocked(bus_width);
-  };
+  fit::function<zx_status_t()> task =
+      [this, bus_width = request->bus_width]()
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcSetBusWidthLocked(bus_width); };
 
   fbl::AutoLock lock(&lock_);
 
@@ -837,19 +811,37 @@ zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
     return ZX_ERR_BAD_STATE;
   }
 
-  return SdmmcSetBusWidthLocked(bus_width);
-}
-
-zx_status_t AmlSdmmc::SdmmcSetBusWidthLocked(sdmmc_bus_width_t bus_width) {
-  uint32_t bus_width_val;
+  // Only handling the cases for AmlSdmmc::SdmmcSetBusWidthLocked() to work correctly.
+  fuchsia_hardware_sdmmc::wire::SdmmcBusWidth wire_bus_width;
   switch (bus_width) {
     case SDMMC_BUS_WIDTH_EIGHT:
-      bus_width_val = AmlSdmmcCfg::kBusWidth8Bit;
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight;
       break;
     case SDMMC_BUS_WIDTH_FOUR:
-      bus_width_val = AmlSdmmcCfg::kBusWidth4Bit;
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour;
       break;
     case SDMMC_BUS_WIDTH_ONE:
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne;
+      break;
+    default:
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kMax;
+      break;
+  }
+
+  return SdmmcSetBusWidthLocked(wire_bus_width);
+}
+
+zx_status_t AmlSdmmc::SdmmcSetBusWidthLocked(
+    fuchsia_hardware_sdmmc::wire::SdmmcBusWidth bus_width) {
+  uint32_t bus_width_val;
+  switch (bus_width) {
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight:
+      bus_width_val = AmlSdmmcCfg::kBusWidth8Bit;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour:
+      bus_width_val = AmlSdmmcCfg::kBusWidth4Bit;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne:
       bus_width_val = AmlSdmmcCfg::kBusWidth1Bit;
       break;
     default:
@@ -865,13 +857,12 @@ zx_status_t AmlSdmmc::SdmmcSetBusWidthLocked(sdmmc_bus_width_t bus_width) {
 void AmlSdmmc::RegisterInBandInterrupt(RegisterInBandInterruptRequestView request,
                                        fdf::Arena& arena,
                                        RegisterInBandInterruptCompleter::Sync& completer) {
-  // Mirroring AmlSdmmc::SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t*
-  // interrupt_cb).
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx_status_t AmlSdmmc::SdmmcRegisterInBandInterrupt(
     const in_band_interrupt_protocol_t* interrupt_cb) {
+  // Mirroring AmlSdmmc::RegisterInBandInterrupt().
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -1131,27 +1122,10 @@ zx_status_t AmlSdmmc::SdmmcHwResetLocked() {
 
 void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
                          SetTimingCompleter::Sync& completer) {
-  sdmmc_timing_t timing;
-  // Only handling the cases for AmlSdmmc::SetTiming(sdmmc_timing_t timing) to work correctly.
-  switch (request->timing) {
-    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400:
-      timing = SDMMC_TIMING_HS400;
-      break;
-    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr:
-      timing = SDMMC_TIMING_HSDDR;
-      break;
-    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kDdr50:
-      timing = SDMMC_TIMING_DDR50;
-      break;
-    default:
-      timing = SDMMC_TIMING_MAX;
-      break;
-  }
-
   // This function is run after acquiring lock_, but the compiler doesn't recognize this.
-  fit::function<zx_status_t()> task = [this, timing]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    return SdmmcSetTimingLocked(timing);
-  };
+  fit::function<zx_status_t()> task =
+      [this, timing = request->timing]()
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcSetTimingLocked(timing); };
 
   fbl::AutoLock lock(&lock_);
 
@@ -1179,14 +1153,32 @@ zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
     return ZX_ERR_BAD_STATE;
   }
 
-  return SdmmcSetTimingLocked(timing);
+  // Only handling the cases for AmlSdmmc::SdmmcSetTimingLocked() to work correctly.
+  fuchsia_hardware_sdmmc::wire::SdmmcTiming wire_timing;
+  switch (timing) {
+    case SDMMC_TIMING_HS400:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400;
+      break;
+    case SDMMC_TIMING_HSDDR:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr;
+      break;
+    case SDMMC_TIMING_DDR50:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kDdr50;
+      break;
+    default:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kMax;
+      break;
+  }
+
+  return SdmmcSetTimingLocked(wire_timing);
 }
 
-zx_status_t AmlSdmmc::SdmmcSetTimingLocked(sdmmc_timing_t timing) {
+zx_status_t AmlSdmmc::SdmmcSetTimingLocked(fuchsia_hardware_sdmmc::wire::SdmmcTiming timing) {
   auto config = AmlSdmmcCfg::Get().ReadFrom(&*mmio_);
-  if (timing == SDMMC_TIMING_HS400 || timing == SDMMC_TIMING_HSDDR ||
-      timing == SDMMC_TIMING_DDR50) {
-    if (timing == SDMMC_TIMING_HS400) {
+  if (timing == fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400 ||
+      timing == fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr ||
+      timing == fuchsia_hardware_sdmmc::wire::SdmmcTiming::kDdr50) {
+    if (timing == fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400) {
       config.set_chk_ds(1);
     } else {
       config.set_chk_ds(0);
@@ -1209,17 +1201,17 @@ zx_status_t AmlSdmmc::SdmmcSetTimingLocked(sdmmc_timing_t timing) {
 
 void AmlSdmmc::SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena& arena,
                                 SetSignalVoltageCompleter::Sync& completer) {
-  // Mirroring AmlSdmmc::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage).
+  // Amlogic controller does not allow to modify voltage
+  // We do not return an error here since things work fine without switching the voltage.
   completer.buffer(arena).ReplySuccess();
 }
 
 zx_status_t AmlSdmmc::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
-  // Amlogic controller does not allow to modify voltage
-  // We do not return an error here since things work fine without switching the voltage.
+  // Mirroring AmlSdmmc::SetSignalVoltage().
   return ZX_OK;
 }
 
-aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const sdmmc_req_t& req) {
+aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req) {
   aml_sdmmc_desc_t* const desc = reinterpret_cast<aml_sdmmc_desc_t*>(descs_buffer_->virt());
   auto cmd_cfg = AmlSdmmcCmdCfg::Get().FromValue(0);
   if (req.cmd_flags == 0) {
@@ -1253,7 +1245,7 @@ aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const sdmmc_req_t& req) {
 }
 
 zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::SetupDataDescs(
-    const sdmmc_req_t& req, aml_sdmmc_desc_t* const cur_desc) {
+    const fuchsia_hardware_sdmmc::wire::SdmmcReq& req, aml_sdmmc_desc_t* const cur_desc) {
   const uint32_t req_blk_len = log2_ceil(req.blocksize);
   if (req_blk_len > AmlSdmmcCfg::kMaxBlkLen) {
     FDF_LOGL(ERROR, logger(), "blocksize %u is greater than the max (%u)", 1 << req_blk_len,
@@ -1263,13 +1255,13 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_blk_len(req_blk_len).WriteTo(&*mmio_);
 
   std::vector<fzl::PinnedVmo> pinned_vmos;
-  pinned_vmos.reserve(req.buffers_count);
+  pinned_vmos.reserve(req.buffers.count());
 
   aml_sdmmc_desc_t* desc = cur_desc;
   SdmmcVmoStore& vmos = registered_vmos_[req.client_id];
-  for (size_t i = 0; i < req.buffers_count; i++) {
-    if (req.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_HANDLE) {
-      auto status = SetupUnownedVmoDescs(req, req.buffers_list[i], desc);
+  for (const auto& buffer : req.buffers) {
+    if (buffer.buffer.is_vmo()) {
+      auto status = SetupUnownedVmoDescs(req, buffer, desc);
       if (!status.is_ok()) {
         return zx::error(status.error_value());
       }
@@ -1277,14 +1269,12 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
       pinned_vmos.push_back(std::move(std::get<1>(status.value())));
       desc = std::get<0>(status.value());
     } else {
-      vmo_store::StoredVmo<OwnedVmoInfo>* const stored_vmo =
-          vmos.GetVmo(req.buffers_list[i].buffer.vmo_id);
+      vmo_store::StoredVmo<OwnedVmoInfo>* const stored_vmo = vmos.GetVmo(buffer.buffer.vmo_id());
       if (stored_vmo == nullptr) {
-        FDF_LOGL(ERROR, logger(), "no VMO %u for client %u", req.buffers_list[i].buffer.vmo_id,
-                 req.client_id);
+        FDF_LOGL(ERROR, logger(), "no VMO %u for client %u", buffer.buffer.vmo_id(), req.client_id);
         return zx::error(ZX_ERR_NOT_FOUND);
       }
-      auto status = SetupOwnedVmoDescs(req, req.buffers_list[i], *stored_vmo, desc);
+      auto status = SetupOwnedVmoDescs(req, buffer, *stored_vmo, desc);
       if (status.is_error()) {
         return zx::error(status.error_value());
       }
@@ -1300,10 +1290,10 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
   return zx::ok(std::pair{desc - 1, std::move(pinned_vmos)});
 }
 
-zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& req,
-                                                           const sdmmc_buffer_region_t& buffer,
-                                                           vmo_store::StoredVmo<OwnedVmoInfo>& vmo,
-                                                           aml_sdmmc_desc_t* const cur_desc) {
+zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(
+    const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+    const fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion& buffer,
+    vmo_store::StoredVmo<OwnedVmoInfo>& vmo, aml_sdmmc_desc_t* const cur_desc) {
   if (!(req.cmd_flags & SDMMC_CMD_READ) && !(vmo.meta().rights & SDMMC_VMO_RIGHT_READ)) {
     FDF_LOGL(ERROR, logger(), "Request would read from write-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
@@ -1354,12 +1344,14 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& re
 }
 
 zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedVmoDescs(
-    const sdmmc_req_t& req, const sdmmc_buffer_region_t& buffer, aml_sdmmc_desc_t* const cur_desc) {
+    const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+    const fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion& buffer,
+    aml_sdmmc_desc_t* const cur_desc) {
   const bool is_read = req.cmd_flags & SDMMC_CMD_READ;
   const uint64_t pagecount =
       ((buffer.offset & PageMask()) + buffer.size + PageMask()) / zx_system_get_page_size();
 
-  const zx::unowned_vmo vmo(buffer.buffer.vmo);
+  const zx::unowned_vmo vmo(buffer.buffer.vmo());
   const uint32_t options = is_read ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
 
   fzl::PinnedVmo pinned_vmo;
@@ -1409,9 +1401,9 @@ zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedV
   return zx::ok(std::pair{desc, std::move(pinned_vmo)});
 }
 
-zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& req,
-                                                            aml_sdmmc_desc_t* const cur_desc,
-                                                            fzl::PinnedVmo::Region region) {
+zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(
+    const fuchsia_hardware_sdmmc::wire::SdmmcReq& req, aml_sdmmc_desc_t* const cur_desc,
+    fzl::PinnedVmo::Region region) {
   if (region.phys_addr > UINT32_MAX || (region.phys_addr + region.size) > UINT32_MAX) {
     FDF_LOGL(ERROR, logger(), "DMA goes out of accessible range: 0x%0zx, %zu", region.phys_addr,
              region.size);
@@ -1480,18 +1472,18 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
   return zx::ok(desc);
 }
 
-zx_status_t AmlSdmmc::FinishReq(const sdmmc_req_t& req) {
+zx_status_t AmlSdmmc::FinishReq(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req) {
   if ((req.cmd_flags & SDMMC_RESP_DATA_PRESENT) && (req.cmd_flags & SDMMC_CMD_READ)) {
-    const cpp20::span<const sdmmc_buffer_region_t> regions{req.buffers_list, req.buffers_count};
-    for (const auto& region : regions) {
-      if (region.type != SDMMC_BUFFER_TYPE_VMO_HANDLE) {
+    for (const auto& region : req.buffers) {
+      if (!region.buffer.is_vmo()) {
         continue;
       }
 
       // Invalidate the cache so that the next CPU read will pick up data that was written to main
       // memory by the controller.
-      zx_status_t status = zx_vmo_op_range(region.buffer.vmo, ZX_VMO_OP_CACHE_CLEAN_INVALIDATE,
-                                           region.offset, region.size, nullptr, 0);
+      zx_status_t status =
+          zx_vmo_op_range(region.buffer.vmo().get(), ZX_VMO_OP_CACHE_CLEAN_INVALIDATE,
+                          region.offset, region.size, nullptr, 0);
       if (status != ZX_OK) {
         FDF_LOGL(ERROR, logger(), "Failed to clean/invalidate cache: %s",
                  zx_status_get_string(status));
@@ -1519,25 +1511,28 @@ zx_status_t AmlSdmmc::TuningDoTransfer(const TuneContext& context) {
 
   SetTuneSettings(context.new_settings);
 
-  const sdmmc_buffer_region_t buffer = {
-      .buffer = {.vmo = context.vmo->get()},
-      .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
-      .offset = 0,
-      .size = context.expected_block.size(),
-  };
-  const sdmmc_req_t tuning_req{
-      .cmd_idx = context.cmd,
-      .cmd_flags = MMC_SEND_TUNING_BLOCK_FLAGS,
-      .arg = 0,
-      .blocksize = static_cast<uint32_t>(context.expected_block.size()),
-      .suppress_error_messages = true,
-      .client_id = 0,
-      .buffers_list = &buffer,
-      .buffers_count = 1,
-  };
+  fuchsia_hardware_sdmmc::wire::SdmmcReq tuning_req;
+  tuning_req.cmd_idx = context.cmd;
+  tuning_req.cmd_flags = MMC_SEND_TUNING_BLOCK_FLAGS;
+  tuning_req.arg = 0;
+  tuning_req.blocksize = static_cast<uint32_t>(context.expected_block.size());
+  tuning_req.suppress_error_messages = true;
+  tuning_req.client_id = 0;
+
+  fdf::Arena arena('AMSD');
+  tuning_req.buffers.Allocate(arena, 1);
+  zx::vmo dup;
+  zx_status_t status = context.vmo->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to duplicate vmo: %s", zx_status_get_string(status));
+    return status;
+  }
+  tuning_req.buffers[0].buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
+  tuning_req.buffers[0].offset = 0;
+  tuning_req.buffers[0].size = context.expected_block.size();
 
   uint32_t unused_response[4];
-  zx_status_t status = SdmmcRequestLocked(&tuning_req, unused_response);
+  status = SdmmcRequestLocked(tuning_req, unused_response);
 
   // Restore the original tuning settings so that client transfers can still go through.
   SetTuneSettings(context.original_settings);
@@ -1923,42 +1918,7 @@ template <typename T>
 void AmlSdmmc::DoRequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer) {
   fidl::Array<uint32_t, 4> response;
   for (const auto& req : request->reqs) {
-    std::vector<sdmmc_buffer_region_t> buffer_regions;
-    buffer_regions.reserve(req.buffers.count());
-    for (const auto& buffer : req.buffers) {
-      sdmmc_buffer_region_t region;
-
-      if (buffer.buffer.is_vmo_id()) {
-        region.buffer.vmo_id = buffer.buffer.vmo_id();
-        region.type = SDMMC_BUFFER_TYPE_VMO_ID;
-      } else if (buffer.buffer.is_vmo()) {
-        region.buffer.vmo = buffer.buffer.vmo().get();
-        region.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
-      } else {
-        completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-        return;
-      }
-
-      region.offset = buffer.offset;
-      region.size = buffer.size;
-      buffer_regions.push_back(region);
-    }
-
-    sdmmc_req_t sdmmc_req = {
-        .cmd_idx = req.cmd_idx,
-        .cmd_flags = req.cmd_flags,
-        .arg = req.arg,
-        .blocksize = req.blocksize,
-        .suppress_error_messages = req.suppress_error_messages,
-        .client_id = req.client_id,
-        .buffers_list = buffer_regions.data(),
-        .buffers_count = buffer_regions.size(),
-    };
-    if (sdmmc_req.client_id > SDMMC_MAX_CLIENT_ID) {
-      completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
-      return;
-    }
-    zx_status_t status = SdmmcRequestLocked(&sdmmc_req, response.data());
+    zx_status_t status = SdmmcRequestLocked(req, response.data());
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
@@ -1968,19 +1928,26 @@ void AmlSdmmc::DoRequestAndComplete(RequestRequestView request, fdf::Arena& aren
 }
 
 zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
-  if (req->client_id > SDMMC_MAX_CLIENT_ID) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
   fbl::AutoLock lock(&lock_);
   if (power_suspended_) {
     FDF_LOGL(ERROR, logger(), "Rejecting SdmmcRequest (Banjo) while power is suspended.");
     return ZX_ERR_BAD_STATE;
   }
-  return SdmmcRequestLocked(req, out_response);
+
+  fdf::Arena arena('AMSD');
+  zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> wire_req = BanjoToFidlReq(*req, &arena);
+  if (wire_req.is_error()) {
+    return wire_req.error_value();
+  }
+
+  return SdmmcRequestLocked(*wire_req, out_response);
 }
 
-zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) {
+zx_status_t AmlSdmmc::SdmmcRequestLocked(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+                                         uint32_t out_response[4]) {
+  if (req.client_id > SDMMC_MAX_CLIENT_ID) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
   if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
@@ -1994,10 +1961,10 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
 
   std::optional<std::vector<fzl::PinnedVmo>> pinned_vmos;
 
-  aml_sdmmc_desc_t* desc = SetupCmdDesc(*req);
+  aml_sdmmc_desc_t* desc = SetupCmdDesc(req);
   aml_sdmmc_desc_t* last_desc = desc;
-  if (req->cmd_flags & SDMMC_RESP_DATA_PRESENT) {
-    auto status = SetupDataDescs(*req, desc);
+  if (req.cmd_flags & SDMMC_RESP_DATA_PRESENT) {
+    auto status = SetupDataDescs(req, desc);
     if (status.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to setup data descriptors");
       return status.error_value();
@@ -2010,7 +1977,7 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
   cmd_info.set_end_of_chain(1);
   last_desc->cmd_info = cmd_info.reg_value();
   FDF_LOGL(TRACE, logger(), "SUBMIT req:%p cmd_idx: %d cmd_cfg: 0x%x cmd_dat: 0x%x cmd_arg: 0x%x",
-           req, req->cmd_idx, desc->cmd_info, desc->data_addr, desc->cmd_arg);
+           &req, req.cmd_idx, desc->cmd_info, desc->data_addr, desc->cmd_arg);
 
   zx_paddr_t desc_phys;
 
@@ -2026,19 +1993,20 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
       .set_desc_addr((static_cast<uint32_t>(desc_phys)) >> 2)
       .WriteTo(&*mmio_);
 
-  zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> response = WaitForInterrupt(*req);
+  zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> response = WaitForInterrupt(req);
   if (response.is_ok()) {
     memcpy(out_response, response.value().data(), sizeof(uint32_t) * AmlSdmmc::kResponseCount);
   }
 
-  if (zx_status_t status = FinishReq(*req); status != ZX_OK) {
+  if (zx_status_t status = FinishReq(req); status != ZX_OK) {
     return status;
   }
 
   return response.status_value();
 }
 
-zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
+zx_status_t AmlSdmmc::Init(
+    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info) {
   fbl::AutoLock lock(&lock_);
 
   // The core clock must be enabled before attempting to access the start register.
@@ -2052,8 +2020,12 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
     return status;
   }
 
-  dev_info_.caps = SDMMC_HOST_CAP_BUS_WIDTH_8 | SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 |
-                   SDMMC_HOST_CAP_SDR50 | SDMMC_HOST_CAP_DDR50 | SDMMC_HOST_CAP_DMA;
+  dev_info_.caps = static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kBusWidth8) |
+                   static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kVoltage330) |
+                   static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kSdr104) |
+                   static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kSdr50) |
+                   static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kDdr50) |
+                   static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kDma);
 
   dev_info_.max_transfer_size = kMaxDmaDescriptors * zx_system_get_page_size();
   dev_info_.max_transfer_size_non_dma = AML_SDMMC_MAX_PIO_DATA_SIZE;
