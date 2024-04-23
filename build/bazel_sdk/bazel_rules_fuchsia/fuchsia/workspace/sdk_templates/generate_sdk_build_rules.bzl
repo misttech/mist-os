@@ -561,18 +561,74 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
     prebuilt_select = {}
     dist_select = {}
 
+    name = _get_target_name(meta["name"])
+    prebuilt_variants = []
+    if "variants" in meta:
+        for variant in meta["variants"]:
+            arch = variant["constraints"]["arch"]
+            api_level = variant["constraints"]["api_level"]
+            values = variant["values"]
+
+            prebuilt_variants.append(struct(
+                name = "%s-api-%s" % (arch, api_level),
+                link_lib = values["link_lib"],
+                constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_%s" % (arch, api_level),
+                os = "@platforms//os:fuchsia",
+                arch = arch,
+                api_level = api_level,
+                has_debug = "debug" in values,
+                debug = values["debug"] if "debug" in values else None,
+                has_dist_lib = "dist_lib" in values,
+                dist_lib = values["dist_lib"] if "dist_lib" in values else None,
+                dist_lib_dest = values["dist_lib_dest"] if "dist_lib_dest" in values else None,
+            ))
+
+    for variant in prebuilt_variants:
+        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_%s" % (
+            variant.arch,
+            variant.api_level,
+        )
+        dist_select[constraint] = [
+            "//%s/%s:dist" % (relative_dir, variant.name),
+        ]
+        prebuilt_select[constraint] = [
+            "//%s/%s:prebuilts" % (relative_dir, variant.name),
+        ]
+
+        per_arch_x_api_build_file = build_file.dirname.get_child(variant.name).get_child("BUILD.bazel")
+        ctx.file(per_arch_x_api_build_file, content = _header(), executable = False)
+
+        _merge_template(ctx, per_arch_x_api_build_file, _sdk_template_path(ctx, "cc_prebuilt_library_linklib"), {
+            "{{link_lib}}": "//:" + variant.link_lib,
+            "{{library_type}}": meta["format"],
+        })
+        process_context.files_to_copy[meta["_meta_sdk_root"]].append(variant.link_lib)
+
+        if variant.has_dist_lib:
+            _merge_template(
+                ctx,
+                per_arch_x_api_build_file,
+                _sdk_template_path(ctx, "cc_prebuilt_library_distlib"),
+                {
+                    "{{dist_lib}}": "//:" + variant.dist_lib,
+                    "{{dist_path}}": variant.dist_lib_dest,
+                },
+            )
+            process_context.files_to_copy[meta["_meta_sdk_root"]].append(variant.dist_lib)
+
     # add all supported architectures to the select, even if they are not available in the current SDK,
     # so that SDKs for different architectures can be composed by a simple directory merge.
     arch_list = process_context.constants.target_cpus
     for arch in arch_list:
-        constraint = _FUCHSIA_CPU_CONSTRAINT_MAP[arch]
-        dist_select[constraint] = ["//%s/%s:dist" % (relative_dir, arch)]
-        prebuilt_select[constraint] = ["//%s/%s:prebuilts" % (relative_dir, arch)]
+        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_HEAD" % (arch)
+        dist_select[constraint] = ["//%s/%s-HEAD:dist" % (relative_dir, arch)]
+        prebuilt_select[constraint] = ["//%s/%s-HEAD:prebuilts" % (relative_dir, arch)]
 
     has_distlibs = False
 
     for arch in arch_list:
-        per_arch_build_file = build_file.dirname.get_child(arch).get_child("BUILD.bazel")
+        head_dirname = "%s-HEAD" % (arch)
+        per_arch_build_file = build_file.dirname.get_child(head_dirname).get_child("BUILD.bazel")
         ctx.file(per_arch_build_file, content = _header(), executable = False)
 
         linklib = meta["binaries"][arch]["link"]
