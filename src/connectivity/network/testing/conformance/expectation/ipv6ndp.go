@@ -227,7 +227,7 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{21, 16}: Inconclusive,
 	// TODO(https://fxbug.dev/328058848): This test is sometimes inconclusive and
 	// sometimes passes when run on its own locally.
-	{21, 17}: Fail,
+	{21, 17}: Flaky,
 	{21, 18}: Pass,
 	// TODO(https://fxbug.dev/328058848): This test is inconclusive when run on
 	// its own locally.
