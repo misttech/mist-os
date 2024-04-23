@@ -223,6 +223,38 @@ type ElementState = table {
     /// Optional.
     @available(added=20)
     6: bypassed bool;
+
+    /// If included, the driver's best estimate of the amount of time (in nanoseconds) it takes
+    /// the element hardware to get into fully operational mode after `started` has changed from
+    /// false to true.
+    ///
+    /// This field should not be present in a `SetElementState` `state` since the `turn_on_delay`
+    /// can't be set by a client. It may be provided by the server in a `WatchElementState` reply.
+    ///
+    /// It may take some time for the hardware to get into fully operational mode, for example due
+    /// a power state change. This delay must be taken into account if not getting the initial audio
+    /// samples played or captured is not acceptable.
+    /// If not included `turn_on_delay` is unknown.
+    ///
+    /// Optional.
+    @available(added=20)
+    7: turn_on_delay zx.Duration;
+
+    /// If included, the driver's best estimate of the amount of time (in nanoseconds) it takes
+    /// the element hardware to get into fully disabled mode after the `ElementState` has
+    /// changed `started` from true to false.
+    ///
+    /// This field should not be present in a `SetElementState` `state` since the `turn_off_delay`
+    /// can't be set by a client. It may be provided by the server in a `WatchElementState` reply.
+    ///
+    /// It may take some time for the hardware to get into fully disabled mode, for example due to
+    /// a power state change. This delay must be taken into account if audio processing of audio
+    /// samples after disabling a processing element is not acceptable.
+    /// If not included, the turn off delay is unknown.
+    ///
+    /// Optional.
+    @available(added=20)
+    8: turn_off_delay zx.Duration;
 };
 
 /// Edge pairs between processing elements used to define ordering in processing elements

@@ -287,6 +287,18 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.turn_off_delay",
+        "ordinal": "8",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.turn_on_delay",
+        "ordinal": "7",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/ElementState.type_specific",
         "ordinal": "1",
         "type": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElementState"
