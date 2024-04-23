@@ -1,3 +1,5 @@
+ffx target add
 ffx target list
+ffx target remove
 ffx target screenshot
 ffx target show

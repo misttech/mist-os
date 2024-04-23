@@ -1,3 +1,5 @@
+target_add.json
 target_list.json
+target_remove.json
 target_screenshot.json
 target_show.json
