@@ -15,6 +15,13 @@ pub(crate) struct TargetInfo {
     pub(crate) addresses: Vec<TargetAddr>,
 }
 
+impl std::fmt::Display for TargetInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let addrs = self.addresses.iter().map(|x| format!("{}", x)).collect::<Vec<_>>().join(",");
+        write!(f, "{}\t{}", self.nodename, addrs)
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ChooseTargetError {
     #[error(
@@ -25,7 +32,7 @@ pub enum ChooseTargetError {
     #[error("Internal error: list of targets was length 1, but the `first` one was None.")]
     InvalidState,
 
-    #[error("Specified target ({}) does not exist", .0    )]
+    #[error("Specified target ({}) does not exist", .0)]
     DoesNotExist(String),
 
     #[error("Invalid choice: {}", .0)]

@@ -12,6 +12,7 @@ use anyhow::{Context, Result};
 use argh::FromArgs;
 #[cfg(feature = "update")]
 use camino::Utf8PathBuf;
+use chrono::Local;
 use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
 };
@@ -61,6 +62,7 @@ enum FunnelSubcommands {
     Update(SubCommandUpdate),
     Cleanup(SubCommandCleanupRemote),
     CloseLocalTunnel(SubCommandCloseLocalTunnel),
+    ListTargets(SubCommandListTargets),
 }
 
 impl FunnelSubcommands {
@@ -71,6 +73,7 @@ impl FunnelSubcommands {
             Self::Update(_) => "update",
             Self::Cleanup(_) => "cleanup",
             Self::CloseLocalTunnel(_) => "close-local-tunnel",
+            Self::ListTargets(_) => "list-targets",
         }
         .to_string()
     }
@@ -135,6 +138,15 @@ struct SubCommandCloseLocalTunnel {
     host: String,
 }
 
+#[derive(FromArgs, PartialEq, Debug)]
+/// Remotely forwards a target from your local host to a remote one.
+#[argh(subcommand, name = "list-targets")]
+struct SubCommandListTargets {
+    /// time to wait to discover targets.
+    #[argh(switch, short = 'w')]
+    watch: bool,
+}
+
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {
     let args: Funnel = argh::from_env();
@@ -152,6 +164,7 @@ async fn main() -> Result<()> {
         FunnelSubcommands::CloseLocalTunnel(close_existing_tunnel) => {
             close_existing_tunnel_main(close_existing_tunnel).await
         }
+        FunnelSubcommands::ListTargets(list_targets) => list_targets_main(list_targets).await,
     };
 
     let (exit_code, error_message) = match res {
@@ -190,6 +203,37 @@ async fn update_main(_args: SubCommandUpdate) -> Result<(), FunnelError> {
     update::self_update(exe_path_buf).await.map_err(FunnelError::from)
 }
 
+async fn list_targets_main(args: SubCommandListTargets) -> Result<(), FunnelError> {
+    // Only want added events
+    let mut device_stream = wait_for_devices(
+        |_: &_| true,
+        None,
+        true,
+        true,
+        DiscoverySources::MDNS | DiscoverySources::USB,
+    )
+    .await?;
+
+    let mut stdout = io::stdout().lock();
+
+    if args.watch {
+        while let Some(s) = device_stream.next().await {
+            if let Ok(event) = s {
+                let now = Local::now();
+                write!(stdout, "{}\t", now.format("%Y-%m-%d %H:%M:%S"))?;
+                write_target_event(&mut stdout, event)?;
+            }
+        }
+    } else {
+        let wait_duration = Duration::from_secs(2);
+        let targets = discover_target_events(&mut stdout, device_stream, wait_duration).await?;
+        for target in targets {
+            writeln!(stdout, "{}", target)?;
+        }
+    }
+
+    Ok(())
+}
 async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     tracing::trace!("Discoving targets...");
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
@@ -254,6 +298,50 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     }
     handle.close();
     signal_thread.join().expect("signal thread to shutdown without panic");
+    Ok(())
+}
+
+fn write_target_event<W: Write>(mut writer: W, event: TargetEvent) -> Result<()> {
+    let symbol = match event {
+        TargetEvent::Added(_) => "+",
+        TargetEvent::Removed(_) => "-",
+    };
+
+    let handle = match event {
+        TargetEvent::Added(handle) => handle,
+        TargetEvent::Removed(handle) => handle,
+    };
+
+    let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+
+    write!(writer, "({symbol})\t{node_name}\t")?;
+    write_target_state(&mut writer, handle.state)?;
+    write!(writer, "\n")?;
+    Ok(())
+}
+
+fn write_target_state<W: Write>(writer: &mut W, state: TargetState) -> Result<()> {
+    match state {
+        TargetState::Unknown => write!(writer, "Unknown")?,
+        TargetState::Product(addrs) => {
+            write!(writer, "Product\t")?;
+            let addr_strs =
+                addrs.iter().map(|addr| format!("{}", addr)).collect::<Vec<_>>().join("\t");
+            write!(writer, "{}", addr_strs)?
+        }
+        TargetState::Zedboot => write!(writer, "Zedboot")?,
+        TargetState::Fastboot(fastboot_state) => {
+            write!(writer, "Fastboot\t")?;
+            match fastboot_state.connection_state {
+                FastbootConnectionState::Usb => write!(writer, "{}", fastboot_state.serial_number)?,
+                FastbootConnectionState::Tcp(addrs) | FastbootConnectionState::Udp(addrs) => {
+                    let addr_strs =
+                        addrs.iter().map(|addr| format!("{}", addr)).collect::<Vec<_>>().join("\t");
+                    write!(writer, "{}", addr_strs)?
+                }
+            }
+        }
+    };
     Ok(())
 }
 
