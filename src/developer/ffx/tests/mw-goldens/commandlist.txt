@@ -1,3 +1,5 @@
+ffx product download
+ffx product lookup
 ffx target add
 ffx target list
 ffx target remove
