@@ -19,10 +19,11 @@
 
 #include <zxtest/zxtest.h>
 
-const uint64_t kIoBufferEpRwMap = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE |
-                                  ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE;
-const uint64_t kIoBufferEp0OnlyRwMap = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE;
-const uint64_t kIoBufferRdOnlyMap = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_READ;
+const uint64_t kIoBufferEpRwMap = ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE |
+                                  ZX_IOB_ACCESS_EP1_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE;
+const uint64_t kIoBufferEp0OnlyRwMap =
+    ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE;
+const uint64_t kIoBufferRdOnlyMap = ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_READ;
 
 namespace {
 TEST(Iob, Create) {
@@ -176,7 +177,7 @@ TEST(Iob, MappingRights) {
   zx_iob_region_t config[3]{
       {
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = ZX_IOB_EP0_CAN_MEDIATED_WRITE,
+          .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE,
           .size = ZX_PAGE_SIZE,
           .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
           .private_region =
@@ -196,7 +197,7 @@ TEST(Iob, MappingRights) {
       },
       {
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = kIoBufferRdOnlyMap | ZX_IOB_EP0_CAN_MEDIATED_WRITE,
+          .access = kIoBufferRdOnlyMap | ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE,
           .size = ZX_PAGE_SIZE,
           .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
           .private_region =
@@ -372,9 +373,11 @@ TEST(Iob, RegionInfoSwappedAccess) {
   EXPECT_EQ(ep0_info[0].koid, ep1_info[0].koid);
 
   // But our view of the access bits should be swapped
-  EXPECT_EQ(ep0_info[0].region.access, ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE);
+  EXPECT_EQ(ep0_info[0].region.access,
+            ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE);
   // ep1 will see itself as ep0, and the other endpoint as ep1
-  EXPECT_EQ(ep1_info[0].region.access, ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE);
+  EXPECT_EQ(ep1_info[0].region.access,
+            ZX_IOB_ACCESS_EP1_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE);
 
   EXPECT_OK(zx_handle_close(ep0));
   EXPECT_OK(zx_handle_close(ep1));
@@ -708,7 +711,7 @@ TEST(Iob, IdAllocatorMediatedAccess) {
   zx_iob_region_t config[]{
       {
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = kIoBufferEp0OnlyRwMap | ZX_IOB_EP1_CAN_MEDIATED_WRITE,
+          .access = kIoBufferEp0OnlyRwMap | ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE,
           .size = ZX_PAGE_SIZE,
           .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
           .private_region = {.options = 0},
@@ -759,7 +762,7 @@ TEST(Iob, IdAllocatorMediatedErrors) {
   zx_iob_region_t config[]{
       {
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = kIoBufferEp0OnlyRwMap | ZX_IOB_EP1_CAN_MEDIATED_WRITE,
+          .access = kIoBufferEp0OnlyRwMap | ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE,
           .size = ZX_PAGE_SIZE,
           .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR},
           .private_region = {.options = 0},

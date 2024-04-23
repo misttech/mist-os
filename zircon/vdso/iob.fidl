@@ -66,10 +66,10 @@ closed protocol Iob {
     /// *access* specifies the access control modifiers for each endpoint. It
     /// must be a combination of one or more of:
     ///
-    ///  - `ZX_IOB_EP0_CAN_MAP_READ` to grant endpoint 0 to ability to map the region as readable
-    ///  - `ZX_IOB_EP0_CAN_MAP_WRITE` to grant endpoint 0 to ability to map the region as writable
-    ///  - `ZX_IOB_EP1_CAN_MAP_READ` to grant endpoint 1 to ability to map the region as readable
-    ///  - `ZX_IOB_EP1_CAN_MAP_WRITE` to grant endpoint 1 to ability to map the region as writable
+    ///  - `ZX_IOB_ACCESS_EP0_CAN_MAP_READ` to grant endpoint 0 to ability to map the region as readable
+    ///  - `ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE` to grant endpoint 0 to ability to map the region as writable
+    ///  - `ZX_IOB_ACCESS_EP1_CAN_MAP_READ` to grant endpoint 1 to ability to map the region as readable
+    ///  - `ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE` to grant endpoint 1 to ability to map the region as writable
     ///
     /// *size* is the requested size of the region in bytes. The size will be
     ///   rounded up to the next system page size boundary, as reported by

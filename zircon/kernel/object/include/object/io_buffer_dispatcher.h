@@ -97,18 +97,18 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
       zx_rights_t rights = 0;
       switch (id) {
         case IobEndpointId::Ep0:
-          if (region_.access & ZX_IOB_EP0_CAN_MAP_WRITE) {
+          if (region_.access & ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE) {
             rights |= ZX_RIGHT_WRITE | ZX_RIGHT_MAP;
           }
-          if (region_.access & ZX_IOB_EP0_CAN_MAP_READ) {
+          if (region_.access & ZX_IOB_ACCESS_EP0_CAN_MAP_READ) {
             rights |= ZX_RIGHT_READ | ZX_RIGHT_MAP;
           }
           break;
         case IobEndpointId::Ep1:
-          if (region_.access & ZX_IOB_EP1_CAN_MAP_WRITE) {
+          if (region_.access & ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE) {
             rights |= ZX_RIGHT_WRITE | ZX_RIGHT_MAP;
           }
-          if (region_.access & ZX_IOB_EP1_CAN_MAP_READ) {
+          if (region_.access & ZX_IOB_ACCESS_EP1_CAN_MAP_READ) {
             rights |= ZX_RIGHT_READ | ZX_RIGHT_MAP;
           }
           break;
@@ -124,11 +124,13 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
       zx_iob_region_info_t info{region_, koid_};
       if (swap_endpoints) {
         uint32_t ep0_access =
-            info.region.access & (ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE |
-                                  ZX_IOB_EP0_CAN_MEDIATED_READ | ZX_IOB_EP0_CAN_MEDIATED_WRITE);
+            info.region.access &
+            (ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE |
+             ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ | ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE);
         uint32_t ep1_access =
-            info.region.access & (ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE |
-                                  ZX_IOB_EP1_CAN_MEDIATED_READ | ZX_IOB_EP1_CAN_MEDIATED_WRITE);
+            info.region.access &
+            (ZX_IOB_ACCESS_EP1_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE |
+             ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ | ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE);
         info.region.access = (ep0_access << 4) | (ep1_access >> 4);
       }
       return info;
@@ -138,18 +140,18 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
       zx_rights_t rights = 0;
       switch (id) {
         case IobEndpointId::Ep0:
-          if (region_.access & ZX_IOB_EP0_CAN_MEDIATED_WRITE) {
+          if (region_.access & ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE) {
             rights |= ZX_RIGHT_WRITE;
           }
-          if (region_.access & ZX_IOB_EP0_CAN_MEDIATED_READ) {
+          if (region_.access & ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ) {
             rights |= ZX_RIGHT_READ;
           }
           break;
         case IobEndpointId::Ep1:
-          if (region_.access & ZX_IOB_EP1_CAN_MEDIATED_WRITE) {
+          if (region_.access & ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE) {
             rights |= ZX_RIGHT_WRITE;
           }
-          if (region_.access & ZX_IOB_EP1_CAN_MEDIATED_READ) {
+          if (region_.access & ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ) {
             rights |= ZX_RIGHT_READ;
           }
           break;

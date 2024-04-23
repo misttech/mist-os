@@ -379,12 +379,12 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
     fbl::RefPtr<VmObject> kernel_vmo,  //
     const zx_iob_region_t& region,     //
     zx_koid_t koid) {
-  constexpr zx_iob_access_t kEp0MedR = ZX_IOB_EP0_CAN_MEDIATED_READ;
-  constexpr zx_iob_access_t kEp0MedW = ZX_IOB_EP0_CAN_MEDIATED_WRITE;
-  constexpr zx_iob_access_t kEp0MapW = ZX_IOB_EP0_CAN_MAP_WRITE;
-  constexpr zx_iob_access_t kEp1MedR = ZX_IOB_EP1_CAN_MEDIATED_READ;
-  constexpr zx_iob_access_t kEp1MedW = ZX_IOB_EP1_CAN_MEDIATED_WRITE;
-  constexpr zx_iob_access_t kEp1MapW = ZX_IOB_EP1_CAN_MAP_WRITE;
+  constexpr zx_iob_access_t kEp0MedR = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ;
+  constexpr zx_iob_access_t kEp0MedW = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE;
+  constexpr zx_iob_access_t kEp0MapW = ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE;
+  constexpr zx_iob_access_t kEp1MedR = ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ;
+  constexpr zx_iob_access_t kEp1MedW = ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE;
+  constexpr zx_iob_access_t kEp1MapW = ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE;
 
   zx_iob_access_t mediated0 = region.access & (kEp0MedR | kEp0MedW);
   zx_iob_access_t mediated1 = region.access & (kEp1MedR | kEp1MedW);

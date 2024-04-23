@@ -239,8 +239,9 @@ TEST(ThreadSampler, BadIob) {
   }
   ASSERT_OK(create_res);
 
-  const uint64_t kIoBufferEpRwMap = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE |
-                                    ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE;
+  const uint64_t kIoBufferEpRwMap =
+      ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE |
+      ZX_IOB_ACCESS_EP1_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE;
   zx_iob_region_t iob_config{
       .type = ZX_IOB_REGION_TYPE_PRIVATE,
       .access = kIoBufferEpRwMap,
