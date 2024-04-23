@@ -141,14 +141,14 @@ ImageFixup = AfterImageFixup
     adr_global tmp, boot_cpu_kstack_end
     mov     sp, tmp
 
-    /* make sure the boot allocator is given a chance to figure out where
-     * we are loaded in physical memory. */
-    bl      boot_alloc_init
-
     /* save the physical address the kernel is loaded at */
     adr_global x0, __code_start
     adr_global x1, kernel_base_phys
     str     x0, [x1]
+
+    /* call into the arm64 boot mapping code to give it a chance to initialize its page tables */
+    sub     x0, kernel_vaddr, x0 /* compute the delta between virtual and physical addresses */
+    bl      arm64_boot_map_init
 
     /* Save a copy of the physical address of the kernel page table */
     adr_global tmp, arm64_kernel_translation_table_phys
@@ -164,7 +164,9 @@ ImageFixup = AfterImageFixup
     cmp     tmp, #MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP
     bne     .Lclear_top_page_table_loop
 
-    /* void arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags); */
+    /* void arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len,
+     *                     pte_t flags, bool allow_large_pages);
+     */
 
     /* map a large run of physical memory at the base of the kernel's address space
      * TODO(https://fxbug.dev/42124648): Only map the arenas. */

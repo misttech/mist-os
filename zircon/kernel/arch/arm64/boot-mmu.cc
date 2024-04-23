@@ -9,16 +9,24 @@
 #include <sys/types.h>
 
 #include <arch/arm64/mmu.h>
-#include <vm/bootalloc.h>
 #include <vm/physmap.h>
 
 // Early boot time page table creation code, called from start.S while running in physical address
 // space with the mmu disabled. This code should be position independent as long as it sticks to
 // basic code.
+namespace {
+
+constexpr size_t kNumBootPageTables = 16;
+alignas(PAGE_SIZE) uint64_t boot_page_tables[MMU_KERNEL_PAGE_TABLE_ENTRIES * kNumBootPageTables];
+
+// Will track the physical address of the page table array above. Starts off initialized to the
+// virtual address, but will be adjusted in arm64_boot_map_init().
+paddr_t boot_page_tables_pa = reinterpret_cast<paddr_t>(boot_page_tables);
+size_t boot_page_table_offset;
 
 // this code only works on a 4K page granule, 48 bits of kernel address space
-static_assert(MMU_KERNEL_PAGE_SIZE_SHIFT == 12, "");
-static_assert(MMU_KERNEL_SIZE_SHIFT == 48, "");
+static_assert(MMU_KERNEL_PAGE_SIZE_SHIFT == 12);
+static_assert(MMU_KERNEL_SIZE_SHIFT == 48);
 
 // 1GB pages
 const uintptr_t l1_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 1);
@@ -28,28 +36,27 @@ const uintptr_t l1_large_page_size_mask = l1_large_page_size - 1;
 const uintptr_t l2_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 2);
 const uintptr_t l2_large_page_size_mask = l2_large_page_size - 2;
 
-static size_t vaddr_to_l0_index(uintptr_t addr) {
+size_t vaddr_to_l0_index(uintptr_t addr) {
   return (addr >> MMU_KERNEL_TOP_SHIFT) & (MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP - 1);
 }
 
-static size_t vaddr_to_l1_index(uintptr_t addr) {
+size_t vaddr_to_l1_index(uintptr_t addr) {
   return (addr >> MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 1)) & (MMU_KERNEL_PAGE_TABLE_ENTRIES - 1);
 }
 
-static size_t vaddr_to_l2_index(uintptr_t addr) {
+size_t vaddr_to_l2_index(uintptr_t addr) {
   return (addr >> MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 2)) & (MMU_KERNEL_PAGE_TABLE_ENTRIES - 1);
 }
 
-static size_t vaddr_to_l3_index(uintptr_t addr) {
+size_t vaddr_to_l3_index(uintptr_t addr) {
   return (addr >> MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 3)) & (MMU_KERNEL_PAGE_TABLE_ENTRIES - 1);
 }
 
 // inner mapping routine passed two helper routines
 __NO_SAFESTACK
-static inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
-                                          const paddr_t paddr, const size_t len, const pte_t flags,
-                                          paddr_t (*alloc_func)(), pte_t* phys_to_virt(paddr_t),
-                                          const bool allow_large_pages) {
+inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr, const paddr_t paddr,
+                                   const size_t len, const pte_t flags, paddr_t (*alloc_func)(),
+                                   pte_t* phys_to_virt(paddr_t), const bool allow_large_pages) {
   // loop through the virtual range and map each physical page, using the largest
   // page size supported. Allocates necessary page tables along the way.
   size_t off = 0;
@@ -141,6 +148,27 @@ static inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t va
   return ZX_OK;
 }
 
+__NO_SAFESTACK
+paddr_t boot_page_table_alloc() {
+  ASSERT(boot_page_table_offset < sizeof(boot_page_tables));
+  boot_page_table_offset += PAGE_SIZE;
+
+  paddr_t new_table = boot_page_tables_pa;
+  boot_page_tables_pa += PAGE_SIZE;
+  return new_table;
+}
+
+}  // anonymous namespace
+
+__NO_SAFESTACK
+extern "C" void arm64_boot_map_init(uint64_t vaddr_paddr_delta) {
+  boot_page_tables_pa -= vaddr_paddr_delta;
+}
+
+std::tuple<size_t, size_t> arm64_boot_map_used_memory() {
+  return {sizeof(boot_page_tables), boot_page_table_offset};
+}
+
 // called from start.S to configure level 1-3 page tables to map the kernel wherever it is located
 // physically to KERNEL_BASE
 __NO_SAFESTACK
@@ -151,7 +179,7 @@ extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
   // off). any physical addresses calculated are assumed to be the same as virtual
   auto alloc = []() __NO_SAFESTACK -> paddr_t {
     // allocate a page out of the boot allocator, asking for a physical address
-    paddr_t pa = boot_alloc_page_phys();
+    paddr_t pa = boot_page_table_alloc();
 
     // avoid using memset, since this relies on dc zva instruction, which isn't set up at
     // this point in the boot process
@@ -179,7 +207,7 @@ zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const siz
   // to allocate and find the virtual mapping of memory
   auto alloc = []() -> paddr_t {
     // allocate a page out of the boot allocator, asking for a physical address
-    paddr_t pa = boot_alloc_page_phys();
+    paddr_t pa = boot_page_table_alloc();
 
     // zero the memory using the physmap
     void* ptr = paddr_to_physmap(pa);
