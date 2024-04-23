@@ -229,6 +229,17 @@ closed protocol ClientSme {
     strict WmmStatus() -> (struct {
         resp fuchsia.wlan.internal.WmmStatusResponse;
     }) error int32;
+
+    // This API is for Fuchsia Controller only.
+    // This call will fail if scan results exceed the maximum FIDL message size.
+    // This provides no functionality over the `Scan` API, and should only be
+    // used by Fuchsia Controller where VMO return values are not permitted.
+    // TODO(b/334937123): Remove this API when VMO messages are supported.
+    strict ScanForController(resource struct {
+        req ScanRequest;
+    }) -> (resource struct {
+        scan_results vector<ScanResult>;
+    }) error ScanErrorCode;
 };
 
 type ApConfig = struct {
