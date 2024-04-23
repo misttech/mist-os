@@ -12,8 +12,6 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::{
@@ -39,23 +37,13 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
-    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, StaticNetdeviceInfo,
-    DEFAULT_INTERFACE_METRIC,
+    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 /// Like [`DeviceId`], but restricted to netdevice devices.
 enum NetdeviceId {
     Ethernet(EthernetDeviceId<BindingsCtx>),
     PureIp(PureIpDeviceId<BindingsCtx>),
-}
-
-impl NetdeviceId {
-    fn netdevice_info(&self) -> &StaticNetdeviceInfo {
-        match self {
-            NetdeviceId::Ethernet(eth) => &eth.external_state().netdevice,
-            NetdeviceId::PureIp(ip) => &ip.external_state().netdevice,
-        }
-    }
 }
 
 /// Like [`WeakDeviceId`], but restricted to netdevice devices.
@@ -141,7 +129,6 @@ impl NetdeviceWorker {
         let mut task = fuchsia_async::Task::spawn(task).fuse();
 
         let mut buff = [0u8; DEFAULT_BUFFER_LENGTH];
-        let mut last_wifi_drop_log = fasync::Time::INFINITE_PAST;
         loop {
             // Extract result into an enum to avoid too much code in  macro.
             let rx: netdevice_client::Buffer<_> = futures::select! {
@@ -183,25 +170,6 @@ impl NetdeviceWorker {
                 continue;
             };
 
-            match workaround_drop_ssh_over_wlan(
-                &id.netdevice_info().handler.device_class,
-                &buff[..frame_length],
-            ) {
-                FilterResult::Drop => {
-                    // This being hardcoded in Netstack is possibly surprising.
-                    // Log a loud warning with some throttling to warn users.
-                    let now = fasync::Time::now();
-                    if now - last_wifi_drop_log >= zx::Duration::from_seconds(5) {
-                        tracing::warn!(
-                            "Dropping frame destined to TCP port 22 on WiFi interface. \
-                            See https://fxbug.dev/42084174."
-                        );
-                        last_wifi_drop_log = now;
-                    }
-                    continue;
-                }
-                FilterResult::Accept => (),
-            }
             let buf = packet::Buf::new(&mut buff[..frame_length], ..);
             let frame_type = rx.frame_type().map_err(Error::Client)?;
             match id {
@@ -244,92 +212,6 @@ impl NetdeviceWorker {
                     )
                 }
             }
-        }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum FilterResult {
-    Accept,
-    Drop,
-}
-
-const SSH_PORT: u16 = 22;
-
-/// Implements a hardcoded filter to drop all incoming TCP frames with
-/// destination port 22 on WiFi interfaces because we don't have a filtering
-/// engine yet. This allows us to test Netstack3 on some devices without
-/// incurring the security risk of remote access before we have the filtering
-/// engine in place.
-///
-/// TODO(https://fxbug.dev/42084174): Remove this and replace with real filtering.
-fn workaround_drop_ssh_over_wlan(
-    device_class: &fhardware_network::DeviceClass,
-    buffer: &[u8],
-) -> FilterResult {
-    use packet::ParsablePacket;
-    use packet_formats::{
-        error::{IpParseError, ParseError, ParseResult},
-        ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
-        ip::{IpProto, Ipv4Proto, Ipv6Proto},
-        ipv4::{Ipv4Header as _, Ipv4PacketRaw},
-        ipv6::{ExtHdrParseError, Ipv6PacketRaw},
-        tcp::TcpSegmentRaw,
-    };
-
-    match device_class {
-        fhardware_network::DeviceClass::Wlan | fhardware_network::DeviceClass::WlanAp => {}
-        fhardware_network::DeviceClass::Ppp
-        | fhardware_network::DeviceClass::Bridge
-        | fhardware_network::DeviceClass::Virtual
-        | fhardware_network::DeviceClass::Ethernet => return FilterResult::Accept,
-    }
-    // Attempt to parse the buffer as loosely as we can, that means we're as
-    // strict as possible here in dropping SSH. We just need to parse deep
-    // enough to get to the TCP header.
-    fn extract_tcp_ports(data: &[u8]) -> ParseResult<Option<(u16, u16)>> {
-        let mut bv = &data[..];
-        let ethernet = EthernetFrame::parse(&mut bv, EthernetFrameLengthCheck::NoCheck)?;
-        let tcp_hdr = match ethernet.ethertype().ok_or(ParseError::Format)? {
-            EtherType::Ipv4 => {
-                let ipv4 = Ipv4PacketRaw::parse(&mut bv, ())
-                    .map_err(|_: IpParseError<_>| ParseError::Format)?;
-
-                match ipv4.proto() {
-                    Ipv4Proto::Proto(IpProto::Tcp) => (),
-                    _ => return Ok(None),
-                };
-                TcpSegmentRaw::parse(&mut ipv4.body().into_inner(), ())?.flow_header()
-            }
-            EtherType::Ipv6 => {
-                let ipv6 = Ipv6PacketRaw::parse(&mut bv, ())
-                    .map_err(|_: IpParseError<_>| ParseError::Format)?;
-                let (body, proto) =
-                    ipv6.body_proto().map_err(|_: ExtHdrParseError| ParseError::Format)?;
-
-                match proto {
-                    Ipv6Proto::Proto(IpProto::Tcp) => (),
-                    _ => return Ok(None),
-                };
-                TcpSegmentRaw::parse(&mut body.into_inner(), ())?.flow_header()
-            }
-            EtherType::Arp | EtherType::Other(_) => return Ok(None),
-        };
-        Ok(Some(tcp_hdr.src_dst()))
-    }
-
-    match extract_tcp_ports(buffer) {
-        Ok(Some((_src, dst))) => {
-            if dst == SSH_PORT {
-                FilterResult::Drop
-            } else {
-                FilterResult::Accept
-            }
-        }
-        Ok(None) => FilterResult::Accept,
-        Result::<_, ParseError>::Err(_) => {
-            // Just pass packets that are not parsable in.
-            FilterResult::Accept
         }
     }
 }
@@ -839,80 +721,5 @@ impl std::fmt::Debug for PortHandler {
             .field("device_class", device_class)
             .field("wire_format", wire_format)
             .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ip_test_macro::ip_test;
-    use net_declare::net_mac;
-    use net_types::Witness as _;
-    use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
-    use packet_formats::{
-        ethernet::EthernetFrameBuilder,
-        ip::{IpExt, IpPacketBuilder as _, IpProto},
-        tcp::TcpSegmentBuilder,
-    };
-    use std::num::NonZeroU16;
-
-    #[ip_test]
-    fn wlan_ssh_workaround<I: Ip + IpExt>() {
-        fn make_packet<I: IpExt>(ip_proto: IpProto, dst: u16) -> Buf<Vec<u8>> {
-            let addr = I::LOOPBACK_ADDRESS.get();
-            (&[1u8, 2, 3, 4])
-                .into_serializer()
-                .encapsulate(TcpSegmentBuilder::new(
-                    addr,
-                    addr,
-                    NonZeroU16::new(1234).unwrap(),
-                    NonZeroU16::new(dst).unwrap(),
-                    1,
-                    None,
-                    1024,
-                ))
-                .encapsulate(I::PacketBuilder::new(addr, addr, 1, ip_proto.into()))
-                .encapsulate(EthernetFrameBuilder::new(
-                    net_mac!("02:00:00:00:00:01"),
-                    net_mac!("02:00:00:00:00:02"),
-                    I::ETHER_TYPE,
-                    0,
-                ))
-                .serialize_vec_outer()
-                .unwrap()
-                .unwrap_b()
-        }
-
-        // Check that we're only dropping for WLAN.
-        for device_class in [
-            fhardware_network::DeviceClass::Virtual,
-            fhardware_network::DeviceClass::Ethernet,
-            fhardware_network::DeviceClass::Ppp,
-            fhardware_network::DeviceClass::Bridge,
-        ] {
-            assert_matches!(
-                workaround_drop_ssh_over_wlan(
-                    &device_class,
-                    make_packet::<I>(IpProto::Tcp, SSH_PORT).as_ref(),
-                ),
-                FilterResult::Accept
-            );
-        }
-
-        for (proto, dst, expect) in [
-            (IpProto::Udp, 1234, FilterResult::Accept),
-            (IpProto::Udp, SSH_PORT, FilterResult::Accept),
-            (IpProto::Tcp, 1234, FilterResult::Accept),
-            (IpProto::Tcp, SSH_PORT, FilterResult::Drop),
-        ] {
-            assert_eq!(
-                workaround_drop_ssh_over_wlan(
-                    &fhardware_network::DeviceClass::Wlan,
-                    make_packet::<I>(proto, dst).as_ref()
-                ),
-                expect,
-                "proto={proto:?}, dst={dst}"
-            );
-        }
     }
 }
