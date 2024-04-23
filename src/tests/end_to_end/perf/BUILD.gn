@@ -19,8 +19,6 @@ import("//build/testing/perf/test.gni")
 test_list = [
   # keep-sorted start
   "flatland_benchmarks_test",
-  "input_latency_benchmarks_test",
-
   # keep-sorted end
 ]
 
@@ -59,6 +57,10 @@ _tests = [
   {
     name = "input_latency_benchmark"
     expected_metric_filenames = [ "fuchsia.input_latency.simplest_app.txt" ]
+    libraries = [
+      "//src/performance/lib/trace_processing",
+      "//src/performance/lib/perf_publish",
+    ]
   },
   {
     name = "perf_publish_example"
@@ -121,8 +123,6 @@ if (is_host) {
   metric_files = [
     # keep-sorted start
     "fuchsia.flatland_latency.txt",
-    "fuchsia.input_latency.simplest_app.txt",
-
     # keep-sorted end
   ]
 

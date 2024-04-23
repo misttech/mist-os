@@ -94,7 +94,7 @@ class InputLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
         else:
             return [
                 trace_metrics.TestCaseResult(
-                    "InputLatency",
+                    "total_input_latency",
                     trace_metrics.Unit.milliseconds,
                     latencies,
                 ),

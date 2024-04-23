@@ -476,7 +476,7 @@ class MetricProcessorsTest(unittest.TestCase):
                 model_file="input_latency_metric.json",
                 expected_results=[
                     TCR(
-                        label="InputLatency",
+                        label="total_input_latency",
                         unit=U.milliseconds,
                         values=[0.005, 0.003, 0.002, 0.007, 0.009],
                     ),
