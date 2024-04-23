@@ -1313,7 +1313,7 @@ mod tests {
                     {
                         source_moniker: "<component_manager>",
                         source: "component",
-                        source_name: "fuchsia.boot.RootResource",
+                        source_name: "fuchsia.kernel.MmioResource",
                         capability: "protocol",
                         target_monikers: ["/root", "/root/bootstrap", "/root/core"],
                     },
@@ -1401,7 +1401,7 @@ mod tests {
                         },
                         component_internal::CapabilityAllowlistEntry {
                             source_moniker: Some("<component_manager>".to_string()),
-                            source_name: Some("fuchsia.boot.RootResource".to_string()),
+                            source_name: Some("fuchsia.kernel.MmioResource".to_string()),
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                             capability: Some(component_internal::AllowlistedCapability::Protocol(
                                 component_internal::AllowlistedProtocol::default()

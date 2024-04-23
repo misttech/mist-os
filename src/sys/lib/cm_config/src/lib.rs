@@ -1214,7 +1214,7 @@ mod tests {
                         allowlist: Some(vec![
                         component_internal::CapabilityAllowlistEntry {
                             source_moniker: None,
-                            source_name: Some("fuchsia.boot.RootResource".to_string()),
+                            source_name: Some("fuchsia.kernel.MmioResource".to_string()),
                             capability: Some(component_internal::AllowlistedCapability::Protocol(component_internal::AllowlistedProtocol::default())),
                             target_monikers: Some(vec!["/core".to_string()]),
                             ..Default::default()
