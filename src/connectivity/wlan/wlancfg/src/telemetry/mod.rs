@@ -737,6 +737,7 @@ fn inspect_record_external_data(
     });
 }
 
+#[derive(Debug)]
 struct HistogramsNode {
     node: InspectNode,
     antenna_nodes: HashMap<fidl_fuchsia_wlan_stats::AntennaId, InspectNode>,

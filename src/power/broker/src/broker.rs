@@ -7,10 +7,12 @@ use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, DependencyType, LeaseStatus, Permissions, PowerLevel,
     RegisterDependencyTokenError, UnregisterDependencyTokenError,
 };
+use fuchsia_inspect::component;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::iter::repeat;
 use uuid::Uuid;
@@ -29,11 +31,14 @@ pub struct Broker {
 
 impl Broker {
     pub fn new() -> Self {
+        let insp_root = component::inspector().root();
+        let insp_cur_levels = insp_root.create_child("current-levels");
+        let insp_req_levels = insp_root.create_child("required-levels");
         Broker {
             catalog: Catalog::new(),
             credentials: Registry::new(),
-            current: SubscribeMap::new(),
-            required: SubscribeMap::new(),
+            current: SubscribeMap::new(insp_cur_levels),
+            required: SubscribeMap::new(insp_req_levels),
         }
     }
 
@@ -536,7 +541,7 @@ impl Catalog {
         Catalog {
             topology: Topology::new(),
             leases: HashMap::new(),
-            lease_status: SubscribeMap::new(),
+            lease_status: SubscribeMap::new(component::inspector().root().create_child("leases")),
             active_claims: ClaimTracker::new(),
             pending_claims: ClaimTracker::new(),
             passive_claims: ClaimTracker::new(),
@@ -768,57 +773,106 @@ impl ClaimTracker {
     }
 }
 
+trait Inspectable {
+    type Value;
+    fn track_inspect_with(
+        &self,
+        value: Self::Value,
+        parent: &fuchsia_inspect::Node,
+    ) -> Box<dyn fuchsia_inspect::InspectType>;
+}
+
+impl Inspectable for &ElementID {
+    type Value = PowerLevel;
+    fn track_inspect_with(
+        &self,
+        value: Self::Value,
+        parent: &fuchsia_inspect::Node,
+    ) -> Box<dyn fuchsia_inspect::InspectType> {
+        Box::new(parent.create_uint(self.to_string(), value.into()))
+    }
+}
+
+impl Inspectable for &LeaseID {
+    type Value = LeaseStatus;
+    fn track_inspect_with(
+        &self,
+        value: Self::Value,
+        parent: &fuchsia_inspect::Node,
+    ) -> Box<dyn fuchsia_inspect::InspectType> {
+        Box::new(parent.create_string(*self, format!("{:?}", value)))
+    }
+}
+
+#[derive(Debug)]
+struct Data<V: Clone + PartialEq> {
+    value: Option<V>,
+    senders: Vec<UnboundedSender<Option<V>>>,
+    _inspect: Option<Box<dyn fuchsia_inspect::InspectType>>,
+}
+
+impl<V: Clone + PartialEq> Default for Data<V> {
+    fn default() -> Self {
+        Data { value: None, senders: Vec::new(), _inspect: None }
+    }
+}
+
 /// SubscribeMap is a wrapper around a HashMap that stores values V by key K
 /// and allows subscribers to register a channel on which they will receive
 /// updates whenever the value stored changes.
 #[derive(Debug)]
 struct SubscribeMap<K: Clone + Hash + Eq, V: Clone + PartialEq> {
-    values: HashMap<K, V>,
-    senders: HashMap<K, Vec<UnboundedSender<Option<V>>>>,
+    values: HashMap<K, Data<V>>,
+    inspect: fuchsia_inspect::Node,
 }
 
 impl<K: Clone + Hash + Eq, V: Clone + PartialEq> SubscribeMap<K, V> {
-    fn new() -> Self {
-        SubscribeMap { values: HashMap::new(), senders: HashMap::new() }
+    fn new(inspect: fuchsia_inspect::Node) -> Self {
+        SubscribeMap { values: HashMap::new(), inspect }
     }
 
     fn get(&self, key: &K) -> Option<V> {
-        self.values.get(key).cloned()
+        self.values.get(key).map(|d| d.value.clone()).flatten()
     }
 
-    fn update(&mut self, key: &K, value: V) {
+    fn update<'a>(&mut self, key: &'a K, value: V)
+    where
+        &'a K: Inspectable<Value = V>,
+        V: Copy,
+    {
         // If the value hasn't changed, this is a no-op.
         if let Some(current) = self.get(key) {
             if current == value {
                 return;
             }
         }
-        self.values.insert(key.clone(), value.clone());
-        let mut senders_to_retain = Vec::new();
-        if let Some(senders) = self.senders.remove(&key) {
-            for sender in senders {
+        let mut senders = Vec::new();
+        if let Some(Data { value: _, senders: old_senders, _inspect: _ }) = self.values.remove(&key)
+        {
+            // Prune invalid senders.
+            for sender in old_senders {
                 if let Err(err) = sender.unbounded_send(Some(value.clone())) {
                     if err.is_disconnected() {
                         continue;
                     }
                 }
-                senders_to_retain.push(sender);
+                senders.push(sender);
             }
         }
-        // Prune invalid senders.
-        self.senders.insert(key.clone(), senders_to_retain);
+        let _inspect = Some(key.track_inspect_with(value, &self.inspect));
+        let value = Some(value);
+        self.values.insert(key.clone(), Data { value, senders, _inspect });
     }
 
     fn subscribe(&mut self, key: &K) -> UnboundedReceiver<Option<V>> {
         let (sender, receiver) = unbounded::<Option<V>>();
-        sender.unbounded_send(self.get(key)).expect("initial send failed");
-        self.senders.entry(key.clone()).or_insert(Vec::new()).push(sender);
+        sender.unbounded_send(self.get(key)).expect("initial send should not fail");
+        self.values.entry(key.clone()).or_default().senders.push(sender);
         receiver
     }
 
     fn remove(&mut self, key: &K) {
         self.values.remove(key);
-        self.senders.remove(key);
     }
 }
 
@@ -837,6 +891,7 @@ impl SatisfyPowerLevel for PowerLevel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use fidl_fuchsia_power_broker::DependencyToken;
     use fuchsia_zircon::{self as zx, HandleBased};
     use power_broker_client::BINARY_POWER_LEVELS;
@@ -883,25 +938,48 @@ mod tests {
 
     #[fuchsia::test]
     fn test_levels() {
-        let mut levels = SubscribeMap::<ElementID, PowerLevel>::new();
+        let inspect = fuchsia_inspect::component::inspector();
+        let mut levels =
+            SubscribeMap::<ElementID, PowerLevel>::new(inspect.root().create_child("test"));
 
         levels.update(&"A".into(), BinaryPowerLevel::On.into_primitive());
         assert_eq!(levels.get(&"A".into()), Some(BinaryPowerLevel::On.into_primitive()));
         assert_eq!(levels.get(&"B".into()), None);
+        assert_data_tree!(inspect, root: { test:
+        {
+          "A": 1u64,
+        }});
 
         levels.update(&"A".into(), BinaryPowerLevel::Off.into_primitive());
         levels.update(&"B".into(), BinaryPowerLevel::On.into_primitive());
         assert_eq!(levels.get(&"A".into()), Some(BinaryPowerLevel::Off.into_primitive()));
         assert_eq!(levels.get(&"B".into()), Some(BinaryPowerLevel::On.into_primitive()));
+        assert_data_tree!(inspect, root: { test:
+        {
+          "A": 0u64,
+          "B": 1u64,
+        }});
 
         levels.update(&"UD1".into(), 145);
         assert_eq!(levels.get(&"UD1".into()), Some(145));
         assert_eq!(levels.get(&"UD2".into()), None);
+
+        levels.update(&"A".into(), BinaryPowerLevel::On.into_primitive());
+        levels.remove(&"B".into());
+        assert_eq!(levels.get(&"B".into()), None);
+
+        assert_data_tree!(inspect, root: { test:
+        {
+          "A": 1u64,
+          "UD1": 145u64,
+        }});
     }
 
     #[fuchsia::test]
     fn test_levels_subscribe() {
-        let mut levels = SubscribeMap::<ElementID, PowerLevel>::new();
+        let inspect = fuchsia_inspect::component::inspector();
+        let mut levels =
+            SubscribeMap::<ElementID, PowerLevel>::new(inspect.root().create_child("test"));
 
         let mut receiver_a = levels.subscribe(&"A".into());
         let mut receiver_b = levels.subscribe(&"B".into());
@@ -932,6 +1010,12 @@ mod tests {
             received_b.push(level)
         }
         assert_eq!(received_b, vec![None, Some(BinaryPowerLevel::On.into_primitive())]);
+
+        assert_data_tree!(inspect, root: { test:
+        {
+          "A": 0u64,
+          "B": 1u64,
+        }});
     }
 
     #[fuchsia::test]

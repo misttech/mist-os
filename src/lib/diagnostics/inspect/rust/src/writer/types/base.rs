@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Trait implemented by all inspect types.
-pub trait InspectType: Send + Sync {}
+pub trait InspectType: Send + Sync + Debug {}
 
 pub(crate) mod private {
     use crate::writer::State;

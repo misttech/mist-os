@@ -24,11 +24,14 @@ $ ffx component run /core/ffx-laboratory:power-broker fuchsia-pkg://fuchsia.com/
 
 ## Testing
 
-Unit tests for power-broker are available in the `power-broker-tests`
-package.
+To add tests to your build, append
+`--with //src/power/broker:tests`
+to the `fx set` invocation.
+
+Unit tests can be run with:
 
 ```
-$ fx test power-broker-tests
+$ fx test power-broker-unittests
 ```
 
 Integration tests can be run with:

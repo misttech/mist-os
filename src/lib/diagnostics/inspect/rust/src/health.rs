@@ -97,6 +97,7 @@ impl ToString for Status {
 /// if the user calls the functions `init()`, `ok()` and `unhealthy(...)`.
 ///
 /// Use as: ```fuchsia_inspect::health::Node``.
+#[derive(Debug)]
 pub struct Node {
     // The generic inspect node that hosts the health metric.
     node: super::Node,

@@ -5,6 +5,7 @@
 /// Manages the Power Element Topology, keeping track of element dependencies.
 use fidl_fuchsia_power_broker::{self as fpb, PowerLevel};
 use std::collections::HashMap;
+use std::fmt;
 use uuid::Uuid;
 
 /// If true, use non-random ElementIDs for ease of debugging.
@@ -31,6 +32,12 @@ impl From<String> for ElementID {
 impl Into<String> for ElementID {
     fn into(self) -> String {
         self.id
+    }
+}
+
+impl fmt::Display for ElementID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.id)
     }
 }
 
