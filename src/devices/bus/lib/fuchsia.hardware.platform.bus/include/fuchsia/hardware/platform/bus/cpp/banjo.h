@@ -126,50 +126,6 @@ class PBusProtocolClient {
     return ZX_OK;
   }
 
-  // Adds a device for binding a protocol implementation driver.
-  // These devices are added in the same devhost as the platform bus.
-  // After the driver binds to the device it calls `pbus_register_protocol()`
-  // to register its protocol with the platform bus.
-  // `pbus_protocol_device_add()` blocks until the protocol implementation driver
-  // registers its protocol (or times out).
-  zx_status_t ProtocolDeviceAdd(uint32_t proto_id, const pbus_dev_t* dev) const {
-    fidl::Arena<> fidl_arena;
-    auto result =
-        client_.buffer(fdf::Arena('PBPD'))->ProtocolNodeAdd(proto_id, DevToNode(dev, fidl_arena));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: ProtocolNodeAdd request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: ProtocolNodeAdd failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-    return ZX_OK;
-  }
-
-  // Called by protocol implementation drivers to register their protocol
-  // with the platform bus.
-  zx_status_t RegisterProtocol(uint32_t proto_id, const uint8_t* protocol_buffer,
-                               size_t protocol_size) const {
-    auto result =
-        client_.buffer(fdf::Arena('PBRP'))
-            ->RegisterProtocol(proto_id, fidl::VectorView<uint8_t>::FromExternal(
-                                             const_cast<uint8_t*>(protocol_buffer), protocol_size));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: RegisterProtocol request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: RegisterProtocol failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-    return ZX_OK;
-  }
-
   // Board drivers may use this to get information about the board, and to
   // differentiate between multiple boards that they support.
   zx_status_t GetBoardInfo(pdev_board_info_t* out_info) const {

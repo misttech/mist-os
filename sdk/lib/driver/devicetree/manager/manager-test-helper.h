@@ -39,14 +39,6 @@ class FakePlatformBus final : public fdf::Server<fuchsia_hardware_platform_bus::
     nodes_.emplace_back(std::move(request.node()));
     completer.Reply(zx::ok());
   }
-  void ProtocolNodeAdd(ProtocolNodeAddRequest& request,
-                       ProtocolNodeAddCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-  void RegisterProtocol(RegisterProtocolRequest& request,
-                        RegisterProtocolCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
 
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequest& request,
                             AddCompositeNodeSpecCompleter::Sync& completer) override {

@@ -90,14 +90,6 @@ void RestrictPlatformBus::NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
                                   NodeAddCompleter::Sync& completer) {
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
-void RestrictPlatformBus::ProtocolNodeAdd(ProtocolNodeAddRequestView request, fdf::Arena& arena,
-                                          ProtocolNodeAddCompleter::Sync& completer) {
-  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void RestrictPlatformBus::RegisterProtocol(RegisterProtocolRequestView request, fdf::Arena& arena,
-                                           RegisterProtocolCompleter::Sync& completer) {
-  upstream_->RegisterProtocol(request, arena, completer);
-}
 
 void RestrictPlatformBus::GetBoardInfo(fdf::Arena& arena, GetBoardInfoCompleter::Sync& completer) {
   upstream_->GetBoardInfo(arena, completer);
@@ -317,9 +309,8 @@ zx_status_t PlatformDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
     proto->ops = &pdev_protocol_ops_;
     proto->ctx = this;
     return ZX_OK;
-  } else {
-    return bus_->DdkGetProtocol(proto_id, out);
   }
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 void PlatformDevice::DdkRelease() { delete this; }

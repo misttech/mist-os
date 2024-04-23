@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
@@ -33,30 +32,24 @@
 namespace platform_bus {
 
 class PlatformBus;
-using PlatformBusType = ddk::Device<PlatformBus, ddk::GetProtocolable, ddk::Initializable,
-                                    ddk::Messageable<fuchsia_sysinfo::SysInfo>::Mixin>;
+using PlatformBusType =
+    ddk::Device<PlatformBus, ddk::Initializable, ddk::Messageable<fuchsia_sysinfo::SysInfo>::Mixin>;
 
 // This is the main class for the platform bus driver.
 class PlatformBus : public PlatformBusType,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::PlatformBus>,
-                    public ddk::IommuProtocol<PlatformBus> {
+                    public ddk::IommuProtocol<PlatformBus, ddk::base_protocol> {
  public:
   static zx_status_t Create(zx_device_t* parent, const char* name, zx::channel items_svc);
 
   PlatformBus(zx_device_t* parent, zx::channel items_svc);
 
-  // Device protocol implementation.
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
   // fuchsia.hardware.platform.bus.PlatformBus implementation.
   void NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
                NodeAddCompleter::Sync& completer) override;
-  void ProtocolNodeAdd(ProtocolNodeAddRequestView request, fdf::Arena& arena,
-                       ProtocolNodeAddCompleter::Sync& completer) override;
-  void RegisterProtocol(RegisterProtocolRequestView request, fdf::Arena& arena,
-                        RegisterProtocolCompleter::Sync& completer) override;
 
   void GetBoardInfo(fdf::Arena& arena, GetBoardInfoCompleter::Sync& completer) override;
   void SetBoardInfo(SetBoardInfoRequestView request, fdf::Arena& arena,
@@ -142,21 +135,6 @@ class PlatformBus : public PlatformBusType,
 
   fuchsia_sysinfo::wire::InterruptControllerType interrupt_controller_type_ =
       fuchsia_sysinfo::wire::InterruptControllerType::kUnknown;
-
-  // Protocols that are optionally provided by the board driver.
-  std::optional<ddk::ClockImplProtocolClient> clock_;
-  std::optional<ddk::IommuProtocolClient> iommu_;
-
-  struct ProtoReadyResponse {
-    fdf::Arena arena;
-    ProtocolNodeAddCompleter::Async completer;
-    std::unique_ptr<async::Task> timeout_task;
-  };
-  // Key is the protocol ID (i.e. ZX_PROTOCOL_GPIO, etc).
-  std::unordered_map<uint32_t, ProtoReadyResponse> proto_ready_responders_
-      __TA_GUARDED(proto_completion_mutex_);
-  // Protects proto_ready_responders_.
-  fbl::Mutex proto_completion_mutex_;
 
   // Dummy IOMMU.
   zx::iommu iommu_handle_;

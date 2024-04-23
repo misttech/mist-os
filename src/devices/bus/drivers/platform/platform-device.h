@@ -29,10 +29,6 @@ class RestrictPlatformBus : public fdf::WireServer<fuchsia_hardware_platform_bus
   // fuchsia.hardware.platform.bus.PlatformBus implementation.
   void NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
                NodeAddCompleter::Sync& completer) override;
-  void ProtocolNodeAdd(ProtocolNodeAddRequestView request, fdf::Arena& arena,
-                       ProtocolNodeAddCompleter::Sync& completer) override;
-  void RegisterProtocol(RegisterProtocolRequestView request, fdf::Arena& arena,
-                        RegisterProtocolCompleter::Sync& completer) override;
 
   void GetBoardInfo(fdf::Arena& arena, GetBoardInfoCompleter::Sync& completer) override;
   void SetBoardInfo(SetBoardInfoRequestView request, fdf::Arena& arena,
