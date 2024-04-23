@@ -38,9 +38,9 @@ generated_partitions_config("vim3") {
   # At most one of either a fvm or fxfs will be generated, but the board
   # supports either configuration.
   fvm = "fvm"
-  fvm_size = 30925979648
+  fvm_size = 30064771072  # 28GiB
   fxfs = "fvm"
-  fxfs_size = 30925979648
+  fxfs_size = 30064771072  # 28GiB
 }
 
 verify_partitions_configuration("verify") {

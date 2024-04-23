@@ -64,14 +64,14 @@ fuchsia_partition(
 fuchsia_partition(
     name = "fvm",
     partition_name = "fvm",
-    size_kib = 30201152,
+    size_kib = 29360128,  # 28GiB
     type = PARTITION_TYPE.FVM,
 )
 
 fuchsia_partition(
     name = "fxfs",
     partition_name = "fvm",
-    size_kib = 30201152,
+    size_kib = 29360128,  # 28GiB
     type = PARTITION_TYPE.FXFS,
 )
 
