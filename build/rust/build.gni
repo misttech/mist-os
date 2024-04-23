@@ -7,16 +7,13 @@ declare_args() {
   # Response files are needed to get around command line length limitations.
   # rustc support for response files (as needed in our GN build) was
   # added with revision 'git_revision:dfe53afaebd817f334d8ef9dc75a5cd2562cf6e6'.
-  # This optional will eventually become permanently true.
-  rustc_use_response_files = false
+  rustc_use_response_files = true
 
   # To avoid build nondeterminism due to extern search paths resolving
-  # to more than one path during a build, enable this option to place
-  # every rlib into its own exclusive directory.
-  # This requires `rustc_use_response_file = true` due to the command-line
-  # bloat this causes.
-  # See http://g-issues.fuchsia.dev/issues/319148874 for more details.
-  rust_one_rlib_per_dir = false
+  # to more than one path during a build, this option places every rlib
+  # into its own exclusive directory. This requires
+  # `rustc_use_response_file = true` due to the command-line bloat this causes.
+  rust_one_rlib_per_dir = true
 }
 
 assert(
