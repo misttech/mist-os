@@ -1430,7 +1430,7 @@ TEST_F(DriverRunnerTest, ConnectToDeviceController) {
       [](fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& reply) {
         ASSERT_EQ(reply.status(), ZX_OK);
         ASSERT_TRUE(reply->is_ok());
-        ASSERT_EQ(reply.value()->path.get(), "dev/node-1");
+        ASSERT_EQ(reply.value()->path.get(), "/dev/node-1");
       });
   EXPECT_TRUE(RunLoopUntilIdle());
 }
