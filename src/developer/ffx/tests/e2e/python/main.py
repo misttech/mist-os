@@ -63,9 +63,11 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
                 self.dut.ffx.run(["daemon", "stop"])
                 while True:
                     line = process.stdout.readline()
-                    if line.startswith(b"ERROR"):
+                    if not line.startswith(b"ERROR") and not line.startswith(
+                        b"Waiting for"
+                    ):
                         break
-                line = process.stdout.readline()
+                    print(line)
                 asserts.assert_true(
                     line.startswith(b"SUCCESS"),
                     f"Success didn't resume after error: {line}",
