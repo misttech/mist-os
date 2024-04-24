@@ -76,7 +76,11 @@ void DriverRuntime::ShutdownAllDispatchers(fdf_dispatcher_t* dut_initial_dispatc
   }
   dispatcher_owners.insert(&foreground_dispatcher_);
 
+// TODO(https://fxbug.dev/336633211): Stop using std::latch or switch to C++20 before LLVM 20.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   std::latch latch(static_cast<int64_t>(dispatcher_owners.size()));
+#pragma clang diagnostic pop
   for (const void* owner : dispatcher_owners) {
     auto shutdown = std::make_unique<fdf_env::DriverShutdown>();
     auto shutdown_ptr = shutdown.get();
