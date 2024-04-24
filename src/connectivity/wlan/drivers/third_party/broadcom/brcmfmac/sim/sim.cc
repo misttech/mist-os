@@ -86,10 +86,9 @@ static const struct brcmf_bus_ops brcmf_sim_bus_ops = {
     .log_stats = [](brcmf_bus* bus) { BRCMF_INFO("Simulated bus, no stats to log"); },
     .prepare_vmo = [](brcmf_bus*, uint8_t, zx_handle_t, uint8_t*, size_t) { return ZX_OK; },
     .queue_rx_space =
-        [](brcmf_bus* bus, const rx_space_buffer_t* buffer_list, size_t buffer_count,
-           uint8_t* vmo_addrs[]) {
-          return BUS_OP(bus)->BusQueueRxSpace(buffer_list, buffer_count, vmo_addrs);
-        },
+        [](brcmf_bus* bus,
+           cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+           uint8_t* vmo_addrs[]) { return BUS_OP(bus)->BusQueueRxSpace(buffers, vmo_addrs); },
     .acquire_tx_space = [](brcmf_bus* bus,
                            size_t count) { return BUS_OP(bus)->BusAcquireTxSpace(count); },
 };

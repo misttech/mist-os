@@ -1,9 +1,9 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <gtest/gtest.h>
 #include <wlan/drivers/components/frame.h>
 #include <wlan/drivers/components/frame_storage.h>
-#include <zxtest/zxtest.h>
 
 namespace {
 

@@ -241,7 +241,7 @@ void brcmf_netdev_set_allmulti(struct net_device* ndev) {
 
 void brcmf_tx_complete(struct brcmf_pub* drvr, cpp20::span<wlan::drivers::components::Frame> frames,
                        zx_status_t result) {
-  drvr->device->NetDev()->CompleteTx(frames, result);
+  drvr->device->NetDev().CompleteTx(frames, result);
 }
 
 zx_status_t brcmf_start_xmit(struct brcmf_pub* drvr,
@@ -259,8 +259,8 @@ zx_status_t brcmf_start_xmit(struct brcmf_pub* drvr,
     return ZX_ERR_UNAVAILABLE;
   }
 
-  uint32_t bytes_per_port[MAX_PORTS] = {0};
-  int frames_per_port[MAX_PORTS] = {0};
+  uint32_t bytes_per_port[fuchsia_hardware_network::kMaxPorts] = {0};
+  int frames_per_port[fuchsia_hardware_network::kMaxPorts] = {0};
   uint8_t highest_port = 0;
   {
     for (auto& frame : frames) {
@@ -614,6 +614,7 @@ void brcmf_recovery_worker(WorkItem* work) {
     // to true before the worker is added into the workqueue, and fw_loading is set to false in
     // brcmf_sdio_load_files(), which marks that the firmware loading is finished.
     drvr->drvr_resetting.store(false);
+    drvr->device->OnRecoveryComplete();
   });
 
   // Do clean up in cfg80211 layer.
@@ -637,12 +638,13 @@ void brcmf_recovery_worker(WorkItem* work) {
   async_dispatcher_t* driver_dispatcher =
       fdf_dispatcher_get_async_dispatcher(drvr->device->GetDriverDispatcher());
 
-  // Move finish_driver_reset into this task so that it's called when the task finishes.
-  async::PostTask(driver_dispatcher,
-                  [drvr, _finish_recovery_worker = std::move(finish_recovery_worker)]() {
-                    drvr->device->DestroyAllIfaces();
-                    // finish_driver_reset should be called at the end of scope here
-                  });
+  // Move finish_recovery_worker into this task so that it's called when the task finishes.
+  async::PostTask(driver_dispatcher, [drvr, finish_recovery_worker =
+                                                std::move(finish_recovery_worker)]() mutable {
+    drvr->device->DestroyAllIfaces([finish_recovery_worker = std::move(finish_recovery_worker)] {
+      // finish_recovery_worker will be called at the end of scope here
+    });
+  });
 }
 
 zx_status_t brcmf_attach(brcmf_pub* drvr) {
@@ -920,9 +922,11 @@ zx_status_t brcmf_get_tail_length(struct brcmf_pub* drvr, uint16_t* tail_length_
   return ZX_OK;
 }
 
-void brcmf_queue_rx_space(brcmf_pub* drvr, const rx_space_buffer_t* buffers_list,
-                          size_t buffers_count, uint8_t* vmo_addrs[]) {
-  brcmf_bus_queue_rx_space(drvr->bus_if, buffers_list, buffers_count, vmo_addrs);
+void brcmf_queue_rx_space(
+    brcmf_pub* drvr,
+    cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+    uint8_t* vmo_addrs[]) {
+  brcmf_bus_queue_rx_space(drvr->bus_if, buffers, vmo_addrs);
 }
 
 zx_status_t brcmf_prepare_vmo(brcmf_pub* drvr, uint8_t vmo_id, zx_handle_t vmo,

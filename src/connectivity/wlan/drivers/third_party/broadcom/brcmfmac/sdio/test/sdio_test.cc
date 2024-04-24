@@ -56,6 +56,12 @@ namespace {
 
 class FakeSdioDevice : public wlan::brcmfmac::StubDevice {
  public:
+  ~FakeSdioDevice() {
+    libsync::Completion shutdown_complete;
+    Shutdown([&] { shutdown_complete.Signal(); });
+    shutdown_complete.Wait();
+  }
+
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override {
     if (type == DEVICE_METADATA_WIFI_CONFIG) {
       // Provide a fake implementation for this metadata.

@@ -1,11 +1,11 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <gtest/gtest.h>
 #include <wlan/drivers/components/frame.h>
 #include <wlan/drivers/components/frame_container.h>
 #include <wlan/drivers/components/frame_storage.h>
 #include <wlan/drivers/components/priority_queue.h>
-#include <zxtest/zxtest.h>
 
 namespace {
 
@@ -184,15 +184,15 @@ TEST(PriorityQueueTest, EvictByPriority) {
   // Ensure that the correct frame is returned in evicted.
   std::unique_ptr<Frame> evicted;
   ASSERT_FALSE(queue.push(std::move(frame9), &evicted));
-  ASSERT_NOT_NULL(evicted.get());
+  ASSERT_NE(evicted.get(), nullptr);
   ASSERT_EQ(buffer_id9, evicted->BufferId());
   evicted.reset();
   ASSERT_TRUE(queue.push(std::move(frame10), &evicted));
-  ASSERT_NOT_NULL(evicted.get());
+  ASSERT_NE(evicted.get(), nullptr);
   // This push succeeded but one frame was evicted, it should have been the lowest priority frame.
   ASSERT_EQ(buffer_id7, evicted->BufferId());
   ASSERT_TRUE(queue.push(std::move(frame8), &evicted));
-  ASSERT_NOT_NULL(evicted.get());
+  ASSERT_NE(evicted.get(), nullptr);
   // This push succeeded but one frame was evicted, it should have been the lowest priority frame.
   ASSERT_EQ(buffer_id10, evicted->BufferId());
   // Queue should still be full afterwards, only one frame should have been evicted.
@@ -308,7 +308,7 @@ TEST(PriorityQueueTest, SaturationBalance) {
   ASSERT_LT(stream_two_frames, kIterations * kPushesStreamTwoPerLoop);
 }
 
-struct PopulatedQueueTestFixture : public ::zxtest::Test {
+struct PopulatedQueueTestFixture : public ::testing::Test {
   PopulatedQueueTestFixture() : queue_(kQueueDepth) {}
   void SetUp() override {
     priority_counts_.resize(kQueueDepth);
@@ -391,7 +391,7 @@ TEST_F(PopulatedQueueTestFixture, PopAppends) {
   FrameContainer frames;
 
   const size_t first_pop_size = queue_.size() / 2;
-  ASSERT_GT(first_pop_size, 0);
+  ASSERT_GT(first_pop_size, 0u);
   queue_.pop(first_pop_size, kAllPrioritiesAllowed, &frames);
   EXPECT_EQ(first_pop_size, frames.size());
 
@@ -399,7 +399,7 @@ TEST_F(PopulatedQueueTestFixture, PopAppends) {
 
   // Pop again and verify that frames were appended and that the frame container was not cleared.
   const size_t second_pop_size = first_pop_size / 2;
-  ASSERT_GT(second_pop_size, 0);
+  ASSERT_GT(second_pop_size, 0u);
   queue_.pop(second_pop_size, kAllPrioritiesAllowed, &frames);
   EXPECT_EQ(first_pop_size + second_pop_size, frames.size());
 
@@ -503,7 +503,7 @@ TEST_F(PopulatedQueueTestFixture, PopIfAppends) {
   FrameContainer frames;
 
   const size_t first_pop_size = queue_.size() / 2;
-  ASSERT_GT(first_pop_size, 0);
+  ASSERT_GT(first_pop_size, 0u);
   size_t counter = 0;
   queue_.pop_if([&](const Frame&) { return counter++ < first_pop_size; }, &frames);
   EXPECT_EQ(first_pop_size, frames.size());
@@ -512,7 +512,7 @@ TEST_F(PopulatedQueueTestFixture, PopIfAppends) {
 
   // Pop again and verify that frames were appended and that the frame container was not cleared.
   const size_t second_pop_size = first_pop_size / 2;
-  ASSERT_GT(second_pop_size, 0);
+  ASSERT_GT(second_pop_size, 0u);
   counter = 0;
   queue_.pop_if([&](const Frame&) { return counter++ < second_pop_size; }, &frames);
   EXPECT_EQ(first_pop_size + second_pop_size, frames.size());

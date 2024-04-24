@@ -10,8 +10,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
-#include "fuchsia/hardware/network/driver/c/banjo.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"

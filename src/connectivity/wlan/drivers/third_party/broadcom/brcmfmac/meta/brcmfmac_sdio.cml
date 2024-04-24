@@ -15,19 +15,22 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     capabilities: [
+        { service: "fuchsia.hardware.network.driver.Service" },
         { service: "fuchsia.wlan.phyimpl.Service" },
         { service: "fuchsia.wlan.fullmac.Service" },
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         { service: "fuchsia.hardware.pci.Service" },
         { service: "fuchsia.hardware.gpio.Service" },
     ],
     expose: [
+        {
+            service: "fuchsia.hardware.network.driver.Service",
+            from: "self",
+        },
         {
             service: "fuchsia.wlan.phyimpl.Service",
             from: "self",

@@ -189,17 +189,17 @@ zx_status_t SimFirmware::SetupInternalVmo() {
     return status;
   }
 
-  rx_space_buffer_t buffer{.region = {
-                               .vmo = kInternalVmoId,
-                               .offset = 0,
-                               .length = size,
-                           }};
+  fuchsia_hardware_network_driver::wire::RxSpaceBuffer buffer{.region = {
+                                                                  .vmo = kInternalVmoId,
+                                                                  .offset = 0,
+                                                                  .length = size,
+                                                              }};
 
   std::array<uint8_t*, kInternalVmoId + 1> addrs{};
   addrs[kInternalVmoId] = reinterpret_cast<uint8_t*>(vaddr);
   {
     std::lock_guard lock(internal_tx_frame_storage_);
-    internal_tx_frame_storage_.Store(&buffer, 1, addrs.data());
+    internal_tx_frame_storage_.Store(cpp20::span(&buffer, 1u), addrs.data());
   }
 
   return ZX_OK;
@@ -893,10 +893,21 @@ zx_status_t SimFirmware::BusGetBootloaderMacAddr(uint8_t* mac_addr) {
   return ZX_OK;
 }
 
-zx_status_t SimFirmware::BusQueueRxSpace(const rx_space_buffer_t* buffer_list, size_t buffer_count,
-                                         uint8_t* vmo_addrs[]) {
+void SimFirmware::WaitForRxSpaceAvailable() {
   std::lock_guard lock(rx_frame_storage_);
-  rx_frame_storage_.Store(buffer_list, buffer_count, vmo_addrs);
+  while (rx_frame_storage_.empty()) {
+    // Only wait for a short time, it's also possible that frames are returned through the Frame
+    // object's destructor which we can't receive notifications for. So we have to poll instead.
+    rx_space_queued_.wait_for(rx_frame_storage_, std::chrono::milliseconds(5));
+  }
+}
+
+zx_status_t SimFirmware::BusQueueRxSpace(
+    cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+    uint8_t* vmo_addrs[]) {
+  std::lock_guard lock(rx_frame_storage_);
+  rx_frame_storage_.Store(buffers, vmo_addrs);
+  rx_space_queued_.notify_all();
   return ZX_OK;
 }
 
@@ -3471,6 +3482,10 @@ void SimFirmware::SendFrameToDriver(uint16_t ifidx, size_t payload_size,
   }
 
   brcmf_sim_rx_frame(simdev_, std::move(buf));
+
+  // Make this synchronous by waiting for the frame to be reclaimed. Either through CompleteRx or
+  // the frame's destruction and subsequent return to storage.
+  WaitForRxSpaceAvailable();
 }
 
 // This function schedules an event for brcmf_sim_reset() instead of directly calling this function,

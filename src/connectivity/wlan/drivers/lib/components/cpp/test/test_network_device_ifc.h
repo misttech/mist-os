@@ -4,72 +4,104 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_TEST_TEST_NETWORK_DEVICE_IFC_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_TEST_TEST_NETWORK_DEVICE_IFC_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
-#include <lib/mock-function/mock-function.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
 
+#include <functional>
 #include <optional>
 
 namespace wlan::drivers::components::test {
 
 // Test implementation of network_device_ifc_protocol_t that contains mock calls useful for
 // mocking and veriyfing interactions with a network device.
-class TestNetworkDeviceIfc : public ::ddk::NetworkDeviceIfcProtocol<TestNetworkDeviceIfc> {
+class TestNetworkDeviceIfc
+    : public fdf::WireServer<fuchsia_hardware_network_driver::NetworkDeviceIfc> {
  public:
-  TestNetworkDeviceIfc() : proto_{&network_device_ifc_protocol_ops_, this} {}
+  TestNetworkDeviceIfc() = default;
 
-  const network_device_ifc_protocol_t& GetProto() const { return proto_; }
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>& PortClient() {
+    return *port_;
+  }
+
+  zx::result<fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkDeviceIfc>> Bind(
+      fdf_dispatcher_t* dispatcher);
 
   // NetworkDeviceIfc methods
-  void NetworkDeviceIfcPortStatusChanged(uint8_t id, const port_status_t* new_status) {
-    if (port_status_changed_.HasExpectations()) {
-      port_status_changed_.Call(id, new_status);
+  void PortStatusChanged(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceIfcPortStatusChangedRequest* request,
+      fdf::Arena& arena, PortStatusChangedCompleter::Sync& completer) override {
+    if (port_status_changed_) {
+      port_status_changed_(request, arena, completer);
     }
   }
-  void NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port,
-                               network_device_ifc_add_port_callback callback, void* cookie) {
-    if (port) {
-      port_proto_ = *port;
-    }
-    if (add_port_.HasExpectations()) {
-      callback(cookie, add_port_.Call(id, port));
+  void AddPort(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest* request,
+               fdf::Arena& arena, AddPortCompleter::Sync& completer) override {
+    if (add_port_) {
+      add_port_(request, arena, completer);
+      if (request->port.is_valid()) {
+        // Create a port client here if the callback did not take the client end.
+        port_ =
+            std::make_unique<fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>>(
+                std::move(request->port), fdf::Dispatcher::GetCurrent()->get());
+      }
     } else {
-      callback(cookie, ZX_OK);
+      // Always create a port client if there is no callback.
+      port_ = std::make_unique<fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>>(
+          std::move(request->port), fdf::Dispatcher::GetCurrent()->get());
+      completer.buffer(arena).Reply(ZX_OK);
     }
   }
-  void NetworkDeviceIfcRemovePort(uint8_t id) {
-    if (remove_port_.HasExpectations()) {
-      remove_port_.Call(id);
+  void RemovePort(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcRemovePortRequest* request,
+                  fdf::Arena& arena, RemovePortCompleter::Sync& completer) override {
+    if (port_ && port_->is_valid()) {
+      auto status = port_->buffer(arena)->Removed();
+      ZX_ASSERT(status.ok());
     }
-    if (port_proto_.has_value()) {
-      network_port_removed(&port_proto_.value());
-    }
-  }
-  void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count) {
-    if (complete_rx_.HasExpectations()) {
-      complete_rx_.Call(rx_list, rx_count);
+    if (remove_port_) {
+      remove_port_(request, arena, completer);
     }
   }
-  void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count) {
-    if (complete_tx_.HasExpectations()) {
-      complete_tx_.Call(tx_list, tx_count);
+  void CompleteRx(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteRxRequest* request,
+                  fdf::Arena& arena, CompleteRxCompleter::Sync& completer) override {
+    if (complete_rx_) {
+      complete_rx_(request, arena, completer);
     }
   }
-  void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
-    if (snoop_.HasExpectations()) {
-      snoop_.Call(rx_list, rx_count);
+  void CompleteTx(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request,
+                  fdf::Arena& arena, CompleteTxCompleter::Sync& completer) override {
+    if (complete_tx_) {
+      complete_tx_(request, arena, completer);
+    }
+  }
+  void Snoop(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcSnoopRequest* request,
+             fdf::Arena& arena, SnoopCompleter::Sync& completer) override {
+    if (snoop_) {
+      snoop_(request, arena, completer);
     }
   }
 
-  mock_function::MockFunction<void, uint8_t, const port_status_t*> port_status_changed_;
-  mock_function::MockFunction<zx_status_t, uint8_t, const network_port_protocol_t*> add_port_;
-  mock_function::MockFunction<void, uint8_t> remove_port_;
-  mock_function::MockFunction<void, const rx_buffer_t*, size_t> complete_rx_;
-  mock_function::MockFunction<void, const tx_result_t*, size_t> complete_tx_;
-  mock_function::MockFunction<void, const rx_buffer_t*, size_t> snoop_;
+  std::function<void(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceIfcPortStatusChangedRequest*, fdf::Arena&,
+      PortStatusChangedCompleter::Sync&)>
+      port_status_changed_;
+  std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest*,
+                     fdf::Arena&, AddPortCompleter::Sync&)>
+      add_port_;
+  std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcRemovePortRequest*,
+                     fdf::Arena&, RemovePortCompleter::Sync&)>
+      remove_port_;
+  std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteRxRequest*,
+                     fdf::Arena&, CompleteRxCompleter::Sync&)>
+      complete_rx_;
+  std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest*,
+                     fdf::Arena&, CompleteTxCompleter::Sync&)>
+      complete_tx_;
+  std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcSnoopRequest*,
+                     fdf::Arena&, SnoopCompleter::Sync&)>
+      snoop_;
 
  private:
-  network_device_ifc_protocol_t proto_;
-  std::optional<network_port_protocol_t> port_proto_;
+  std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::NetworkDeviceIfc>> binding_;
+  std::unique_ptr<fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>> port_;
 };
 
 }  // namespace wlan::drivers::components::test

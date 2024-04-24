@@ -4,10 +4,12 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_NETWORK_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_NETWORK_DEVICE_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
-#include <lib/driver/compat/cpp/compat.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
 #include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/stdcompat/span.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/compiler.h>
 
 #include <mutex>
@@ -27,21 +29,21 @@ using fuchsia_driver_framework::NodeController;
 // instantiate an object of this class and provide an implementation of NetworkDevice::Callbacks to
 // handle the various calls that are made to it.
 //
-// The actual network device is created when Init() is called. As part of the creation of the
+// The actual network device is created when Initialize() is called. As part of the creation of the
 // device Callbacks::NetDevInit will be called and is a suitable place to perform any setup that
 // could fail and prevent the creation of the device by returning an error code. When the device
 // is destroyed Callbacks::NetDevRelease will be called which should be used to perform any cleanup.
-class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevice>,
-                            public fidl::WireAsyncEventHandler<NodeController> {
+class NetworkDevice final
+    : public fdf::WireServer<fuchsia_hardware_network_driver::NetworkDeviceImpl>,
+      public fidl::WireAsyncEventHandler<NodeController> {
  public:
   class Callbacks {
    public:
     // Takes zx_status_t as parameter, call txn.Reply(status) to complete transaction.
-    using InitTxn = AsyncTxn<zx_status_t>;
-    // Takes zx_status_t as parameter, call txn.Reply(status) to complete transaction.
-    using StartTxn = AsyncTxn<zx_status_t>;
+    using InitTxn = AsyncTxn<InitCompleter::Sync, zx_status_t>;
+    using StartTxn = AsyncTxn<StartCompleter::Sync, zx_status_t>;
     // Does not take a parameter, call txn.Reply() to complete transaction.
-    using StopTxn = AsyncTxn<>;
+    using StopTxn = AsyncTxn<StopCompleter::Sync>;
 
     virtual ~Callbacks();
 
@@ -76,7 +78,7 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
     // Get information from the device about the underlying device. This includes details such as RX
     // depth, TX depths, features supported any many others. See the device_impl_info_t struct for
     // more information.
-    virtual void NetDevGetInfo(device_impl_info_t* out_info) = 0;
+    virtual void NetDevGetInfo(fuchsia_hardware_network_driver::DeviceImplInfo* out_info) = 0;
 
     // Enqueue frames for transmission. A span of frames is provided which represent all the frames
     // to be sent. These frames point to the payload to be transmitted and will have any additional
@@ -100,8 +102,9 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
     // to get the address for a specific buffer the offset in the buffer needs to be added to the
     // VMO address. The number of addresses in this array matches the maximum number of possible
     // VMOs, defined by MAX_VMOS.
-    virtual void NetDevQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count,
-                                    uint8_t* vmo_addrs[]) = 0;
+    virtual void NetDevQueueRxSpace(
+        cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+        uint8_t* vmo_addrs[]) = 0;
 
     // Inform the device that a new VMO is being used for data transfer. Each frame simply points to
     // a VMO provided through this call. Usually this VMO is shared among multiple frames and each
@@ -125,46 +128,37 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
     virtual void NetDevSetSnoopEnabled(bool snoop) = 0;
   };
 
-  // Construct a NetworkDevice object with a DDK parent, used for DFv1 usage.
-  // TODO(b/317249253) Cleanup DFv1 code once it is deprecated (or all fullmac drivers have been
-  // ported over to DFv2).
-  NetworkDevice(zx_device_t* parent, Callbacks* callbacks);
-  // Construct a NetworkDevice object without a DDK parent, used for DFv2 usage.
   explicit NetworkDevice(Callbacks* callbacks);
 
-  virtual ~NetworkDevice();
+  ~NetworkDevice() override;
   NetworkDevice(const NetworkDevice&) = delete;
   NetworkDevice& operator=(const NetworkDevice&) = delete;
 
-  // Initialize the NetworkDevice for use with DFv1, attempting to use this with the DFv2
-  // constructor will trigger an assert. This should be called by the device driver when it's ready
-  // for the NetworkDevice to start. The device will show up as deviceName in the device tree.
-  // TODO(b/317249253) Cleanup DFv1 code once it is deprecated (or all fullmac drivers have been
-  // ported over to DFv2).
-  zx_status_t Init(const char* deviceName);
-  // Initialize the NetworkDevice for use with DFv2, attempting to use this with the DFv1
-  // constructor will trigger an assert. This should be called by the device driver when it's ready
-  // for the NetworkDevice to start. This will bind the client end to the dispatcher.
-  void Init(fidl::ClientEnd<NodeController> client_end, async_dispatcher_t* dispatcher);
+  // Initialize the NetworkDevice. This should be called by the device driver when it's ready for
+  // the NetworkDevice to start. The NetworkDeviceImpl service will be added to the |outgoing|
+  // directory. A netdev child node named |device_name| will be added to |parent|. Requests will be
+  // served on |dispatcher|. This MUST be called on a dispatcher that can safely make calls to
+  // |parent| and |outgoing|. The |outgoing| object MUST be kept alive for the duration of the
+  // NetworkDevice object's lifetime. It will be used again as part of the Remove call.
+  zx_status_t Initialize(fidl::WireClient<fuchsia_driver_framework::Node>& parent,
+                         fdf_dispatcher_t* dispatcher, fdf::OutgoingDirectory& outgoing,
+                         const char* device_name) __TA_EXCLUDES(mutex_);
 
-  // Remove the NetworkDevice, this calls DdkRemove. The removal is not complete until NetDevRelease
-  // is called on the Callbacks interface.
-  void Remove();
+  // Remove the NetworkDevice, this calls Remove on the network device child node controller. The
+  // removal is not complete until NetDevRelease is called on the Callbacks interface. Returns true
+  // if removal was initiated, false if removal is not needed because Initialize was never called or
+  // the device was already removed. Note that multiple concurrent calls to Remove may all return
+  // true, don't rely on it to determine if removal has been initiated. It only indicates that the
+  // removal is completed.
+  bool Remove() __TA_EXCLUDES(mutex_);
 
-  // This is called by the DDK and the device does not need to call this. The device will be
-  // notified of this through the Callbacks interface instead.
-  void Release();
+  // Wait until the server is connected to a client. Intended for use in testing.
+  void WaitUntilServerConnected();
 
-  network_device_ifc_protocol_t NetDevIfcProto() const;
-  network_device_impl_protocol_ops_t* NetDevImplProtoOps() {
-    return const_cast<network_device_impl_protocol_ops_t*>(netdev_proto_.ops);
-  }
-  // Get compatiblity banjo config when running with DFv2.
-  compat::DeviceServer::BanjoConfig GetBanjoConfig() {
-    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_NETWORK_DEVICE_IMPL};
-    config.callbacks[ZX_PROTOCOL_NETWORK_DEVICE_IMPL] = banjo_server_.callback();
-    return config;
-  }
+  // Access the NetworkDeviceIfc client that is created when NetworkDeviceImpl::Init is called by
+  // the network-device driver. This client will not be valid until the NetDevInit callback has been
+  // called on the Callbacks interface.
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc>& NetDevIfcClient();
 
   // Notify NetworkDevice of a single incoming RX frame. This method exists for convenience but the
   // driver should prefer to complete as many frames as possible in one call instead of making
@@ -189,43 +183,83 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
   // call the device must not expect to be able to use the frames again.
   void CompleteTx(cpp20::span<Frame> frames, zx_status_t status);
 
+ private:
   // NetworkDeviceImpl implementation
-  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
-                             network_device_impl_init_callback callback, void* cookie);
-  void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie)
-      __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie)
-      __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
-  void NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count)
-      __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count);
-  void NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
-                                   network_device_impl_prepare_vmo_callback callback, void* cookie);
-  void NetworkDeviceImplReleaseVmo(uint8_t id);
-  void NetworkDeviceImplSetSnoop(bool snoop);
+  void Init(fuchsia_hardware_network_driver::wire::NetworkDeviceImplInitRequest* request,
+            fdf::Arena& arena, InitCompleter::Sync& completer) override;
+  void Start(fdf::Arena& arena, StartCompleter::Sync& completer) override;
+  void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override;
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override;
+  void QueueTx(fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueTxRequest* request,
+               fdf::Arena& arena, QueueTxCompleter::Sync& completer) override;
+  void QueueRxSpace(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
+      fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) override;
+  void PrepareVmo(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceImplPrepareVmoRequest* request,
+      fdf::Arena& arena, PrepareVmoCompleter::Sync& completer) override;
+  void ReleaseVmo(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceImplReleaseVmoRequest* request,
+      fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) override;
+  void SetSnoop(fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
+                fdf::Arena& arena, SetSnoopCompleter::Sync& completer) override;
 
   // fidl::WireAsyncEventHandler<NodeController> implementation
   void handle_unknown_event(fidl::UnknownEventMetadata<NodeController> metadata) override {}
   void on_fidl_error(::fidl::UnbindInfo error) override;
 
- private:
-  zx_status_t AddNetworkDevice(const char* deviceName);
+  zx_status_t AddService(fdf::OutgoingDirectory& outgoing) __TA_REQUIRES(mutex_);
   bool ShouldCompleteFrame(const Frame& frame);
 
-  zx_device_t* parent_ = nullptr;
-  zx_device_t* device_ = nullptr;
+  // Removal tasks
+  void RemoveLocked() __TA_REQUIRES(mutex_);
+  // These removal methods should only ever be called from the parent dispatcher. No locks needed.
+  void Unbind();
+  void RemoveService();
+  void RemoveNode();
+  void Release();
+
+  enum class State {
+    // Device not yet initialized, this is the initial state after the object has been constructed.
+    UnInitialized,
+    // The device has been initialized and is actively serving requests.
+    Initialized,
+    // The device is shutting down and currently removing the network device child node.
+    RemovingNode,
+    // The device is shutting down and currently removing the NetworkDeviceImpl service.
+    RemovingService,
+    // The device is shutting down and currently unbinding the NetworkDeviceImpl server.
+    Unbinding,
+    // The device is shut down and is about to call NetDevRelease on its Callbacks pointer.
+    Releasing,
+    // The device is fully shut down and the NetworkDevice object can safely be destroyed.
+    Released,
+  };
+
+  void TransitionToState(State new_state, fit::function<void()>&& task) __TA_REQUIRES(mutex_);
+
+  // Device management members.
+  fdf_dispatcher_t* netdev_dispatcher_ __TA_GUARDED(mutex_) = nullptr;
+  async_dispatcher_t* parent_dispatcher_ __TA_GUARDED(mutex_) = nullptr;
+  fdf::OutgoingDirectory* outgoing_directory_ __TA_GUARDED(mutex_) = nullptr;
+  fidl::WireClient<NodeController> node_controller_ __TA_GUARDED(mutex_);
+  State state_ __TA_GUARDED(mutex_) = State::UnInitialized;
+  // To be able to use unsynchronized dispatchers the binding has to be a ServerBindingRef. Other
+  // binding types require a synchronized dispatcher.
+  std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::NetworkDeviceImpl>> binding_
+      __TA_GUARDED(mutex_);
+  std::mutex mutex_;
+  libsync::Completion server_connected_;
+
+  // Regular operations members.
   Callbacks* callbacks_;
-  bool started_ __TA_GUARDED(started_mutex_) = false;
-  std::mutex started_mutex_;
-  network_device_impl_protocol_t netdev_proto_;
-  ::ddk::NetworkDeviceIfcProtocolClient netdev_ifc_;
-  std::optional<fidl::WireClient<NodeController>> controller_node_;
-  uint8_t* vmo_addrs_[MAX_VMOS] = {};
-  uint64_t vmo_lengths_[MAX_VMOS] = {};
+  std::atomic<bool> started_ = false;
+  // This needs to be a shared client because it's going to be used with an unsynchronized
+  // dispatcher and it's going to be cloned for each NetworkPort.
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> netdev_ifc_;
+  uint8_t* vmo_addrs_[fuchsia_hardware_network_driver::wire::kMaxVmos] = {};
+  uint64_t vmo_lengths_[fuchsia_hardware_network_driver::wire::kMaxVmos] = {};
   std::vector<Frame> tx_frames_;
-  compat::BanjoServer banjo_server_{ZX_PROTOCOL_NETWORK_DEVICE_IMPL, this,
-                                    &network_device_impl_protocol_ops_};
 };
 
 }  // namespace wlan::drivers::components

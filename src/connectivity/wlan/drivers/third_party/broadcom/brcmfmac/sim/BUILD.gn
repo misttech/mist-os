@@ -49,8 +49,6 @@ source_set("sim_common") {
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/devices/lib/broadcom",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//third_party/bcmdhd/crossdriver:bcmdhd_crossdriver",
     "//zircon/system/public",
   ]
@@ -58,6 +56,7 @@ source_set("sim_common") {
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/connectivity/wlan/drivers/lib/components/cpp/test:support",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:bcdc",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",

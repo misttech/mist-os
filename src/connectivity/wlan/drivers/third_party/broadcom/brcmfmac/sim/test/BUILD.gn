@@ -19,6 +19,7 @@ source_set("sim_test") {
   sources = [ "sim_test.cc" ]
   public = [ "sim_test.h" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
     "//sdk/lib/fdio",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",

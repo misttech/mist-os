@@ -14,14 +14,9 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_DEVICE_H_
 
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -53,7 +48,6 @@ class SdioDevice final : public Device, public fdf::DriverBase {
   async_dispatcher_t* GetTimerDispatcher() override { return dispatcher(); }
   fdf_dispatcher_t* GetDriverDispatcher() override { return driver_dispatcher()->get(); }
   DeviceInspect* GetInspect() override { return inspect_.get(); }
-  compat::DeviceServer& GetCompatServer() override { return compat_server_.inner(); }
   fidl::WireClient<fdf::Node>& GetParentNode() override { return parent_node_; }
   std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() override { return outgoing(); }
   const std::shared_ptr<fdf::Namespace>& Incoming() const override { return incoming(); }
@@ -65,11 +59,9 @@ class SdioDevice final : public Device, public fdf::DriverBase {
 
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
 
- protected:
  private:
   fidl::WireClient<fdf::Node> parent_node_;
   std::unique_ptr<DeviceInspect> inspect_;
-  compat::SyncInitializedDeviceServer compat_server_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
 };
 

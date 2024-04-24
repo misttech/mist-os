@@ -4,7 +4,26 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
+source_set("support") {
+  testonly = true
+  sources = [
+    "network_device_client.cc",
+    "test_network_device_ifc.cc",
+  ]
+  public = [
+    "network_device_client.h",
+    "test_network_device_ifc.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
+    "//sdk/lib/fidl",
+  ]
+}
+
 test("components_test") {
+  testonly = true
   sources = [
     "frame_container_test.cc",
     "frame_storage_test.cc",
@@ -12,13 +31,16 @@ test("components_test") {
     "network_device_test.cc",
     "network_port_test.cc",
     "priority_queue_test.cc",
+    "test_driver.cc",
   ]
-  deps = [
+  public_deps = [
+    ":support",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
-    "//src/devices/testing/mock-ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
     "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/mock-function",
-    "//zircon/system/ulib/zxtest:zxtest",
   ]
 }
 

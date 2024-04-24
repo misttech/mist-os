@@ -31,7 +31,8 @@ namespace wlan::brcmfmac {
 class SimDevice final : public fdf::DriverBase, public Device {
  public:
   SimDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("sim-brcmfmac", std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase("sim-brcmfmac", std::move(start_args), std::move(driver_dispatcher)),
+        data_path_(*this) {}
 
   SimDevice(const SimDevice& device) = delete;
   SimDevice& operator=(const SimDevice& other) = delete;
@@ -43,18 +44,21 @@ class SimDevice final : public fdf::DriverBase, public Device {
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
-  // Run the simulator bus initialization.  This is a replacement for the DDK init hook.
-  zx_status_t SimBusInit();
-  zx_status_t BusInit() override { return ZX_OK; }
+  zx_status_t BusInit() override;
 
-  // Set the `simulation::Environment` instance that the SimDevice will use.
-  // This should be called after `Start()` is called, but before any test logic.
-  zx_status_t InitWithEnv(simulation::Environment* env);
+  // Set the `simulation::Environment` instance and outgoing directory client (from start_args) that
+  // the SimDevice will use. This should be called after `Start()` is called, but before any test
+  // logic.
+  zx_status_t InitWithEnv(simulation::Environment* env,
+                          fidl::UnownedClientEnd<fuchsia_io::Directory> outgoing_dir_client);
+  // Call to InitDevice on the Device base class which in turn will kick off all initialization.
+  // This exists so that code outside of SimDevice can initialize the device without having access
+  // to the protected members in fdf::DriverBase.
+  void Initialize(fit::callback<void(zx_status_t)>&& on_complete);
 
   async_dispatcher_t* GetTimerDispatcher() override { return env_->GetDispatcher(); }
   fdf_dispatcher_t* GetDriverDispatcher() override { return driver_dispatcher()->get(); }
   DeviceInspect* GetInspect() override { return inspect_.get(); }
-  compat::DeviceServer& GetCompatServer() override { return compat_server_.inner(); }
   fidl::WireClient<fdf::Node>& GetParentNode() override { return parent_node_; }
   std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() override { return outgoing(); }
   const std::shared_ptr<fdf::Namespace>& Incoming() const override { return incoming(); }
@@ -63,23 +67,29 @@ class SimDevice final : public fdf::DriverBase, public Device {
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
 
+  void OnRecoveryComplete() override { recovery_complete_.Signal(); }
+  void WaitForRecoveryComplete() {
+    recovery_complete_.Wait();
+    recovery_complete_.Reset();
+  }
+
   brcmf_simdev* GetSim();
 
   SimDataPath& DataPath() { return data_path_; }
-
- protected:
-  void Shutdown();
 
  private:
   void ShutdownImpl();
 
   simulation::Environment* env_;
+  // This is the client end of the outgoing directory that is provided by outgoing(). Any services
+  // added to outgoing() will be available for discovery through this client end.
+  std::optional<fidl::UnownedClientEnd<fuchsia_io::Directory>> outgoing_dir_client_;
   std::unique_ptr<DeviceInspect> inspect_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
 
   SimDataPath data_path_;
-  compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireClient<fdf::Node> parent_node_;
+  libsync::Completion recovery_complete_;
 };
 
 }  // namespace wlan::brcmfmac

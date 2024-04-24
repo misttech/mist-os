@@ -29,14 +29,12 @@ class StubDevice : public Device {
   DeviceInspect* GetInspect() override { return nullptr; }
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
-  compat::DeviceServer& GetCompatServer() override { return compat_server_.value().inner(); }
   fidl::WireClient<fdf::Node>& GetParentNode() override { return parent_node_; }
   std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() override { return outgoing_dir_.value(); }
   const std::shared_ptr<fdf::Namespace>& Incoming() const override { return incoming_dir_.value(); }
   fdf_dispatcher_t* GetDriverDispatcher() override { return nullptr; }
 
  protected:
-  std::optional<compat::SyncInitializedDeviceServer> compat_server_;
   fidl::WireClient<fdf::Node> parent_node_;
   std::optional<std::shared_ptr<fdf::OutgoingDirectory>> outgoing_dir_;
   std::optional<std::shared_ptr<fdf::Namespace>> incoming_dir_;

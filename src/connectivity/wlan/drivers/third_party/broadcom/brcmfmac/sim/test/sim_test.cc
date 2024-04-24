@@ -14,6 +14,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 
+#include <bind/fuchsia/wlan/fullmac/cpp/bind.h>
 #include <fbl/string_buffer.h>
 
 namespace wlan::brcmfmac {
@@ -68,7 +69,7 @@ void SimInterface::Reset() {
 
 zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
                                   fdf_dispatcher_t* server_dispatcher) {
-  client_ = fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(std::move(client_end));
+  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client(std::move(client_end));
 
   // Establish the FIDL connection on the oppsite direction.
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
@@ -91,9 +92,9 @@ zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullm
 
   create_binding_completion.Wait();
 
-  auto result = client_.buffer(test_arena_)->Start(std::move(endpoints->client));
+  auto result = client.buffer(test_arena_)->Start(std::move(endpoints->client));
   if (!result.ok()) {
-    BRCMF_ERR("Start failed, FIDL error: %s", result.status_string());
+    BRCMF_ERR("Failed to start wlanfullmac interface: %s", result.FormatDescription().c_str());
     return result.status();
   }
 
@@ -101,6 +102,9 @@ zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullm
     BRCMF_ERR("Start failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
+
+  // Only assign the client if Start succeeded, otherwise client_ is assigned but not working.
+  client_ = std::move(client);
 
   // Verify that the channel passed back from start() is the same one we gave to create_iface()
   if (result->value()->sme_channel.get() != ch_mlme_) {
@@ -490,6 +494,14 @@ SimTest::~SimTest() {
       BRCMF_ERR("Delete iface: %u failed", iface.first);
     }
   }
+  // Make sure to synchronously shut down the device here to avoid any in-flight FIDL calls arriving
+  // during the rest of the destruction.
+  zx::result prepare_stop_result = runtime().RunToCompletion(
+      dut_.SyncCall(&fdf_testing::DriverUnderTest<brcmfmac::SimDevice>::PrepareStop));
+  EXPECT_OK(prepare_stop_result.status_value());
+
+  zx::result stop_result = dut_.SyncCall(&fdf_testing::DriverUnderTest<brcmfmac::Device>::Stop);
+  EXPECT_OK(stop_result.status_value());
 }
 
 zx_status_t SimTest::PreInit() {
@@ -510,7 +522,9 @@ zx_status_t SimTest::PreInit() {
 
   EXPECT_OK(start_result.status_value());
 
-  WithSimDevice([this](brcmfmac::SimDevice* device) { device->InitWithEnv(env_.get()); });
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    device->InitWithEnv(env_.get(), driver_outgoing_.borrow());
+  });
 
   driver_created_ = true;
 
@@ -522,7 +536,14 @@ zx_status_t SimTest::Init() {
     EXPECT_OK(PreInit());
   }
 
-  WithSimDevice([](brcmfmac::SimDevice* device) { device->SimBusInit(); });
+  libsync::Completion initialized;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    device->Initialize([&](zx_status_t status) {
+      EXPECT_OK(status);
+      initialized.Signal();
+    });
+  });
+  initialized.Wait();
 
   // Connect to WlanPhyimpl served on outgoing directory.
   zx::result connect_result =
@@ -593,7 +614,9 @@ zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface*
   }
 
   // check that fullmac device count is expected.
-  EXPECT_EQ(ifaces_.size(), DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL));
+  auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
+                                                bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
+  EXPECT_EQ(ifaces_.size(), DeviceCountWithProperty(fullmac_service_prop));
 
   return ZX_OK;
 }
@@ -611,7 +634,16 @@ zx_status_t SimTest::InterfaceDestroyed(SimInterface* ifc) {
   ifc->Reset();
   ifaces_.erase(iter);
 
-  WaitForDeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL, ifaces_.size());
+  auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
+                                                bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
+  WaitForDeviceCountWithProperty(fullmac_service_prop, ifaces_.size());
+
+  // Wait until reset is complete. This has to happen on this thread, not the driver dispatcher.
+  // Otherwise the wait will block part of the recovery work that has to happen on the driver
+  // dispatcher.
+  brcmfmac::SimDevice* device_ptr = nullptr;
+  WithSimDevice([&](brcmfmac::SimDevice* device) { device_ptr = device; });
+  device_ptr->WaitForRecoveryComplete();
 
   return ZX_OK;
 }
@@ -620,17 +652,12 @@ uint32_t SimTest::DeviceCount() {
   return node_server_.SyncCall([](fdf_testing::TestNode* root) { return root->children().size(); });
 }
 
-uint32_t SimTest::DeviceCountByProtocolId(uint32_t proto_id) {
-  return node_server_.SyncCall([proto_id](fdf_testing::TestNode* root) {
+uint32_t SimTest::DeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property) {
+  return node_server_.SyncCall([&](fdf_testing::TestNode* root) {
     uint32_t count = 0;
-    auto expected_property = fuchsia_driver_framework::NodeProperty{{
-        .key = fuchsia_driver_framework::NodePropertyKey::WithIntValue(BIND_PROTOCOL),
-        .value = fuchsia_driver_framework::NodePropertyValue::WithIntValue(proto_id),
-    }};
-
     for (const auto& [_, child] : root->children()) {
-      for (const fuchsia_driver_framework::NodeProperty& property : child.GetProperties()) {
-        if (property == expected_property) {
+      for (const fuchsia_driver_framework::NodeProperty& child_property : child.GetProperties()) {
+        if (child_property == property) {
           count++;
           break;
         }
@@ -647,8 +674,9 @@ void SimTest::WaitForDeviceCount(uint32_t expected) {
   }
 }
 
-void SimTest::WaitForDeviceCountByProtocolId(uint32_t proto_id, uint32_t expected) {
-  while (expected != DeviceCountByProtocolId(proto_id)) {
+void SimTest::WaitForDeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property,
+                                             uint32_t expected) {
+  while (expected != DeviceCountWithProperty(property)) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 }
@@ -684,7 +712,9 @@ zx_status_t SimTest::DeleteInterface(SimInterface* ifc) {
   // Once the interface data structures have been deleted, our pointers are no longer valid.
   ifaces_.erase(iter);
 
-  WaitForDeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL, ifaces_.size());
+  auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
+                                                bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
+  WaitForDeviceCountWithProperty(fullmac_service_prop, ifaces_.size());
 
   return ZX_OK;
 }

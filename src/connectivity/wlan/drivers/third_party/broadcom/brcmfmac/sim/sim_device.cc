@@ -26,29 +26,18 @@ namespace wlan::brcmfmac {
 
 SimDevice::~SimDevice() { ShutdownImpl(); }
 
-void SimDevice::Shutdown() { ShutdownImpl(); }
-
 void SimDevice::ShutdownImpl() {
   // Keep a separate implementation for this that's not virtual so that it can be called from the
   // destructor.
   if (brcmf_bus_) {
     brcmf_sim_exit(brcmf_bus_.get());
+    drvr()->bus_if = nullptr;
     brcmf_bus_.reset();
   }
 }
 
 zx::result<> SimDevice::Start() {
   parent_node_.Bind(std::move(node()), dispatcher());
-  // Ensure netdevice is initialzied for dfv2?
-  CreateNetDevice();
-  // synchronously initialize compat_server_
-  // Needed by brcmfmac::Device base class.
-  zx::result<> result = compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                                  compat::ForwardMetadata::None());
-  if (result.is_error()) {
-    BRCMF_ERR("Compat server init failed: %s", result.status_string());
-    return result.take_error();
-  }
 
   std::unique_ptr<DeviceInspect> inspect;
   zx_status_t status = DeviceInspect::Create(dispatcher(), &inspect);
@@ -59,36 +48,48 @@ zx::result<> SimDevice::Start() {
 
   inspect_ = std::move(inspect);
   wlan::drivers::log::Instance::Init(Debug::kBrcmfMsgFilter);
-
-  status = InitDevice();
-  if (status != ZX_OK) {
-    lerror("ERROR calling InitDevice(): %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
   return zx::ok();
 }
 
 void SimDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
-  Shutdown();
-  compat_server_.reset();
-  completer(zx::ok());
+  ShutdownImpl();
+  Shutdown([completer = std::move(completer)]() mutable { completer(zx::ok()); });
 }
 
-zx_status_t SimDevice::InitWithEnv(simulation::Environment* env) {
+zx_status_t SimDevice::InitWithEnv(
+    simulation::Environment* env,
+    fidl::UnownedClientEnd<fuchsia_io::Directory> outgoing_dir_client) {
   env_ = env;
   brcmf_bus_ = brcmf_sim_alloc(drvr(), env);
+
+  outgoing_dir_client_ = outgoing_dir_client;
   return ZX_OK;
 }
 
-zx_status_t SimDevice::SimBusInit() {
-  zx_status_t status = brcmf_sim_register(drvr());
-  if (status != ZX_OK) {
-    return status;
+void SimDevice::Initialize(fit::callback<void(zx_status_t)>&& on_complete) {
+  if (!outgoing_dir_client_.has_value()) {
+    FDF_LOG(ERROR, "Missing outgoing directory client, call Initialize first");
+    on_complete(ZX_ERR_BAD_STATE);
+    return;
   }
-  data_path_.Init(NetDev());
-  return ZX_OK;
+
+  zx_status_t status = InitDevice(*outgoing());
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to initialize device: %s", zx_status_get_string(status));
+    on_complete(status);
+    return;
+  }
+
+  data_path_.Init(
+      *outgoing_dir_client_, [on_complete = std::move(on_complete)](zx_status_t status) mutable {
+        if (status != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to initialize data path: %s", zx_status_get_string(status));
+        }
+        on_complete(status);
+      });
 }
+
+zx_status_t SimDevice::BusInit() { return brcmf_sim_register(drvr()); }
 
 zx_status_t SimDevice::LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) {
   return ZX_ERR_NOT_SUPPORTED;

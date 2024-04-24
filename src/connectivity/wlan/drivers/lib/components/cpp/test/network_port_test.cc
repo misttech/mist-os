@@ -1,9 +1,13 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <wlan/drivers/components/network_port.h>
-#include <zxtest/zxtest.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
+#include <gmock/gmock.h>
+#include <wlan/drivers/components/network_port.h>
+
+#include "src/lib/testing/predicates/status.h"
+#include "test_driver.h"
 #include "test_network_device_ifc.h"
 
 namespace {
@@ -16,343 +20,462 @@ constexpr uint32_t kTestMtu = 1514;
 class TestNetworkPortInterface : public NetworkPort::Callbacks {
  public:
   void SetMtu(uint32_t mtu) { mtu_ = mtu; }
-  // NetworkPort::Callbacks implementation
+
+  // NetworkPort::Callbacks implementation and mocks
   uint32_t PortGetMtu() override { return mtu_; }
-  void PortGetStatus(port_status_t* out_status) override { port_get_status_.Call(out_status); }
-  void PortRemoved() override { removed_.Call(); }
-  void MacGetAddress(mac_address_t* out_mac) override { mac_get_address_.Call(out_mac); }
-  void MacGetFeatures(features_t* out_features) override { mac_get_features_.Call(out_features); }
-  void MacSetMode(mac_filter_mode_t mode,
-                  cpp20::span<const mac_address_t> multicast_macs) override {
-    mac_set_mode_.Call(mode, multicast_macs);
-  }
-  mock_function::MockFunction<void> removed_;
-  mock_function::MockFunction<void, port_status_t*> port_get_status_;
-  mock_function::MockFunction<void, mac_address_t*> mac_get_address_;
-  mock_function::MockFunction<void, features_t*> mac_get_features_;
-  mock_function::MockFunction<void, mac_filter_mode_t, cpp20::span<const mac_address_t>>
-      mac_set_mode_;
+  MOCK_METHOD(void, PortGetStatus, (fuchsia_hardware_network::PortStatus * out_status), (override));
+  MOCK_METHOD(void, PortRemoved, (), (override));
+  MOCK_METHOD(void, MacGetAddress, (fuchsia_net::MacAddress * out_mac), (override));
+  MOCK_METHOD(void, MacGetFeatures, (fuchsia_hardware_network_driver::Features * out_features),
+              (override));
+  MOCK_METHOD(void, MacSetMode,
+              (fuchsia_hardware_network::wire::MacFilterMode mode,
+               cpp20::span<const ::fuchsia_net::wire::MacAddress> multicast_macs),
+              (override));
 
   uint32_t mtu_ = kTestMtu;
 };
 
-TEST(NetworkPortTest, Init) {
-  TestNetworkPortInterface port_ifc;
-  {
-    TestNetworkDeviceIfc netdev_ifc;
-    constexpr uint8_t kPortId = 13;
+struct TestFixtureConfig {
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = false;
 
-    NetworkPort port_(netdev_ifc.GetProto(), port_ifc, kPortId);
+  using DriverType = wlan::drivers::components::test::TestDriver;
+  using EnvironmentType = fdf_testing::MinimalEnvironment;
+};
 
-    netdev_ifc.add_port_.ExpectCallWithMatcher(
-        [&](uint8_t port_id, const network_port_protocol_t* proto) {
-          EXPECT_EQ(port_id, kPortId);
-          EXPECT_EQ(proto->ctx, &port_);
-          EXPECT_NOT_NULL(proto->ops);
-          return ZX_OK;
-        });
-
-    ASSERT_OK(port_.Init(NetworkPort::Role::Client));
-    netdev_ifc.add_port_.VerifyAndClear();
-    port_ifc.removed_.ExpectCall();
-  }
-  port_ifc.removed_.VerifyAndClear();
-}
-
-TEST(NetworkPortTest, InitInvalidIfc) {
-  TestNetworkPortInterface port_ifc;
-  {
-    TestNetworkDeviceIfc netdev_ifc;
-    constexpr uint8_t kPortId = 13;
-
-    NetworkPort port_({nullptr, nullptr}, port_ifc, kPortId);
-
-    // Should not be called because the ifc wasn't valid to begin with.
-    netdev_ifc.add_port_.ExpectNoCall();
-
-    ASSERT_EQ(port_.Init(NetworkPort::Role::Client), ZX_ERR_BAD_STATE);
-    netdev_ifc.add_port_.VerifyAndClear();
-    // Should not be called because the ifc wasn't valid to begin with.
-    port_ifc.removed_.ExpectNoCall();
-  }
-  port_ifc.removed_.VerifyAndClear();
-}
-
-TEST(NetworkPortTest, InitAddPortFails) {
-  TestNetworkPortInterface port_ifc;
-  {
-    TestNetworkDeviceIfc netdev_ifc;
-    constexpr uint8_t kPortId = 13;
-    constexpr zx_status_t kAddPortError = ZX_ERR_INTERNAL;
-
-    NetworkPort port_(netdev_ifc.GetProto(), port_ifc, kPortId);
-
-    netdev_ifc.add_port_.ExpectCallWithMatcher(
-        [&](uint8_t port_id, const network_port_protocol_t* proto) { return kAddPortError; });
-
-    ASSERT_EQ(port_.Init(NetworkPort::Role::Client), kAddPortError);
-    netdev_ifc.add_port_.VerifyAndClear();
-    // Should not be called because the port was not successfully added in the first place.
-    port_ifc.removed_.ExpectNoCall();
-  }
-  port_ifc.removed_.VerifyAndClear();
-}
-
-TEST(NetworkPortTest, RemovePort) {
-  TestNetworkPortInterface port_ifc;
-  TestNetworkDeviceIfc netdev_ifc;
-  constexpr uint8_t kPortId = 13;
-
-  NetworkPort port_(netdev_ifc.GetProto(), port_ifc, kPortId);
-
-  netdev_ifc.remove_port_.ExpectCall(kPortId);
-  port_ifc.removed_.ExpectCall();
-
-  ASSERT_OK(port_.Init(NetworkPort::Role::Client));
-  port_.RemovePort();
-
-  netdev_ifc.remove_port_.VerifyAndClear();
-  port_ifc.removed_.VerifyAndClear();
-}
-
-TEST(NetworkPortTest, Destructor) {
-  TestNetworkPortInterface port_ifc;
-  TestNetworkDeviceIfc netdev_ifc;
-  constexpr uint8_t kPortId = 13;
-
-  auto port = std::make_unique<NetworkPort>(netdev_ifc.GetProto(), port_ifc, kPortId);
-
-  netdev_ifc.add_port_.ExpectCallWithMatcher(
-      [&](uint8_t, const network_port_protocol_t*) { return ZX_OK; });
-
-  ASSERT_OK(port->Init(NetworkPort::Role::Client));
-  netdev_ifc.add_port_.VerifyAndClear();
-
-  // When the port is destroyed it should call remove port which should call removed.
-  netdev_ifc.remove_port_.ExpectCall(kPortId);
-  port_ifc.removed_.ExpectCall();
-  port.reset();
-  netdev_ifc.remove_port_.VerifyAndClear();
-  port_ifc.removed_.VerifyAndClear();
-}
-
-TEST(NetworkPortTest, PortWithEmptyProto) {
-  constexpr network_device_ifc_protocol_t kEmptyProto = {};
-  TestNetworkPortInterface port_ifc;
-  constexpr uint8_t kPortId = 0;
-  // Ensure that this object can be constructed and destructed even with an empty proto
-  NetworkPort port(kEmptyProto, port_ifc, kPortId);
-}
-
-TEST(NetworkPortTest, GetInfoClient) {
-  TestNetworkPortInterface port_ifc;
-  {
-    TestNetworkDeviceIfc netdev_ifc;
-    constexpr uint8_t kPortId = 7;
-
-    NetworkPort port(netdev_ifc.GetProto(), port_ifc, kPortId);
-
-    ASSERT_OK(port.Init(NetworkPort::Role::Client));
-
-    port_base_info_t info;
-    port.NetworkPortGetInfo(&info);
-
-    EXPECT_EQ(info.port_class,
-              static_cast<uint8_t>(fuchsia_hardware_network::wire::DeviceClass::kWlan));
-    port_ifc.removed_.ExpectCall();
-  }
-  port_ifc.removed_.VerifyAndClear();
-}
-
-TEST(NetworkPortTest, GetInfoAp) {
-  TestNetworkPortInterface port_ifc;
-  {
-    TestNetworkDeviceIfc netdev_ifc;
-    constexpr uint8_t kPortId = 7;
-
-    NetworkPort port(netdev_ifc.GetProto(), port_ifc, kPortId);
-
-    ASSERT_OK(port.Init(NetworkPort::Role::Ap));
-
-    port_base_info_t info;
-    port.NetworkPortGetInfo(&info);
-
-    EXPECT_EQ(info.port_class,
-              static_cast<uint8_t>(fuchsia_hardware_network::wire::DeviceClass::kWlanAp));
-    port_ifc.removed_.ExpectCall();
-  }
-  port_ifc.removed_.VerifyAndClear();
-}
-
-struct NetworkPortTestFixture : public ::zxtest::Test {
+struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
   static constexpr uint8_t kPortId = 13;
 
-  NetworkPortTestFixture()
-      : port_(std::make_unique<NetworkPort>(netdev_ifc_.GetProto(), port_ifc_, kPortId)) {
-    ASSERT_OK(port_->Init(NetworkPort::Role::Client));
+  void SetUp() override {
+    auto client_end = netdev_ifc_.Bind(runtime().StartBackgroundDispatcher()->get());
+    ASSERT_OK(client_end.status_value());
+    ifc_client_.Bind(std::move(*client_end), runtime().StartBackgroundDispatcher()->get());
+    ASSERT_TRUE(ifc_client_.is_valid());
   }
 
   void TearDown() override {
-    // Expect the call to 'removed' as part of the destruction of NetworkPort, destroy it manually
-    // so that afterwards we can verify that the 'removed' call happened.
-    port_ifc_.removed_.ExpectCall();
-    port_.reset();
-    port_ifc_.removed_.VerifyAndClear();
+    if (port_) {
+      // The port must be removed before it is destroyed by the default destructor. Don't worry
+      // about the status here. Some tests will have already removed the port which will cause this
+      // to fail and other tests should verify that the status is ZX_OK when the removal works.
+      libsync::Completion port_removed;
+      port_->RemovePort([&](zx_status_t) { port_removed.Signal(); });
+      port_removed.Wait();
+    }
+    ASSERT_OK(StopDriver().status_value());
+  }
+
+  NetworkPort& CreatePort(uint8_t port_id) {
+    port_ = std::make_unique<NetworkPort>(std::move(ifc_client_), port_ifc_, port_id);
+    return *port_;
+  }
+
+  zx_status_t InitPort(NetworkPort& port, NetworkPort::Role role = NetworkPort::Role::Client) {
+    zx_status_t result = ZX_OK;
+    libsync::Completion initialized;
+    port.Init(role, dispatcher_, [&](zx_status_t status) {
+      result = status;
+      initialized.Signal();
+    });
+    initialized.Wait();
+    return result;
   }
 
   TestNetworkPortInterface port_ifc_;
   TestNetworkDeviceIfc netdev_ifc_;
   std::unique_ptr<NetworkPort> port_;
+  fdf_dispatcher_t* dispatcher_ = runtime().StartBackgroundDispatcher()->get();
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> ifc_client_;
 };
 
-TEST_F(NetworkPortTestFixture, PortId) { EXPECT_EQ(port_->PortId(), kPortId); }
+TEST_F(NetworkPortTest, Init) {
+  constexpr uint8_t kPortId = 13;
 
-TEST_F(NetworkPortTestFixture, GetInfo) {
-  constexpr uint8_t kEthFrame =
-      static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet);
+  NetworkPort& port = CreatePort(kPortId);
+
+  libsync::Completion add_port_called;
+  netdev_ifc_.add_port_ =
+      [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest* request,
+          fdf::Arena& arena, auto& completer) {
+        EXPECT_EQ(request->id, kPortId);
+        ASSERT_TRUE(request->port.is_valid());
+        completer.buffer(arena).Reply(ZX_OK);
+        add_port_called.Signal();
+      };
+
+  ASSERT_OK(InitPort(port));
+
+  add_port_called.Wait();
+}
+
+TEST_F(NetworkPortTest, InitInvalidIfc) {
+  constexpr uint8_t kPortId = 13;
+
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> invalid_client;
+  ASSERT_FALSE(invalid_client.is_valid());
+
+  {
+    NetworkPort port(std::move(invalid_client), port_ifc_, kPortId);
+
+    // Should not be called because the ifc wasn't valid to begin with.
+    netdev_ifc_.add_port_ =
+        [](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest*, fdf::Arena&,
+           auto&) { ADD_FAILURE() << "AddPort should NOT be called!"; };
+    // Should not be called because the ifc wasn't valid to begin with.
+    EXPECT_CALL(port_ifc_, PortRemoved).Times(0);
+
+    ASSERT_EQ(InitPort(port), ZX_ERR_BAD_STATE);
+  }
+}
+
+TEST_F(NetworkPortTest, InitAddPortFails) {
+  constexpr uint8_t kPortId = 13;
+  constexpr zx_status_t kAddPortError = ZX_ERR_INTERNAL;
+
+  NetworkPort& port = CreatePort(kPortId);
+
+  libsync::Completion add_port_called;
+  netdev_ifc_.add_port_ =
+      [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest*, fdf::Arena& arena,
+          auto& completer) {
+        completer.buffer(arena).Reply(kAddPortError);
+        add_port_called.Signal();
+      };
+
+  ASSERT_EQ(InitPort(port), kAddPortError);
+
+  add_port_called.Wait();
+}
+
+TEST_F(NetworkPortTest, InitFailsAsyncAndDestroysPort) {
+  constexpr uint8_t kPortId = 13;
+  constexpr zx_status_t kAddPortError = ZX_ERR_INTERNAL;
+
+  CreatePort(kPortId);
+
+  netdev_ifc_.add_port_ =
+      [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest*, fdf::Arena& arena,
+          auto& completer) { completer.buffer(arena).Reply(kAddPortError); };
+
+  // Verify that the NetworkPort object can safely be destroyed inside the Init on_complete
+  // callback if Init fails. This is important especially for failure cases where the caller might
+  // want to discard a useless port if initialization failed.
+  libsync::Completion initialized;
+  port_->Init(NetworkPort::Role::Client, dispatcher_, [&](zx_status_t status) mutable {
+    EXPECT_EQ(status, kAddPortError);
+    port_.reset();
+    initialized.Signal();
+  });
+  initialized.Wait();
+}
+
+TEST_F(NetworkPortTest, InitFailsInlineAndDestroysPort) {
+  constexpr uint8_t kPortId = 13;
+
+  // Verify that the NetworkPort object can safely be destroyed inside the Init on_complete
+  // callback if Init fails inline. This verifies that the recursive call to the destructor works in
+  // when the initialization fails before even making any asynchronous calls.
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> invalid_client;
+  ASSERT_FALSE(invalid_client.is_valid());
+
+  auto port = std::make_unique<NetworkPort>(std::move(invalid_client), port_ifc_, kPortId);
+
+  libsync::Completion initialized;
+  port->Init(NetworkPort::Role::Client, dispatcher_, [&](zx_status_t status) mutable {
+    EXPECT_EQ(status, ZX_ERR_BAD_STATE);
+    port.reset();
+    initialized.Signal();
+  });
+  initialized.Wait();
+}
+
+TEST_F(NetworkPortTest, RemovePortByUser) {
+  constexpr uint8_t kPortId = 13;
+  NetworkPort& port = CreatePort(kPortId);
+
+  libsync::Completion remove_port_called;
+  netdev_ifc_.remove_port_ =
+      [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcRemovePortRequest* request,
+          fdf::Arena& arena, auto& completer) {
+        ASSERT_EQ(request->id, kPortId);
+        remove_port_called.Signal();
+      };
+
+  ASSERT_OK(InitPort(port));
+
+  // PortRemoved should NOT be called for a user initiated port removal.
+  EXPECT_CALL(port_ifc_, PortRemoved).Times(0);
+  libsync::Completion remove_port_completed;
+  port.RemovePort([&](zx_status_t status) {
+    EXPECT_OK(status);
+    remove_port_completed.Signal();
+  });
+  remove_port_called.Wait();
+  remove_port_completed.Wait();
+}
+
+TEST_F(NetworkPortTest, RemovePortByNetdev) {
+  constexpr uint8_t kPortId = 13;
+  NetworkPort& port = CreatePort(kPortId);
+
+  ASSERT_OK(InitPort(port));
+
+  libsync::Completion port_removed;
+  EXPECT_CALL(port_ifc_, PortRemoved).WillOnce([&] { port_removed.Signal(); });
+
+  fdf::Arena arena('TEST');
+  fidl::OneWayStatus status = netdev_ifc_.PortClient().sync().buffer(arena)->Removed();
+  ASSERT_TRUE(status.ok());
+
+  // For a port removal initiated by netdev's port client we should get a PortRemoved call.
+  port_removed.Wait();
+}
+
+TEST_F(NetworkPortTest, RemovesPortInAddPortCallback) {
+  constexpr uint8_t kPortId = 13;
+  NetworkPort& port = CreatePort(kPortId);
+
+  // Verify that the NetworkPort object can safely be removed inside the Init on_complete
+  // callback if Init succeeds. This shouldn't be a common use case but could happen if the callback
+  // performs other initialization that could fail, leaing to the removal of the port.
+  libsync::Completion removed;
+  port.Init(NetworkPort::Role::Client, dispatcher_, [&](zx_status_t status) mutable {
+    EXPECT_OK(status);
+    port.RemovePort([&](zx_status_t status) {
+      EXPECT_OK(status);
+      removed.Signal();
+    });
+  });
+  removed.Wait();
+}
+
+TEST_F(NetworkPortTest, PortWithEmptyClient) {
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> empty_client;
+
+  TestNetworkPortInterface port_ifc;
+  constexpr uint8_t kPortId = 0;
+  // Ensure that this object can be constructed and destructed even with an empty proto
+  NetworkPort port(std::move(empty_client), port_ifc, kPortId);
+}
+
+TEST_F(NetworkPortTest, GetInfoClient) {
+  constexpr uint8_t kPortId = 7;
+
+  NetworkPort& port = CreatePort(kPortId);
+
+  ASSERT_OK(InitPort(port));
+
+  fdf::Arena arena('WLAN');
+  auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetInfo();
+  ASSERT_OK(result.status());
+  EXPECT_EQ(result->info.port_class(), fuchsia_hardware_network::wire::DeviceClass::kWlan);
+}
+
+TEST_F(NetworkPortTest, GetInfoAp) {
+  constexpr uint8_t kPortId = 7;
+
+  NetworkPort& port = CreatePort(kPortId);
+
+  ASSERT_OK(InitPort(port, NetworkPort::Role::Ap));
+
+  fdf::Arena arena('WLAN');
+  auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetInfo();
+  ASSERT_OK(result.status());
+  EXPECT_EQ(result->info.port_class(), fuchsia_hardware_network::wire::DeviceClass::kWlanAp);
+}
+
+struct NetworkPortTestWithPort : public NetworkPortTest {
+  void SetUp() override {
+    NetworkPortTest::SetUp();
+    CreatePort(kPortId);
+
+    ASSERT_OK(InitPort(*port_, NetworkPort::Role::Client));
+  }
+};
+
+TEST_F(NetworkPortTestWithPort, PortId) { EXPECT_EQ(port_->PortId(), kPortId); }
+
+TEST_F(NetworkPortTestWithPort, GetInfo) {
+  constexpr auto kEthFrame = fuchsia_hardware_network::wire::FrameType::kEthernet;
   constexpr uint32_t kRawFrameFeature = fuchsia_hardware_network::wire::kFrameFeaturesRaw;
 
-  port_base_info_t info;
-  port_->NetworkPortGetInfo(&info);
+  fdf::Arena arena('WLAN');
+  auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetInfo();
+  ASSERT_OK(result.status());
+  auto& info = result->info;
   // Should be a WLAN port in the default setting
-  EXPECT_EQ(info.port_class,
-            static_cast<uint8_t>(fuchsia_hardware_network::wire::DeviceClass::kWlan));
+  EXPECT_EQ(info.port_class(), fuchsia_hardware_network::wire::DeviceClass::kWlan);
 
   // Must support at least reception of ethernet frames
-  cpp20::span<const uint8_t> rx_types(info.rx_types_list, info.rx_types_count);
+  const auto& rx_types = info.rx_types();
   EXPECT_NE(std::find(rx_types.begin(), rx_types.end(), kEthFrame), rx_types.end());
 
   // Must support at least transmission of raw ethernet frames
-  cpp20::span<const frame_type_support_t> tx_types(info.tx_types_list, info.tx_types_count);
-  auto is_raw_ethernet = [&](const frame_type_support_t& support) {
+  auto is_raw_ethernet = [&](const fuchsia_hardware_network::wire::FrameTypeSupport& support) {
     return support.features == kRawFrameFeature && support.type == kEthFrame;
   };
+  const auto& tx_types = info.tx_types();
   EXPECT_NE(std::find_if(tx_types.begin(), tx_types.end(), is_raw_ethernet), tx_types.end());
 }
 
-TEST_F(NetworkPortTestFixture, GetPortStatus) {
+TEST_F(NetworkPortTestWithPort, GetPortStatus) {
   ASSERT_FALSE(port_->IsOnline());
 
-  port_status_t status;
-  port_ifc_.port_get_status_.ExpectCall(&status);
-  port_->NetworkPortGetStatus(&status);
-  // After construction status should be offline, which means flags are zero.
-  EXPECT_EQ(status.flags, 0u);
-  EXPECT_EQ(status.mtu, kTestMtu);
+  libsync::Completion port_get_status_called;
+  EXPECT_CALL(port_ifc_, PortGetStatus).WillOnce([&](fuchsia_hardware_network::PortStatus* status) {
+    ASSERT_NE(status, nullptr);
+    port_get_status_called.Signal();
+  });
+
+  fdf::Arena arena('WLAN');
+  auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetStatus();
+  ASSERT_OK(result.status());
+  // After construction status should be offline, which means no flags are set.
+  const auto& status = result->status;
+  EXPECT_EQ(status.flags(), fuchsia_hardware_network::wire::StatusFlags{});
+  EXPECT_EQ(status.mtu(), kTestMtu);
+  port_get_status_called.Wait();
   // Testing of online status in next test, this just verifies correct propagation of calls.
 }
 
-TEST_F(NetworkPortTestFixture, PortStatus) {
-  constexpr uint32_t kOnline =
-      static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline);
+TEST_F(NetworkPortTestWithPort, PortStatus) {
+  constexpr auto kOnline = fuchsia_hardware_network::wire::StatusFlags::kOnline;
+  constexpr uint32_t kModifiedMtu = kTestMtu + 3;
 
   ASSERT_FALSE(port_->IsOnline());
+  libsync::Completion port_get_status_called;
+  EXPECT_CALL(port_ifc_, PortGetStatus).WillOnce([&](fuchsia_hardware_network::PortStatus* status) {
+    EXPECT_EQ(status->mtu(), kTestMtu);
+    EXPECT_EQ(status->flags(), kOnline);
+    status->mtu().value() = kModifiedMtu;
+    port_get_status_called.Signal();
+  });
   // When the port goes online it should call PortStatusChanged and the flags field should now
   // indicate that the port is online.
-  const port_status_t* changed_status = nullptr;
-  const port_status_t* get_status = nullptr;
-  netdev_ifc_.port_status_changed_.ExpectCallWithMatcher(
-      [&](uint8_t port_id, const port_status_t* status) {
-        EXPECT_EQ(port_id, kPortId);
-        EXPECT_EQ(status->mtu, kTestMtu);
-        EXPECT_EQ(status->flags, kOnline);
-        changed_status = status;
-      });
-  port_ifc_.port_get_status_.ExpectCallWithMatcher([&](port_status_t* status) {
-    EXPECT_EQ(status->flags, kOnline);
-    get_status = status;
-  });
+  libsync::Completion port_status_changed;
+  netdev_ifc_.port_status_changed_ =
+      [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcPortStatusChangedRequest* request,
+          fdf::Arena& arena, auto& completer) {
+        EXPECT_EQ(request->id, kPortId);
+        EXPECT_EQ(request->new_status.mtu(), kModifiedMtu);
+        EXPECT_EQ(request->new_status.flags(), kOnline);
+        port_status_changed.Signal();
+      };
   port_->SetPortOnline(true);
+  port_status_changed.Wait();
   // Ensure that the interface implementation gets to modify the same status if it wants to.
-  EXPECT_NOT_NULL(changed_status);
-  EXPECT_NOT_NULL(get_status);
-  EXPECT_EQ(changed_status, get_status);
   EXPECT_TRUE(port_->IsOnline());
+  port_status_changed.Reset();
+
+  port_get_status_called.Wait();
 
   // Setting the port status to online again should NOT have any effect or call anything.
-  netdev_ifc_.port_status_changed_.ExpectNoCall();
-  port_ifc_.port_get_status_.ExpectNoCall();
+  EXPECT_CALL(port_ifc_, PortGetStatus).Times(0);
   port_->SetPortOnline(true);
   EXPECT_TRUE(port_->IsOnline());
+  ASSERT_FALSE(port_status_changed.signaled());
 
   // Setting the port to offline should clear the flags field.
-  netdev_ifc_.port_status_changed_.ExpectCallWithMatcher(
-      [&](uint8_t port_id, const port_status_t* status) {
-        EXPECT_EQ(port_id, kPortId);
-        EXPECT_EQ(status->flags, 0u);
-      });
-  port_ifc_.port_get_status_.ExpectCallWithMatcher(
-      [](port_status_t* status) { EXPECT_EQ(status->flags, 0u); });
+  netdev_ifc_.port_status_changed_ =
+      [&](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcPortStatusChangedRequest* request,
+          fdf::Arena& arena, auto& completer) {
+        EXPECT_EQ(request->id, kPortId);
+        EXPECT_EQ(request->new_status.flags(), fuchsia_hardware_network::wire::StatusFlags{});
+        port_status_changed.Signal();
+      };
+  EXPECT_CALL(port_ifc_, PortGetStatus).WillOnce([&](fuchsia_hardware_network::PortStatus* status) {
+    EXPECT_EQ(status->flags(), fuchsia_hardware_network::wire::StatusFlags{});
+    port_get_status_called.Signal();
+  });
   port_->SetPortOnline(false);
+  port_status_changed.Wait();
   EXPECT_FALSE(port_->IsOnline());
 
-  netdev_ifc_.port_status_changed_.VerifyAndClear();
-  port_ifc_.port_get_status_.VerifyAndClear();
+  port_get_status_called.Wait();
 }
 
-TEST_F(NetworkPortTestFixture, MacGetProto) {
-  mac_addr_protocol_t* mac_ifc = nullptr;
-  port_->NetworkPortGetMac(&mac_ifc);
-  EXPECT_EQ(mac_ifc->ctx, port_.get());
-  ASSERT_NOT_NULL(mac_ifc->ops);
+TEST_F(NetworkPortTestWithPort, MacGetProto) {
+  fdf::Arena arena('WLAN');
+  auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetMac();
+  ASSERT_OK(result.status());
+  ASSERT_TRUE(result->mac_ifc.is_valid());
 }
 
-struct NetworkPortMacTestFixture : public NetworkPortTestFixture {
-  NetworkPortMacTestFixture() : mac_ifc_(GetMacProto()), mac_(&mac_ifc_) {}
-
-  mac_addr_protocol_t GetMacProto() {
-    mac_addr_protocol_t* mac_proto = nullptr;
-    port_->NetworkPortGetMac(&mac_proto);
-    return *mac_proto;
+struct NetworkPortMacTest : public NetworkPortTestWithPort {
+  void SetUp() override {
+    NetworkPortTestWithPort::SetUp();
+    fdf::Arena arena('WLAN');
+    auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetMac();
+    ZX_ASSERT(result.ok());
+    mac_client_.Bind(std::move(result->mac_ifc), dispatcher_);
   }
 
-  mac_addr_protocol_t mac_ifc_;
-  ::ddk::MacAddrProtocolClient mac_;
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::MacAddr> mac_client_;
 };
 
-TEST_F(NetworkPortMacTestFixture, MacGetAddress) {
-  constexpr uint8_t kMacAddr[6] = {0x0C, 0x00, 0x0F, 0xF0, 0x0E, 0xE0};
-  port_ifc_.mac_get_address_.ExpectCallWithMatcher(
-      [&](mac_address_t* out_mac) { memcpy(out_mac->octets, kMacAddr, sizeof(kMacAddr)); });
-
-  mac_address_t mac_addr;
-  mac_.GetAddress(&mac_addr);
-  EXPECT_BYTES_EQ(mac_addr.octets, kMacAddr, sizeof(kMacAddr));
-}
-
-TEST_F(NetworkPortMacTestFixture, MacGetFeatures) {
-  constexpr supported_mac_filter_mode_t kSupportedModes =
-      SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS | SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER;
-  constexpr uint32_t kNumMulticastFilters = 42;
-  port_ifc_.mac_get_features_.ExpectCallWithMatcher([&](features_t* out_features) {
-    out_features->supported_modes = kSupportedModes;
-    out_features->multicast_filter_count = kNumMulticastFilters;
+TEST_F(NetworkPortMacTest, MacGetAddress) {
+  constexpr fuchsia_net::wire::MacAddress kMacAddr{0x0C, 0x00, 0x0F, 0xF0, 0x0E, 0xE0};
+  EXPECT_CALL(port_ifc_, MacGetAddress).WillOnce([&](fuchsia_net::MacAddress* out_mac) {
+    memcpy(out_mac->octets().data(), kMacAddr.octets.data(), kMacAddr.octets.size());
   });
 
-  features_t features;
-  mac_.GetFeatures(&features);
-  EXPECT_EQ(features.supported_modes, kSupportedModes);
-  EXPECT_EQ(features.multicast_filter_count, kNumMulticastFilters);
-  port_ifc_.mac_get_features_.VerifyAndClear();
+  fdf::Arena arena('WLAN');
+  auto result = mac_client_.sync().buffer(arena)->GetAddress();
+  ASSERT_OK(result.status());
+  const auto& mac_addr = result->mac;
+  ASSERT_EQ(mac_addr.octets.size(), kMacAddr.octets.size());
+  EXPECT_EQ(memcmp(mac_addr.octets.data(), kMacAddr.octets.data(), kMacAddr.octets.size()), 0);
 }
 
-TEST_F(NetworkPortMacTestFixture, MacSetMode) {
-  constexpr std::array<mac_address_t, 2> kMulticastMacs = {
-      mac_address_t{{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
-      mac_address_t{{0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A}}};
-
-  constexpr mac_filter_mode_t kMode = MAC_FILTER_MODE_MULTICAST_FILTER;
-  port_ifc_.mac_set_mode_.ExpectCallWithMatcher(
-      [&](mac_filter_mode_t mode, cpp20::span<const mac_address_t> multicast_macs) {
-        EXPECT_EQ(mode, kMode);
-        ASSERT_EQ(multicast_macs.size(), kMulticastMacs.size());
-        for (size_t i = 0; i < multicast_macs.size(); ++i) {
-          EXPECT_BYTES_EQ(kMulticastMacs[i].octets, multicast_macs[i].octets, MAC_SIZE);
-        }
+TEST_F(NetworkPortMacTest, MacGetFeatures) {
+  constexpr fuchsia_hardware_network_driver::SupportedMacFilterMode kSupportedModes =
+      fuchsia_hardware_network_driver::SupportedMacFilterMode::kPromiscuous |
+      fuchsia_hardware_network_driver::SupportedMacFilterMode::kMulticastFilter;
+  constexpr uint32_t kNumMulticastFilters = 42;
+  libsync::Completion mac_get_features_called;
+  EXPECT_CALL(port_ifc_, MacGetFeatures)
+      .WillOnce([&](fuchsia_hardware_network_driver::Features* out_features) {
+        out_features->supported_modes() = kSupportedModes;
+        out_features->multicast_filter_count() = kNumMulticastFilters;
+        mac_get_features_called.Signal();
       });
 
-  mac_.SetMode(kMode, kMulticastMacs.data(), kMulticastMacs.size());
-  port_ifc_.mac_set_mode_.VerifyAndClear();
+  fdf::Arena arena('WLAN');
+  auto result = mac_client_.sync().buffer(arena)->GetFeatures();
+  ASSERT_OK(result.status());
+  const auto& features = result->features;
+  EXPECT_EQ(features.supported_modes(), kSupportedModes);
+  EXPECT_EQ(features.multicast_filter_count(), kNumMulticastFilters);
+  mac_get_features_called.Wait();
+}
+
+TEST_F(NetworkPortMacTest, MacSetMode) {
+  const std::array<fuchsia_net::wire::MacAddress, 2> kMulticastMacs(
+      {fuchsia_net::wire::MacAddress({0x01, 0x02, 0x03, 0x04, 0x05, 0x06}),
+       fuchsia_net::wire::MacAddress({0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A})});
+
+  constexpr auto kMode = fuchsia_hardware_network::MacFilterMode::kMulticastFilter;
+
+  libsync::Completion mac_set_mode_called;
+  EXPECT_CALL(port_ifc_, MacSetMode)
+      .WillOnce([&](fuchsia_hardware_network::wire::MacFilterMode mode,
+                    cpp20::span<const fuchsia_net::wire::MacAddress> multicast_macs) {
+        EXPECT_EQ(mode, kMode);
+        ASSERT_EQ(multicast_macs.size(), std::size(kMulticastMacs));
+        for (size_t i = 0; i < multicast_macs.size(); ++i) {
+          EXPECT_EQ(memcmp(kMulticastMacs[i].octets.data(), multicast_macs[i].octets.data(),
+                           multicast_macs[i].octets.size()),
+                    0);
+        }
+        mac_set_mode_called.Signal();
+      });
+
+  fdf::Arena arena('WLAN');
+  auto result = mac_client_.sync().buffer(arena)->SetMode(kMode, {arena, kMulticastMacs});
+  ASSERT_OK(result.status());
+  mac_set_mode_called.Wait();
 }
 
 }  // namespace
