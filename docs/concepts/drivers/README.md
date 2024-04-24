@@ -21,7 +21,7 @@ all devices (known as [nodes][nodes]) and drivers in a Fuchsia system.
 *  [Driver communication][driver-communication]
 *  [Mapping a device's memory in a driver][mapping-memory]
 *  [Driver dispatcher and threads][driver-dispatcher]
-*. [Driver dispatcher performance][driver-dispatcher-performance]
+*  [Driver dispatcher performance][driver-dispatcher-performance]
 
 <!-- Reference links -->
 
