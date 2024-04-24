@@ -4,15 +4,17 @@
 
 use std::{
     cmp::min,
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::{Debug, Display},
     hash::Hash,
 };
 
 /// A directed graph, whose nodes contain an identifier of type `T`.
-pub struct DirectedGraph<T: Hash + Copy + Ord + Debug + Display>(HashMap<T, DirectedNode<T>>);
+pub struct DirectedGraph<T: PartialEq + Hash + Copy + Ord + Debug + Display>(
+    HashMap<T, DirectedNode<T>>,
+);
 
-impl<T: Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
+impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
     /// Created a new empty `DirectedGraph`.
     pub fn new() -> Self {
         Self(HashMap::new())
@@ -36,9 +38,65 @@ impl<T: Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
     pub fn topological_sort(&self) -> Result<Vec<T>, Error<T>> {
         TarjanSCC::new(self).run()
     }
+
+    /// Finds the shortest path between the `from` and `to` nodes in this graph, if such a path
+    /// exists. Both `from` and `to` are included in the returned path.
+    pub fn find_shortest_path(&self, from: T, to: T) -> Option<Vec<T>> {
+        // Keeps track of edges in the shortest path to each node.
+        //
+        // The key in this map is a node whose shortest path to it is known. The value
+        // is the next-to-last node in the shortest path to the key node.
+        //
+        // For example, if the shortest path from `a` to `b` is `{a, b, c}`, this
+        // map will contain:
+        // (c, b)
+        // (b, a)
+        let mut shortest_path_edges: HashMap<T, T> = HashMap::new();
+
+        // Nodes which we have found in the graph but have not yet been visited.
+        let mut discovered_nodes = VecDeque::new();
+        discovered_nodes.push_back(from);
+
+        loop {
+            // Visit the first node in the list.
+            let Some(current_node) = discovered_nodes.pop_front() else {
+                // If there are no more nodes to visit, then a shortest path must not exist.
+                return None;
+            };
+            match self.get_targets(current_node) {
+                None => continue,
+                Some(targets) if targets.is_empty() => continue,
+                Some(targets) => {
+                    for target in targets {
+                        // If we haven't yet visited this node, add it to our set of edges and add
+                        // it to the set of nodes we should visit.
+                        if !shortest_path_edges.contains_key(target) {
+                            shortest_path_edges.insert(*target, current_node);
+                            discovered_nodes.push_back(*target);
+                        }
+                        // If this node is the node we're searching for a path to, then compute the
+                        // path based on the hashmap we've built and return it.
+                        if *target == to {
+                            let mut result = vec![*target];
+                            let mut path_node: T = *target;
+                            loop {
+                                path_node = *shortest_path_edges.get(&path_node).unwrap();
+                                result.push(path_node);
+                                if path_node == from {
+                                    break;
+                                }
+                            }
+                            result.reverse();
+                            return Some(result);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
-impl<T: Hash + Copy + Ord + Debug + Display> Default for DirectedGraph<T> {
+impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> Default for DirectedGraph<T> {
     fn default() -> Self {
         Self(HashMap::new())
     }
@@ -46,9 +104,9 @@ impl<T: Hash + Copy + Ord + Debug + Display> Default for DirectedGraph<T> {
 
 /// A graph node. Contents contain the nodes mapped by edges from this node.
 #[derive(Eq, PartialEq)]
-struct DirectedNode<T: Hash + Copy + Ord + Debug + Display>(HashSet<T>);
+struct DirectedNode<T: PartialEq + Hash + Copy + Ord + Debug + Display>(HashSet<T>);
 
-impl<T: Hash + Copy + Ord + Debug + Display> DirectedNode<T> {
+impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedNode<T> {
     /// Create an empty node.
     pub fn new() -> Self {
         Self(HashSet::new())
@@ -62,11 +120,11 @@ impl<T: Hash + Copy + Ord + Debug + Display> DirectedNode<T> {
 
 /// Errors produced by `DirectedGraph`.
 #[derive(Debug)]
-pub enum Error<T: Hash + Copy + Ord + Debug + Display> {
+pub enum Error<T: PartialEq + Hash + Copy + Ord + Debug + Display> {
     CyclesDetected(HashSet<Vec<T>>),
 }
 
-impl<T: Hash + Copy + Ord + Debug + Display> Error<T> {
+impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> Error<T> {
     pub fn format_cycle(&self) -> String {
         match &self {
             Error::CyclesDetected(cycles) => {
@@ -100,7 +158,7 @@ impl<T: Hash + Copy + Ord + Debug + Display> Error<T> {
 ///
 /// Description of algorithm:
 /// https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-struct TarjanSCC<'a, T: Hash + Copy + Ord + Debug + Display> {
+struct TarjanSCC<'a, T: PartialEq + Hash + Copy + Ord + Debug + Display> {
     // Each node is assigned an index in the order we find them. This tracks the next index to use.
     index: u64,
     // The mappings between nodes and indices
@@ -296,6 +354,26 @@ mod tests {
         }
     }
 
+    macro_rules! test_shortest_path {
+        (
+            $(
+                $test_name:ident => {
+                    edges = $edges:expr,
+                    from = $from:expr,
+                    to = $to:expr,
+                    shortest_path = $shortest_path:expr,
+                },
+            )+
+        ) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    shortest_path_test($edges, $from, $to, $shortest_path);
+                }
+            )+
+        }
+    }
+
     fn topological_sort_test(edges: &[(&'static str, &'static str)], order: &[&'static str]) {
         let mut graph = DirectedGraph::new();
         edges.iter().for_each(|e| graph.add_edge(e.0, e.1));
@@ -315,6 +393,20 @@ mod tests {
         let expected_cycles: HashSet<Vec<_>> =
             cycles.iter().cloned().map(|c| c.iter().cloned().collect()).collect();
         assert_eq!(reported_cycles, expected_cycles);
+    }
+
+    fn shortest_path_test(
+        edges: &[(&'static str, &'static str)],
+        from: &'static str,
+        to: &'static str,
+        expected_shortest_path: Option<&[&'static str]>,
+    ) {
+        let mut graph = DirectedGraph::new();
+        edges.iter().for_each(|e| graph.add_edge(e.0, e.1));
+        let actual_shortest_path = graph.find_shortest_path(from, to);
+        let expected_shortest_path =
+            expected_shortest_path.map(|path| path.iter().cloned().collect::<Vec<_>>());
+        assert_eq!(actual_shortest_path, expected_shortest_path);
     }
 
     // Tests with no cycles
@@ -551,6 +643,97 @@ mod tests {
                 &["c", "d", "c"],
             ],
         },
+    }
 
+    test_shortest_path! {
+        test_empty_graph => {
+            edges = &[],
+            from = "a",
+            to = "b",
+            shortest_path = None,
+        },
+        test_two_nodes => {
+            edges = &[
+                ("a", "b"),
+            ],
+            from = "a",
+            to = "b",
+            shortest_path = Some(&["a", "b"]),
+        },
+        test_path_to_self => {
+            edges = &[
+                ("a", "a"),
+            ],
+            from = "a",
+            to = "a",
+            shortest_path = Some(&["a", "a"]),
+        },
+        test_path_to_self_no_edge => {
+            edges = &[
+                ("a", "b"),
+            ],
+            from = "a",
+            to = "a",
+            shortest_path = None,
+        },
+        test_path_three_nodes => {
+            edges = &[
+                ("a", "b"),
+                ("b", "c"),
+            ],
+            from = "a",
+            to = "c",
+            shortest_path = Some(&["a", "b", "c"]),
+        },
+        test_path_multiple_options => {
+            edges = &[
+                ("a", "b"),
+                ("b", "c"),
+                ("a", "c"),
+            ],
+            from = "a",
+            to = "c",
+            shortest_path = Some(&["a", "c"]),
+        },
+        test_path_two_islands => {
+            edges = &[
+                ("a", "b"),
+                ("c", "d"),
+            ],
+            from = "a",
+            to = "d",
+            shortest_path = None,
+        },
+        test_path_with_cycle => {
+            edges = &[
+                ("a", "b"),
+                ("b", "a"),
+            ],
+            from = "a",
+            to = "b",
+            shortest_path = Some(&["a", "b"]),
+        },
+        test_path_with_cycle_2 => {
+            edges = &[
+                ("a", "b"),
+                ("b", "c"),
+                ("c", "b"),
+            ],
+            from = "a",
+            to = "b",
+            shortest_path = Some(&["a", "b"]),
+        },
+        test_path_with_cycle_3 => {
+            edges = &[
+                ("a", "b"),
+                ("b", "c"),
+                ("c", "b"),
+                ("b", "d"),
+                ("d", "e"),
+            ],
+            from = "a",
+            to = "e",
+            shortest_path = Some(&["a", "b", "d", "e"]),
+        },
     }
 }
