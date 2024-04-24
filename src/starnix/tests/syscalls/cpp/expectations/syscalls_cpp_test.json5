@@ -68,6 +68,8 @@
                 "VmspliceTest.ModifyBufferInPipe",
                 "VmspliceTest.UnmapBufferInPipe",
                 "VmspliceTest.UnmapBufferInPipeThenMapInPlace",
+                "VmspliceTest.RemapSharedBufferInPipeThenModify",
+                "VmspliceTest/VmspliceUnmapBufferAfterVmsplicingRemappedBufferTest.UnmapBufferAfterVmsplicingRemappedBuffer/*",
 
                 // TODO(https://fxbug.dev/334365844)
                 "Task.BrkIsZeroedAfterShrinkAndRegrow",
