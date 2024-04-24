@@ -108,7 +108,3 @@ config("allow_unused_results") {
     "//zircon/*",
   ]
 }
-
-config("deny_unused_imports") {
-  rustflags = [ "-Dunused_imports" ]
-}
