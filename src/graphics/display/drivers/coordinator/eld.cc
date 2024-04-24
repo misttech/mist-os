@@ -18,7 +18,7 @@
 
 namespace display {
 
-void ComputeEld(const edid::Edid& edid, fbl::Array<uint8_t>& eld) {
+fbl::Array<uint8_t> ComputeEld(const edid::Edid& edid) {
   // First we calculate the total length so we can allocate.
   // The total ELD length of the ELD includes the ELD header, the ELD baseline (parts 1, 2 and 3)
   // and the any vendor specific data (not suported).
@@ -50,8 +50,13 @@ void ComputeEld(const edid::Edid& edid, fbl::Array<uint8_t>& eld) {
   eld_length = (eld_length + 3) & ~3;  //  Make the ELD length multiple of 4.
 
   // With the ELD length we can allocate and then fill in the data.
-  eld = fbl::Array<uint8_t>(new uint8_t[eld_length], eld_length);
-  memset(eld.get(), 0, eld_length);  // Set reserved fields to 0.
+  //
+  // The array is default-initialized, so all ELD fields are set to zero.
+  fbl::Array<uint8_t> eld = fbl::MakeArray<uint8_t>(eld_length);
+  if (eld.empty()) {
+    // Array allocation failed.
+    return eld;
+  }
 
   // Fill the data, moving pointer p along the way.
   uint8_t* p = eld.get();
@@ -99,6 +104,8 @@ void ComputeEld(const edid::Edid& edid, fbl::Array<uint8_t>& eld) {
     *sad = *it;
   }
   // We don't populate the vendor specific block.
+
+  return eld;
 }
 
 }  // namespace display

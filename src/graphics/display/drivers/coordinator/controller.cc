@@ -201,8 +201,10 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     }
     fbl::RefPtr<DisplayInfo> info = std::move(info_result).value();
     if (info->edid.has_value()) {
-      fbl::Array<uint8_t> eld;
-      ComputeEld(info->edid->base, eld);
+      fbl::Array<uint8_t> eld = ComputeEld(info->edid->base);
+
+      // The array is empty if memory allocation failed. We prefer using an
+      // empty ELD to dropping the display altogether.
       driver_.SetEld(info->id, eld);
     }
 
