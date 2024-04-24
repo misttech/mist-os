@@ -48,6 +48,9 @@ template("prebuilt_host_test_manifest") {
   test_targets = []
   foreach(test, manifest) {
     host_test_name = test.test_name
+    if (defined(invoker.suffix)) {
+      host_test_name = "${host_test_name}${invoker.suffix}"
+    }
 
     test_disabled = false
     if (defined(invoker.disabled_tests)) {
