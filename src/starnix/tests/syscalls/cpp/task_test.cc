@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <thread>
 
+#include <fbl/algorithm.h>
 #include <gtest/gtest.h>
 #include <linux/sched.h>
 
@@ -308,19 +309,22 @@ TEST(Task, CloneVfork_exit) {
   EXPECT_GT(elapsed_us, kCloneVforkSleepUS);
 }
 
+// Invokes `brk()` syscall directly. The syscall returns the requested `new_break` on success,
+// or the old break on failure. Setting `new_break` to null always fails, so can be used to
+// retrieve the current break.
+// Some tests invoke this directly so as to bypass the `brk()` wrapper provided by some libc
+// implementations, that has different behaviour, matching the POSIX specification.
+uintptr_t brk_syscall(uintptr_t new_break) { return syscall(SYS_brk, new_break); }
+
 TEST(Task, BrkReturnsCurrentBreakOnFailure) {
   // Tests that the brk system call doesn't return an error, instead it returns
   // the current value of the program break.
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
-    // Some libc implementations wrap brk so that it returns an error.
-    // The Linux system call returns the current break on failure.
-    auto brk = [](uintptr_t addr) { return syscall(SYS_brk, addr); };
-
     const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
 
     // This should always fail, returning the program_break
-    uintptr_t program_break = brk(UINTPTR_MAX);
+    uintptr_t program_break = brk_syscall(UINTPTR_MAX);
 
     // Try to reserve something beyond the program break, aligned to page size.
     uintptr_t map_addr = (program_break & ~(page_size - 1)) + page_size;
@@ -331,13 +335,11 @@ TEST(Task, BrkReturnsCurrentBreakOnFailure) {
     ASSERT_TRUE(res != MAP_FAILED || errno == EEXIST)
         << "unexpected mmap error: " << std::strerror(errno);
 
-    uintptr_t new_break = brk(map_addr + page_size);
+    uintptr_t new_break = brk_syscall(map_addr + page_size);
     // brk should fail.
     EXPECT_EQ(new_break, program_break);
 
-    if (res != MAP_FAILED) {
-      SAFE_SYSCALL(munmap(res, page_size));
-    }
+    _exit(testing::Test::HasFailure());
   });
 
   EXPECT_TRUE(helper.WaitForChildren());
@@ -345,22 +347,318 @@ TEST(Task, BrkReturnsCurrentBreakOnFailure) {
 
 TEST(Task, BrkShrinkAfterFork) {
   // Tests that a program can shrink their break after forking.
-  const void* SBRK_ERROR = reinterpret_cast<void*>(-1);
+  const void* kSbrkError = reinterpret_cast<void*>(-1);
   test_helper::ForkHelper helper;
 
   constexpr int brk_increment = 0x4000;
-  ASSERT_NE(SBRK_ERROR, sbrk(brk_increment));
+  ASSERT_NE(kSbrkError, sbrk(brk_increment));
   void* old_brk = sbrk(0);
-  ASSERT_NE(SBRK_ERROR, old_brk);
+  ASSERT_NE(kSbrkError, old_brk);
   helper.RunInForkedProcess([&] {
     ASSERT_EQ(old_brk, sbrk(0));
-    ASSERT_NE(SBRK_ERROR, sbrk(-brk_increment));
+    ASSERT_NE(kSbrkError, sbrk(-brk_increment));
   });
 
   // Make sure fork didn't change our current break.
   ASSERT_EQ(old_brk, sbrk(0));
+
   // Restore the old brk.
-  ASSERT_NE(SBRK_ERROR, sbrk(-brk_increment));
+  ASSERT_NE(kSbrkError, sbrk(-brk_increment));
+}
+
+// Returns true if the `len` bytes at `ptr` all have value `value`.
+static bool mem_contains(volatile char* ptr, size_t len, char value) {
+  for (const auto* end = ptr + len; ptr != end; ++ptr) {
+    if (*ptr != value)
+      return false;
+  }
+  return true;
+}
+
+// Moves the program break to a page aligned address, and returns the old break address.
+static uintptr_t set_brk_page_aligned() {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  uintptr_t original_break = brk_syscall(0);
+  uintptr_t aligned_break = (original_break + page_size) & ~(page_size - 1);
+  if (brk_syscall(aligned_break) != aligned_break) {
+    return 0;
+  }
+  return original_break;
+}
+
+// Verify that if the program break is reduced down to a page-aligned address, and then
+// regrown, then all the pages, including the one pointed to by the page-aligned address,
+// are zeroed.
+TEST(Task, BrkIsZeroedAfterShrinkAndRegrow) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    const void* kSbrkError = reinterpret_cast<void*>(-1);
+
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    // Allocate space via `sbrk()`, and fill it with non-zero bytes.
+    constexpr intptr_t kBreakIncrement = 0x4142;
+    void* base_break = sbrk(kBreakIncrement);
+    ASSERT_NE(base_break, kSbrkError) << "sbrk failed: " << std::strerror(errno);
+    char* memory = static_cast<char*>(base_break);
+    ASSERT_TRUE(mem_contains(memory, static_cast<size_t>(kBreakIncrement), 0));
+    memset(memory, 'a', kBreakIncrement);
+    ASSERT_FALSE(mem_contains(memory, static_cast<size_t>(kBreakIncrement), 0));
+
+    // Shrink the `sbrk()` to free the pages, then re-allocate them.
+    ASSERT_NE(sbrk(-kBreakIncrement), kSbrkError) << "sbrk failed: " << std::strerror(errno);
+    ASSERT_NE(sbrk(kBreakIncrement), kSbrkError) << "sbrk failed: " << std::strerror(errno);
+
+    // The re-allocated range should now be zeroed.
+    EXPECT_TRUE(mem_contains(memory, static_cast<size_t>(kBreakIncrement), 0));
+
+    _exit(testing::Test::HasFailure());
+  });
+}
+
+// Verifies that overwriting the program break with private or shared mappings does not
+// prevent the program break from being shrunk, and regrown.
+TEST(Task, BrkShrinkUnmapsAnonMmap) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+    // Allocate eight pages from the program break.
+    uintptr_t program_break = brk_syscall(0);
+    uintptr_t new_break = brk_syscall(program_break + (8 * page_size));
+    ASSERT_EQ(new_break, program_break + (8 * page_size));
+
+    // Anonymously map over second and third pages, with RW and read-only private pages.
+    uintptr_t addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + page_size), page_size, PROT_WRITE | PROT_READ,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + page_size);
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (2 * page_size)), page_size, PROT_READ,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (2 * page_size));
+
+    // Anonymously map over fifth and sixth pages, with RW and read-only shared pages.
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (4 * page_size)), page_size,
+             PROT_WRITE | PROT_READ, MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (4 * page_size));
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (5 * page_size)), page_size, PROT_READ,
+             MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (5 * page_size));
+
+    // Shrink the program break back down.
+    uintptr_t final_break = brk_syscall(program_break);
+    EXPECT_EQ(final_break, program_break);
+
+    // Validate that all eight pages are no longer available.
+    for (size_t i = 0; i < 8; i++) {
+      EXPECT_FALSE(test_helper::TryRead(program_break + (i * page_size)))
+          << "page " << i + 1 << " is readable";
+    }
+
+    // Regrow and validate that all eight pages are then readable.
+    new_break = brk_syscall(program_break + (8 * page_size));
+    EXPECT_EQ(new_break, program_break + (8 * page_size));
+    for (size_t i = 0; i < 8; i++) {
+      EXPECT_TRUE(test_helper::TryRead(program_break + (i * page_size)))
+          << "page " << i + 1 << " not readable";
+    }
+
+    _exit(testing::Test::HasFailure());
+  });
+}
+
+// Verifies that the program break can be extended after `mmap()` has been used to overwrite
+// preceding parts of the program break area, and that doing so does not alter those
+// mappings.
+TEST(Task, BrkGrowsAfterAnonMmap) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+    // Allocate eight pages from the program break, and set them non-zero.
+    uintptr_t program_break = brk_syscall(0);
+    uintptr_t new_break = brk_syscall(program_break + (8 * page_size));
+    ASSERT_EQ(new_break, program_break + (8 * page_size));
+
+    char* break_memory = reinterpret_cast<char*>(program_break);
+    memset(break_memory, 'a', 8 * page_size);
+    ASSERT_TRUE(mem_contains(break_memory, 8 * page_size, 'a'));
+
+    // Anonymously map over second and third pages, with RW and read-only private pages.
+    uintptr_t addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + page_size), page_size, PROT_WRITE | PROT_READ,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + page_size);
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (2 * page_size)), page_size, PROT_READ,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (2 * page_size));
+
+    // Anonymously map over fifth and sixth pages, with RW and read-only shared pages.
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (4 * page_size)), page_size,
+             PROT_WRITE | PROT_READ, MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (4 * page_size));
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (5 * page_size)), page_size, PROT_READ,
+             MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (5 * page_size));
+
+    // Fill the writable `mmap()`ed pages with identifiable content.
+    memset(break_memory + page_size, 'b', page_size);
+    memset(break_memory + 4 * page_size, 'c', page_size);
+
+    // Extend the program break by another eight pages.
+    new_break = brk_syscall(program_break + (16 * page_size));
+    ASSERT_EQ(new_break, program_break + (16 * page_size));
+
+    // Everything preceding the old break should be preserved.
+    EXPECT_TRUE(mem_contains(break_memory, page_size, 'a'));  // first of the old break pages
+    EXPECT_TRUE(mem_contains(break_memory + page_size, page_size, 'b'));
+    EXPECT_TRUE(mem_contains(break_memory + 4 * page_size, page_size, 'c'));
+    EXPECT_TRUE(mem_contains(break_memory + 7 * page_size, page_size,
+                             'a'));  // last of the old break pages.
+
+    // The new break area will be zeroed.
+    EXPECT_TRUE(mem_contains(break_memory + 8 * page_size, 8 * page_size, 0));
+
+    _exit(testing::Test::HasFailure());
+  });
+}
+
+// Verify that the program break will not grow over existing private mappings.
+TEST(Task, BrkWillNotGrowOverPrivateAnonMmap) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+    // Create anonymous mapped pages after the break.
+    uintptr_t program_break = brk_syscall(0);
+
+    // Anonymously map over second and third pages, with RW and read-only private pages.
+    uintptr_t addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + page_size), page_size, PROT_WRITE | PROT_READ,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + page_size);
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (2 * page_size)), page_size, PROT_READ,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (2 * page_size));
+
+    // Attempt to grow the program break over the private mappings.
+    // This should fail, causing the old program break position to remain current.
+    uintptr_t new_break = brk_syscall(program_break + (8 * page_size));
+    EXPECT_EQ(new_break, program_break);
+
+    _exit(testing::Test::HasFailure());
+  });
+}
+
+// Verify that the program break will not grow over existing private mappings.
+TEST(Task, BrkWillNotGrowOverSharedAnonMmap) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+    // Create shared mapped pages after the break.
+    uintptr_t program_break = brk_syscall(0);
+
+    // Anonymously map over second and fourth pages, with RW and read-only shared pages.
+    uintptr_t addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (page_size)), page_size,
+             PROT_WRITE | PROT_READ, MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + page_size);
+    addr = reinterpret_cast<uintptr_t>(
+        mmap(reinterpret_cast<void*>(program_break + (3 * page_size)), page_size, PROT_READ,
+             MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0));
+    ASSERT_EQ(addr, program_break + (3 * page_size));
+
+    // Attempt to grow the program break over the shared mappings.
+    // This should fail, causing the old program break position to remain current.
+    uintptr_t new_break = brk_syscall(program_break + (8 * page_size));
+    EXPECT_EQ(new_break, program_break);
+
+    _exit(testing::Test::HasFailure());
+  });
+}
+
+// Verify that the `brk()` syscall continues to function after pages within the
+// program break have been explicitly unmapped by the caller.
+TEST(Task, BrkCanBeUnmapped) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+    // Allocate a page from the program break.
+    uintptr_t program_break = brk_syscall(0);
+    uintptr_t new_break = brk_syscall(program_break + page_size);
+
+    // Unmap the last page we just added.
+    ASSERT_TRUE(test_helper::TryRead(program_break));
+    SAFE_SYSCALL(munmap(reinterpret_cast<void*>(program_break), page_size));
+    EXPECT_FALSE(test_helper::TryRead(program_break));
+
+    // The program break hasn't changed.
+    uintptr_t break_after_unmap = brk_syscall(0);
+    EXPECT_EQ(break_after_unmap, new_break);
+
+    // The program break can still be extended.
+    uintptr_t final_break = brk_syscall(new_break + page_size);
+    EXPECT_EQ(final_break, new_break + page_size);
+
+    // The final page of the break is readable, and the unmapped page is still not.
+    EXPECT_TRUE(test_helper::TryRead(new_break));
+    EXPECT_FALSE(test_helper::TryRead(program_break));
+
+    // The break can be rewound over the unmapped region.
+    EXPECT_EQ(brk_syscall(program_break), program_break);
+
+    _exit(testing::Test::HasFailure());
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+// Verify that the current program break address is treated as outside the break.
+TEST(Task, BrkIsOutOfRange) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    // Set the program break to be page-aligned.
+    ASSERT_NE(set_brk_page_aligned(), 0u);
+
+    // The break address should refer to the first byte of the page after the break,
+    // and therefore not be mapped.
+    uintptr_t aligned_break = brk_syscall(0);
+    EXPECT_FALSE(test_helper::TryRead(aligned_break));
+
+    // Increasing the break by one byte effectively "allocates" the byte at the
+    // aligned break address, causing that page to now be mapped.
+    uintptr_t increased_break = aligned_break + 1;
+    EXPECT_EQ(brk_syscall(increased_break), increased_break);
+    EXPECT_TRUE(test_helper::TryRead(aligned_break));
+
+    // Reducing the break by one byte "deallocates" the byte at the aligned
+    // address, causing the page to be unmapped.
+    EXPECT_EQ(brk_syscall(aligned_break), aligned_break);
+    EXPECT_FALSE(test_helper::TryRead(aligned_break));
+
+    _exit(testing::Test::HasFailure());
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 TEST(Task, ChildCantModifyParent) {
