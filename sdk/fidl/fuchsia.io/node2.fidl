@@ -203,7 +203,7 @@ closed protocol Node2 {
     /// status.
     ///
     /// This method does not require any rights.
-    @available(removed=9)
+    @available(replaced=9)
     @selector("fuchsia.io/Node.Close")
     strict Close() -> () error zx.Status;
 

@@ -196,8 +196,7 @@ TEST_P(VersioningReplacementTest, BadMethodReplaced) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// TODO(https://fxbug.dev/330775608): Enable.
-TEST_P(VersioningReplacementTest, DISABLED_BadMethodRemovedComposeNew) {
+TEST_P(VersioningReplacementTest, BadMethodRemovedComposeNew) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -220,8 +219,7 @@ protocol Base {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// TODO(https://fxbug.dev/330775608): Enable.
-TEST_P(VersioningReplacementTest, DISABLED_BadMethodRemovedComposeExisting) {
+TEST_P(VersioningReplacementTest, BadMethodRemovedComposeExisting) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -244,8 +242,7 @@ protocol Base {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// TODO(https://fxbug.dev/330775608): Enable.
-TEST_P(VersioningReplacementTest, DISABLED_GoodMethodReplacedComposeNew) {
+TEST_P(VersioningReplacementTest, GoodMethodReplacedComposeNew) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -268,8 +265,7 @@ protocol Base {
   EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].is_composed, GetParam() >= V2);
 }
 
-// TODO(https://fxbug.dev/330775608): Enable.
-TEST_P(VersioningReplacementTest, DISABLED_GoodMethodReplacedComposeExisting) {
+TEST_P(VersioningReplacementTest, GoodMethodReplacedComposeExisting) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;

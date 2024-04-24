@@ -95,9 +95,10 @@ void ReplacementStep::CheckMembers() {
     Decl* after = next->second;
     ZX_ASSERT_MSG(End(before) == Start(after), "multimap should preserve insertion order");
     Checker<std::string_view> checker(reporter());
-    before->ForEachMember(
+    before->ForEachMemberFlattened(
         [&](const Element* member) { checker.Insert(member->GetName(), member); });
-    after->ForEachMember([&](const Element* member) { checker.Check(member->GetName(), member); });
+    after->ForEachMemberFlattened(
+        [&](const Element* member) { checker.Check(member->GetName(), member); });
     checker.Finish();
   }
 }

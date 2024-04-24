@@ -154,6 +154,10 @@ struct Decl : public Element {
   // unlike Library::TraverseElements, it does not call `fn(this)`.
   void ForEachMember(const fit::function<void(Element*)>& fn);
 
+  // Like ForEachMember, but when the decl is a protocol, instead of visiting
+  // `composed_protocols` and `methods`, visits `all_methods`.
+  void ForEachMemberFlattened(const fit::function<void(Element*)>& fn);
+
   // Returns a clone of this decl for the given range, only including members
   // that intersect the range. Narrows the returned decl's availability, and its
   // members' availabilities, to the range.

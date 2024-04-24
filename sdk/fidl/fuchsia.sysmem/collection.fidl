@@ -309,21 +309,21 @@ closed protocol BufferCollectionToken {
     // See Node for non-deprecated equivalents.  Re-building existing code will
     // use the Node equivalents instead.  These ordinals will eventually not be
     // recognized by sysmem.
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict Sync() -> ();
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("Sync")
     strict DeprecatedSync() -> ();
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict Close();
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("Close")
     strict DeprecatedClose();
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict SetName(struct {
         priority uint32;
         name string:64;
@@ -336,7 +336,7 @@ closed protocol BufferCollectionToken {
         name string:64;
     });
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
@@ -349,7 +349,7 @@ closed protocol BufferCollectionToken {
         id uint64;
     });
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict SetDebugTimeoutLogDeadline(struct {
         deadline zx.Time;
     });
@@ -554,19 +554,19 @@ closed protocol BufferCollection {
     // See Node for non-deprecated equivalents.  Re-building existing code will
     // use the Node equivalents instead.  These ordinals will eventually not be
     // recognized by sysmem.
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict Sync() -> ();
     @available(added=9)
     @selector("Sync")
     strict DeprecatedSync() -> ();
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict Close();
     @available(added=9)
     @selector("Close")
     strict DeprecatedClose();
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict SetName(struct {
         priority uint32;
         name string:64;
@@ -578,7 +578,7 @@ closed protocol BufferCollection {
         name string:64;
     });
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
