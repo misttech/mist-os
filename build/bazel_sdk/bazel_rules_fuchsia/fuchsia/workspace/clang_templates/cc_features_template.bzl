@@ -160,9 +160,6 @@ _flag_groups = struct(
     werror = _make_flag_group_struct(
         cflags = [
             "-Werror",
-
-            # Deprecations print warnings instead of erroring out.
-            "-Wno-error=deprecated-declarations",
             "-Wa,--fatal-warnings",
         ],
     ),
