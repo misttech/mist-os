@@ -16,7 +16,7 @@ class ExampleTestCaseRevive(test_case_revive.TestCaseRevive):
 
     # TODO(https://fxbug.dev/332381215): mypy complains about this decorator not
     # being typed, but it is. Ignoring this for now, until we fix it.
-    @test_case_revive.tag_test(tag_name="revive_test_case")  # type: ignore[misc]
+    @test_case_revive.tag_test(tag_name="revive_test_case")
     def test_firmware_version(self) -> None:
         for fuchsia_device in self.fuchsia_devices:
             _LOGGER.info(

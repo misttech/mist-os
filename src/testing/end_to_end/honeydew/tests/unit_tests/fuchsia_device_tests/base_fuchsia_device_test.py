@@ -96,7 +96,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
             mock_ssh_check_connection.assert_called()
 
     # # List all the tests related to __init__
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -335,7 +335,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
         mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -384,7 +384,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
             level=parameterized_dict["log_level"],
         )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -506,7 +506,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Testcase for BaseFuchsiaDevice.register_for_on_device_boot()"""
         self.fd_obj.register_for_on_device_boot(fn=lambda: None)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {

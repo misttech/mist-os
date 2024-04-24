@@ -435,7 +435,7 @@ class FfxTests(unittest.TestCase):
 
         mock_ffx_run.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -498,7 +498,7 @@ class FfxTests(unittest.TestCase):
         )
         mock_ffx_run.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ({"label": "empty_output", "side_effect": b"[]"},),
             (
@@ -696,7 +696,7 @@ class FfxTests(unittest.TestCase):
             stdout="abc",
         )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -788,7 +788,7 @@ class FfxTests(unittest.TestCase):
 
         mock_subprocess_check_output.assert_called_once()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -845,7 +845,7 @@ class FfxTests(unittest.TestCase):
 
         mock_ffx_get_target_information.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ({"label": "empty_output", "side_effect": b"[]"},),
             (
@@ -887,7 +887,7 @@ class FfxTests(unittest.TestCase):
         self.ffx_obj_with_ip.wait_for_rcs_connection()
         mock_ffx_run.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -938,7 +938,7 @@ class FfxTests(unittest.TestCase):
         self.ffx_obj_with_ip.wait_for_rcs_disconnection()
         mock_ffx_run.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {

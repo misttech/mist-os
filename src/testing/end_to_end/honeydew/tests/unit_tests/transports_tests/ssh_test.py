@@ -181,7 +181,7 @@ class SshTests(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {

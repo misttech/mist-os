@@ -49,7 +49,7 @@ class TracingSL4FTests(unittest.TestCase):
         )
         self.sl4f_obj.reset_mock()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -86,7 +86,7 @@ class TracingSL4FTests(unittest.TestCase):
             with self.assertRaises(errors.FuchsiaStateError):
                 self.tracing_obj.initialize()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -113,7 +113,7 @@ class TracingSL4FTests(unittest.TestCase):
             self.tracing_obj.start()
             self.sl4f_obj.run.assert_any_call(method="tracing_facade.Start")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -152,7 +152,7 @@ class TracingSL4FTests(unittest.TestCase):
             self.tracing_obj.stop()
             self.sl4f_obj.run.assert_any_call(method="tracing_facade.Stop")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -184,7 +184,7 @@ class TracingSL4FTests(unittest.TestCase):
                 params={"results_destination": "Ignore"},
             )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {
@@ -247,7 +247,7 @@ class TracingSL4FTests(unittest.TestCase):
                 else:
                     self.assertRegex(trace_path, f"{tmpdir}/trace_.*.fxt")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {

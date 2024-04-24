@@ -39,6 +39,11 @@ warn_return_any = false
 # More info @ https://github.com/python/mypy/issues/9318
 disallow_subclassing_any = false
 
+# Allow decorators, calls without type annotations since some of our packages
+# don't have type annotations.
+allow_untyped_decorators = true
+allow_untyped_calls = true
+
 # 'yaml' module imports aren't working with the global
 # 'ignore_missing_imports' flag. Overriding using overridesr entry.
 [[tool.mypy.overrides]]

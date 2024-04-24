@@ -15,7 +15,7 @@ from honeydew.typing import custom_types
 class CustomTypesTests(unittest.TestCase):
     """Unit tests for honeydew.custom_types.py."""
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "valid_ipv4",
@@ -59,7 +59,7 @@ class CustomTypesTests(unittest.TestCase):
         )
         self.assertEqual(got, expected)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "valid_ipv4",
@@ -101,7 +101,7 @@ class CustomTypesTests(unittest.TestCase):
         got: custom_types.IpPort = custom_types.IpPort.create_using_ip(addr)
         self.assertEqual(got, expected)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("invalid", "some_str"),
             ("invalid_double_scope", "[::1%e%eth0]:100"),
@@ -117,7 +117,7 @@ class CustomTypesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             custom_types.IpPort.create_using_ip_and_port(addr)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("invalid", "some_str"),
             ("invalid_double_scope", "[::1%e%eth0]"),
@@ -129,7 +129,7 @@ class CustomTypesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             custom_types.IpPort.create_using_ip(addr)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "valid_ipv4_and_port",

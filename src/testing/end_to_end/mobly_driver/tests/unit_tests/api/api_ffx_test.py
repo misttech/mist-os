@@ -22,7 +22,7 @@ class FfxClientTest(unittest.TestCase):
         super().setUp()
         self.client = api_ffx.FfxClient("some_ffx_path")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "No default nodes",
@@ -53,7 +53,7 @@ class FfxClientTest(unittest.TestCase):
         self.assertEqual(res.all_nodes, want_all_nodes)
         self.assertEqual(res.default_nodes, want_default_nodes)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "timeout",
@@ -87,7 +87,7 @@ class FfxClientTest(unittest.TestCase):
         check_output_args = mock_check_output.call_args.args[0]
         self.assertIn("some_isolate_dir_path", check_output_args)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("Invalid JSON str", b""),
             ("Empty device JSON str", b"[{}]"),
@@ -129,7 +129,7 @@ class FfxClientTest(unittest.TestCase):
 
         mock_check_output.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "timeout",
@@ -172,7 +172,7 @@ class FfxClientTest(unittest.TestCase):
             )
         mock_check_output.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "::1",

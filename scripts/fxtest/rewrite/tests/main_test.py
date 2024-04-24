@@ -268,7 +268,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), 1)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [("--host", HOST_TESTS_IN_INPUT), ("--device", DEVICE_TESTS_IN_INPUT)]
     )
     async def test_selection_flags(
@@ -293,7 +293,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), expected_count)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("--use-package-hash", DEVICE_TESTS_IN_INPUT),
             ("--no-use-package-hash", 0),
@@ -337,7 +337,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             f"Prefixes were\n{self.prettyFormatPrefixes(call_prefixes)}",
         )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("default suggestions", [], 6),
             ("custom suggestion count", ["--suggestion-count=10"], 10),

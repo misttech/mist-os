@@ -82,7 +82,7 @@ class BluetoothAvrcpSL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ({"label": "play_command", "command": BluetoothAvrcpCommand.PLAY},),
             (

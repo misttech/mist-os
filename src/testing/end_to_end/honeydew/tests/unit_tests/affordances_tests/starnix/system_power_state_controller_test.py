@@ -320,7 +320,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
 
         self.mock_ffx.run.assert_called_once()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             param(
                 label="no_suspend",

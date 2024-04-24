@@ -448,7 +448,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called_once()
 
     # List all the tests related to private methods
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 {

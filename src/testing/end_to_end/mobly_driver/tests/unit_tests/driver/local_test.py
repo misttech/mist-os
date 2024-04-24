@@ -136,7 +136,7 @@ class LocalDriverTest(unittest.TestCase):
         mock_ffx_target_list.assert_called()
         mock_ffx_target_ssh_address.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "default_nodes exist, prefer all_nodes",
@@ -186,7 +186,7 @@ class LocalDriverTest(unittest.TestCase):
         mock_ffx_target_list.assert_called()
         mock_ffx_target_ssh_address.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("default_nodes exist, prefer default_nodes", ["dut_1"], ["dut_1"]),
             ("default_nodes empty, prefer all_nodes", [], ["dut_1", "dut_2"]),
@@ -273,7 +273,7 @@ class LocalDriverTest(unittest.TestCase):
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("Invalid JSON str", b""),
             ("No devices JSON str", b"[]"),

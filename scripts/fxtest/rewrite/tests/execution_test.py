@@ -78,7 +78,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(output)
         self.assertTrue(any([e.error is not None for e in events]))
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "with default log severity",
@@ -195,7 +195,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "test execution does not pass a --parallel by default",
@@ -330,7 +330,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 any([e.error is not None async for e in recorder.iter()])
             )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("without --e2e enabled", ["--no-e2e"], execution.TestSkipped),
             ("with --e2e enabled", ["--e2e"], execution.TestFailed),
