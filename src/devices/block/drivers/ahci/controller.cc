@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
-#include <threads.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/listnode.h>
@@ -99,7 +98,7 @@ void Controller::PrepareStop(fdf::PrepareStopCompleter completer) {
 
 bool Controller::ShouldExit() {
   fbl::AutoLock lock(&lock_);
-  return threads_should_exit_;
+  return shutdown_;
 }
 
 void Controller::WorkerLoop() {
@@ -128,16 +127,14 @@ void Controller::WorkerLoop() {
   }
 }
 
-// irq handler:
-
-int Controller::IrqLoop() {
+void Controller::IrqLoop() {
   for (;;) {
     zx_status_t status = bus_->InterruptWait();
     if (status != ZX_OK) {
       if (!ShouldExit()) {
         FDF_LOG(ERROR, "Error waiting for interrupt: %s", zx_status_get_string(status));
       }
-      return 0;
+      return;
     }
     // mask hba interrupts while interrupts are being handled
     uint32_t ghc = RegRead(kHbaGlobalHostControl);
@@ -167,7 +164,7 @@ int Controller::IrqLoop() {
 
 zx_status_t Controller::Init() {
   zx_status_t status;
-  if ((status = LaunchIrqAndWorkerThreads()) != ZX_OK) {
+  if ((status = LaunchIrqAndWorkerDispatchers()) != ZX_OK) {
     FDF_LOG(ERROR, "Failed to start controller irq and worker threads: %s",
             zx_status_get_string(status));
     return status;
@@ -242,17 +239,27 @@ zx_status_t Controller::Init() {
   return ZX_OK;
 }
 
-zx_status_t Controller::LaunchIrqAndWorkerThreads() {
-  // TODO(b/324291694): Switch to using DF's dispatcher thread.
-  zx_status_t status = irq_thread_.CreateWithName(IrqThread, this, "ahci-irq");
+zx_status_t Controller::LaunchIrqAndWorkerDispatchers() {
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ahci-irq",
+      [&](fdf_dispatcher_t*) { irq_shutdown_completion_.Signal(); });
+  if (dispatcher.is_error()) {
+    FDF_LOG(ERROR, "Failed to create irq dispatcher: %s",
+            zx_status_get_string(dispatcher.status_value()));
+    return dispatcher.status_value();
+  }
+  irq_dispatcher_ = *std::move(dispatcher);
+
+  zx_status_t status = async::PostTask(irq_dispatcher_.async_dispatcher(), [this] { IrqLoop(); });
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Error creating irq thread: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Error creating irq loop: %s", zx_status_get_string(status));
     return status;
   }
 
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+  worker_shutdown_.store(false);
+  dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ahci-worker",
-      [&](fdf_dispatcher_t*) { worker_shutdown_completion_.Signal(); });
+      [&](fdf_dispatcher_t*) { worker_shutdown_.store(true); });
   if (dispatcher.is_error()) {
     FDF_LOG(ERROR, "Failed to create dispatcher: %s",
             zx_status_get_string(dispatcher.status_value()));
@@ -269,21 +276,28 @@ zx_status_t Controller::LaunchIrqAndWorkerThreads() {
 }
 
 void Controller::Shutdown() {
-  if (worker_dispatcher_.get()) {
-    {
-      fbl::AutoLock lock(&lock_);
-      threads_should_exit_ = true;
-    }
-
-    // Signal the worker loop.
-    worker_event_completion_.Signal();
-    worker_dispatcher_.ShutdownAsync();
-    worker_shutdown_completion_.Wait();
+  {
+    fbl::AutoLock lock(&lock_);
+    shutdown_ = true;
   }
 
-  // Signal the interrupt thread to exit.
+  if (worker_dispatcher_.get() && !worker_shutdown_.load()) {
+    worker_dispatcher_.ShutdownAsync();
+    // TODO(https://fxbug.dev/42061061): This driver may be missing a watchdog-like capability to
+    // check in on in-flight device requests to detect timeouts. The polling here implements the
+    // watchdog only for the shutdown case, but a more general solution may be needed.
+    while (!worker_shutdown_.load()) {
+      worker_event_completion_.Signal();
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+    }
+  }
+
+  // Signal the interrupt loop to exit.
   bus_->InterruptCancel();
-  irq_thread_.Join();
+  if (irq_dispatcher_.get() && !irq_shutdown_completion_.signaled()) {
+    irq_dispatcher_.ShutdownAsync();
+    irq_shutdown_completion_.Wait();
+  }
 }
 
 zx::result<std::unique_ptr<Bus>> Controller::CreateBus() {
