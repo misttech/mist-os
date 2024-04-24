@@ -307,9 +307,7 @@ constexpr inline duration min(int64_t n) { return duration(ZX_MIN(n)); }
 
 constexpr inline duration hour(int64_t n) { return duration(ZX_HOUR(n)); }
 
-inline zx_status_t nanosleep(zx::time deadline) ZX_AVAILABLE_SINCE(7) {
-  return zx_nanosleep(deadline.get());
-}
+zx_status_t nanosleep(zx::time deadline) ZX_AVAILABLE_SINCE(7);
 
 inline time deadline_after(zx::duration nanoseconds) ZX_AVAILABLE_SINCE(7) {
   return time(zx_deadline_after(nanoseconds.get()));
