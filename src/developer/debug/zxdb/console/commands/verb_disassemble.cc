@@ -78,6 +78,8 @@ Examples
 
   disassemble *pc - 0x10   # arm64
   disassemble *rip - 0x10  # x64
+  disassemble -- -0x10
+  disassemble -- +0x10
       Disassembles instructions starting at the active thread's PC with relative
       byte offset.
 )";
@@ -149,7 +151,24 @@ void RunDisassembleVerb(const Command& cmd, fxl::RefPtr<CommandContext> cmd_cont
   if (cmd.args().size() > 1) {
     return cmd_context->ReportError(
         Err("\"disassemble\" requires exactly one argument specifying a location."));
-  } else if (cmd.args().empty()) {
+  } else if (cmd.args().empty() || cmd.args()[0][0] == '+' || cmd.args()[0][0] == '-') {
+    int64_t offset = 0;
+    if (!cmd.args().empty()) {
+      std::string number = cmd.args()[0];
+
+      // Need to trim the leading "+" for the integer parser.
+      if (number[0] == '+') {
+        number = number.substr(1);
+      }
+
+      auto err = StringToInt64(number, &offset);
+
+      if (err.has_error()) {
+        return cmd_context->ReportError(
+            Err("pc relative byte offset input did not parse as a number: %s", err.msg().c_str()));
+      }
+    }
+
     // No args: implicitly read the frame's instruction pointer.
     //
     // TODO(brettw) by default it would be nice if this showed a few lines of disassembly before the
@@ -165,7 +184,7 @@ void RunDisassembleVerb(const Command& cmd, fxl::RefPtr<CommandContext> cmd_cont
     Location location = frame->GetLocation();
 
     // Schedule memory request.
-    process->ReadMemory(location.address(), size,
+    process->ReadMemory(location.address() + offset, size,
                         [cmd_context, options, weak_process](const Err& err, MemoryDump dump) {
                           CompleteDisassemble(cmd_context, err, std::move(dump),
                                               std::move(weak_process), options);
