@@ -179,6 +179,7 @@ group("non_hermetic_deps") {
 
   # Products which use Bazel-based assembly have non-hermetic outputs
   visibility += [
+    "//products/microfuchsia:*",
     "//products/minimal:*",
     "//products/workbench:*",
   ]

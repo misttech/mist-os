@@ -1,0 +1,89 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "ARCH",
+    "BUILD_TYPES",
+    "fuchsia_elf_sizes",
+    "fuchsia_prebuilt_package",
+    "fuchsia_product",
+    "fuchsia_product_bundle",
+    "fuchsia_product_configuration",
+    "fuchsia_virtual_device",
+)
+
+package(default_visibility = [
+    "//build/bazel/assembly:__pkg__",
+])
+
+fuchsia_virtual_device(
+    name = "microfuchsia_emu",
+    arch = ARCH.X64,
+    device_name = "microfuchsia_emu",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle_eng.x64",
+    board_name = "x64",
+    default_virtual_device = ":microfuchsia_emu",
+    main = ":microfuchsia_eng.x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
+    product_bundle_name = "microfuchsia_eng",
+    recovery = "//products/zedboot:x64",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+    update_version_file = "//build/info:version",
+    virtual_devices = [
+        ":microfuchsia_emu",
+    ],
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle_eng.arm64",
+    board_name = "arm64",
+    main = ":microfuchsia_eng.arm64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
+    product_bundle_name = "microfuchsia_eng",
+    recovery = "//products/zedboot:arm64",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+    update_version_file = "//build/info:version",
+)
+
+fuchsia_product(
+    name = "microfuchsia_eng.x64",
+    board_config = "//boards:x64",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product(
+    name = "microfuchsia_eng.arm64",
+    board_config = "//boards:arm64",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.x64",
+    product = ":microfuchsia_eng.x64",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.arm64",
+    product = ":microfuchsia_eng.arm64",
+)
+
+fuchsia_product_configuration(
+    name = "assembly_config_eng",
+    product_config_json = {
+        "platform": {
+            "build_type": BUILD_TYPES.ENG,
+            "feature_set_level": "embeddable",
+        },
+    },
+)
