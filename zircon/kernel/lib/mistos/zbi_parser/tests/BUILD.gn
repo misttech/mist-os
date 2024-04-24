@@ -1,0 +1,19 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+import("//build/zbi/zbi.gni")
+import("//build/zbi/zbi_input.gni")
+
+source_set("tests") {
+  sources = [
+    "bootfs-test.cc",
+    #"option-test.cc",
+  ]
+  deps = [
+    "//zircon/kernel/lib/mistos/zbi_parser",
+    "//zircon/kernel/lib/mistos/zx",
+    "//zircon/system/ulib/zxtest:zxtest-mistos",
+  ]
+}
