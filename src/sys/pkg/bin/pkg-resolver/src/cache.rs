@@ -479,21 +479,24 @@ pub struct BlobFetcher {
 }
 
 impl BlobFetcher {
-    /// Creates an unbounded queue that will fetch up to  `max_concurrency`
-    /// blobs at once.
+    /// Creates an unbounded queue that will fetch up to `max_concurrency` blobs at once.
+    /// Returns:
+    ///   1. a Future to be awaited that processes the queue
+    ///   2. a Self that enables pushing work onto the queue
     pub fn new(
         node: fuchsia_inspect::Node,
         max_concurrency: usize,
         stats: Arc<Mutex<Stats>>,
         cobalt_sender: ProtocolSender<MetricEvent>,
         blob_fetch_params: BlobFetchParams,
-    ) -> (impl Future<Output = ()>, BlobFetcher) {
+    ) -> (impl Future<Output = ()>, Self) {
         let http_client = Arc::new(fuchsia_hyper::new_https_client_from_tcp_options(
             fuchsia_hyper::TcpOptions::keepalive_timeout(TCP_KEEPALIVE_TIMEOUT),
         ));
+        let weak_node = node.clone_weak();
         let inspect = inspect::BlobFetcher::from_node_and_params(node, &blob_fetch_params);
 
-        let (blob_fetch_queue, blob_fetcher) = work_queue::work_queue(
+        let (queue, sender) = work_queue::work_queue(
             max_concurrency,
             move |merkle: BlobId, context: FetchBlobContext| {
                 let inspect = inspect.fetch(&merkle);
@@ -516,8 +519,9 @@ impl BlobFetcher {
                 }
             },
         );
+        weak_node.record_lazy_child("raw_queue", queue.record_lazy_inspect());
 
-        (blob_fetch_queue.into_future(), BlobFetcher { sender: blob_fetcher })
+        (queue.into_future(), BlobFetcher { sender })
     }
 
     /// Enqueue the given blob to be fetched, or attach to an existing request to

@@ -12,7 +12,7 @@ use {
     fuchsia_sync::Mutex,
     futures::{
         channel::mpsc,
-        future::Shared,
+        future::{BoxFuture, Shared},
         prelude::*,
         ready,
         stream::{FusedStream, FuturesUnordered},
@@ -264,6 +264,51 @@ where
                 // value was successful or not.
                 Poll::Ready(Some(key))
             }
+        }
+    }
+}
+
+impl<W, K, C> WorkQueue<W, K, C>
+where
+    W: Work<K, C>,
+    <<W as Work<K, C>>::Future as futures::Future>::Output: Send + Sync + 'static,
+    K: std::fmt::Debug + Send + 'static,
+    C: Send + 'static,
+{
+    /// Returns a callback to be given to `fuchsia_inspect::Node::record_lazy_child`.
+    /// Records the keys of the queue using their Debug format along with the number of
+    /// corresponding tasks that are running and pending.
+    pub fn record_lazy_inspect(
+        &self,
+    ) -> impl Fn() -> BoxFuture<'static, Result<fuchsia_inspect::Inspector, anyhow::Error>>
+           + Send
+           + Sync
+           + 'static {
+        let tasks = Arc::downgrade(&self.tasks);
+        move || {
+            let tasks = tasks.clone();
+            async move {
+                let inspector = fuchsia_inspect::Inspector::default();
+                if let Some(tasks) = tasks.upgrade() {
+                    // Drop the lock before the inspect operations in case they are slow.
+                    let tasks = {
+                        tasks
+                            .lock()
+                            .iter()
+                            .map(|(k, v)| (format!("{k:?}"), (v.running(), v.pending())))
+                            .collect::<Vec<_>>()
+                    };
+                    let root = inspector.root();
+                    for (k, (running, pending)) in tasks {
+                        root.record_child(k, |n| {
+                            n.record_uint("running", running as u64);
+                            n.record_uint("pending", pending as u64);
+                        })
+                    }
+                }
+                Ok(inspector)
+            }
+            .boxed()
         }
     }
 }
@@ -891,5 +936,56 @@ mod tests {
         assert_eq!(executor.run_until(task_c2), Ok(()));
         assert_eq!(done.take(), vec!["dup"]);
         running.assert_empty();
+    }
+
+    #[fuchsia::test]
+    async fn inspect() {
+        // Notify the test when the tasks are running.
+        let (sender, mut receiver) = futures::channel::mpsc::channel(0);
+        let do_work = move |_: String, _: MergeEqual| {
+            let mut sender = sender.clone();
+            async move {
+                let () = sender.send(()).await.unwrap();
+                let () = futures::future::pending().await;
+                Ok::<_, ()>(())
+            }
+        };
+        let (mut processor, enqueue) = work_queue(2, do_work);
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        inspector.root().record_lazy_child("queue", processor.record_lazy_inspect());
+        fuchsia_async::Task::spawn(async move { while let Some(_) = processor.next().await {} })
+            .detach();
+
+        // Inspect empty before queue is used.
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
+            "queue": {}
+        });
+
+        // Inspect populated when queue non-empty.
+        let _a0 = enqueue.push("a".into(), MergeEqual(0));
+        let _b0 = enqueue.push("b".into(), MergeEqual(0));
+        let _a1 = enqueue.push("a".into(), MergeEqual(1));
+        let _c0 = enqueue.push("c".into(), MergeEqual(0));
+
+        let () = receiver.next().await.unwrap();
+        let () = receiver.next().await.unwrap();
+
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
+            "queue": {
+                r#""a""#: {
+                    "running": 1u64,
+                    "pending": 1u64,
+                },
+                r#""b""#: {
+                    "running": 1u64,
+                    "pending": 0u64,
+                },
+                r#""c""#: {
+                    "running": 0u64,
+                    "pending": 1u64,
+                },
+            }
+        });
     }
 }
