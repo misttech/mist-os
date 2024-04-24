@@ -18,8 +18,7 @@ mod test_topology;
 mod utils;
 
 async fn wait_for_single_counter_inspect(ns: &InstalledNamespace) {
-    let accessor =
-        connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(ns.prefix()).unwrap();
+    let accessor = connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(&ns).unwrap();
     let _ = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector(format!("{}:root", test_topology::COUNTER_NAME))
@@ -35,13 +34,10 @@ async fn wait_for_single_counter_inspect(ns: &InstalledNamespace) {
 #[fuchsia::test]
 async fn event_count_sampler_test() {
     let ns = test_topology::create_realm().await.expect("initialized topology");
-    let test_app_controller =
-        connect_to_protocol_at::<SamplerTestControllerMarker>(ns.prefix()).unwrap();
+    let test_app_controller = connect_to_protocol_at::<SamplerTestControllerMarker>(&ns).unwrap();
     wait_for_single_counter_inspect(&ns).await;
-    let reboot_controller =
-        connect_to_protocol_at::<MockRebootControllerMarker>(ns.prefix()).unwrap();
-    let logger_querier =
-        connect_to_protocol_at::<MetricEventLoggerQuerierMarker>(ns.prefix()).unwrap();
+    let reboot_controller = connect_to_protocol_at::<MockRebootControllerMarker>(&ns).unwrap();
+    let logger_querier = connect_to_protocol_at::<MetricEventLoggerQuerierMarker>(&ns).unwrap();
     let _sampler_binder = connect_to_protocol_at_path::<BinderMarker>(format!(
         "{}/fuchsia.component.SamplerBinder",
         ns.prefix()
@@ -133,13 +129,10 @@ async fn event_count_sampler_test() {
 #[fuchsia::test]
 async fn reboot_server_crashed_test() {
     let ns = test_topology::create_realm().await.expect("initialized topology");
-    let test_app_controller =
-        connect_to_protocol_at::<SamplerTestControllerMarker>(ns.prefix()).unwrap();
+    let test_app_controller = connect_to_protocol_at::<SamplerTestControllerMarker>(&ns).unwrap();
     wait_for_single_counter_inspect(&ns).await;
-    let reboot_controller =
-        connect_to_protocol_at::<MockRebootControllerMarker>(ns.prefix()).unwrap();
-    let logger_querier =
-        connect_to_protocol_at::<MetricEventLoggerQuerierMarker>(ns.prefix()).unwrap();
+    let reboot_controller = connect_to_protocol_at::<MockRebootControllerMarker>(&ns).unwrap();
+    let logger_querier = connect_to_protocol_at::<MetricEventLoggerQuerierMarker>(&ns).unwrap();
     let _sampler_binder = connect_to_protocol_at_path::<BinderMarker>(format!(
         "{}/fuchsia.component.SamplerBinder",
         ns.prefix()
@@ -200,8 +193,7 @@ async fn sampler_inspect_test() {
     .unwrap();
 
     let hierarchy = loop {
-        let accessor =
-            connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(ns.prefix()).unwrap();
+        let accessor = connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(&ns).unwrap();
         // Observe verification shows up in inspect.
         let mut data = ArchiveReader::new()
             .with_archive(accessor)

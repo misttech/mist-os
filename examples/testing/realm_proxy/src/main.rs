@@ -32,13 +32,13 @@ async fn test_example() {
 
     info!("connected to the test realm!");
 
-    let echo = connect_to_protocol_at::<fecho::EchoMarker>(test_ns.prefix()).unwrap();
+    let echo = connect_to_protocol_at::<fecho::EchoMarker>(&test_ns).unwrap();
     let response = echo.echo_string(Some("hello")).await.unwrap().unwrap();
     assert_eq!(response, "hello");
 
     let echo = connect_to_protocol_at_path::<fecho::EchoMarker>(&format!(
         "{}/reverse-echo",
-        test_ns.prefix()
+        test_ns.prefix(),
     ))
     .unwrap();
     let response = echo.echo_string(Some("hello")).await.unwrap().unwrap();

@@ -29,7 +29,7 @@ async fn test_example() -> Result<()> {
     let realm_options = ftest::RealmOptions { ..Default::default() };
     let test_ns = create_realm(realm_options).await?;
 
-    let echo = connect_to_protocol_at::<EchoMarker>(test_ns.prefix())?;
+    let echo = connect_to_protocol_at::<EchoMarker>(&test_ns)?;
     let response = echo.echo_string("hello").await?;
     info!("response: {:?}", response);
 

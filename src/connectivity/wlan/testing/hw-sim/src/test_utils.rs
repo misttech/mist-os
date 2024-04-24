@@ -97,7 +97,7 @@ impl TestRealmContext {
 
         // Start the driver test realm
         let driver_test_realm_proxy =
-            connect_to_protocol_at::<fidl_driver_test::RealmMarker>(test_ns.prefix())
+            connect_to_protocol_at::<fidl_driver_test::RealmMarker>(&test_ns)
                 .expect("Failed to connect to driver test realm");
 
         let (pkg_client, pkg_server) = create_endpoints();

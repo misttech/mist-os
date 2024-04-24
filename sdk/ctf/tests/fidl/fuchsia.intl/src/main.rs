@@ -28,9 +28,8 @@ async fn create_realm(options: RealmOptions) -> Result<InstalledNamespace> {
 async fn set_then_get() -> Result<()> {
     let realm_options = RealmOptions::default();
     let test_ns = create_realm(realm_options).await?;
-    let intl = connect_to_protocol_at::<fsettings::IntlMarker>(test_ns.prefix())?;
-    let property_provider =
-        connect_to_protocol_at::<fintl::PropertyProviderMarker>(test_ns.prefix())?;
+    let intl = connect_to_protocol_at::<fsettings::IntlMarker>(&test_ns)?;
+    let property_provider = connect_to_protocol_at::<fintl::PropertyProviderMarker>(&test_ns)?;
     let mut event_stream = property_provider.take_event_stream();
 
     // This warms up the intl services component and the set_ui component, avoiding potential

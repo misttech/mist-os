@@ -49,6 +49,12 @@ impl Drop for InstalledNamespace {
     }
 }
 
+impl AsRef<str> for &InstalledNamespace {
+    fn as_ref(&self) -> &str {
+        self.prefix()
+    }
+}
+
 /// Converts the given dictionary to a namespace and adds it this component's namespace,
 /// thinly wrapped by the returned [InstalledNamespace].
 ///
