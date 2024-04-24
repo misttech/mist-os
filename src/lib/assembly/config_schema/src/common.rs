@@ -4,7 +4,26 @@
 
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+pub fn path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <String>::json_schema(gen).into();
+    schema.format = Some("Utf8PathBuf".to_owned());
+    schema.into()
+}
+
+pub fn vec_path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <Vec<String>>::json_schema(gen).into();
+    schema.format = Some("Vec<Utf8PathBuf>".to_owned());
+    schema.into()
+}
+
+pub fn option_path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <Option<String>>::json_schema(gen).into();
+    schema.format = Some("Option<Utf8PathBuf>".to_owned());
+    schema.into()
+}
 
 /// These are the package sets that a package can belong to.
 ///
@@ -13,7 +32,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// NOTE: Not all of the sets defined in the RFC are currently supported by this
 /// enum.  They are being added as they are needed by assembly.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PackageSet {
     /// The packages in this set are stored in the pkg-cache, and are not
@@ -71,19 +90,23 @@ impl std::fmt::Display for PackageSet {
 }
 
 /// Details about a package that contains drivers.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DriverDetails {
     /// The package containing the driver.
+    #[schemars(schema_with = "path_schema")]
     pub package: Utf8PathBuf,
 
     /// The driver components within the package, e.g. meta/foo.cm.
+    #[schemars(schema_with = "vec_path_schema")]
     pub components: Vec<Utf8PathBuf>,
 }
 
 /// This defines one or more drivers in a package, and which package set they
 /// belong to.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct PackagedDriverDetails {
     /// The package containing the driver.
@@ -93,11 +116,14 @@ pub struct PackagedDriverDetails {
     pub set: PackageSet,
 
     /// The driver components within the package, e.g. meta/foo.cm.
+    #[schemars(schema_with = "vec_path_schema")]
     pub components: Vec<Utf8PathBuf>,
 }
 
 /// This defines a package, and which package set it belongs to.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct PackageDetails {
     /// A package to add.
@@ -112,7 +138,7 @@ pub(crate) type PackageName = String;
 
 /// Options for features that may either be forced on, forced off, or allowed
 /// to be either on or off. Features default to disabled.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 #[derive(Default)]

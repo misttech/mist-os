@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the connectivity area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConnectivityConfig {
     #[serde(default)]
@@ -22,7 +23,7 @@ pub struct PlatformConnectivityConfig {
 }
 
 /// Platform configuration options for the network area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformNetworkConfig {
     /// Only used to control networking for the `utility` and `minimal`
@@ -33,12 +34,15 @@ pub struct PlatformNetworkConfig {
     pub netstack_version: NetstackVersion,
 
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub netcfg_config_path: Option<Utf8PathBuf>,
 
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub netstack_config_path: Option<Utf8PathBuf>,
 
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub google_maps_api_key_path: Option<Utf8PathBuf>,
 
     /// Controls how long the http client will wait when it is idle before it
@@ -63,7 +67,7 @@ pub struct PlatformNetworkConfig {
 }
 
 /// Network stack version to use.
-#[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NetstackVersion {
     #[default]
@@ -73,7 +77,7 @@ pub enum NetstackVersion {
 }
 
 /// Which networking type to use (standard or basic).
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NetworkingConfig {
     /// The standard network configuration
@@ -85,7 +89,7 @@ pub enum NetworkingConfig {
 }
 
 /// Platform configuration options for the wlan area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformWlanConfig {
     /// Enable the use of legacy security types like WEP and/or WPA1.
@@ -102,7 +106,7 @@ pub struct PlatformWlanConfig {
     pub policy_layer: WlanPolicyLayer,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WlanPolicyLayer {
     /// Use the Fuchsia platform's built-in policy layer, `wlancfg`, to configure and manage the
@@ -114,13 +118,13 @@ pub enum WlanPolicyLayer {
     ViaWlanix,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WlanRecoveryProfile {
     ThresholdedRecovery,
 }
 
-#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WlanRoamingProfile {
     #[default]
@@ -129,18 +133,19 @@ pub enum WlanRoamingProfile {
     StationaryRoaming,
 }
 /// Platform configuration options to use for the mdns area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MdnsConfig {
     /// Enable a wired service so that ffx can discover the device.
     pub publish_fuchsia_dev_wired_service: Option<bool>,
 
     /// Service config file.
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub config: Option<Utf8PathBuf>,
 }
 
 /// Platform configuration options to use for the thread area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ThreadConfig {
     /// Include the LoWPAN service.
@@ -149,7 +154,7 @@ pub struct ThreadConfig {
 }
 
 /// Platform configuration options to use for the weave area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WeaveConfig {
     /// The URL of the weave component.

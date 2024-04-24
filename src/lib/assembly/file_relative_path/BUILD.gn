@@ -18,6 +18,7 @@ rustc_library("file_relative_path") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:pathdiff",
+    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
   ]
   test_deps = [ "//third_party/rust_crates:serde_json" ]

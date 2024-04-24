@@ -8,6 +8,7 @@ use crate::PackageDetails;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_util::{CompiledPackageDestination, FileEntry};
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -18,7 +19,7 @@ use crate::product_config::ProductConfig;
 /// that takes a more abstract description of what is desired in the assembled
 /// product images, and then generates the complete Image Assembly configuration
 /// (`crate::config::ImageAssemblyConfig`) from that.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfig {
     pub platform: PlatformConfig,

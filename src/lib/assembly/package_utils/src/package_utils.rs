@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use assembly_util::{impl_path_type_marker, PathTypeMarker, TypedPathBuf};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// PackageIdentity is an opaque type that allows for the string that's used as
 /// a package's identity to be evolved over time, compared with other instances,
 /// and used as a key in maps / sets.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, JsonSchema)]
 struct PackageIdentity(String);
 
 impl std::str::FromStr for PackageIdentity {
@@ -20,6 +21,7 @@ impl std::str::FromStr for PackageIdentity {
 }
 
 /// The marker trait for paths within a package
+#[derive(JsonSchema)]
 pub struct InternalPathMarker {}
 impl_path_type_marker!(InternalPathMarker);
 
@@ -28,6 +30,7 @@ pub type PackageInternalPathBuf = TypedPathBuf<InternalPathMarker>;
 
 /// The marker trait for the source path when that's ambiguous (like in a list
 /// of source to destination paths)
+#[derive(JsonSchema)]
 pub struct SourcePathMarker {}
 impl_path_type_marker!(SourcePathMarker);
 
@@ -36,6 +39,7 @@ impl_path_type_marker!(SourcePathMarker);
 pub type SourcePathBuf = TypedPathBuf<SourcePathMarker>;
 
 /// The marker trait for paths to a PackageManifest
+#[derive(JsonSchema)]
 pub struct PackageManifestPathMarker {}
 impl_path_type_marker!(PackageManifestPathMarker);
 

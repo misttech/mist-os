@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub enum ICUType {
     /// Use assembly to define the setui config.  Use the unflavored setui
@@ -21,7 +22,7 @@ pub enum ICUType {
 }
 
 /// Platform configuration options for the input area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetUiConfig {
     /// If set, the setui config is added to the product configuration.
@@ -34,11 +35,14 @@ pub struct SetUiConfig {
     pub with_camera: bool,
 
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub display: Option<Utf8PathBuf>,
 
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub interface: Option<Utf8PathBuf>,
 
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub agent: Option<Utf8PathBuf>,
 }

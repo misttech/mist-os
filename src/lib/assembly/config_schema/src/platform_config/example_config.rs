@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// This struct configures the example subsystem which is used for
 /// documentation and testing. The example subsystem is only configured
 /// when the example enabled option is set.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct ExampleConfig {
     // Whether to include the example AIB in the build.
     pub include_example_aib: bool,

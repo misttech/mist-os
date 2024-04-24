@@ -27,3 +27,5 @@ pub use platform_config::{
     intl_config::IntlConfig,
     BuildType, FeatureSupportLevel,
 };
+
+use common::{option_path_schema, path_schema, vec_path_schema};

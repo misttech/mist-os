@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The type if intl configuration to be used.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Type {
     /// Intl services are not used at all. Some very basic configurations such
@@ -40,7 +41,7 @@ impl std::fmt::Display for Type {
 }
 
 /// Platform configuration options for the input area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct IntlConfig {
     /// The intl configuration type in use.  If unspecified, the Type::Default

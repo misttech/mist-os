@@ -4,12 +4,13 @@
 
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf, SourcePathBuf};
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::common::DriverDetails;
 
 /// The Product-provided configuration details.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductConfig {
     #[serde(default)]
@@ -61,7 +62,7 @@ pub struct ProductConfig {
 ///   }
 /// ```
 ///
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductPackagesConfig {
     /// Paths to package manifests, or more detailed json entries for packages
@@ -78,7 +79,7 @@ pub struct ProductPackagesConfig {
 }
 
 /// Describes in more detail a package to add to the assembly.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductPackageDetails {
     /// Path to the package manifest for this package.
@@ -103,7 +104,7 @@ impl From<&str> for ProductPackageDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductConfigData {
     /// Path to the config file on the host.
@@ -114,7 +115,7 @@ pub struct ProductConfigData {
 }
 
 /// Configuration options for product info.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductInfoConfig {
     /// Name of the product.
@@ -126,27 +127,32 @@ pub struct ProductInfoConfig {
 }
 
 /// Configuration options for build info.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BuildInfoConfig {
     /// Name of the product build target.
     pub name: String,
     /// Path to the version file.
+    #[schemars(schema_with = "crate::path_schema")]
     pub version: Utf8PathBuf,
     /// Path to the jiri snapshot.
+    #[schemars(schema_with = "crate::path_schema")]
     pub jiri_snapshot: Utf8PathBuf,
     /// Path to the latest commit date.
+    #[schemars(schema_with = "crate::path_schema")]
     pub latest_commit_date: Utf8PathBuf,
     /// Path to the minimum UTC stamp.
+    #[schemars(schema_with = "crate::path_schema")]
     pub minimum_utc_stamp: Utf8PathBuf,
 }
 
 /// Configuration options for the component policy.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ComponentPolicyConfig {
     /// The file paths to a product-provided component policies.
     #[serde(default)]
+    #[schemars(schema_with = "crate::vec_path_schema")]
     pub product_policies: Vec<Utf8PathBuf>,
 }
 

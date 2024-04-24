@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub mod battery_config;
@@ -35,7 +36,7 @@ pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// The minimum service-level that the platform will provide, or the main
@@ -202,7 +203,7 @@ pub struct PlatformConfig {
 ///
 /// The standard (default) level is `Minimal`. It is the level that should be
 /// used by products' main system.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 pub enum FeatureSupportLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
     ///
@@ -248,7 +249,7 @@ pub enum FeatureSupportLevel {
 /// These control security and behavioral settings within the platform, and can
 /// change the platform packages placed into the assembled product image.
 ///
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub enum BuildType {
     #[serde(rename = "eng")]
     Eng,

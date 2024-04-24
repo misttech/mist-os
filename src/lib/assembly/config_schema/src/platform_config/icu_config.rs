@@ -4,9 +4,10 @@
 
 use include_str_from_working_dir::include_str_from_working_dir_env;
 use once_cell::sync::Lazy;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema)]
 pub struct ICUMap(pub std::collections::HashMap<Revision, String>);
 
 // See `rustenv` in //src/lib/assembly/config_schema:config_schema.
@@ -17,7 +18,7 @@ pub static ICU_CONFIG_INFO: Lazy<ICUMap> = Lazy::new(|| {
     .unwrap()
 });
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Hash, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Hash, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Revision {
     /// Whatever revision is currently 'default'.
@@ -51,7 +52,7 @@ impl std::fmt::Display for Revision {
 }
 
 /// System assembly configuration for the ICU subsystem.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone, JsonSchema)]
 pub struct ICUConfig {
     /// The revision (corresponding to either one of the labels, or a git commit ID) of the ICU
     /// library to use in system assembly. This revision is constrained to the commit IDs available

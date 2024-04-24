@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Configuration options for the forensics area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ForensicsConfig {
     #[serde(default)]
@@ -16,7 +17,7 @@ pub struct ForensicsConfig {
 }
 
 /// Configuration options for the feedback configuration area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FeedbackConfig {
     #[serde(default)]
@@ -30,9 +31,10 @@ pub struct FeedbackConfig {
 }
 
 /// Configuration options for the cobalt configuration area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CobaltConfig {
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub api_key: Option<Utf8PathBuf>,
 }

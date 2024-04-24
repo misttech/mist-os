@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A representative struct of all the configurable details of the software delivery system made
 /// available to a product owner
-#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 #[serde(rename(serialize = "software_delivery"))]
 #[serde(rename(deserialize = "software_delivery"))]
@@ -15,13 +16,14 @@ pub struct SwdConfig {
     pub policy: Option<PolicyLabels>,
     pub update_checker: Option<UpdateChecker>,
     pub on_verification_failure: VerificationFailureAction,
+    #[schemars(schema_with = "crate::vec_path_schema")]
     pub tuf_config_paths: Vec<Utf8PathBuf>,
     pub include_configurator: bool,
 }
 
 /// The SWD Policies are laid out in
 /// [RFC-0118](https://https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0118_swd_policy_at_image_assembly_rfc)
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyLabels {
     BaseComponentsOnly,
@@ -31,7 +33,7 @@ pub enum PolicyLabels {
 
 /// The UpdateChecker enum represents the particular implementation of the
 /// update-checker tool on the target that the `update` package depends on
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateChecker {
     /// Omaha-client is the default update checker on userdebug and user builds.
@@ -42,7 +44,7 @@ pub enum UpdateChecker {
 
 /// Defines the behavior of the system-update-committer package when update
 /// verification fails
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum VerificationFailureAction {
@@ -52,11 +54,12 @@ pub enum VerificationFailureAction {
 }
 
 /// Configuration for the Omaha Client
-#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub struct OtaConfigs {
     /// Deserializes to the ChannelConfig struct defined by SWD in
     /// //src/sys/pkg/lib/channel-config
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub channels_path: Option<Utf8PathBuf>,
     /// If not specified, the hard-coded value in omaha-client-bin will be
     /// used
@@ -73,7 +76,7 @@ type ServerUrl = String;
 
 /// Allows the product owner to define the values that the Omaha Client's
 /// FuchsiaPolicy implementation is configured with.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PolicyConfig {
     pub allow_reboot_when_idle: bool,
