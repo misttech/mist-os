@@ -185,10 +185,16 @@ TEST_F(ResolvePtrRefTest, GetPointedToType_NoPointedToType) {
   // Pointer to nothing.
   auto ptr_type = fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType, LazySymbol());
 
+  // Don't supply the option to include void* in the results.
   fxl::RefPtr<Type> pointed_to;
   Err err = GetPointedToType(eval_context, ptr_type.get(), &pointed_to);
   EXPECT_TRUE(err.has_error());
   EXPECT_EQ("Can not dereference a pointer to 'void'.", err.msg());
+
+  // Now with the option it should not return an error, but |pointed_to| will be null.
+  err = GetPointedToType(eval_context, ptr_type.get(), &pointed_to, PointedToOptions::kIncludeVoid);
+  EXPECT_TRUE(err.ok());
+  EXPECT_EQ(pointed_to.get(), nullptr);
 }
 
 TEST_F(ResolvePtrRefTest, GetPointedToType_Good) {

@@ -151,7 +151,7 @@ TEST_F(ExprTest, LogicalOrShortCircuit) {
 
   result = Eval("0 || nonexistant", eval_context);
   EXPECT_TRUE(result.has_error());
-  EXPECT_EQ("MockEvalContext::GetVariableValue 'nonexistant' not found.", result.err().msg());
+  EXPECT_EQ("MockEvalContext::GetNamedValue 'nonexistant' not found.", result.err().msg());
 
   result = Eval("0 || 1", eval_context);
   EXPECT_TRUE(result.ok());
@@ -182,7 +182,7 @@ TEST_F(ExprTest, LogicalAndShortCircuit) {
 
   result = Eval("1 && nonexistant", eval_context);
   EXPECT_TRUE(result.has_error());
-  EXPECT_EQ("MockEvalContext::GetVariableValue 'nonexistant' not found.", result.err().msg());
+  EXPECT_EQ("MockEvalContext::GetNamedValue 'nonexistant' not found.", result.err().msg());
 
   result = Eval("1 && 99", eval_context);
   EXPECT_TRUE(result.ok());
@@ -496,6 +496,27 @@ TEST_F(ExprTest, BuiltinFunctionCall) {
     int64_t value = 0;
     ASSERT_TRUE(result.value().PromoteTo64(&value).ok());
     EXPECT_EQ(1000, value);
+  });
+
+  EXPECT_TRUE(called);
+}
+
+TEST_F(ExprTest, VoidPointerArithmetic) {
+  const char kCode[] = "rip - 0x20";
+  auto eval_context = fxl::MakeRefCounted<MockEvalContext>();
+
+  eval_context->set_language(ExprLanguage::kC);
+  eval_context->data_provider()->set_ip(0x1000);
+  eval_context->data_provider()->set_arch(debug::Arch::kX64);
+
+  bool called = false;
+  EvalExpression(kCode, eval_context, false, [&](ErrOrValue result) {
+    called = true;
+    ASSERT_TRUE(result.ok()) << result.err().msg();
+
+    uint64_t value = 0;
+    ASSERT_TRUE(result.value().PromoteTo64(&value).ok());
+    EXPECT_EQ(0xfe0ull, value);
   });
 
   EXPECT_TRUE(called);

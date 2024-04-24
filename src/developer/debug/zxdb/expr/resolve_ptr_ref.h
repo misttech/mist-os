@@ -18,6 +18,12 @@ class Err;
 class EvalContext;
 class Type;
 
+// Control what is allowed to be returned from |GetPointedToType|.
+enum class PointedToOptions {
+  kNoVoid,       // Do not allow void* pointers in the results. This is the default.
+  kIncludeVoid,  // Include void* pointers.
+};
+
 // Extracts the address value from the ExprValue, assuming it's a pointer or reference.
 ErrOr<TargetPointer> ExtractPointerValue(const ExprValue& value);
 
@@ -55,12 +61,12 @@ void EnsureResolveReference(const fxl::RefPtr<EvalContext>& eval_context, ExprVa
 //
 // The returned type may not necessarily be concrete (need to preserve, const, etc.).
 //
-// This function currently assumes that the caller wants to do something with the type so the
-// pointed-to type can not be "void". This means that "void*" will issue an error. If this
-// capability is needed in the future, probably we want to add an enum parameter to control whether
-// this is OK (forcing all callers to check for null is probably not a good idea).
+// The |options| parameter controls whether or not it is allowed to return a void type in
+// |pointed_to|. If kIncludeVoid is passed here, a void* as |input| will not return an error, and
+// |pointed_to| will be null, which must be checked before further usage.
 Err GetPointedToType(const fxl::RefPtr<EvalContext>& eval_context, const Type* input,
-                     fxl::RefPtr<Type>* pointed_to);
+                     fxl::RefPtr<Type>* pointed_to,
+                     PointedToOptions option = PointedToOptions::kNoVoid);
 
 }  // namespace zxdb
 

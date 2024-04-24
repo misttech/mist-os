@@ -74,8 +74,12 @@ Examples
       (which will be the call return address).
 
   process 1 disassemble 0x7b851239a0
-  disassemble *$pc - 0x10
       Disassembles instructions in process 1 starting at the given address.
+
+  disassemble *pc - 0x10   # arm64
+  disassemble *rip - 0x10  # x64
+      Disassembles instructions starting at the active thread's PC with relative
+      byte offset.
 )";
 
 // Completion callback after reading process memory.

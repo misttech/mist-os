@@ -4,12 +4,14 @@
 
 #include "src/developer/debug/zxdb/expr/mock_eval_context.h"
 
+#include "src/developer/debug/shared/register_info.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/expr/abi_null.h"
 #include "src/developer/debug/zxdb/expr/builtin_types.h"
 #include "src/developer/debug/zxdb/expr/expr_value.h"
 #include "src/developer/debug/zxdb/expr/find_name.h"
 #include "src/developer/debug/zxdb/expr/found_name.h"
+#include "src/developer/debug/zxdb/expr/register_utils.h"
 #include "src/developer/debug/zxdb/expr/resolve_type.h"
 #include "src/developer/debug/zxdb/symbols/identifier.h"
 
@@ -82,11 +84,24 @@ void MockEvalContext::GetNamedValue(const ParsedIdentifier& ident, EvalCallback 
   // Can ignore the symbol output for this test, it's not needed by the expression evaluation
   // system.
   auto found = values_by_name_.find(ident.GetFullName());
-  if (found == values_by_name_.end()) {
-    cb(Err("MockEvalContext::GetVariableValue '%s' not found.", ident.GetFullName().c_str()));
-  } else {
-    cb(found->second);
+  if (found != values_by_name_.end()) {
+    return cb(found->second);
   }
+
+  // Try to resolve the ident as a register.
+  auto reg = GetRegisterID(data_provider_->GetArch(), ident);
+  if (reg == debug::RegisterID::kUnknown)
+    return cb(Err("MockEvalContext::GetNamedValue '%s' not found.", ident.GetFullName().c_str()));
+
+  // Do not perform any implicit asynchronous memory fetches in the mock.
+  if (std::optional<cpp20::span<const uint8_t>> opt_reg_data = data_provider_->GetRegister(reg)) {
+    if (opt_reg_data->empty())
+      return cb(GetUnavailableRegisterErr(reg));
+    else
+      return cb(RegisterDataToValue(language_, reg, GetVectorRegisterFormat(), *opt_reg_data));
+  }
+
+  return cb(Err("MockEvalContext::GetNamedValue '%s' not found.", ident.GetFullName().c_str()));
 }
 
 void MockEvalContext::GetVariableValue(fxl::RefPtr<Value> variable, EvalCallback cb) const {

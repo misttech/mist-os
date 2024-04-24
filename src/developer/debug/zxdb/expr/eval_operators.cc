@@ -474,21 +474,28 @@ fxl::RefPtr<Type> ExpandTypeTo64(MathRealm realm, fxl::RefPtr<Type> input) {
   return input;
 }
 
-// Returns the byte size of the type pointed to by the given type. If anything fails or if the size
-// is 0, returns an error.
+// Returns the byte size of the type pointed to by the given type. If anything fails, returns an
+// error. Void* pointers will return size equal to 1 to allow pointer arithmetic on void pointers.
 Err GetPointedToByteSize(const fxl::RefPtr<EvalContext>& context, const Type* type,
                          uint32_t* size) {
   *size = 0;
 
   fxl::RefPtr<Type> pointed_to;
-  if (Err err = GetPointedToType(context, type, &pointed_to); err.has_error())
+  if (Err err = GetPointedToType(context, type, &pointed_to, PointedToOptions::kIncludeVoid);
+      err.has_error())
     return err;
 
-  // Need to make concrete to get the size.
-  pointed_to = context->GetConcreteType(pointed_to.get());
-  *size = pointed_to->byte_size();
-  if (*size == 0)
-    return Err("Can't do pointer arithmetic on a type of size 0.");
+  if (pointed_to) {
+    // Need to make concrete to get the size.
+    pointed_to = context->GetConcreteType(pointed_to.get());
+    *size = pointed_to->byte_size();
+  } else {
+    // We allow pointer arithmetic on void pointers by setting size equal to 1. This is technically
+    // incorrect and is disallowed in the C standard, but in the context of a debugger it's more
+    // convenient to not have to cast things like registers.
+    *size = 1;
+  }
+
   return Err();
 }
 
