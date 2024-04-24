@@ -44,19 +44,21 @@ libc_source_set("fenv") {
 libc_test("unittests") {
   dir = "$llvm_libc/test/src/fenv"
   deps = [ ":fenv.testonly" ]
-  sources = [
-    "enabled_exceptions_test.cpp",
-    "exception_flags_test.cpp",
 
-    # TODO(https://fxbug.dev/334985146): Disabled to allow next roll,
-    # when https://fxrev.dev/1028378 can land to re-enable it along
-    # with adding new functions the new upstream version now uses.
-    #"exception_status_test.cpp",
-
-    "feclearexcept_test.cpp",
-    "feholdexcept_test.cpp",
-    "feupdateenv_test.cpp",
-    "getenv_and_setenv_test.cpp",
-    "rounding_mode_test.cpp",
-  ]
+  # TODO(https://fxbug.dev/334985146): Disabled to allow next roll,
+  # when https://fxrev.dev/1028378 can land to re-enable it along
+  # with adding new functions the new upstream version now uses.
+  sources = []
+  if (false) {
+    sources = [
+      "enabled_exceptions_test.cpp",
+      "exception_flags_test.cpp",
+      "exception_status_test.cpp",
+      "feclearexcept_test.cpp",
+      "feholdexcept_test.cpp",
+      "feupdateenv_test.cpp",
+      "getenv_and_setenv_test.cpp",
+      "rounding_mode_test.cpp",
+    ]
+  }
 }
