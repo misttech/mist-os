@@ -70,26 +70,36 @@ zx_status_t vmo::create(uint64_t size, uint32_t options, vmo* result) {
 
 zx_status_t vmo::read(void* data, uint64_t offset, size_t len) const {
   LTRACEF("data %p offset %#" PRIx64 " len %#" PRIx64 "\n", data, offset, len);
+  if (data == nullptr) {
+    // nullptr is no valid kernel address it will fail inside Read
+    // but as len is zero it ok, we just do nothing.
+    if (len == 0) {
+      return ZX_OK;
+    }
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   const fbl::RefPtr<VmoStorage>& tmp = get();
   if (!tmp) {
     return ZX_ERR_BAD_HANDLE;
-  }
-  // Assuming this is the expected behaviour
-  if (len == 0) {
-    return ZX_OK;
   }
   return tmp->vmo->Read(data, offset, len);
 }
 
 zx_status_t vmo::write(const void* data, uint64_t offset, size_t len) const {
   LTRACEF("data %p offset %#" PRIx64 " len %#" PRIx64 "\n", data, offset, len);
+  if (data == nullptr) {
+    // nullptr is not valid kernel address it will fail inside Write
+    // but as len is zero it ok, we just do nothing.
+    if (len == 0) {
+      return ZX_OK;
+    }
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   const fbl::RefPtr<VmoStorage>& tmp = get();
   if (!tmp) {
     return ZX_ERR_BAD_HANDLE;
-  }
-  // Assuming this is the expected behaviour
-  if (len == 0) {
-    return ZX_OK;
   }
   return tmp->vmo->Write(data, offset, len);
 }
