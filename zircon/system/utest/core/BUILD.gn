@@ -270,6 +270,10 @@ if (current_cpu == "x64") {
   core_tests("core-tests-hpet") {
     args = [ "kernel.wallclock=hpet" ]
     device_types = [ "Intel NUC Kit NUC7i5DNHE" ]
+
+    # core-hpet test is taking longer than 14mins. Bump the timeout to 16mins
+    # as a mitigation.
+    timeout = 960
   }
 
   boot_tests += [ ":core-tests-hpet" ]
