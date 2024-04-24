@@ -145,8 +145,9 @@ def main() -> int:
 
     debug_hints = args.debug_hints
 
-    for collected_license in collector.unique_licenses:
-        spdx_writer.add_license(
+    sorted_licenses = sorted(collector.unique_licenses)
+    for collected_license in sorted_licenses:
+        spdx_writer.add_package_with_licenses(
             public_package_name=collected_license.public_name,
             license_labels=collected_license.license_files,
             collection_hint=collected_license.debug_hint

@@ -156,6 +156,9 @@ class GnLabel:
     def is_3p_golib(self) -> bool:
         return self.gn_str.startswith("//third_party/golibs:")
 
+    def is_spdx_json_document(self) -> bool:
+        return self.name.endswith(".spdx.json")
+
     def create_child_from_str(self, child_path_str: str) -> "GnLabel":
         """Create a GnLabel relative to this label from a child path GN string"""
         if child_path_str.startswith("//"):

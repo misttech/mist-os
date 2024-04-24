@@ -23,6 +23,9 @@ if (is_host) {
     main_source = "generated_licenses_spdx_tool.py"
     sources = common_sources
     enable_mypy = true
+    deps = [
+      "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/licenses:spdx_types",
+    ]
   }
 
   # The following tests can be run conveniently also via:
@@ -49,6 +52,7 @@ if (is_host) {
     python_host_test(test_name) {
       main_source = "${test_name}.py"
       sources = common_sources
+      libraries = [ "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/licenses:spdx_types" ]
     }
 
     host_test_deps += [ ":${test_name}" ]

@@ -26,8 +26,16 @@ license("license_4") {
   license_files = [ "text4.txt" ]
 }
 
+license("spdx_license") {
+  public_package_name = "sub-package"
+  license_files = [ "sub_package.spdx.json" ]
+}
+
 group("foo") {
-  applicable_licenses = [ ":license_1" ]
+  applicable_licenses = [
+    ":license_1",
+    ":spdx_license",
+  ]
   deps = []
 }
 
@@ -59,6 +67,9 @@ generated_licenses_spdx("actual_spdx") {
   generate_stub = false
 }
 
+# Run via:
+# `fx set ... --with-test //build/licenses/tests:golden_test`
+# `fx build //build/licenses/tests:golden_test`
 golden_files("golden_test") {
   testonly = true
   deps = [ ":actual_spdx" ]

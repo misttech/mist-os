@@ -191,6 +191,15 @@ class GnLabelTest(unittest.TestCase):
             ).is_3p_golib()
         )
 
+    def test_is_spdx_json_document(self):
+        self.assertFalse(GnLabel.from_str("//foo:bar").is_spdx_json_document())
+        self.assertTrue(
+            GnLabel.from_str("//foo:bar.spdx.json").is_spdx_json_document()
+        )
+        self.assertTrue(
+            GnLabel.from_str("//foo.spdx.json").is_spdx_json_document()
+        )
+
     def test_create_child_from_str(self):
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
         child = parent.create_child_from_str("path2/to/child:baz")

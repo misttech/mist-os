@@ -19,7 +19,7 @@ import dataclasses
 import os
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, order=True)
 class CollectedLicense:
     """Data about a a single collected license (may have multiple files)."""
 
