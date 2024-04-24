@@ -605,7 +605,6 @@ sdk_molecule("core_cc_prebuilt_libraries") {
     "//zircon/system/ulib/syslog:syslog_sdk",
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
     "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
-    "//zircon/system/ulib/trace-vthread:trace-vthread_sdk",
   ]
 }
 
@@ -654,6 +653,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
     "//zircon/system/ulib/inspect:inspect_sdk",
     "//zircon/system/ulib/trace:trace_sdk",
+    "//zircon/system/ulib/trace-vthread:trace-vthread_sdk",
   ]
 }
 
