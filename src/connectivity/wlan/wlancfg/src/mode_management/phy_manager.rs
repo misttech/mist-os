@@ -12,8 +12,11 @@ use {
         regulatory_manager::REGION_CODE_LEN,
         telemetry::{TelemetryEvent, TelemetrySender},
     },
+    anyhow::{format_err, Error},
     async_trait::async_trait,
+    fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device_service as fidl_service,
+    fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_inspect::{self as inspect, NumericProperty},
     ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR},
     std::collections::{HashMap, HashSet},
@@ -765,10 +768,63 @@ impl PhyManagerApi for PhyManager {
     }
 
     async fn perform_recovery(&mut self, summary: recovery::RecoverySummary) {
-        // When recovery APIs are available, perform recovery here if allowed by the product
-        // configuration.
-        if !self.recovery_enabled {
-            self.log_recovery_action(summary);
+        self.log_recovery_action(summary);
+
+        if self.recovery_enabled {
+            match summary.action {
+                RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id }) => {
+                    for (_, phy_container) in self.phys.iter_mut() {
+                        if phy_container.ap_ifaces.remove(&iface_id) {
+                            if let Err(_) = destroy_iface(
+                                &self.device_monitor,
+                                iface_id,
+                                &self.telemetry_sender,
+                            )
+                            .await
+                            {
+                                let _ = phy_container.ap_ifaces.insert(iface_id);
+                            }
+
+                            return;
+                        }
+
+                        if let Some(client_info) = phy_container.client_ifaces.remove(&iface_id) {
+                            if let Err(_) = destroy_iface(
+                                &self.device_monitor,
+                                iface_id,
+                                &self.telemetry_sender,
+                            )
+                            .await
+                            {
+                                let _ = phy_container.client_ifaces.insert(iface_id, client_info);
+                            }
+
+                            return;
+                        }
+                    }
+
+                    warn!(
+                        "Recovery suggested destroying iface {}, but no record was found.",
+                        iface_id
+                    );
+                }
+                RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id }) => {
+                    warn!(
+                        "PHY reset has been requested for PHY {} but is not currently possible.",
+                        phy_id
+                    );
+                }
+                RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { iface_id }) => {
+                    if let Err(e) = disconnect(&self.device_monitor, iface_id).await {
+                        warn!("Disconnecting client {} failed: {:?}", iface_id, e);
+                    }
+                }
+                RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { iface_id }) => {
+                    if let Err(e) = stop_ap(&self.device_monitor, iface_id).await {
+                        warn!("Stopping AP {} failed: {:?}", iface_id, e);
+                    }
+                }
+            }
         }
     }
 }
@@ -913,11 +969,49 @@ async fn clear_phy_country_code(
     })
 }
 
+async fn disconnect(
+    dev_monitor_proxy: &fidl_service::DeviceMonitorProxy,
+    iface_id: u16,
+) -> Result<(), Error> {
+    let (sme_proxy, remote) = create_proxy()?;
+    dev_monitor_proxy
+        .get_client_sme(iface_id, remote)
+        .await?
+        .map_err(fuchsia_zircon::Status::from_raw)?;
+
+    sme_proxy
+        .disconnect(fidl_sme::UserDisconnectReason::Recovery)
+        .await
+        .map_err(|e| format_err!("Disconnect failed: {:?}", e))
+}
+
+async fn stop_ap(
+    dev_monitor_proxy: &fidl_service::DeviceMonitorProxy,
+    iface_id: u16,
+) -> Result<(), Error> {
+    let (sme_proxy, remote) = create_proxy()?;
+    dev_monitor_proxy
+        .get_ap_sme(iface_id, remote)
+        .await?
+        .map_err(fuchsia_zircon::Status::from_raw)?;
+
+    match sme_proxy.stop().await {
+        Ok(result) => match result {
+            fidl_sme::StopApResultCode::Success => Ok(()),
+            err => Err(format_err!("Stop AP failed: {:?}", err)),
+        },
+        Err(e) => Err(format_err!("Stop AP request failed: {:?}", e)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        crate::telemetry,
+        crate::{
+            telemetry,
+            util::testing::{poll_ap_sme_req, poll_sme_req},
+        },
         diagnostics_assertions::assert_data_tree,
         fidl::endpoints,
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -4166,5 +4260,548 @@ mod tests {
                 assert_eq!(reason, expected_reason);
             },
         )
+    }
+
+    #[fuchsia::test]
+    fn test_disconnect_request_fails() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the disconnect request.
+        let fut = disconnect(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // First, the client SME will be requested.
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+                iface_id: 0, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Drop the SME server so that the request will fail.
+        drop(sme_server);
+
+        // The future should complete with an error.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_disconnect_succeeds() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the disconnect request.
+        let fut = disconnect(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // First, the client SME will be requested.
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+                iface_id: 0, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Next, the disconnect will be requested.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_stream),
+            Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{
+                responder,
+                reason: fidl_fuchsia_wlan_sme::UserDisconnectReason::Recovery
+            }) => {
+                responder.send().expect("Failed to send disconnect response")
+            }
+        );
+
+        // Verify the future completes successfully.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+    }
+
+    #[fuchsia::test]
+    fn test_disconnect_cannot_get_sme() {
+        let mut exec = TestExecutor::new();
+        let test_values = test_setup();
+
+        // Drop the DeviceMonitor stream so that the client SME cannot be obtained.
+        drop(test_values.monitor_stream);
+
+        // Make the disconnect request.
+        let fut = disconnect(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_stop_ap_request_fails() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the stop AP request.
+        let fut = stop_ap(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // First, the AP SME will be requested.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetApSme {
+                iface_id: 0, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Drop the SME server so that the request will fail.
+        drop(sme_server);
+
+        // The future should complete with an error.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_stop_ap_fails() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the stop AP request.
+        let fut = stop_ap(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // First, the AP SME will be requested.
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetApSme {
+                iface_id: 0, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Expect the stop AP request.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        assert_variant!(
+            poll_ap_sme_req(&mut exec, &mut sme_stream),
+            Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
+                responder,
+            }) => {
+                responder.send(fidl_sme::StopApResultCode::InternalError).expect("Failed to send stop AP response")
+            }
+        );
+
+        // The future should complete with an error.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_stop_ap_succeeds() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the stop AP request.
+        let fut = stop_ap(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // First, the AP SME will be requested.
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetApSme {
+                iface_id: 0, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Expect the stop AP request.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        assert_variant!(
+            poll_ap_sme_req(&mut exec, &mut sme_stream),
+            Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
+                responder,
+            }) => {
+                responder.send(fidl_sme::StopApResultCode::Success).expect("Failed to send stop AP response")
+            }
+        );
+
+        // The future should complete with an error.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+    }
+
+    #[fuchsia::test]
+    fn test_stop_ap_cannot_get_sme() {
+        let mut exec = TestExecutor::new();
+        let test_values = test_setup();
+
+        // Drop the DeviceMonitor stream so that the client SME cannot be obtained.
+        drop(test_values.monitor_stream);
+
+        // Make the disconnect request.
+        let fut = stop_ap(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    fn phy_manager_for_recovery_test(
+        device_monitor: fidl_service::DeviceMonitorProxy,
+        node: inspect::Node,
+        telemetry_sender: TelemetrySender,
+        recovery_action_sender: recovery::RecoveryActionSender,
+    ) -> PhyManager {
+        let mut phy_manager = PhyManager::new(
+            device_monitor,
+            recovery::lookup_recovery_profile("thresholded_recovery"),
+            true,
+            node,
+            telemetry_sender,
+            recovery_action_sender,
+        );
+
+        // Give the PhyManager client and AP interfaces.
+        let mut phy_container =
+            PhyContainer::new(vec![fidl_common::WlanMacRole::Client, fidl_common::WlanMacRole::Ap]);
+        assert!(phy_container
+            .client_ifaces
+            .insert(
+                1,
+                fidl_common::SecuritySupport {
+                    sae: fidl_common::SaeFeature {
+                        driver_handler_supported: false,
+                        sme_handler_supported: false,
+                    },
+                    mfp: fidl_common::MfpFeature { supported: false },
+                }
+            )
+            .is_none());
+        assert!(phy_container.ap_ifaces.insert(2));
+        assert!(phy_manager.phys.insert(0, phy_container).is_none());
+
+        phy_manager
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_destroy_nonexistent_iface() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Suggest a recovery action to destroy nonexistent interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::FailedScan { iface_id: 123 }),
+            action: recovery::RecoveryAction::PhyRecovery(
+                recovery::PhyRecoveryOperation::DestroyIface { iface_id: 123 },
+            ),
+        };
+
+        // The future should complete immediately.
+        {
+            let fut = phy_manager.perform_recovery(summary);
+            let mut fut = pin!(fut);
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // No request should have been made of DeviceMonitor.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Pending
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_destroy_client_iface_fails() {
+        let mut exec = TestExecutor::new();
+        let test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Drop the DeviceMonitor serving end so that destroying the interface will fail.
+        drop(test_values.monitor_stream);
+
+        // Suggest a recovery action to destroy the client interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::FailedScan { iface_id: 1 }),
+            action: recovery::RecoveryAction::PhyRecovery(
+                recovery::PhyRecoveryOperation::DestroyIface { iface_id: 1 },
+            ),
+        };
+
+        {
+            let fut = phy_manager.perform_recovery(summary);
+            let mut fut = pin!(fut);
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that the client interface is still present.
+        assert!(phy_manager.phys[&0].client_ifaces.contains_key(&1));
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_destroy_client_iface_succeeds() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Suggest a recovery action to destroy the client interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::FailedScan { iface_id: 1 }),
+            action: recovery::RecoveryAction::PhyRecovery(
+                recovery::PhyRecoveryOperation::DestroyIface { iface_id: 1 },
+            ),
+        };
+
+        {
+            let fut = phy_manager.perform_recovery(summary);
+            let mut fut = pin!(fut);
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+            // Verify that the DestroyIface request was made and respond with a success.
+            send_destroy_iface_response(&mut exec, &mut test_values.monitor_stream, ZX_OK);
+
+            // The future should complete now.
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that the client interface has been removed.
+        assert!(!phy_manager.phys[&0].client_ifaces.contains_key(&1));
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_destroy_ap_iface_fails() {
+        let mut exec = TestExecutor::new();
+        let test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Drop the DeviceMonitor serving end so that destroying the interface will fail.
+        drop(test_values.monitor_stream);
+
+        // Suggest a recovery action to destroy the AP interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 2 }),
+            action: recovery::RecoveryAction::PhyRecovery(
+                recovery::PhyRecoveryOperation::DestroyIface { iface_id: 2 },
+            ),
+        };
+
+        {
+            let fut = phy_manager.perform_recovery(summary);
+            let mut fut = pin!(fut);
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that the AP interface is still present.
+        assert!(phy_manager.phys[&0].ap_ifaces.contains(&2));
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_destroy_ap_iface_succeeds() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Suggest a recovery action to destroy the AP interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 2 }),
+            action: recovery::RecoveryAction::PhyRecovery(
+                recovery::PhyRecoveryOperation::DestroyIface { iface_id: 2 },
+            ),
+        };
+
+        {
+            let fut = phy_manager.perform_recovery(summary);
+            let mut fut = pin!(fut);
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+            // Verify that the DestroyIface request was made and respond with a success.
+            send_destroy_iface_response(&mut exec, &mut test_values.monitor_stream, ZX_OK);
+
+            // The future should complete now.
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that the AP interface has been removed.
+        assert!(!phy_manager.phys[&0].ap_ifaces.contains(&2));
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_reset_does_nothing() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Suggest a recovery action to reset the PHY.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 2 }),
+            action: recovery::RecoveryAction::PhyRecovery(
+                recovery::PhyRecoveryOperation::ResetPhy { phy_id: 0 },
+            ),
+        };
+
+        let fut = phy_manager.perform_recovery(summary);
+        let mut fut = pin!(fut);
+
+        // The future should complete immediately.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+
+        // Verify that the Reset request was made and respond with a success.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Pending,
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_disconnect_issues_request() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Suggest a recovery action to disconnect the client interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::FailedScan { iface_id: 1 }),
+            action: recovery::RecoveryAction::IfaceRecovery(
+                recovery::IfaceRecoveryOperation::Disconnect { iface_id: 1 },
+            ),
+        };
+
+        let fut = phy_manager.perform_recovery(summary);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the disconnect request was made and respond with a success.
+        // First, the client SME will be requested.
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+                iface_id: 1, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Next, the disconnect will be requested.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_stream),
+            Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{
+                responder,
+                reason: fidl_fuchsia_wlan_sme::UserDisconnectReason::Recovery
+            }) => {
+                responder.send().expect("Failed to send disconnect response")
+            }
+        );
+
+        // The future should complete now.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+    }
+
+    #[fuchsia::test]
+    fn test_perform_recovery_stop_ap_issues_request() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Suggest a recovery action to destroy the AP interface.
+        let summary = recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 2 }),
+            action: recovery::RecoveryAction::IfaceRecovery(
+                recovery::IfaceRecoveryOperation::StopAp { iface_id: 2 },
+            ),
+        };
+
+        let fut = phy_manager.perform_recovery(summary);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the StopAp request was made and respond with a success.
+        // First, the AP SME will be requested.
+        let sme_server = assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetApSme {
+                iface_id: 2, sme_server, responder
+            }))) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+                sme_server
+            }
+        );
+
+        // Expect the stop AP request.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        assert_variant!(
+            poll_ap_sme_req(&mut exec, &mut sme_stream),
+            Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
+                responder,
+            }) => {
+                responder.send(fidl_sme::StopApResultCode::Success).expect("Failed to send stop AP response")
+            }
+        );
+
+        // The future should complete now.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 }

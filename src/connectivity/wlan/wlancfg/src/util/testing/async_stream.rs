@@ -55,6 +55,18 @@ pub fn poll_sme_req(
     })
 }
 
+#[track_caller]
+pub fn poll_ap_sme_req(
+    exec: &mut fasync::TestExecutor,
+    next_sme_req: &mut StreamFuture<fidl_fuchsia_wlan_sme::ApSmeRequestStream>,
+) -> Poll<fidl_fuchsia_wlan_sme::ApSmeRequest> {
+    exec.run_until_stalled(next_sme_req).map(|(req, stream)| {
+        *next_sme_req = stream.into_future();
+        req.expect("did not expect the SME request stream to end")
+            .expect("error polling SME request stream")
+    })
+}
+
 mod tests {
     use {super::*, fuchsia_async as fasync};
 

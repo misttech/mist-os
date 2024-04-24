@@ -2271,7 +2271,8 @@ impl StatsLogger {
                     fidl_sme::UserDisconnectReason::WlanstackUnitTesting
                     | fidl_sme::UserDisconnectReason::WlanSmeUnitTesting
                     | fidl_sme::UserDisconnectReason::WlanServiceUtilTesting
-                    | fidl_sme::UserDisconnectReason::WlanDevTool => Unknown,
+                    | fidl_sme::UserDisconnectReason::WlanDevTool
+                    | fidl_sme::UserDisconnectReason::Recovery => Unknown,
                 },
                 fidl_sme::DisconnectSource::Ap(..) | fidl_sme::DisconnectSource::Mlme(..) => {
                     DisconnectDetectedFromSme
@@ -3734,7 +3735,8 @@ fn is_roam_disconnect(reason: fidl_sme::UserDisconnectReason) -> bool {
         | UserDisconnectReason::WlanstackUnitTesting
         | UserDisconnectReason::WlanSmeUnitTesting
         | UserDisconnectReason::WlanServiceUtilTesting
-        | UserDisconnectReason::WlanDevTool => false,
+        | UserDisconnectReason::WlanDevTool
+        | UserDisconnectReason::Recovery => false,
     }
 }
 
