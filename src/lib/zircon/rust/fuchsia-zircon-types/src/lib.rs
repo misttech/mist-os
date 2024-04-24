@@ -1,13 +1,13 @@
-// Copyright 2016 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #![allow(non_camel_case_types)]
 
-use static_assertions::const_assert_eq;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicI32;
+#[cfg(feature = "zerocopy")]
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub type zx_addr_t = usize;
@@ -44,6 +44,17 @@ pub type zx_vcpu_state_topic_t = u32;
 pub type zx_restricted_reason_t = u64;
 pub type zx_processor_power_level_options_t = u64;
 pub type zx_processor_power_control_t = u64;
+
+macro_rules! const_assert {
+    ($e:expr $(,)?) => {
+        const _: [(); 1 - { const ASSERT: bool = $e; ASSERT as usize }] = [];
+    };
+}
+macro_rules! const_assert_eq {
+    ($lhs:expr, $rhs:expr $(,)?) => {
+        const_assert!($lhs == $rhs);
+    };
+}
 
 // TODO: magically coerce this to &`static str somehow?
 #[repr(C)]
@@ -502,7 +513,8 @@ multiconst!(u32, [
 /// safely initialized. These explicit padding fields are mirrored in the Rust struct definitions
 /// to minimize the opportunities for mistakes and inconsistencies.
 #[repr(C)]
-#[derive(Copy, Clone, Eq, Default, FromZeros, FromBytes, NoCell, AsBytes)]
+#[derive(Copy, Clone, Eq, Default)]
+#[cfg_attr(feature = "zerocopy", derive(FromZeros, FromBytes, NoCell, AsBytes))]
 pub struct PadByte(u8);
 
 impl PartialEq for PadByte {
@@ -980,7 +992,8 @@ multiconst!(zx_obj_type_t, [
 ]);
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, FromZeros, FromBytes, NoCell, AsBytes)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "zerocopy", derive(FromZeros, FromBytes, NoCell, AsBytes))]
 pub struct zx_exception_info_t {
     pub pid: zx_koid_t,
     pub tid: zx_koid_t,
