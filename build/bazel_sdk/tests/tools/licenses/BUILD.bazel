@@ -15,7 +15,10 @@ py_test(
     # b/319458863: py_test() does not support our custom Python
     # toolchain with remote builds!
     tags = ["no-remote"],
-    deps = ["@fuchsia_sdk//fuchsia/tools/licenses:spdx_types"],
+    deps = [
+        "@fuchsia_sdk//fuchsia/tools/licenses:common_types",
+        "@fuchsia_sdk//fuchsia/tools/licenses:spdx_types",
+    ],
 )
 
 py_test(

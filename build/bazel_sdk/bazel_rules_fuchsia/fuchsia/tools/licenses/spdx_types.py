@@ -3,13 +3,20 @@
 # found in the LICENSE file.
 """Classes for using an SPDX document and its sub-elements"""
 
+
 from collections import defaultdict
 import dataclasses
 import json
 import re
 import hashlib
-from fuchsia.tools.licenses.common_types import *
-from typing import Any, Dict, List, Set, Tuple, Type
+from typing import Any, ClassVar, Dict, List, Set, Tuple, Type
+
+try:
+    # Bazel build uses fully-qualified package names.
+    from fuchsia.tools.licenses.common_types import *
+except ImportError:
+    # Bazel uses shorter package names.
+    from common_types.common_types import *
 
 # Actually 2.2.2, but only SPDX-N.M is used in JSON serialization.
 _default_spdx_json_version = "SPDX-2.2"
@@ -31,7 +38,7 @@ class SpdxLicenseExpression:
     expression_template: str
     license_ids: Tuple[str]
 
-    def create(expression_str: str, location_for_error=None):
+    def create(expression_str: str, location_for_error: str | None = None):
         assert expression_str != None
 
         expression_template = []
@@ -100,9 +107,10 @@ class SpdxPackage:
 
     spdx_id: str
     name: str
-    copyright_text: str
-    license_concluded: SpdxLicenseExpression
-    homepage: str
+    copyright_text: str | None = None
+    license_concluded: SpdxLicenseExpression | None = None
+    homepage: str | None = None
+    debug_hint: List[str] | None = None
 
     def to_json_dict(self):
         output = {"SPDXID": self.spdx_id, "name": self.name}
@@ -110,6 +118,7 @@ class SpdxPackage:
         _maybe_set(output, "homepage", self.homepage)
         if self.license_concluded:
             output["licenseConcluded"] = self.license_concluded.serialize()
+        _maybe_set(output, "_hint", self.debug_hint)
         return output
 
     def from_json_dict(input: DictReader):
@@ -128,24 +137,37 @@ class SpdxPackage:
             # TODO(b/316188315): Remove once fixed upstream.
             name = name[len("third_party/") :]
 
+        try:
+            debug_hint = input.get_string_list("_hint") or None
+        except LicenseException:
+            # TODO(fxr/1035255): GN pipeline may produce hints that
+            # are strings. Remove once fxr/1035255 lands.
+            debug_hint = None
+
         return SpdxPackage(
             spdx_id=input.get("SPDXID"),
             name=name,
             copyright_text=copyright_text,
             license_concluded=license_concluded,
             homepage=homepage,
+            debug_hint=debug_hint,
         )
 
-    def replace_license_ids(self, license_id_replacer: "SpdxIdReplacer"):
-        if self.license_concluded:
-            replaced_license_concluded = (
-                self.license_concluded.replace_license_ids(license_id_replacer)
+    def replace_ids(
+        self,
+        package_id_replacer: "SpdxIdReplacer",
+        license_id_replacer: "SpdxIdReplacer",
+    ) -> "SpdxPackage":
+        license_concluded = self.license_concluded
+        if license_concluded:
+            license_concluded = license_concluded.replace_license_ids(
+                license_id_replacer
             )
-            return dataclasses.replace(
-                self, license_concluded=replaced_license_concluded
-            )
-        else:
-            return self
+        return dataclasses.replace(
+            self,
+            spdx_id=package_id_replacer.get_replaced_id(self.spdx_id),
+            license_concluded=license_concluded,
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -162,6 +184,7 @@ class SpdxExtractedLicensingInfo:
     extracted_text: str
     cross_refs: List[str] = dataclasses.field(default_factory=list)
     see_also: List[str] = dataclasses.field(default_factory=list)
+    debug_hint: List[str] | None = None
 
     def to_json_dict(self):
         output = {
@@ -177,6 +200,7 @@ class SpdxExtractedLicensingInfo:
                 for u in self.cross_refs
             ]
         _maybe_set(output, "seeAlsos", self.see_also)
+        _maybe_set(output, "_hint", self.debug_hint)
 
         return output
 
@@ -201,12 +225,20 @@ class SpdxExtractedLicensingInfo:
 
         extracted_text = input.get("extractedText")
 
+        try:
+            debug_hint = input.get_string_list("_hint") or None
+        except LicenseException:
+            # TODO(fxr/1035255): GN pipeline may produce hints that
+            # are strings. Remove once fxr/1035255 lands.
+            debug_hint = None
+
         return SpdxExtractedLicensingInfo(
             license_id=license_id,
             name=name,
             extracted_text=extracted_text,
             cross_refs=cross_refs,
             see_also=see_also,
+            debug_hint=debug_hint,
         )
 
     def merge_with(self, other: "SpdxExtractedLicensingInfo"):
@@ -214,9 +246,23 @@ class SpdxExtractedLicensingInfo:
             other.cross_refs, self.cross_refs
         )
         unified_see_also = _unify_and_sort_lists(other.see_also, self.see_also)
+        unified_debug_hint = _unify_and_sort_lists(
+            other.debug_hint, self.debug_hint
+        )
 
         return dataclasses.replace(
-            self, cross_refs=unified_cross_refs, see_also=unified_see_also
+            self,
+            cross_refs=unified_cross_refs,
+            see_also=unified_see_also,
+            debug_hint=unified_debug_hint,
+        )
+
+    def replace_id(
+        self, license_id_replacer: "SpdxIdReplacer"
+    ) -> "SpdxExtractedLicensingInfo":
+        return dataclasses.replace(
+            self,
+            license_id=license_id_replacer.get_replaced_id(self.license_id),
         )
 
     def extracted_text_lines(self):
@@ -227,6 +273,15 @@ class SpdxExtractedLicensingInfo:
         links.extend(self.cross_refs)
         links.extend(self.see_also)
         return sorted(list(set(links)))
+
+    @staticmethod
+    def content_based_license_id(name: str, text: str) -> str:
+        """Returns an ids that is based on the content of the license: Name and Text (stripped)"""
+        md5 = hashlib.md5()
+        md5.update(name.strip().encode("utf-8"))
+        md5.update(text.strip().encode("utf-8"))
+        digest = md5.hexdigest()
+        return f"LicenseRef-{digest}"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -251,6 +306,19 @@ class SpdxRelationship:
             relationship_type=input.get("relationshipType"),
         )
 
+    def replace_ids(
+        self, package_id_replacer: "SpdxIdReplacer"
+    ) -> "SpdxRelationship":
+        return dataclasses.replace(
+            self,
+            spdx_element_id=package_id_replacer.get_replaced_id(
+                self.spdx_element_id
+            ),
+            related_spdx_element=package_id_replacer.get_replaced_id(
+                self.related_spdx_element
+            ),
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class SpdxDocument:
@@ -269,54 +337,52 @@ class SpdxDocument:
     def refactor_ids(
         self,
         package_id_factory: "SpdxPackageIdFactory",
-        license_id_factory: "SpdxLicenseIdFactory",
     ):
         """
         Returns a copy of the document with all ids refactored.
 
-        Uses the input id factories to replace existing package and license
-        ids in the doc with new ones, and fixes all id references.
+        Uses package_id_factory to replace existing package ids.
+        Uses SpdxExtractedLicensingInfo.content_based_license_id() to
+        replace license ids, potentially merging license elements with
+        identical content.
         """
 
         package_id_replacer = SpdxIdReplacer(doc_location=self.file_path)
         license_id_replacer = SpdxIdReplacer(doc_location=self.file_path)
 
-        new_extracted_licenses = []
+        new_extracted_licenses_by_id: Dict[str, SpdxExtractedLicensingInfo] = {}
         for el in self.extracted_licenses:
-            new_id = license_id_factory.new_id()
-            license_id_replacer.replace_id(old_id=el.license_id, new_id=new_id)
-            new_extracted_licenses.append(
-                dataclasses.replace(el, license_id=new_id)
+            new_id = SpdxExtractedLicensingInfo.content_based_license_id(
+                el.name, el.extracted_text
             )
+            license_id_replacer.replace_id(el.license_id, new_id)
+            el = el.replace_id(license_id_replacer)
+            duplicate_el = new_extracted_licenses_by_id.get(new_id, None)
+            if duplicate_el:
+                el = el.merge_with(duplicate_el)
+            new_extracted_licenses_by_id[new_id] = el
 
-        new_packages = []
+        new_packages: List[SpdxPackage] = []
         for p in self.packages:
-            p = p.replace_license_ids(license_id_replacer)
-            new_id = package_id_factory.new_id()
-            package_id_replacer.replace_id(old_id=p.spdx_id, new_id=new_id)
-            new_packages.append(dataclasses.replace(p, spdx_id=new_id))
+            package_id_replacer.replace_id(
+                p.spdx_id, package_id_factory.new_id()
+            )
+            new_packages.append(
+                p.replace_ids(package_id_replacer, license_id_replacer)
+            )
 
         new_describes = [
             package_id_replacer.get_replaced_id(d) for d in self.describes
         ]
         new_relationships = [
-            dataclasses.replace(
-                r,
-                spdx_element_id=package_id_replacer.get_replaced_id(
-                    r.spdx_element_id
-                ),
-                related_spdx_element=package_id_replacer.get_replaced_id(
-                    r.related_spdx_element
-                ),
-            )
-            for r in self.relationships
+            r.replace_ids(package_id_replacer) for r in self.relationships
         ]
         return dataclasses.replace(
             self,
             describes=new_describes,
             packages=new_packages,
             relationships=new_relationships,
-            extracted_licenses=new_extracted_licenses,
+            extracted_licenses=new_extracted_licenses_by_id.values(),
         )
 
     def to_json(self, spdx_json_file_path):
@@ -325,6 +391,25 @@ class SpdxDocument:
             json.dump(json_dict, output_file, indent=4)
 
     def to_json_dict(self):
+        describes_json = sorted(self.describes)
+        packages_json = [
+            p.to_json_dict()
+            for p in sorted(self.packages, key=lambda x: (x.name, x.spdx_id))
+        ]
+        relationships_json = [
+            r.to_json_dict()
+            for r in sorted(
+                self.relationships,
+                key=lambda x: (x.spdx_element_id, x.related_spdx_element),
+            )
+        ]
+        licenses_json = [
+            e.to_json_dict()
+            for e in sorted(
+                self.extracted_licenses, key=lambda x: (x.name, x.license_id)
+            )
+        ]
+
         return {
             "spdxVersion": _default_spdx_json_version,
             "SPDXID": self.spdx_id,
@@ -334,20 +419,27 @@ class SpdxDocument:
                 "creators": self.creators,
             },
             "dataLicense": "CC0-1.0",
-            "documentDescribes": self.describes,
-            "packages": [p.to_json_dict() for p in self.packages],
-            "relationships": [r.to_json_dict() for r in self.relationships],
-            "hasExtractedLicensingInfos": [
-                e.to_json_dict() for e in self.extracted_licenses
-            ],
+            "documentDescribes": describes_json,
+            "packages": packages_json,
+            "relationships": relationships_json,
+            "hasExtractedLicensingInfos": licenses_json,
         }
 
-    def from_json(spdx_json_file_path: str):
-        input_file = open(spdx_json_file_path, "r")
-        doc_dict = DictReader(json.load(input_file), f"{spdx_json_file_path}")
-        return SpdxDocument.from_json_dict(spdx_json_file_path, doc_dict)
+    def from_json(spdx_json_file_path: str) -> "SpdxDocument":
+        with open(spdx_json_file_path, "r") as input_file:
+            return SpdxDocument.from_json_dict(
+                spdx_json_file_path, json.load(input_file)
+            )
 
-    def from_json_dict(spdx_json_file_path, doc_dict: DictReader):
+    def from_json_dict(
+        spdx_json_file_path: str, json_dict: Dict[str, Any]
+    ) -> "SpdxDocument":
+        reader = DictReader(json_dict, f"{spdx_json_file_path}")
+        return SpdxDocument.from_json_dict_reader(spdx_json_file_path, reader)
+
+    def from_json_dict_reader(
+        spdx_json_file_path: str, doc_dict: DictReader
+    ) -> "SpdxDocument":
         """Parses an SPDX json dictionary into an SpdxDocument"""
 
         name = doc_dict.get("name")
@@ -504,7 +596,7 @@ class SpdxIndex:
 
         return output
 
-    def create(input: SpdxDocument):
+    def create(input: SpdxDocument) -> "SpdxIndex":
         """Constructs an SpdxIndex for the given SpdxDocument"""
         license_by_id = {}
         for el in input.extracted_licenses:
@@ -580,25 +672,141 @@ class SpdxPackageIdFactory:
         return "SPDXRef-Package-{id}".format(id=self._next_id)
 
 
-class SpdxLicenseIdFactory:
-    """Factory for monotonically increasing SPDX license ids"""
+@dataclasses.dataclass(frozen=False)
+class SpdxDocumentBuilder:
+    """A builder for SpdxDocument"""
 
-    _next_id: int
+    root_package_name: str
+    creators: List[str]
+    root_package: SpdxPackage = None
+    _describes: List["str"] = dataclasses.field(default_factory=list)
+    _packages_by_id: Dict[str, SpdxPackage] = dataclasses.field(
+        default_factory=dict
+    )
+    _relationships: List[SpdxRelationship] = dataclasses.field(
+        default_factory=list
+    )
+    _extracted_licenses_by_id: Dict[
+        str, SpdxExtractedLicensingInfo
+    ] = dataclasses.field(default_factory=dict)
+    _package_id_factory: SpdxPackageIdFactory = dataclasses.field(
+        default_factory=SpdxPackageIdFactory
+    )
 
-    def __init__(self):
-        self._next_id = -1
+    @staticmethod
+    def create(
+        root_package_name: str,
+        creators: List[str],
+        root_package_homepage: str | None = None,
+    ) -> "SpdxDocumentBuilder":
+        builder = SpdxDocumentBuilder(
+            root_package_name=root_package_name,
+            creators=creators,
+        )
+        builder._add_root_package(
+            name=root_package_name,
+            homepage=root_package_homepage,
+        )
+        return builder
 
-    def new_id(self):
-        self._next_id = self._next_id + 1
-        return "LicenseRef-{id}".format(id=self._next_id)
+    def next_package_id(self) -> str:
+        return self._package_id_factory.new_id()
 
-    def make_content_based_id(self, license: SpdxExtractedLicensingInfo):
-        """Returns an ids that is based on the content of the license: Name and Text (stripped)"""
-        md5 = hashlib.md5()
-        md5.update(license.name.strip().encode("utf-8"))
-        md5.update(license.extracted_text.strip().encode("utf-8"))
-        digest = md5.hexdigest()
-        return f"LicenseRef-{digest}"
+    def has_package(self, package_or_package_id: str | SpdxPackage) -> bool:
+        package_id = (
+            package_or_package_id
+            if isinstance(package_or_package_id, str)
+            else package_or_package_id.spdx_id
+        )
+        return package_id in self._packages_by_id
+
+    def add_package(self, package: SpdxPackage) -> None:
+        assert package.spdx_id
+        assert (
+            package.spdx_id not in self._packages_by_id
+        ), f"{package} already in document as {self._packages_by_id[package.spdx_id]}"
+
+        self._packages_by_id[package.spdx_id] = package
+        self._describes.append(package.spdx_id)
+
+    def _add_root_package(self, name: str, homepage: str | None):
+        assert not self.root_package
+        self.root_package = SpdxPackage(
+            spdx_id=self._package_id_factory.new_id(),
+            name=name,
+            homepage=homepage,
+        )
+        self.add_package(self.root_package)
+
+    def add_license(self, license: SpdxExtractedLicensingInfo) -> None:
+        existing_license = self._extracted_licenses_by_id.get(
+            license.license_id, None
+        )
+        if existing_license:
+            license = license.merge_with(existing_license)
+        self._extracted_licenses_by_id[license.license_id] = license
+
+    def add_relationship(self, rel: SpdxRelationship) -> None:
+        assert self.has_package(rel.spdx_element_id)
+        assert self.has_package(rel.related_spdx_element)
+        self._relationships.append(rel)
+
+    def add_contains_relationship(
+        self, spdx_element_id: str, related_spdx_element: str
+    ) -> None:
+        self.add_relationship(
+            SpdxRelationship(
+                spdx_element_id,
+                related_spdx_element,
+                relationship_type="CONTAINS",
+            ),
+        )
+
+    def add_contained_by_root_package_relationship(
+        self, related_spdx_element: str
+    ) -> None:
+        self.add_contains_relationship(
+            self.root_package.spdx_id, related_spdx_element
+        )
+
+    def add_document(
+        self, parent_package: SpdxPackage, doc: SpdxDocument
+    ) -> None:
+        """Adds all the elements of the given document to the currently built document.
+
+        All licenses, packages and relationships are copied, and new "contains" relationships
+        are introduced between |parent_package| and the root packages in the given document.
+
+        The ids of licenses and packages are replaced to integrate without collisions within
+        the build document's id space. Licenses are given content-based ids, to de-duplicate
+        repeated ids.
+        """
+        doc = doc.refactor_ids(self._package_id_factory)
+        index: SpdxIndex = SpdxIndex.create(doc)
+
+        for license in doc.extracted_licenses:
+            self.add_license(license)
+        for p in doc.packages:
+            self.add_package(p)
+        for rel in doc.relationships:
+            self.add_relationship(rel)
+
+        for root_pkg in index.get_root_packages():
+            self.add_contains_relationship(
+                parent_package.spdx_id, root_pkg.spdx_id
+            )
+
+    def build(self) -> SpdxDocument:
+        return SpdxDocument(
+            file_path=None,
+            name=self.root_package_name,
+            namespace="",
+            creators=self.creators.copy(),
+            describes=self._describes.copy(),
+            packages=list(self._packages_by_id.values()),
+            relationships=self._relationships.copy(),
+            extracted_licenses=list(self._extracted_licenses_by_id.values()),
+        )
 
 
 class SpdxIdReplacer:
@@ -620,6 +828,9 @@ class SpdxIdReplacer:
             )
         self._replaced_ids[old_id] = new_id
 
+    def is_replaced_id(self, old_id: str) -> bool:
+        return old_id in self._replaced_ids
+
     def get_replaced_id(self, old_id):
         """Returns the new id associated with the given id"""
         if old_id is None:
@@ -639,9 +850,14 @@ def _maybe_set(output_dict: Dict[str, Any], key: str, value: Any):
 
 def _unify_and_sort_lists(list1, list2):
     """Unifies and sorts 2 lists, removing duplicate values"""
-    unique_values = set()
-    if list1:
+    if not list1 and not list2:
+        return []
+    elif not list1:
+        return sorted(list2)
+    elif not list2:
+        return sorted(list1)
+    else:
+        unique_values = set()
         unique_values.update(list1)
-    if list2:
         unique_values.update(list2)
-    return sorted(list(unique_values))
+        return sorted(list(unique_values))

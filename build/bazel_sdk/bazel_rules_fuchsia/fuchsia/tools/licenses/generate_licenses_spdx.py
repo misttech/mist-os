@@ -6,6 +6,7 @@
 
 import argparse
 import json
+from pathlib import Path
 from typing import Dict, List
 from sys import stderr
 from fuchsia.tools.licenses.common_types import *
@@ -42,147 +43,66 @@ def _create_doc_from_licenses_used_json(
     assert "licenses" in licenses_used_dict
     json_list = licenses_used_dict["licenses"]
 
-    # Sort the list to make the output more deterministic.
-    def sort_by(d):
-        return d["package_name"]
+    # Sort the list to make execution more deterministic.
+    json_list = sorted(json_list, key=lambda d: d["package_name"])
 
-    json_list = sorted(json_list, key=sort_by)
-
-    package_id_factory = SpdxPackageIdFactory()
-    license_id_factory = SpdxLicenseIdFactory()
-
-    packages = []
-    describes = []
-    relationships = []
-    extracted_licenses = []
-
-    root_package = SpdxPackage(
-        spdx_id=package_id_factory.new_id(),
-        name=root_package_name,
-        copyright_text=None,
-        license_concluded=None,
-        homepage=root_package_homepage,
+    doc_builder: SpdxDocumentBuilder = SpdxDocumentBuilder.create(
+        root_package_name=root_package_name,
+        root_package_homepage=root_package_homepage,
+        creators=[f"Tool: {Path(__file__).name}"],
     )
-
-    packages.append(root_package)
-    describes.append(root_package.spdx_id)
 
     for json_dict in json_list:
         dict_reader = DictReader(json_dict, location=licenses_used_path)
-        bazel_package_name = dict_reader.get("package_name")
-        homepage = dict_reader.get_or("package_url", None)
-        copyright_notice = dict_reader.get("copyright_notice")
-        license_text_file_path = dict_reader.get("license_text")
+        bazel_package_name: str = dict_reader.get("package_name")
+        homepage: str | None = dict_reader.get_or("package_url", None)
+        copyright_notice: str = dict_reader.get("copyright_notice")
+        license_text_file_path: str = dict_reader.get("license_text")
 
-        package_id = package_id_factory.new_id()
-        license_id = None
-        other_doc = None
+        license_id: str = None
+        nested_doc: SpdxDocument = None
+
         if license_text_file_path.endswith(".spdx.json"):
-            other_doc = SpdxDocument.from_json(license_text_file_path)
+            _log(f"Adding {license_text_file_path} spdx as a nested document!")
+            nested_doc = SpdxDocument.from_json(license_text_file_path)
         else:
+            _log(f"Adding {license_text_file_path}!")
             with open(license_text_file_path, "r") as text_file:
-                license_id = license_id_factory.new_id()
-                _log(f"Extracting {license_text_file_path}!")
+                _log(f"Adding license {license_text_file_path}!")
                 cross_ref = (
                     licenses_cross_refs_base_url + license_text_file_path
                 )
-                extracted_licenses.append(
-                    SpdxExtractedLicensingInfo(
-                        license_id=license_id,
-                        name=bazel_package_name,
-                        extracted_text=text_file.read(),
-                        cross_refs=[cross_ref],
-                    )
+                license_text = text_file.read()
+                license = SpdxExtractedLicensingInfo(
+                    license_id=SpdxExtractedLicensingInfo.content_based_license_id(
+                        bazel_package_name, license_text
+                    ),
+                    name=bazel_package_name,
+                    extracted_text=license_text,
+                    cross_refs=[cross_ref],
                 )
+                license_id = license.license_id
+                doc_builder.add_license(license)
 
-        packages.append(
-            SpdxPackage(
-                spdx_id=package_id,
-                name=bazel_package_name,
-                copyright_text=copyright_notice,
-                license_concluded=SpdxLicenseExpression.create(license_id)
-                if license_id
-                else None,
-                homepage=homepage,
-            )
+        package = SpdxPackage(
+            spdx_id=doc_builder.next_package_id(),
+            name=bazel_package_name,
+            copyright_text=copyright_notice,
+            license_concluded=SpdxLicenseExpression.create(license_id)
+            if license_id
+            else None,
+            homepage=homepage,
         )
+        doc_builder.add_package(package)
+        doc_builder.add_contained_by_root_package_relationship(package.spdx_id)
 
-        describes.append(package_id)
-        relationships.append(
-            SpdxRelationship(root_package.spdx_id, package_id, "CONTAINS")
-        )
-
-        if other_doc:
-            other_doc = other_doc.refactor_ids(
-                package_id_factory, license_id_factory
-            )
-
-            other_doc_index = SpdxIndex.create(other_doc)
-
-            relationships.extend(
-                [
-                    SpdxRelationship(
-                        package_id, root_package.spdx_id, "CONTAINS"
-                    )
-                    for root_package in other_doc_index.get_root_packages()
-                ]
-            )
-            describes.extend(other_doc.describes)
-            packages.extend(other_doc.packages)
-            relationships.extend(other_doc.relationships)
-            extracted_licenses.extend(other_doc.extracted_licenses)
-
+        if nested_doc:
+            doc_builder.add_document(parent_package=package, doc=nested_doc)
             _log(
-                f"Merged {license_text_file_path}: packages={len(other_doc.packages)} licenses={len(other_doc.extracted_licenses)}"
+                f"Merged {license_text_file_path}: packages={len(nested_doc.packages)} licenses={len(nested_doc.extracted_licenses)}"
             )
 
-    return SpdxDocument(
-        file_path=None,
-        name=root_package_name,
-        namespace=document_namespace,
-        creators=["Tool: fuchsia_licenses_spdx"],
-        describes=describes,
-        packages=packages,
-        relationships=relationships,
-        extracted_licenses=extracted_licenses,
-    )
-
-
-def _merge_duplicate_licenses(document: SpdxDocument):
-    """
-    Returns a copy of the document with duplicate licenses merged.
-
-    In large projects, many prebuilts have the same dependencies.
-    Dedupping the extracted licenses helps optimize the automated
-    analysis and manual reviews.
-
-    Licenses are duplicate if their name and text are the same.
-    The merged licenses will inherit the union of cross references
-    and see-alsos from the originals to void data loss.
-    """
-
-    license_id_factory = SpdxLicenseIdFactory()
-    id_replacer = SpdxIdReplacer()
-    unique_licenses: dict[str, SpdxExtractedLicensingInfo] = {}
-    for license in document.extracted_licenses:
-        content_id = license_id_factory.make_content_based_id(license)
-        id_replacer.replace_id(old_id=license.license_id, new_id=content_id)
-        if content_id not in unique_licenses:
-            unique_licenses[content_id] = dataclasses.replace(
-                license, license_id=content_id
-            )
-        else:
-            unique_license = unique_licenses[content_id]
-            unique_licenses[content_id] = unique_license.merge_with(license)
-
-    updated_licenses = list(unique_licenses.values())
-    updated_packages = [
-        p.replace_license_ids(id_replacer) for p in document.packages
-    ]
-
-    return dataclasses.replace(
-        document, packages=updated_packages, extracted_licenses=updated_licenses
-    )
+    return doc_builder.build()
 
 
 def main():
@@ -226,15 +146,11 @@ def main():
 
     document = _create_doc_from_licenses_used_json(
         licenses_used_path=args.licenses_used,
-        root_package_name=args.root_package_name
-        if args.root_package_name
-        else None,
+        root_package_name=args.root_package_name,
         root_package_homepage=args.root_package_homepage,
         document_namespace=args.document_namespace,
         licenses_cross_refs_base_url=args.licenses_cross_refs_base_url,
     )
-
-    document = _merge_duplicate_licenses(document)
 
     _log(f"Writing {output_path}!")
     document.to_json(output_path)

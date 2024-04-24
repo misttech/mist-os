@@ -61,8 +61,16 @@ fuchsia_licenses_spdx(
 
 diff_test(
     name = "golden_test",
+    failure_message = """
+When the diffs don't match, you may update them via:
+    ./build/bazel_sdk/tests/scripts/bazel_test.py \\
+      --test_target //:licenses_tests \\
+      --output_base /tmp/bazel_sdk_tests_output
+    cp \\
+      /tmp/bazel_sdk_tests_output/execroot/sdk-integration/bazel-out/aarch64-fastbuild/bin/fuchsia/licenses/spdx_dedup/actual_licenses.spdx.json \\
+      ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/spdx_dedup/expected_licenses.spdx.json
+""",
     file1 = ":actual_licenses.spdx.json",
-    # Copied from third_party/sdk-integration/tests/bazel-bin/fuchsia/licenses/spdx_dedup/actual_licenses.spdx.json
     file2 = "expected_licenses.spdx.json",
     visibility = ["//visibility:public"],
 )
