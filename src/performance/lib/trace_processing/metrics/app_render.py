@@ -63,6 +63,12 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
     def process_metrics(
         self, model: trace_model.Model
     ) -> List[trace_metrics.TestCaseResult]:
+        # This method looks for a possible race between trace event start in Scenic and magma.
+        # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
+        model = trace_utils.adjust_to_common_process_start(
+            model, [("scenic.cm", ""), ("driver_host.cm", "DeviceThread")]
+        )
+
         all_events: Iterator[trace_model.Event] = model.all_events()
         present_flow_events: Iterable[
             trace_model.Event
@@ -97,12 +103,6 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
 
         present_latency_mean: float = statistics.mean(present_latencies)
         _LOGGER.info(f"Average Present Latency: {present_latency_mean}")
-
-        # This method looks for a possible race between trace event start in Scenic and magma.
-        # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
-        vsync_events = vsync_events[
-            trace_utils.find_valid_vsync_start_index(vsync_events) :
-        ]
 
         if len(vsync_events) < 2:
             _LOGGER.fatal(

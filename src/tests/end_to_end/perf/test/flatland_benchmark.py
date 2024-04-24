@@ -56,6 +56,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             categories=[
                 "input",
                 "gfx",
+                "kernel:sched",
                 "magma",
                 "system_metrics",
                 "system_metrics_logger",

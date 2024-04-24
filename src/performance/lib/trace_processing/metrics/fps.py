@@ -54,6 +54,12 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
     def process_metrics(
         self, model: trace_model.Model
     ) -> List[trace_metrics.TestCaseResult]:
+        # This method looks for a possible race between trace event start in Scenic and magma.
+        # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
+        model = trace_utils.adjust_to_common_process_start(
+            model, [("scenic.cm", ""), ("driver_host.cm", "DeviceThread")]
+        )
+
         all_events: Iterator[trace_model.Event] = model.all_events()
         cpu_render_start_events: Iterable[
             trace_model.Event
@@ -71,12 +77,6 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
             )
             if next_event is not None:
                 vsync_events.append(next_event)
-
-        # This method looks for a possible race between trace event start in Scenic and magma.
-        # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
-        vsync_events = vsync_events[
-            trace_utils.find_valid_vsync_start_index(vsync_events) :
-        ]
 
         if len(vsync_events) < 2:
             _LOGGER.info(

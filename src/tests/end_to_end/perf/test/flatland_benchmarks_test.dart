@@ -44,15 +44,15 @@ void _addTest(String testName) {
     await Future.delayed(Duration(seconds: 3));
 
     // Start tracing.
-    final traceSession = await helper.performance.initializeTracing(
-        categories: [
-          'input',
-          'gfx',
-          'magma',
-          'system_metrics',
-          'system_metrics_logger'
-        ],
-        bufferSize: 36);
+    final traceSession =
+        await helper.performance.initializeTracing(categories: [
+      'input',
+      'gfx',
+      'kernel:sched',
+      'magma',
+      'system_metrics',
+      'system_metrics_logger'
+    ], bufferSize: 36);
 
     await traceSession.start();
 
