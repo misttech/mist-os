@@ -59,6 +59,7 @@ test("f2fs_unit") {
     "unit/roll_forward_recovery.cc",
     "unit/segment.cc",
     "unit/teardown.cc",
+    "unit/timestamp.cc",
     "unit/unit_lib.cc",
     "unit/vnode.cc",
     "unit/vnode_cache.cc",

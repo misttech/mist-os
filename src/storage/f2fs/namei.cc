@@ -30,12 +30,7 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
 
   vnode->InitNlink();
   vnode->InitBlocks();
-
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  vnode->SetATime(cur_time);
-  vnode->SetCTime(cur_time);
-  vnode->SetMTime(cur_time);
+  vnode->InitTime();
   vnode->SetGeneration(superblock_info_.GetNextGeneration());
   superblock_info_.IncNextGeneration();
 
@@ -127,9 +122,7 @@ zx_status_t Dir::Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) {
       return ZX_ERR_ALREADY_EXISTS;
     }
 
-    timespec cur_time;
-    clock_gettime(CLOCK_REALTIME, &cur_time);
-    target->SetCTime(cur_time);
+    target->SetTime<Timestamps::ChangeTime>();
 
     target->SetFlag(InodeInfoFlag::kIncLink);
     if (zx_status_t err = AddLink(name, target.get()); err != ZX_OK) {
@@ -318,10 +311,6 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     }
 
     std::lock_guard dir_lock(mutex_);
-
-    timespec cur_time;
-    clock_gettime(CLOCK_REALTIME, &cur_time);
-
     if (new_dir->GetNlink() == 0) {
       return ZX_ERR_NOT_FOUND;
     }
@@ -408,7 +397,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
         new_dir->SetLinkSafe(new_entry, new_page, old_vnode.get());
       }
 
-      new_vnode->SetCTime(cur_time);
+      new_vnode->SetTime<Timestamps::ChangeTime>();
       if (old_dir_entry) {
         new_vnode->DropNlink();
       }
@@ -444,7 +433,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     }
 
     old_vnode->SetParentNid(new_dir->Ino());
-    old_vnode->SetCTime(cur_time);
+    old_vnode->SetTime<Timestamps::ChangeTime>();
     old_vnode->SetFlag(InodeInfoFlag::kNeedCp);
     old_vnode->SetDirty();
 

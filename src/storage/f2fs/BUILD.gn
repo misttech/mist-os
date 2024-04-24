@@ -46,6 +46,8 @@ static_library("f2fs") {
     "storage_buffer.h",
     "third_party/ext2_hash/hash.cc",
     "third_party/ext2_hash/hash.h",
+    "timestamp.cc",
+    "timestamp.h",
     "vnode.cc",
     "vnode.h",
     "vnode_cache.cc",

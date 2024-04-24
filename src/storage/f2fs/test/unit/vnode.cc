@@ -61,9 +61,10 @@ TEST_F(VnodeTest, Time) {
 
   timespec cur_time;
   clock_gettime(CLOCK_REALTIME, &cur_time);
-  ASSERT_LE(zx::duration(test_vnode->GetATime()), zx::duration(cur_time));
-  ASSERT_LE(zx::duration(test_vnode->GetMTime()), zx::duration(cur_time));
-  ASSERT_LE(zx::duration(test_vnode->GetCTime()), zx::duration(cur_time));
+  ASSERT_LE(zx::duration(test_vnode->GetTime<Timestamps::AccessTime>()), zx::duration(cur_time));
+  ASSERT_LE(zx::duration(test_vnode->GetTime<Timestamps::ChangeTime>()), zx::duration(cur_time));
+  ASSERT_LE(zx::duration(test_vnode->GetTime<Timestamps::ModificationTime>()),
+            zx::duration(cur_time));
 
   ASSERT_EQ(test_vnode->Close(), ZX_OK);
   test_vnode = nullptr;

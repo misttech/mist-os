@@ -261,18 +261,15 @@ void Dir::DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs
 
   fs()->GetDirEntryCache().RemoveDirEntry(Ino(), remove_name);
 
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  ctime_ = mtime_ = cur_time;
+  time_->Update<Timestamps::ModificationTime>();
 
   if (vnode && vnode->IsDir()) {
     DropNlink();
   }
 
   if (vnode) {
-    clock_gettime(CLOCK_REALTIME, &cur_time);
     vnode->SetDirty();
-    vnode->SetCTime(cur_time);
+    vnode->SetTime<Timestamps::ChangeTime>();
     vnode->DropNlink();
     if (vnode->IsDir()) {
       vnode->DropNlink();
@@ -409,10 +406,7 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
   SetFlag(InodeInfoFlag::kDataExist);
   inline_page.SetDirty();
 
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  SetCTime(cur_time);
-  SetMTime(cur_time);
+  SetTime<Timestamps::ModificationTime>();
   SetDirty();
 
   *out_actual = len;
@@ -441,10 +435,7 @@ zx_status_t File::TruncateInline(size_t len, bool is_recover) {
   }
   inline_page.SetDirty();
 
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  SetCTime(cur_time);
-  SetMTime(cur_time);
+  SetTime<Timestamps::ModificationTime>();
   SetDirty();
 
   return ZX_OK;
