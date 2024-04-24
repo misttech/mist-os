@@ -27,7 +27,15 @@ namespace standalone {
 void LogWrite(std::string_view str) {
   static zx::debuglog log = []() {
     zx::debuglog log;
-    zx_status_t status = zx::debuglog::create(*standalone::GetRootResource(), 0, &log);
+    auto system_resource = standalone::GetSystemResource();
+    zx::result<zx::resource> result =
+        standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUGLOG_BASE);
+    if (result.is_error()) {
+      zx_process_exit(result.error_value());
+    }
+    zx::resource debuglog_resource = std::move(result.value());
+
+    zx_status_t status = zx::debuglog::create(debuglog_resource, 0, &log);
     if (status != ZX_OK) {
       zx_process_exit(status);
     }
