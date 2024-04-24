@@ -17,8 +17,6 @@
 namespace pwm {
 
 namespace {
-
-constexpr pwm_id_t kTestMetadataIds[] = {{0}};
 constexpr size_t kMaxConfigBufferSize = 256;
 
 }  // namespace
@@ -95,7 +93,13 @@ class PwmDeviceTest : public zxtest::Test {
     fake_parent_ = MockDevice::FakeRootParent();
     fake_parent_->AddProtocol(ZX_PROTOCOL_PWM_IMPL, fake_pwm_impl_.proto()->ops,
                               fake_pwm_impl_.proto()->ctx);
-    fake_parent_->SetMetadata(DEVICE_METADATA_PWM_IDS, &kTestMetadataIds, sizeof(kTestMetadataIds));
+    fuchsia_hardware_pwm::PwmChannelsMetadata kTestMetadataChannels = {
+        {.channels = {{{{.id = 0}}}}}};
+    fit::result encoded_metadata = fidl::Persist(kTestMetadataChannels);
+    ASSERT_TRUE(encoded_metadata.is_ok());
+
+    fake_parent_->SetMetadata(DEVICE_METADATA_PWM_CHANNELS, encoded_metadata.value().data(),
+                              encoded_metadata.value().size());
 
     ASSERT_OK(PwmDevice::Create(nullptr, fake_parent_.get()));
 

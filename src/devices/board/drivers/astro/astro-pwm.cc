@@ -4,18 +4,20 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <vector>
+
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
-#include <ddk/metadata/pwm.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>
 
 #include "astro-gpios.h"
@@ -47,33 +49,13 @@ static const std::vector<fpbus::Mmio> pwm_mmios{
     }},
 };
 
-/*
-    PWM_AO_B used by bootloader to control PP800_EE rail. The init flag is set
-    to false to prevent access to that channel as the configuration set by the
-    bootloader must be preserved for proper SoC operation.
-*/
-static const pwm_id_t pwm_ids[] = {
-    {S905D2_PWM_A},    {S905D2_PWM_B},    {S905D2_PWM_C},    {S905D2_PWM_D},
-    {S905D2_PWM_E},    {S905D2_PWM_F},    {S905D2_PWM_AO_A}, {S905D2_PWM_AO_B, /* init = */ false},
-    {S905D2_PWM_AO_C}, {S905D2_PWM_AO_D},
-};
-
-static const std::vector<fpbus::Metadata> pwm_metadata{
-    {{
-        .type = DEVICE_METADATA_PWM_IDS,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&pwm_ids),
-                                     reinterpret_cast<const uint8_t*>(&pwm_ids) + sizeof(pwm_ids)),
-    }},
-};
-
-static const fpbus::Node pwm_dev = []() {
+static fpbus::Node pwm_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "pwm";
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PWM;
   dev.mmio() = pwm_mmios;
-  dev.metadata() = pwm_metadata;
   return dev;
 }();
 
@@ -114,6 +96,37 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Astro::PwmInit() {
+  /* PWM_AO_B used by bootloader to control PP800_EE rail. The init flag is set
+  to false to prevent access to that channel as the configuration set by the
+  bootloader must be preserved for proper SoC operation. */
+  fuchsia_hardware_pwm::PwmChannelsMetadata metadata = {{{{
+      {{.id = S905D2_PWM_A}},
+      {{.id = S905D2_PWM_B}},
+      {{.id = S905D2_PWM_C}},
+      {{.id = S905D2_PWM_D}},
+      {{.id = S905D2_PWM_E}},
+      {{.id = S905D2_PWM_F}},
+      {{.id = S905D2_PWM_AO_A}},
+      {{.id = S905D2_PWM_AO_B, .skip_init = true}},
+      {{.id = S905D2_PWM_AO_C}},
+      {{.id = S905D2_PWM_AO_D}},
+  }}}};
+
+  fit::result encoded_metadata = fidl::Persist(metadata);
+  if (encoded_metadata.is_error()) {
+    zxlogf(ERROR, "Failed to encode pwm channels metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> pwm_metadata{
+      {{
+          .type = DEVICE_METADATA_PWM_CHANNELS,
+          .data = encoded_metadata.value(),
+      }},
+  };
+  pwm_dev.metadata() = pwm_metadata;
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('PWM_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pwm_dev));

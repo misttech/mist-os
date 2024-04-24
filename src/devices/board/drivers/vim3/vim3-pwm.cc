@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -15,7 +16,6 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
-#include <ddk/metadata/pwm.h>
 #include <soc/aml-a311d/a311d-pwm.h>
 
 #include "vim3-gpios.h"
@@ -47,27 +47,13 @@ static const std::vector<fpbus::Mmio> pwm_mmios{
     }},
 };
 
-static const pwm_id_t pwm_ids[] = {
-    {A311D_PWM_A}, {A311D_PWM_B},    {A311D_PWM_C},    {A311D_PWM_D},    {A311D_PWM_E},
-    {A311D_PWM_F}, {A311D_PWM_AO_A}, {A311D_PWM_AO_B}, {A311D_PWM_AO_C}, {A311D_PWM_AO_D},
-};
-
-static const std::vector<fpbus::Metadata> pwm_metadata{
-    {{
-        .type = DEVICE_METADATA_PWM_IDS,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&pwm_ids),
-                                     reinterpret_cast<const uint8_t*>(&pwm_ids) + sizeof(pwm_ids)),
-    }},
-};
-
-static const fpbus::Node pwm_dev = []() {
+static fpbus::Node pwm_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "pwm";
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PWM;
   dev.mmio() = pwm_mmios;
-  dev.metadata() = pwm_metadata;
   return dev;
 }();
 
@@ -107,6 +93,34 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Vim3::PwmInit() {
+  fuchsia_hardware_pwm::PwmChannelsMetadata metadata = {{{{
+      {{.id = A311D_PWM_A}},
+      {{.id = A311D_PWM_B}},
+      {{.id = A311D_PWM_C}},
+      {{.id = A311D_PWM_D}},
+      {{.id = A311D_PWM_E}},
+      {{.id = A311D_PWM_F}},
+      {{.id = A311D_PWM_AO_A}},
+      {{.id = A311D_PWM_AO_B}},
+      {{.id = A311D_PWM_AO_C}},
+      {{.id = A311D_PWM_AO_D}},
+  }}}};
+
+  fit::result encoded_metadata = fidl::Persist(metadata);
+  if (encoded_metadata.is_error()) {
+    zxlogf(ERROR, "Failed to encode pwm channels metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> pwm_metadata{
+      {{
+          .type = DEVICE_METADATA_PWM_CHANNELS,
+          .data = encoded_metadata.value(),
+      }},
+  };
+  pwm_dev.metadata() = pwm_metadata;
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('PWM_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pwm_dev));

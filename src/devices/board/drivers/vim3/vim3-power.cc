@@ -27,7 +27,6 @@
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/power.h>
-#include <ddk/metadata/pwm.h>
 #include <ddktl/device.h>
 #include <soc/aml-a311d/a311d-power.h>
 #include <soc/aml-a311d/a311d-pwm.h>

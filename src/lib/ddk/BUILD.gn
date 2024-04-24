@@ -425,7 +425,6 @@ library_headers("ddk-metadata-headers") {
     "ddk/metadata/lights.h",
     "ddk/metadata/nand.h",
     "ddk/metadata/power.h",
-    "ddk/metadata/pwm.h",
     "ddk/metadata/test.h",
   ]
 
@@ -466,7 +465,6 @@ library_headers("ddk-metadata-headers") {
     "//src/devices/nand/drivers/nandpart:*",
     "//src/devices/nand/drivers/ram-nand:*",
     "//src/devices/power/drivers/power:*",
-    "//src/devices/pwm/drivers/aml-pwm:*",
     "//src/devices/serial/drivers/ftdi:*",
     "//src/devices/serial/drivers/ftdi/test:*",
     "//src/devices/testing/driver-integration-test-shim:*",

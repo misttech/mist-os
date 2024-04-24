@@ -4,6 +4,7 @@
 
 #include "../pwm-visitor.h"
 
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/testing/visitor-test-helper.h>
@@ -17,7 +18,6 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
-#include <ddk/metadata/pwm.h>
 #include <gtest/gtest.h>
 
 #include "dts/pwm.h"
@@ -61,14 +61,16 @@ TEST(PwmVisitorTest, TestMetadataAndBindProperty) {
       ASSERT_TRUE(metadata);
       ASSERT_EQ(1lu, metadata->size());
 
-      // PWM ID metadata.
+      // PWM Channels metadata.
       std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
-      auto metadata_start = reinterpret_cast<pwm_id_t*>(metadata_blob.data());
-      std::vector<pwm_id_t> pwm_ids(metadata_start,
-                                    metadata_start + (metadata_blob.size() / sizeof(pwm_id_t)));
-      ASSERT_EQ(pwm_ids.size(), 2u);
-      EXPECT_EQ(pwm_ids[0].id, static_cast<uint32_t>(PIN1));
-      EXPECT_EQ(pwm_ids[1].id, static_cast<uint32_t>(PIN2));
+      fit::result pwm_channels =
+          fidl::Unpersist<fuchsia_hardware_pwm::PwmChannelsMetadata>(cpp20::span(metadata_blob));
+      ASSERT_TRUE(pwm_channels.is_ok());
+
+      ASSERT_TRUE(pwm_channels->channels());
+      ASSERT_EQ(pwm_channels->channels()->size(), 2u);
+      EXPECT_EQ((*pwm_channels->channels())[0].id(), static_cast<uint32_t>(PIN1));
+      EXPECT_EQ((*pwm_channels->channels())[1].id(), static_cast<uint32_t>(PIN2));
 
       node_tested_count++;
     }

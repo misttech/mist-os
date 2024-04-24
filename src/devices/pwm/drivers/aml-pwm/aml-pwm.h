@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_PWM_DRIVERS_AML_PWM_AML_PWM_H_
 #define SRC_DEVICES_PWM_DRIVERS_AML_PWM_AML_PWM_H_
 
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
@@ -14,7 +15,6 @@
 #include <cstdint>
 #include <vector>
 
-#include <ddk/metadata/pwm.h>
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -30,8 +30,9 @@ constexpr size_t kPwmPairCount = 2;
 
 class AmlPwm {
  public:
-  explicit AmlPwm(fdf::MmioBuffer mmio, pwm_id_t id1, pwm_id_t id2)
-      : ids_{id1, id2}, enabled_{false, false}, mmio_(std::move(mmio)) {}
+  explicit AmlPwm(fdf::MmioBuffer mmio, fuchsia_hardware_pwm::PwmChannelInfo channel1,
+                  fuchsia_hardware_pwm::PwmChannelInfo channel2)
+      : channels_{channel1, channel2}, enabled_{false, false}, mmio_(std::move(mmio)) {}
 
   void Init() {
     for (size_t i = 0; i < kPwmPairCount; i++) {
@@ -42,7 +43,7 @@ class AmlPwm {
                      .duty_cycle = 0.0,
                      .mode_config_buffer = reinterpret_cast<uint8_t*>(&mode_configs_[i]),
                      .mode_config_size = sizeof(mode_config)};
-      if (ids_[i].init) {
+      if (!channels_[i].skip_init()) {
         SetMode(i, Mode::kOff);
       }
     }
@@ -80,7 +81,7 @@ class AmlPwm {
   void SetDSSetting(uint32_t idx, uint16_t val);
   void SetTimers(uint32_t idx, uint8_t timer1, uint8_t timer2);
 
-  std::array<pwm_id_t, kPwmPairCount> ids_;
+  std::array<fuchsia_hardware_pwm::PwmChannelInfo, kPwmPairCount> channels_;
   std::array<bool, kPwmPairCount> enabled_;
   std::array<pwm_config_t, kPwmPairCount> configs_;
   std::array<mode_config, kPwmPairCount> mode_configs_;
@@ -103,7 +104,8 @@ class AmlPwmDevice : public AmlPwmDeviceType,
  protected:
   // For unit testing
   explicit AmlPwmDevice() : AmlPwmDeviceType(nullptr) {}
-  zx_status_t Init(std::vector<fdf::MmioBuffer> mmios, std::vector<pwm_id_t> ids);
+  zx_status_t Init(std::vector<fdf::MmioBuffer> mmios,
+                   fuchsia_hardware_pwm::PwmChannelsMetadata metadata);
 
  private:
   explicit AmlPwmDevice(zx_device_t* parent) : AmlPwmDeviceType(parent) {}

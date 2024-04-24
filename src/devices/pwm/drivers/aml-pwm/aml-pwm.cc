@@ -518,7 +518,7 @@ zx_status_t AmlPwmDevice::Create(void* ctx, zx_device_t* parent) {
 
   if (auto status = device->DdkAdd(ddk::DeviceAddArgs("aml-pwm-device")
                                        .set_proto_id(ZX_PROTOCOL_PWM_IMPL)
-                                       .forward_metadata(parent, DEVICE_METADATA_PWM_IDS));
+                                       .forward_metadata(parent, DEVICE_METADATA_PWM_CHANNELS));
       status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed", __func__);
     return status;
@@ -550,38 +550,40 @@ zx_status_t AmlPwmDevice::Init(zx_device_t* parent) {
     mmios.push_back(std::move(*mmio));
   }
 
-  auto pwm_ids = ddk::GetMetadataArray<pwm_id_t>(parent, DEVICE_METADATA_PWM_IDS);
-  if (!pwm_ids.is_ok()) {
-    zxlogf(ERROR, "Failed to get PWM_IDS metadata : %s", pwm_ids.status_string());
-    return pwm_ids.error_value();
+  auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_pwm::wire::PwmChannelsMetadata>(
+      parent, DEVICE_METADATA_PWM_CHANNELS);
+  if (!metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to get PWM_IDS metadata : %s", metadata.status_string());
+    return metadata.error_value();
   }
 
-  return Init(std::move(mmios), std::move(*pwm_ids));
+  return Init(std::move(mmios), fidl::ToNatural(*metadata.value()));
 }
 
-zx_status_t AmlPwmDevice::Init(std::vector<fdf::MmioBuffer> mmios, std::vector<pwm_id_t> ids) {
+zx_status_t AmlPwmDevice::Init(std::vector<fdf::MmioBuffer> mmios,
+                               fuchsia_hardware_pwm::PwmChannelsMetadata metadata) {
   // PWM IDs are expected to be continuous starting with 0. There will be 2 PWM ID per mmio.
   max_pwm_id_ = (mmios.size() * 2) - 1;
-  std::vector<pwm_id_t> supported_pwm_ids;
-  supported_pwm_ids.resize(mmios.size() * 2lu);
-  for (uint32_t i = 0; i < supported_pwm_ids.size(); i++) {
-    supported_pwm_ids[i].id = i;
+  std::vector<fuchsia_hardware_pwm::PwmChannelInfo> supported_pwm_channels;
+  supported_pwm_channels.resize(mmios.size() * 2lu);
+  for (uint32_t i = 0; i < supported_pwm_channels.size(); i++) {
+    supported_pwm_channels[i].id() = i;
   }
 
-  // Validate the pwm ids passed in and copy init information. The value of init is left as default
+  // Validate the pwm ids passed in and copy config information. The config is left as default
   // for the rest of pwms which are not part of the metadata.
-  for (auto& pwm_id : ids) {
-    if (pwm_id.id > max_pwm_id_) {
-      zxlogf(ERROR, "Invalid PWM ID - %d in metadata. Maximum valid PWM ID is %d", pwm_id.id,
+  for (auto& channel : *metadata.channels()) {
+    if (channel.id() > max_pwm_id_) {
+      zxlogf(ERROR, "Invalid PWM ID - %d in metadata. Maximum valid PWM ID is %d", *channel.id(),
              max_pwm_id_);
       return ZX_ERR_INVALID_ARGS;
     }
-    supported_pwm_ids[pwm_id.id].init = pwm_id.init;
+    supported_pwm_channels[*channel.id()] = channel;
   }
 
   for (uint32_t i = 0; i < mmios.size(); i++) {
-    pwms_.push_back(std::make_unique<AmlPwm>(std::move(mmios[i]), supported_pwm_ids[2lu * i],
-                                             supported_pwm_ids[2lu * i + 1]));
+    pwms_.push_back(std::make_unique<AmlPwm>(std::move(mmios[i]), supported_pwm_channels[2lu * i],
+                                             supported_pwm_channels[2lu * i + 1]));
     pwms_.back()->Init();
   }
 

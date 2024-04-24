@@ -84,6 +84,7 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
       "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib_cpp",
+      "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
       "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cpp",
