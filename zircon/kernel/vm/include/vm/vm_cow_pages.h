@@ -149,7 +149,6 @@ class VmCowPages final : public VmHierarchyBase,
     // parent's pages.
     auto* cow = is_slice_locked() ? parent_.get() : this;
     bool result = cow->page_source_ && cow->page_source_->properties().is_preserving_page_content;
-    AssertHeld(cow->lock_ref());
     DEBUG_ASSERT(result == cow->debug_is_user_pager_backed());
     return result;
   }
