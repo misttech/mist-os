@@ -1499,25 +1499,28 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
     assert!(prefix_control.is_closed());
 }
 
-#[netstack_test]
-async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &str) {
-    const SERVER_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("fe80::5122");
-    const SERVER_ID: [u8; 3] = [2, 5, 1];
-    const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("a::/64");
-    const RENEWED_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("b::/64");
-    const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(546));
-    const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(547));
-    const INFINITE_TIME_VALUE: u32 = u32::MAX;
-    const ONE_SECOND_TIME_VALUE: u32 = 1;
-    // The DHCPv6 Client always sends IAs with the first IAID starting at 0.
-    const EXPECTED_IAID: dhcpv6::IAID = dhcpv6::IAID::new(0);
+mod dhcpv6_helper {
+    use super::*;
 
-    struct Dhcpv6ClientMessage {
-        tx_id: [u8; 3],
-        client_id: Vec<u8>,
+    pub(crate) const SERVER_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("fe80::5122");
+    pub(crate) const SERVER_ID: [u8; 3] = [2, 5, 1];
+    pub(crate) const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> =
+        net_subnet_v6!("a::/64");
+    pub(crate) const RENEWED_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> =
+        net_subnet_v6!("b::/64");
+    pub(crate) const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(546));
+    pub(crate) const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(547));
+    pub(crate) const INFINITE_TIME_VALUE: u32 = u32::MAX;
+    pub(crate) const ONE_SECOND_TIME_VALUE: u32 = 1;
+    // The DHCPv6 Client always sends IAs with the first IAID starting at 0.
+    pub(crate) const EXPECTED_IAID: dhcpv6::IAID = dhcpv6::IAID::new(0);
+
+    pub(crate) struct Dhcpv6ClientMessage {
+        pub(crate) tx_id: [u8; 3],
+        pub(crate) client_id: Vec<u8>,
     }
 
-    async fn send_dhcpv6_message(
+    pub(crate) async fn send_dhcpv6_message(
         fake_ep: &netemul::TestFakeEndpoint<'_>,
         client_addr: net_types_ip::Ipv6Addr,
         prefix: Option<net_types_ip::Subnet<net_types_ip::Ipv6Addr>>,
@@ -1589,7 +1592,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
             fake_ep.write(buf.unwrap_b().as_ref()).await.expect("error sending dhcpv6 message");
     }
 
-    async fn wait_for_message(
+    pub(crate) async fn wait_for_message(
         fake_ep: &netemul::TestFakeEndpoint<'_>,
         expected_src_ip: net_types_ip::Ipv6Addr,
         want_msg_type: dhcpv6::MessageType,
@@ -1668,7 +1671,10 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
         let mut stream = pin!(stream);
         stream.next().await.expect("expected DHCPv6 message")
     }
+}
 
+#[netstack_test]
+async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Dhcpv6,
@@ -1706,12 +1712,12 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     (dhcpv6::MessageType::Solicit, dhcpv6::MessageType::Advertise),
                     (dhcpv6::MessageType::Request, dhcpv6::MessageType::Reply),
                 ] {
-                    let Dhcpv6ClientMessage { tx_id, client_id } =
-                        wait_for_message(&fake_ep, if_ll_addr, expected).await;
-                    send_dhcpv6_message(
+                    let dhcpv6_helper::Dhcpv6ClientMessage { tx_id, client_id } =
+                        dhcpv6_helper::wait_for_message(&fake_ep, if_ll_addr, expected).await;
+                    dhcpv6_helper::send_dhcpv6_message(
                         &fake_ep,
                         if_ll_addr,
-                        Some(PREFIX),
+                        Some(dhcpv6_helper::PREFIX),
                         None,
                         tx_id,
                         send,
@@ -1723,8 +1729,10 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     prefix_control.watch_prefix().await.expect("error watching prefix"),
                     fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
                         prefix: fnet::Ipv6AddressWithPrefix {
-                            addr: fnet::Ipv6Address { addr: PREFIX.network().ipv6_bytes() },
-                            prefix_len: PREFIX.prefix(),
+                            addr: fnet::Ipv6Address {
+                                addr: dhcpv6_helper::PREFIX.network().ipv6_bytes()
+                            },
+                            prefix_len: dhcpv6_helper::PREFIX.prefix(),
                         },
                         lifetimes: fnet_dhcpv6::Lifetimes {
                             valid_until: zx::Time::INFINITE.into_nanos(),
@@ -1736,14 +1744,14 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                 for (new_prefix, old_prefix, res) in [
                     // Renew the IA with a new prefix and invalidate the old prefix.
                     (
-                        Some(RENEWED_PREFIX),
-                        Some(PREFIX),
+                        Some(dhcpv6_helper::RENEWED_PREFIX),
+                        Some(dhcpv6_helper::PREFIX),
                         fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
                             prefix: fnet::Ipv6AddressWithPrefix {
                                 addr: fnet::Ipv6Address {
-                                    addr: RENEWED_PREFIX.network().ipv6_bytes(),
+                                    addr: dhcpv6_helper::RENEWED_PREFIX.network().ipv6_bytes(),
                                 },
-                                prefix_len: RENEWED_PREFIX.prefix(),
+                                prefix_len: dhcpv6_helper::RENEWED_PREFIX.prefix(),
                             },
                             lifetimes: fnet_dhcpv6::Lifetimes {
                                 valid_until: zx::Time::INFINITE.into_nanos(),
@@ -1754,13 +1762,18 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     // Invalidate the prefix.
                     (
                         None,
-                        Some(RENEWED_PREFIX),
+                        Some(dhcpv6_helper::RENEWED_PREFIX),
                         fnet_dhcpv6::PrefixEvent::Unassigned(fnet_dhcpv6::Empty {}),
                     ),
                 ] {
-                    let Dhcpv6ClientMessage { tx_id, client_id } =
-                        wait_for_message(&fake_ep, if_ll_addr, dhcpv6::MessageType::Renew).await;
-                    send_dhcpv6_message(
+                    let dhcpv6_helper::Dhcpv6ClientMessage { tx_id, client_id } =
+                        dhcpv6_helper::wait_for_message(
+                            &fake_ep,
+                            if_ll_addr,
+                            dhcpv6::MessageType::Renew,
+                        )
+                        .await;
+                    dhcpv6_helper::send_dhcpv6_message(
                         &fake_ep,
                         if_ll_addr,
                         new_prefix,
@@ -1775,6 +1788,129 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                         res,
                     );
                 }
+            }
+            .boxed_local()
+        },
+    )
+    .await;
+}
+
+// Regression test for https://fxbug.dev/335892036, in which netcfg panicked if an interface was
+// disabled while it was holding a DHCPv6 prefix for it.
+#[netstack_test]
+async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(name: &str) {
+    let _if_name: String = with_netcfg_owned_device::<M, N, _>(
+        name,
+        ManagerConfig::Dhcpv6,
+        true, /* use_out_of_stack_dhcp_client */
+        [KnownServiceProvider::Dhcpv6Client, KnownServiceProvider::DhcpClient],
+        |if_id, network, interface_state, realm, _sandbox| {
+            async move {
+                // Fake endpoint to inject server packets and intercept client packets.
+                let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+
+                // Request Prefixes to be acquired.
+                let prefix_provider = realm
+                    .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
+                    .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
+                let (prefix_control, server_end) =
+                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
+                        .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+                prefix_provider
+                    .acquire_prefix(
+                        &fnet_dhcpv6::AcquirePrefixConfig {
+                            interface_id: Some(if_id),
+                            ..Default::default()
+                        },
+                        server_end,
+                    )
+                    .expect("acquire prefix");
+
+                let if_ll_addr = interfaces::wait_for_v6_ll(interface_state, if_id)
+                    .await
+                    .expect("error waiting for link-local address");
+                let fake_ep = &fake_ep;
+
+                // Perform the prefix negotiation.
+                for (expected, send) in [
+                    (dhcpv6::MessageType::Solicit, dhcpv6::MessageType::Advertise),
+                    (dhcpv6::MessageType::Request, dhcpv6::MessageType::Reply),
+                ] {
+                    let dhcpv6_helper::Dhcpv6ClientMessage { tx_id, client_id } =
+                        dhcpv6_helper::wait_for_message(&fake_ep, if_ll_addr, expected).await;
+                    dhcpv6_helper::send_dhcpv6_message(
+                        &fake_ep,
+                        if_ll_addr,
+                        Some(dhcpv6_helper::PREFIX),
+                        None,
+                        tx_id,
+                        send,
+                        client_id,
+                    )
+                    .await;
+                }
+                assert_eq!(
+                    prefix_control.watch_prefix().await.expect("error watching prefix"),
+                    fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
+                        prefix: fnet::Ipv6AddressWithPrefix {
+                            addr: fnet::Ipv6Address {
+                                addr: dhcpv6_helper::PREFIX.network().ipv6_bytes()
+                            },
+                            prefix_len: dhcpv6_helper::PREFIX.prefix(),
+                        },
+                        lifetimes: fnet_dhcpv6::Lifetimes {
+                            valid_until: zx::Time::INFINITE.into_nanos(),
+                            preferred_until: zx::Time::INFINITE.into_nanos(),
+                        },
+                    }),
+                );
+
+                let root_interfaces = realm
+                    .connect_to_protocol::<fnet_root::InterfacesMarker>()
+                    .expect("connect to fuchsia.net.root.Interfaces");
+                let (control, server_end) =
+                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+                        .expect("create proxy");
+                root_interfaces.get_admin(if_id, server_end).expect("get admin");
+
+                let mut interface_event_stream = Box::pin(
+                    realm.get_interface_event_stream().expect("get interface event stream"),
+                );
+
+                let mut if_state = fnet_interfaces_ext::existing(
+                    interface_event_stream.by_ref(),
+                    fnet_interfaces_ext::InterfaceState::Unknown::<()>(if_id),
+                )
+                .await
+                .expect("collect initial state of interface");
+
+                let fnet_interfaces_ext::PropertiesAndState {
+                    properties: fnet_interfaces_ext::Properties { online, .. },
+                    state: (),
+                } = assert_matches!(
+                    &if_state,
+                    fnet_interfaces_ext::InterfaceState::Known(properties) => properties
+                );
+                assert!(online, "interface should start out online before disabling");
+
+                // When netcfg had the issue that this regression test covers,
+                // it would panic while handling the interface-disabled event.
+                // This manifests as a test failure due to error log severity.
+                assert!(control
+                    .disable()
+                    .await
+                    .expect("disable should not have FIDL error")
+                    .expect("disable should succeed"));
+
+                fnet_interfaces_ext::wait_interface_with_id(
+                    interface_event_stream,
+                    &mut if_state,
+                    |fnet_interfaces_ext::PropertiesAndState { properties, state: () }| {
+                        (!properties.online).then_some(())
+                    },
+                )
+                .await
+                .expect("wait for interface to go offline");
             }
             .boxed_local()
         },
