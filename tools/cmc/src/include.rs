@@ -20,7 +20,7 @@ use {
 /// the strings are treated as paths to JSON files to be merged with the input file.
 ///
 /// If a depfile is provided, also writes includes encountered to the depfile.
-pub fn merge_includes(
+pub(crate) fn merge_includes(
     file: &PathBuf,
     output: Option<&PathBuf>,
     depfile: Option<&PathBuf>,
@@ -64,7 +64,7 @@ pub fn merge_includes(
 const CHECK_INCLUDES_URL: &str = "https://fuchsia.dev/go/components/build-errors";
 
 /// Read in the provided JSON file and ensure that it contains all expected includes.
-pub fn check_includes(
+pub(crate) fn check_includes(
     file: &PathBuf,
     mut expected_includes: Vec<String>,
     // If specified, this is a path to newline-delimited `expected_includes`
@@ -123,7 +123,7 @@ pub fn check_includes(
 /// Detects cycles.
 /// Includes are returned in sorted order.
 /// Includes are returned as canonicalized paths.
-pub fn transitive_includes(
+pub(crate) fn transitive_includes(
     file: &PathBuf,
     includepath: &Vec<PathBuf>,
     includeroot: &PathBuf,
