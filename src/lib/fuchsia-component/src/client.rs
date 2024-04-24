@@ -156,10 +156,11 @@ pub fn connect_to_protocol_sync<P: DiscoverableProtocolMarker>(
 
 /// Connect to a FIDL protocol using the provided namespace prefix.
 pub fn connect_to_protocol_at<P: DiscoverableProtocolMarker>(
-    service_prefix: &str,
+    service_prefix: impl AsRef<str>,
 ) -> Result<P::Proxy, Error> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
-    let () = connect_channel_to_protocol_at::<P>(server_end.into_channel(), service_prefix)?;
+    let () =
+        connect_channel_to_protocol_at::<P>(server_end.into_channel(), service_prefix.as_ref())?;
     Ok(proxy)
 }
 
@@ -169,10 +170,11 @@ pub fn connect_to_protocol_at<P: DiscoverableProtocolMarker>(
 /// the connection is complete. The proxy must be used to discover whether the connection was
 /// successful.
 pub fn connect_to_protocol_sync_at<P: DiscoverableProtocolMarker>(
-    service_prefix: &str,
+    service_prefix: impl AsRef<str>,
 ) -> Result<P::SynchronousProxy, Error> {
     let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<P>();
-    let () = connect_channel_to_protocol_at::<P>(server_end.into_channel(), service_prefix)?;
+    let () =
+        connect_channel_to_protocol_at::<P>(server_end.into_channel(), service_prefix.as_ref())?;
     Ok(proxy)
 }
 
