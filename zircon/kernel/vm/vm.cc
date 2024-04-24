@@ -26,7 +26,6 @@
 #include <kernel/thread.h>
 #include <ktl/array.h>
 #include <vm/anonymous_page_requester.h>
-#include <vm/bootalloc.h>
 #include <vm/init.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -95,29 +94,6 @@ lazy_init::LazyInit<VmAddressRegion> kernel_image_vmar;
 lazy_init::LazyInit<VmAddressRegion> kernel_random_padding_vmar;
 #endif
 lazy_init::LazyInit<VmAddressRegion> kernel_heap_vmar;
-
-// mark a range of physical pages as WIRED
-void MarkPagesInUsePhys(paddr_t pa, size_t len) {
-  LTRACEF("pa %#" PRIxPTR ", len %#zx\n", pa, len);
-
-  // make sure we are inclusive of all of the pages in the address range
-  len = PAGE_ALIGN(len + (pa & (PAGE_SIZE - 1)));
-  pa = ROUNDDOWN(pa, PAGE_SIZE);
-
-  LTRACEF("aligned pa %#" PRIxPTR ", len %#zx\n", pa, len);
-
-  list_node list = LIST_INITIAL_VALUE(list);
-
-  zx_status_t status = pmm_alloc_range(pa, len / PAGE_SIZE, &list);
-  ASSERT_MSG(status == ZX_OK, "failed to reserve memory range [%#" PRIxPTR ", %#" PRIxPTR "]\n", pa,
-             pa + len - 1);
-
-  // mark all of the pages we allocated as WIRED
-  vm_page_t* p;
-  list_for_every_entry (&list, p, vm_page_t, queue_node) {
-    p->set_state(vm_page_state::WIRED);
-  }
-}
 
 }  // namespace
 
@@ -226,14 +202,6 @@ void vm_init_preheap() {
   VmAspace::KernelAspaceInitPreHeap();
 
   vm_init_preheap_vmars();
-
-  // mark the physical pages used by the boot time allocator
-  if (boot_alloc_end != boot_alloc_start) {
-    dprintf(INFO, "VM: marking boot alloc used range [%#" PRIxPTR ", %#" PRIxPTR ")\n",
-            boot_alloc_start, boot_alloc_end);
-
-    MarkPagesInUsePhys(boot_alloc_start, boot_alloc_end - boot_alloc_start);
-  }
 
   zx_status_t status;
 

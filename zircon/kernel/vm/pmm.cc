@@ -31,7 +31,6 @@
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <lk/init.h>
-#include <vm/bootalloc.h>
 #include <vm/physmap.h>
 #include <vm/pmm_checker.h>
 #include <vm/scanner.h>

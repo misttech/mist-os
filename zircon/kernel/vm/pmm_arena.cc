@@ -17,7 +17,6 @@
 #include <kernel/range_check.h>
 #include <ktl/limits.h>
 #include <pretty/cpp/sizes.h>
-#include <vm/bootalloc.h>
 #include <vm/bootreserve.h>
 #include <vm/physmap.h>
 
