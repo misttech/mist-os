@@ -602,18 +602,22 @@ async def _console_event_loop(
                 root_path = next_event.payload.process_env["fuchsia_dir"]
             elif next_event.payload.user_message is not None:
                 # Style and display user messages.
+                quietable = False
                 msg = next_event.payload.user_message
                 if msg.level == event.MessageLevel.INSTRUCTION:
+                    quietable = True
                     text = statusinfo.dim(msg.value, style=flags.style)
                 elif msg.level == event.MessageLevel.WARNING:
                     text = statusinfo.warning(msg.value, style=flags.style)
                 elif msg.level == event.MessageLevel.INFO:
+                    quietable = True
                     text = msg.value
                 elif msg.level == event.MessageLevel.VERBATIM:
                     text = msg.value
                 else:
                     text = msg.value
-                lines_to_print.append(text)
+                if not quietable or not flags.quiet:
+                    lines_to_print.append(text)
             elif next_event.payload.program_output is not None:
                 output = next_event.payload.program_output
 
