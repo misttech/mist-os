@@ -377,6 +377,9 @@ rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
 netlink-packet-route = { path="forks/netlink-packet-route-0.20.0" }
 netlink-packet-utils = { path="forks/netlink-packet-utils-0.5.2" }
+netlink-packet-core = {path = "forks/netlink-packet-core-0.7.0"}
+netlink-packet-sock-diag = {path = "forks/netlink-packet-sock-diag-0.4.2"}
+netlink-packet-generic = {path = "forks/netlink-packet-generic-0.3.3"}
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 zeroize = { path = "forks/zeroize" }
