@@ -670,7 +670,15 @@ sdk_molecule("core_licenses") {
   ]
 }
 
+#
+# BEGIN @internal_sdk
+# DO NOT ADD anything here! This will soon be removed.
+# See https://fxbug.dev/333907106.
+#
+
 sdk_molecule("platform_fidls") {
+  visibility += [ ":platform" ]
+  category = "internal"
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_sdk($fidl_toolchain)",
@@ -729,6 +737,8 @@ sdk_molecule("platform_fidls") {
 # This SDK molecule is a collection of libraries only available to the in-tree
 # Bazel build. See //sdk:platform.
 sdk_molecule("platform_libs") {
+  visibility += [ ":platform" ]
+  category = "internal"
   deps = [
     ":version_history",
     "//sdk/lib/driver/compat/cpp:cpp_sdk",
@@ -755,7 +765,7 @@ sdk_molecule("platform_libs") {
 # Content are bound to change a lot. Nothing else should rely on this.
 # See https://fxrev.dev/737558 and https://fxbug.dev/42064359.
 sdk_collection("platform") {
-  visibility += [ "*" ]
+  visibility += [ "//build/bazel/*" ]
 
   id = sdk_id
 
@@ -767,11 +777,21 @@ sdk_collection("platform") {
   ]
 }
 
+#
+# END @internal_sdk
+#
+
 if (is_host) {
   # A collection that only contains host tools that are used by the
   # Fuchsia build system itself. In particular, this is where
   # `ffx` will pick companion host tools when running in-tree.
   sdk_collection("host_tools.internal") {
+    # This (sorta) restricts the use of this group to instances of the
+    # `ffx_action()` template, which uses the group below (which doesn't have
+    # visibility restrictions to have a dependency on this group.)
+    visibility = []
+    visibility = [ "//src/developer/ffx/build:internal_sdk_tools_for_ffx" ]
+
     id = sdk_id
     category = "partner"
 
@@ -786,12 +806,6 @@ if (is_host) {
       "//src/developer/ffx:ffx_tool",
       "//src/developer/ffx/frontends/ffx:ffx_bin($host_toolchain)",
     ]
-
-    # This (sorta) restricts the use of this group to instances of the
-    # `ffx_action()` template, which uses the group below (which doesn't have
-    # visibility restrictions to have a dependency on this group.)
-    visibility = []
-    visibility = [ "//src/developer/ffx/build:internal_sdk_tools_for_ffx" ]
 
     deps = [
       "//src/developer/debug/zxdb:zxdb_sdk",
