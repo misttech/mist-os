@@ -44,6 +44,7 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
@@ -151,13 +152,11 @@ class Controller : public DeviceType,
   void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
                                  OpenCoordinatorForPrimaryCompleter::Sync& _completer) override;
 
-  // Periodically reads |last_vsync_timestamp_| and increments |vsync_stalls_detected_| if no vsync
-  // has been observed in a given time period.
-  void OnVsyncMonitor();
-
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
+
+  VsyncMonitor vsync_monitor_;
 
   // mtx_ is a global lock on state shared among clients.
   mutable mtx_t mtx_;
@@ -194,16 +193,6 @@ class Controller : public DeviceType,
   thrd_t loop_thread_;
   async_watchdog::Watchdog watchdog_;
   Driver driver_;
-
-  std::atomic<zx::time> last_vsync_timestamp_{};
-  inspect::UintProperty last_vsync_ns_property_;
-  inspect::UintProperty last_vsync_interval_ns_property_;
-  inspect::UintProperty last_vsync_config_stamp_property_;
-
-  // Fields that track how often vsync was detected to have been stalled.
-  std::atomic_bool vsync_stalled_ = false;
-  inspect::UintProperty vsync_stalls_detected_;
-  async::TaskClosureMethod<Controller, &Controller::OnVsyncMonitor> vsync_monitor_{this};
 
   zx_time_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;

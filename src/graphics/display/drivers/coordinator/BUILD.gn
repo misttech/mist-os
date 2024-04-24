@@ -69,6 +69,8 @@ source_set("shared") {
     "layer.h",
     "migration-util.cc",
     "migration-util.h",
+    "vsync-monitor.cc",
+    "vsync-monitor.h",
   ]
   public_deps = [
     ":coordinator_bind",

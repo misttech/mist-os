@@ -55,6 +55,7 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
@@ -71,11 +72,6 @@ namespace {
 // happen close together and can be correlated.
 constexpr uint64_t kWatchdogWarningIntervalMs = 15000;
 constexpr uint64_t kWatchdogTimeoutMs = 45000;
-
-// vsync delivery is considered to be stalled if at least this amount of time has elapsed since
-// vsync was last observed.
-constexpr zx::duration kVsyncStallThreshold = zx::sec(10);
-constexpr zx::duration kVsyncMonitorInterval = kVsyncStallThreshold / 2;
 
 }  // namespace
 
@@ -306,9 +302,9 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
   task.release()->Post(loop_.dispatcher());
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id,
-                                                          zx_time_t timestamp,
-                                                          const config_stamp_t* config_stamp_ptr) {
+void Controller::DisplayControllerInterfaceOnDisplayVsync(
+    uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+    const config_stamp_t* banjo_config_stamp_ptr) {
   // Emit an event called "VSYNC", which is by convention the event
   // that Trace Viewer looks for in its "Highlight VSync" feature.
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
@@ -316,14 +312,10 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
 
   const DisplayId display_id(banjo_display_id);
 
-  last_vsync_ns_property_.Set(timestamp);
-  last_vsync_interval_ns_property_.Set(timestamp - last_vsync_timestamp_.load().get());
-  last_vsync_timestamp_ = zx::time(timestamp);
-  vsync_stalled_ = false;
-
-  ConfigStamp controller_config_stamp =
-      config_stamp_ptr ? ToConfigStamp(*config_stamp_ptr) : kInvalidConfigStamp;
-  last_vsync_config_stamp_property_.Set(controller_config_stamp.value());
+  zx::time vsync_timestamp = zx::time(banjo_timestamp);
+  ConfigStamp vsync_config_stamp =
+      banjo_config_stamp_ptr ? ToConfigStamp(*banjo_config_stamp_ptr) : kInvalidConfigStamp;
+  vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
   DisplayInfo* info = nullptr;
@@ -344,7 +336,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
   // If there's a pending layer change, don't process any present/retire actions
   // until the change is complete.
   if (info->pending_layer_change) {
-    bool done = controller_config_stamp >= info->pending_layer_change_controller_config_stamp;
+    bool done = vsync_config_stamp >= info->pending_layer_change_controller_config_stamp;
     if (done) {
       info->pending_layer_change = false;
       info->pending_layer_change_controller_config_stamp = kInvalidConfigStamp;
@@ -379,10 +371,10 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
     if (client) {
       auto pending_stamps = client->pending_applied_config_stamps();
       auto it = std::find_if(pending_stamps.begin(), pending_stamps.end(),
-                             [controller_config_stamp](const auto& pending_stamp) {
-                               return pending_stamp.controller_stamp >= controller_config_stamp;
+                             [vsync_config_stamp](const auto& pending_stamp) {
+                               return pending_stamp.controller_stamp >= vsync_config_stamp;
                              });
-      if (it != pending_stamps.end() && it->controller_stamp == controller_config_stamp) {
+      if (it != pending_stamps.end() && it->controller_stamp == vsync_config_stamp) {
         config_stamp_source = source;
         // Obsolete stamps will be removed in |Client::OnDisplayVsync|.
         break;
@@ -402,7 +394,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
     //   `latest_controller_config_stamp` is greater than the incoming
     //   `controller_config_stamp`) and yet to be presented.
     for (auto it = info->images.begin(); it != info->images.end();) {
-      bool should_retire = it->latest_controller_config_stamp() < controller_config_stamp;
+      bool should_retire = it->latest_controller_config_stamp() < vsync_config_stamp;
 
       // Retire any images which are older than whatever is currently in their
       // layer.
@@ -427,12 +419,12 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
   // OnVsync() DisplayController FIDL events. In the future we'll remove this
   // logic and only return config seqnos in OnVsync() events instead.
 
-  if (controller_config_stamp != kInvalidConfigStamp) {
+  if (vsync_config_stamp != kInvalidConfigStamp) {
     auto& config_image_queue = info->config_image_queue;
 
     // Evict retired configurations from the queue.
     while (!config_image_queue.empty() &&
-           config_image_queue.front().config_stamp < controller_config_stamp) {
+           config_image_queue.front().config_stamp < vsync_config_stamp) {
       config_image_queue.pop();
     }
 
@@ -444,7 +436,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
     // Otherwise, we'll get the list of images used at ApplyConfig() with
     // the given |config_stamp|.
     if (!config_image_queue.empty() &&
-        config_image_queue.front().config_stamp == controller_config_stamp) {
+        config_image_queue.front().config_stamp == vsync_config_stamp) {
       for (const auto& image : config_image_queue.front().images) {
         // End of the flow for the image going to be presented.
         //
@@ -457,10 +449,10 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
 
   switch (config_stamp_source) {
     case ConfigStampSource::kPrimary:
-      primary_client_->OnDisplayVsync(display_id, timestamp, controller_config_stamp);
+      primary_client_->OnDisplayVsync(display_id, banjo_timestamp, vsync_config_stamp);
       break;
     case ConfigStampSource::kVirtcon:
-      virtcon_client_->OnDisplayVsync(display_id, timestamp, controller_config_stamp);
+      virtcon_client_->OnDisplayVsync(display_id, banjo_timestamp, vsync_config_stamp);
       break;
     case ConfigStampSource::kNeither:
       if (primary_client_) {
@@ -881,22 +873,6 @@ void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView 
   completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator)));
 }
 
-void Controller::OnVsyncMonitor() {
-  if (vsync_stalled_) {
-    return;
-  }
-
-  if ((zx::clock::get_monotonic() - last_vsync_timestamp_.load()) > kVsyncStallThreshold) {
-    vsync_stalled_ = true;
-    vsync_stalls_detected_.Add(1);
-  }
-
-  zx_status_t status = vsync_monitor_.PostDelayed(loop_.dispatcher(), kVsyncMonitorInterval);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
-  }
-}
-
 ConfigStamp Controller::TEST_controller_stamp() const {
   fbl::AutoLock lock(mtx());
   return controller_stamp_;
@@ -943,12 +919,11 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
   zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
          zx_status_get_string(status));
 
-  status = vsync_monitor_.PostDelayed(loop_.dispatcher(), kVsyncMonitorInterval);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
-    return status;
+  zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
+  if (vsync_monitor_init_result.is_error()) {
+    // VsyncMonitor::Init() logged the error.
+    return vsync_monitor_init_result.status_value();
   }
-
   return ZX_OK;
 }
 
@@ -967,7 +942,7 @@ void Controller::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void Controller::DdkRelease() {
-  vsync_monitor_.Cancel();
+  vsync_monitor_.Deinitialize();
   // Clients may have active work holding mtx_ in loop_.dispatcher(), so shut it down without mtx_.
   loop_.Shutdown();
 
@@ -988,16 +963,13 @@ Controller::Controller(zx_device_t* parent) : Controller(parent, inspect::Inspec
 Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
     : DeviceType(parent),
       inspector_(std::move(inspector)),
+      root_(inspector_.GetRoot().CreateChild("display")),
+      vsync_monitor_(root_.CreateChild("vsync_monitor")),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
                 loop_.dispatcher()),
       driver_(Driver(this, parent)) {
   mtx_init(&mtx_, mtx_plain);
-  root_ = inspector_.GetRoot().CreateChild("display");
-  last_vsync_ns_property_ = root_.CreateUint("last_vsync_timestamp_ns", 0);
-  last_vsync_interval_ns_property_ = root_.CreateUint("last_vsync_interval_ns", 0);
-  last_vsync_config_stamp_property_ =
-      root_.CreateUint("last_vsync_config_stamp", kInvalidConfigStamp.value());
 
   last_valid_apply_config_timestamp_ns_property_ =
       root_.CreateUint("last_valid_apply_config_timestamp_ns", 0);
@@ -1005,8 +977,6 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
       root_.CreateUint("last_valid_apply_config_interval_ns", 0);
   last_valid_apply_config_config_stamp_property_ =
       root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStamp.value());
-
-  vsync_stalls_detected_ = root_.CreateUint("vsync_stalls", 0);
 }
 
 Controller::~Controller() { zxlogf(INFO, "Controller::~Controller"); }
