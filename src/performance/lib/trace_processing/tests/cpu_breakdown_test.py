@@ -193,6 +193,10 @@ class CpuBreakdownTest(unittest.TestCase):
 
         self.assertEqual(len(breakdown), 5)
 
+        # Make it easier to compare breakdown results.
+        for b in breakdown:
+            b["percent"] = round(float(b["percent"]), 3)
+
         # Each process: thread has the correct numbers for each CPU.
         # Sorted by descending cpu and descending percent.
         # Note that neither thread-3 nor thread-4 are logged because

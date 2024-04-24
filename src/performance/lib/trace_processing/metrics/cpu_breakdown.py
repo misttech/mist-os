@@ -3,8 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 import itertools
 import logging
 import trace_processing.trace_model as trace_model
@@ -33,7 +32,7 @@ class CpuBreakdownMetricsProcessor:
         # E.g. For a TID of 1001 with 3 CPUs, this would be:
         #   {1001: {0: 1123.123, 1: 123123.123, 3: 1231.23}}
         self._tid_to_durations: Dict[int, Dict[int, float]] = {}
-        self._breakdown: List[Dict[str, object]] = []
+        self._breakdown: List[Dict[str, Any]] = []
         self._tid_to_thread_name: Dict[int, str] = {}
         self._tid_to_process_name: Dict[int, str] = {}
         # Map of CPU to total duration used (ms).
@@ -89,12 +88,10 @@ class CpuBreakdownMetricsProcessor:
         """
         return timestamp.to_epoch_delta().to_milliseconds_f()
 
-    def process_metrics(self) -> List[Dict[str, object]]:
+    def process_metrics(self) -> List[Dict[str, Any]]:
         """
-        Given TraceModel:
-        - Iterates through all the SchedulingRecords and calculates the duration
+        Given TraceModel, iterates through all the SchedulingRecords and calculates the duration
         for each Process's Threads, and saves them by CPU.
-        - Writes durations into free-form-metric JSON file.
         """
         # Map tids to names.
         for p in self._model.processes:
@@ -123,9 +120,7 @@ class CpuBreakdownMetricsProcessor:
         for tid, breakdown in self._tid_to_durations.items():
             if tid in self._tid_to_thread_name:
                 for cpu, duration in breakdown.items():
-                    percent = round(
-                        duration / self._cpu_to_total_duration[cpu] * 100, 3
-                    )
+                    percent = duration / self._cpu_to_total_duration[cpu] * 100
                     if percent >= self._percent_cutoff:
                         metric = {
                             "process_name": self._tid_to_process_name[tid],
