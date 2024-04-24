@@ -10,9 +10,9 @@
 
 #include <fbl/string.h>
 #include <ktl/span.h>
+#include <zxtest/zxtest.h>
 
 #include "tests.h"
-#include "zxtest/zxtest.h"
 
 // All VMO-related test traits create extensible VMOs by default,
 // parameterizing all of the creation APIs with a boolean `Resizable` template
@@ -64,12 +64,12 @@ struct VmoTestTraits {
 
   static void Read(const storage_type& storage, payload_type payload, size_t size,
                    fbl::String* contents) {
-    // Alway malloc one byte more to avoid malloc(0).
+    // Always malloc one byte more to avoid malloc(0).
     char* tmp = static_cast<char*>(malloc(size + 1));
-    // ASSERT_NONNULL(tmp);
+    auto defer = fit::defer([&tmp] { free(tmp); });
+    ASSERT_TRUE(tmp != nullptr);
     ASSERT_EQ(ZX_OK, storage.read(tmp, payload, size));
     *contents += fbl::String(tmp, size);
-    free(tmp);
   }
 
   static void Write(const storage_type& storage, uint32_t offset, const fbl::String& data) {
