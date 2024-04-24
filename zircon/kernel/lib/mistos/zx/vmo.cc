@@ -104,7 +104,8 @@ zx_status_t vmo::write(const void* data, uint64_t offset, size_t len) const {
   return tmp->vmo->Write(data, offset, len);
 }
 
-zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const {
+zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, bool copy_prop,
+                              vmo* result) const {
   LTRACE;
   if (!get()) {
     return ZX_ERR_BAD_HANDLE;
@@ -129,7 +130,7 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
 
   LTRACEF("options 0x%x offset %#" PRIx64 " size %#" PRIx64 "\n", options, offset, size);
 
-  status = create_child_internal(options, offset, size, true, &child_vmo);
+  status = create_child_internal(options, offset, size, copy_prop, &child_vmo);
   DEBUG_ASSERT((status == ZX_OK) == (child_vmo != nullptr));
   if (status != ZX_OK)
     return status;

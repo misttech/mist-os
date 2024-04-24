@@ -5,8 +5,9 @@
 source_set("tests") {
   sources = [
     "object-test.cc",
-    "zx-test.cc",
+    "vmo-clone.cc",
     "vmo.cc",
+    "zx-test.cc",
   ]
   deps = [
     "//zircon/kernel/lib/mistos/zx",
