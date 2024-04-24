@@ -57,7 +57,10 @@
 _script_dir="${BASH_SOURCE[0]%/*}"; if [[ "${_script_dir}" == "${BASH_SOURCE[0]}" ]]; then _script_dir=.; fi
 # shellcheck source=/dev/null
 source "${_script_dir}/lib/vars.sh" || exit 1
+# shellcheck source=/dev/null
+source "${_script_dir}/lib/build_api_client.sh" || exit $?
 fx-config-read
+
 
 shopt -s extglob
 
@@ -351,17 +354,14 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
         fx-error "Toolchain option ${last_fuchsia_target} must be followed by at least one GN label"
         exit 1
       fi
-      # Parse GN labels into a set of fully qualified GN labels
-      build_api_client="${FUCHSIA_DIR}/build/api/client"
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
-
       local -a gn_labels  # define variable to quiet shellcheck
-      command-stdout-to-array gn_labels "${build_api_client}" fx_build_args_to_labels --allow-unknown --args "${fuchsia_targets[@]}"
+      command-stdout-to-array gn_labels fx-build-api-client fx_build_args_to_labels --allow-unknown --args "${fuchsia_targets[@]}"
 
       # Convert GN labels to Ninja targets now.
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
       local -a ninja_targets  # define variable to quiet shellcheck
-      command-stdout-to-array ninja_targets "${build_api_client}" gn_label_to_ninja_paths --allow-unknown "${gn_labels[@]}"
+      command-stdout-to-array ninja_targets fx-build-api-client gn_label_to_ninja_paths --allow-unknown "${gn_labels[@]}"
 
       # For invalid labels, the above command will print errors to stderr directly and not list them in the result.
       # If ninja_targets is empty, we can stop here.
