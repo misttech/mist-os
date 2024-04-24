@@ -39,12 +39,13 @@ auto CreateStreamBufferPartialSettings(
 }
 
 auto CreateValidInputBufferCollectionConstraints() {
-  fuchsia::sysmem::BufferCollectionConstraints result;
-  result.usage.cpu = fuchsia::sysmem::cpuUsageRead | fuchsia::sysmem::cpuUsageReadOften;
-  result.min_buffer_count_for_camping = kInputMinBufferCountForCamping;
-  // Must specify true here, as enforced by CodecImpl.  Leaving all
+  fuchsia_sysmem2::BufferCollectionConstraints result;
+  result.usage().emplace().cpu() =
+      fuchsia::sysmem::cpuUsageRead | fuchsia::sysmem::cpuUsageReadOften;
+  result.min_buffer_count_for_camping() = kInputMinBufferCountForCamping;
+  // Must emplace the buffer_memory_constraints here, as enforced by CodecImpl.  Leaving all
   // buffer_memory_constraints fields default is fine.
-  result.has_buffer_memory_constraints = true;
+  result.buffer_memory_constraints().emplace();
   return result;
 }
 
@@ -94,7 +95,7 @@ TEST_F(CodecImplFailures, InputBufferCollectionConstraintsCpuUsage) {
     auto buffer_collection_constraints = CreateValidInputBufferCollectionConstraints();
     // Setting write usage on input buffers is invalid and will result in codec
     // failure
-    buffer_collection_constraints.usage.cpu =
+    buffer_collection_constraints.usage()->cpu() =
         fuchsia::sysmem::cpuUsageWrite | fuchsia::sysmem::cpuUsageWriteOften;
     codec_adapter_->SetBufferCollectionConstraints(kInputPort,
                                                    std::move(buffer_collection_constraints));
@@ -119,7 +120,7 @@ TEST_F(CodecImplFailures, InputBufferCollectionConstraintsMinBufferCount) {
     auto buffer_collection_constraints = CreateValidInputBufferCollectionConstraints();
     // No buffers required for camping would be less than the minimum for the
     // server
-    buffer_collection_constraints.min_buffer_count_for_camping = 0;
+    buffer_collection_constraints.min_buffer_count_for_camping() = 0;
     codec_adapter_->SetBufferCollectionConstraints(kInputPort,
                                                    std::move(buffer_collection_constraints));
 
