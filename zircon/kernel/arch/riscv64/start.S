@@ -48,9 +48,11 @@ PhysbootHandoff = _start
     lla     shadow_call_sp, boot_shadow_call_stack
 #endif
 
-    // make sure the boot allocator is given a chance to figure out where we
-    // are loaded in physical memory
-    call     boot_alloc_init
+    // call into the riscv64 boot mapping code to give it a chance to initialize its page tables
+    la      a0, __executable_start // virtual
+    lla     a1, __executable_start // physical
+    sub     a0, a0, a1 // compute the delta between the virtual and physical address the kernel is at
+    call    riscv64_boot_map_init
 
     // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
 

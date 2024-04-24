@@ -9,7 +9,7 @@
 #include <sys/types.h>
 
 #include <arch/riscv64/mmu.h>
-#include <vm/bootalloc.h>
+#include <ktl/tuple.h>
 #include <vm/physmap.h>
 
 namespace {
@@ -23,6 +23,14 @@ namespace {
 // in the spec to make this code more consistent with other zircon platforms.
 // In the RISC-V spec, for sv39, the top level of the page table tree is level 2
 // whereas in the code below it is level 0.
+
+constexpr size_t kNumBootPageTables = 8;
+alignas(PAGE_SIZE) uint64_t boot_page_tables[RISCV64_MMU_PT_ENTRIES * kNumBootPageTables];
+
+// Will track the physical address of the page table array above. Starts off initialized to the
+// virtual address, but will be adjusted in riscv64_boot_map_init().
+paddr_t boot_page_tables_pa = reinterpret_cast<paddr_t>(boot_page_tables);
+size_t boot_page_table_offset;
 
 // Level 0 PTEs may point to large pages of size 1GB.
 constexpr uintptr_t l0_large_page_size = 1UL << (PAGE_SIZE_SHIFT + 2 * RISCV64_MMU_PT_SHIFT);
@@ -50,18 +58,24 @@ constexpr size_t vaddr_to_l2_index(vaddr_t addr) {
   return (addr >> PAGE_SIZE_SHIFT) & (RISCV64_MMU_PT_ENTRIES - 1);
 }
 
-// The following helper routines assume that code is running in physical
-// addressing mode (mmu off). Any physical addresses calculated are assumed to
-// be the same as virtual.  This function is guaranteed to return PAGE_SIZE
-// aligned memory.
-paddr_t boot_alloc_ptable() {
-  // Allocate a page out of the boot allocator, asking for a physical address.
-  paddr_t ptr = boot_alloc_page_phys();
-  memset(reinterpret_cast<char*>(ptr), 0, PAGE_SIZE);
-  return ptr;
+paddr_t boot_page_table_alloc() {
+  ASSERT(boot_page_table_offset < sizeof(boot_page_tables));
+  boot_page_table_offset += PAGE_SIZE;
+
+  paddr_t new_table = boot_page_tables_pa;
+  boot_page_tables_pa += PAGE_SIZE;
+  return new_table;
 }
 
 }  // anonymous namespace
+
+extern "C" void riscv64_boot_map_init(uint64_t vaddr_paddr_delta) {
+  boot_page_tables_pa -= vaddr_paddr_delta;
+}
+
+std::tuple<size_t, size_t> riscv64_boot_map_used_memory() {
+  return {sizeof(boot_page_tables), boot_page_table_offset};
+}
 
 // Early boot time page table creation code, called from start.S while running
 // in physical address space with the mmu disabled. This code should be position
@@ -95,7 +109,7 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
         continue;
       }
 
-      paddr_t pa = boot_alloc_ptable();
+      paddr_t pa = boot_page_table_alloc();
       kernel_ptable0[index0] = riscv64_pte_pa_to_pte(pa) | RISCV64_PTE_V;
       kernel_ptable1 = reinterpret_cast<pte_t*>(pa);
     } else if (!riscv64_pte_is_leaf(kernel_ptable0[index0])) {
@@ -122,7 +136,7 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
         continue;
       }
 
-      paddr_t pa = boot_alloc_ptable();
+      paddr_t pa = boot_page_table_alloc();
       kernel_ptable1[index1] = riscv64_pte_pa_to_pte(pa) | RISCV64_PTE_V;
       kernel_ptable2 = reinterpret_cast<pte_t*>(pa);
     } else if (!riscv64_pte_is_leaf(kernel_ptable1[index1])) {
