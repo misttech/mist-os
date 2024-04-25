@@ -115,9 +115,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiu) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   ReadAttributeUpiu request(Attributes::bBootLunEn);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          request);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_OK(response);
 
   // Check that the Request UPIU is copied into the command descriptor.
@@ -150,9 +148,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
 
   ReadAttributeUpiu request(Attributes::bBootLunEn);
   ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          request);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_TIMED_OUT);
   ufs_->ProcessCompletions();
 
@@ -183,9 +179,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
                                                                          *response_upiu);
       });
 
-  response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          request);
+  response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
 }
 

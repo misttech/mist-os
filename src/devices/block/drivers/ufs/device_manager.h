@@ -12,6 +12,7 @@
 
 #include <map>
 
+#include "src/devices/block/drivers/ufs/transfer_request_processor.h"
 #include "src/devices/block/drivers/ufs/upiu/attributes.h"
 #include "src/devices/block/drivers/ufs/upiu/descriptors.h"
 #include "src/devices/block/drivers/ufs/upiu/flags.h"
@@ -55,8 +56,10 @@ using PowerModeMap = std::map<UfsPowerMode, std::pair<scsi::PowerCondition, Link
 class Ufs;
 class DeviceManager {
  public:
-  static zx::result<std::unique_ptr<DeviceManager>> Create(Ufs &controller);
-  explicit DeviceManager(Ufs &controller) : controller_(controller) {}
+  static zx::result<std::unique_ptr<DeviceManager>> Create(
+      Ufs &controller, TransferRequestProcessor &transfer_request_processor);
+  explicit DeviceManager(Ufs &controller, TransferRequestProcessor &transfer_request_processor)
+      : controller_(controller), req_processor_(transfer_request_processor) {}
 
   // Device initialization.
   zx::result<> SendLinkStartUp();
@@ -104,6 +107,7 @@ class DeviceManager {
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition);
 
   Ufs &controller_;
+  TransferRequestProcessor &req_processor_;
 
   DeviceDescriptor device_descriptor_;
   GeometryDescriptor geometry_descriptor_;

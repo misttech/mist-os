@@ -550,13 +550,6 @@ zx::result<> Ufs::InitController() {
     return result.take_error();
   }
 
-  auto device_manager = DeviceManager::Create(*this);
-  if (device_manager.is_error()) {
-    zxlogf(ERROR, "Failed to create device manager %s", device_manager.status_string());
-    return device_manager.take_error();
-  }
-  device_manager_ = std::move(*device_manager);
-
   uint8_t number_of_task_management_request_slots = safemath::checked_cast<uint8_t>(
       CapabilityReg::Get().ReadFrom(&mmio_).number_of_utp_task_management_request_slots() + 1);
   zxlogf(DEBUG, "number_of_task_management_request_slots=%d",
@@ -576,6 +569,13 @@ zx::result<> Ufs::InitController() {
     return transfer_request_processor.take_error();
   }
   transfer_request_processor_ = std::move(*transfer_request_processor);
+
+  auto device_manager = DeviceManager::Create(*this, *transfer_request_processor_);
+  if (device_manager.is_error()) {
+    zxlogf(ERROR, "Failed to create device manager %s", device_manager.status_string());
+    return device_manager.take_error();
+  }
+  device_manager_ = std::move(*device_manager);
 
   if (int thrd_status = thrd_create_with_name(
           &io_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IoLoop(); }, this,

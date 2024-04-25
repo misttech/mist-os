@@ -14,9 +14,11 @@
 #include "transfer_request_processor.h"
 
 namespace ufs {
-zx::result<std::unique_ptr<DeviceManager>> DeviceManager::Create(Ufs &controller) {
+zx::result<std::unique_ptr<DeviceManager>> DeviceManager::Create(
+    Ufs &controller, TransferRequestProcessor &transfer_request_processor) {
   fbl::AllocChecker ac;
-  auto device_manager = fbl::make_unique_checked<DeviceManager>(&ac, controller);
+  auto device_manager =
+      fbl::make_unique_checked<DeviceManager>(&ac, controller, transfer_request_processor);
   if (!ac.check()) {
     zxlogf(ERROR, "Failed to allocate device manager.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -37,20 +39,16 @@ zx::result<> DeviceManager::SendLinkStartUp() {
 zx::result<> DeviceManager::DeviceInit() {
   zx::time device_init_start_time = zx::clock::get_monotonic();
   SetFlagUpiu set_flag_upiu(Flags::fDeviceInit);
-  auto query_response = controller_.GetTransferRequestProcessor()
-                            .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(set_flag_upiu);
+  auto query_response = req_processor_.SendQueryRequestUpiu(set_flag_upiu);
   if (query_response.is_error()) {
-    zxlogf(ERROR, "Failed to set fDeviceInit flag: %s", query_response.status_string());
     return query_response.take_error();
   }
 
   zx::time device_init_time_out = device_init_start_time + zx::usec(kDeviceInitTimeoutUs);
   while (true) {
     ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
-    auto response = controller_.GetTransferRequestProcessor()
-                        .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(read_flag_upiu);
+    auto response = req_processor_.SendQueryRequestUpiu(read_flag_upiu);
     if (response.is_error()) {
-      zxlogf(ERROR, "Failed to read fDeviceInit flag: %s", response.status_string());
       return response.take_error();
     }
     uint8_t flag = response->GetResponse<FlagResponseUpiu>().GetFlag();
@@ -69,10 +67,8 @@ zx::result<> DeviceManager::DeviceInit() {
 
 zx::result<> DeviceManager::GetControllerDescriptor() {
   ReadDescriptorUpiu read_device_desc_upiu(DescriptorType::kDevice);
-  auto response = controller_.GetTransferRequestProcessor()
-                      .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(read_device_desc_upiu);
+  auto response = req_processor_.SendQueryRequestUpiu(read_device_desc_upiu);
   if (response.is_error()) {
-    zxlogf(ERROR, "Failed to read device descriptor: %s", response.status_string());
     return response.take_error();
   }
   device_descriptor_ =
@@ -87,10 +83,8 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
   zxlogf(INFO, "%u enabled LUNs found", device_descriptor_.bNumberLU);
 
   ReadDescriptorUpiu read_geometry_desc_upiu(DescriptorType::kGeometry);
-  response = controller_.GetTransferRequestProcessor()
-                 .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(read_geometry_desc_upiu);
+  response = req_processor_.SendQueryRequestUpiu(read_geometry_desc_upiu);
   if (response.is_error()) {
-    zxlogf(ERROR, "Failed to read geometry descriptor: %s", response.status_string());
     return response.take_error();
   }
   geometry_descriptor_ =
@@ -107,12 +101,8 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
 
 zx::result<uint32_t> DeviceManager::ReadAttribute(Attributes attribute) {
   ReadAttributeUpiu read_attribute_upiu(attribute);
-  auto query_response =
-      controller_.GetTransferRequestProcessor()
-          .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(read_attribute_upiu);
+  auto query_response = req_processor_.SendQueryRequestUpiu(read_attribute_upiu);
   if (query_response.is_error()) {
-    zxlogf(ERROR, "Failed to read attribute(%x): %s", static_cast<uint8_t>(attribute),
-           query_response.status_string());
     return query_response.take_error();
   }
   return zx::ok(query_response->GetResponse<AttributeResponseUpiu>().GetAttribute());
@@ -120,12 +110,8 @@ zx::result<uint32_t> DeviceManager::ReadAttribute(Attributes attribute) {
 
 zx::result<> DeviceManager::WriteAttribute(Attributes attribute, uint32_t value) {
   WriteAttributeUpiu write_attribute_upiu(attribute, value);
-  auto query_response =
-      controller_.GetTransferRequestProcessor()
-          .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(write_attribute_upiu);
+  auto query_response = req_processor_.SendQueryRequestUpiu(write_attribute_upiu);
   if (query_response.is_error()) {
-    zxlogf(ERROR, "Failed to write attribute(%x): %s", static_cast<uint8_t>(attribute),
-           query_response.status_string());
     return query_response.take_error();
   }
   return zx::ok();
@@ -175,8 +161,7 @@ zx::result<uint32_t> DeviceManager::GetBootLunEnabled() {
 
 zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
   ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, lun);
-  auto response = controller_.GetTransferRequestProcessor()
-                      .SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(read_unit_desc_upiu);
+  auto response = req_processor_.SendQueryRequestUpiu(read_unit_desc_upiu);
   if (response.is_error()) {
     return response.take_error();
   }
