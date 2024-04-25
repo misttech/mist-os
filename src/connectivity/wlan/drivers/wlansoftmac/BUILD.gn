@@ -37,7 +37,6 @@ source_set("source_set") {
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/fidl_driver",
     "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp",
     "//src/connectivity/wlan/drivers/lib/log/cpp",

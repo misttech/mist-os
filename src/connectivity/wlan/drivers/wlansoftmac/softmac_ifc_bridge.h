@@ -5,10 +5,9 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_IFC_BRIDGE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_IFC_BRIDGE_H_
 
-#include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
-#include <fidl/fuchsia.wlan.softmac/cpp/wire.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl_driver/cpp/transport.h>
 #include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
@@ -19,7 +18,7 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
+class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
       const fdf::Dispatcher& softmac_ifc_server_dispatcher,
@@ -29,12 +28,11 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
 
   ~SoftmacIfcBridge() override = default;
 
-  void Recv(RecvRequestView fdf_request, fdf::Arena& arena,
-            RecvCompleter::Sync& completer) override;
+  void Recv(RecvRequest& fdf_request, RecvCompleter::Sync& completer) override;
   zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
-  void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
+  void ReportTxResult(ReportTxResultRequest& request,
                       ReportTxResultCompleter::Sync& completer) override;
-  void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
+  void NotifyScanComplete(NotifyScanCompleteRequest& request,
                           NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
@@ -45,7 +43,7 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
   std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>
       softmac_ifc_server_binding_;
 
-  std::unique_ptr<fidl::WireClient<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>
+  std::unique_ptr<fidl::Client<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>
       softmac_ifc_bridge_client_;
 };
 
