@@ -9,11 +9,11 @@ use {
             FrameworkCapability,
         },
         model::component::WeakComponentInstance,
-        model::error::ModelError,
         model::token::InstanceRegistry,
     },
     ::routing::policy::GlobalPolicyChecker,
     cm_config::{AbiRevisionPolicy, RuntimeConfig},
+    errors::ModelError,
     futures::lock::Mutex,
     std::sync::Arc,
 };

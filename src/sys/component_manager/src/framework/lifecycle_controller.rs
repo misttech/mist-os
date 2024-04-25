@@ -8,7 +8,6 @@ use {
         model::{
             actions::{ActionSet, StopAction},
             component::{IncomingCapabilities, StartReason, WeakComponentInstance},
-            error::ModelError,
             model::Model,
         },
     },
@@ -16,6 +15,7 @@ use {
     async_trait::async_trait,
     cm_rust::FidlIntoNative,
     cm_types::Name,
+    errors::ModelError,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,

@@ -7,7 +7,6 @@ use {
         actions::{Action, ActionKey, ActionSet},
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
-        error::ActionError,
     },
     async_trait::async_trait,
     cm_rust::{
@@ -20,6 +19,7 @@ use {
         UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_types::{IterablePath, Name},
+    errors::ActionError,
     futures::future::select_all,
     moniker::{ChildName, ChildNameBase},
     std::collections::{HashMap, HashSet},
@@ -939,7 +939,6 @@ mod tests {
         crate::model::{
             actions::StopAction,
             component::StartReason,
-            error::StopActionError,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, execution_is_shut_down, has_child,
@@ -951,6 +950,7 @@ mod tests {
         cm_rust::{ComponentDecl, DependencyType, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         cm_types::AllowedOffers,
+        errors::StopActionError,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         maplit::{btreeset, hashmap, hashset},
         moniker::Moniker,

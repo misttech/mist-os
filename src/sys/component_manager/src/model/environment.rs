@@ -156,7 +156,6 @@ mod tests {
         crate::model::{
             component::StartReason,
             context::ModelContext,
-            error::{ActionError, ModelError, ResolveActionError},
             model::{Model, ModelParams},
             structured_dict::ComponentInput,
             testing::mocks::MockResolver,
@@ -173,6 +172,7 @@ mod tests {
             ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
         },
         cm_types::Name,
+        errors::{ActionError, ModelError, ResolveActionError},
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},

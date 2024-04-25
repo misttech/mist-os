@@ -67,9 +67,10 @@ pub use {
 };
 
 use {
-    crate::model::{component::ComponentInstance, error::ActionError},
+    crate::model::component::ComponentInstance,
     async_trait::async_trait,
     cm_util::AbortHandle,
+    errors::ActionError,
     fuchsia_async as fasync,
     futures::{
         channel::oneshot,
@@ -396,10 +397,8 @@ impl ActionSet {
 #[cfg(test)]
 pub mod tests {
     use {
-        super::*,
-        crate::model::{error::StopActionError, testing::test_helpers::ActionsTest},
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
+        super::*, crate::model::testing::test_helpers::ActionsTest, assert_matches::assert_matches,
+        errors::StopActionError, fuchsia_async as fasync,
     };
 
     async fn register_action_in_new_task<A>(

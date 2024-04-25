@@ -6,7 +6,6 @@ use {
     crate::model::{
         actions::{ActionSet, DestroyAction, ShutdownType},
         component::StartReason,
-        error::{ActionError, CreateNamespaceError, ModelError, StartActionError},
         routing::route_and_open_capability,
         start::Start,
         testing::routing_test_helpers::*,
@@ -21,6 +20,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     component_id_index::InstanceId,
+    errors::{ActionError, CreateNamespaceError, ModelError, StartActionError},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::TestExecutor,

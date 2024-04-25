@@ -5,10 +5,7 @@
 use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability},
-        model::{
-            component::WeakComponentInstance, error::CapabilityProviderError,
-            testing::routing_test_helpers::*,
-        },
+        model::{component::WeakComponentInstance, testing::routing_test_helpers::*},
     },
     ::routing::capability_source::InternalCapability,
     ::routing_test_helpers::{rights::CommonRightsTest, RoutingTestModel},
@@ -16,6 +13,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     cm_util::TaskGroup,
+    errors::CapabilityProviderError,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };

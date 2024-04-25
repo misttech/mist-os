@@ -19,10 +19,6 @@ use {
             },
             context::ModelContext,
             environment::Environment,
-            error::{
-                ActionError, AddChildError, CreateNamespaceError, DynamicOfferError,
-                OpenOutgoingDirError, ResolveActionError, StopError,
-            },
             escrow::{self, EscrowedState},
             hooks::{CapabilityReceiver, Event, EventPayload},
             namespace::create_namespace,
@@ -59,6 +55,10 @@ use {
     },
     cm_types::Name,
     config_encoder::ConfigFields,
+    errors::{
+        ActionError, AddChildError, CreateNamespaceError, DynamicOfferError, OpenOutgoingDirError,
+        ResolveActionError, StopError,
+    },
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,

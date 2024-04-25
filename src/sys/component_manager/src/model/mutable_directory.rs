@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::error::VfsError,
+    errors::VfsError,
     std::sync::Arc,
     vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
 };

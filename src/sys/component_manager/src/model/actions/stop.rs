@@ -6,9 +6,9 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::ComponentInstance,
-        error::ActionError,
     },
     async_trait::async_trait,
+    errors::ActionError,
     std::sync::Arc,
 };
 
@@ -45,7 +45,6 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::{test_utils::is_stopped, ActionSet},
-            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             testing::{
                 test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -53,6 +52,7 @@ pub mod tests {
             },
         },
         cm_rust_testing::ComponentDeclBuilder,
+        errors::ModelError,
         futures::channel::oneshot,
         futures::lock::Mutex,
         moniker::{Moniker, MonikerBase},

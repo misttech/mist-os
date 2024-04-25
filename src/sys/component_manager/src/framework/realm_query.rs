@@ -7,7 +7,6 @@ use {
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::OpenExposedDirError,
             model::Model,
             namespace::create_namespace,
             resolver::Resolver,
@@ -19,6 +18,7 @@ use {
     bedrock_error::Explain,
     cm_rust::NativeIntoFidl,
     cm_types::Name,
+    errors::OpenExposedDirError,
     fidl::{
         endpoints::{ClientEnd, ServerEnd},
         prelude::*,

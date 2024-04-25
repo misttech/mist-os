@@ -7,7 +7,6 @@ use {
         constants::PKG_PATH,
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
-            error::CreateNamespaceError,
             routing::router_ext::{RouterExt, WeakComponentTokenExt},
             routing::{self, route_and_open_capability},
         },
@@ -19,6 +18,7 @@ use {
     },
     bedrock_error::{BedrockError, Explain},
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
+    errors::CreateNamespaceError,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{

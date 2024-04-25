@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use errors::ModelError;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect::{IntExponentialHistogramProperty, IntLinearHistogramProperty};
 use fuchsia_sync as fsync;
@@ -15,10 +16,7 @@ use fuchsia_zircon as zx;
 use inspect::HistogramProperty;
 use moniker::Moniker;
 
-use crate::model::{
-    error::ModelError,
-    hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
-};
+use crate::model::hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 
 const STARTED_DURATIONS: &str = "started_durations";
 const STOPPED_DURATIONS: &str = "stopped_durations";

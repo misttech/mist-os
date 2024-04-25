@@ -10,12 +10,12 @@ use {
         },
         component::instance::InstanceState,
         component::{ComponentInstance, IncomingCapabilities, StartReason},
-        error::{ActionError, DestroyActionError},
         hooks::{Event, EventPayload},
         structured_dict::ComponentInput,
     },
     ::routing::component_instance::ExtendedInstanceInterface,
     async_trait::async_trait,
+    errors::{ActionError, DestroyActionError},
     futures::{future::join_all, Future},
     moniker::MonikerBase,
     std::{

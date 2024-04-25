@@ -4,11 +4,7 @@
 use {
     crate::{
         capability::CapabilityProvider,
-        model::{
-            component::WeakComponentInstance,
-            error::{CapabilityProviderError, OpenError},
-            routing::router_ext::WeakComponentTokenExt,
-        },
+        model::{component::WeakComponentInstance, routing::router_ext::WeakComponentTokenExt},
         sandbox_util::DictExt,
     },
     ::routing::error::RoutingError,
@@ -18,6 +14,7 @@ use {
     cm_rust::Availability,
     cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
     cm_util::TaskGroup,
+    errors::{CapabilityProviderError, OpenError},
     sandbox::Request,
     sandbox::WeakComponentToken,
     std::sync::Arc,

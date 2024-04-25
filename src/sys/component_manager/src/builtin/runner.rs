@@ -4,13 +4,14 @@
 use {
     crate::{
         capability::{BuiltinCapability, CapabilityProvider},
-        model::{component::WeakComponentInstance, error::CapabilityProviderError},
+        model::component::WeakComponentInstance,
     },
     ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
     async_trait::async_trait,
     cm_config::SecurityPolicy,
     cm_types::Name,
     cm_util::TaskGroup,
+    errors::CapabilityProviderError,
     fuchsia_zircon as zx,
     std::sync::Arc,
     vfs::directory::entry::OpenRequest,

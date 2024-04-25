@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        error::ModelError,
-        hooks::{Event, EventType, Hook, HooksRegistration},
-    },
+    crate::model::hooks::{Event, EventType, Hook, HooksRegistration},
     async_trait::async_trait,
+    errors::ModelError,
     futures::{channel::*, lock::Mutex},
     moniker::MonikerBase,
     std::sync::{Arc, Weak},

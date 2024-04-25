@@ -7,10 +7,10 @@ use {
         actions::{shutdown::do_shutdown, Action, ActionKey, ShutdownType},
         component::instance::InstanceState,
         component::ComponentInstance,
-        error::{ActionError, UnresolveActionError},
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
+    errors::{ActionError, UnresolveActionError},
     std::sync::Arc,
 };
 
@@ -95,7 +95,6 @@ pub mod tests {
             actions::test_utils::{is_destroyed, is_discovered, is_resolved, is_shutdown},
             actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
             component::{ComponentInstance, StartReason},
-            error::{ActionError, UnresolveActionError},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -104,6 +103,7 @@ pub mod tests {
         cm_rust::{Availability, UseEventStreamDecl, UseSource},
         cm_rust_testing::*,
         cm_types::Name,
+        errors::{ActionError, UnresolveActionError},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::{Moniker, MonikerBase},
         std::sync::Arc,

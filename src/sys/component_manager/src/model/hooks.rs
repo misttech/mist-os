@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        component::{ComponentInstance, WeakComponentInstance},
-        error::ModelError,
-    },
+    crate::model::component::{ComponentInstance, WeakComponentInstance},
     anyhow::format_err,
     async_trait::async_trait,
     cm_rust::ComponentDecl,
     cm_types::Name,
+    errors::ModelError,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},

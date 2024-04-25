@@ -7,7 +7,6 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance},
-            error::{CapabilityProviderError, ModelError, OpenError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
             routing::{CapabilityOpenRequest, CapabilitySource, RouteSource},
@@ -18,6 +17,7 @@ use {
     cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
     cm_types::{IterablePath, Name, RelativePath},
     cm_util::TaskGroup,
+    errors::{CapabilityProviderError, ModelError, OpenError},
     fidl_fuchsia_io as fio,
     flyweights::FlyStr,
     fuchsia_async::{DurationExt, TimeoutExt},

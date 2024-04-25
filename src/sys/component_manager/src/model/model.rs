@@ -8,12 +8,12 @@ use {
         component::{manager::ComponentManagerInstance, ComponentInstance, StartReason},
         context::ModelContext,
         environment::Environment,
-        error::ModelError,
         start::Start,
         structured_dict::ComponentInput,
         token::InstanceRegistry,
     },
     cm_config::RuntimeConfig,
+    errors::ModelError,
     std::sync::Arc,
     tracing::warn,
 };
@@ -136,7 +136,6 @@ pub mod tests {
     use {
         crate::model::{
             actions::{ActionSet, ShutdownAction, ShutdownType},
-            error::ModelError,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
             structured_dict::ComponentInput,
@@ -144,6 +143,7 @@ pub mod tests {
         },
         async_trait::async_trait,
         cm_rust_testing::*,
+        errors::ModelError,
         moniker::Moniker,
         std::sync::{Arc, Weak},
     };

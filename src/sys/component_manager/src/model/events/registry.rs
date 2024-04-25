@@ -8,7 +8,6 @@ use {
         model::{
             component::instance::InstanceState,
             component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance},
-            error::{EventsError, ModelError},
             events::{
                 dispatcher::{EventDispatcher, EventDispatcherScope},
                 stream::EventStream,
@@ -29,6 +28,7 @@ use {
     async_trait::async_trait,
     cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl},
     cm_types::Name,
+    errors::{EventsError, ModelError},
     futures::lock::Mutex,
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{

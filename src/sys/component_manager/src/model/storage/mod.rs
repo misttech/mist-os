@@ -8,7 +8,6 @@ use {
         capability::CapabilitySource,
         model::{
             component::{ComponentInstance, StartReason},
-            error::{ModelError, StorageError},
             routing::{Route, RouteSource},
             start::Start,
         },
@@ -21,6 +20,7 @@ use {
     cm_types::RelativePath,
     component_id_index::InstanceId,
     derivative::Derivative,
+    errors::{ModelError, StorageError},
     fidl::endpoints,
     fidl_fuchsia_io as fio,
     moniker::MonikerBase,

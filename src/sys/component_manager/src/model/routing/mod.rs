@@ -14,7 +14,6 @@ use {
         capability::CapabilitySource,
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::ModelError,
             storage,
         },
     },
@@ -23,6 +22,7 @@ use {
     bedrock_error::{BedrockError, Explain},
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     cm_types::{Availability, Name},
+    errors::ModelError,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
     moniker::MonikerBase,
@@ -64,8 +64,7 @@ pub(super) fn capability_into_open(capability: Capability) -> Result<Open, Bedro
     match capability {
         Capability::Unit(_) => Err(RoutingError::SourceCapabilityIsVoid.into()),
         cap => Ok(Open::new(
-            cap.try_into_directory_entry()
-                .map_err(crate::model::error::OpenError::DoesNotSupportOpen)?,
+            cap.try_into_directory_entry().map_err(errors::OpenError::DoesNotSupportOpen)?,
         )),
     }
 }

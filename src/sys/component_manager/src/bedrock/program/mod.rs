@@ -3,13 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    model::{
-        error::{StartError, StopError},
-        escrow::EscrowedState,
-        token::InstanceToken,
-    },
+    model::{escrow::EscrowedState, token::InstanceToken},
     runner::RemoteRunner,
 };
+use errors::{StartError, StopError};
 use fidl::endpoints;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_component_runner as fcrunner;

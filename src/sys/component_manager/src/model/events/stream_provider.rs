@@ -5,7 +5,6 @@
 use {
     crate::model::{
         component::WeakExtendedInstance,
-        error::{EventsError, ModelError},
         events::{
             registry::{EventRegistry, EventSubscription},
             stream::EventStream,
@@ -14,6 +13,7 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl},
+    errors::{EventsError, ModelError},
     futures::lock::Mutex,
     moniker::{ExtendedMoniker, Moniker},
     std::{

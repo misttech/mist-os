@@ -17,7 +17,6 @@ use {
         },
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::ModelError,
             model::Model,
             routing::{Route, RouteSource},
             storage::{self, BackingDirectoryInfo},
@@ -30,6 +29,7 @@ use {
     cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
     cm_types::Name,
     component_id_index::InstanceId,
+    errors::ModelError,
     fidl::{endpoints::ServerEnd, prelude::*},
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},

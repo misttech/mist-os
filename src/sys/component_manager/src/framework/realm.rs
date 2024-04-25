@@ -7,7 +7,6 @@ use {
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::OpenExposedDirError,
             model::Model,
         },
     },
@@ -17,6 +16,7 @@ use {
     cm_config::RuntimeConfig,
     cm_rust::FidlIntoNative,
     cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
+    errors::OpenExposedDirError,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
