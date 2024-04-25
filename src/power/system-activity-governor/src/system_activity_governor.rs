@@ -18,11 +18,10 @@ use fuchsia_inspect::{ArrayProperty, Property};
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{
     channel::mpsc::{self, Receiver, Sender},
-    future::LocalBoxFuture,
     lock::Mutex,
     prelude::*,
 };
-use power_broker_client::PowerElementContext;
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use std::{
     cell::{OnceCell, RefCell},
     rc::Rc,
@@ -333,81 +332,6 @@ impl SuspendStatsManager {
     }
 }
 
-fn default_update_fn<'a>(
-    power_element: &'a PowerElementContext,
-) -> Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()> + 'a> {
-    Box::new(move |new_power_level: fbroker::PowerLevel| {
-        async move {
-            let element_name = power_element.name();
-
-            tracing::debug!(
-                ?element_name,
-                ?new_power_level,
-                "default_update_fn: updating current level"
-            );
-
-            let res = power_element.current_level.update(new_power_level).await;
-            if let Err(error) = res {
-                tracing::warn!(
-                    ?element_name,
-                    ?error,
-                    "default_update_fn: updating current level failed"
-                );
-            }
-        }
-        .boxed_local()
-    })
-}
-
-async fn run_power_element<'a>(
-    element_name: &'a str,
-    required_level: &'a fbroker::RequiredLevelProxy,
-    initial_level: fbroker::PowerLevel,
-    inspect_node: fuchsia_inspect::Node,
-    update_fn: Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()> + 'a>,
-) {
-    let mut last_required_level = initial_level;
-    let power_level_node = inspect_node.create_uint("power_level", last_required_level.into());
-
-    loop {
-        tracing::debug!(
-            ?element_name,
-            ?last_required_level,
-            "run_power_element: waiting for new level"
-        );
-        match required_level.watch().await {
-            Ok(Ok(required_level)) => {
-                tracing::debug!(
-                    ?element_name,
-                    ?required_level,
-                    ?last_required_level,
-                    "run_power_element: new level requested"
-                );
-                if required_level == last_required_level {
-                    tracing::debug!(
-                        ?element_name,
-                        ?required_level,
-                        ?last_required_level,
-                        "run_power_element: required level has not changed, skipping."
-                    );
-                    continue;
-                }
-
-                update_fn(required_level).await;
-                power_level_node.set(required_level.into());
-                last_required_level = required_level;
-            }
-            error => {
-                tracing::warn!(
-                    ?element_name,
-                    ?error,
-                    "run_power_element: watch_required_level failed"
-                )
-            }
-        }
-    }
-}
-
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
 /// APIs.
 pub struct SystemActivityGovernor {
@@ -598,7 +522,7 @@ impl SystemActivityGovernor {
                 &element_name,
                 &required_level,
                 ExecutionStateLevel::Inactive.into_primitive(),
-                execution_state_node,
+                Some(execution_state_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let sag = sag.clone();
                     let mut execution_state_suspend_signaller =
@@ -629,7 +553,7 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
-            let update_fn = Rc::new(default_update_fn(&this.application_activity));
+            let update_fn = Rc::new(basic_update_fn_factory(&this.application_activity));
 
             tracing::info!("System is booting. Acquiring boot control lease.");
             let boot_control_lease = this
@@ -645,7 +569,7 @@ impl SystemActivityGovernor {
                 this.application_activity.name(),
                 &this.application_activity.required_level,
                 ApplicationActivityLevel::Inactive.into_primitive(),
-                application_activity_node,
+                Some(application_activity_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let update_fn = update_fn.clone();
                     let boot_control_lease = boot_control_lease.clone();
@@ -681,8 +605,8 @@ impl SystemActivityGovernor {
                 &this.full_wake_handling.name(),
                 &this.full_wake_handling.required_level,
                 FullWakeHandlingLevel::Inactive.into_primitive(),
-                full_wake_handling_node,
-                default_update_fn(&this.full_wake_handling),
+                Some(full_wake_handling_node),
+                basic_update_fn_factory(&this.full_wake_handling),
             )
             .await;
         })
@@ -698,8 +622,8 @@ impl SystemActivityGovernor {
                 this.wake_handling.name(),
                 &this.wake_handling.required_level,
                 WakeHandlingLevel::Inactive.into_primitive(),
-                wake_handling_node,
-                default_update_fn(&this.wake_handling),
+                Some(wake_handling_node),
+                basic_update_fn_factory(&this.wake_handling),
             )
             .await;
         })
@@ -924,14 +848,14 @@ impl ResumeLatencyContext {
 
         let this = self.clone();
         fasync::Task::local(async move {
-            let update_fn = Rc::new(default_update_fn(&this.execution_resume_latency));
+            let update_fn = Rc::new(basic_update_fn_factory(&this.execution_resume_latency));
 
             let resume_latency_ctx = this.clone();
             run_power_element(
                 this.execution_resume_latency.name(),
                 &this.execution_resume_latency.required_level,
                 initial_level,
-                execution_resume_latency_node,
+                Some(execution_resume_latency_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let this = resume_latency_ctx.clone();
                     let execution_state_manager = execution_state_manager.clone();

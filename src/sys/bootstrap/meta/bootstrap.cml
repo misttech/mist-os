@@ -100,6 +100,20 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "#system-activity-governor",
+            to: "#shutdown_shim",
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#shutdown_shim",
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

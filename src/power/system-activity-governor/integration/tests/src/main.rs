@@ -236,6 +236,13 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     set_up_default_suspender(&suspend_device).await;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
 
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
 
