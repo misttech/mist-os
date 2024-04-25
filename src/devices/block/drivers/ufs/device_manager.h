@@ -76,10 +76,17 @@ class DeviceManager {
 
   bool IsSuspended() const { return current_power_mode_ != UfsPowerMode::kActive; }
 
-  // for test
-  DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
 
+  // This function is only used for the QEMU quirk case.
+  void SetCurrentPowerMode(UfsPowerMode power_mode) {
+    current_power_mode_ = power_mode;
+    current_power_condition_ = power_mode_map_[power_mode].first;
+    current_link_state_ = power_mode_map_[power_mode].second;
+  }
+
+  // for test
+  DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   PowerModeMap &GetPowerModeMap() { return power_mode_map_; }
   UfsPowerMode GetCurrentPowerMode() const { return current_power_mode_; }
   scsi::PowerCondition GetCurrentPowerCondition() const { return current_power_condition_; }

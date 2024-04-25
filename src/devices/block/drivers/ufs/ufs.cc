@@ -452,6 +452,10 @@ zx_status_t Ufs::Init() {
 
   auto controller_node = inspect_node_.CreateChild("controller");
 
+  if (zx::result<> result = InitQuirk(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize quirk: %s", result.status_string());
+    return result.error_value();
+  }
   if (zx::result<> result = InitController(); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize UFS controller: %s", result.status_string());
     return result.error_value();
@@ -489,6 +493,30 @@ zx_status_t Ufs::Init() {
   zxlogf(INFO, "Bind Success");
 
   return ZX_OK;
+}
+
+zx::result<> Ufs::InitQuirk() {
+  // Check PCI device quirk.
+  if (pci_.is_valid()) {
+    fuchsia_hardware_pci::wire::DeviceInfo info;
+    if (zx_status_t status = pci_.GetDeviceInfo(&info); status != ZX_OK) {
+      zxlogf(ERROR, "Failed to get PCI device info: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
+
+    // Check that the current environment is QEMU.
+    // Vendor ID = 0x1b36: Red Hat, Inc
+    // Device ID = 0x0013: QEMU UFS Host Controller
+    constexpr uint16_t kRedHatVendorId = 0x1b36;
+    constexpr uint16_t kQemuUfsHostController = 0x0013;
+    if ((info.vendor_id == kRedHatVendorId) && (info.device_id == kQemuUfsHostController)) {
+      qemu_quirk_ = true;
+    }
+    zxlogf(INFO, "PCI device info: Vendor ID = 0x%x, Device ID = 0x%x", info.vendor_id,
+           info.device_id);
+  }
+
+  return zx::ok();
 }
 
 zx::result<> Ufs::InitController() {
@@ -635,21 +663,27 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
   }
 
   auto unipro_node = controller_node.CreateChild("unipro");
-  if (zx::result<> result = device_manager_->InitUniproAttributes(unipro_node); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize Unipro attributes %s", result.status_string());
-    return result.take_error();
-  }
-
-  if (zx::result<> result = device_manager_->InitUicPowerMode(unipro_node); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize UIC power mode %s", result.status_string());
-    return result.take_error();
-  }
-
   auto attributes_node = controller_node.CreateChild("attributes");
-  if (zx::result<> result = device_manager_->InitUfsPowerMode(controller_node, attributes_node);
-      result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize UFS power mode %s", result.status_string());
-    return result.take_error();
+  if (qemu_quirk_) {
+    // Currently, QEMU UFS devices do not support unipro and power mode.
+    device_manager_->SetCurrentPowerMode(UfsPowerMode::kActive);
+  } else {
+    if (zx::result<> result = device_manager_->InitUniproAttributes(unipro_node);
+        result.is_error()) {
+      zxlogf(ERROR, "Failed to initialize Unipro attributes %s", result.status_string());
+      return result.take_error();
+    }
+
+    if (zx::result<> result = device_manager_->InitUicPowerMode(unipro_node); result.is_error()) {
+      zxlogf(ERROR, "Failed to initialize UIC power mode %s", result.status_string());
+      return result.take_error();
+    }
+
+    if (zx::result<> result = device_manager_->InitUfsPowerMode(controller_node, attributes_node);
+        result.is_error()) {
+      zxlogf(ERROR, "Failed to initialize UFS power mode %s", result.status_string());
+      return result.take_error();
+    }
   }
 
   zx::result<uint32_t> result = device_manager_->GetBootLunEnabled();
