@@ -12,7 +12,6 @@
 #include "src/performance/trace/commands/time.h"
 
 #include <lib/syslog/cpp/macros.h>
-#include <stdint.h>
 #include <zircon/syscalls.h>
 
 #include <iomanip>
@@ -21,25 +20,23 @@
 namespace tracing {
 
 Command::Info TimeCommand::Describe() {
-  return Command::Info{
-      [](sys::ComponentContext* context) { return std::make_unique<TimeCommand>(context); },
-      "time",
-      "interactively print timestamps",
-      {}};
+  return Command::Info{[]() { return std::make_unique<TimeCommand>(); },
+                       "time",
+                       "interactively print timestamps",
+                       {}};
 }
 
-TimeCommand::TimeCommand(sys::ComponentContext* context) : Command(context) {}
+TimeCommand::TimeCommand() = default;
 
 void TimeCommand::Start(const fxl::CommandLine& command_line) {
   if (!(command_line.options().empty() && command_line.positional_args().empty())) {
-    FX_LOGS(ERROR) << "We encountered unknown options, please check your "
-                   << "command invocation";
+    FX_LOGS(ERROR) << "We encountered unknown options, please check your " << "command invocation";
     Done(EXIT_FAILURE);
     return;
   }
 
   out() << "Time sync tool: Input \"t\" to get a tracing timestamp in "
-        << "microseconds. Input \"q\" to quit." << std::endl;
+        << "microseconds. Input \"q\" to quit.\n";
 
   double tick_scale = 1'000'000.0 / static_cast<double>(zx_ticks_per_second());
   char c;
@@ -51,7 +48,7 @@ void TimeCommand::Start(const fxl::CommandLine& command_line) {
         return;
       case 't': {
         double timestamp = static_cast<double>(zx_ticks_get()) * tick_scale;
-        out() << std::fixed << std::setprecision(3) << timestamp << std::endl;
+        out() << std::fixed << std::setprecision(3) << timestamp << '\n';
         break;
       }
       default:

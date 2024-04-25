@@ -13,7 +13,7 @@ class TimeCommand : public Command {
  public:
   static Info Describe();
 
-  explicit TimeCommand(sys::ComponentContext* context);
+  explicit TimeCommand();
 
  protected:
   void Start(const fxl::CommandLine& command_line) override;

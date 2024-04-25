@@ -13,8 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace tracing {
-namespace test {
+namespace tracing::test {
 
 // Our component's tmp directory.
 constexpr char kTestTmpPath[] = "/tmp";
@@ -61,7 +60,6 @@ bool VerifyIntegrationTest(const std::string& app_path, const std::string& test_
                            const std::string& relative_output_file_path,
                            const fuchsia_logging::LogSettings& log_settings);
 
-}  // namespace test
-}  // namespace tracing
+}  // namespace tracing::test
 
 #endif  // SRC_PERFORMANCE_TRACE_TESTS_RUN_TEST_H_

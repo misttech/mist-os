@@ -5,7 +5,7 @@
 #ifndef SRC_PERFORMANCE_TRACE_CMD_UTILS_H_
 #define SRC_PERFORMANCE_TRACE_CMD_UTILS_H_
 
-#include <fuchsia/tracing/controller/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.controller/cpp/fidl.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,12 +18,12 @@
 
 namespace tracing {
 
-namespace controller = fuchsia::tracing::controller;
+namespace controller = fuchsia_tracing_controller;
 
 constexpr uint32_t kDefaultDurationSeconds = 10;
 constexpr uint32_t kDefaultBufferSizeMegabytes = 4;
-constexpr fuchsia::tracing::BufferingMode kDefaultBufferingMode =
-    fuchsia::tracing::BufferingMode::ONESHOT;
+constexpr fuchsia_tracing::BufferingMode kDefaultBufferingMode =
+    fuchsia_tracing::BufferingMode::kOneshot;
 
 constexpr char kDefaultOutputFileName[] = "/tmp/trace.json";
 constexpr char kDefaultBinaryOutputFileName[] = "/tmp/trace.fxt";
@@ -42,7 +42,7 @@ bool ParseTriggers(const std::vector<std::string_view>& values,
 
 bool ParseAction(std::string_view value, Action* out_action);
 
-fuchsia::tracing::BufferingMode TranslateBufferingMode(BufferingMode mode);
+fuchsia_tracing::BufferingMode TranslateBufferingMode(BufferingMode mode);
 
 // Uniquify the list, with later entries overriding earlier entries,
 // and convert to the FIDL form.

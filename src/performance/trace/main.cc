@@ -13,13 +13,12 @@
 
 int main(int argc, const char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
-  if (!fxl::SetLogSettingsFromCommandLine(command_line))
+  if (!fxl::SetLogSettingsFromCommandLine(command_line)) {
     return 1;
+  }
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-
-  tracing::App app(context.get());
+  tracing::App app;
   int32_t return_code = EXIT_SUCCESS;
   async::PostTask(loop.dispatcher(), [&app, &command_line, &return_code, &loop] {
     app.Run(command_line, [&return_code, &loop](int32_t code) {

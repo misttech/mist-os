@@ -5,7 +5,7 @@
 #ifndef SRC_PERFORMANCE_TRACE_TRACER_H_
 #define SRC_PERFORMANCE_TRACE_TRACER_H_
 
-#include <fuchsia/tracing/controller/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.controller/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
 #include <lib/trace-engine/fields.h>
@@ -18,7 +18,7 @@
 
 namespace tracing {
 
-namespace controller = ::fuchsia::tracing::controller;
+namespace controller = fuchsia_tracing_controller;
 
 // Runs traces.
 class Tracer {
@@ -29,7 +29,8 @@ class Tracer {
   using ErrorHandler = trace::TraceReader::ErrorHandler;
 
   // Called when tracing has completed starting.
-  using StartCallback = fit::callback<void(controller::Controller_StartTracing_Result result)>;
+  using StartCallback =
+      fit::callback<void(fidl::Result<controller::Controller::StartTracing> result)>;
 
   // This is called when there's a failure and trace processing must stop.
   using FailCallback = fit::callback<void()>;
@@ -41,7 +42,7 @@ class Tracer {
   // This is called when an alert is received.
   using AlertCallback = fit::function<void(std::string)>;
 
-  explicit Tracer(controller::Controller* controller);
+  explicit Tracer(fidl::Client<controller::Controller> controller);
   ~Tracer();
 
   // Initialize tracing.
@@ -79,7 +80,7 @@ class Tracer {
 
   void BeginWatchAlert();
 
-  controller::Controller* const controller_;
+  fidl::Client<controller::Controller> const controller_;
 
   State state_ = State::kReady;
 
