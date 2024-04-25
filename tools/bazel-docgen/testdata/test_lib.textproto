@@ -50,11 +50,33 @@ func_info {
   function_name: "some_function"
   parameter {
     name: "name"
+    doc_string: "the name to pass"
     mandatory: true
   }
+  parameter {
+    name: "some_val"
+    doc_string: "some value to supply"
+    default_value: "\"some_default\""
+  }
+  parameter {
+    name: "some_int"
+    doc_string: "some integer value"
+    default_value: "1"
+  }
   doc_string: "a starlark function"
+  return {
+    doc_string: "The number 1"
+  }
   origin_key {
     name: "some_function"
+    file: "//tools/bazel-docgen/testdata:foo.bzl"
+  }
+}
+func_info {
+  function_name: "empty_function"
+  doc_string: "empty function"
+  origin_key {
+    name: "empty_function"
     file: "//tools/bazel-docgen/testdata:foo.bzl"
   }
 }

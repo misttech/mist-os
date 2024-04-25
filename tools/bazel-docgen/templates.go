@@ -22,13 +22,34 @@ const ruleTemplate = `
 
 | Name  | Description | Type | Mandatory | Default |
 | :------------- | :------------- | :------------- | :------------- | :------------- |
-{{ range .Attribute }}| {{ .Name }} | {{description .DocString }} | {{attributeTypeString .Type }} | {{isMandatory .Mandatory }} | {{defaultValue .DefaultValue }} |
-{{ end }}
+{{range .Attribute }}| {{ .Name }} | {{description .DocString }} | {{attributeTypeString .Type }} | {{isMandatory .Mandatory }} | {{defaultValue .DefaultValue }} |
+{{end }}
 `
 
 // TODO: these are all just stubs, need actual implementation
 const providerTemplate = ""
-const starlarkFunctionTemplate = ""
+const starlarkFunctionTemplate = `
+[TOC]
+
+# {{ .FunctionName }}
+
+{{ .DocString }}
+
+{{if .Parameter }}## **PARAMETERS**
+
+
+| Name  | Description | Default |
+| :------------- | :------------- | :------------- |
+{{range .Parameter }}| {{ .Name }} | {{description .DocString }} | {{defaultValue .DefaultValue }} |
+{{end}}{{end}}
+
+{{if .Return }}
+**RETURNS**
+
+{{with .Return }}{{ .DocString }}{{end}}
+{{end}}
+`
+
 const repositoryRuleTemplate = ""
 
 var (

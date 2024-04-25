@@ -27,6 +27,10 @@ def some_function(name, some_val = "some_default", some_int = 1):
     """
     return 1
 
+def empty_function():
+    """ empty function """
+    pass
+
 FooInfo = provider(
     doc = "Some provider",
     fields = {

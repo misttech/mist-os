@@ -73,6 +73,7 @@ if (is_host) {
       "$target_gen_dir/goldens/README.md",
       "$target_gen_dir/goldens/rule_example_rule.md",
       "$target_gen_dir/goldens/func_some_function.md",
+      "$target_gen_dir/goldens/func_empty_function.md",
       "$target_gen_dir/goldens/provider_FooInfo.md",
       "$target_gen_dir/goldens/repo_rule_empty_repo.md",
     ]
@@ -97,6 +98,10 @@ if (is_host) {
       {
         golden = "goldens/func_some_function.md.golden"
         candidate = "$target_gen_dir/goldens/func_some_function.md"
+      },
+      {
+        golden = "goldens/func_empty_function.md.golden"
+        candidate = "$target_gen_dir/goldens/func_empty_function.md"
       },
       {
         golden = "goldens/provider_FooInfo.md.golden"
