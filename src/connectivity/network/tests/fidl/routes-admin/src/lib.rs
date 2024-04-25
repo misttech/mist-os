@@ -44,8 +44,8 @@ struct TestSetup<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> {
     realm: netemul::TestRealm<'a>,
     network: netemul::TestNetwork<'a>,
     interface: netemul::TestInterface<'a>,
-    set_provider: <I::RouteTableMarker as ProtocolMarker>::Proxy,
-    global_set_provider: <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
+    route_table: <I::RouteTableMarker as ProtocolMarker>::Proxy,
+    global_route_table: <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
     state: <I::StateMarker as ProtocolMarker>::Proxy,
 }
 
@@ -67,15 +67,15 @@ impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
         let network =
             sandbox.create_network(format!("routes-admin-{name}")).await.expect("create network");
         let interface = realm.join_network(&network, "ep1").await.expect("join network");
-        let set_provider = realm
+        let route_table = realm
             .connect_to_protocol::<I::RouteTableMarker>()
             .expect("connect to routes-admin RouteTable");
-        let global_set_provider = realm
+        let global_route_table = realm
             .connect_to_protocol::<I::GlobalRouteTableMarker>()
             .expect("connect to global route set provider");
 
         let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to routes State");
-        TestSetup { realm, network, interface, set_provider, global_set_provider, state }
+        TestSetup { realm, network, interface, route_table, global_route_table, state }
     }
 }
 
@@ -153,8 +153,8 @@ async fn add_remove_route<
         realm: _realm,
         network: _network,
         interface,
-        set_provider,
-        global_set_provider,
+        route_table,
+        global_route_table,
         state,
     } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
@@ -170,10 +170,10 @@ async fn add_remove_route<
     println!("initial routes = {routes:?}");
 
     let proxy = match route_set_type {
-        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
             .expect("new global route set"),
         RouteSet::User => {
-            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+            fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set")
         }
     };
 
@@ -333,12 +333,11 @@ async fn validates_route_v4<N: Netstack>(
         realm: _realm,
         network: _network,
         interface,
-        set_provider,
-        global_set_provider: _,
+        route_table,
+        global_route_table: _,
         state: _,
     } = TestSetup::<Ipv4>::new::<N>(&sandbox, name).await;
-    let proxy =
-        fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider).expect("new route set");
+    let proxy = fnet_routes_ext::admin::new_route_set::<Ipv4>(&route_table).expect("new route set");
     let grant = interface.get_authorization().await.expect("getting grant should succeed");
     let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
     fnet_routes_ext::admin::authenticate_for_interface::<Ipv4>(&proxy, proof)
@@ -441,12 +440,11 @@ async fn validates_route_v6<N: Netstack>(
         realm: _realm,
         network: _network,
         interface,
-        set_provider,
-        global_set_provider: _,
+        route_table,
+        global_route_table: _,
         state: _,
     } = TestSetup::<Ipv6>::new::<N>(&sandbox, name).await;
-    let proxy =
-        fnet_routes_ext::admin::new_route_set::<Ipv6>(&set_provider).expect("new route set");
+    let proxy = fnet_routes_ext::admin::new_route_set::<Ipv6>(&route_table).expect("new route set");
     let grant = interface.get_authorization().await.expect("getting grant should succeed");
     let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
     fnet_routes_ext::admin::authenticate_for_interface::<Ipv6>(&proxy, proof)
@@ -485,8 +483,8 @@ async fn add_route_twice_with_same_set<
         realm: _realm,
         network: _network,
         interface,
-        set_provider,
-        global_set_provider,
+        route_table,
+        global_route_table,
         state,
     } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
@@ -501,11 +499,11 @@ async fn add_route_twice_with_same_set<
 
     let proxy = match system_route_protocol {
         SystemRouteProtocol::NetRootRoutes => {
-            fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
                 .expect("new global route set")
         }
         SystemRouteProtocol::NetStack => {
-            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+            fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set")
         }
     };
 
@@ -574,8 +572,8 @@ async fn add_route_with_multiple_route_sets<
         realm: _realm,
         network: _network,
         interface,
-        set_provider,
-        global_set_provider: _,
+        route_table,
+        global_route_table: _,
         state,
     } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
@@ -589,7 +587,7 @@ async fn add_route_with_multiple_route_sets<
             .expect("collect routes should succeed");
 
     let get_route_set =
-        || fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+        || fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set");
     let proxy_a = get_route_set();
     let proxy_b = get_route_set();
 
@@ -673,7 +671,7 @@ async fn add_remove_system_route<
     system_route_protocol: SystemRouteProtocol,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _network, interface, set_provider, global_set_provider, state } =
+    let TestSetup { realm, network: _network, interface, route_table, global_route_table, state } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
@@ -686,7 +684,7 @@ async fn add_remove_system_route<
             .expect("collect routes should succeed");
 
     let route_set =
-        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+        fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set");
     let grant = interface.get_authorization().await.expect("getting grant should succeed");
     let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
     fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
@@ -699,7 +697,7 @@ async fn add_remove_system_route<
     // Add a "system route".
     match system_route_protocol {
         SystemRouteProtocol::NetRootRoutes => {
-            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
                 .expect("new global route set");
 
             let grant = interface.get_authorization().await.expect("getting grant should succeed");
@@ -783,7 +781,7 @@ async fn system_removes_route_from_route_set<
     system_route_protocol: SystemRouteProtocol,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _network, interface, set_provider, global_set_provider, state } =
+    let TestSetup { realm, network: _network, interface, route_table, global_route_table, state } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
@@ -796,7 +794,7 @@ async fn system_removes_route_from_route_set<
             .expect("collect routes should succeed");
 
     let route_set =
-        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+        fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set");
     let grant = interface.get_authorization().await.expect("getting grant should succeed");
     let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
     fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
@@ -824,7 +822,7 @@ async fn system_removes_route_from_route_set<
     // Have the "system" remove that route out from under the RouteSet.
     match system_route_protocol {
         SystemRouteProtocol::NetRootRoutes => {
-            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
                 .expect("new global route set");
 
             let grant = interface.get_authorization().await.expect("getting grant should succeed");
@@ -890,8 +888,8 @@ async fn root_route_apis_can_remove_loopback_route<
         realm,
         network: _network,
         interface: _interface,
-        set_provider: _,
-        global_set_provider,
+        route_table: _,
+        global_route_table,
         state,
     } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
@@ -928,7 +926,7 @@ async fn root_route_apis_can_remove_loopback_route<
     // Remove the loopback route.
     match system_route_protocol {
         SystemRouteProtocol::NetRootRoutes => {
-            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
                 .expect("new global route set");
 
             let iface_id = if let RouteAction::Forward(target) = loopback_route.route.action {
@@ -1008,8 +1006,8 @@ async fn removing_one_default_route_does_not_flip_presence<
         realm: _realm,
         network: _network,
         interface,
-        set_provider,
-        global_set_provider: _,
+        route_table,
+        global_route_table: _,
         state,
     } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
@@ -1018,9 +1016,9 @@ async fn removing_one_default_route_does_not_flip_presence<
     let mut routes_stream = pin!(routes_stream);
 
     let route_set_1 =
-        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+        fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set");
     let route_set_2 =
-        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+        fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set");
     let authenticate = |proxy| async {
         let grant = interface.get_authorization().await.expect("getting grant should succeed");
         let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
@@ -1169,8 +1167,8 @@ async fn dropping_global_route_set_does_not_remove_routes<
         realm: _,
         network: _network,
         interface,
-        set_provider: _,
-        global_set_provider,
+        route_table: _,
+        global_route_table,
         state,
     } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
@@ -1186,7 +1184,7 @@ async fn dropping_global_route_set_does_not_remove_routes<
     let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
     // Create a new global route set and add a new route with it.
-    let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+    let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
         .expect("new global route set");
     let grant = interface.get_authorization().await.expect("getting grant should succeed");
     let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
@@ -1275,7 +1273,7 @@ async fn interface_authorization_fails_with_invalid_token<
     route_set_type: RouteSet,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _, interface, set_provider, global_set_provider, state } =
+    let TestSetup { realm, network: _, interface, route_table, global_route_table, state } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
@@ -1289,10 +1287,10 @@ async fn interface_authorization_fails_with_invalid_token<
     let mut routes_stream = pin!(routes_stream);
 
     let proxy = match route_set_type {
-        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
             .expect("new global route set"),
         RouteSet::User => {
-            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+            fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set")
         }
     };
 
@@ -1358,7 +1356,7 @@ async fn authorizing_for_one_interface_out_of_two<
     route_set_type: RouteSet,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _, interface, set_provider, global_set_provider, state: _ } =
+    let TestSetup { realm, network: _, interface, route_table, global_route_table, state: _ } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
@@ -1368,10 +1366,10 @@ async fn authorizing_for_one_interface_out_of_two<
         .expect("install interface");
 
     let proxy = match route_set_type {
-        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
             .expect("new global route set"),
         RouteSet::User => {
-            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+            fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set")
         }
     };
 
@@ -1409,7 +1407,7 @@ async fn unauthenticated_connections_cannot_remove_routes<
     route_set_type: RouteSet,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _, network: _, interface, set_provider, global_set_provider, state } =
+    let TestSetup { realm: _, network: _, interface, route_table, global_route_table, state } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
@@ -1422,7 +1420,7 @@ async fn unauthenticated_connections_cannot_remove_routes<
             .expect("collect routes should succeed");
 
     {
-        let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+        let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
             .expect("new global route set");
 
         let grant = interface
@@ -1454,10 +1452,10 @@ async fn unauthenticated_connections_cannot_remove_routes<
     }
 
     let proxy = match route_set_type {
-        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_route_table)
             .expect("new global route set"),
         RouteSet::User => {
-            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+            fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set")
         }
     };
 

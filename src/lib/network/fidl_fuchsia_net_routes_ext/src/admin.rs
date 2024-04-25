@@ -118,7 +118,7 @@ impl_responder!(
 /// Dispatches `new_route_set` on either the `RouteTableV4`
 /// or `RouteTableV6` proxy.
 pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
-    set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
+    route_table_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {
     let (route_set_proxy, route_set_server_end) =
         fidl::endpoints::create_proxy::<I::RouteSetMarker>()
@@ -128,15 +128,15 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
     #[generic_over_ip(I, Ip)]
     struct NewRouteSetInput<'a, I: FidlRouteAdminIpExt> {
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
-        set_provider_proxy: &'a <I::RouteTableMarker as ProtocolMarker>::Proxy,
+        route_table_proxy: &'a <I::RouteTableMarker as ProtocolMarker>::Proxy,
     }
     let IpInvariant(result) = I::map_ip::<NewRouteSetInput<'_, I>, _>(
-        NewRouteSetInput::<'_, I> { route_set_server_end, set_provider_proxy },
-        |NewRouteSetInput { route_set_server_end, set_provider_proxy }| {
-            IpInvariant(set_provider_proxy.new_route_set(route_set_server_end))
+        NewRouteSetInput::<'_, I> { route_set_server_end, route_table_proxy },
+        |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
+            IpInvariant(route_table_proxy.new_route_set(route_set_server_end))
         },
-        |NewRouteSetInput { route_set_server_end, set_provider_proxy }| {
-            IpInvariant(set_provider_proxy.new_route_set(route_set_server_end))
+        |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
+            IpInvariant(route_table_proxy.new_route_set(route_set_server_end))
         },
     );
 
@@ -147,7 +147,7 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
 /// Dispatches `global_route_set` on either the `RoutesV4` or `RoutesV6` in
 /// fuchsia.net.root.
 pub fn new_global_route_set<I: Ip + FidlRouteAdminIpExt>(
-    set_provider_proxy: &<I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
+    route_table_proxy: &<I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {
     let (route_set_proxy, route_set_server_end) =
         fidl::endpoints::create_proxy::<I::RouteSetMarker>()
@@ -157,15 +157,15 @@ pub fn new_global_route_set<I: Ip + FidlRouteAdminIpExt>(
     #[generic_over_ip(I, Ip)]
     struct NewRouteSetInput<'a, I: FidlRouteAdminIpExt> {
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
-        set_provider_proxy: &'a <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
+        route_table_proxy: &'a <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
     }
     let IpInvariant(result) = I::map_ip::<NewRouteSetInput<'_, I>, _>(
-        NewRouteSetInput::<'_, I> { route_set_server_end, set_provider_proxy },
-        |NewRouteSetInput { route_set_server_end, set_provider_proxy }| {
-            IpInvariant(set_provider_proxy.global_route_set(route_set_server_end))
+        NewRouteSetInput::<'_, I> { route_set_server_end, route_table_proxy },
+        |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
+            IpInvariant(route_table_proxy.global_route_set(route_set_server_end))
         },
-        |NewRouteSetInput { route_set_server_end, set_provider_proxy }| {
-            IpInvariant(set_provider_proxy.global_route_set(route_set_server_end))
+        |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
+            IpInvariant(route_table_proxy.global_route_set(route_set_server_end))
         },
     );
 
