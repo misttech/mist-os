@@ -29,7 +29,9 @@ class Rtc(rtc.Rtc):
     # Currently, this is board-specific. Once the RTC protocol lands and is
     # routable from the toolbox realm, this affordance can be made
     # board-agnostic.
-    MONIKER = "/bootstrap/pkg-drivers:dev.sys.platform.05_00_2.i2c-0.aml-i2c.i2c.i2c-0-81"
+    MONIKER = (
+        "/bootstrap/pkg-drivers:dev.sys.platform.05_00_2.i2c-0.aml-i2c.i2c-0-81"
+    )
 
     def __init__(
         self,

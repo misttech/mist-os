@@ -24,7 +24,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:03:d/display/amlogic-display/display-coordinator",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:e/tee/optee",
@@ -42,7 +42,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:03:11/clocks",
       "sys/platform/05:03:11/clocks/clock-init",
       "sys/platform/05:03:12:1/aml_tdm/astro-audio-i2s-out",
@@ -95,8 +95,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 
   static const char* kTouchscreenDevicePaths[] = {
-      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
-      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-93/gt92xx_touch/gt92xx-HidDevice",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c-1-93/gt92xx_touch/gt92xx-HidDevice",
   };
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
       cpp20::span(kTouchscreenDevicePaths, std::size(kTouchscreenDevicePaths))));
