@@ -4,12 +4,15 @@
 
 use {
     drivers_only_common::DriversOnlyTestRealm,
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
+    fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_common_security as fidl_wlan_security,
+    fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     fullmac_helpers::config::{default_fullmac_query_info, FullmacDriverConfig},
     futures::StreamExt,
+    ieee80211::MacAddrBytes,
     rand::{seq::SliceRandom, Rng},
-    wlan_common::{assert_variant, random_fidl_bss_description},
+    wlan_common::{assert_variant, fake_bss_description, random_fidl_bss_description},
 };
 
 #[fuchsia::test]
@@ -180,4 +183,208 @@ async fn test_scan_request_error() {
 
     let (scan_result, _) = futures::join!(client_fut, driver_fut);
     assert_eq!(scan_result.unwrap_err(), fidl_sme::ScanErrorCode::NotSupported);
+}
+
+#[fuchsia::test]
+async fn test_open_connect_request_success() {
+    let realm = DriversOnlyTestRealm::new().await;
+
+    let config = FullmacDriverConfig { ..Default::default() };
+
+    let (mut fullmac_req_stream, fullmac_ifc_proxy, generic_sme_proxy) =
+        fullmac_helpers::create_fullmac_driver(&realm.testcontroller_proxy, &config).await;
+
+    let (client_sme_proxy, client_sme_server) =
+        fidl::endpoints::create_proxy().expect("Failed to create client SME proxy");
+    async {
+        generic_sme_proxy
+            .get_client_sme(client_sme_server)
+            .await
+            .expect("FIDL error")
+            .expect("GetClientSme Error")
+    }
+    .await;
+
+    // Note: bss description has to be compatible with the fullmac driver configuration.
+    let target_bss = fake_bss_description!(
+        Open,
+        channel: wlan_common::channel::Channel::new(1, wlan_common::channel::Cbw::Cbw20),
+        rates: vec![2, 4, 11],
+        bssid: [0xa, 0xb, 0xc, 0xd, 0xe, 0xf],
+    );
+
+    let client_fut = async {
+        let (connect_txn, connect_txn_server) =
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+        let mut connect_txn_event_stream = connect_txn.take_event_stream();
+
+        let connect_req = fidl_sme::ConnectRequest {
+            ssid: vec![0, 1, 2, 3, 4, 5],
+            bss_description: target_bss.clone().into(),
+            multiple_bss_candidates: false,
+            authentication: fidl_wlan_security::Authentication {
+                protocol: fidl_wlan_security::Protocol::Open,
+                credentials: None,
+            },
+            deprecated_scan_type: fidl_common::ScanType::Passive,
+        };
+
+        client_sme_proxy
+            .connect(&connect_req, Some(connect_txn_server))
+            .expect("Connect FIDL error.");
+
+        let connect_txn_event = connect_txn_event_stream
+            .next()
+            .await
+            .expect("Connect event stream FIDL error")
+            .expect("Connect txn returned error");
+
+        // Returns the Connect result code.
+        assert_variant!(connect_txn_event,
+            fidl_sme::ConnectTransactionEvent::OnConnectResult { result } => {
+                result
+            }
+        )
+    };
+
+    let driver_fut = async {
+        let connect_req = assert_variant!(fullmac_req_stream.next().await,
+        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Connect { payload, responder })) => {
+            responder
+                .send()
+                .expect("Failed to respond to Connect");
+             payload
+        });
+
+        fullmac_ifc_proxy
+            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
+                peer_sta_address: target_bss.bssid.to_array(),
+                result_code: fidl_ieee80211::StatusCode::Success,
+                association_id: 0,
+                association_ies: vec![],
+            })
+            .await
+            .expect("Failed to send ConnectConf");
+
+        let online = assert_variant!(fullmac_req_stream.next().await,
+        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online, responder })) => {
+            responder
+                .send()
+                .expect("Failed to respond to OnLinkStateChanged");
+            online
+        });
+
+        (connect_req, online)
+    };
+
+    let (connect_result, (driver_connect_req, driver_online)) =
+        futures::join!(client_fut, driver_fut);
+    assert_eq!(connect_result.code, fidl_ieee80211::StatusCode::Success);
+    assert!(driver_online);
+
+    assert_eq!(driver_connect_req.selected_bss.unwrap(), target_bss.into());
+    assert_eq!(driver_connect_req.connect_failure_timeout.unwrap(), 60);
+    assert_eq!(driver_connect_req.auth_type.unwrap(), fidl_fullmac::WlanAuthType::OpenSystem);
+
+    // TODO(b/337074689): Check that these are None instead of empty vectors.
+    assert_eq!(driver_connect_req.sae_password.unwrap(), vec![]);
+    assert_eq!(driver_connect_req.security_ie.unwrap(), vec![]);
+}
+
+#[fuchsia::test]
+async fn test_open_connect_request_error() {
+    let realm = DriversOnlyTestRealm::new().await;
+
+    let config = FullmacDriverConfig { ..Default::default() };
+
+    let (mut fullmac_req_stream, fullmac_ifc_proxy, generic_sme_proxy) =
+        fullmac_helpers::create_fullmac_driver(&realm.testcontroller_proxy, &config).await;
+
+    let (client_sme_proxy, client_sme_server) =
+        fidl::endpoints::create_proxy().expect("Failed to create client SME proxy");
+    async {
+        generic_sme_proxy
+            .get_client_sme(client_sme_server)
+            .await
+            .expect("FIDL error")
+            .expect("GetClientSme Error")
+    }
+    .await;
+
+    // Note: bss description has to be compatible with the fullmac driver configuration.
+    let target_bss = fake_bss_description!(
+        Open,
+        channel: wlan_common::channel::Channel::new(1, wlan_common::channel::Cbw::Cbw20),
+        rates: vec![2, 4, 11],
+        bssid: [0xa, 0xb, 0xc, 0xd, 0xe, 0xf],
+    );
+
+    let client_fut = async {
+        let (connect_txn, connect_txn_server) =
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+        let mut connect_txn_event_stream = connect_txn.take_event_stream();
+
+        let connect_req = fidl_sme::ConnectRequest {
+            ssid: vec![0, 1, 2, 3, 4, 5],
+            bss_description: target_bss.clone().into(),
+            multiple_bss_candidates: false,
+            authentication: fidl_wlan_security::Authentication {
+                protocol: fidl_wlan_security::Protocol::Open,
+                credentials: None,
+            },
+            deprecated_scan_type: fidl_common::ScanType::Passive,
+        };
+
+        client_sme_proxy
+            .connect(&connect_req, Some(connect_txn_server))
+            .expect("Connect FIDL error.");
+
+        let connect_txn_event = connect_txn_event_stream
+            .next()
+            .await
+            .expect("Connect event stream FIDL error")
+            .expect("Connect txn returned error");
+
+        // Returns the Connect result code.
+        assert_variant!(connect_txn_event,
+            fidl_sme::ConnectTransactionEvent::OnConnectResult { result } => {
+                result
+            }
+        )
+    };
+
+    let driver_fut = async {
+        // The driver responds to the initial Connect request after it sends a failed ConnectConf.
+        let connect_req_responder = assert_variant!(fullmac_req_stream.next().await,
+        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Connect { payload: _, responder })) => {
+            responder
+        });
+
+        fullmac_ifc_proxy
+            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
+                peer_sta_address: target_bss.bssid.to_array(),
+                result_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                association_id: 0,
+                association_ies: vec![],
+            })
+            .await
+            .expect("Failed to send ConnectConf");
+
+        connect_req_responder.send().expect("Failed to respond to connect req");
+
+        let deauth_req = assert_variant!(fullmac_req_stream.next().await,
+        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Deauth { payload, responder })) => {
+            responder
+                .send()
+                .expect("Failed to respond to Deauth");
+            payload
+        });
+
+        deauth_req
+    };
+
+    let (connect_result, driver_deauth_req) = futures::join!(client_fut, driver_fut);
+    assert_eq!(connect_result.code, fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
+    assert_eq!(driver_deauth_req.reason_code.unwrap(), fidl_ieee80211::ReasonCode::StaLeaving);
+    assert_eq!(driver_deauth_req.peer_sta_address.unwrap(), target_bss.bssid.to_array());
 }
