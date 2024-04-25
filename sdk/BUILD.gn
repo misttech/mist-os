@@ -172,8 +172,8 @@ sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
 sdk_collection("core") {
   visibility += [ "*" ]
 
-  id = sdk_id
   category = "partner"
+  id = sdk_id
 
   deps = [
     # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
@@ -191,6 +191,8 @@ sdk_collection("core") {
 # attribute must be removed.
 sdk_molecule("fuchsia_idk_atoms") {
   visibility += [ "//vendor/*" ]
+
+  category = "partner"
 
   deps = [ ":fuchsia_idk_atoms_for_each_api_level_and_platform" ]
 
@@ -230,6 +232,7 @@ sdk_molecule("fuchsia_idk_atoms") {
 # `fuchsia_idk_atoms_for_each_api_level` once all IDK users are using the
 # per-API-level artifacts.
 sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_platform") {
+  category = "partner"
   deps = [
     ":core_cc_prebuilt_libraries",
     ":core_packages_for_each_api_level_and_platform",
@@ -243,6 +246,7 @@ sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_platform") {
 # Prebuilt libraries and packages that are built exclusively for the API levels
 # SDK users can target (not `PLATFORM`).
 sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
+  category = "partner"
   deps = [ ":core_packages" ]
 }
 
@@ -252,6 +256,7 @@ if (override_target_api_level == "PLATFORM") {
   # :fuchsia_idk_atoms_for_each_api_level) or be verifiably independent of the
   # API level (add to :fuchsia_idk_atoms_independent_of_api_level).
   sdk_molecule("fuchsia_idk_atoms_for_platform_only") {
+    category = "partner"
     deps = [
       # The C++ source libraries must be buildable at each supported API level
       # but are only built once.
@@ -274,6 +279,8 @@ if (override_target_api_level == "PLATFORM") {
   # IDK atoms that are independent of a specific API level.
   # This is enforced by an assert_no_deps.
   sdk_molecule("fuchsia_idk_atoms_independent_of_api_level") {
+    category = "partner"
+
     # The following serve as a proxy for the building of FIDL files. A
     # dependency on these suggests that there is a dependency on FIDL
     # interface(s), which would likely mean that the code must be built at each
@@ -300,6 +307,7 @@ if (override_target_api_level == "PLATFORM") {
 # IDK atoms that are host tools. These may rely on an API level because they
 # are not shipped to devices.
 sdk_molecule("fuchsia_idk_atoms_host_tools") {
+  category = "partner"
   deps = [
     ":host_tools",
     "//tools/docsgen:ref_docs_sdk",
@@ -307,6 +315,7 @@ sdk_molecule("fuchsia_idk_atoms_host_tools") {
 }
 
 sdk_molecule("fuchsia_idk_atoms_host_tests") {
+  category = "partner"
   deps = [ ":core_experimental_python_e2e_tests" ]
 }
 
@@ -417,7 +426,12 @@ sdk_documentation("sdk_notice") {
 #
 # [1] https://cs.opensource.google/search?q=zircon_sysroot&ss=fuchsia%2Ffuchsia
 sdk_collection("zircon_sysroot") {
-  category = "internal"
+  # This collection is not included in any SDK and could be a standard `group()`
+  # except that there are shell scripts that expect
+  # `$OUTPUT_DIR/sdk/exported/zircon_sysroot/` to be populated,
+  # TODO(https://fxbug.dev/331962496): Find a solution that doesn't depend on
+  # sdk_* templates.
+  category = "excluded"
 
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
 }
@@ -426,6 +440,8 @@ sdk_collection("zircon_sysroot") {
 # Linux or Mac OS.
 sdk_molecule("host_tools") {
   visibility += [ "//tools/docsgen:invoke_clidoc" ]
+
+  category = "partner"
 
   _host_tools = [
     "//src/developer/debug/zxdb:zxdb_sdk",
@@ -502,6 +518,7 @@ sdk_molecule("host_tools") {
 }
 
 sdk_molecule("core_bindlib") {
+  category = "partner"
   deps = [
     "//src/devices/bind/fuchsia:fuchsia_sdk",
     "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_sdk",
@@ -541,6 +558,7 @@ sdk_molecule("core_bindlib") {
 }
 
 sdk_molecule("core_packages") {
+  category = "partner"
   deps = [
     "//src/performance/memory/heapdump/collector:collector_sdk",
     # TODO(https://fxbug.dev/326231777): Uncomment this once
@@ -554,6 +572,7 @@ sdk_molecule("core_packages") {
 # ":core_packages" once downstream customers no longer need them in "API level
 # agnostic" form.
 sdk_molecule("core_packages_for_each_api_level_and_platform") {
+  category = "partner"
   deps = [
     "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
     "//src/graphics/tests/vkreadback:vkreadback_test_sdk",
@@ -561,6 +580,7 @@ sdk_molecule("core_packages_for_each_api_level_and_platform") {
 }
 
 sdk_molecule("core_data") {
+  category = "partner"
   deps = [
     # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
     "//sdk/lib/driver_component:driver_component",
@@ -574,18 +594,22 @@ sdk_molecule("core_data") {
 }
 
 sdk_molecule("core_documentation") {
+  category = "partner"
   deps = [ "//third_party/Vulkan-Loader:vulkan_license" ]
 }
 
 sdk_molecule("core_loadable_modules") {
+  category = "partner"
   deps = [ "//src/lib/vulkan:vulkan_layers" ]
 }
 
 sdk_molecule("core_dart_library") {
+  category = "partner"
   deps = [ "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)" ]
 }
 
 sdk_molecule("core_experimental_python_e2e_tests") {
+  category = "partner"
   deps =
       [ "//src/tests/end_to_end/rtc:rtc_conformance_test_sdk($host_toolchain)" ]
 }
@@ -593,6 +617,7 @@ sdk_molecule("core_experimental_python_e2e_tests") {
 # C/C++ code that must be provided as prebuilt libraries for each supported API
 # level. Must export symbols with C linkage.
 sdk_molecule("core_cc_prebuilt_libraries") {
+  category = "partner"
   deps = [
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/magma_client:magma_client_sdk",
@@ -616,6 +641,7 @@ sdk_molecule("core_cc_prebuilt_libraries") {
 # supported API level, though this is not part of the build.
 # Prefer providing source code if all dependencies are available in the SDK.
 sdk_molecule("core_cc_source_libraries") {
+  category = "partner"
   deps = [
     "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
     "//sdk/lib/async_patterns/cpp:cpp_sdk",
@@ -661,11 +687,13 @@ sdk_molecule("core_cc_source_libraries") {
 }
 
 sdk_molecule("core_sysroot") {
+  category = "partner"
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
 }
 
 # License/copyright files for the SDK.
 sdk_molecule("core_licenses") {
+  category = "partner"
   deps = [
     ":musl_license",
     ":open_source",
@@ -770,9 +798,8 @@ sdk_molecule("platform_libs") {
 sdk_collection("platform") {
   visibility += [ "//build/bazel/*" ]
 
-  id = sdk_id
-
   category = "internal"
+  id = sdk_id
 
   deps = [
     ":platform_fidls",
@@ -795,8 +822,13 @@ if (is_host) {
     visibility = []
     visibility = [ "//src/developer/ffx/build:internal_sdk_tools_for_ffx" ]
 
+    # Though ffx_action() depends on the manifest generated by this rule, this
+    # collection is not included in any SDK.
+    # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
+    # sdk_* templates.
+    category = "excluded"
+
     id = sdk_id
-    category = "partner"
 
     # This is a collection of host tools that are used _by_ ffx itself to
     # perform actions within the build.  As such, it CANNOT have a dependency

@@ -199,6 +199,8 @@ sdk_molecule("fidl") {
     "//sdk:*",
   ]
 
+  category = "partner"
+
   deps = []
   foreach(target, sdk_fidl_targets) {
     deps += [ "${target}_sdk($fidl_toolchain)" ]

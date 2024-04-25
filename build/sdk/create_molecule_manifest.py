@@ -24,7 +24,7 @@ def main():
         nargs="*",
     )
     parser.add_argument(
-        "--category", help="Minimum publication level", required=False
+        "--category", help="Minimum publication level", required=True
     )
     parser.add_argument(
         "--areas-file-path",

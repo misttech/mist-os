@@ -52,4 +52,5 @@ config("zircon-headers.config") {
 # The zircon library is not a real SDK atom since it is provided
 # directly as part of the SDK sysroot.
 sdk_noop_atom("zircon_sdk") {
+  category = "partner"
 }
