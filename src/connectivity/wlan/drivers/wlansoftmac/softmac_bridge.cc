@@ -303,6 +303,10 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequest& request,
       ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::UpdateWmmParameters>(completer.ToAsync()));
 }
 
+// Queues a packet for transmission.
+//
+// The returned status only indicates whether `SoftmacBridge` successfully queued the
+// packet and not that the packet was successfully sent.
 zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payload_size) {
   auto self = static_cast<const SoftmacBridge*>(ctx);
 
@@ -351,26 +355,28 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
       finalized_buffer.data(), finalized_buffer.data() + finalized_buffer.written()));
   fdf_request.info(fidl_request->packet_info().value());
 
-  {
-    auto status = ZX_OK;
-    libsync::Completion request_returned;
-    self->softmac_client_->QueueTx(fdf_request)
-        .Then([&request_returned, &status, loc = cpp20::source_location::current(),
-               async_id](fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
-          if (result.is_error()) {
-            auto error = result.error_value();
-            status = FidlErrorToStatus(error);
-            WLAN_TRACE_ASYNC_END_TX(async_id, status);
-          } else {
-            WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
-          }
-          request_returned.Signal();
-        });
-    request_returned.Wait();
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
+  // Queue the frame to be sent by the vendor driver, but don't block this thread on
+  // the returned status. Supposing an error preventing transmission beyond this point
+  // occurred, MLME would handle the failure the same as other transmission failures
+  // inherent in the 802.11 protocol itself. In general, MLME cannot soley rely on
+  // detecting transmission failures via this function's return value, so it's
+  // unnecessary to block the MLME thread any longer once the well-formed packet has
+  // been sent to the vendor driver.
+  //
+  // Unlike other error logging above, it's critical this callback logs an error
+  // if there is one because the error may otherwise be silently discarded since
+  // MLME will not receive the error.
+  self->softmac_client_->QueueTx(fdf_request)
+      .Then([loc = cpp20::source_location::current(),
+             async_id](fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
+        if (result.is_error()) {
+          auto status = FidlErrorToStatus(result.error_value());
+          lerror("Failed to queue frame in the vendor driver: %s", zx_status_get_string(status));
+          WLAN_TRACE_ASYNC_END_TX(async_id, status);
+        } else {
+          WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
+        }
+      });
 
   return ZX_OK;
 }
