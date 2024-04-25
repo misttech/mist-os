@@ -5,10 +5,7 @@
 #ifndef ZIRCON_AVAILABILITY_H_
 #define ZIRCON_AVAILABILITY_H_
 
-// The value of __Fuchsia_API_level__ when the target API level is HEAD.
-// LINT.IfChange(fuchsia_head_value)
-#define FUCHSIA_HEAD 4292870144
-// LINT.ThenChange(//build/config/fuchsia/target_api_level.gni:fuchsia_head_value)
+// Availability attributes.
 
 #if defined(__Fuchsia_API_level__) && defined(__clang__)
 
@@ -74,5 +71,53 @@
 #define ZX_REMOVED_SINCE(level_added, level_deprecated, level_removed, msg)
 
 #endif  // __Fuchsia_API_level__
+
+// To avoid mistakenly using a non-existent name or unpublished API level, the levels specified in
+// the following macros are converted to calls to a macro containing the specified API level in its
+// name. If the macro does not exist, the build will fail. See https://fxbug.dev/42084512.
+#define FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level) prefix##level##_
+#define FUCHSIA_API_LEVEL_CAT_(prefix, level) FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level)
+#define FUCHSIA_API_LEVEL_(level) (FUCHSIA_API_LEVEL_CAT_(FUCHSIA_INTERNAL_LEVEL_, level)())
+
+// Macros for conditionally compiling code based on the target API level.
+// Prefer the attribute macros above for declarations.
+//
+// Use to guard code that is added and/or removed at specific API levels.
+// `level` must be a one of:
+//  * a positive decimal integer literal no greater than the largest current stable API level
+//    * Supported levels are defined in availability_levels.h.
+//    * Support for older retired API levels may be removed over time.
+//  * `NEXT` - for code to be included in the next stable API level.
+//    * TODO(https://fxbug.dev/323889271): Add support for NEXT as a parameter.
+//  * `HEAD` - for either of the following:
+//    * In-development code that is not ready to be exposed in an SDK
+//  * * Code that should only be in Platform builds.
+
+// The target API level is `level` or greater.
+#define FUCHSIA_API_LEVEL_AT_LEAST(level) (__Fuchsia_API_level__ >= FUCHSIA_API_LEVEL_(level))
+
+// The target API level is less than `level`.
+#define FUCHSIA_API_LEVEL_LESS_THAN(level) (__Fuchsia_API_level__ < FUCHSIA_API_LEVEL_(level))
+
+// The target API level is `level` or less.
+#define FUCHSIA_API_LEVEL_AT_MOST(level) (__Fuchsia_API_level__ <= FUCHSIA_API_LEVEL_(level))
+
+// Do NOT use this value directly. Use one of the macros above instead.
+// The value of __Fuchsia_API_level__ when the target API level is HEAD.
+// LINT.IfChange(fuchsia_head_value)
+#define FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_() 4292870144
+// LINT.ThenChange(//build/config/fuchsia/target_api_level.gni:fuchsia_head_value)
+
+// Obsolete mechanism for determining whether the target API level is HEAD.
+// Use one of the macros above instead.
+// TODO(https://fxbug.dev/42084512): Remove FUCHSIA_HEAD once all code is using
+// the macros above. In the short term, consider defining it as a string like
+// "do not use" so uses of it will fail to compile.
+#define FUCHSIA_HEAD FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_()
+
+// The macros referenced by the output of `FUCHSIA_API_LEVEL_()` must be defined for each API level.
+// They are defined in the following file, which must be included after the macros above because it
+// may use those macros.
+#include <zircon/availability_levels.inc>
 
 #endif  // ZIRCON_AVAILABILITY_H_

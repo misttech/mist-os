@@ -235,6 +235,9 @@ sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_platform") {
     ":core_packages_for_each_api_level_and_platform",
     ":core_sysroot",
   ]
+
+  # Successfully building the test at each API level is the test.
+  non_sdk_deps = [ "//zircon/system:availability_test" ]
 }
 
 # Prebuilt libraries and packages that are built exclusively for the API levels
