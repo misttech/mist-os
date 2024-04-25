@@ -17,23 +17,18 @@ declare_args() {
   override_target_api_level = "PLATFORM"
 }
 
-# TODO(https://fxbug.dev/325448727): Move this value back into the if
-# statement below and prefix it with `_` once the bug is fixed.
-# Due to limitations in Clang, we use `UINT32_MAX` to represent the HEAD API
-# level. See zircon/availability.h.
-# TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
-# LINT.IfChange(fuchsia_head_c_value)
-CLANG_FUCHSIA_HEAD_VALUE = 4294967295
+# LINT.IfChange(fuchsia_head_value)
+FUCHSIA_HEAD_VALUE = 4292870144
 
-# LINT.ThenChange(//zircon/system/public/zircon/availability.h:fuchsia_head_c_value)
+# LINT.ThenChange(//zircon/system/public/zircon/availability.h:fuchsia_head_value)
 
 if (override_target_api_level == "PLATFORM") {
-  # This should really be a constant that indicates that we're building at
-  # `PLATFORM`, rather than `HEAD` (which we actually don't support yet).
+  # This constant actually gives the API level for `HEAD`. It _should_ be the
+  # API level for `PLATFORM`, and will be soon, but I'm taking tiny baby steps.
   #
   # TODO(https://fxbug.dev/330426357): Switch this to a constant for `PLATFORM`,
   # once one exists.
-  clang_fuchsia_api_level = CLANG_FUCHSIA_HEAD_VALUE
+  clang_fuchsia_api_level = FUCHSIA_HEAD_VALUE
 
   # By default the FIDL APIs are compiled at the "LEGACY" level, which is an
   # older name for the "PLATFORM" API level. This level is only meant to be used

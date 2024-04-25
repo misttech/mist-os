@@ -94,7 +94,13 @@ class Bindgen:
             "-target",
             self.clang_target,
             "-nostdlibinc",
-            "-D__Fuchsia_API_level__=4294967295",
+            # Use the `HEAD` API level.
+            #
+            # NOTE(hjfreyer): It's not totally clear that FUCHSIA_HEAD is the
+            # right value here. If some parts of the C structures are missing,
+            # we may want to investigate setting this to a different value like
+            # `PLATFORM`.
+            "-D__Fuchsia_API_level__=4292870144",
             "-DIS_BINDGEN=1",
         ]
         for i in self.include_dirs:
