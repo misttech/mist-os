@@ -35,6 +35,9 @@ class LowEnergyConnectionServer : public ServerBase<fuchsia::bluetooth::le::Conn
   void RequestGattClient(
       ::fidl::InterfaceRequest<::fuchsia::bluetooth::gatt2::Client> client) override;
   void AcceptCis(fuchsia::bluetooth::le::ConnectionAcceptCisRequest parameters) override;
+  void GetCodecLocalDelayRange(::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest
+                                   CodecDelayGetCodecLocalDelayRangeRequest,
+                               GetCodecLocalDelayRangeCallback callback) override;
 
   std::unique_ptr<bt::gap::LowEnergyConnectionHandle> conn_;
   fit::callback<void()> closed_handler_;

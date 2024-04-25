@@ -62,3 +62,15 @@ type DataDirection = strict enum : uint8 {
     /// Controller => Host
     OUTPUT = 2;
 };
+
+/// Logical transport types that may be used with encoded data streams. Note that these values do
+/// not correspond to constants from the Bluetooth Core specification, nor are BR/EDR values
+/// supported yet.
+@available(added=HEAD)
+type LogicalTransportType = flexible enum : uint8 {
+    /// LE CIS
+    LE_CIS = 1;
+
+    /// LE BIS
+    LE_BIS = 2;
+};
