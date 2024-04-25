@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
-#include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
@@ -56,43 +55,6 @@ zx_paddr_t PageMask() {
 }  // namespace
 
 namespace aml_sdmmc {
-
-zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> AmlSdmmc::BanjoToFidlReq(
-    const sdmmc_req_t& banjo_req, fdf::Arena* arena) {
-  fuchsia_hardware_sdmmc::wire::SdmmcReq wire_req;
-
-  wire_req.cmd_idx = banjo_req.cmd_idx;
-  wire_req.cmd_flags = banjo_req.cmd_flags;
-  wire_req.arg = banjo_req.arg;
-  wire_req.blocksize = banjo_req.blocksize;
-  wire_req.suppress_error_messages = banjo_req.suppress_error_messages;
-  wire_req.client_id = banjo_req.client_id;
-
-  wire_req.buffers.Allocate(*arena, banjo_req.buffers_count);
-  for (size_t i = 0; i < banjo_req.buffers_count; i++) {
-    if (banjo_req.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
-      wire_req.buffers[i].buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmoId(
-          banjo_req.buffers_list[i].buffer.vmo_id);
-    } else {
-      if (banjo_req.buffers_list[i].type != SDMMC_BUFFER_TYPE_VMO_HANDLE) {
-        return zx::error(ZX_ERR_INVALID_ARGS);
-      }
-      zx::vmo dup;
-      zx_status_t status = zx_handle_duplicate(banjo_req.buffers_list[i].buffer.vmo,
-                                               ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
-      if (status != ZX_OK) {
-        FDF_LOGL(ERROR, logger(), "Failed to duplicate vmo: %s", zx_status_get_string(status));
-        return zx::error(status);
-      }
-      wire_req.buffers[i].buffer =
-          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
-    }
-
-    wire_req.buffers[i].offset = banjo_req.buffers_list[i].offset;
-    wire_req.buffers[i].size = banjo_req.buffers_list[i].size;
-  }
-  return zx::ok(std::move(wire_req));
-}
 
 zx_status_t AmlSdmmc::AcquireLease(
     const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
@@ -770,20 +732,12 @@ void AmlSdmmc::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
   completer.buffer(arena).ReplySuccess(dev_info_);
 }
 
-zx_status_t AmlSdmmc::SdmmcHostInfo(sdmmc_host_info_t* info) {
-  info->caps = dev_info_.caps;
-  info->max_transfer_size = dev_info_.max_transfer_size;
-  info->max_transfer_size_non_dma = dev_info_.max_transfer_size_non_dma;
-  info->max_buffer_regions = dev_info_.max_buffer_regions;
-  return ZX_OK;
-}
-
 void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
                            SetBusWidthCompleter::Sync& completer) {
   // This function is run after acquiring lock_, but the compiler doesn't recognize this.
   fit::function<zx_status_t()> task =
       [this, bus_width = request->bus_width]()
-          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcSetBusWidthLocked(bus_width); };
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SetBusWidthImpl(bus_width); };
 
   fbl::AutoLock lock(&lock_);
 
@@ -803,36 +757,7 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
   DoTaskAndComplete(std::move(task), arena, completer);
 }
 
-zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
-  fbl::AutoLock lock(&lock_);
-
-  if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcSetBusWidth (Banjo) while power is suspended.");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // Only handling the cases for AmlSdmmc::SdmmcSetBusWidthLocked() to work correctly.
-  fuchsia_hardware_sdmmc::wire::SdmmcBusWidth wire_bus_width;
-  switch (bus_width) {
-    case SDMMC_BUS_WIDTH_EIGHT:
-      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight;
-      break;
-    case SDMMC_BUS_WIDTH_FOUR:
-      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour;
-      break;
-    case SDMMC_BUS_WIDTH_ONE:
-      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne;
-      break;
-    default:
-      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kMax;
-      break;
-  }
-
-  return SdmmcSetBusWidthLocked(wire_bus_width);
-}
-
-zx_status_t AmlSdmmc::SdmmcSetBusWidthLocked(
-    fuchsia_hardware_sdmmc::wire::SdmmcBusWidth bus_width) {
+zx_status_t AmlSdmmc::SetBusWidthImpl(fuchsia_hardware_sdmmc::wire::SdmmcBusWidth bus_width) {
   uint32_t bus_width_val;
   switch (bus_width) {
     case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight:
@@ -860,18 +785,12 @@ void AmlSdmmc::RegisterInBandInterrupt(RegisterInBandInterruptRequestView reques
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t AmlSdmmc::SdmmcRegisterInBandInterrupt(
-    const in_band_interrupt_protocol_t* interrupt_cb) {
-  // Mirroring AmlSdmmc::RegisterInBandInterrupt().
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
                           SetBusFreqCompleter::Sync& completer) {
   // This function is run after acquiring lock_, but the compiler doesn't recognize this.
   fit::function<zx_status_t()> task =
       [this, bus_freq = request->bus_freq]()
-          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcSetBusFreqLocked(bus_freq); };
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SetBusFreqImpl(bus_freq); };
 
   fbl::AutoLock lock(&lock_);
 
@@ -891,18 +810,7 @@ void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
   DoTaskAndComplete(std::move(task), arena, completer);
 }
 
-zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t bus_freq) {
-  fbl::AutoLock lock(&lock_);
-
-  if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcSetBusFreq (Banjo) while power is suspended.");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  return SdmmcSetBusFreqLocked(bus_freq);
-}
-
-zx_status_t AmlSdmmc::SdmmcSetBusFreqLocked(uint32_t freq) {
+zx_status_t AmlSdmmc::SetBusFreqImpl(uint32_t freq) {
   uint32_t clk = 0, clk_src = 0, clk_div = 0;
   if (freq == 0) {
     AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_cfg_div(0).WriteTo(&*mmio_);
@@ -1025,9 +933,8 @@ void AmlSdmmc::ConfigureDefaultRegs() {
 
 void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
   // This function is run after acquiring lock_, but the compiler doesn't recognize this.
-  fit::function<zx_status_t()> task = [this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    return SdmmcHwResetLocked();
-  };
+  fit::function<zx_status_t()> task = [this]()
+                                          __TA_NO_THREAD_SAFETY_ANALYSIS { return HwResetImpl(); };
 
   fbl::AutoLock lock(&lock_);
 
@@ -1077,18 +984,7 @@ void AmlSdmmc::DoTaskAndComplete(fit::function<zx_status_t()> task, fdf::Arena& 
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcHwReset() {
-  fbl::AutoLock lock(&lock_);
-
-  if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcHwReset (Banjo) while power is suspended.");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  return SdmmcHwResetLocked();
-}
-
-zx_status_t AmlSdmmc::SdmmcHwResetLocked() {
+zx_status_t AmlSdmmc::HwResetImpl() {
   if (reset_gpio_.is_valid()) {
     fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
     if (!result1.ok()) {
@@ -1125,7 +1021,7 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
   // This function is run after acquiring lock_, but the compiler doesn't recognize this.
   fit::function<zx_status_t()> task =
       [this, timing = request->timing]()
-          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcSetTimingLocked(timing); };
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return SetTimingImpl(timing); };
 
   fbl::AutoLock lock(&lock_);
 
@@ -1145,35 +1041,7 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
   DoTaskAndComplete(std::move(task), arena, completer);
 }
 
-zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
-  fbl::AutoLock lock(&lock_);
-
-  if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcSetTiming (Banjo) while power is suspended.");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // Only handling the cases for AmlSdmmc::SdmmcSetTimingLocked() to work correctly.
-  fuchsia_hardware_sdmmc::wire::SdmmcTiming wire_timing;
-  switch (timing) {
-    case SDMMC_TIMING_HS400:
-      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400;
-      break;
-    case SDMMC_TIMING_HSDDR:
-      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr;
-      break;
-    case SDMMC_TIMING_DDR50:
-      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kDdr50;
-      break;
-    default:
-      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kMax;
-      break;
-  }
-
-  return SdmmcSetTimingLocked(wire_timing);
-}
-
-zx_status_t AmlSdmmc::SdmmcSetTimingLocked(fuchsia_hardware_sdmmc::wire::SdmmcTiming timing) {
+zx_status_t AmlSdmmc::SetTimingImpl(fuchsia_hardware_sdmmc::wire::SdmmcTiming timing) {
   auto config = AmlSdmmcCfg::Get().ReadFrom(&*mmio_);
   if (timing == fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400 ||
       timing == fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr ||
@@ -1204,11 +1072,6 @@ void AmlSdmmc::SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena&
   // Amlogic controller does not allow to modify voltage
   // We do not return an error here since things work fine without switching the voltage.
   completer.buffer(arena).ReplySuccess();
-}
-
-zx_status_t AmlSdmmc::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
-  // Mirroring AmlSdmmc::SetSignalVoltage().
-  return ZX_OK;
 }
 
 aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req) {
@@ -1294,11 +1157,15 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(
     const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
     const fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion& buffer,
     vmo_store::StoredVmo<OwnedVmoInfo>& vmo, aml_sdmmc_desc_t* const cur_desc) {
-  if (!(req.cmd_flags & SDMMC_CMD_READ) && !(vmo.meta().rights & SDMMC_VMO_RIGHT_READ)) {
+  if (!(req.cmd_flags & SDMMC_CMD_READ) &&
+      !(vmo.meta().rights &
+        static_cast<uint32_t>(fuchsia_hardware_sdmmc::wire::SdmmcVmoRight::kRead))) {
     FDF_LOGL(ERROR, logger(), "Request would read from write-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
-  if ((req.cmd_flags & SDMMC_CMD_READ) && !(vmo.meta().rights & SDMMC_VMO_RIGHT_WRITE)) {
+  if ((req.cmd_flags & SDMMC_CMD_READ) &&
+      !(vmo.meta().rights &
+        static_cast<uint32_t>(fuchsia_hardware_sdmmc::wire::SdmmcVmoRight::kWrite))) {
     FDF_LOGL(ERROR, logger(), "Request would write to read-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
@@ -1309,7 +1176,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  fzl::PinnedVmo::Region regions[SDMMC_PAGES_COUNT];
+  fzl::PinnedVmo::Region regions[fuchsia_hardware_sdmmc::wire::kSdmmcPagesCount];
   size_t offset = buffer.offset;
   size_t remaining = buffer.size;
   aml_sdmmc_desc_t* desc = cur_desc;
@@ -1532,7 +1399,7 @@ zx_status_t AmlSdmmc::TuningDoTransfer(const TuneContext& context) {
   tuning_req.buffers[0].size = context.expected_block.size();
 
   uint32_t unused_response[4];
-  status = SdmmcRequestLocked(tuning_req, unused_response);
+  status = RequestImpl(tuning_req, unused_response);
 
   // Restore the original tuning settings so that client transfers can still go through.
   SetTuneSettings(context.original_settings);
@@ -1655,7 +1522,7 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
   // This function is run after acquiring tuning_lock_, but the compiler doesn't recognize this.
   fit::function<zx_status_t()> task =
       [this, cmd_idx = request->cmd_idx]()
-          __TA_NO_THREAD_SAFETY_ANALYSIS { return SdmmcPerformTuningLocked(cmd_idx); };
+          __TA_NO_THREAD_SAFETY_ANALYSIS { return PerformTuningImpl(cmd_idx); };
 
   fbl::AutoLock tuning_lock(&tuning_lock_);
 
@@ -1678,21 +1545,7 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
   DoTaskAndComplete(std::move(task), arena, completer);
 }
 
-zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
-  fbl::AutoLock tuning_lock(&tuning_lock_);
-
-  {
-    fbl::AutoLock lock(&lock_);
-    if (power_suspended_) {
-      FDF_LOGL(ERROR, logger(), "Rejecting SdmmcPerformTuning (Banjo) while power is suspended.");
-      return ZX_ERR_BAD_STATE;
-    }
-  }
-
-  return SdmmcPerformTuningLocked(tuning_cmd_idx);
-}
-
-zx_status_t AmlSdmmc::SdmmcPerformTuningLocked(uint32_t tuning_cmd_idx) {
+zx_status_t AmlSdmmc::PerformTuningImpl(uint32_t tuning_cmd_idx) {
   // Using a lambda for the constness of the resulting variables.
   const auto result = [this]() -> zx::result<std::tuple<uint32_t, uint32_t, TuneSettings>> {
     fbl::AutoLock lock(&lock_);
@@ -1826,9 +1679,8 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
 
 void AmlSdmmc::RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
                            RegisterVmoCompleter::Sync& completer) {
-  zx_status_t status =
-      SdmmcRegisterVmo(request->vmo_id, request->client_id, std::move(request->vmo),
-                       request->offset, request->size, request->vmo_rights);
+  zx_status_t status = RegisterVmoImpl(request->vmo_id, request->client_id, std::move(request->vmo),
+                                       request->offset, request->size, request->vmo_rights);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -1836,9 +1688,9 @@ void AmlSdmmc::RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
-                                       uint64_t offset, uint64_t size, uint32_t vmo_rights) {
-  if (client_id > SDMMC_MAX_CLIENT_ID) {
+zx_status_t AmlSdmmc::RegisterVmoImpl(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
+                                      uint64_t offset, uint64_t size, uint32_t vmo_rights) {
+  if (client_id > fuchsia_hardware_sdmmc::wire::kSdmmcMaxClientId) {
     return ZX_ERR_OUT_OF_RANGE;
   }
   if (vmo_rights == 0) {
@@ -1850,8 +1702,14 @@ zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
                                                                     .size = size,
                                                                     .rights = vmo_rights,
                                                                 });
-  const uint32_t read_perm = (vmo_rights & SDMMC_VMO_RIGHT_READ) ? ZX_BTI_PERM_READ : 0;
-  const uint32_t write_perm = (vmo_rights & SDMMC_VMO_RIGHT_WRITE) ? ZX_BTI_PERM_WRITE : 0;
+  const uint32_t read_perm =
+      (vmo_rights & static_cast<uint32_t>(fuchsia_hardware_sdmmc::wire::SdmmcVmoRight::kRead))
+          ? ZX_BTI_PERM_READ
+          : 0;
+  const uint32_t write_perm =
+      (vmo_rights & static_cast<uint32_t>(fuchsia_hardware_sdmmc::wire::SdmmcVmoRight::kWrite))
+          ? ZX_BTI_PERM_WRITE
+          : 0;
   zx_status_t status = stored_vmo.Pin(bti_, read_perm | write_perm, true);
   if (status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to pin VMO %u for client %u: %s", vmo_id, client_id,
@@ -1866,7 +1724,7 @@ zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
 void AmlSdmmc::UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena,
                              UnregisterVmoCompleter::Sync& completer) {
   zx::vmo vmo;
-  zx_status_t status = SdmmcUnregisterVmo(request->vmo_id, request->client_id, &vmo);
+  zx_status_t status = UnregisterVmoImpl(request->vmo_id, request->client_id, &vmo);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -1874,8 +1732,8 @@ void AmlSdmmc::UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena
   completer.buffer(arena).ReplySuccess(std::move(vmo));
 }
 
-zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
-  if (client_id > SDMMC_MAX_CLIENT_ID) {
+zx_status_t AmlSdmmc::UnregisterVmoImpl(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
+  if (client_id > fuchsia_hardware_sdmmc::wire::kSdmmcMaxClientId) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -1918,7 +1776,7 @@ template <typename T>
 void AmlSdmmc::DoRequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer) {
   fidl::Array<uint32_t, 4> response;
   for (const auto& req : request->reqs) {
-    zx_status_t status = SdmmcRequestLocked(req, response.data());
+    zx_status_t status = RequestImpl(req, response.data());
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
@@ -1927,25 +1785,9 @@ void AmlSdmmc::DoRequestAndComplete(RequestRequestView request, fdf::Arena& aren
   completer.buffer(arena).ReplySuccess(response);
 }
 
-zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
-  fbl::AutoLock lock(&lock_);
-  if (power_suspended_) {
-    FDF_LOGL(ERROR, logger(), "Rejecting SdmmcRequest (Banjo) while power is suspended.");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  fdf::Arena arena('AMSD');
-  zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> wire_req = BanjoToFidlReq(*req, &arena);
-  if (wire_req.is_error()) {
-    return wire_req.error_value();
-  }
-
-  return SdmmcRequestLocked(*wire_req, out_response);
-}
-
-zx_status_t AmlSdmmc::SdmmcRequestLocked(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
-                                         uint32_t out_response[4]) {
-  if (req.client_id > SDMMC_MAX_CLIENT_ID) {
+zx_status_t AmlSdmmc::RequestImpl(const fuchsia_hardware_sdmmc::wire::SdmmcReq& req,
+                                  uint32_t out_response[4]) {
+  if (req.client_id > fuchsia_hardware_sdmmc::wire::kSdmmcMaxClientId) {
     return ZX_ERR_OUT_OF_RANGE;
   }
   if (shutdown_) {

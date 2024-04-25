@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-sdmmc.h"
+#include "aml-sdmmc-with-banjo.h"
 
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
@@ -35,10 +35,11 @@
 
 namespace aml_sdmmc {
 
-class TestAmlSdmmc : public AmlSdmmc {
+class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
  public:
-  TestAmlSdmmc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : AmlSdmmc(std::move(start_args), std::move(dispatcher)) {}
+  TestAmlSdmmcWithBanjo(fdf::DriverStartArgs start_args,
+                        fdf::UnownedSynchronizedDispatcher dispatcher)
+      : AmlSdmmcWithBanjo(std::move(start_args), std::move(dispatcher)) {}
 
   void* SetTestHooks() {
     view_.emplace(mmio().View(0));
@@ -458,9 +459,9 @@ struct IncomingNamespace {
   FakePowerBroker power_broker;
 };
 
-class AmlSdmmcTest : public zxtest::Test {
+class AmlSdmmcWithBanjoTest : public zxtest::Test {
  public:
-  AmlSdmmcTest()
+  AmlSdmmcWithBanjoTest()
       : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
         incoming_(env_dispatcher_->async_dispatcher(), std::in_place),
         mmio_buffer_(
@@ -725,14 +726,14 @@ class AmlSdmmcTest : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
-  fdf_testing::DriverUnderTest<TestAmlSdmmc> dut_;
+  fdf_testing::DriverUnderTest<TestAmlSdmmcWithBanjo> dut_;
 
  private:
   fdf::MmioBuffer mmio_buffer_;
   void* descs_ = nullptr;
 };
 
-TEST_F(AmlSdmmcTest, Init) {
+TEST_F(AmlSdmmcWithBanjoTest, Init) {
   StartDriver();
 
   AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
@@ -750,7 +751,7 @@ TEST_F(AmlSdmmcTest, Init) {
                                                                     .reg_value());
 }
 
-TEST_F(AmlSdmmcTest, Tuning) {
+TEST_F(AmlSdmmcWithBanjoTest, Tuning) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -770,7 +771,7 @@ TEST_F(AmlSdmmcTest, Tuning) {
   EXPECT_EQ(adjust.adj_delay(), 0);
 }
 
-TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
+TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningAllPass) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -812,7 +813,7 @@ TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
   dut_->ExpectInspectPropertyValue("distance_to_failing_point", 63);
 }
 
-TEST_F(AmlSdmmcTest, DelayLineTuningFailingPoint) {
+TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningFailingPoint) {
   StartDriver();
 
   dut_->SetRequestResults(
@@ -865,7 +866,7 @@ TEST_F(AmlSdmmcTest, DelayLineTuningFailingPoint) {
   dut_->ExpectInspectPropertyValue("distance_to_failing_point", 0);
 }
 
-TEST_F(AmlSdmmcTest, DelayLineTuningEvenDivider) {
+TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningEvenDivider) {
   StartDriver();
 
   dut_->SetRequestResults(
@@ -919,7 +920,7 @@ TEST_F(AmlSdmmcTest, DelayLineTuningEvenDivider) {
   dut_->ExpectInspectPropertyValue("distance_to_failing_point", 63);
 }
 
-TEST_F(AmlSdmmcTest, DelayLineTuningOddDivider) {
+TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningOddDivider) {
   StartDriver();
 
   dut_->SetRequestResults(
@@ -972,7 +973,7 @@ TEST_F(AmlSdmmcTest, DelayLineTuningOddDivider) {
   dut_->ExpectInspectPropertyValue("distance_to_failing_point", 63);
 }
 
-TEST_F(AmlSdmmcTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
+TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
   StartDriver();
 
   dut_->SetRequestResults(
@@ -1014,7 +1015,7 @@ TEST_F(AmlSdmmcTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
   dut_->ExpectInspectPropertyValue("delay_lines", 60);
 }
 
-TEST_F(AmlSdmmcTest, SetBusFreq) {
+TEST_F(AmlSdmmcWithBanjoTest, SetBusFreq) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -1044,7 +1045,7 @@ TEST_F(AmlSdmmcTest, SetBusFreq) {
   dut_->ExpectInspectPropertyValue("bus_clock_frequency", 400'000);
 }
 
-TEST_F(AmlSdmmcTest, ClearStatus) {
+TEST_F(AmlSdmmcWithBanjoTest, ClearStatus) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -1060,7 +1061,7 @@ TEST_F(AmlSdmmcTest, ClearStatus) {
   EXPECT_EQ(AmlSdmmcStatus::kClearStatus, status.ReadFrom(&*mmio_).reg_value());
 }
 
-TEST_F(AmlSdmmcTest, TxCrcError) {
+TEST_F(AmlSdmmcWithBanjoTest, TxCrcError) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -1077,7 +1078,7 @@ TEST_F(AmlSdmmcTest, TxCrcError) {
   EXPECT_EQ(0, start.ReadFrom(&*mmio_).desc_busy());
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmosBlockMode) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmosBlockMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -1142,7 +1143,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosBlockMode) {
   }
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmosNotBlockSizeMultiple) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmosNotBlockSizeMultiple) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -1179,7 +1180,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosNotBlockSizeMultiple) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmosByteMode) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmosByteMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -1243,7 +1244,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosByteMode) {
   }
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmoByteModeMultiBlock) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoByteModeMultiBlock) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
@@ -1305,7 +1306,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoByteModeMultiBlock) {
   }
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmoOffsetNotAligned) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoOffsetNotAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
@@ -1339,7 +1340,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoOffsetNotAligned) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferMultipleDescriptors) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoSingleBufferMultipleDescriptors) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeSingleVmoPaddrs(pages);
@@ -1404,7 +1405,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferMultipleDescriptors) {
   EXPECT_EQ(descs[1].resp_addr, 0);
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferNotPageAligned) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoSingleBufferNotPageAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
@@ -1439,7 +1440,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferNotPageAligned) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferPageAligned) {
+TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoSingleBufferPageAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
@@ -1504,7 +1505,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferPageAligned) {
   }
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmosBlockMode) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmosBlockMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -1582,7 +1583,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosBlockMode) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmosNotBlockSizeMultiple) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmosNotBlockSizeMultiple) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -1620,7 +1621,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosNotBlockSizeMultiple) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmosByteMode) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmosByteMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -1685,7 +1686,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosByteMode) {
   }
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmoByteModeMultiBlock) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoByteModeMultiBlock) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
@@ -1748,7 +1749,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoByteModeMultiBlock) {
   }
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmoOffsetNotAligned) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoOffsetNotAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
@@ -1783,7 +1784,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoOffsetNotAligned) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferMultipleDescriptors) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoSingleBufferMultipleDescriptors) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeSingleVmoPaddrs(pages);
@@ -1851,7 +1852,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferMultipleDescriptors) {
   EXPECT_EQ(descs[1].resp_addr, 0);
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferNotPageAligned) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoSingleBufferNotPageAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
@@ -1888,7 +1889,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferNotPageAligned) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferPageAligned) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoSingleBufferPageAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
@@ -1955,7 +1956,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferPageAligned) {
   }
 }
 
-TEST_F(AmlSdmmcTest, OwnedVmoWritePastEnd) {
+TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoWritePastEnd) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
@@ -2024,7 +2025,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoWritePastEnd) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, SeparateClientVmoSpaces) {
+TEST_F(AmlSdmmcWithBanjoTest, SeparateClientVmoSpaces) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -2070,7 +2071,7 @@ TEST_F(AmlSdmmcTest, SeparateClientVmoSpaces) {
   EXPECT_NOT_OK(dut_->SdmmcUnregisterVmo(1, 1, &vmo));
 }
 
-TEST_F(AmlSdmmcTest, RequestWithOwnedAndUnownedVmos) {
+TEST_F(AmlSdmmcWithBanjoTest, RequestWithOwnedAndUnownedVmos) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -2191,7 +2192,7 @@ TEST_F(AmlSdmmcTest, RequestWithOwnedAndUnownedVmos) {
   EXPECT_EQ(descs[9].resp_addr, 0);
 }
 
-TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
+TEST_F(AmlSdmmcWithBanjoTest, ResetCmdInfoBits) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
 
   ASSERT_OK(dut_->Init({}));
@@ -2263,7 +2264,7 @@ TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
   EXPECT_EQ(descs[2].resp_addr, 0);
 }
 
-TEST_F(AmlSdmmcTest, WriteToReadOnlyVmo) {
+TEST_F(AmlSdmmcWithBanjoTest, WriteToReadOnlyVmo) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -2300,7 +2301,7 @@ TEST_F(AmlSdmmcTest, WriteToReadOnlyVmo) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, ReadFromWriteOnlyVmo) {
+TEST_F(AmlSdmmcWithBanjoTest, ReadFromWriteOnlyVmo) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
@@ -2337,7 +2338,7 @@ TEST_F(AmlSdmmcTest, ReadFromWriteOnlyVmo) {
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
-TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
+TEST_F(AmlSdmmcWithBanjoTest, ConsecutiveErrorLogging) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -2393,7 +2394,7 @@ TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
   EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
 }
 
-TEST_F(AmlSdmmcTest, PowerSuspendResume) {
+TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
   StartDriver(/*create_fake_bti_with_paddrs=*/false, /*supply_power_framework=*/true);
 
   auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
@@ -2453,7 +2454,7 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
 }
 
-TEST_F(AmlSdmmcTest, WakeOnRequest) {
+TEST_F(AmlSdmmcWithBanjoTest, WakeOnRequest) {
   StartDriver(/*create_fake_bti_with_paddrs=*/false, /*supply_power_framework=*/true);
 
   auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
@@ -2596,4 +2597,4 @@ TEST_F(AmlSdmmcTest, WakeOnRequest) {
 
 }  // namespace aml_sdmmc
 
-FUCHSIA_DRIVER_EXPORT(aml_sdmmc::TestAmlSdmmc);
+FUCHSIA_DRIVER_EXPORT(aml_sdmmc::TestAmlSdmmcWithBanjo);

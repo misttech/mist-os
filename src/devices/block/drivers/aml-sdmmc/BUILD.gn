@@ -22,8 +22,35 @@ driver_bind_rules("aml-sdmmc-bind") {
   ]
 }
 
-fuchsia_driver("aml-sdmmc-driver") {
-  output_name = "aml-sdmmc"
+_common_deps = [
+  ":aml-sdmmc-bind",
+  "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+  "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+  "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+  "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+  "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+  "//sdk/lib/driver/compat/cpp",
+  "//sdk/lib/driver/component/cpp:cpp",
+  "//sdk/lib/driver/power/cpp",
+  "//sdk/lib/fit",
+  "//sdk/lib/inspect/component/cpp",
+  "//src/devices/block/lib/sdio",
+  "//src/devices/block/lib/sdmmc",
+  "//src/devices/bus/lib/device-protocol-pdev",
+  "//src/devices/lib/amlogic",
+  "//src/devices/lib/dma-buffer",
+  "//src/devices/lib/mmio",
+  "//src/lib/vmo_store",
+  "//zircon/system/ulib/hwreg",
+  "//zircon/system/ulib/inspect",
+  "//zircon/system/ulib/sync",
+  "//zircon/system/ulib/trace",
+  "//zircon/system/ulib/zircon-internal",
+  "//zircon/system/ulib/zx",
+]
+
+fuchsia_driver("aml-sdmmc-no-banjo-driver") {
+  output_name = "aml-sdmmc-no-banjo"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -35,36 +62,40 @@ fuchsia_driver("aml-sdmmc-driver") {
     "aml-sdmmc-export.cc",
     "aml-sdmmc.cc",
   ]
-  deps = [
-    ":aml-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/power/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/inspect/component/cpp",
-    "//src/devices/bin/driver_runtime",
-    "//src/devices/block/lib/sdio",
-    "//src/devices/block/lib/sdmmc",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/dma-buffer",
-    "//src/devices/lib/mmio",
-    "//src/lib/vmo_store",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
+  deps = _common_deps + [
+           "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+           "//sdk/lib/driver/runtime:driver_runtime_cpp",
+           "//src/devices/bin/driver_runtime",
+         ]
+}
+
+fuchsia_driver_component("aml-sdmmc-no-banjo") {
+  component_name = "aml-sdmmc-no-banjo"
+  deps = [ ":aml-sdmmc-no-banjo-driver" ]
+  info = "aml-sdmmc-info.json"
+  manifest = "meta/aml-sdmmc-no-banjo.cml"
+}
+
+fuchsia_driver("aml-sdmmc-driver") {
+  output_name = "aml-sdmmc"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+
+    # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
+    "//build/config:Wno-vla-cxx-extension",
   ]
+  sources = [
+    "aml-sdmmc-with-banjo-export.cc",
+    "aml-sdmmc-with-banjo.cc",
+    "aml-sdmmc.cc",
+  ]
+  deps = _common_deps + [
+           "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+           "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+           "//sdk/lib/driver/runtime:driver_runtime_cpp",
+           "//src/devices/bin/driver_runtime",
+         ]
 }
 
 fuchsia_driver_component("aml-sdmmc") {
@@ -82,45 +113,23 @@ fuchsia_driver_package("package") {
 test("aml-sdmmc-test-bin") {
   output_name = "aml-sdmmc-test"
   sources = [
-    "aml-sdmmc-test.cc",
+    "aml-sdmmc-with-banjo-test.cc",
+    "aml-sdmmc-with-banjo.cc",
     "aml-sdmmc.cc",
   ]
-  deps = [
-    ":aml-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/power/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/inspect/component/cpp",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/block/lib/sdio",
-    "//src/devices/block/lib/sdmmc",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/dma-buffer",
-    "//src/devices/lib/mmio",
-    "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/fake-bti",
-    "//src/lib/vmo_store",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
-  ]
+  deps =
+      _common_deps + [
+        "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+        "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
+        "//sdk/lib/async_patterns/testing/cpp",
+        "//sdk/lib/driver/testing/cpp:cpp",
+        "//sdk/lib/inspect/testing/cpp:zxtest",
+        "//src/devices/bus/testing/fake-pdev",
+        "//src/devices/lib/mmio:test_helper",
+        "//src/devices/testing/fake-bti",
+        "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+        "//zircon/system/ulib/zxtest",
+      ]
 }
 
 fuchsia_unittest_package("aml-sdmmc-test") {
