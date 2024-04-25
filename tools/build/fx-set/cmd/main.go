@@ -127,6 +127,7 @@ func mainImpl(ctx context.Context) error {
 			path = filepath.Join(args.checkoutDir, path)
 		}
 		staticSpec, err = fint.ReadStatic(path)
+		staticSpec.GnArgs = append(staticSpec.GnArgs, args.gnArgs...)
 		if err != nil {
 			return err
 		}
