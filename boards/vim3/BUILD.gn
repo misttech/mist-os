@@ -133,9 +133,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/bootpart.cm" ]
     },
     {
-      package_target = "//src/devices/clock/drivers/amlogic-clk:package"
+      package_target = "//src/devices/clock/drivers/vim3-clk:package"
       package_set = "bootfs"
-      driver_components = [ "meta/amlogic-clk.cm" ]
+      driver_components = [ "meta/vim3-clk.cm" ]
     },
     {
       package_target = "//src/devices/cpu/drivers/aml-cpu:package"

@@ -8,5 +8,6 @@ group("tests") {
   deps = [
     "amlogic-clk:tests",
     "clock:tests",
+    "vim3-clk:tests",
   ]
 }

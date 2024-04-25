@@ -129,6 +129,7 @@
 //src/devices/bus/drivers/platform:platform-bus-driver
 //src/devices/clock/drivers/amlogic-clk:amlogic-clk-driver
 //src/devices/clock/drivers/clock:clock-driver
+//src/devices/clock/drivers/vim3-clk:vim3-clk-driver
 //src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver
 //src/devices/cpu/drivers/aml-cpu:aml-cpu-driver
 //src/devices/gpio/drivers/aml-gpio:bazel_package.bazel_build
