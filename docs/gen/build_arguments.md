@@ -7456,6 +7456,14 @@ a guess.
 
 From //build/sdk/config.gni:36
 
+### sdk_sub_build_verbose
+
+Set to `true` to enable verbose logging during IDK subbuilds.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:44
+
 ### select_variant
 
 List of "selectors" to request variant builds of certain targets.
