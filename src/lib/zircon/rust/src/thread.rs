@@ -8,10 +8,20 @@ use crate::object_get_info;
 use crate::ok;
 use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Profile, Status, Task};
 use crate::{ObjectQuery, Topic};
+use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
 
 #[cfg(target_arch = "x86_64")]
 use crate::{object_set_property, Property, PropertyQuery};
+
+bitflags! {
+    /// Options that may be used with `Thread::raise_exception`
+    #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct RaiseExceptionOptions: u32 {
+        const TARGET_JOB_DEBUGGER = sys::ZX_EXCEPTION_TARGET_JOB_DEBUGGER;
+    }
+}
 
 /// An object representing a Zircon thread.
 ///
@@ -119,6 +129,26 @@ impl Thread {
             )
         };
         ok(status)
+    }
+
+    pub fn raise_exception(
+        options: RaiseExceptionOptions,
+        exception_type: sys::zx_excp_type_t,
+        context: sys::zx_exception_context_t,
+    ) -> Result<(), Status> {
+        let status =
+            unsafe { sys::zx_thread_raise_exception(options.bits(), exception_type, &context) };
+        ok(status)
+    }
+
+    pub fn raise_user_exception(
+        options: RaiseExceptionOptions,
+        synth_code: u32,
+        synth_data: u32,
+    ) -> Result<(), Status> {
+        let arch = unsafe { std::mem::zeroed::<sys::zx_exception_header_arch_t>() };
+        let context = sys::zx_exception_context_t { arch, synth_code, synth_data };
+        Self::raise_exception(options, sys::ZX_EXCP_USER, context)
     }
 }
 

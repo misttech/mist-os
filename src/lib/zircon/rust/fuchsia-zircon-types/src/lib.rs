@@ -503,6 +503,7 @@ multiconst!(u64, [
 // from //zircon/system/public/zircon/syscalls/exception.h
 multiconst!(u32, [
     ZX_EXCEPTION_CHANNEL_DEBUGGER = 1 << 0;
+    ZX_EXCEPTION_TARGET_JOB_DEBUGGER = 1 << 0;
 ]);
 
 /// A byte used only to control memory alignment. All padding bytes are considered equal
@@ -976,7 +977,7 @@ multiconst!(u32, [
 
 pub type zx_excp_type_t = u32;
 
-multiconst!(zx_obj_type_t, [
+multiconst!(zx_excp_type_t, [
     ZX_EXCP_GENERAL               = 0x008;
     ZX_EXCP_FATAL_PAGE_FAULT      = 0x108;
     ZX_EXCP_UNDEFINED_INSTRUCTION = 0x208;
@@ -989,6 +990,7 @@ multiconst!(zx_obj_type_t, [
     ZX_EXCP_THREAD_STARTING       = 0x008 | ZX_EXCP_SYNTH;
     ZX_EXCP_THREAD_EXITING        = 0x108 | ZX_EXCP_SYNTH;
     ZX_EXCP_POLICY_ERROR          = 0x208 | ZX_EXCP_SYNTH;
+    ZX_EXCP_USER                  = 0x309 | ZX_EXCP_SYNTH;
 ]);
 
 #[repr(C)]
@@ -1002,7 +1004,7 @@ pub struct zx_exception_info_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_x86_64_exc_data_t {
     pub vector: u64,
     pub err_code: u64,
@@ -1010,7 +1012,7 @@ pub struct zx_x86_64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_arm64_exc_data_t {
     pub esr: u32,
     pub padding1: [PadByte; 4],
@@ -1019,7 +1021,7 @@ pub struct zx_arm64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_riscv64_exc_data_t {
     pub cause: u64,
     pub tval: u64,
