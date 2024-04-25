@@ -88,9 +88,6 @@
                 "RawSocketTest.ReceiveTTL",
                 "RawSocketTest.SetIPv6ChecksumError_MultipleOf2",
                 "RawSocketTest.UnboundReceive",
-
-                // TODO(https://fxbug.dev/336543553): Expect success when fixed.
-                "AllPacketSocketTests/PacketSocketTest.SendWithoutTargetDevice/*",
             ],
         },
     ],

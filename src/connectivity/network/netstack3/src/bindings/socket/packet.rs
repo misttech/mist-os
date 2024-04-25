@@ -369,6 +369,9 @@ impl<'a> RequestHandler<'a> {
         let SocketState { kind, queue: _ } = *id.socket_state();
 
         let data = Buf::new(data, ..);
+        // NB: Packet sockets require the packet_info be provided to specify
+        // the destination of the data.
+        let packet_info = *packet_info.ok_or(fposix::Errno::Einval)?;
         match kind {
             fppacket::Kind::Network => {
                 let params = packet_info.try_into_core_with_ctx(ctx.bindings_ctx())?;
@@ -608,7 +611,7 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties> for WeakDeviceId<Bind
     }
 }
 
-impl<D> TryFromFidlWithContext<Option<Box<fppacket::PacketInfo>>> for SendDatagramParams<D>
+impl<D> TryFromFidlWithContext<fppacket::PacketInfo> for SendDatagramParams<D>
 where
     D: TryFromFidlWithContext<BindingId, Error = DeviceNotFoundError>,
 {
@@ -616,46 +619,41 @@ where
 
     fn try_from_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
         ctx: &C,
-        packet_info: Option<Box<fppacket::PacketInfo>>,
+        packet_info: fppacket::PacketInfo,
     ) -> Result<Self, Self::Error> {
-        packet_info.ok_or(fposix::Errno::Einval).and_then(|info| {
-            let fppacket::PacketInfo { protocol, interface_id, addr } = *info;
-            let device = BindingId::new(interface_id)
-                .map(|id| id.try_into_core_with_ctx(ctx))
-                .transpose()
-                .map_err(IntoErrno::into_errno)?;
-            let protocol = NonZeroU16::new(protocol);
-            let dest_addr = match addr {
-                fppacket::HardwareAddress::Eui48(mac) => Some(mac.into_core()),
-                fppacket::HardwareAddress::None(fppacket::Empty) => None,
-                fppacket::HardwareAddressUnknown!() => None,
-            }
-            .ok_or(fposix::Errno::Einval)?;
-            Ok(Self { frame: SendFrameParams { device }, protocol, dest_addr })
-        })
+        let frame_params = packet_info.clone().try_into_core_with_ctx(ctx)?;
+        let fppacket::PacketInfo { protocol, interface_id: _, addr } = packet_info;
+        let protocol = NonZeroU16::new(protocol).ok_or(fposix::Errno::Einval)?;
+        let dest_addr = match addr {
+            fppacket::HardwareAddress::Eui48(mac) => Some(mac.into_core()),
+            fppacket::HardwareAddress::None(fppacket::Empty) => None,
+            fppacket::HardwareAddressUnknown!() => None,
+        }
+        .ok_or(fposix::Errno::Einval)?;
+        Ok(Self { frame: frame_params, protocol, dest_addr })
     }
 }
 
-impl<D> TryFromFidlWithContext<Option<Box<fppacket::PacketInfo>>> for SendFrameParams<D>
+impl<D> TryFromFidlWithContext<fppacket::PacketInfo> for SendFrameParams<D>
 where
     D: TryFromFidlWithContext<BindingId, Error = DeviceNotFoundError>,
 {
-    type Error = DeviceNotFoundError;
+    type Error = fposix::Errno;
 
     fn try_from_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
         ctx: &C,
-        packet_info: Option<Box<fppacket::PacketInfo>>,
+        packet_info: fppacket::PacketInfo,
     ) -> Result<Self, Self::Error> {
-        packet_info.map_or(Ok(SendFrameParams::default()), |info| {
-            let fppacket::PacketInfo { protocol, interface_id, addr } = *info;
-            // Ignore protocol and addr since the frame to send already includes
-            // any link-layer headers.
-            let _ = (protocol, addr);
-            let device = BindingId::new(interface_id)
-                .map(|id| id.try_into_core_with_ctx(ctx))
-                .transpose()?;
-            Ok(SendFrameParams { device })
-        })
+        // Ignore protocol and addr since the frame to send already includes
+        // any link-layer headers.
+        let fppacket::PacketInfo { protocol: _, interface_id, addr: _ } = packet_info;
+        match BindingId::new(interface_id) {
+            None => Err(fposix::Errno::Enxio),
+            Some(id) => id
+                .try_into_core_with_ctx(ctx)
+                .map(|device| SendFrameParams { device })
+                .map_err(IntoErrno::into_errno),
+        }
     }
 }
 
@@ -704,7 +702,6 @@ impl IntoErrno for SendDatagramError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             Self::Frame(f) => f.into_errno(),
-            Self::NoProtocol => fposix::Errno::Einval,
         }
     }
 }
@@ -712,7 +709,6 @@ impl IntoErrno for SendDatagramError {
 impl IntoErrno for SendFrameError {
     fn into_errno(self) -> fposix::Errno {
         match self {
-            SendFrameError::NoDevice => fposix::Errno::Einval,
             SendFrameError::SendFailed => fposix::Errno::Enobufs,
         }
     }
