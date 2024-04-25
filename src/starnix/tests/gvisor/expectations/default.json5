@@ -976,12 +976,6 @@
                 // This test hangs because "RTM_F_LOOKUP_TABLE" is not supported.
                 "NetlinkRouteTest.GetRouteRequest",
 
-                // This test hangs because sending a request of unsupported type
-                // should result in receiving a Netlink error message. The
-                // current implementation returns an error to the write without
-                // putting an error in the socket's recv buffer.
-                "NetlinkRouteTest.MsgHdrMsgUnsuppType",
-
                 // These tests hang because "RTM_DELLINK" is not supported.
                 "NetlinkRouteTest.RemoveLinkByNameNotFound",
                 "NetlinkRouteTest.RemoveLoopbackByName",

@@ -17,7 +17,7 @@ use netlink::{
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::RouteNetlinkMessage;
 use netlink_packet_sock_diag::message::SockDiagMessage;
-use netlink_packet_utils::Emitable as _;
+use netlink_packet_utils::{DecodeError, Emitable as _};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
@@ -900,7 +900,7 @@ impl SocketOps for RouteNetlinkSocket {
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         let RouteNetlinkSocket { inner: _, client: _, message_sender } = self;
-        let bytes = data.read_all()?;
+        let bytes = data.peek_all()?;
         match NetlinkMessage::<RouteNetlinkMessage>::deserialize(&bytes) {
             Err(e) => {
                 log_warn!(
@@ -908,10 +908,18 @@ impl SocketOps for RouteNetlinkSocket {
                     "Failed to process write; data could not be deserialized: {:?}",
                     e
                 );
-                error!(EINVAL)
+                if matches!(e, DecodeError::FailedToParseMessageWithType { .. }) {
+                    // Unsupported type.
+                    error!(EOPNOTSUPP)
+                } else {
+                    error!(EINVAL)
+                }
             }
             Ok(msg) => match message_sender.unbounded_send(msg) {
-                Ok(()) => Ok(bytes.len()),
+                Ok(()) => {
+                    data.drain();
+                    Ok(bytes.len())
+                }
                 Err(e) => {
                     log_warn!(
                         tag = NETLINK_LOG_TAG,
