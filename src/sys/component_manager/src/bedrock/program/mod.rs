@@ -3,7 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    model::{escrow::EscrowedState, token::InstanceToken},
+    model::{
+        error::{StartError, StopError},
+        escrow::EscrowedState,
+        token::InstanceToken,
+    },
     runner::RemoteRunner,
 };
 use fidl::endpoints;
@@ -21,8 +25,7 @@ use futures::{
     future::{BoxFuture, Either},
     FutureExt,
 };
-use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
-use thiserror::Error;
+use serve_processargs::NamespaceBuilder;
 use vfs::execution_scope::ExecutionScope;
 
 mod component_controller;
@@ -233,19 +236,6 @@ pub enum StopRequestSuccess {
     NoController,
     /// The component stopped within the timeout.
     Stopped,
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum StopError {
-    /// Internal errors are not meant to be meaningfully handled by the user.
-    #[error("internal error: {0}")]
-    Internal(fidl::Error),
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum StartError {
-    #[error("failed to serve namespace: {0}")]
-    ServeNamespace(BuildNamespaceError),
 }
 
 /// Information and capabilities used to start a program.

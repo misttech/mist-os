@@ -8,7 +8,7 @@ use {
         capability::CapabilitySource,
         model::{
             component::{ComponentInstance, StartReason},
-            error::ModelError,
+            error::{ModelError, StorageError},
             routing::{Route, RouteSource},
             start::Start,
         },
@@ -17,8 +17,6 @@ use {
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
         error::RoutingError, RouteRequest,
     },
-    anyhow::Error,
-    clonable_error::ClonableError,
     cm_moniker::InstancedMoniker,
     cm_types::RelativePath,
     component_id_index::InstanceId,
@@ -27,7 +25,6 @@ use {
     fidl_fuchsia_io as fio,
     moniker::MonikerBase,
     std::{path::PathBuf, sync::Arc},
-    thiserror::Error,
     vfs::{directory::entry::OpenRequest, ToObjectRequest},
 };
 
@@ -72,124 +69,6 @@ impl PartialEq for BackingDirectoryInfo {
             && self.backing_directory_path == other.backing_directory_path
             && self.backing_directory_subdir == other.backing_directory_subdir
             && self.storage_subdir == other.storage_subdir
-    }
-}
-
-/// Errors related to isolated storage.
-#[derive(Debug, Error, Clone)]
-pub enum StorageError {
-    #[error("failed to open {:?}'s directory {}: {} ", dir_source_moniker, dir_source_path, err)]
-    OpenRoot {
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        #[source]
-        err: ClonableError,
-    },
-    #[error(
-        "failed to open isolated storage from {:?}'s directory {} for {} (instance_id={:?}): {} ",
-        dir_source_moniker,
-        dir_source_path,
-        moniker,
-        instance_id,
-        err
-    )]
-    Open {
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
-        instance_id: Option<InstanceId>,
-        #[source]
-        err: ClonableError,
-    },
-    #[error(
-        "failed to open isolated storage from {:?}'s directory {} for {:?}: {} ",
-        dir_source_moniker,
-        dir_source_path,
-        instance_id,
-        err
-    )]
-    OpenById {
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        instance_id: InstanceId,
-        #[source]
-        err: ClonableError,
-    },
-    #[error(
-        "failed to remove isolated storage from {:?}'s directory {} for {} (instance_id={:?}): {} ",
-        dir_source_moniker,
-        dir_source_path,
-        moniker,
-        instance_id,
-        err
-    )]
-    Remove {
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
-        instance_id: Option<InstanceId>,
-        #[source]
-        err: ClonableError,
-    },
-    #[error("storage path for moniker={}, instance_id={:?} is invalid", moniker, instance_id)]
-    InvalidStoragePath { moniker: InstancedMoniker, instance_id: Option<InstanceId> },
-}
-
-impl StorageError {
-    pub fn open_root(
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        err: impl Into<Error>,
-    ) -> Self {
-        Self::OpenRoot { dir_source_moniker, dir_source_path, err: err.into().into() }
-    }
-
-    pub fn open(
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
-        instance_id: Option<InstanceId>,
-        err: impl Into<Error>,
-    ) -> Self {
-        Self::Open {
-            dir_source_moniker,
-            dir_source_path,
-            moniker,
-            instance_id,
-            err: err.into().into(),
-        }
-    }
-
-    pub fn open_by_id(
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        instance_id: InstanceId,
-        err: impl Into<Error>,
-    ) -> Self {
-        Self::OpenById { dir_source_moniker, dir_source_path, instance_id, err: err.into().into() }
-    }
-
-    pub fn remove(
-        dir_source_moniker: Option<InstancedMoniker>,
-        dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
-        instance_id: Option<InstanceId>,
-        err: impl Into<Error>,
-    ) -> Self {
-        Self::Remove {
-            dir_source_moniker,
-            dir_source_path,
-            moniker,
-            instance_id,
-            err: err.into().into(),
-        }
-    }
-
-    pub fn invalid_storage_path(
-        moniker: InstancedMoniker,
-        instance_id: Option<InstanceId>,
-    ) -> Self {
-        Self::InvalidStoragePath { moniker, instance_id }
     }
 }
 

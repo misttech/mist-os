@@ -3,24 +3,23 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        bedrock::program,
-        model::{events::error::EventsError, storage::StorageError},
-    },
     ::routing::{
         error::{ComponentInstanceError, RoutingError},
         policy::PolicyError,
         resolving::ResolverError,
     },
+    anyhow::Error,
     bedrock_error::{BedrockError, Explain},
     clonable_error::ClonableError,
     cm_config::CompatibilityCheckError,
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_rust::UseDecl,
     cm_types::Name,
+    component_id_index::InstanceId,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{ChildName, Moniker, MonikerError},
     sandbox::ConversionError,
+    serve_processargs::BuildNamespaceError,
     std::sync::Arc,
     thiserror::Error,
 };
@@ -812,7 +811,7 @@ pub enum StartActionError {
     StartProgramError {
         moniker: Moniker,
         #[source]
-        err: program::StartError,
+        err: StartError,
     },
     #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
     StructuredConfigError {
@@ -876,7 +875,7 @@ impl Into<fcomponent::Error> for StartActionError {
 #[derive(Debug, Clone, Error)]
 pub enum StopActionError {
     #[error("failed to stop program: {0}")]
-    ProgramStopError(#[source] program::StopError),
+    ProgramStopError(#[source] StopError),
     #[error("failed to get top instance")]
     GetTopInstanceFailed,
     #[error("failed to get parent instance")]
@@ -1044,4 +1043,169 @@ impl EventSourceError {
             Self::AlreadyConsumed => zx::Status::INTERNAL,
         }
     }
+}
+
+#[derive(Debug, Error, Clone)]
+pub enum EventsError {
+    #[error("capability_requested event streams cannot be taken twice")]
+    CapabilityRequestedStreamTaken,
+
+    #[error("Model not available")]
+    ModelNotAvailable,
+
+    #[error("Instance shut down")]
+    InstanceShutdown,
+
+    #[error("Instance destroyed")]
+    InstanceDestroyed,
+
+    #[error("Registry not found")]
+    RegistryNotFound,
+
+    #[error("Event {:?} appears more than once in a subscription request", event_name)]
+    DuplicateEvent { event_name: Name },
+
+    #[error("Events not allowed for subscription {:?}", names)]
+    NotAvailable { names: Vec<Name> },
+}
+
+impl EventsError {
+    pub fn duplicate_event(event_name: Name) -> Self {
+        Self::DuplicateEvent { event_name }
+    }
+
+    pub fn not_available(names: Vec<Name>) -> Self {
+        Self::NotAvailable { names }
+    }
+}
+
+/// Errors related to isolated storage.
+#[derive(Debug, Error, Clone)]
+pub enum StorageError {
+    #[error("failed to open {:?}'s directory {}: {} ", dir_source_moniker, dir_source_path, err)]
+    OpenRoot {
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        #[source]
+        err: ClonableError,
+    },
+    #[error(
+        "failed to open isolated storage from {:?}'s directory {} for {} (instance_id={:?}): {} ",
+        dir_source_moniker,
+        dir_source_path,
+        moniker,
+        instance_id,
+        err
+    )]
+    Open {
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        moniker: InstancedMoniker,
+        instance_id: Option<InstanceId>,
+        #[source]
+        err: ClonableError,
+    },
+    #[error(
+        "failed to open isolated storage from {:?}'s directory {} for {:?}: {} ",
+        dir_source_moniker,
+        dir_source_path,
+        instance_id,
+        err
+    )]
+    OpenById {
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        instance_id: InstanceId,
+        #[source]
+        err: ClonableError,
+    },
+    #[error(
+        "failed to remove isolated storage from {:?}'s directory {} for {} (instance_id={:?}): {} ",
+        dir_source_moniker,
+        dir_source_path,
+        moniker,
+        instance_id,
+        err
+    )]
+    Remove {
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        moniker: InstancedMoniker,
+        instance_id: Option<InstanceId>,
+        #[source]
+        err: ClonableError,
+    },
+    #[error("storage path for moniker={}, instance_id={:?} is invalid", moniker, instance_id)]
+    InvalidStoragePath { moniker: InstancedMoniker, instance_id: Option<InstanceId> },
+}
+
+impl StorageError {
+    pub fn open_root(
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        err: impl Into<Error>,
+    ) -> Self {
+        Self::OpenRoot { dir_source_moniker, dir_source_path, err: err.into().into() }
+    }
+
+    pub fn open(
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        moniker: InstancedMoniker,
+        instance_id: Option<InstanceId>,
+        err: impl Into<Error>,
+    ) -> Self {
+        Self::Open {
+            dir_source_moniker,
+            dir_source_path,
+            moniker,
+            instance_id,
+            err: err.into().into(),
+        }
+    }
+
+    pub fn open_by_id(
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        instance_id: InstanceId,
+        err: impl Into<Error>,
+    ) -> Self {
+        Self::OpenById { dir_source_moniker, dir_source_path, instance_id, err: err.into().into() }
+    }
+
+    pub fn remove(
+        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_path: cm_types::Path,
+        moniker: InstancedMoniker,
+        instance_id: Option<InstanceId>,
+        err: impl Into<Error>,
+    ) -> Self {
+        Self::Remove {
+            dir_source_moniker,
+            dir_source_path,
+            moniker,
+            instance_id,
+            err: err.into().into(),
+        }
+    }
+
+    pub fn invalid_storage_path(
+        moniker: InstancedMoniker,
+        instance_id: Option<InstanceId>,
+    ) -> Self {
+        Self::InvalidStoragePath { moniker, instance_id }
+    }
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum StartError {
+    #[error("failed to serve namespace: {0}")]
+    ServeNamespace(BuildNamespaceError),
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum StopError {
+    /// Internal errors are not meant to be meaningfully handled by the user.
+    #[error("internal error: {0}")]
+    Internal(fidl::Error),
 }

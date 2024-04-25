@@ -8,10 +8,9 @@ use {
         model::{
             component::instance::InstanceState,
             component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance},
-            error::ModelError,
+            error::{EventsError, ModelError},
             events::{
                 dispatcher::{EventDispatcher, EventDispatcherScope},
-                error::EventsError,
                 stream::EventStream,
                 synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer},
             },

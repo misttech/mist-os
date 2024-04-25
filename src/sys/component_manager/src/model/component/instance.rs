@@ -21,7 +21,7 @@ use {
             environment::Environment,
             error::{
                 ActionError, AddChildError, CreateNamespaceError, DynamicOfferError,
-                OpenOutgoingDirError, ResolveActionError,
+                OpenOutgoingDirError, ResolveActionError, StopError,
             },
             escrow::{self, EscrowedState},
             hooks::{CapabilityReceiver, Event, EventPayload},
@@ -1131,7 +1131,7 @@ impl ProgramRuntime {
         self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<StopOutcomeWithEscrow, program::StopError> {
+    ) -> Result<StopOutcomeWithEscrow, StopError> {
         let outcome = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
         // Drop the program and join on the exit listener. Dropping the program
         // should cause the exit listener to stop waiting for the channel epitaph and
@@ -1211,7 +1211,7 @@ impl StartedInstanceState {
         mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<StopOutcomeWithEscrow, program::StopError> {
+    ) -> Result<StopOutcomeWithEscrow, StopError> {
         let program = self.program.take();
         // If the component has a program, also stop the program.
         let ret = if let Some(program) = program {

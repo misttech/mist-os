@@ -7,9 +7,8 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ExtendedInstance, WeakExtendedInstance},
-            error::{CapabilityProviderError, EventSourceError, ModelError},
+            error::{CapabilityProviderError, EventSourceError, EventsError, ModelError},
             events::{
-                error::EventsError,
                 registry::{EventRegistry, EventSubscription},
                 serve::serve_event_stream,
                 stream::EventStream,

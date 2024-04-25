@@ -5,9 +5,8 @@
 use {
     crate::model::{
         component::WeakExtendedInstance,
-        error::ModelError,
+        error::{EventsError, ModelError},
         events::{
-            error::EventsError,
             registry::{EventRegistry, EventSubscription},
             stream::EventStream,
         },
