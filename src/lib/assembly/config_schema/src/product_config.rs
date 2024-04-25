@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf, SourcePathBuf};
-use camino::Utf8PathBuf;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
+use camino::{Utf8Path, Utf8PathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::common::DriverDetails;
 
 /// The Product-provided configuration details.
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct ProductConfig {
     #[serde(default)]
+    #[file_relative_paths]
     pub packages: ProductPackagesConfig,
 
     /// List of base drivers to include in the product.
@@ -31,7 +33,7 @@ pub struct ProductConfig {
     pub info: Option<ProductInfoConfig>,
 
     /// The file paths to various build information.
-    #[serde(default)]
+    #[file_relative_paths]
     pub build_info: Option<BuildInfoConfig>,
 
     /// The policy given to component_manager that restricts where sensitive capabilities can be
@@ -62,28 +64,31 @@ pub struct ProductConfig {
 ///   }
 /// ```
 ///
-#[derive(Debug, Default, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct ProductPackagesConfig {
     /// Paths to package manifests, or more detailed json entries for packages
     /// to add to the 'base' package set.
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[file_relative_paths]
     pub base: Vec<ProductPackageDetails>,
 
     /// Paths to package manifests, or more detailed json entries for packages
     /// to add to the 'cache' package set.
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[file_relative_paths]
     pub cache: Vec<ProductPackageDetails>,
 }
 
 /// Describes in more detail a package to add to the assembly.
-#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct ProductPackageDetails {
     /// Path to the package manifest for this package.
-    pub manifest: PackageManifestPathBuf,
+    #[file_relative_paths]
+    pub manifest: FileRelativePathBuf,
 
     /// Map of config_data entries for this package, from the destination path
     /// within the package, to the path where the source file is to be found.
@@ -94,7 +99,9 @@ pub struct ProductPackageDetails {
 
 impl From<PackageManifestPathBuf> for ProductPackageDetails {
     fn from(manifest: PackageManifestPathBuf) -> Self {
-        Self { manifest, config_data: Vec::default() }
+        let manifestpath: &Utf8Path = manifest.as_ref();
+        let path: Utf8PathBuf = manifestpath.into();
+        Self { manifest: FileRelativePathBuf::Resolved(path), config_data: Vec::default() }
     }
 }
 
@@ -108,7 +115,7 @@ impl From<&str> for ProductPackageDetails {
 #[serde(deny_unknown_fields)]
 pub struct ProductConfigData {
     /// Path to the config file on the host.
-    pub source: SourcePathBuf,
+    pub source: FileRelativePathBuf,
 
     /// Path to find the file in the package on the target.
     pub destination: PackageInternalPathBuf,
@@ -127,33 +134,34 @@ pub struct ProductInfoConfig {
 }
 
 /// Configuration options for build info.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct BuildInfoConfig {
     /// Name of the product build target.
     pub name: String,
     /// Path to the version file.
-    #[schemars(schema_with = "crate::path_schema")]
-    pub version: Utf8PathBuf,
+    #[file_relative_paths]
+    pub version: FileRelativePathBuf,
     /// Path to the jiri snapshot.
-    #[schemars(schema_with = "crate::path_schema")]
-    pub jiri_snapshot: Utf8PathBuf,
+    #[file_relative_paths]
+    pub jiri_snapshot: FileRelativePathBuf,
     /// Path to the latest commit date.
-    #[schemars(schema_with = "crate::path_schema")]
-    pub latest_commit_date: Utf8PathBuf,
+    #[file_relative_paths]
+    pub latest_commit_date: FileRelativePathBuf,
     /// Path to the minimum UTC stamp.
-    #[schemars(schema_with = "crate::path_schema")]
-    pub minimum_utc_stamp: Utf8PathBuf,
+    #[file_relative_paths]
+    pub minimum_utc_stamp: FileRelativePathBuf,
 }
 
 /// Configuration options for the component policy.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct ComponentPolicyConfig {
     /// The file paths to a product-provided component policies.
     #[serde(default)]
-    #[schemars(schema_with = "crate::vec_path_schema")]
-    pub product_policies: Vec<Utf8PathBuf>,
+    pub product_policies: Vec<FileRelativePathBuf>,
 }
 
 #[cfg(test)]
@@ -196,23 +204,38 @@ mod tests {
         assert_eq!(
             packages.base,
             vec![
-                ProductPackageDetails::from("path/to/base/package_manifest.json"),
                 ProductPackageDetails {
-                    manifest: "some/other/manifest.json".into(),
+                    manifest: FileRelativePathBuf::FileRelative(
+                        "path/to/base/package_manifest.json".into()
+                    ),
+                    config_data: Vec::default()
+                },
+                ProductPackageDetails {
+                    manifest: FileRelativePathBuf::FileRelative("some/other/manifest.json".into()),
                     config_data: vec![
                         ProductConfigData {
                             destination: "dest/path/cfg.txt".into(),
-                            source: "source/path/cfg.txt".into(),
+                            source: FileRelativePathBuf::FileRelative("source/path/cfg.txt".into()),
                         },
                         ProductConfigData {
                             destination: "other_data.json".into(),
-                            source: "source_other_data.json".into(),
+                            source: FileRelativePathBuf::FileRelative(
+                                "source_other_data.json".into()
+                            ),
                         },
                     ]
                 }
             ]
         );
-        assert_eq!(packages.cache, vec!["path/to/cache/package_manifest.json".into()]);
+        assert_eq!(
+            packages.cache,
+            vec![ProductPackageDetails {
+                manifest: FileRelativePathBuf::FileRelative(
+                    "path/to/cache/package_manifest.json".into()
+                ),
+                config_data: Vec::default()
+            }]
+        );
     }
 
     #[test]
@@ -233,15 +256,15 @@ mod tests {
             }
         "#;
         let expected = ProductPackageDetails {
-            manifest: "some/other/manifest.json".into(),
+            manifest: FileRelativePathBuf::FileRelative("some/other/manifest.json".into()),
             config_data: vec![
                 ProductConfigData {
                     destination: "dest/path/cfg.txt".into(),
-                    source: "source/path/cfg.txt".into(),
+                    source: FileRelativePathBuf::FileRelative("source/path/cfg.txt".into()),
                 },
                 ProductConfigData {
                     destination: "other_data.json".into(),
-                    source: "source_other_data.json".into(),
+                    source: FileRelativePathBuf::FileRelative("source_other_data.json".into()),
                 },
             ],
         };

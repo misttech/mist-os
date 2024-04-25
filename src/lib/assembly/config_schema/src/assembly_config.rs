@@ -5,6 +5,7 @@
 use crate::image_assembly_config::PartialKernelConfig;
 use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
+use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_util::{CompiledPackageDestination, FileEntry};
 use camino::Utf8PathBuf;
@@ -19,11 +20,15 @@ use crate::product_config::ProductConfig;
 /// that takes a more abstract description of what is desired in the assembled
 /// product images, and then generates the complete Image Assembly configuration
 /// (`crate::config::ImageAssemblyConfig`) from that.
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfig {
+    #[file_relative_paths]
     pub platform: PlatformConfig,
+    #[file_relative_paths]
     pub product: ProductConfig,
+    #[serde(default)]
+    pub file_relative_paths: bool,
 }
 
 /// Configuration for Product Assembly, when developer overrides are in use.
@@ -31,13 +36,15 @@ pub struct AssemblyConfig {
 /// This deserializes to intermediate types that can be manipulated in order to
 /// apply developer overrides, before being parsed into the PlatformConfig
 /// and ProductConfig types.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfigWrapperForOverrides {
     // The platform config is deserialized as a Value before it is parsed into
     // a 'PlatformConfig``
     pub platform: serde_json::Value,
     pub product: ProductConfig,
+    #[serde(default)]
+    pub file_relative_paths: bool,
 }
 
 /// A typename to represent a package that contains shell command binaries,
@@ -315,14 +322,18 @@ mod tests {
         assert_eq!(
             config.product.packages.base,
             vec![ProductPackageDetails {
-                manifest: "path/to/base/package_manifest.json".into(),
+                manifest: FileRelativePathBuf::FileRelative(
+                    "path/to/base/package_manifest.json".into()
+                ),
                 config_data: Vec::default()
             }]
         );
         assert_eq!(
             config.product.packages.cache,
             vec![ProductPackageDetails {
-                manifest: "path/to/cache/package_manifest.json".into(),
+                manifest: FileRelativePathBuf::FileRelative(
+                    "path/to/cache/package_manifest.json".into()
+                ),
                 config_data: Vec::default()
             }]
         );
@@ -334,6 +345,47 @@ mod tests {
                 components: vec!["meta/path/to/component.cml".into()]
             }]
         )
+    }
+
+    #[test]
+    fn test_product_assembly_config_with_relative_paths() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+          product: {
+              packages: {
+                  base: [
+                      { manifest: "base/package_manifest.json" }
+                  ],
+                  cache: [
+                      { manifest: "cache/package_manifest.json" }
+                  ]
+              },
+          },
+          file_relative_paths: true,
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
+        let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
+        assert_eq!(config.file_relative_paths, true);
+        assert_eq!(
+            config.product.packages.base,
+            vec![ProductPackageDetails {
+                manifest: "path/to/base/package_manifest.json".into(),
+                config_data: Vec::default()
+            }]
+        );
+        assert_eq!(
+            config.product.packages.cache,
+            vec![ProductPackageDetails {
+                manifest: "path/to/cache/package_manifest.json".into(),
+                config_data: Vec::default()
+            }]
+        );
     }
 
     #[test]
@@ -481,7 +533,7 @@ mod tests {
         });
 
         let mut cursor = std::io::Cursor::new(json5);
-        let AssemblyConfigWrapperForOverrides { platform, product: _ } =
+        let AssemblyConfigWrapperForOverrides { platform, product: _, .. } =
             util::from_reader(&mut cursor).unwrap();
 
         // serde_json and serde_json5 have an incompatible handling of how they

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::SupportsFileRelativePaths;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +37,7 @@ pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// The minimum service-level that the platform will provide, or the main

@@ -41,50 +41,67 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     info!("Reading configuration files.");
     info!("  product: {}", product);
 
-    let (platform, product, developer_overrides) = if let Some(overrides_path) = developer_overrides
-    {
-        // If developer overrides are in use, parse to intermediate types so
-        // that overrides can be applied.
-        let AssemblyConfigWrapperForOverrides { platform, product } =
-            read_config(&product).context("Reading product configuration")?;
+    let product_path = product;
 
-        let developer_overrides =
-            read_config(&overrides_path).context("Reading developer overrides")?;
-        print_developer_overrides_banner(&developer_overrides, &overrides_path)
-            .context("Displaying developer overrides.")?;
+    let (platform, product, developer_overrides, file_relative_paths) =
+        if let Some(overrides_path) = developer_overrides {
+            // If developer overrides are in use, parse to intermediate types so
+            // that overrides can be applied.
+            let AssemblyConfigWrapperForOverrides { platform, product, file_relative_paths } =
+                read_config(&product_path).context("Reading product configuration")?;
 
-        // Extract the platform config overrides so that we can apply them to the platform config.
-        let platform_config_overrides = developer_overrides.platform;
+            let developer_overrides =
+                read_config(&overrides_path).context("Reading developer overrides")?;
+            print_developer_overrides_banner(&developer_overrides, &overrides_path)
+                .context("Displaying developer overrides.")?;
 
-        // Merge the platform config with the overrides.
-        let merged_platform: serde_json::Value =
-            assembly_config_schema::try_merge_into(platform, platform_config_overrides)
-                .context("Merging developer overrides")?;
+            // Extract the platform config overrides so that we can apply them to the platform config.
+            let platform_config_overrides = developer_overrides.platform;
 
-        // Because serde_json and serde_json5 deserialize enums differently, we need to bounce the
-        // serde_json::Value of the platform config through a string so that we can re-parse it
-        // using serde_json5.
-        // TODO: Remove this after the following issue is fixed:
-        // https://github.com/google/serde_json5/issues/10
-        let merged_platform_json5 = serde_json::to_string_pretty(&merged_platform)
-            .context("Creating temporary json5 from merged config")?;
+            // Merge the platform config with the overrides.
+            let merged_platform: serde_json::Value =
+                assembly_config_schema::try_merge_into(platform, platform_config_overrides)
+                    .context("Merging developer overrides")?;
 
-        // Now deserialize the merged and serialized json5 of the platform configuration.  This
-        // works around the issue with enums.
-        let platform: PlatformConfig = serde_json5::from_str(&merged_platform_json5)
-            .context("Deserializing platform configuration merged with developer overrides.")?;
+            // Because serde_json and serde_json5 deserialize enums differently, we need to bounce the
+            // serde_json::Value of the platform config through a string so that we can re-parse it
+            // using serde_json5.
+            // TODO: Remove this after the following issue is fixed:
+            // https://github.com/google/serde_json5/issues/10
+            let merged_platform_json5 = serde_json::to_string_pretty(&merged_platform)
+                .context("Creating temporary json5 from merged config")?;
 
-        // Reconstitute the developer overrides struct, but with a null platform config, since it's
-        // been used to modify the platform configuration.
-        let developer_overrides =
-            DeveloperOverrides { platform: serde_json::Value::Null, ..developer_overrides };
+            // Now deserialize the merged and serialized json5 of the platform configuration.  This
+            // works around the issue with enums.
+            let platform: PlatformConfig = serde_json5::from_str(&merged_platform_json5)
+                .context("Deserializing platform configuration merged with developer overrides.")?;
 
-        (platform, product, Some(developer_overrides))
+            // Reconstitute the developer overrides struct, but with a null platform config, since it's
+            // been used to modify the platform configuration.
+            let developer_overrides =
+                DeveloperOverrides { platform: serde_json::Value::Null, ..developer_overrides };
+
+            (platform, product, Some(developer_overrides), file_relative_paths)
+        } else {
+            let AssemblyConfig { platform, product, file_relative_paths } =
+                read_config(&product_path).context("Reading product configuration")?;
+
+            (platform, product, None, file_relative_paths)
+        };
+
+    // Resolve paths from file-relative to cwd-relative if the config specifies
+    // it.
+    let (platform, product) = if file_relative_paths {
+        (
+            platform
+                .resolve_paths_from_file(&product_path)
+                .context("Resolving paths in platform configuration")?,
+            product
+                .resolve_paths_from_file(&product_path)
+                .context("Resolving paths in product configuration")?,
+        )
     } else {
-        let AssemblyConfig { platform, product } =
-            read_config(&product).context("Reading product configuration")?;
-
-        (platform, product, None)
+        (platform, product)
     };
 
     let board_info_path = board_info;

@@ -1507,15 +1507,23 @@ mod tests {
         std::fs::write(&config_data_source_a, "source a").unwrap();
         std::fs::write(&config_data_source_b, "{}").unwrap();
 
+        let base_b = write_empty_pkg(outdir, "base_b", None);
+        let base_b_path: &Utf8Path = base_b.as_ref();
+        let base_b_pathbuf: Utf8PathBuf = base_b_path.into();
+
+        let base_c = write_empty_pkg(outdir, "base_c", None);
+        let base_c_path: &Utf8Path = base_c.as_ref();
+        let base_c_pathbuf: Utf8PathBuf = base_c_path.into();
+
         let packages = ProductPackagesConfig {
             base: vec![
                 write_empty_pkg(outdir, "base_a", None).into(),
                 ProductPackageDetails {
-                    manifest: write_empty_pkg(outdir, "base_b", None),
+                    manifest: FileRelativePathBuf::Resolved(base_b_pathbuf),
                     config_data: Vec::default(),
                 },
                 ProductPackageDetails {
-                    manifest: write_empty_pkg(outdir, "base_c", None),
+                    manifest: FileRelativePathBuf::Resolved(base_c_pathbuf),
                     config_data: vec![
                         ProductConfigData {
                             destination: "dest/path/cfg.txt".into(),

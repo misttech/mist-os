@@ -21,19 +21,19 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
             dir.entry_from_contents("board", &context.board_info.name)?;
             dir.entry_from_contents("product", &build_info.name)?;
             dir.entry(FileEntry {
-                source: build_info.version.clone(),
+                source: build_info.version.clone().into(),
                 destination: "version".into(),
             })?;
             dir.entry(FileEntry {
-                source: build_info.jiri_snapshot.clone(),
+                source: build_info.jiri_snapshot.clone().into(),
                 destination: "snapshot".into(),
             })?;
             dir.entry(FileEntry {
-                source: build_info.latest_commit_date.clone(),
+                source: build_info.latest_commit_date.clone().into(),
                 destination: "latest-commit-date".into(),
             })?;
             dir.entry(FileEntry {
-                source: build_info.minimum_utc_stamp.clone(),
+                source: build_info.minimum_utc_stamp.clone().into(),
                 destination: "minimum-utc-stamp".into(),
             })?;
         }

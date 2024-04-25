@@ -408,7 +408,7 @@ mod tests {
         "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let AssemblyConfig { platform, product } = util::from_reader(&mut cursor).unwrap();
+        let AssemblyConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
         let result =
             define_configuration(&platform, &product, &BoardInformation::default(), false, "", "");
 
