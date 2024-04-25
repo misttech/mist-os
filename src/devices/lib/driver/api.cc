@@ -52,8 +52,6 @@ __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_handle_t get_root_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
-
 __EXPORT zx_handle_t get_ioport_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
 
 __EXPORT zx_handle_t get_mmio_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }

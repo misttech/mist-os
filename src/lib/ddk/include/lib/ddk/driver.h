@@ -344,9 +344,6 @@ typedef struct zx_device_str_prop {
   zx_device_str_prop_val_t property_value;
 } zx_device_str_prop_t;
 
-// temporary accessor for root resource handle
-zx_handle_t get_root_resource(zx_device_t* dev);
-
 zx_handle_t get_mmio_resource(zx_device_t* dev);
 
 zx_handle_t get_msi_resource(zx_device_t* dev);
