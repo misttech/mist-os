@@ -2449,9 +2449,12 @@ template("_fuchsia_binary") {
 
       # Add dependency to the C runtime startup object file for executables,
       # except if the static-pie-config is used.
+      _static_pie_label = "//build/config/fuchsia:static-pie-config"
+      if (is_mistos) {
+        _static_pie_label = "//build/config/mistos:static-pie-config"
+      }
       if ((target_type == "executable" || target_type == "test") &&
-          configs + [ "//build/config/fuchsia:static-pie-config" ] -
-          [ "//build/config/fuchsia:static-pie-config" ] == configs) {
+          configs + [ _static_pie_label ] - [ _static_pie_label ] == configs) {
         deps += [ "//zircon/public/sysroot:crt1_deps" ]
       }
 
