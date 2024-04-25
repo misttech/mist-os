@@ -29,7 +29,8 @@ class event;
 class thread;
 class vmar;
 class vmo;
-struct VmoStorage;
+
+class VmoStorage;
 
 typedef void* raw_ptr_t;
 

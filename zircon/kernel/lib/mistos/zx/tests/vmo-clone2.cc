@@ -208,12 +208,12 @@ TEST_F(VmoClone2TestCase, ObjMemAccounting) {
   ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
   ASSERT_EQ(VmoPopulatedBytes(clone), 0);
 
-  // Write to the clone and check that that forks a page into the clone.
+  // Write to the original and check that forks a page into the clone.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 2, 0));
   ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
   ASSERT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
 
-  // Write to the original and check that that forks a page into the clone.
+  // Write to the clone and check that forks a page into the clone.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 2, zx_system_get_page_size()));
   ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
   ASSERT_EQ(VmoPopulatedBytes(clone), 2 * zx_system_get_page_size());
@@ -855,6 +855,7 @@ TEST_F(VmoCloneResizeTests, ResizeChild) {
 TEST_F(VmoCloneResizeTests, ResizeOriginal) {
   ASSERT_NO_FATAL_FAILURE(ResizeTest(Contiguity::NonContig, ResizeTarget::Parent));
 }
+#endif
 
 // Tests that growing a clone exposes zeros and doesn't consume memory on parent writes.
 TEST_F(VmoClone2TestCase, ResizeGrow) {
@@ -1030,6 +1031,7 @@ TEST_F(VmoClone2TestCase, ResizeOverSiblingRange) {
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 4, 3 * zx_system_get_page_size()));
 }
 
+#if 0
 // Tests the basic operation of the ZX_VMO_ZERO_CHILDREN signal.
 TEST_F(VmoClone2TestCase, Children) {
   zx::vmo vmo;

@@ -14,58 +14,100 @@
 
 #define LOCAL_TRACE ZX_GLOBAL_TRACE(0)
 
+static_assert(ZX_CACHE_POLICY_CACHED == ARCH_MMU_FLAG_CACHED,
+              "Cache policy constant mismatch - CACHED");
+static_assert(ZX_CACHE_POLICY_UNCACHED == ARCH_MMU_FLAG_UNCACHED,
+              "Cache policy constant mismatch - UNCACHED");
+static_assert(ZX_CACHE_POLICY_UNCACHED_DEVICE == ARCH_MMU_FLAG_UNCACHED_DEVICE,
+              "Cache policy constant mismatch - UNCACHED_DEVICE");
+static_assert(ZX_CACHE_POLICY_WRITE_COMBINING == ARCH_MMU_FLAG_WRITE_COMBINING,
+              "Cache policy constant mismatch - WRITE_COMBINING");
+static_assert(ZX_CACHE_POLICY_MASK == ARCH_MMU_FLAG_CACHE_MASK,
+              "Cache policy constant mismatch - CACHE_MASK");
+
 namespace zx {
 
 namespace {
 
-zx_status_t parse_create_flags(uint32_t flags, uint32_t* out_flags) {
-  uint32_t res = 0;
+struct CreateStats {
+  uint32_t flags;
+  size_t size;
+};
+
+zx::result<CreateStats> parse_create_syscall_flags(uint32_t flags, size_t size) {
+  CreateStats res = {0, size};
+
   if (flags & ZX_VMO_RESIZABLE) {
-    res |= VmObjectPaged::kResizable;
+    if (flags & ZX_VMO_UNBOUNDED) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    res.flags |= VmObjectPaged::kResizable;
     flags &= ~ZX_VMO_RESIZABLE;
   }
   if (flags & ZX_VMO_DISCARDABLE) {
-    res |= VmObjectPaged::kDiscardable;
+    res.flags |= VmObjectPaged::kDiscardable;
     flags &= ~ZX_VMO_DISCARDABLE;
+  }
+  if (flags & ZX_VMO_UNBOUNDED) {
+    if (size != 0) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    flags &= ~ZX_VMO_UNBOUNDED;
+    res.size = VmObjectPaged::max_size();
   }
 
   if (flags) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  *out_flags = res;
-
-  return ZX_OK;
+  return zx::ok(res);
 }
 
 }  // namespace
 
-zx_status_t vmo::create(uint64_t size, uint32_t options, vmo* result) {
-  uint32_t vmo_options = 0;
-  if (zx_status_t status = parse_create_flags(options, &vmo_options); status != ZX_OK) {
-    return status;
-  }
+VmoStorage::VmoStorage(fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager> content_size_mgr,
+                       InitialMutability initial_mutability)
+    : koid_(KernelObjectId::Generate()),
+      vmo_(std::move(vmo)),
+      content_size_mgr_(std::move(content_size_mgr)),
+      /*pager_koid_(pager_koid),*/
+      initial_mutability_(initial_mutability) {
+  vmo_->set_user_id(koid_);
 
-  fbl::RefPtr<VmObjectPaged> new_vmo;
-  if (zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, vmo_options, size, &new_vmo);
-      status != ZX_OK) {
-    return status;
+  rights_ |= (vmo_->is_resizable() ? ZX_RIGHT_RESIZE : 0);
+}
+
+zx_status_t vmo::create(uint64_t size, uint32_t options, vmo* out) {
+  LTRACEF("size %#" PRIx64 "\n", size);
+
+  zx::result<CreateStats> parse_result = parse_create_syscall_flags(options, size);
+  if (parse_result.is_error()) {
+    return parse_result.error_value();
   }
+  CreateStats stats = parse_result.value();
+
+  // create a vm object
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t res = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY /*| PMM_ALLOC_FLAG_CAN_WAIT*/,
+                                          stats.flags, stats.size, &vmo);
+  if (res != ZX_OK)
+    return res;
 
   fbl::RefPtr<ContentSizeManager> content_size_manager;
-  if (zx_status_t status = ContentSizeManager::Create(size, &content_size_manager);
-      status != ZX_OK) {
-    return status;
+  res = ContentSizeManager::Create(size, &content_size_manager);
+  if (res != ZX_OK) {
+    return res;
   }
 
   fbl::AllocChecker ac;
-  auto storage = fbl::MakeRefCountedChecked<VmoStorage>(&ac, std::move(new_vmo),
-                                                        std::move(content_size_manager));
+  auto storage =
+      fbl::MakeRefCountedChecked<VmoStorage>(&ac, std::move(vmo), std::move(content_size_manager),
+                                             VmoStorage::InitialMutability::kMutable);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  result->reset(std::move(storage));
+  out->reset(std::move(storage));
   return ZX_OK;
 }
 
@@ -84,7 +126,7 @@ zx_status_t vmo::read(void* data, uint64_t offset, size_t len) const {
   if (!tmp) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return tmp->vmo->Read(data, offset, len);
+  return tmp->vmo_->Read(data, offset, len);
 }
 
 zx_status_t vmo::write(const void* data, uint64_t offset, size_t len) const {
@@ -102,7 +144,7 @@ zx_status_t vmo::write(const void* data, uint64_t offset, size_t len) const {
   if (!tmp) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return tmp->vmo->Write(data, offset, len);
+  return tmp->vmo_->Write(data, offset, len);
 }
 
 zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, bool copy_prop,
@@ -114,7 +156,7 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
 
   zx_status_t status;
   fbl::RefPtr<VmObject> child_vmo;
-  // bool no_write = false;
+  bool no_write = false;
 
   // Resizing a VMO requires the WRITE permissions, but NO_WRITE forbids the WRITE permissions, as
   // such it does not make sense to create a VMO with both of these.
@@ -125,16 +167,23 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
   // Writable is a property of the handle, not the object, so we consume this option here before
   // calling CreateChild.
   if (options & ZX_VMO_CHILD_NO_WRITE) {
-    // no_write = true;
+    no_write = true;
     options &= ~ZX_VMO_CHILD_NO_WRITE;
   }
 
+  // Save a copy of the rights for later.
+  zx_rights_t in_rights = get()->rights_;
+
+  // VmObjectDispatcher::CreateChild
   LTRACEF("options 0x%x offset %#" PRIx64 " size %#" PRIx64 "\n", options, offset, size);
 
+  // clone the vmo into a new one
   status = create_child_internal(options, offset, size, copy_prop, &child_vmo);
   DEBUG_ASSERT((status == ZX_OK) == (child_vmo != nullptr));
   if (status != ZX_OK)
     return status;
+
+  DEBUG_ASSERT(child_vmo);
 
   // This checks that the child VMO is explicitly created with ZX_VMO_CHILD_SNAPSHOT.
   // There are other ways that VMOs can be effectively immutable, for instance if the VMO is
@@ -142,15 +191,15 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
   // "upgraded" to a snapshot. However this behavior is not guaranteed at the API level.
   // A choice was made to conservatively only mark VMOs as immutable when the user explicitly
   // creates a VMO in a way that is guaranteed at the API level to always output an immutable VMO.
-  // auto initial_mutability = VmObjectDispatcher::InitialMutability::kMutable;
-  // if (no_write && (options & ZX_VMO_CHILD_SNAPSHOT)) {
-  //  initial_mutability = VmObjectDispatcher::InitialMutability::kImmutable;
-  //}
+  auto initial_mutability = VmoStorage::InitialMutability::kMutable;
+  if (no_write && (options & ZX_VMO_CHILD_SNAPSHOT)) {
+    initial_mutability = VmoStorage::InitialMutability::kImmutable;
+  }
 
   fbl::RefPtr<ContentSizeManager> content_size_manager;
   // A reference child shares the same content size manager as the parent.
   if (options & ZX_VMO_CHILD_REFERENCE) {
-    content_size_manager = fbl::RefPtr(get()->content_size_mgr.get());
+    content_size_manager = fbl::RefPtr(get()->content_size_mgr_.get());
   } else {
     status = ContentSizeManager::Create(size, &content_size_manager);
     if (status != ZX_OK) {
@@ -158,12 +207,41 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
     }
   }
 
+  // create a VmoStorage
   fbl::AllocChecker ac;
-  auto storage = fbl::MakeRefCountedChecked<VmoStorage>(&ac, std::move(child_vmo),
-                                                        std::move(content_size_manager));
+  auto storage = fbl::MakeRefCountedChecked<VmoStorage>(
+      &ac, std::move(child_vmo), std::move(content_size_manager), initial_mutability);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
+  zx_rights_t default_rights = storage->rights_;
+
+  // Set the rights to the new handle to no greater than the input (parent) handle minus the RESIZE
+  // right, which is added independently based on ZX_VMO_CHILD_RESIZABLE; it is possible for a
+  // non-resizable parent to have a resizable child and vice versa. Always allow GET/SET_PROPERTY so
+  // the user can set ZX_PROP_NAME on the new clone.
+  zx_rights_t rights = (in_rights & ~ZX_RIGHT_RESIZE) |
+                       (options & ZX_VMO_CHILD_RESIZABLE ? ZX_RIGHT_RESIZE : 0) |
+                       ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY;
+
+  // Unless it was explicitly requested to be removed, WRITE can be added to CoW clones at the
+  // expense of executability.
+  if (no_write) {
+    rights &= ~ZX_RIGHT_WRITE;
+    // NO_WRITE and RESIZABLE cannot be specified together, so we should not have the RESIZE
+    // right.
+    DEBUG_ASSERT((rights & ZX_RIGHT_RESIZE) == 0);
+  } else if (options & (ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
+                        ZX_VMO_CHILD_SNAPSHOT_MODIFIED)) {
+    rights &= ~ZX_RIGHT_EXECUTE;
+    rights |= ZX_RIGHT_WRITE;
+  }
+
+  // make sure we're somehow not elevating rights beyond what a new vmo should have
+  DEBUG_ASSERT(((default_rights | ZX_RIGHT_EXECUTE) & rights) == rights);
+
+  storage->rights_ = rights;
+
   result->reset(std::move(storage));
   return ZX_OK;
 }
@@ -171,7 +249,7 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
 zx_status_t vmo::create_child_internal(uint32_t options, uint64_t offset, uint64_t size,
                                        bool copy_name, fbl::RefPtr<VmObject>* child_vmo) const {
   LTRACE;
-  fbl::RefPtr<VmObject> vmo = get()->vmo;
+  fbl::RefPtr<VmObject> vmo = get()->vmo_;
 
   // Clones are not supported for discardable VMOs.
   if (vmo->is_discardable()) {
@@ -231,7 +309,7 @@ zx_status_t vmo::range_op(uint32_t op, uint64_t offset, uint64_t size, void* buf
   LTRACEF("op %u offset %#" PRIx64 " size %#" PRIx64 " buffer %p buffer_size %zu\n", op, offset,
           size, buffer, buffer_size);
 
-  fbl::RefPtr<VmObject> vmo = get()->vmo;
+  fbl::RefPtr<VmObject> vmo = get()->vmo_;
 
   switch (op) {
     case ZX_VMO_OP_COMMIT: {
@@ -374,10 +452,10 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
 }
 
 zx_info_vmo_t vmo::get_vmo_info(zx_rights_t rights) const {
-  zx_info_vmo_t info = VmoToInfoEntry(get()->vmo.get(), VmoOwnership::kHandle, rights);
-  // if (initial_mutability_ == InitialMutability::kImmutable) {
-  //   info.flags |= ZX_INFO_VMO_IMMUTABLE;
-  // }
+  zx_info_vmo_t info = VmoToInfoEntry(get()->vmo_.get(), VmoOwnership::kHandle, rights);
+  if (get()->initial_mutability_ == VmoStorage::InitialMutability::kImmutable) {
+    info.flags |= ZX_INFO_VMO_IMMUTABLE;
+  }
   return info;
 }
 
@@ -405,10 +483,23 @@ zx_status_t vmo::get_info(uint32_t topic, void* buffer, size_t buffer_size, size
         return single_record_result(buffer, buffer_size, actual_count, avail_count, entry);
       }
     }
-      return ZX_OK;
+    case ZX_INFO_HANDLE_BASIC: {
+      zx_rights_t rights = ZX_RIGHT_NONE;
+
+      // build the info structure
+      zx_info_handle_basic_t info = {
+          .koid = 0,
+          .rights = rights,
+          .type = ZX_OBJ_TYPE_VMO,
+          .related_koid = 0,
+          .reserved = 0u,
+          .padding1 = {},
+      };
+      return single_record_result(buffer, buffer_size, actual_count, avail_count, info);
+    }
     case ZX_INFO_HANDLE_COUNT: {
       zx_info_handle_count_t info = {.handle_count =
-                                         static_cast<uint32_t>(get()->vmo->ref_count_debug())};
+                                         static_cast<uint32_t>(get()->vmo_->ref_count_debug())};
       return single_record_result(buffer, buffer_size, actual_count, avail_count, info);
     }
     default:
@@ -428,7 +519,7 @@ zx_status_t vmo::get_property(uint32_t property, void* value, size_t size) const
       if (size < ZX_MAX_NAME_LEN)
         return ZX_ERR_BUFFER_TOO_SMALL;
       char name[ZX_MAX_NAME_LEN] = {};
-      get()->vmo->get_name(name, ZX_MAX_NAME_LEN);
+      get()->vmo_->get_name(name, ZX_MAX_NAME_LEN);
       memcpy(value, name, ZX_MAX_NAME_LEN);
       return ZX_OK;
     }
@@ -436,7 +527,7 @@ zx_status_t vmo::get_property(uint32_t property, void* value, size_t size) const
       if (size < sizeof(uint64_t)) {
         return ZX_ERR_BUFFER_TOO_SMALL;
       }
-      *reinterpret_cast<uint64_t*>(value) = get()->content_size_mgr->GetContentSize();
+      *reinterpret_cast<uint64_t*>(value) = get()->content_size_mgr_->GetContentSize();
       return ZX_OK;
     }
     default:
@@ -457,7 +548,7 @@ zx_status_t vmo::set_property(uint32_t property, const void* value, size_t size)
         size = ZX_MAX_NAME_LEN - 1;
       // char name[ZX_MAX_NAME_LEN - 1];
       // memcpy(name, value, size);
-      return get()->vmo->set_name(static_cast<const char*>(value), size);
+      return get()->vmo_->set_name(static_cast<const char*>(value), size);
     }
     case ZX_PROP_VMO_CONTENT_SIZE: {
       if (size < sizeof(uint64_t)) {
@@ -471,20 +562,75 @@ zx_status_t vmo::set_property(uint32_t property, const void* value, size_t size)
   }
 }
 
+zx_status_t vmo::set_size(uint64_t size) const {
+  const fbl::RefPtr<VmoStorage>& thiz = get();
+  if (!thiz) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  // VMOs that are not resizable should fail with ZX_ERR_UNAVAILABLE for backwards compatibility,
+  // which will be handled by the SetSize call below. Only validate the RESIZE right if the VMO is
+  // resizable.
+  if (thiz->vmo_->is_resizable() && (thiz->rights_ & ZX_RIGHT_RESIZE) == 0) {
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
+  // do the operation
+  fbl::RefPtr<ContentSizeManager> content_size_mgr = thiz->content_size_mgr_;
+  ContentSizeManager::Operation op;
+  Guard<Mutex> guard{content_size_mgr->lock()};
+
+  content_size_mgr->BeginSetContentSizeLocked(size, &op, &guard);
+
+  uint64_t size_aligned = ROUNDUP(size, PAGE_SIZE);
+  // Check for overflow when rounding up.
+  if (size_aligned < size) {
+    op.AssertParentLockHeld();
+    op.CancelLocked();
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  zx_status_t status = thiz->vmo_->Resize(size_aligned);
+  if (status != ZX_OK) {
+    op.AssertParentLockHeld();
+    op.CancelLocked();
+    return status;
+  }
+
+  uint64_t remaining = size_aligned - size;
+  if (remaining > 0) {
+    // TODO(https://fxbug.dev/42053728): Determine whether failure to ZeroRange here should undo
+    // this operation.
+    //
+    // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
+    // committing, or cancelling.
+    guard.CallUnlocked([&] { thiz->vmo_->ZeroRange(size, remaining); });
+  }
+
+  op.AssertParentLockHeld();
+  op.CommitLocked();
+  return status;
+}
+
 zx_status_t vmo::set_content_size(uint64_t content_size) const {
-  fbl::RefPtr<ContentSizeManager> content_size_mgr = get()->content_size_mgr;
+  const fbl::RefPtr<VmoStorage>& thiz = get();
+  if (!thiz) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  fbl::RefPtr<ContentSizeManager> content_size_mgr = thiz->content_size_mgr_;
   ContentSizeManager::Operation op;
   Guard<Mutex> guard{content_size_mgr->lock()};
   content_size_mgr->BeginSetContentSizeLocked(content_size, &op, &guard);
 
-  uint64_t vmo_size = get()->vmo->size();
+  uint64_t vmo_size = thiz->vmo_->size();
   if (content_size < vmo_size) {
     // TODO(https://fxbug.dev/42053728): Determine whether failure to ZeroRange here should undo
     // this operation.
     //
     // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
     // committing, or cancelling.
-    guard.CallUnlocked([&] { get()->vmo->ZeroRange(content_size, vmo_size - content_size); });
+    guard.CallUnlocked([&] { thiz->vmo_->ZeroRange(content_size, vmo_size - content_size); });
   }
 
   op.AssertParentLockHeld();
@@ -494,7 +640,7 @@ zx_status_t vmo::set_content_size(uint64_t content_size) const {
 
 template <>
 bool operator<(const unowned<vmo>& a, const unowned<vmo>& b) {
-  return a->get()->vmo->user_id() < b->get()->vmo->user_id();
+  return a->get()->vmo()->user_id() < b->get()->vmo()->user_id();
 }
 
 }  // namespace zx

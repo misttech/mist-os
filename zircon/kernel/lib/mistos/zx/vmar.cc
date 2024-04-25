@@ -124,7 +124,7 @@ zx_status_t vmar::map(zx_vm_option_t options, size_t vmar_offset, const vmo& vmo
 
   if (vmar_flags & VMAR_FLAG_REQUIRE_NON_RESIZABLE) {
     vmar_flags &= ~VMAR_FLAG_REQUIRE_NON_RESIZABLE;
-    if (vmo.get()->vmo->is_resizable()) {
+    if (vmo.get()->vmo()->is_resizable()) {
       return ZX_ERR_NOT_SUPPORTED;
     }
   }
@@ -134,14 +134,14 @@ zx_status_t vmar::map(zx_vm_option_t options, size_t vmar_offset, const vmo& vmo
   } else {
     // TODO(https://fxbug.dev/42109795): Add additional checks once all clients (resizable and
     // pager-backed VMOs) start using the VMAR_FLAG_ALLOW_FAULTS flag.
-    if (vmo.get()->vmo->is_discardable()) {
+    if (vmo.get()->vmo()->is_discardable()) {
       return ZX_ERR_NOT_SUPPORTED;
     }
   }
 
   zx::result<VmAddressRegion::MapResult> map_result = get()->CreateVmMapping(
       vmar_offset, len, alignment,
-      vmar_flags | (is_user ? 0 : VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING), vmo.get()->vmo,
+      vmar_flags | (is_user ? 0 : VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING), vmo.get()->vmo(),
       vmo_offset, arch_mmu_flags, is_user ? "useralloc" : "kernelalloc");
 
   if (map_result.is_error()) {

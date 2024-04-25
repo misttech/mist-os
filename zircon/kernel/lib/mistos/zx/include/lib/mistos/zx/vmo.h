@@ -11,6 +11,8 @@
 #include <lib/mistos/zx/resource.h>
 #include <zircon/errors.h>
 
+#include <utility>
+
 #include <fbl/ref_ptr.h>
 #include <vm/content_size_manager.h>
 #include <vm/vm_object.h>
@@ -18,17 +20,40 @@
 
 namespace zx {
 
-struct VmoStorage : fbl::RefCountedUpgradeable<VmoStorage> {
-  VmoStorage(const fbl::RefPtr<VmObject>& vmo,
-             const fbl::RefPtr<ContentSizeManager>& content_size_mgr)
-      : vmo(vmo), content_size_mgr(content_size_mgr) {}
+class vmo;
 
-  fbl::RefPtr<VmObject> vmo;
+class VmoStorage : public fbl::RefCounted<VmoStorage> {
+ public:
+  enum class InitialMutability { kMutable, kImmutable };
+
+  explicit VmoStorage(fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager> content_size_mgr,
+                      /*zx_koid_t pager_koid,*/ InitialMutability initial_mutability);
+
+  const fbl::RefPtr<VmObject>& vmo() const { return vmo_; }
+
+ private:
+  friend class vmo;
+
+  const zx_koid_t koid_;
+
+  zx_rights_t rights_ = ZX_DEFAULT_VMO_RIGHTS;
+
+  // The 'const' here is load bearing; we give a raw pointer to
+  // ourselves to |vmo_| so we have to ensure we don't reset vmo_
+  // except during destruction.
+  fbl::RefPtr<VmObject> const vmo_;
 
   // Manages the content size associated with this VMO. The content size is used by streams created
   // against this VMO.
-  fbl::RefPtr<ContentSizeManager> content_size_mgr;
+  fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
+
+  // Indicates whether the VMO was immutable at creation time.
+  const InitialMutability initial_mutability_;
 };
+
+enum class VmoOwnership { kHandle, kMapping, kIoBuffer };
+zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
+                             zx_rights_t handle_rights);
 
 class vmo final : public object<vmo> {
  public:
@@ -61,17 +86,11 @@ class vmo final : public object<vmo> {
     if (!tmp) {
       return ZX_ERR_BAD_HANDLE;
     }
-    *size = tmp->vmo->size();
+    *size = tmp->vmo_->size();
     return ZX_OK;
   }
 
-  zx_status_t set_size(uint64_t size) const {
-    const fbl::RefPtr<VmoStorage>& tmp = get();
-    if (!tmp) {
-      return ZX_ERR_BAD_HANDLE;
-    }
-    return tmp->vmo->Resize(size);
-  }
+  zx_status_t set_size(uint64_t size) const;
 
   zx_status_t set_prop_content_size(uint64_t size) const {
     return set_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
@@ -128,10 +147,6 @@ using unowned_vmo = unowned<vmo>;
 
 template <>
 bool operator<(const unowned<vmo>& a, const unowned<vmo>& b);
-
-enum class VmoOwnership { kHandle, kMapping, kIoBuffer };
-zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
-                             zx_rights_t handle_rights);
 
 }  // namespace zx
 
