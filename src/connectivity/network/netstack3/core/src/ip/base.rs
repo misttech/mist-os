@@ -142,6 +142,41 @@ enum TransportReceiveErrorInner {
 #[derivative(Default(bound = ""))]
 pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> {
     conntrack_connection: Option<ConntrackConnection<I, BT>>,
+    #[cfg(debug_assertions)]
+    drop_check: IpLayerPacketMetadataDropCheck,
+}
+
+/// A type that asserts, on drop, that it was intentionally being dropped.
+///
+/// NOTE: Unfortunately, debugging this requires backtraces, since track_caller
+/// won't do what we want (https://github.com/rust-lang/rust/issues/116942).
+/// Since this is only enabled in debug, the assumption is that stacktraces are
+/// enabled.
+#[cfg(debug_assertions)]
+#[derive(Default)]
+struct IpLayerPacketMetadataDropCheck {
+    okay_to_drop: bool,
+}
+
+impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
+    #[cfg(debug_assertions)]
+    pub(crate) fn acknowledge_drop(&mut self) {
+        self.drop_check.okay_to_drop = true;
+    }
+
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn acknowledge_drop(&mut self) {}
+}
+
+#[cfg(debug_assertions)]
+impl Drop for IpLayerPacketMetadataDropCheck {
+    fn drop(&mut self) {
+        if !self.okay_to_drop {
+            panic!(
+                "IpLayerPacketMetadata dropped without acknowledgement.  https://fxbug.dev/334127474"
+            );
+        }
+    }
 }
 
 impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT>
@@ -1669,15 +1704,18 @@ fn dispatch_receive_ipv4_packet<
         | None => (),
     }
 
-    let _ = packet_metadata;
     match core_ctx.filter_handler().local_ingress_hook(
         &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, &body),
         device,
         &mut packet_metadata,
     ) {
-        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Drop => {
+            packet_metadata.acknowledge_drop();
+            return;
+        }
         crate::filter::Verdict::Accept => {}
     }
+    packet_metadata.acknowledge_drop();
 
     let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
         bindings_ctx,
@@ -1776,13 +1814,15 @@ fn dispatch_receive_ipv6_packet<
         | None => (),
     }
 
-    let _ = packet_metadata;
     match core_ctx.filter_handler().local_ingress_hook(
         &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, &body),
         device,
         &mut packet_metadata,
     ) {
-        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Drop => {
+            packet_metadata.acknowledge_drop();
+            return;
+        }
         crate::filter::Verdict::Accept => {}
     }
 
@@ -1794,7 +1834,10 @@ fn dispatch_receive_ipv6_packet<
         proto,
         body,
     ) {
-        Ok(()) => return,
+        Ok(()) => {
+            packet_metadata.acknowledge_drop();
+            return;
+        }
         Err(e) => e,
     };
 
@@ -1838,6 +1881,8 @@ fn dispatch_receive_ipv6_packet<
             }
         }
     }
+
+    packet_metadata.acknowledge_drop();
 }
 
 pub(crate) fn send_ip_frame<I, CC, BC, S>(
@@ -1859,10 +1904,14 @@ where
     let (verdict, proof) =
         core_ctx.filter_handler().egress_hook(&mut body, device, &mut packet_metadata);
     match verdict {
-        crate::filter::Verdict::Drop => return Ok(()),
+        crate::filter::Verdict::Drop => {
+            packet_metadata.acknowledge_drop();
+            return Ok(());
+        }
         crate::filter::Verdict::Accept => {}
     }
 
+    packet_metadata.acknowledge_drop();
     core_ctx.send_ip_frame(bindings_ctx, device, next_hop, body, broadcast, proof)
 }
 
@@ -1918,6 +1967,10 @@ macro_rules! process_fragment {
                 trace!("receive_ip_packet: fragmented, ready for reassembly");
                 // Allocate a buffer of `packet_len` bytes.
                 let mut buffer = Buf::new(alloc::vec![0; packet_len], ..);
+                // The packet metadata associated with this last fragment will
+                // be dropped and a new metadata struct created for the
+                // reassembled packet.
+                $packet_metadata.acknowledge_drop();
 
                 // Attempt to reassemble the packet.
                 match FragmentHandler::<$ip, _>::reassemble_packet(
@@ -1953,12 +2006,16 @@ macro_rules! process_fragment {
                     }
                     // TODO(ghanan): Handle reassembly errors, remove
                     // `allow(unreachable_patterns)` when complete.
-                    _ => return,
+                    _ => {
+                        $packet_metadata.acknowledge_drop();
+                        return;
+                    },
                     #[allow(unreachable_patterns)]
                     Err(e) => {
                         $core_ctx.increment(|counters: &IpCounters<$ip>| {
                             &counters.fragment_reassembly_error
                         });
+                        $packet_metadata.acknowledge_drop();
                         trace!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
                     }
                 }
@@ -1966,6 +2023,7 @@ macro_rules! process_fragment {
             // Cannot proceed since we need more fragments before we
             // can reassemble a packet.
             FragmentProcessingState::NeedMoreFragments => {
+                $packet_metadata.acknowledge_drop();
                 $core_ctx.increment(|counters: &IpCounters<$ip>| {
                     &counters.need_more_fragments
                 });
@@ -1973,12 +2031,14 @@ macro_rules! process_fragment {
             }
             // TODO(ghanan): Handle invalid fragments.
             FragmentProcessingState::InvalidFragment => {
+                $packet_metadata.acknowledge_drop();
                 $core_ctx.increment(|counters: &IpCounters<$ip>| {
                     &counters.invalid_fragment
                 });
                 trace!("receive_ip_packet: fragmented, invalid")
             }
             FragmentProcessingState::OutOfMemory => {
+                $packet_metadata.acknowledge_drop();
                 $core_ctx.increment(|counters: &IpCounters<$ip>| {
                     &counters.fragment_cache_full
                 });
@@ -2122,7 +2182,10 @@ pub(crate) fn receive_ipv4_packet<
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().ingress_hook(&mut packet, device, &mut packet_metadata) {
-        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Drop => {
+            packet_metadata.acknowledge_drop();
+            return;
+        }
         crate::filter::Verdict::Accept => {}
     }
 
@@ -2174,7 +2237,10 @@ pub(crate) fn receive_ipv4_packet<
                     &dst_device,
                     &mut packet_metadata,
                 ) {
-                    crate::filter::Verdict::Drop => return,
+                    crate::filter::Verdict::Drop => {
+                        packet_metadata.acknowledge_drop();
+                        return;
+                    }
                     crate::filter::Verdict::Accept => {}
                 }
 
@@ -2209,6 +2275,7 @@ pub(crate) fn receive_ipv4_packet<
                 let fragment_type = packet.fragment_type();
                 let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
                     drop_packet_and_undo_parse!(packet, buffer);
+                packet_metadata.acknowledge_drop();
                 let src_ip = match SpecifiedAddr::new(src_ip) {
                     Some(ip) => ip,
                     None => {
@@ -2240,6 +2307,7 @@ pub(crate) fn receive_ipv4_packet<
             let fragment_type = packet.fragment_type();
             let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
                 drop_packet_and_undo_parse!(packet, buffer);
+            packet_metadata.acknowledge_drop();
             let src_ip = match SpecifiedAddr::new(src_ip) {
                 Some(ip) => ip,
                 None => {
@@ -2264,6 +2332,7 @@ pub(crate) fn receive_ipv4_packet<
         }
         ReceivePacketAction::Drop { reason } => {
             let src_ip = packet.src_ip();
+            packet_metadata.acknowledge_drop();
             core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.dropped);
             debug!(
                 "receive_ipv4_packet: dropping packet from {src_ip} to {dst_ip} received on \
@@ -2374,7 +2443,10 @@ pub(crate) fn receive_ipv6_packet<
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().ingress_hook(&mut packet, device, &mut packet_metadata) {
-        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Drop => {
+            packet_metadata.acknowledge_drop();
+            return;
+        }
         crate::filter::Verdict::Accept => {}
     }
 
@@ -2403,6 +2475,7 @@ pub(crate) fn receive_ipv6_packet<
                     trace!(
                         "receive_ipv6_packet: handled IPv6 extension headers: discarding packet"
                     );
+                    packet_metadata.acknowledge_drop();
                 }
                 Ipv6PacketAction::Continue => {
                     trace!(
@@ -2490,7 +2563,10 @@ pub(crate) fn receive_ipv6_packet<
                     &dst_device,
                     &mut packet_metadata,
                 ) {
-                    crate::filter::Verdict::Drop => return,
+                    crate::filter::Verdict::Drop => {
+                        packet_metadata.acknowledge_drop();
+                        return;
+                    }
                     crate::filter::Verdict::Accept => {}
                 }
 
@@ -2549,6 +2625,7 @@ pub(crate) fn receive_ipv6_packet<
                 // 2460 Section 3.
                 core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.ttl_expired);
                 debug!("received IPv6 packet dropped due to expired Hop Limit");
+                packet_metadata.acknowledge_drop();
 
                 if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
@@ -2571,6 +2648,7 @@ pub(crate) fn receive_ipv6_packet<
             let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                 drop_packet_and_undo_parse!(packet, buffer);
             debug!("received IPv6 packet with no known route to destination {}", dst_ip);
+            packet_metadata.acknowledge_drop();
 
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                 IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
@@ -2588,6 +2666,7 @@ pub(crate) fn receive_ipv6_packet<
         ReceivePacketAction::Drop { reason } => {
             core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.dropped);
             let src_ip = packet.src_ip();
+            packet_metadata.acknowledge_drop();
             debug!(
                 "receive_ipv6_packet: dropping packet from {src_ip} to {dst_ip} received on \
                 {device:?}: {reason:?}",

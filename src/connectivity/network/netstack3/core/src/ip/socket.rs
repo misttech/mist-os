@@ -542,7 +542,10 @@ where
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().local_egress_hook(&mut packet, &device, &mut packet_metadata) {
-        crate::filter::Verdict::Drop => return Ok(()),
+        crate::filter::Verdict::Drop => {
+            packet_metadata.acknowledge_drop();
+            return Ok(());
+        }
         crate::filter::Verdict::Accept => {}
     }
 
