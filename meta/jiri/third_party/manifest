@@ -34,6 +34,16 @@
              remote="https://fuchsia.googlesource.com/third_party/re2"
              gerrithost="https://fuchsia-review.googlesource.com"
              revision="123d379e288f3c113c26dca952d78ad5f4fc98fd"/>
+    <project name="scudo"
+             gitsubmoduleof="fuchsia"
+             path="third_party/scudo/src"
+             remote="https://llvm.googlesource.com/scudo"
+             revision="eb39902a7b3bd689e8fbb70a7535c736a5ef594b"/>
+    <project name="gwp-asan"
+             gitsubmoduleof="fuchsia"
+             path="third_party/scudo/gwp_asan"
+             remote="https://llvm.googlesource.com/gwp-asan"
+             revision="4b71d2c81a62e1a489462f59c12529024456a1d4"/>
     <project name="third_party/zstd"
              gitsubmoduleof="fuchsia"
              path="third_party/zstd/src"

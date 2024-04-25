@@ -33,6 +33,16 @@
 	url = https://fuchsia.googlesource.com/third_party/re2
 	name = third_party/re2
 	ignore = all
+[submodule "third_party/scudo/gwp_asan"]
+	path = third_party/scudo/gwp_asan
+	url = https://llvm.googlesource.com/gwp-asan
+	name = gwp-asan
+	ignore = all
+[submodule "third_party/scudo/src"]
+	path = third_party/scudo/src
+	url = https://llvm.googlesource.com/scudo
+	name = scudo
+	ignore = all
 [submodule "third_party/zstd/src"]
 	path = third_party/zstd/src
 	url = https://fuchsia.googlesource.com/third_party/zstd
