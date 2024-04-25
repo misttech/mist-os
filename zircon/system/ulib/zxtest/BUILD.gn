@@ -141,7 +141,7 @@ sdk_source_set("zxtest") {
   ]
   deps = zxtest_deps
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [ "death-statement.cc" ]
 
     public_deps += [ "//zircon/system/ulib/zx" ]
@@ -151,7 +151,9 @@ sdk_source_set("zxtest") {
       "//zircon/system/ulib/zx",
     ]
 
-    metadata = zxtest_metadata
+    if (is_fuchsia) {
+      metadata = zxtest_metadata
+    }
   }
 }
 
