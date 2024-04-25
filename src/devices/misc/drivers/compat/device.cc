@@ -771,7 +771,11 @@ void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodeProperty
   }
 }
 
-std::string Device::OutgoingName() { return name_ + "-" + std::to_string(device_id_); }
+std::string Device::OutgoingName() {
+  auto outgoing_name = name_ + "-" + std::to_string(device_id_);
+  std::replace(outgoing_name.begin(), outgoing_name.end(), ':', '_');
+  return outgoing_name;
+}
 
 bool Device::HasChildNamed(std::string_view name) const {
   return std::any_of(children_.begin(), children_.end(),
