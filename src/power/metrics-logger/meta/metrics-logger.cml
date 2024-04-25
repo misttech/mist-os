@@ -54,7 +54,6 @@
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.Stats",
                 "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.activity.Provider",
             ],
         },
     ],

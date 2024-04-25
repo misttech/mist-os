@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::driver_utils::{connect_proxy, list_drivers, Driver},
+    crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver},
     crate::MIN_INTERVAL_FOR_SYSLOG_MS,
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
@@ -38,32 +38,32 @@ pub type PowerLoggerArgs<'a> = SensorLoggerArgs<'a, fpower::DeviceProxy>;
 const HISTOGRAM_PARAMS: LinearHistogramParams<i64> =
     LinearHistogramParams { floor: 0, step_size: 50, buckets: 100 };
 
-pub async fn generate_temperature_drivers() -> Result<Vec<Driver<ftemperature::DeviceProxy>>> {
-    let mut drivers = Vec::new();
-    // For each driver path, create a proxy for the service.
-    for dir_path in TEMPERATURE_SERVICE_DIRS {
-        let listed_drivers = list_drivers(dir_path).await;
-        for driver in listed_drivers.iter() {
-            let class_path = format!("{}/{}", dir_path, driver);
-            let proxy = connect_proxy::<ftemperature::DeviceMarker>(&class_path)?;
-            let name = proxy.get_sensor_name().await?;
-            drivers.push(Driver { name, proxy });
-        }
-    }
-    Ok(drivers)
+pub async fn generate_temperature_drivers(
+    driver_aliases: HashMap<String, String>,
+) -> Result<Vec<Driver<ftemperature::DeviceProxy>>> {
+    generate_sensor_drivers::<ftemperature::DeviceMarker>(&TEMPERATURE_SERVICE_DIRS, driver_aliases)
+        .await
 }
 
-pub async fn generate_power_drivers() -> Result<Vec<Driver<fpower::DeviceProxy>>> {
-    let mut drivers = Vec::new();
+pub async fn generate_power_drivers(
+    driver_aliases: HashMap<String, String>,
+) -> Result<Vec<Driver<fpower::DeviceProxy>>> {
+    generate_sensor_drivers::<fpower::DeviceMarker>(&POWER_SERVICE_DIRS, driver_aliases).await
+}
+
+/// Generates a list of `Driver` from driver paths and aliases.
+async fn generate_sensor_drivers<T: fidl::endpoints::ProtocolMarker>(
+    service_dirs: &[&str],
+    driver_aliases: HashMap<String, String>,
+) -> Result<Vec<Driver<T::Proxy>>> {
+    let topo_to_class = map_topo_paths_to_class_paths(service_dirs).await?;
+
     // For each driver path, create a proxy for the service.
-    for dir_path in POWER_SERVICE_DIRS {
-        let listed_drivers = list_drivers(dir_path).await;
-        for driver in listed_drivers.iter() {
-            let class_path = format!("{}/{}", dir_path, driver);
-            let proxy = connect_proxy::<fpower::DeviceMarker>(&class_path)?;
-            let name = proxy.get_sensor_name().await?;
-            drivers.push(Driver { name, proxy });
-        }
+    let mut drivers = Vec::new();
+    for (topological_path, class_path) in topo_to_class {
+        let proxy: T::Proxy = connect_proxy::<T>(&class_path)?;
+        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c.to_string());
+        drivers.push(Driver { alias, topological_path, proxy });
     }
     Ok(drivers)
 }
@@ -341,7 +341,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
             return Err(fmetrics::RecorderError::NoDrivers);
         }
 
-        let driver_names: Vec<String> = drivers.iter().map(|c| c.name.to_string()).collect();
+        let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();
 
         let start_time = fasync::Time::now();
         let end_time = duration_ms
@@ -424,6 +424,15 @@ impl<T: Sensor<T>> SensorLogger<T> {
         let mut trace_args = Vec::new();
         let mut trace_args_statistics = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
+        let mut sensor_names = Vec::new();
+        for driver in self.drivers.iter() {
+            let topological_path = &driver.topological_path;
+            let sensor_name = driver.alias.as_ref().map_or(topological_path.to_string(), |alias| {
+                format!("{}({})", alias, topological_path)
+            });
+            sensor_names.push(sensor_name);
+        }
+
         for (index, result) in results.into_iter() {
             match result {
                 Ok(value) => {
@@ -439,12 +448,14 @@ impl<T: Sensor<T>> SensorLogger<T> {
                         (time_stamp - self.start_time).into_millis(),
                     );
 
-                    trace_args
-                        .push(fuchsia_trace::ArgValue::of(&self.drivers[index].name, value as f64));
+                    trace_args.push(fuchsia_trace::ArgValue::of(
+                        self.drivers[index].name(),
+                        value as f64,
+                    ));
 
                     if self.output_samples_to_syslog {
                         info!(
-                            name = self.drivers[index].name,
+                            name = sensor_names[index].as_str(),
                             unit = T::unit().as_str(),
                             value,
                             "Reading sensor"
@@ -456,9 +467,11 @@ impl<T: Sensor<T>> SensorLogger<T> {
                 // sample will be missing from the trace counter as is, and any serious analysis
                 // should be performed on the trace. This sample will also be missing for
                 // calculating statistics.
-                Err(err) => {
-                    error!(?err, path = self.drivers[index].name.as_str(), "Error reading sensor",)
-                }
+                Err(err) => error!(
+                    ?err,
+                    path = self.drivers[index].topological_path.as_str(),
+                    "Error reading sensor",
+                ),
             };
 
             if is_last_sample_for_statistics {
@@ -490,17 +503,17 @@ impl<T: Sensor<T>> SensorLogger<T> {
                     );
 
                     trace_args_statistics[Statistics::Min as usize]
-                        .push(fuchsia_trace::ArgValue::of(&self.drivers[index].name, min as f64));
+                        .push(fuchsia_trace::ArgValue::of(&sensor_names[index], min as f64));
                     trace_args_statistics[Statistics::Max as usize]
-                        .push(fuchsia_trace::ArgValue::of(&self.drivers[index].name, max as f64));
+                        .push(fuchsia_trace::ArgValue::of(&sensor_names[index], max as f64));
                     trace_args_statistics[Statistics::Avg as usize]
-                        .push(fuchsia_trace::ArgValue::of(&self.drivers[index].name, avg as f64));
+                        .push(fuchsia_trace::ArgValue::of(&sensor_names[index], avg as f64));
                     trace_args_statistics[Statistics::Median as usize]
-                        .push(fuchsia_trace::ArgValue::of(&self.drivers[index].name, med as f64));
+                        .push(fuchsia_trace::ArgValue::of(&sensor_names[index], med as f64));
 
                     if self.output_stats_to_syslog {
                         info!(
-                            name = self.drivers[index].name,
+                            name = sensor_names[index].as_str(),
                             max,
                             min,
                             avg,
@@ -797,8 +810,16 @@ pub mod tests {
         tasks.push(task);
 
         let temperature_drivers = vec![
-            TemperatureDriver { name: "cpu".to_string(), proxy: cpu_temperature_proxy },
-            TemperatureDriver { name: "audio".to_string(), proxy: gpu_temperature_proxy },
+            TemperatureDriver {
+                alias: Some("cpu".to_string()),
+                topological_path: "/dev/fake/cpu_temperature".to_string(),
+                proxy: cpu_temperature_proxy,
+            },
+            TemperatureDriver {
+                alias: None,
+                topological_path: "/dev/fake/gpu_temperature".to_string(),
+                proxy: gpu_temperature_proxy,
+            },
         ];
 
         (tasks, temperature_drivers, cpu_temperature, gpu_temperature)
@@ -821,8 +842,16 @@ pub mod tests {
         tasks.push(task);
 
         let power_drivers = vec![
-            PowerDriver { name: "power_1".to_string(), proxy: power_1_proxy },
-            PowerDriver { name: "power_2".to_string(), proxy: power_2_proxy },
+            PowerDriver {
+                alias: Some("power_1".to_string()),
+                topological_path: "/dev/fake/power_1".to_string(),
+                proxy: power_1_proxy,
+            },
+            PowerDriver {
+                alias: None,
+                topological_path: "/dev/fake/power_2".to_string(),
+                proxy: power_2_proxy,
+            },
         ];
         (tasks, power_drivers)
     }
@@ -964,7 +993,7 @@ pub mod tests {
                                 "cpu": {
                                     "data (°C)": runner.cpu_temperature.get() as f64,
                                 },
-                                "audio": {
+                                "/dev/fake/gpu_temperature": {
                                     "data (°C)": runner.gpu_temperature.get() as f64,
                                 }
                             }
@@ -1050,7 +1079,7 @@ pub mod tests {
                                     "median (W)": 2.0,
                                 }
                             },
-                            "power_2": contains {
+                            "/dev/fake/power_2": contains {
                                 "data (W)": 5.0,
                                 "statistics": {
                                     "(start ms, end ms]": vec![0i64, 100i64],
@@ -1124,7 +1153,7 @@ pub mod tests {
                                     "cpu": {
                                         "data (°C)": runner.cpu_temperature.get() as f64,
                                     },
-                                    "audio": {
+                                    "/dev/fake/gpu_temperature": {
                                         "data (°C)": runner.gpu_temperature.get() as f64,
                                     }
                                 }
@@ -1153,7 +1182,7 @@ pub mod tests {
                                             "median (°C)": (29 + i - (i + 1) % 3) as f64,
                                         }
                                     },
-                                    "audio": contains {
+                                    "/dev/fake/gpu_temperature": contains {
                                         "data (°C)": (40 + i) as f64,
                                         "statistics": {
                                             "(start ms, end ms]":
@@ -1289,7 +1318,7 @@ pub mod tests {
                                     }
                                 }
                             },
-                            "power_2": contains {
+                            "/dev/fake/power_2": contains {
                                 "histograms": {
                                     "unit": "mW",
                                     "active": {
@@ -1363,7 +1392,7 @@ pub mod tests {
                                     }
                                 }
                             },
-                            "power_2": contains {
+                            "/dev/fake/power_2": contains {
                                 "histograms": {
                                     "unit": "mW",
                                     "idle": {
@@ -1436,7 +1465,7 @@ pub mod tests {
                                     }
                                 }
                             },
-                            "power_2": contains {
+                            "/dev/fake/power_2": contains {
                                 "histograms": {
                                     "unit": "mW",
                                     "active": {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::driver_utils::{connect_proxy, get_driver_topological_path, list_drivers, Driver},
+    crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver},
     crate::MIN_INTERVAL_FOR_SYSLOG_MS,
     anyhow::{format_err, Error, Result},
     fidl_fuchsia_gpu_magma as fgpu, fidl_fuchsia_power_metrics as fmetrics,
@@ -12,7 +12,7 @@ use {
     fuchsia_zircon as zx,
     futures::{stream::FuturesUnordered, StreamExt},
     magma::magma_total_time_query_result,
-    std::{mem, rc::Rc},
+    std::{collections::HashMap, mem, rc::Rc},
     tracing::{error, info},
     zerocopy::FromBytes,
 };
@@ -24,22 +24,21 @@ pub type GpuDriver = Driver<fgpu::DeviceProxy>;
 
 const MAGMA_TOTAL_TIME_QUERY_RESULT_SIZE: usize = mem::size_of::<magma_total_time_query_result>();
 
-/// Generates a list of `GpuDriver` from driver paths.
-pub async fn generate_gpu_drivers() -> Result<Vec<GpuDriver>> {
+/// Generates a list of `GpuDriver` from driver paths and aliases.
+pub async fn generate_gpu_drivers(
+    driver_aliases: HashMap<String, String>,
+) -> Result<Vec<GpuDriver>> {
+    let topo_to_class = map_topo_paths_to_class_paths(&GPU_SERVICE_DIRS).await?;
+
     let mut drivers = Vec::new();
-    // For each driver path, create a proxy for the service.
-    for dir_path in GPU_SERVICE_DIRS {
-        let listed_drivers = list_drivers(dir_path).await;
-        for driver in listed_drivers.iter() {
-            let class_path = format!("{}/{}", dir_path, driver);
-            let proxy = connect_proxy::<fgpu::DeviceMarker>(&class_path)?;
-            let name = get_driver_topological_path(&class_path).await?;
-            // Add driver if querying `MagmaQueryTotalTime` is supported.
-            if is_total_time_supported(&proxy).await? {
-                drivers.push(Driver { name, proxy });
-            } else {
-                info!("GPU driver {:?}: `MagmaQueryTotalTime` is not supported", name);
-            }
+    for (topological_path, class_path) in topo_to_class {
+        let proxy = connect_proxy::<fgpu::DeviceMarker>(&class_path)?;
+        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c.to_string());
+        // Add driver if querying `MagmaQueryTotalTime` is supported.
+        if is_total_time_supported(&proxy).await? {
+            drivers.push(Driver { alias, topological_path, proxy });
+        } else {
+            info!("GPU driver {:?}: `MagmaQueryTotalTime` is not supported", alias);
         }
     }
     Ok(drivers)
@@ -130,7 +129,7 @@ impl GpuUsageLogger {
             return Err(fmetrics::RecorderError::NoDrivers);
         }
 
-        let driver_names: Vec<String> = drivers.iter().map(|c| c.name.to_string()).collect();
+        let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();
         let start_time = fasync::Time::now();
         let end_time = duration_ms.map_or(fasync::Time::INFINITE, |ms| {
             fasync::Time::now() + zx::Duration::from_millis(ms as i64)
@@ -166,8 +165,15 @@ impl GpuUsageLogger {
     async fn log_gpu_usage(&mut self, now: fasync::Time) {
         // Execute a query to each driver.
         let queries = FuturesUnordered::new();
+        let mut driver_names = Vec::new();
 
         for (index, driver) in self.drivers.iter().enumerate() {
+            let topological_path = &driver.topological_path;
+            let driver_name = driver.alias.as_ref().map_or(topological_path.to_string(), |alias| {
+                format!("{}({})", alias, topological_path)
+            });
+            driver_names.push(driver_name);
+
             let query = async move {
                 let result = query_total_time(&driver.proxy).await;
                 (index, result)
@@ -196,19 +202,21 @@ impl GpuUsageLogger {
                         );
 
                         if self.output_samples_to_syslog {
-                            info!(name = &self.drivers[index].name, gpu_usage);
+                            info!(name = driver_names[index].as_str(), gpu_usage);
                         }
 
                         trace_args.push(fuchsia_trace::ArgValue::of(
-                            &self.drivers[index].name,
+                            &driver_names[index],
                             gpu_usage as f64,
                         ));
                     }
                     current_sample = Some(value);
                 }
-                Err(err) => {
-                    error!(?err, path = &self.drivers[index].name, "Error reading GPU stats",)
-                }
+                Err(err) => error!(
+                    ?err,
+                    path = self.drivers[index].topological_path.as_str(),
+                    "Error reading GPU stats",
+                ),
             }
             current_samples.push(current_sample);
         }
@@ -333,7 +341,11 @@ pub mod tests {
         });
         tasks.push(task);
 
-        let gpu_drivers = vec![GpuDriver { name: "/dev/fake/gpu".to_string(), proxy: gpu_proxy }];
+        let gpu_drivers = vec![GpuDriver {
+            alias: None,
+            topological_path: "/dev/fake/gpu".to_string(),
+            proxy: gpu_proxy,
+        }];
 
         (tasks, gpu_drivers, gpu_time_ns, monotonic_time_ns)
     }

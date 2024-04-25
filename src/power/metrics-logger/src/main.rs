@@ -10,6 +10,7 @@ mod sensor_logger;
 
 use {
     crate::cpu_load_logger::{generate_cpu_stats_driver, CpuLoadLogger, CpuStatsDriver},
+    crate::driver_utils::Config,
     crate::gpu_usage_logger::{generate_gpu_drivers, GpuDriver, GpuUsageLogger},
     crate::network_activity_logger::{generate_network_devices, NetworkActivityLoggerBuilder},
     crate::sensor_logger::{
@@ -31,6 +32,7 @@ use {
         task::Context,
         FutureExt, TryFutureExt,
     },
+    serde_json as json,
     std::{
         cell::RefCell,
         collections::{HashMap, HashSet},
@@ -46,6 +48,8 @@ const MAX_CONCURRENT_CLIENTS: usize = 20;
 
 // Minimum interval for logging to syslog.
 const MIN_INTERVAL_FOR_SYSLOG_MS: u32 = 500;
+
+const CONFIG_PATH: &'static str = "/config/data/config.json";
 
 const STANDALONE_SAMPLING_INTERVAL: u32 = 1000; // 1 sec.
 const STANDALONE_STATISTICS_INTERVAL: u32 = 60 * 1000; // 60 secs.
@@ -70,11 +74,16 @@ pub struct ServerBuilder<'a> {
 
     /// Optional inspect root for test usage.
     inspect_root: Option<&'a inspect::Node>,
+
+    /// Config for driver aliases.
+    config: Option<Config>,
 }
 
 impl<'a> ServerBuilder<'a> {
-    /// Constructs a new ServerBuilder.
-    fn new() -> Self {
+    /// Constructs a new ServerBuilder from a JSON configuration.
+    fn new_from_json(json_data: Option<json::Value>) -> Self {
+        let config: Option<Config> = json_data.map(|d| json::from_value(d).unwrap());
+
         ServerBuilder {
             temperature_drivers: None,
             power_drivers: None,
@@ -82,6 +91,7 @@ impl<'a> ServerBuilder<'a> {
             cpu_stats_driver: None,
             network_devices: None,
             inspect_root: None,
+            config,
         }
     }
 
@@ -159,6 +169,7 @@ impl<'a> ServerBuilder<'a> {
             gpu_drivers,
             network_devices,
             cpu_stats_driver,
+            self.config,
             inspect_root.create_child("MetricsLogger"),
         ))
     }
@@ -183,6 +194,9 @@ struct MetricsLoggerServer {
     /// Root node for MetricsLogger
     inspect_root: inspect::Node,
 
+    /// Config for driver aliases.
+    config: Option<Config>,
+
     /// Map that stores the logging task for all clients. Once a logging request is received
     /// with a new client_id, a task is lazily inserted into the map using client_id as the key.
     client_tasks: RefCell<HashMap<String, fasync::Task<()>>>,
@@ -195,6 +209,7 @@ impl MetricsLoggerServer {
         gpu_drivers: RefCell<Option<Rc<Vec<GpuDriver>>>>,
         network_devices: RefCell<Option<Rc<Vec<fhwnet::DeviceProxy>>>>,
         cpu_stats_driver: RefCell<Option<Rc<CpuStatsDriver>>>,
+        config: Option<Config>,
         inspect_root: inspect::Node,
     ) -> Rc<Self> {
         Rc::new(Self {
@@ -204,6 +219,7 @@ impl MetricsLoggerServer {
             network_devices,
             cpu_stats_driver,
             inspect_root,
+            config,
             client_tasks: RefCell::new(HashMap::new()),
         })
     }
@@ -414,10 +430,19 @@ impl MetricsLoggerServer {
             _ => (),
         }
 
-        let drivers = Rc::new(generate_temperature_drivers().await.map_err(|err| {
-            error!(%err, "Request failed with internal error");
-            fmetrics::RecorderError::Internal
-        })?);
+        let driver_aliases = match &self.config {
+            None => HashMap::new(),
+            Some(c) => c.temperature_drivers.as_ref().map_or_else(
+                || HashMap::new(),
+                |d| d.into_iter().map(|m| (m.topo_path_suffix.clone(), m.name.clone())).collect(),
+            ),
+        };
+
+        let drivers =
+            Rc::new(generate_temperature_drivers(driver_aliases).await.map_err(|err| {
+                error!(%err, "Request failed with internal error");
+                fmetrics::RecorderError::Internal
+            })?);
         self.temperature_drivers.replace(Some(drivers.clone()));
         Ok(drivers)
     }
@@ -428,7 +453,15 @@ impl MetricsLoggerServer {
             _ => (),
         }
 
-        let drivers = Rc::new(generate_power_drivers().await.map_err(|err| {
+        let driver_aliases = match &self.config {
+            None => HashMap::new(),
+            Some(c) => c.power_drivers.as_ref().map_or_else(
+                || HashMap::new(),
+                |d| d.into_iter().map(|m| (m.topo_path_suffix.clone(), m.name.clone())).collect(),
+            ),
+        };
+
+        let drivers = Rc::new(generate_power_drivers(driver_aliases).await.map_err(|err| {
             error!(%err, "Request failed with internal error");
             fmetrics::RecorderError::Internal
         })?);
@@ -442,7 +475,15 @@ impl MetricsLoggerServer {
             _ => (),
         }
 
-        let drivers = Rc::new(generate_gpu_drivers().await.map_err(|err| {
+        let driver_aliases = match &self.config {
+            None => HashMap::new(),
+            Some(c) => c.gpu_drivers.as_ref().map_or_else(
+                || HashMap::new(),
+                |d| d.into_iter().map(|m| (m.topo_path_suffix.clone(), m.name.clone())).collect(),
+            ),
+        };
+
+        let drivers = Rc::new(generate_gpu_drivers(driver_aliases).await.map_err(|err| {
             error!(%err, "Request failed with internal error");
             fmetrics::RecorderError::Internal
         })?);
@@ -561,7 +602,10 @@ async fn inner_main(args: CmdArgs) -> Result<()> {
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     // Construct the server, and begin serving.
-    let server = ServerBuilder::new().build().await?;
+    let config: Option<json::Value> = std::fs::File::open(CONFIG_PATH)
+        .ok()
+        .and_then(|file| json::from_reader(std::io::BufReader::new(file)).ok());
+    let server = ServerBuilder::new_from_json(config).build().await?;
 
     if args.standalone {
         info!("Running in standalone mode");
@@ -698,7 +742,8 @@ mod tests {
             let inspector = inspect::Inspector::default();
 
             // Build the server.
-            let mut builder = ServerBuilder::new().with_inspect_root(inspector.root());
+            let mut builder =
+                ServerBuilder::new_from_json(None).with_inspect_root(inspector.root());
 
             builder = match temperature_drivers {
                 Some(drivers) => builder.with_temperature_drivers(drivers),
@@ -854,7 +899,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 45.0,
                             }
                         }
@@ -890,7 +935,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 45.0,
                             }
                         }
@@ -914,6 +959,32 @@ mod tests {
         );
 
         assert_eq!(runner.iterate_logging_task(), false);
+    }
+
+    /// Tests that well-formed alias JSON does not panic the `new_from_json` function.
+    #[test]
+    fn test_new_from_json() {
+        // Test config file for one sensor.
+        let json_data = json::json!({
+            "power_drivers": [{
+                "name": "power_1",
+                "topo_path_suffix": "/sys/platform/power_1"
+            }]
+        });
+        let _ = ServerBuilder::new_from_json(Some(json_data));
+
+        // Test config file for two sensors.
+        let json_data = json::json!({
+            "temperature_drivers": [{
+                "name": "temp_1",
+                "topo_path_suffix": "/sys/platform/temp_1"
+            }],
+            "power_drivers": [{
+                "name": "power_1",
+                "topo_path_suffix": "/sys/platform/power_1"
+            }]
+        });
+        let _ = ServerBuilder::new_from_json(Some(json_data));
     }
 
     #[test]
@@ -1052,7 +1123,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 45.0,
                             }
                         }
@@ -1155,7 +1226,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 45.0,
                             }
                         }
@@ -1187,7 +1258,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 45.0,
                             }
                         }
@@ -1198,7 +1269,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 36.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 46.0,
                             }
                         }
@@ -1231,7 +1302,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 45.0,
                             }
                         }
@@ -1242,7 +1313,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 36.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 46.0,
                             }
                         }
@@ -1275,7 +1346,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 36.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 46.0,
                             }
                         }
@@ -1286,7 +1357,7 @@ mod tests {
                             "cpu": {
                                 "data (°C)": 36.0,
                             },
-                            "audio": {
+                            "/dev/fake/gpu_temperature": {
                                 "data (°C)": 46.0,
                             }
                         }
@@ -1904,7 +1975,7 @@ mod tests {
                                     "median (°C)": 21.0,
                                 }
                             },
-                            "audio": contains {
+                            "/dev/fake/gpu_temperature": contains {
                                 "data (°C)": 52.0,
                                 "statistics": contains {
                                     "min (°C)": 52.0,
@@ -1924,7 +1995,7 @@ mod tests {
                                     "median (W)": 14.0,
                                 }
                             },
-                            "power_2": contains {
+                            "/dev/fake/power_2": contains {
                                 "data (W)": 106.0,
                                 "statistics": contains {
                                     "min (W)": 106.0,
