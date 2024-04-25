@@ -25,6 +25,13 @@ constexpr std::pair<std::string_view, bool> NotFound(std::string_view name) {
   return {name, false};
 }
 
+// Cast `symbol` into a function returning type T and run it.
+template <typename T>
+T RunFunction(void* symbol __attribute__((nonnull))) {
+  auto func_ptr = reinterpret_cast<T (*)()>(reinterpret_cast<uintptr_t>(symbol));
+  return func_ptr();
+}
+
 using ::testing::MatchesRegex;
 
 template <class Fixture>
@@ -92,6 +99,7 @@ TYPED_TEST(DlTests, InvalidMode) {
 
 // Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
+  constexpr int64_t kReturnValue = 17;
   constexpr const char* kBasicFile = "ret17.module.so";
 
   this->ExpectRootModule(kBasicFile);
@@ -99,13 +107,49 @@ TYPED_TEST(DlTests, Basic) {
   auto result = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
+
   // Look up the "TestStart" function and call it, expecting it to return 17.
   auto sym_result = this->DlSym(result.value(), "TestStart");
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
-  int64_t (*func_ptr)();
-  func_ptr = reinterpret_cast<int64_t (*)()>(reinterpret_cast<uintptr_t>(sym_result.value()));
-  EXPECT_EQ(func_ptr(), 17);
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+}
+
+// Load a file that performs relative relocations against itself. The TestStart
+// function's return value is derived from the resolved symbols.
+TYPED_TEST(DlTests, Relative) {
+  constexpr int64_t kReturnValue = 17;
+
+  this->ExpectRootModule("relative-reloc.module.so");
+
+  auto result = this->DlOpen("relative-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+}
+
+// Load a file that performs symbolic relocations against itself. The TestStart
+// functions' return value is derived from the resolved symbols.
+TYPED_TEST(DlTests, Symbolic) {
+  constexpr int64_t kReturnValue = 17;
+
+  this->ExpectRootModule("symbolic-reloc.module.so");
+
+  auto result = this->DlOpen("symbolic-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
 TYPED_TEST(DlTests, BasicDep) {

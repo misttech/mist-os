@@ -9,12 +9,14 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/fit/result.h>
 #include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
+#include <lib/ld/memory.h>
 #include <lib/ld/module.h>
 
 #include <fbl/alloc_checker.h>
@@ -38,6 +40,9 @@ inline constexpr size_t kMaxSegments = 8;
 // segment, so allow a fair few more.
 inline constexpr size_t kMaxPhdrs = 32;
 static_assert(kMaxPhdrs > kMaxSegments);
+
+template <class ModuleType>
+using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
 
 // TODO(https://fxbug.dev/324136831): comment on how ModuleHandle relates to
 // startup modules when the latter is supported.
@@ -125,6 +130,21 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxSegments>::Container>;
+
+  // TODO(https://fxbug.dev/331421403): Implement TLS.
+  struct NoTlsDesc {
+    using TlsDescGot = typename Elf::TlsDescGot;
+    constexpr TlsDescGot operator()() const {
+      assert(false && "TLS is not supported");
+      return {};
+    }
+    template <class Diagnostics, class Definition>
+    constexpr fit::result<bool, TlsDescGot> operator()(Diagnostics& diag,
+                                                       const Definition& defn) const {
+      assert(false && "TLS is not supported");
+      return fit::error{false};
+    }
+  };
 
   // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
   static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};
@@ -227,6 +247,17 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
     }
 
     return std::nullopt;
+  }
+
+  // Perform relative and symbolic relocations, resolving symbols from the
+  // list of modules as needed.
+  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<OSImpl>>& modules) {
+    constexpr NoTlsDesc kNoTlsDesc{};
+    auto memory = ld::ModuleMemory{module()};
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kNoTlsDesc);
+    return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
+           elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
+                                      resolver);
   }
 
  private:

@@ -41,9 +41,6 @@ inline constexpr int kOpenSymbolScopeMask = OpenSymbolScope::kLocal | OpenSymbol
 inline constexpr int kOpenBindingModeMask = OpenBindingMode::kLazy | OpenBindingMode::kNow;
 inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
 
-template <class ModuleType>
-using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
-
 class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
@@ -84,6 +81,10 @@ class RuntimeDynamicLinker {
       return diag.take_error();
     }
 
+    if (!Relocate(diag, load_modules)) {
+      return diag.take_error();
+    }
+
     // TODO(caslyn): These are actions needed to return a reference to the main
     // module back to the caller and add the loaded modules to the dynamic
     // linker's bookkeeping. This will be abstracted away into another function
@@ -111,8 +112,7 @@ class RuntimeDynamicLinker {
   // LoadModule is created for each file that is to be loaded, decoded, and its
   // dependencies parsed and enqueued to be processed in the same manner.
   template <class OSImpl>
-  static fbl::DoublyLinkedList<std::unique_ptr<LoadModule<OSImpl>>> Load(Diagnostics& diag,
-                                                                         Soname soname) {
+  static ModuleList<LoadModule<OSImpl>> Load(Diagnostics& diag, Soname soname) {
     // This is the list of modules to load and process. The first module of this
     // list will always be the main file that was `dlopen`-ed.
     ModuleList<LoadModule<OSImpl>> pending_modules;
@@ -158,6 +158,15 @@ class RuntimeDynamicLinker {
     }
 
     return std::move(pending_modules);
+  }
+
+  // TODO(https://fxbug.dev/324136831): Include global modules in `modules`.
+  // Perform relocations on all pending modules to be loaded. Return a boolean
+  // if relocations succeeded on all modules.
+  template <class OSImpl>
+  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<OSImpl>>& modules) {
+    auto relocate = [&](auto& module) -> bool { return module.Relocate(diag, modules); };
+    return std::all_of(std::begin(modules), std::end(modules), relocate);
   }
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
