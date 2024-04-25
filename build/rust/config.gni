@@ -46,9 +46,6 @@ declare_args() {
   # Sets the default LTO type for rustc builds.
   rust_lto = ""
 
-  # Sets the fuchsia toolchain target triple suffix (after arch)
-  rust_toolchain_triple_suffix = "fuchsia"
-
   # Sets the maximum lint level.
   # "deny" will make all warnings into errors, "warn" preserves them as warnings, and "allow" will
   # ignore warnings.
@@ -112,19 +109,14 @@ if (current_os == "mac") {
 } else if (current_os == "win") {
   _suffix = "windows-msvc"
 } else if (current_os == "fuchsia") {
-  _suffix = rust_toolchain_triple_suffix
+  _suffix = "unknown-fuchsia"
 }
 if (current_cpu == "x64") {
   rust_target = "x86_64-${_suffix}"
 } else if (current_cpu == "arm64") {
   rust_target = "aarch64-${_suffix}"
 } else if (current_cpu == "riscv64") {
-  if (current_os == "fuchsia") {
-    # See https://github.com/rust-lang/rust/pull/108722/files
-    rust_target = "riscv64gc-unknown-${_suffix}"
-  } else {
-    rust_target = "riscv64gc-${_suffix}"
-  }
+  rust_target = "riscv64gc-${_suffix}"
 } else if (current_cpu == "wasm32" && current_os == "unknown") {
   rust_target = "wasm32-unknown-unknown"
 }
