@@ -8,8 +8,6 @@ static_library("sim-fake-ap") {
     "sim-fake-ap.h",
   ]
 
-  deps = [ "//src/lib/ddk" ]
-
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",

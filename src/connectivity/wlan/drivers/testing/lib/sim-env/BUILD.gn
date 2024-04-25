@@ -13,8 +13,6 @@ static_library("sim-env") {
     "sim-sta-ifc.h",
   ]
 
-  deps = [ "//src/lib/ddk" ]
-
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp",
