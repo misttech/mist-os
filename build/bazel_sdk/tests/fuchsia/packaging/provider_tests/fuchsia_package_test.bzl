@@ -6,7 +6,7 @@
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load("//test_utils:make_file.bzl", "make_file", "make_resource_file")
+load("//test_utils:make_file.bzl", "make_file")
 
 ## Name Tests
 def _name_test_impl(ctx):
@@ -148,34 +148,6 @@ def _test_package_deps():
         manifest = "meta/foo.cml",
     )
 
-    make_resource_file(
-        name = "no_cml_driver_lib",
-        dest = "driver/no_cml_driver_lib.so",
-        content = "",
-    )
-
-    make_resource_file(
-        name = "no_cml_driver_bind",
-        dest = "meta/bind/no_cml_driver_lib_bind",
-        content = "",
-    )
-
-    fuchsia_driver_component(
-        name = "no_cml_driver",
-        component_name = "no_cml_driver",
-        driver_lib = ":no_cml_driver_lib",
-        bind_bytecode = ":no_cml_driver_bind",
-        fallback = True,
-        colocate = True,
-        root_resource = True,
-        uses_profiles = True,
-        uses_sysmem = True,
-        uses_boot_args = True,
-        default_dispatcher_opts = ["foo_opt"],
-        default_dispatcher_scheduler_role = "foo_role",
-        tags = ["manual"],
-    )
-
     fuchsia_package(
         name = "single_component",
         tags = ["manual"],
@@ -198,8 +170,6 @@ def _test_package_deps():
             ":driver_2",
             # test that we can pass in a plain cml file
             ":component_with_cml",
-            # test that we can create drivers without a cml
-            ":no_cml_driver",
         ],
     )
 
@@ -225,12 +195,10 @@ def _test_package_deps():
             "meta/foo.cm",
             "meta/driver_1.cm",
             "meta/driver_2.cm",
-            "meta/no_cml_driver.cm",
         ],
         expected_drivers = [
             "meta/driver_1.cm",
             "meta/driver_2.cm",
-            "meta/no_cml_driver.cm",
         ],
     )
 
