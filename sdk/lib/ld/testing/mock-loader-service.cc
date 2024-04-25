@@ -160,6 +160,8 @@ zx::unowned_channel MockLoaderServiceForTest::BorrowLdsvc() {
 }
 
 void MockLoaderServiceForTest::CallWithLdsvcInstalled(fit::function<void()> func) {
+  // Initialize the mock loader for tests that have not set expectations on it.
+  ASSERT_NO_FATAL_FAILURE(ReadyMock());
   // Install the mock loader as the system loader.
   auto mock_ldsvc = BorrowLdsvc();
   ASSERT_TRUE(mock_ldsvc->is_valid());

@@ -8,6 +8,7 @@
 #include <lib/elfldltl/testing/get-test-data.h>
 #ifdef __Fuchsia__
 #include <lib/ld/testing/test-vmo.h>
+#include <zircon/dlfcn.h>
 #endif
 
 #include <filesystem>
@@ -33,22 +34,31 @@ void FileCheck(std::string_view filename) {
 std::optional<TestFuchsia::File> TestFuchsia::RetrieveFile(Diagnostics& diag,
                                                            std::string_view filename) {
   FileCheck(filename);
-  auto prefix = "";
-  // TODO(https://fxbug.dev/323419430): dlopen shouldn't know if it's loading a
-  // loadable_module or shared library. Shared libraries reside in a
-  // lib/$libprefix directory on instrumented builds; this is a temporary hack
-  // to amend the filepath of a shared library (but not a loadable module) for
-  // an instrumented build so dlopen can locate the file.
-  // Eventually, the mock loader will be primed with the module/shlib files
-  // and this function will only pass `filename` to `TryGetTestLibVmo()` to
-  // retrieve the file from the mock loader.
-  if (std::string{filename}.find("module") == std::string::npos) {
-    prefix = LD_TEST_LIBPREFIX;
+
+  // TODO(caslyn): We should avoid altering the global loader service state in
+  // this test class. Instead RetrieveFile will become an object method
+  // on DlImplLoadTestsBase which will have direct access to the mock loader,
+  // and we will remove the TestOS class abstraction (Loader/File aliases
+  // will be moved to the DlImplLoadTestsBase and passed separately to `Open`).
+
+  // Obtain and save a handle to the loader installed for the test to make
+  // fuchsia.ldsvc/Loader.LoadObject requests to.
+  constexpr auto init_ldsvc = []() {
+    zx::unowned_channel channel{dl_set_loader_service(ZX_HANDLE_INVALID)};
+    EXPECT_TRUE(channel->is_valid());
+    zx_handle_t reset = dl_set_loader_service(channel->get());
+    EXPECT_EQ(reset, ZX_HANDLE_INVALID);
+    return fidl::UnownedClientEnd<fuchsia_ldsvc::Loader>{channel};
+  };
+  static const auto ldsvc_endpoint = init_ldsvc();
+
+  fidl::Arena arena;
+  if (auto result = fidl::WireCall(ldsvc_endpoint)->LoadObject({arena, filename}); result.ok()) {
+    if (auto load_result = result.Unwrap(); load_result->rv == ZX_OK) {
+      return File{std::move(load_result->object), diag};
+    }
   }
-  std::filesystem::path path = std::filesystem::path("test") / "lib" / prefix / filename;
-  if (auto vmo = elfldltl::testing::TryGetTestLibVmo(path.c_str())) {
-    return File{std::move(vmo), diag};
-  }
+
   diag.SystemError("cannot open ", filename);
   return std::nullopt;
 }

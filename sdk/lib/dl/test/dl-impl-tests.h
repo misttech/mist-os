@@ -16,6 +16,8 @@
 #ifdef __Fuchsia__
 #include <lib/elfldltl/vmar-loader.h>
 #include <lib/elfldltl/vmo.h>
+
+#include "dl-load-zircon-tests-base.h"
 #endif
 
 #include "dl-load-posix-tests-base.h"
@@ -40,11 +42,11 @@ class TestPosix {
   static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };
 
-// TODO(https://fxbug.dev/323419430): For now, both versions of dl-impl-tests
-// will use DlLoadPosixTestsBase, which is just a class of empty hooks so that
-// dl-load-tests.cc can compile. Eventually, DlImplTests may use another base
-// class to verify that module/dep files were loaded as expected.
+#ifdef __Fuchsia__
+using DlImplLoadTestsBase = DlLoadZirconTestsBase;
+#else
 using DlImplLoadTestsBase = DlLoadPosixTestsBase;
+#endif
 
 template <class TestOS>
 class DlImplTests : public DlImplLoadTestsBase {
@@ -55,7 +57,11 @@ class DlImplTests : public DlImplLoadTestsBase {
   static constexpr bool kCanMatchExactError = true;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
-    return dynamic_linker_.Open<TestOS>(file, mode);
+    // fit::result<...> must be initialized to something, but this will get
+    // overwritten by the return value from dynamic_linker_.Open.
+    fit::result<Error, void*> result = fit::error{Error{"dlopen result is not set"}};
+    CallWithLdsvcInstalled([&]() { result = dynamic_linker_.Open<TestOS>(file, mode); });
+    return result;
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
