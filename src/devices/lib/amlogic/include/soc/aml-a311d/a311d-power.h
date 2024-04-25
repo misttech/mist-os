@@ -8,8 +8,8 @@
 #include <stdint.h>
 
 enum class A311dPowerDomains : uint32_t {
-  kArmCoreBig = 0,
-  kArmCoreLittle = 1,
+  kArmCoreLittle = 0,
+  kArmCoreBig = 1,
 };
 
 static constexpr uint32_t kMinVoltageUv = 690'000;

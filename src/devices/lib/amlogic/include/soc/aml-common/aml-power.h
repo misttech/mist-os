@@ -5,9 +5,10 @@
 #ifndef SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_POWER_H_
 #define SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_POWER_H_
 
+#include <lib/ddk/metadata.h>
 #include <stdint.h>
 
-#include <lib/ddk/metadata.h>
+#include <vector>
 
 // Note: The voltage table must be sorted in descending order.
 #define DEVICE_METADATA_AML_VOLTAGE_TABLE (0x41565400 | (DEVICE_METADATA_PRIVATE))  // AVTp

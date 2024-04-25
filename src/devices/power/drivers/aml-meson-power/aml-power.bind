@@ -23,22 +23,22 @@ primary node "pdev" {
   }
 }
 
-optional node "pwm-ao-d" {
+optional node "pwm-little" {
   fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
   fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.AO_D;
 }
 
-optional node "pwm-a" {
+optional node "pwm-big" {
   fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
   fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.A;
 }
 
-optional node "vreg-pwm-ao-d" {
+optional node "vreg-pwm-little" {
   fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
   fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.AO_D;
 }
 
-optional node "vreg-pwm-a" {
+optional node "vreg-pwm-big" {
   fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
   fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.A;
 }

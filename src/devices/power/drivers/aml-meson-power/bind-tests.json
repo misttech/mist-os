@@ -27,7 +27,7 @@
         ]
     },
     {
-        "node": "pwm-ao-d",
+        "node": "pwm-little",
         "tests": [
             {
                 "name": "Match",
@@ -40,7 +40,7 @@
         ]
     },
     {
-        "node": "pwm-a",
+        "node": "pwm-big",
         "tests": [
             {
                 "name": "Match",
@@ -53,7 +53,7 @@
         ]
     },
     {
-        "node": "vreg-pwm-ao-d",
+        "node": "vreg-pwm-little",
         "tests": [
             {
                 "name": "Match",
@@ -66,7 +66,7 @@
         ]
     },
     {
-        "node": "vreg-pwm-a",
+        "node": "vreg-pwm-big",
         "tests": [
             {
                 "name": "Match",
