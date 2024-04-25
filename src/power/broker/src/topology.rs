@@ -8,13 +8,22 @@ use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
-/// If true, use non-random ElementIDs for ease of debugging.
-const ELEMENT_ID_DEBUG_MODE: bool = false;
+/// If true, use non-random IDs for ease of debugging.
+const ID_DEBUG_MODE: bool = false;
+
+/// The minimum possible PowerLevel.
+const ABSOLUTE_MINIMUM_POWER_LEVEL: PowerLevel = 0;
 
 // This may be a token later, but using a String for now for simplicity.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct ElementID {
     id: String,
+}
+
+impl fmt::Display for ElementID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
 }
 
 impl From<&str> for ElementID {
@@ -35,16 +44,16 @@ impl Into<String> for ElementID {
     }
 }
 
-impl fmt::Display for ElementID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.id)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct ElementLevel {
     pub element_id: ElementID,
     pub level: PowerLevel,
+}
+
+impl fmt::Display for ElementLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({})", self.element_id, self.level)
+    }
 }
 
 /// Power dependency from one element's PowerLevel to another.
@@ -54,6 +63,12 @@ pub struct ElementLevel {
 pub struct Dependency {
     pub dependent: ElementLevel,
     pub requires: ElementLevel,
+}
+
+impl fmt::Display for Dependency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Dep{{{}->{}}}", self.dependent, self.requires)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -130,7 +145,7 @@ impl Topology {
         name: &str,
         valid_levels: Vec<PowerLevel>,
     ) -> Result<ElementID, AddElementError> {
-        let id: ElementID = if ELEMENT_ID_DEBUG_MODE {
+        let id: ElementID = if ID_DEBUG_MODE {
             ElementID::from(name)
         } else {
             ElementID::from(Uuid::new_v4().as_simple().to_string())
@@ -148,11 +163,14 @@ impl Topology {
         self.elements.remove(element_id);
     }
 
-    pub fn minimum_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
+    pub fn minimum_level(&self, element_id: &ElementID) -> PowerLevel {
         let Some(elem) = self.elements.get(element_id) else {
-            return None;
+            return ABSOLUTE_MINIMUM_POWER_LEVEL;
         };
-        elem.valid_levels.first().copied()
+        match elem.valid_levels.first().copied() {
+            Some(level) => level,
+            None => ABSOLUTE_MINIMUM_POWER_LEVEL,
+        }
     }
 
     pub fn is_valid_level(&self, element_id: &ElementID, level: PowerLevel) -> bool {

@@ -741,11 +741,12 @@ mod tests {
     #[test]
     fn test_passive() -> Result<()> {
         // B has an active dependency on A.
-        // C has a passive dependency on B (and transitively, a passive dependency on A).
+        // C has a passive dependency on B (and transitively, a passive dependency on A)
+        //   and an active dependency on E.
         // D has an active dependency on B (and transitively, an active dependency on A).
-        //  A     B     C     D
+        //  A     B     C     D     E
         // ON <= ON
-        //       ON <- ON
+        //       ON <- ON =======> ON
         //       ON <======= ON
         let mut executor = fasync::TestExecutor::new();
         let realm =
@@ -805,6 +806,28 @@ mod tests {
                 .unwrap()
                 .expect("add_element failed")
         });
+        let token_e_active = zx::Event::create();
+        let (current_e, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (required_e, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let _element_e_control = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("E".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    active_dependency_tokens_to_register: Some(vec![token_e_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .unwrap()]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
         let (element_c_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
         let _element_c_control = executor.run_singlethreaded(async {
             topology
@@ -812,14 +835,24 @@ mod tests {
                     element_name: Some("C".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Passive,
-                        dependent_level: BinaryPowerLevel::On.into_primitive(),
-                        requires_token: token_b_passive
-                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                            .unwrap(),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
-                    }]),
+                    dependencies: Some(vec![
+                        LevelDependency {
+                            dependency_type: DependencyType::Passive,
+                            dependent_level: BinaryPowerLevel::On.into_primitive(),
+                            requires_token: token_b_passive
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .unwrap(),
+                            requires_level: BinaryPowerLevel::On.into_primitive(),
+                        },
+                        LevelDependency {
+                            dependency_type: DependencyType::Active,
+                            dependent_level: BinaryPowerLevel::On.into_primitive(),
+                            requires_token: token_e_active
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .unwrap(),
+                            requires_level: BinaryPowerLevel::On.into_primitive(),
+                        },
+                    ]),
                     lessor_channel: Some(lessor_server),
                     ..Default::default()
                 })
@@ -850,13 +883,15 @@ mod tests {
                 .expect("add_element failed")
         });
 
-        // Initial required level for A and B should be OFF.
-        // Set A and B's current level to OFF.
+        // Initial required level for A, B & E should be OFF.
+        // Set A, B & E's current level to OFF.
         executor.run_singlethreaded(async {
             let req_level_a = required_a.watch().await.unwrap();
             assert_eq!(req_level_a, Ok(BinaryPowerLevel::Off.into_primitive()));
             let req_level_b = required_b.watch().await.unwrap();
             assert_eq!(req_level_b, Ok(BinaryPowerLevel::Off.into_primitive()));
+            let req_level_e = required_e.watch().await.unwrap();
+            assert_eq!(req_level_e, Ok(BinaryPowerLevel::Off.into_primitive()));
             current_a
                 .update(BinaryPowerLevel::Off.into_primitive())
                 .await
@@ -867,14 +902,24 @@ mod tests {
                 .await
                 .unwrap()
                 .expect("update_current_power_level failed");
+            current_e
+                .update(BinaryPowerLevel::Off.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
         });
         let mut required_a_fut = required_a.watch();
         let mut required_b_fut = required_b.watch();
+        let mut required_e_fut = required_e.watch();
 
-        // Lease C, A & B's required levels should remain OFF because of
-        // passive claim.
-        // Lease C should remain unsatisfied.
-        // TODO(b/311419716): When we have lease rejection, reject this lease.
+        // Lease C.
+        // A and B's required levels should remain OFF because C's passive claim
+        // does not raise the level of A or B.
+        // E's required level should remain OFF because C's passive claim on B
+        // has no other active claims to satisfy it (the lease is contingent)
+        // and hence its active claim on E should remain pending and should not
+        // raise the level of E.
+        // Lease C should be Pending.
         let lease_c = executor.run_singlethreaded(async {
             element_c_lessor
                 .lease(BinaryPowerLevel::On.into_primitive())
@@ -891,6 +936,10 @@ mod tests {
             executor.run_until_stalled(&mut required_b_fut).map(|fidl| fidl.unwrap()),
             Poll::Pending
         );
+        assert_eq!(
+            executor.run_until_stalled(&mut required_e_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
         executor.run_singlethreaded(async {
             assert_eq!(
                 lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
@@ -898,8 +947,12 @@ mod tests {
             );
         });
 
-        // Lease D, A should have required level ON because of D's transitive active claim.
-        // Lease C & D should become satisfied.
+        // Lease D.
+        // A should have required level ON because of D's transitive active claim.
+        // B should still have required level OFF because A is not yet ON.
+        // E should have required level ON because it C's lease is no longer
+        // contingent on an active claim that would satisfy its passive claim.
+        // Lease C & D should become pending.
         let lease_d = executor.run_singlethreaded(async {
             element_d_lessor
                 .lease(BinaryPowerLevel::On.into_primitive())
@@ -917,6 +970,10 @@ mod tests {
             Poll::Pending
         );
         executor.run_singlethreaded(async {
+            assert_eq!(required_e_fut.await.unwrap(), Ok(BinaryPowerLevel::On.into_primitive()));
+        });
+        let mut required_e_fut = required_e.watch();
+        executor.run_singlethreaded(async {
             assert_eq!(
                 lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
                 LeaseStatus::Pending
@@ -928,8 +985,11 @@ mod tests {
         });
 
         // Update A's current level to ON.
+        // A should still have required level ON.
         // B should now have required level ON because of D's active claim and
         // its dependency on A being satisfied.
+        // E should still have required level ON.
+        // Lease C & D should remain pending.
         executor.run_singlethreaded(async {
             current_a
                 .update(BinaryPowerLevel::On.into_primitive())
@@ -952,10 +1012,14 @@ mod tests {
                 LeaseStatus::Pending
             );
         });
-        let required_b_fut = required_b.watch();
+        let mut required_b_fut = required_b.watch();
+        assert_eq!(
+            executor.run_until_stalled(&mut required_e_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
 
         // Update B's current level to ON.
-        // Lease C & D should become satisfied.
+        // Lease D should become satisfied.
         executor.run_singlethreaded(async {
             current_b
                 .update(BinaryPowerLevel::On.into_primitive())
@@ -963,17 +1027,60 @@ mod tests {
                 .unwrap()
                 .expect("update_current_power_level failed");
             assert_eq!(
-                lease_c.watch_status(LeaseStatus::Pending).await.unwrap(),
-                LeaseStatus::Satisfied
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
             );
             assert_eq!(
-                lease_d.watch_status(LeaseStatus::Pending).await.unwrap(),
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
                 LeaseStatus::Satisfied
             );
         });
 
-        // Drop Lease on D, B's required level should become OFF.
+        // Update E's current level to ON.
+        // Lease C should become satisfied.
+        executor.run_singlethreaded(async {
+            current_e
+                .update(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop Lease on D.
+        // Lease C should now be Pending.
+        // A, B & E's required level should remain ON.
         drop(lease_d);
+        assert_eq!(
+            executor.run_until_stalled(&mut required_a_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut required_b_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut required_e_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Drop Lease on C.
+        // A's required level should remain ON.
+        // B & E's required levels should become OFF.
+        drop(lease_c);
         assert_eq!(
             executor.run_until_stalled(&mut required_a_fut).map(|fidl| fidl.unwrap()),
             Poll::Pending
@@ -982,9 +1089,14 @@ mod tests {
             assert_eq!(required_b_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
         });
         let mut required_b_fut = required_b.watch();
-        // TODO(b/308659273): When we have lease revocation, verify lease C was revoked.
+        executor.run_singlethreaded(async {
+            assert_eq!(required_e_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
+        });
+        let mut required_e_fut = required_e.watch();
 
-        // Update B's current level to OFF. A's required level should become OFF.
+        // Update B's current level to OFF.
+        // A's required level should become OFF.
+        // B & E's required levels should remain OFF.
         executor.run_singlethreaded(async {
             current_b
                 .update(BinaryPowerLevel::Off.into_primitive())
@@ -995,6 +1107,10 @@ mod tests {
         });
         assert_eq!(
             executor.run_until_stalled(&mut required_b_fut).map(|fidl| fidl.unwrap()),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut required_e_fut).map(|fidl| fidl.unwrap()),
             Poll::Pending
         );
 
