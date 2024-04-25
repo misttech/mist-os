@@ -6,7 +6,6 @@ import("//build/zircon/zx_library.gni")
 
 zx_library("fdio-caller") {
   sdk = "source"
-  sdk_publishable = "internal"
   sdk_headers = [ "lib/fdio/cpp/caller.h" ]
   sources = []
   deps = [

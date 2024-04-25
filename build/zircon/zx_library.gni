@@ -36,6 +36,11 @@ import("//build/toolchain/toolchain_environment.gni")
 #   If `sdk_publishable` is present, an sdk_*() template will be used, enabling
 #   the library to be part of the Fuchsia SDK. The value of `sdk_publishable`
 #   must be a valid SDK category.
+#   The only allowed value for new instances of this template is `"partner"`.
+#   This is enforced by the allowlists defined in //build/zircon/BUILD.gn.
+#   New libraries likely probably need to be added to the partner SDK rather
+#   than specifying one of the other SDK categories. See
+#   https://fxbug.dev/333125197 for details.
 #
 #   Any :headers sub-targets that appear in public_deps will be rewritten into
 #   a dependency to the library itself, e.g.:
@@ -286,6 +291,7 @@ template("zx_library") {
     config_target_name = "$target_name.config"
 
     config(config_target_name) {
+      visibility = [ ":$main_target_name" ]
       include_dirs = [ "include" ]
     }
 
@@ -387,6 +393,22 @@ template("zx_library") {
 
       # Add allowlist to data_deps rather than deps to not trigger SDK deps logic
       data_deps += [ "//build:deprecated_zx_wrapper_allowlist" ]
+      if (sdkable) {
+        # Prevent additional confusing uses of `sdk_publishable` per its documentation.
+        if (sdk_category == "partner") {
+          data_deps += [ "//build/zircon:sdk_category_partner_allowlist" ]
+        } else if (sdk_category == "internal") {
+          data_deps += [ "//build/zircon:sdk_category_internal_allowlist" ]
+        } else if (sdk_category == "cts") {
+          data_deps += [ "//build/zircon:sdk_category_cts_allowlist" ]
+        } else if (sdk_category == "excluded") {
+          data_deps += [ "//build/zircon:sdk_category_excluded_allowlist" ]
+        } else {
+          assert(
+              false,
+              "Unsupported SDK category '${sdk_category}' - see https://fxbug.dev/333125197.")
+        }
+      }
     }
   }
 
