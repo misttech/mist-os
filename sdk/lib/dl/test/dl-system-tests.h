@@ -26,18 +26,14 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   static constexpr bool kCanMatchExactError = false;
 
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/324650368): Disable dep tests until Fuchsia's
-  // loader service can load from test paths.
-  static constexpr bool kCanLookUpDeps = false;
-
   // Fuchsia's musl implementation of dlopen does not validate flag values for
   // the mode argument.
   static constexpr bool kCanValidateMode = false;
 #endif
 
-  fit::result<Error, void*> DlOpen(const char* name, int mode);
+  fit::result<Error, void*> DlOpen(const char* file, int mode);
 
-  fit::result<Error, void*> DlSym(void* module, const char* ref);
+  static fit::result<Error, void*> DlSym(void* module, const char* ref);
 };
 
 }  // namespace dl::testing

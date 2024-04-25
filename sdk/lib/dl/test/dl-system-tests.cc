@@ -25,29 +25,23 @@ fit::error<Error> TakeError() {
 
 fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
   void* result;
-  if (!file || !strlen(file)) {
-    result = dlopen(file, mode);
-  } else {
+
+  // TODO(caslyn): have the POSIX vs Zircon base class supply a dlopen wrapper
+  // (e.g. CallDlopen). The POSIX base class can modify the module path and the
+  // Zircon base class will internally call CallWithLdsvcInstalled.
+  CallWithLdsvcInstalled([&]() {
+    // dlopen on POSIX does not use a Loader, so set the file arg to the test
+    // location from which it will retrieve the file.
     std::filesystem::path path;
-#ifdef __Fuchsia__
-    auto prefix = "";
-    // TODO(https://fxbug.dev/323419430): dlopen shouldn't know if it's loading a
-    // loadable_module or shared library. Shared libraries reside in a
-    // lib/$libprefix directory on instrumented builds; this is a temporary hack
-    // to amend the filepath of a shared library (but not a loadable module) for
-    // an instrumented build so dlopen can locate the file.
-    // Eventually, the mock loader will be primed with the module/shlib files
-    // and this function will only pass `filename` to `TryGetTestLibVmo()` to
-    // retrieve the file from the mock loader.
-    if (std::string{file}.find("module") == std::string::npos) {
-      prefix = LD_TEST_LIBPREFIX;
+#ifndef __Fuchsia__
+    if (file) {
+      path = elfldltl::testing::GetTestDataPath(file);
+      file = path.c_str();
     }
-    path = std::filesystem::path("test") / "lib" / prefix / file;
-#else
-    path = elfldltl::testing::GetTestDataPath(file);
 #endif
-    result = dlopen(path.c_str(), mode);
-  }
+    result = dlopen(file, mode);
+  });
+
   if (!result) {
     return TakeError();
   }

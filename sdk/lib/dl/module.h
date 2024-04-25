@@ -154,6 +154,7 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
       caller_ac.arm(sizeof(LoadModule), false);
       return nullptr;
     }
+    // TODO(https://fxbug.dev/335921712): Have ModuleHandle own the name string.
     load_module->set_name(name);
     // Have the underlying DecodedModule (see <lib/ld/decoded-module.h>) point to
     // the ABIModule embedded in the ModuleHandle, so that its information will

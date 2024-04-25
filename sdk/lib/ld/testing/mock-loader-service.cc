@@ -159,7 +159,7 @@ zx::unowned_channel MockLoaderServiceForTest::BorrowLdsvc() {
   return ldsvc;
 }
 
-void MockLoaderServiceForTest::CallWithLoaderInstalled(fit::function<void()> func) {
+void MockLoaderServiceForTest::CallWithLdsvcInstalled(fit::function<void()> func) {
   // Install the mock loader as the system loader.
   auto mock_ldsvc = BorrowLdsvc();
   ASSERT_TRUE(mock_ldsvc->is_valid());

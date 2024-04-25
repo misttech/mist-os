@@ -108,13 +108,7 @@ TYPED_TEST(DlTests, Basic) {
   EXPECT_EQ(func_ptr(), 17);
 }
 
-// TODO(https://fxrev.dev/323419430): expect that libld-dep-a.so was needed.
 TYPED_TEST(DlTests, BasicDep) {
-  if constexpr (!TestFixture::kCanLookUpDeps) {
-    GTEST_SKIP()
-        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
-  }
-
   constexpr const char* kBasicDepFile = "basic-dep.module.so";
 
   this->ExpectRootModule(kBasicDepFile);
@@ -125,13 +119,7 @@ TYPED_TEST(DlTests, BasicDep) {
   EXPECT_TRUE(result.value());
 }
 
-// TODO(https://fxrev.dev/323419430): expect that libld-dep-[a,b,c].so was needed.
 TYPED_TEST(DlTests, IndirectDeps) {
-  if constexpr (!TestFixture::kCanLookUpDeps) {
-    GTEST_SKIP()
-        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
-  }
-
   constexpr const char* kIndirectDepsFile = "indirect-deps.module.so";
 
   this->ExpectRootModule(kIndirectDepsFile);
@@ -143,13 +131,6 @@ TYPED_TEST(DlTests, IndirectDeps) {
 }
 
 TYPED_TEST(DlTests, MissingDependency) {
-  // To clarify this condition, the test needs to be accurate in that its
-  // searching the correct path for the dependency, but can't find it.
-  if constexpr (!TestFixture::kCanLookUpDeps) {
-    GTEST_SKIP()
-        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
-  }
-
   constexpr const char* kMissingDepFile = "missing-dep.module.so";
 
   this->ExpectRootModule(kMissingDepFile);
@@ -157,13 +138,24 @@ TYPED_TEST(DlTests, MissingDependency) {
 
   auto result = this->DlOpen(kMissingDepFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
+
+  // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
+  // between implementations.
   // Expect that the dependency lib to missing-dep.module.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
     EXPECT_EQ(result.error_value().take_str(), "cannot open libmissing-dep-dep.so");
   } else {
+    // Match on musl/glibc's error message for a missing dependency.
+    // Fuchsia's musl generates the following:
+    //   "Error loading shared library libmissing-dep-dep.so: ZX_ERR_NOT_FOUND (needed by
+    //   missing-dep.module.so)"
+    // Linux's glibc generates the following:
+    //   "libmissing-dep-dep.so: cannot open shared object file: No such file or directory"
     EXPECT_THAT(
         result.error_value().take_str(),
-        MatchesRegex(".*libmissing-dep-dep.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
+        MatchesRegex(
+            "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.module.so\\)"
+            "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
   }
 }
 

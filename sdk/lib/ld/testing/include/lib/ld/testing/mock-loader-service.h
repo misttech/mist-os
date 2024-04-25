@@ -136,7 +136,7 @@ class MockLoaderServiceForTest {
 
   // Call `func` with the mock loader installed as the system loader so it will
   // handle fuchsia.ldsvc.Loader requests made during the duration of `func()`.
-  void CallWithLoaderInstalled(fit::function<void()> func);
+  void CallWithLdsvcInstalled(fit::function<void()> func);
 
  private:
   // Fetch a dependency VMO from a specific path in the test package.

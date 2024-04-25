@@ -5,6 +5,8 @@
 #ifndef LIB_DL_TEST_DL_LOAD_POSIX_TESTS_BASE_H_
 #define LIB_DL_TEST_DL_LOAD_POSIX_TESTS_BASE_H_
 
+#include <lib/fit/function.h>
+
 #include <string_view>
 
 #include "dl-tests-base.h"
@@ -30,6 +32,11 @@ class DlLoadPosixTestsBase : public DlTestsBase {
   // that the file does not exist.
   constexpr void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
   }
+
+  // TODO(caslyn): alias fit::function<void()> signature
+  // There is no particular loader to install on POSIX systems during tests, so
+  // this function simply runs the fit::function it was passed.
+  static void CallWithLdsvcInstalled(fit::function<void()> func) { func(); }
 };
 
 }  // namespace dl::testing

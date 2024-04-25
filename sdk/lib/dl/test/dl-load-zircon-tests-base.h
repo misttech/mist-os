@@ -5,6 +5,7 @@
 #ifndef LIB_DL_TEST_DL_LOAD_ZIRCON_TESTS_BASE_H_
 #define LIB_DL_TEST_DL_LOAD_ZIRCON_TESTS_BASE_H_
 
+#include <lib/fit/function.h>
 #include <lib/ld/testing/mock-loader-service.h>
 
 #include "dl-tests-base.h"
@@ -20,13 +21,19 @@ namespace dl::testing {
 // TODO(caslyn): comment on how the root module is loaded.
 class DlLoadZirconTestsBase : public DlTestsBase {
  public:
-  constexpr void ExpectRootModule(std::string_view name) {}
+  constexpr void ExpectRootModule(std::string_view name) { mock_.ExpectRootModule(name); }
 
-  constexpr void ExpectMissing(std::string_view name) {}
+  constexpr void ExpectMissing(std::string_view name) { mock_.ExpectMissing(name); }
 
-  constexpr void Needed(std::initializer_list<std::string_view> names) {}
+  constexpr void Needed(std::initializer_list<std::string_view> names) { mock_.Needed(names); }
 
   constexpr void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+    mock_.Needed(name_found_pairs);
+  }
+
+  // TODO(caslyn): alias fit::function<void()> signature
+  void CallWithLdsvcInstalled(fit::function<void()> func) {
+    mock_.CallWithLdsvcInstalled(std::move(func));
   }
 
  private:
