@@ -14,8 +14,9 @@ from typing import ClassVar, Dict, List, Tuple, Any, Set
 class Readme:
     readme_label: GnLabel
     package_name: str | None
-    license_files: Tuple[GnLabel]
+    license_files: Tuple[GnLabel, ...]
 
+    @staticmethod
     def from_text(
         readme_label: GnLabel, applicable_target: GnLabel, file_text: str
     ) -> "Readme":

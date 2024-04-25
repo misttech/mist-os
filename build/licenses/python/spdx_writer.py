@@ -43,7 +43,7 @@ class SpdxWriter:
     def add_package_with_licenses(
         self,
         public_package_name: str,
-        license_labels: Tuple[GnLabel],
+        license_labels: Tuple[GnLabel, ...],
         collection_hint: str | None,
     ) -> None:
         license_ids: List[str] = []
@@ -102,7 +102,7 @@ class SpdxWriter:
         return json.dumps(self.builder.build().to_json_dict(), indent=4)
 
     def _spdx_package_id(
-        self, public_package_name: str, license_labels: Tuple[GnLabel]
+        self, public_package_name: str, license_labels: Tuple[GnLabel, ...]
     ) -> str:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))

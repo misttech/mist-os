@@ -24,18 +24,18 @@ class CollectedLicense:
     """Data about a a single collected license (may have multiple files)."""
 
     public_name: str
-    license_files: tuple[GnLabel]
+    license_files: tuple[GnLabel, ...]
     debug_hint: str = dataclasses.field(hash=False, compare=False, default="")
 
     @staticmethod
     def create(
         public_name: str,
-        license_files: Tuple[GnLabel],
+        license_files: Tuple[GnLabel, ...],
         collection_hint: str,
     ) -> "CollectedLicense":
         assert type(public_name) is str
         assert type(license_files) is tuple
-        GnLabel.check_types_in_list(license_files)
+        GnLabel.check_types_in_list(list(license_files))
         assert type(collection_hint) is str
         return CollectedLicense(
             public_name, tuple(sorted(license_files)), collection_hint
@@ -178,7 +178,7 @@ class Collector:
     metadata_db: GnLicenseMetadataDB
     readmes_db: ReadmesDB
     include_host_tools: bool
-    default_license_file: GnLabel = None
+    default_license_file: GnLabel | None = None
     scan_result_by_label: Dict[GnLabel, bool] = dataclasses.field(
         default_factory=dict
     )
@@ -246,7 +246,7 @@ class Collector:
     def _add_license_from_readme(
         self,
         label: GnLabel,
-        resource_of: GnLabel,
+        resource_of: GnLabel | None,
         is_empty_readme_ok: bool,
     ) -> bool:
         readme = self.readmes_db.find_readme_for_label(label)
@@ -379,7 +379,7 @@ class Collector:
     def _scan_label(
         self,
         label: GnLabel,
-        resource_of: GnLabel = None,
+        resource_of: GnLabel | None = None,
         is_resource_of_target_with_licenses: bool = False,
     ) -> bool:
         result = self.scan_result_by_label.get(label, None)
@@ -395,7 +395,7 @@ class Collector:
         is_group_target = False
         resources = None
 
-        target_metadata: GnApplicableLicensesMetadata = (
+        target_metadata: GnApplicableLicensesMetadata | None = (
             self.metadata_db.applicable_licenses_by_target.get(label, None)
         )
         if target_metadata is not None:
