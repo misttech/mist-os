@@ -960,6 +960,15 @@ impl Offer {
                 false
             }
 
+            // Make sure this isn't coming from a dictionary
+            for o in offer_bundle.iter() {
+                if !o.source_path().dirname.is_dot() {
+                    return Err(RoutingError::DictionariesNotSupported {
+                        cap_type: CapabilityTypeName::from(o),
+                    });
+                }
+            }
+
             match offer_bundle {
                 RouteBundle::Single(offer) => {
                     match Self::route_segment(offer, target, sources, visitor, mapper).await? {
@@ -1368,6 +1377,15 @@ impl Expose {
             if let Some(visit_expose) = visit_expose {
                 mapper.add_expose(target.moniker().clone(), visit_expose.clone().into());
                 ExposeVisitor::visit(visitor, &visit_expose)?;
+            }
+
+            // Make sure this isn't coming from a dictionary
+            for e in expose_bundle.iter() {
+                if !e.source_path().dirname.is_dot() {
+                    return Err(RoutingError::DictionariesNotSupported {
+                        cap_type: CapabilityTypeName::from(e),
+                    });
+                }
             }
 
             match expose_bundle {

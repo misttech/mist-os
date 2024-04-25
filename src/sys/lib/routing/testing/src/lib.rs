@@ -346,6 +346,9 @@ macro_rules! instantiate_common_routing_tests {
             test_use_config_from_self,
             test_use_config_from_parent,
             test_use_config_from_void,
+            test_use_dictionary_protocol_from_self,
+            test_offer_dictionary_to_grandchild_not_supported,
+            test_expose_dictionary_to_grandparent_not_supported,
         }
     };
     ($builder_impl:path, $test:ident, $($remaining:ident),+ $(,)?) => {
@@ -4385,5 +4388,178 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let value =
             routing::config::route_config_value(&use_config, &child_component).await.unwrap();
         assert_eq!(value, None);
+    }
+
+    pub async fn test_use_dictionary_protocol_from_self(&self) {
+        let components = vec![(
+            "root",
+            ComponentDeclBuilder::new()
+                .dictionary_default("my_dict")
+                // It doesn't actually matter that this dictionary doesn't
+                // contain the requested protocol, because routing should
+                // fail before that with a DictionariesNotSupported.
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("my_dict"),
+                )
+                .build(),
+        )];
+
+        let model = T::new("root", components).build().await;
+        let root_component = model.look_up_instance(&Moniker::root()).await.expect("root instance");
+
+        let route_result = route_capability(
+            RouteRequest::UseProtocol(UseProtocolDecl {
+                source: UseSource::Self_,
+                source_name: "A".parse().unwrap(),
+                source_dictionary: "my_dict".parse().unwrap(),
+                target_path: "/svc/A".parse().unwrap(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }),
+            &root_component,
+            &mut NoopRouteMapper,
+        )
+        .await;
+
+        assert_matches!(
+            route_result,
+            Err(RoutingError::DictionariesNotSupported { cap_type: CapabilityTypeName::Protocol })
+        );
+    }
+
+    pub async fn test_offer_dictionary_to_grandchild_not_supported(&self) {
+        // Using a dictionary in legacy routing isn't supported. Also, when a
+        // component uses a protocol from its grandparent that passes through a
+        // dictionary, that should trickle down into a DictionariesNotSupported
+        // rather than another type of routing error.
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    // It doesn't matter that this dictionary doesn't
+                    // actually contain the required protocol, since routing
+                    // will fail before that.
+                    .dictionary_default("parent_dict")
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("A")
+                            .from_dictionary("parent_dict")
+                            .source(OfferSource::Self_)
+                            .target_static_child("intermediate"),
+                    )
+                    .child_default("intermediate")
+                    .build(),
+            ),
+            (
+                "intermediate",
+                ComponentDeclBuilder::new()
+                    .offer(
+                        OfferBuilder::protocol()
+                            .source(OfferSource::Parent)
+                            .name("A")
+                            .target_static_child("leaf"),
+                    )
+                    .child_default("leaf")
+                    .build(),
+            ),
+            (
+                "leaf",
+                ComponentDeclBuilder::new()
+                    .use_(UseBuilder::protocol().source(UseSource::Parent).name("A"))
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("root", components).build().await;
+        let leaf_component = model
+            .look_up_instance(&vec!["intermediate", "leaf"].try_into().unwrap())
+            .await
+            .expect("leaf instance");
+
+        let route_result = route_capability(
+            RouteRequest::UseProtocol(UseProtocolDecl {
+                source: UseSource::Parent,
+                source_name: "A".parse().unwrap(),
+                source_dictionary: Default::default(),
+                target_path: "/svc/dict_protocol".parse().unwrap(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }),
+            &leaf_component,
+            &mut NoopRouteMapper,
+        )
+        .await;
+
+        assert_matches!(
+            route_result,
+            Err(RoutingError::DictionariesNotSupported { cap_type: CapabilityTypeName::Protocol })
+        );
+    }
+
+    pub async fn test_expose_dictionary_to_grandparent_not_supported(&self) {
+        // Same as above: using a dictionary in legacy routing isn't supported,
+        // but check the expose direction.
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Child("intermediate".parse().unwrap()))
+                            .name("A"),
+                    )
+                    .child_default("intermediate")
+                    .build(),
+            ),
+            (
+                "intermediate",
+                ComponentDeclBuilder::new()
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .source(ExposeSource::Child("leaf".parse().unwrap()))
+                            .name("A")
+                            .target(ExposeTarget::Parent),
+                    )
+                    .child_default("leaf")
+                    .build(),
+            ),
+            (
+                "leaf",
+                ComponentDeclBuilder::new()
+                    .dictionary_default("child_dict")
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("A")
+                            .from_dictionary("child_dict")
+                            .source(ExposeSource::Self_)
+                            .target(ExposeTarget::Parent),
+                    )
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("root", components).build().await;
+        let root_component = model.look_up_instance(&Moniker::root()).await.expect("root instance");
+        let route_result = route_capability(
+            RouteRequest::UseProtocol(UseProtocolDecl {
+                source: UseSource::Child("intermediate".parse().unwrap()),
+                source_name: "A".parse().unwrap(),
+                source_dictionary: Default::default(),
+                target_path: "/svc/dict_protocol".parse().unwrap(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }),
+            &root_component,
+            &mut NoopRouteMapper,
+        )
+        .await;
+
+        assert_matches!(
+            route_result,
+            Err(RoutingError::DictionariesNotSupported { cap_type: CapabilityTypeName::Protocol })
+        );
     }
 }
