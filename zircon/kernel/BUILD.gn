@@ -871,7 +871,7 @@ if (!is_efi_toolchain) {
     if (is_mistos) {
       deps -= [ "//zircon/kernel/lib/userabi/userboot/tests:boot_tests" ]
       if (register_zxtest) {
-        deps += [ ":kernel-zxtest" ]
+        deps += [ ":kernel-unittests-zxtest" ]
       }
     }
 
@@ -894,7 +894,7 @@ if (!is_efi_toolchain) {
   }
 
   if (is_mistos && register_zxtest) {
-    kernel_shell_script_test("kernel-zxtest") {
+    kernel_shell_script_test("kernel-unittests-zxtest") {
       device_types = kernel_test_device_types
       script = [
         "zx_run_all_test",
@@ -910,8 +910,10 @@ foreach(cpu, standard_fuchsia_cpus) {
     testonly = true
     deps = [
       ":kernel-unittests-boot-test(:kernel_$cpu)",
-      ":kernel-zxtest(:kernel_$cpu)",
       "phys/test:$cpu",
     ]
+    if (is_mistos && register_zxtest) {
+      deps += [ ":kernel-unittests-zxtest(:kernel_$cpu)" ]
+    }
   }
 }

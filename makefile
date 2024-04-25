@@ -59,10 +59,10 @@ zxtest: ## Enable zxtest
 
 #test: args zxtest kasan gen info ## Run test kernel-zxtest.zbi ZBI (with kasan enabled)
 test: args zxtest gen info ## Run test kernel-zxtest.zbi ZBI 
-	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-zxtest.zbi
+	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-zxtest
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
-	-z $(OUTPUT)/obj/zircon/kernel/kernel-zxtest.zbi -s1 \
+	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-zxtest.zbi -s1 \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: test
 
