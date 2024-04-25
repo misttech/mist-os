@@ -39,6 +39,7 @@ source_set("source_set") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/fidl_driver",
+    "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp",
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
     "//src/connectivity/wlan/lib/common/cpp:common",

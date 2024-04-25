@@ -9,25 +9,27 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
-#include <lib/fidl/cpp/wire/channel.h>
-#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/fit/function.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/trace/event.h>
 #include <zircon/status.h>
 
+#include <wlan/drivers/fidl_bridge.h>
 #include <wlan/drivers/log.h>
 
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
-SoftmacBridge::SoftmacBridge(
-    DeviceInterface* device_interface,
-    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
-    std::shared_ptr<std::mutex> ethernet_proxy_lock, ddk::EthernetIfcProtocolClient* ethernet_proxy)
+using ::wlan::drivers::fidl_bridge::FidlErrorToStatus;
+using ::wlan::drivers::fidl_bridge::ForwardResult;
+
+SoftmacBridge::SoftmacBridge(DeviceInterface* device_interface,
+                             fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+                             std::shared_ptr<std::mutex> ethernet_proxy_lock,
+                             ddk::EthernetIfcProtocolClient* ethernet_proxy)
     : softmac_client_(
-          std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)),
+          std::forward<fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)),
       device_interface_(device_interface),
       ethernet_proxy_lock_(std::move(ethernet_proxy_lock)),
       ethernet_proxy_(ethernet_proxy) {
@@ -57,7 +59,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
     fdf::Dispatcher& softmac_bridge_server_dispatcher,
     std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
     fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
-    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+    fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
     std::shared_ptr<std::mutex> ethernet_proxy_lock,
     ddk::EthernetIfcProtocolClient* ethernet_proxy) {
   WLAN_TRACE_DURATION();
@@ -197,156 +199,108 @@ zx_status_t SoftmacBridge::Stop(std::unique_ptr<StopCompleter> stop_completer) {
 
 void SoftmacBridge::Query(QueryCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::Query> dispatcher = [](const auto& arena,
-                                                                       const auto& softmac_client) {
-    return softmac_client.sync().buffer(arena)->Query();
-  };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->Query().Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::Query>(completer.ToAsync()));
 }
 
 void SoftmacBridge::QueryDiscoverySupport(QueryDiscoverySupportCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryDiscoverySupport> dispatcher =
-      [](const auto& arena, const auto& client) {
-        return client.sync().buffer(arena)->QueryDiscoverySupport();
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->QueryDiscoverySupport().Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::QueryDiscoverySupport>(completer.ToAsync()));
 }
 
 void SoftmacBridge::QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryMacSublayerSupport> dispatcher =
-      [](const auto& arena, const auto& client) {
-        return client.sync().buffer(arena)->QueryMacSublayerSupport();
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->QueryMacSublayerSupport().Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::QueryMacSublayerSupport>(
+          completer.ToAsync()));
 }
 
 void SoftmacBridge::QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySecuritySupport> dispatcher =
-      [](const auto& arena, const auto& client) {
-        return client.sync().buffer(arena)->QuerySecuritySupport();
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->QuerySecuritySupport().Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::QuerySecuritySupport>(completer.ToAsync()));
 }
 
 void SoftmacBridge::QuerySpectrumManagementSupport(
     QuerySpectrumManagementSupportCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySpectrumManagementSupport> dispatcher =
-      [](const auto& arena, const auto& client) {
-        return client.sync().buffer(arena)->QuerySpectrumManagementSupport();
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->QuerySpectrumManagementSupport().Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::QuerySpectrumManagementSupport>(
+          completer.ToAsync()));
 }
 
-void SoftmacBridge::SetChannel(SetChannelRequestView request,
-                               SetChannelCompleter::Sync& completer) {
+void SoftmacBridge::SetChannel(SetChannelRequest& request, SetChannelCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->SetChannel(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->SetChannel(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::SetChannel>(completer.ToAsync()));
 }
 
-void SoftmacBridge::JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) {
+void SoftmacBridge::JoinBss(JoinBssRequest& request, JoinBssCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::JoinBss> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->JoinBss(request->join_request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->JoinBss(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::JoinBss>(completer.ToAsync()));
 }
 
-void SoftmacBridge::EnableBeaconing(EnableBeaconingRequestView request,
+void SoftmacBridge::EnableBeaconing(EnableBeaconingRequest& request,
                                     EnableBeaconingCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->EnableBeaconing(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->EnableBeaconing(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing>(completer.ToAsync()));
 }
 
 void SoftmacBridge::DisableBeaconing(DisableBeaconingCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
-      [](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->DisableBeaconing();
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->DisableBeaconing().Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing>(completer.ToAsync()));
 }
 
-void SoftmacBridge::InstallKey(InstallKeyRequestView request,
-                               InstallKeyCompleter::Sync& completer) {
+void SoftmacBridge::InstallKey(InstallKeyRequest& request, InstallKeyCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::InstallKey> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->InstallKey(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->InstallKey(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::InstallKey>(completer.ToAsync()));
 }
 
-void SoftmacBridge::NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
+void SoftmacBridge::NotifyAssociationComplete(NotifyAssociationCompleteRequest& request,
                                               NotifyAssociationCompleteCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::NotifyAssociationComplete> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->NotifyAssociationComplete(request->assoc_cfg);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->NotifyAssociationComplete(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::NotifyAssociationComplete>(
+          completer.ToAsync()));
 }
 
-void SoftmacBridge::ClearAssociation(ClearAssociationRequestView request,
+void SoftmacBridge::ClearAssociation(ClearAssociationRequest& request,
                                      ClearAssociationCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::ClearAssociation> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->ClearAssociation(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->ClearAssociation(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::ClearAssociation>(completer.ToAsync()));
 }
 
-void SoftmacBridge::StartPassiveScan(StartPassiveScanRequestView request,
+void SoftmacBridge::StartPassiveScan(StartPassiveScanRequest& request,
                                      StartPassiveScanCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::StartPassiveScan> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->StartPassiveScan(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->StartPassiveScan(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::StartPassiveScan>(completer.ToAsync()));
 }
 
-void SoftmacBridge::StartActiveScan(StartActiveScanRequestView request,
+void SoftmacBridge::StartActiveScan(StartActiveScanRequest& request,
                                     StartActiveScanCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::StartActiveScan> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->StartActiveScan(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->StartActiveScan(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::StartActiveScan>(completer.ToAsync()));
 }
 
-void SoftmacBridge::CancelScan(CancelScanRequestView request,
-                               CancelScanCompleter::Sync& completer) {
+void SoftmacBridge::CancelScan(CancelScanRequest& request, CancelScanCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::CancelScan> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->CancelScan(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->CancelScan(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::CancelScan>(completer.ToAsync()));
 }
 
-void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequestView request,
+void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequest& request,
                                         UpdateWmmParametersCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::UpdateWmmParameters> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->UpdateWmmParameters(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
+  softmac_client_->UpdateWmmParameters(request).Then(
+      ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::UpdateWmmParameters>(completer.ToAsync()));
 }
 
 zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payload_size) {
@@ -392,23 +346,31 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
   auto finalized_buffer = FinalizedBuffer(buffer, fidl_request->packet_size().value());
   ZX_DEBUG_ASSERT(finalized_buffer.written() <= std::numeric_limits<uint16_t>::max());
 
-  fuchsia_wlan_softmac::wire::WlanTxPacket fdf_request;
-  fdf_request.mac_frame = fidl::VectorView<uint8_t>::FromExternal(
-      const_cast<uint8_t*>(finalized_buffer.data()), finalized_buffer.written());
-  fdf_request.info = fidl::ToWire(*arena, fidl_request->packet_info().value());
+  fuchsia_wlan_softmac::WlanTxPacket fdf_request;
+  fdf_request.mac_frame(::std::vector<uint8_t>(
+      finalized_buffer.data(), finalized_buffer.data() + finalized_buffer.written()));
+  fdf_request.info(fidl_request->packet_info().value());
 
-  self->softmac_client_.buffer(*std::move(arena))
-      ->QueueTx(fdf_request)
-      .Then(
-          [loc = cpp20::source_location::current(), async_id](
-              fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
-            auto flattened_unwrapped_result = FlattenAndLogError(loc.function_name(), result);
-            if (flattened_unwrapped_result.is_error()) {
-              WLAN_TRACE_ASYNC_END_TX(async_id, flattened_unwrapped_result.error_value());
-            } else {
-              WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
-            }
-          });
+  {
+    auto status = ZX_OK;
+    libsync::Completion request_returned;
+    self->softmac_client_->QueueTx(fdf_request)
+        .Then([&request_returned, &status, loc = cpp20::source_location::current(),
+               async_id](fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
+          if (result.is_error()) {
+            auto error = result.error_value();
+            status = FidlErrorToStatus(error);
+            WLAN_TRACE_ASYNC_END_TX(async_id, status);
+          } else {
+            WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
+          }
+          request_returned.Signal();
+        });
+    request_returned.Wait();
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
 
   return ZX_OK;
 }
@@ -444,42 +406,6 @@ zx_status_t SoftmacBridge::EthernetRx(void* ctx, const uint8_t* payload, size_t 
   }
 
   return ZX_OK;
-}
-
-template <typename FidlMethod>
-fidl::WireResultUnwrapType<FidlMethod> SoftmacBridge::FlattenAndLogError(
-    const std::string& method_name, fdf::WireUnownedResult<FidlMethod>& result) {
-  WLAN_TRACE_DURATION();
-  if (!result.ok()) {
-    lerror("%s failed (FIDL error %s)", method_name.c_str(), result.status_string());
-    return fit::error(result.status());
-  }
-  if (result->is_error()) {
-    lerror("%s failed (status %s)", method_name.c_str(),
-           zx_status_get_string(result->error_value()));
-    return fit::error(result->error_value());
-  }
-
-  if constexpr (has_value_type<fidl::WireResultUnwrapType<FidlMethod>>) {
-    return fit::success(std::move(result->value()));
-  } else
-    return fit::ok();
-}
-
-template <typename Completer, typename FidlMethod>
-void SoftmacBridge::DispatchAndComplete(const std::string& method_name,
-                                        Dispatcher<FidlMethod> dispatcher, Completer& completer) {
-  WLAN_TRACE_DURATION();
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    completer.ReplyError(ZX_ERR_INTERNAL);
-    return;
-  }
-
-  auto result = dispatcher(*std::move(arena), softmac_client_);
-  auto flattened_result = FlattenAndLogError(method_name, result);
-  completer.Reply(std::move(flattened_result));
 }
 
 wlansoftmac_buffer_t SoftmacBridge::IntoRustBuffer(std::unique_ptr<Buffer> buffer) {

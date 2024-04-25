@@ -16,49 +16,12 @@
 #include <sstream>
 #include <vector>
 
-#include <wlan/drivers/log.h>
+#include <wlan/drivers/fidl_bridge.h>
 
 namespace wlan_testcontroller {
-namespace {
 
-// Retrieve the underlying zx_status_t from a FIDL error, which may be either a domain or framework
-// error. This assumes that the type of the domain_error is a zx_status_t, not a domain-specific
-// error enum.
-template <typename ErrorType>
-zx_status_t FidlErrorToStatus(const ErrorType& e) {
-  return e.is_domain_error() ? e.domain_error() : e.framework_error().status();
-}
-
-// Returns a lambda that can be used as the callback passed to |Then| or |ThenExactlyOnce| on the
-// return value from making an async FIDL request over |bridge_client_|.
-// The returned lambda will forward the result to the provided |completer|.
-template <typename FidlMethod, typename AsyncCompleter>
-auto ForwardResult(AsyncCompleter completer,
-                   cpp20::source_location loc = cpp20::source_location::current()) {
-  // This function can be applied to FIDL protocols on both the channel and driver transports.
-  constexpr bool channel_transport =
-      std::is_same_v<typename FidlMethod::Protocol::Transport, fidl::internal::ChannelTransport>;
-  using ResultType = typename std::conditional_t<channel_transport, fidl::Result<FidlMethod>,
-                                                 fdf::Result<FidlMethod>>;
-
-  return [completer = std::move(completer), loc](ResultType& result) mutable {
-    FDF_LOG(TRACE, "Forwarding result for %s", loc.function_name());
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Result not ok for %s: %s", loc.function_name(),
-              result.error_value().FormatDescription().c_str());
-    }
-
-    constexpr bool has_reply = FidlMethod::kHasNonEmptyUserFacingResponse ||
-                               FidlMethod::kHasDomainError || FidlMethod::kHasFrameworkError;
-    if constexpr (has_reply) {
-      completer.Reply(result.map_error([](auto error) { return FidlErrorToStatus(error); }));
-    } else {
-      completer.Reply();
-    }
-  };
-}
-
-}  // namespace
+using ::wlan::drivers::fidl_bridge::FidlErrorToStatus;
+using ::wlan::drivers::fidl_bridge::ForwardResult;
 
 // Server that forwards calls from WlanFullmacImplIfcChannel to WlanFullmacImplIfc.
 class WlanFullmacImplIfcToDriverBridge

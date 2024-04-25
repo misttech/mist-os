@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_
 
-#include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
@@ -137,7 +137,7 @@ class SoftmacBinding : public DeviceInterface {
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
 
   // The FIDL client to communicate with iwlwifi
-  fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
+  fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
   fdf::Dispatcher softmac_ifc_server_dispatcher_;
 
