@@ -152,7 +152,10 @@ TYPED_TEST(DlTests, Symbolic) {
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
+// Load a module that depends on a symbol provided directly by a dependency.
 TYPED_TEST(DlTests, BasicDep) {
+  constexpr int64_t kReturnValue = 17;
+
   constexpr const char* kBasicDepFile = "basic-dep.module.so";
 
   this->ExpectRootModule(kBasicDepFile);
@@ -161,9 +164,20 @@ TYPED_TEST(DlTests, BasicDep) {
   auto result = this->DlOpen(kBasicDepFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
+// Load a module that depends on a symbols provided directly and transitively by
+// several dependencies. Dependency ordering is serialized such that a module
+// depends on another module only one hop away (e.g. in its DT_NEEDED list):
 TYPED_TEST(DlTests, IndirectDeps) {
+  constexpr int64_t kReturnValue = 17;
+
   constexpr const char* kIndirectDepsFile = "indirect-deps.module.so";
 
   this->ExpectRootModule(kIndirectDepsFile);
@@ -172,6 +186,12 @@ TYPED_TEST(DlTests, IndirectDeps) {
   auto result = this->DlOpen(kIndirectDepsFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
 TYPED_TEST(DlTests, MissingDependency) {
