@@ -1,3 +1,4 @@
+ffx component show
 ffx product download
 ffx product lookup
 ffx target add

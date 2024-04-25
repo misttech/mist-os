@@ -1,3 +1,4 @@
+component_show.json
 product_download.json
 product_lookup.json
 target_add.json
