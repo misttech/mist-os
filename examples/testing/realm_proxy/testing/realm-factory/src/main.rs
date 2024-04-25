@@ -4,7 +4,7 @@
 
 use {
     anyhow::{Error, Result},
-    fidl::endpoints,
+    fidl::endpoints::{self, Proxy},
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_test_echoserver::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
     fuchsia_async as fasync,
@@ -28,14 +28,14 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                RealmFactoryRequest::CreateRealm { options, dictionary, responder } => {
+                RealmFactoryRequest::CreateRealm { options, responder } => {
                     let realm = create_realm(options).await?;
 
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
-                    let (my_dictionary_proxy, server) = endpoints::create_proxy().unwrap();
                     realm.root.controller().get_exposed_dictionary(server_end).await?.unwrap();
-                    let () = expose_dict.copy(server)?;
+                    let dictionary = expose_dict.copy().await?;
+                    let dictionary = dictionary.into_proxy().unwrap();
 
                     // Mix in additional capabilities to the dict.
                     //
@@ -56,13 +56,10 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                         endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
                     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
                     let echo_sender_client = factory.create_sender(echo_receiver_client).await?;
-                    my_dictionary_proxy
+                    dictionary
                         .insert("reverse-echo", fsandbox::Capability::Sender(echo_sender_client))
                         .await?
                         .unwrap();
-
-                    // Bind the dict.
-                    my_dictionary_proxy.clone2(dictionary.into_channel().into())?;
 
                     // Serve the mixed-in capability.
                     task_group.spawn(async move {
@@ -77,7 +74,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                         });
                     });
 
-                    responder.send(Ok(()))?;
+                    responder.send(Ok(dictionary.into_client_end().unwrap()))?;
                 }
                 RealmFactoryRequest::_UnknownMethod { .. } => unimplemented!(),
             }

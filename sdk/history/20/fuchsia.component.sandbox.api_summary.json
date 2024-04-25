@@ -1,13 +1,5 @@
 [
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.component.sandbox/Dictionary.Clone2",
-        "strictness": "strict",
-        "ordinal": "2366825959783828089",
-        "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
-    },
-    {
         "kind": "protocol",
         "name": "fuchsia.component.sandbox/Dictionary",
         "openness": "open",

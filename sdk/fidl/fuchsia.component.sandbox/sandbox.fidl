@@ -83,11 +83,6 @@ type DictionaryError = flexible enum {
 @discoverable
 @available(added=20)
 open protocol Dictionary {
-    /// Creates a new connection to the same underlying dictionary.
-    ///
-    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
-    compose fuchsia.unknown.Cloneable;
-
     /// Inserts a key-value pair into the dictionary.
     ///
     /// * error `DictionaryError.ALREADY_EXISTS` if the dictionary already contains an
@@ -124,6 +119,14 @@ open protocol Dictionary {
         items vector<DictionaryItem>:MAX;
     });
 
+    /// Creates a new connection to the same underlying dictionary.
+    ///
+    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
+    @available(added=HEAD)
+    flexible Clone() -> (resource struct {
+        dictionary client_end:Dictionary;
+    });
+
     /// Create a new dictionary that contains a clone of all the entries in
     /// this dictionary.
     ///
@@ -131,8 +134,8 @@ open protocol Dictionary {
     /// created dictionary will contain references to those same nested
     /// dictionaries because the entries are cloned rather than copied.
     @available(added=HEAD)
-    flexible Copy(resource struct {
-        request server_end:Dictionary;
+    flexible Copy() -> (resource struct {
+        dictionary client_end:Dictionary;
     });
 
     /// Enumerates the entries in this dictionary.

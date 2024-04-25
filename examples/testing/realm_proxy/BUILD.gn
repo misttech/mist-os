@@ -20,7 +20,6 @@ rustc_test("bin") {
   deps = [
     "testing/fidl:test.echoserver_rust",
     "//examples/components/routing/fidl:echo_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/testing/realm_client/rust",

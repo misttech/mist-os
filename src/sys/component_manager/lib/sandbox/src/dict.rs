@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use derivative::Derivative;
-use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
+use fidl::endpoints::{self, create_request_stream, ClientEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -150,21 +150,23 @@ impl Dict {
                         .collect();
                     responder.send(items)?;
                 }
-                fsandbox::DictionaryRequest::Clone2 { request, control_handle: _ } => {
+                fsandbox::DictionaryRequest::Clone { responder } => {
+                    let (client_end, server_end) =
+                        endpoints::create_endpoints::<fsandbox::DictionaryMarker>();
                     // The clone is registered under the koid of the client end.
-                    let koid = request.basic_info().unwrap().related_koid;
-                    let server_end: ServerEnd<fsandbox::DictionaryMarker> =
-                        request.into_channel().into();
+                    let koid = client_end.basic_info().unwrap().koid;
                     let stream = server_end.into_stream().unwrap();
                     self.clone().serve_and_register(stream, koid);
+                    responder.send(client_end)?;
                 }
-                fsandbox::DictionaryRequest::Copy { request, .. } => {
+                fsandbox::DictionaryRequest::Copy { responder } => {
+                    let (client_end, server_end) =
+                        endpoints::create_endpoints::<fsandbox::DictionaryMarker>();
                     // The copy is registered under the koid of the client end.
-                    let koid = request.basic_info().unwrap().related_koid;
-                    let server_end: ServerEnd<fsandbox::DictionaryMarker> =
-                        request.into_channel().into();
+                    let koid = client_end.basic_info().unwrap().koid;
                     let stream = server_end.into_stream().unwrap();
                     self.shallow_copy().serve_and_register(stream, koid);
+                    responder.send(client_end)?;
                 }
                 fsandbox::DictionaryRequest::Enumerate { contents: server_end, .. } => {
                     let items = self
@@ -350,9 +352,10 @@ mod tests {
     use crate::{Data, Directory, Open, Unit};
     use anyhow::{Error, Result};
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream, Proxy};
+    use fidl::endpoints::{
+        create_endpoints, create_proxy, create_proxy_and_stream, Proxy, ServerEnd,
+    };
     use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_unknown as funknown;
     use fuchsia_fs::directory::DirEntry;
     use futures::try_join;
     use lazy_static::lazy_static;
@@ -636,9 +639,8 @@ mod tests {
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
 
-        // Clone the dict with `Clone2`
-        let (clone_client_end, clone_server_end) = create_endpoints::<funknown::CloneableMarker>();
-        let _ = dict_proxy.clone2(clone_server_end);
+        // Clone the dict with `Clone`
+        let clone_client_end = dict_proxy.clone().await.unwrap();
         let clone_client_end: ClientEnd<fsandbox::DictionaryMarker> =
             clone_client_end.into_channel().into();
         let clone_proxy = clone_client_end.into_proxy().unwrap();
