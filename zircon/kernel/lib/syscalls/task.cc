@@ -19,6 +19,7 @@
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/debug.h>
+#include <zircon/syscalls/exception.h>
 #include <zircon/syscalls/policy.h>
 #include <zircon/types.h>
 
@@ -177,6 +178,13 @@ zx_status_t sys_thread_write_state(zx_handle_t handle, uint32_t kind,
     return status;
 
   return thread->WriteState(static_cast<zx_thread_state_topic_t>(kind), buffer, buffer_size);
+}
+
+// zx_status_t zx_thread_raise_exception
+zx_status_t sys_thread_raise_exception(uint32_t options, zx_excp_type_t type,
+                                       user_in_ptr<const zx_exception_context_t> context) {
+  // TODO(https://fxbug.dev/333900230): Implement this function.
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 // zx_status_t zx_thread_legacy_yield

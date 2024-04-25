@@ -7,9 +7,12 @@
 
 #include <zircon/compiler.h>
 
+#include "zircon/syscalls/exception.h"
+
 __BEGIN_CDECLS
 
 // forward declarations needed by syscalls.h
+typedef struct zx_exception_context zx_exception_context_t;
 typedef struct zx_port_packet zx_port_packet_t;
 typedef struct zx_pci_bar zx_pci_bar_t;
 typedef struct zx_pcie_device_info zx_pcie_device_info_t;

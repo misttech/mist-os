@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 library zx;
 
+type ExceptionContext = struct {
+        // TODO
+        };
+
 @transport("Syscall")
 closed protocol Thread {
     /// ## Summary
@@ -446,6 +450,66 @@ closed protocol Thread {
         kind uint32;
         @voidptr
         buffer vector<byte>:MAX;
+    }) -> () error Status;
+
+    /// ## Summary
+    ///
+    /// Raise a user-generated exception.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_status_t zx_thread_raise_exception(uint32_t options,
+    ///                                       zx_excp_type_t type,
+    ///                                       const zx_exception_context_t* context
+    ///                                       size_t context_size);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// `zx_thread_raise_exception()` raises a user-generated exception. The exception
+    /// will be delivered to the exception channels associated with the current thread.
+    ///
+    /// Currently, the *options* argument must be `ZX_EXCEPTION_TARGET_JOB_DEBUGGER`,
+    /// which causes the exception to be delivered to the job debugger exception channels.
+    /// In the future, *options* may be expanded to enable targeting other types of
+    /// exception channels.
+    ///
+    /// The the *type* argument must be be `ZX_EXCP_USER`. In the future, *type* may be
+    /// expanded to enable raising other types of exceptions.
+    ///
+    /// The `arch` field in `zx_exception_context_t` is ignored. Instead, use the
+    /// `synth_code` and `synth_data` fields to communicate information about the exception.
+    /// Codes less than `ZX_EXCP_USER_CODE_USER0` are reserved for system-defined purposes.
+    /// Applications may use codes greater than or equal to `ZX_EXCP_USER_CODE_USER0` for
+    /// their own purposes.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_thread_raise_exception()` returns `ZX_OK` on success.
+    /// In the event of failure, a negative error value is returned.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_INVALID_ARGS`  *options* is a value other than
+    /// `ZX_EXCEPTION_TARGET_JOB_DEBUGGER` or *type* is a value other than
+    /// *ZX_EXCP_USER*.
+    ///
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
+    /// There is no good way for userspace to handle this (unlikely) error.
+    /// In a future build this error will no longer occur.
+    ///
+    /// ## See also
+    ///
+    ///  - [`zx_task_create_exception_channel()`]
+    ///
+    /// [`zx_task_create_exception_channel()`]: task_create_exception_channel.md
+    strict RaiseException(struct {
+        options uint32;
+        type uint32;
+        context ExceptionContext;
     }) -> () error Status;
 
     /// ## Summary
