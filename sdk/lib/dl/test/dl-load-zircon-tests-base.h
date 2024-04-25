@@ -5,7 +5,6 @@
 #ifndef LIB_DL_TEST_DL_LOAD_ZIRCON_TESTS_BASE_H_
 #define LIB_DL_TEST_DL_LOAD_ZIRCON_TESTS_BASE_H_
 
-#include <lib/fit/function.h>
 #include <lib/ld/testing/mock-loader-service.h>
 
 #include "dl-load-tests-base.h"
@@ -34,10 +33,9 @@ class DlLoadZirconTestsBase : public DlLoadTestsBase {
     mock_.Needed(name_found_pairs);
   }
 
-  // TODO(caslyn): alias fit::function<void()> signature
-  void CallWithLdsvcInstalled(fit::function<void()> func) {
-    mock_.CallWithLdsvcInstalled(std::move(func));
-  }
+  // TODO(caslyn): This function can be removed once we introduce a CallDlopen
+  // wrapper to the base classes.
+  void CallWithLdsvcInstalled(fit::closure func) { mock_.CallWithLdsvcInstalled(std::move(func)); }
 
  private:
   ld::testing::MockLoaderServiceForTest mock_;

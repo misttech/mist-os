@@ -26,10 +26,9 @@ class DlLoadTestsBase : public DlTestsBase {
 
   static void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
-  // TODO(caslyn): alias fit::function<void()> signature
   // There is no particular loader to install on non-Fuchsia systems during
-  // tests, so this function simply runs the fit::function it was passed.
-  static void CallWithLdsvcInstalled(fit::function<void()> func) { func(); }
+  // tests, so this function simply runs the function it was passed.
+  static void CallWithLdsvcInstalled(fit::closure func) { func(); }
 };
 
 }  // namespace dl::testing
