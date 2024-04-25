@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/zircon/zx_library.gni")
 
 # The in-memory filesystem implementation.
 static_library("lib") {
@@ -36,6 +35,18 @@ static_library("lib") {
     "//zircon/system/ulib/sync",
     "//zircon/third_party/ulib/safemath",
   ]
+
+  # TODO(https://fxbug.dev/293618742): Remove uses of memfs as a library. Tests should use /tmp in
+  # tests instead of running their own memfs instances.
+  visibility = [
+    ":*",
+    "//src/lib/loader_service:loader_service_test_fixture",
+    "//src/storage/conformance/conformance_harness/memfs:bin",
+    "//src/storage/memfs/test/*",
+    "//src/sys/component_manager/tests/rights:expose_dir_rights_bin",
+    "//src/sys/component_manager/tests/security_policy/capability_allowlist:dir_service_bin",
+    "//zircon/system/ulib/fdio-caller/test:fdio-caller",
+  ]
 }
 
 # A C++ wrapper around ":lib" that handles setup and tear-down.
@@ -48,6 +59,18 @@ source_set("cpp") {
   public_deps = [
     ":lib",
     "//zircon/system/ulib/zx",
+  ]
+
+  # TODO(https://fxbug.dev/293618742): Remove uses of memfs as a library. Tests should use /tmp in
+  # tests instead of running their own memfs instances.
+  visibility = [
+    ":*",
+    "//sdk/lib/fdio/tests:fdio-test",
+    "//src/developer/forensics/testing:scoped_memfs_manager",
+    "//src/developer/memory/monitor/tests:memory_monitor_unittests",
+    "//src/storage/lib/vfs/cpp:fs-connection-test",
+    "//src/storage/memfs/test/*",
+    "//src/virtualization/bin/termina_guest_manager:termina_guest_manager_unittests",
   ]
 }
 
