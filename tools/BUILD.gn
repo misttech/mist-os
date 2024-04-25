@@ -6,6 +6,7 @@ group("tools") {
   testonly = true
 
   public_deps = [
+    "//src/testing/pkgstats:host($host_toolchain)",
     "//tools/auto_owners($host_toolchain)",
     "//tools/bindc:host($host_toolchain)",
     "//tools/blackout",

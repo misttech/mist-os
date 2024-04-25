@@ -8,6 +8,7 @@ group("testing") {
     ":tests",
     "fuzzing",
     "loadbench",
+    "pkgstats",
   ]
 }
 
@@ -19,6 +20,7 @@ group("tests") {
     "fuzzing:tests",
     "host-target-testing:tests",
     "loadbench:tests",
+    "pkgstats:tests",
     "realm_client:tests",
     "sl4f:tests",
   ]
