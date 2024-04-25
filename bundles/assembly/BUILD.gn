@@ -483,6 +483,10 @@ assembly_input_bundle("paver_legacy") {
   bootfs_packages = [ "//src/bringup/bin/paver:package" ]
 }
 
+assembly_input_bundle("sysmem_no_allocate") {
+  kernel_cmdline = [ "driver.sysmem.contiguous_memory_size=0" ]
+}
+
 # The console AIB is included by all eng and userdebug products.
 #
 assembly_input_bundle("console_userdebug") {

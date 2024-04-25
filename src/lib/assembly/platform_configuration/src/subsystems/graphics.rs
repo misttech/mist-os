@@ -31,6 +31,10 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         } else {
             builder.platform_bundle("virtcon_disable");
         }
+
+        if matches!(context.feature_set_level, FeatureSupportLevel::Embeddable) {
+            builder.platform_bundle("sysmem_no_allocate");
+        }
         Ok(())
     }
 }
