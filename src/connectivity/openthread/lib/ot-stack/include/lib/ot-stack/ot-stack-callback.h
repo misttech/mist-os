@@ -15,14 +15,8 @@
  *
  */
 
-#ifdef OPENTHREAD_231010
-extern "C" void platformCallbackSendOneFrameToRadio(otInstance* a_instance, uint8_t* buffer,
-                                                    size_t size);
-#endif
-#ifdef OPENTHREAD_240214
 extern "C" void platformCallbackSendOneFrameToRadio(otInstance* a_instance, const uint8_t* buffer,
                                                     size_t size);
-#endif
 extern "C" size_t platformCallbackWaitForFrameFromRadio(otInstance* a_instance, uint8_t* buffer,
                                                         size_t buffer_len_max, uint64_t timeout_us);
 extern "C" size_t platformCallbackFetchQueuedFrameFromRadio(otInstance* a_instance, uint8_t* buffer,

@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_RADIO_URL_H_
 #define SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_RADIO_URL_H_
 
-#ifdef OPENTHREAD_240214
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -53,5 +52,4 @@ class RadioUrl : public ot::Url::Url {
 }  // namespace Posix
 }  // namespace ot
 
-#endif  // OPENTHREAD_240214
 #endif  // SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_RADIO_URL_H_
