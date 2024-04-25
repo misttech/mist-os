@@ -202,6 +202,9 @@ build_config = struct(
     # The RBE container image for remote build configuration. Empty if disabled.
     rbe_container_image = "{rbe_container_image}",
 
+    # The RBE default machine type for remote build configuration, e.g. "n2-standard-2".
+    rbe_gce_machine_type = "{rbe_gce_machine_type}",
+
     # The path to the Ninja output directory, relative to the current
     # workspace root.
     ninja_output_dir = "{ninja_output_dir}",
@@ -216,6 +219,7 @@ build_config = struct(
         host_cpu_constraint = host_cpu_constraint,
         rbe_instance_name = rbe_config.instance_name,
         rbe_container_image = rbe_config.container_image,
+        rbe_gce_machine_type = rbe_config.gce_machine_type,
         ninja_output_dir = ninja_output_dir,
     )
 

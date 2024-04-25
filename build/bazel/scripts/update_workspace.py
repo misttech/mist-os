@@ -814,7 +814,6 @@ block *
         remote_instance_name=build_config["rbe_instance_name"],
         rbe_project=build_config["rbe_project"],
     )
-    # TODO(b/327500655): figure out where build_config["rbe_gce_machine_type"] goes
     if args.use_bzlmod:
         bazelrc_content += """
 # Enable BlzMod, i.e. support for MODULE.bazel files.
