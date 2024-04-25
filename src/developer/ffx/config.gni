@@ -52,7 +52,6 @@ included_ffx_plugins = [
 dual_mode_plugins = [
   "//src/developer/ffx/plugins/component:ffx_component",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
-  "//src/developer/ffx/plugins/package:ffx_package",
   "//src/developer/ffx/plugins/product:ffx_product",
   "//src/developer/ffx/plugins/repository:ffx_repository",
   "//src/developer/ffx/plugins/session:ffx_session",
