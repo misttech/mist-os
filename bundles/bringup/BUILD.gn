@@ -36,5 +36,6 @@ group("boot_tests") {
       "//zircon/system/ulib/c:boot_tests",
       "//zircon/system/utest/core:boot_tests",
     ]
+    deps += [ "//zircon/kernel/lib/mistos/userloader/example:tests" ]
   }
 }
