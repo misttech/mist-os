@@ -7,6 +7,6 @@
 
 #include <lib/zx/job.h>
 
-zx::resource GetRootResource();
+zx::resource GetProfileResource();
 
 #endif  // ZIRCON_SYSTEM_ULIB_ZX_TEST_UTIL_H_

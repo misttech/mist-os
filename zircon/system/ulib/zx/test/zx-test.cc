@@ -502,7 +502,7 @@ TEST(ZxTestCase, ThreadSetProfile) {
   zx_profile_info_t info = {};
   info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
   info.priority = ZX_PRIORITY_LOWEST;
-  ASSERT_OK(zx::profile::create(GetRootResource(), 0u, &info, &profile));
+  ASSERT_OK(zx::profile::create(GetProfileResource(), 0u, &info, &profile));
   EXPECT_OK(thread.set_profile(profile, 0u));
 }
 
