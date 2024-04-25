@@ -8,7 +8,7 @@
 #include <lib/fit/function.h>
 #include <lib/ld/testing/mock-loader-service.h>
 
-#include "dl-tests-base.h"
+#include "dl-load-tests-base.h"
 
 namespace dl::testing {
 
@@ -22,7 +22,7 @@ namespace dl::testing {
 // register an expectation for it. Usually, `ExpectRootModule` is used for the
 // module that is being `dlopen`-ed and should be called before `Needed` for the
 // mock loader to expect to load the root module first before its dependencies.
-class DlLoadZirconTestsBase : public DlTestsBase {
+class DlLoadZirconTestsBase : public DlLoadTestsBase {
  public:
   constexpr void ExpectRootModule(std::string_view name) { mock_.ExpectRootModule(name); }
 

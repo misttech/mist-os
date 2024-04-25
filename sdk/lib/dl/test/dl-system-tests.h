@@ -7,16 +7,16 @@
 
 #ifdef __Fuchsia__
 #include "dl-load-zircon-tests-base.h"
-#else
-#include "dl-load-posix-tests-base.h"
 #endif
+
+#include "dl-load-tests-base.h"
 
 namespace dl::testing {
 
 #ifdef __Fuchsia__
 using DlSystemLoadTestsBase = DlLoadZirconTestsBase;
 #else
-using DlSystemLoadTestsBase = DlLoadPosixTestsBase;
+using DlSystemLoadTestsBase = DlLoadTestsBase;
 #endif
 
 class DlSystemTests : public DlSystemLoadTestsBase {

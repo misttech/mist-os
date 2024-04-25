@@ -12,6 +12,7 @@
 
 #include "../diagnostics.h"
 #include "../runtime-dynamic-linker.h"
+#include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
 #include <lib/elfldltl/vmar-loader.h>
@@ -19,8 +20,6 @@
 
 #include "dl-load-zircon-tests-base.h"
 #endif
-
-#include "dl-load-posix-tests-base.h"
 
 namespace dl::testing {
 
@@ -45,7 +44,7 @@ class TestPosix {
 #ifdef __Fuchsia__
 using DlImplLoadTestsBase = DlLoadZirconTestsBase;
 #else
-using DlImplLoadTestsBase = DlLoadPosixTestsBase;
+using DlImplLoadTestsBase = DlLoadTestsBase;
 #endif
 
 template <class TestOS>
