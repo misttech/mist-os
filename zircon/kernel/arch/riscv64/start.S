@@ -16,6 +16,14 @@
 
 // This code is purely position-independent and generates no relocations
 // that need boot-time fixup.
+
+// Note within this file, the difference between lla and la is subtle when loading the address
+// of a symbol.
+// - lla will use PC-relative instructions and thus will compute the physical address of the
+// label since the code is running in physical space.
+// - la will emit a literal pool load from a hidden symbol and thus will load the proper
+// virtual address of the label, since the kernel has already been relocated by physboot
+// by the time we get here.
 .text
 FUNCTION(_start)
 .globl PhysbootHandoff
@@ -77,8 +85,7 @@ PhysbootHandoff = _start
     // map the kernel to a fixed address
     // note: mapping the kernel here with full rwx, this will get locked down later in vm initialization
     lla     a0, riscv64_kernel_bootstrap_translation_table
-    lla     t0, kernel_relocated_base
-    ld      a1, (t0)
+    la      a1, __executable_start
     lla     a2, __executable_start
     lla     a3, _end
     sub     a3, a3, a2
@@ -155,8 +162,7 @@ FUNCTION(riscv64_secondary_entry_asm)
     sfence.vma  zero, zero
 
     // Compute the relocation offset
-    lla     t0, kernel_relocated_base
-    ld      t1, (t0)
+    la      t1, __executable_start
     lla     t0, __executable_start
     sub     t0, t1, t0
 
