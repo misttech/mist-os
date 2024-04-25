@@ -380,7 +380,13 @@ impl Repl {
                         }
                     } else if byte == b'\t' {
                         let got = String::from_iter(inner.cmd_buf.iter().copied());
-                        let completions = completer(got, inner.cursor_pos).await;
+                        let pos = got
+                            .char_indices()
+                            .skip(inner.cursor_pos)
+                            .next()
+                            .map(|x| x.0)
+                            .unwrap_or(got.len());
+                        let completions = completer(got.clone(), pos).await;
                         let double_tab = tab_time
                             .take()
                             .map(|x| Instant::now().duration_since(x) <= DOUBLE_TAB_TIME)
@@ -410,6 +416,7 @@ impl Repl {
                                 .filter(|x| !x.0.is_empty());
 
                             if let Some((completion, start)) = singular {
+                                let start = got[..start].chars().count();
                                 let cursor_pos = inner.cursor_pos;
                                 assert!(start <= cursor_pos, "Completion starts after cursor!");
                                 inner.cmd_buf.splice(start..cursor_pos, completion.chars());
