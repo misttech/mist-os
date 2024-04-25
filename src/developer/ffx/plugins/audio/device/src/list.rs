@@ -44,7 +44,8 @@ impl Devices {
 
 /// A query that matches device properties against a [DeviceSelector].
 pub struct DeviceQuery {
-    pub id: Option<String>,
+    pub name: Option<String>,
+    pub token_id: Option<fadevice::TokenId>,
     pub device_type: Option<DeviceType>,
 }
 
@@ -58,9 +59,13 @@ pub trait QueryExt {
 
 impl QueryExt for DevfsSelector {
     fn matches(&self, query: &DeviceQuery) -> bool {
+        // Only registry devices have token IDs.
+        if query.token_id.is_some() {
+            return false;
+        }
         let mut is_match = true;
-        if let Some(id) = &query.id {
-            is_match = is_match && (id == &self.0.id);
+        if let Some(name) = &query.name {
+            is_match = is_match && (name == &self.0.name);
         }
         if let Some(device_type) = &query.device_type {
             is_match = is_match && (device_type.0 == self.0.device_type);
@@ -72,14 +77,14 @@ impl QueryExt for DevfsSelector {
 impl QueryExt for DeviceInfo {
     fn matches(&self, query: &DeviceQuery) -> bool {
         let mut is_match = true;
-        if let Some(id) = &query.id {
-            let Ok(id) = id.parse::<fadevice::TokenId>() else {
-                return false;
-            };
-            is_match = is_match && (id == self.0.token_id.unwrap());
+        if let Some(name) = &query.name {
+            is_match = is_match && (*name == self.device_name());
+        }
+        if let Some(token_id) = &query.token_id {
+            is_match = is_match && (*token_id == self.token_id());
         }
         if let Some(device_type) = &query.device_type {
-            is_match = is_match && (device_type.0 == self.0.device_type.unwrap());
+            is_match = is_match && (*device_type == self.device_type());
         }
         is_match
     }
@@ -89,12 +94,13 @@ impl TryFrom<&DeviceCommand> for DeviceQuery {
     type Error = String;
 
     fn try_from(cmd: &DeviceCommand) -> Result<Self, Self::Error> {
-        let id = cmd.id.clone();
+        let name = cmd.name.clone();
+        let token_id = cmd.token_id.clone();
         let device_type = cmd
             .device_type
             .map(|hw_type| DeviceType::try_from((hw_type, cmd.device_direction)))
             .transpose()?;
-        Ok(Self { id, device_type })
+        Ok(Self { name, token_id, device_type })
     }
 }
 
@@ -106,7 +112,7 @@ pub struct ListResult {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ListResultDevice {
-    device_id: String,
+    device_name: String,
     is_input: Option<bool>,
     #[serde(serialize_with = "serialize_hw_device_type")]
     device_type: HardwareDeviceType,
@@ -136,7 +142,7 @@ impl From<Devices> for ListResult {
 impl From<DevfsSelector> for ListResultDevice {
     fn from(value: DevfsSelector) -> Self {
         Self {
-            device_id: value.0.id.clone(),
+            device_name: value.0.name.clone(),
             // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
             device_type: HardwareDeviceType(fhaudio::DeviceType::StreamConfig),
             is_input: match value.0.device_type {
@@ -152,8 +158,8 @@ impl From<DevfsSelector> for ListResultDevice {
 impl From<DeviceInfo> for ListResultDevice {
     fn from(value: DeviceInfo) -> Self {
         Self {
-            device_id: value.0.token_id.unwrap().to_string(),
             device_type: HardwareDeviceType::from(value.device_type()),
+            device_name: value.0.device_name.expect("missing 'device_name'"),
             is_input: value.0.is_input,
             path: None,
         }
@@ -187,8 +193,8 @@ impl Display for ListResult {
             }
             write!(
                 f,
-                "Device id: {:?}, Device type: {}, {in_out}",
-                device.device_id, device.device_type
+                "Device name: {:?}, Device type: {}, {in_out}",
+                device.device_name, device.device_type
             )?;
         }
         Ok(())
@@ -227,35 +233,39 @@ mod test {
 
     #[test_case(
         DeviceQuery {
-            id: None,
+            name: None,
+            token_id: None,
             device_type: None
         };
         "empty"
     )]
     #[test_case(
         DeviceQuery {
-            id: Some("some-id".to_string()),
+            name: Some("some-name".to_string()),
+            token_id: None,
             device_type: None
         };
-        "id"
+        "name"
     )]
     #[test_case(
         DeviceQuery {
-            id: None,
+            name: None,
+            token_id: None,
             device_type: Some(fadevice::DeviceType::Input.into())
         };
         "device type"
     )]
     #[test_case(
         DeviceQuery {
-            id: Some("some-id".to_string()),
+            name: Some("some-name".to_string()),
+            token_id: None,
             device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
         };
-        "id and device type"
+        "name and device type"
     )]
-    fn test_query_matches_selector(query: DeviceQuery) {
+    fn test_query_matches_devfsselector(query: DeviceQuery) {
         let selector = DevfsSelector(fac::Devfs {
-            id: "some-id".to_string(),
+            name: "some-name".to_string(),
             device_type: fadevice::DeviceType::Input,
         });
         assert!(selector.matches(&query));
@@ -263,21 +273,31 @@ mod test {
 
     #[test_case(
         DeviceQuery {
-            id: Some("incorrect".to_string()),
+            name: Some("incorrect".to_string()),
+            token_id: None,
             device_type: None
         };
-        "wrong id"
+        "wrong name"
     )]
     #[test_case(
         DeviceQuery {
-            id: None,
+            name: Some("some-name".to_string()),
+            token_id: Some(123),
+            device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
+        };
+        "contains token id"
+    )]
+    #[test_case(
+        DeviceQuery {
+            name: None,
+            token_id: None,
             device_type: Some(DeviceType::from(fadevice::DeviceType::Output))
         };
         "wrong device type"
     )]
-    fn test_query_does_not_match_selector(query: DeviceQuery) {
+    fn test_query_does_not_match_devfsselector(query: DeviceQuery) {
         let selector = DevfsSelector(fac::Devfs {
-            id: "some-id".to_string(),
+            name: "some-name".to_string(),
             device_type: fadevice::DeviceType::Input,
         });
         assert!(!selector.matches(&query));
@@ -285,35 +305,56 @@ mod test {
 
     #[test_case(
         DeviceQuery {
-            id: None,
+            name: None,
+            token_id: None,
             device_type: None
         };
         "empty"
     )]
     #[test_case(
         DeviceQuery {
-            id: Some("1".to_string()),
+            name: None,
+            token_id: Some(1),
             device_type: None
         };
-        "id"
+        "token id"
     )]
     #[test_case(
         DeviceQuery {
-            id: None,
+            name: Some("some-name".to_string()),
+            token_id: None,
+            device_type: None
+        };
+        "name"
+    )]
+    #[test_case(
+        DeviceQuery {
+            name: Some("some-name".to_string()),
+            token_id: Some(1),
+            device_type: None
+        };
+        "token id and name"
+    )]
+    #[test_case(
+        DeviceQuery {
+            name: None,
+            token_id: None,
             device_type: Some(fadevice::DeviceType::Input.into())
         };
         "device type"
     )]
     #[test_case(
         DeviceQuery {
-            id: Some("1".to_string()),
+            name: None,
+            token_id: Some(1),
             device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
         };
-        "id and device type"
+        "token id and device type"
     )]
-    fn test_query_matches_info(query: DeviceQuery) {
+    fn test_query_matches_deviceinfo(query: DeviceQuery) {
         let info = DeviceInfo::from(fadevice::Info {
             token_id: Some(1),
+            device_name: Some("some-name".to_string()),
             device_type: Some(fadevice::DeviceType::Input),
             ..Default::default()
         });
@@ -322,21 +363,32 @@ mod test {
 
     #[test_case(
         DeviceQuery {
-            id: Some("incorrect".to_string()),
+            name: None,
+            token_id: Some(456),
             device_type: None
         };
-        "wrong id"
+        "wrong token id"
     )]
     #[test_case(
         DeviceQuery {
-            id: None,
+            name: Some("incorrect".to_string()),
+            token_id: Some(1),
+            device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
+        };
+        "wrong name"
+    )]
+    #[test_case(
+        DeviceQuery {
+            name: None,
+            token_id: None,
             device_type: Some(DeviceType::from(fadevice::DeviceType::Output))
         };
         "wrong device type"
     )]
-    fn test_query_does_not_match_info(query: DeviceQuery) {
+    fn test_query_does_not_match_deviceinfo(query: DeviceQuery) {
         let info = DeviceInfo::from(fadevice::Info {
             token_id: Some(1),
+            device_name: Some("some-name".to_string()),
             device_type: Some(fadevice::DeviceType::Input),
             ..Default::default()
         });

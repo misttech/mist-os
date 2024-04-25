@@ -16,31 +16,41 @@ use fuchsia_audio::{
 #[argh(
     subcommand,
     name = "device",
-    description = "Interact directly with device hardware.",
+    description = "Interact directly with device hardware.
+
+The flags on the device command filter the list of available devices.
+
+Commands that operate on a single device pick the first matching device,
+after filtering. For example, if the target has only one device, and no
+filter flags are provided, `ffx audio device` will use that device by default.",
     example = "Show information about a specific device:
 
-    $ ffx audio device --id 3d99d780 --direction input info
+    $ ffx audio device --name 3d99d780 --direction input info
+
+Show information about a specific device in the audio device registry:
+
+    $ ffx audio device --token-id 1 info
 
 Play a WAV file directly to device hardware:
 
-    $ cat ~/sine.wav | ffx audio device --id a70075f2 play
-    $ ffx audio device --id a70075f2 play --file ~/sine.wav
+    $ cat ~/sine.wav | ffx audio device --name a70075f2 play
+    $ ffx audio device --name a70075f2 play --file ~/sine.wav
 
 Record a WAV file directly from device hardware:
 
-    $ ffx audio device --id 3d99d780 record --format 48000,uint8,1ch --duration 1s
+    $ ffx audio device --name 3d99d780 record --format 48000,uint8,1ch --duration 1s
 
 Mute the stream of an output device:
 
-    $ ffx audio device --id a70075f2 --direction output mute
+    $ ffx audio device --name a70075f2 --direction output mute
 
 Set the gain of an output device to -20 dB:
 
-    $ ffx audio device --id a70075f2 --direction output gain -20
+    $ ffx audio device --name a70075f2 --direction output gain -20
 
 Turn AGC on for an input device:
 
-    $ ffx audio device --id 3d99d780 --direction input agc on"
+    $ ffx audio device --name 3d99d780 --direction input agc on"
 )]
 pub struct DeviceCommand {
     #[argh(subcommand)]
@@ -48,11 +58,17 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        description = "device ID. Specify a devfs node name, \
-        e.g. 3d99d780 for /dev/class/audio-input/3d99d780.
-        If not specified, defaults to the first device alphabetically listed."
+        description = "device devfs node name. \
+        e.g. 3d99d780 for the devfs path /dev/class/audio-input/3d99d780."
     )]
-    pub id: Option<String>,
+    pub name: Option<String>,
+
+    #[argh(
+        option,
+        description = "device token ID, for a device in the audio device registry. \
+        Only applies if the audio device registry is available on the target."
+    )]
+    pub token_id: Option<fadevice::TokenId>,
 
     #[argh(
         option,

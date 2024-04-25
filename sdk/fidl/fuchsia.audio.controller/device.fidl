@@ -14,8 +14,8 @@ using zx;
 type DeviceSelector = flexible union {
     /// Driver node in devfs, e.g. `/dev/class/audio-input/3d99d780`.
     1: devfs struct {
-        /// ID of device.
-        id fuchsia.io.Name;
+        /// Name of this device's devfs node, e.g. `3d99d780`.
+        name fuchsia.io.Name;
 
         /// Device type.
         device_type fuchsia.audio.device.DeviceType;

@@ -386,7 +386,7 @@ mod tests {
         let writer: MachineWriter<DeviceResult> = MachineWriter::new_test(None, &test_buffers);
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Output,
         });
 
@@ -444,7 +444,7 @@ mod tests {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Output,
         });
 
@@ -490,7 +490,7 @@ mod tests {
         };
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Input,
         });
 
@@ -541,7 +541,7 @@ mod tests {
         };
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Input,
         });
 
@@ -574,11 +574,11 @@ mod tests {
 
         let devices = list::Devices::Devfs(vec![
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Input,
             }),
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Output,
             }),
         ]);
@@ -587,8 +587,8 @@ mod tests {
 
         let stdout = test_buffers.into_stdout_str();
         let stdout_expected = format!(
-            "\"/dev/class/audio-input/abc123\" Device id: \"abc123\", Device type: StreamConfig, Input\n\
-            \"/dev/class/audio-output/abc123\" Device id: \"abc123\", Device type: StreamConfig, Output\n"
+            "\"/dev/class/audio-input/abc123\" Device name: \"abc123\", Device type: StreamConfig, Input\n\
+            \"/dev/class/audio-output/abc123\" Device name: \"abc123\", Device type: StreamConfig, Output\n"
         );
 
         assert_eq!(stdout, stdout_expected);
@@ -604,11 +604,11 @@ mod tests {
 
         let devices = list::Devices::Devfs(vec![
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Input,
             }),
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Output,
             }),
         ]);
@@ -619,13 +619,13 @@ mod tests {
         let stdout_expected = format!(
             "{{\"devices\":[\
                 {{\
-                    \"device_id\":\"abc123\",\
+                    \"device_name\":\"abc123\",\
                     \"is_input\":true,\
                     \"device_type\":\"STREAMCONFIG\",\
                     \"path\":\"/dev/class/audio-input/abc123\"\
                 }},\
                 {{\
-                    \"device_id\":\"abc123\",\
+                    \"device_name\":\"abc123\",\
                     \"is_input\":false,\
                     \"device_type\":\"STREAMCONFIG\",\
                     \"path\":\"/dev/class/audio-output/abc123\"\
