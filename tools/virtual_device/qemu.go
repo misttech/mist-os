@@ -85,6 +85,12 @@ func QEMUCommand(b *qemu.QEMUCommandBuilder, fvd *fvdpb.VirtualDevice, images bu
 				File: drive.Image,
 				Addr: drive.PciAddress,
 			})
+		case "ufs-storage":
+			b.AddUFSDrive(qemu.Drive{
+				ID:   drive.Id,
+				File: drive.Image,
+				Addr: drive.PciAddress,
+			})
 		case "virtio-blk-pci":
 			b.AddVirtioBlkPciDrive(qemu.Drive{
 				ID:   drive.Id,

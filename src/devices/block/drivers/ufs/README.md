@@ -44,7 +44,6 @@ and provides reliable data transfer through the M-PHY physical layer.
 * Support runtime suspend
 * Support background operation
 * Implement Ufs tools
-* Integration tests
 * Support UFS 4.0 Spec (multi queue)
 * Support multiple platform (exynos, snapdragon, etc.)
 * Support multiple block size (4KB, 8KB, 16KB ...)
