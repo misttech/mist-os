@@ -21,7 +21,7 @@ group("end_to_end_deps") {
     "//src/testing/sl4f:sl4f",
 
     # Needed for performance testing.
-    "//bundles/packages/prod:tracing",
+    "//src/performance/trace",
 
     # Needed for VP9 decode conformance testing.
     "//src/media/codec/examples:vp9_decoder_conformance_http",

@@ -8,13 +8,10 @@ assert(is_fuchsia, "This can only be included in default_toolchain contexts")
 group("tools") {
   testonly = true
   public_deps = [
-    "//bundles/packages/prod:cmdutils",
-    "//bundles/packages/prod:debug_agent",
-    "//bundles/packages/prod:far",
-    "//bundles/packages/prod:tracing",
     "//src/camera:tools",
     "//src/connectivity:tools",
     "//src/connectivity/bluetooth/tools",
+    "//src/developer/debug/debug_agent",
     "//src/developer/debug/zxdb:zxdb_host",
     "//src/developer/fastboot",
     "//src/devices/bundles:tools",
@@ -24,9 +21,11 @@ group("tools") {
     "//src/lib/chunked-compression:chunked-compress-host-tool",
     "//src/lib/icu:tools",
     "//src/media/bundles:tools",
+    "//src/performance/trace",
     "//src/recovery/factory_reset:tools",
     "//src/security/lib/scrutiny",
     "//src/storage:tools",
+    "//src/sys/pkg/bin/far",
     "//src/sys/pkg/bin/pm",
     "//src/sys/pkg/bin/pm:host",
     "//src/sys/tools/activity-ctl",
@@ -60,6 +59,9 @@ group("host_tools") {
   public_deps = [
     "//build/tools/formatjson5:install($host_toolchain)",
     "//src/diagnostics/triage:install($host_toolchain)",
+    "//src/performance/trace2json($host_toolchain)",
+    "//src/performance/traceutil($host_toolchain)",
+    "//src/sys/pkg/bin/far:host($host_toolchain)",
     "//tools/check-licenses:host($host_toolchain)",
     "//tools/sys-realm-analyzer:host($host_toolchain)",
     "//tools/whereiscl:host($host_toolchain)",
