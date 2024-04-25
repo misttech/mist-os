@@ -9,7 +9,7 @@ import dataclasses
 import json
 import re
 import hashlib
-from typing import Any, ClassVar, Dict, List, Set, Tuple, Type
+from typing import Any, ClassVar, Dict, List, Set, Tuple, Type, Union
 
 try:
     # Bazel build uses fully-qualified package names.
@@ -38,7 +38,9 @@ class SpdxLicenseExpression:
     expression_template: str
     license_ids: Tuple[str]
 
-    def create(expression_str: str, location_for_error: str | None = None):
+    def create(
+        expression_str: str, location_for_error: Union[str, None] = None
+    ):
         assert expression_str != None
 
         expression_template = []
@@ -107,10 +109,10 @@ class SpdxPackage:
 
     spdx_id: str
     name: str
-    copyright_text: str | None = None
-    license_concluded: SpdxLicenseExpression | None = None
-    homepage: str | None = None
-    debug_hint: List[str] | None = None
+    copyright_text: Union[str, None] = None
+    license_concluded: Union[SpdxLicenseExpression, None] = None
+    homepage: Union[str, None] = None
+    debug_hint: Union[List[str], None] = None
 
     def to_json_dict(self):
         output = {"SPDXID": self.spdx_id, "name": self.name}
@@ -184,7 +186,7 @@ class SpdxExtractedLicensingInfo:
     extracted_text: str
     cross_refs: List[str] = dataclasses.field(default_factory=list)
     see_also: List[str] = dataclasses.field(default_factory=list)
-    debug_hint: List[str] | None = None
+    debug_hint: Union[List[str], None] = None
 
     def to_json_dict(self):
         output = {
@@ -697,7 +699,7 @@ class SpdxDocumentBuilder:
     def create(
         root_package_name: str,
         creators: List[str],
-        root_package_homepage: str | None = None,
+        root_package_homepage: Union[str, None] = None,
     ) -> "SpdxDocumentBuilder":
         builder = SpdxDocumentBuilder(
             root_package_name=root_package_name,
@@ -712,7 +714,9 @@ class SpdxDocumentBuilder:
     def next_package_id(self) -> str:
         return self._package_id_factory.new_id()
 
-    def has_package(self, package_or_package_id: str | SpdxPackage) -> bool:
+    def has_package(
+        self, package_or_package_id: Union[str, SpdxPackage]
+    ) -> bool:
         package_id = (
             package_or_package_id
             if isinstance(package_or_package_id, str)
@@ -729,7 +733,7 @@ class SpdxDocumentBuilder:
         self._packages_by_id[package.spdx_id] = package
         self._describes.append(package.spdx_id)
 
-    def _add_root_package(self, name: str, homepage: str | None):
+    def _add_root_package(self, name: str, homepage: Union[str, None]):
         assert not self.root_package
         self.root_package = SpdxPackage(
             spdx_id=self._package_id_factory.new_id(),
