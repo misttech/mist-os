@@ -1309,6 +1309,81 @@ fn attempt_atomic_operation<T: 'static>(
     })
 }
 
+async fn serve_all_iface_functionality(
+    iface_manager: &mut IfaceManagerService,
+    requests: &mut atomic_oneshot_stream::AtomicOneshotStream<mpsc::Receiver<IfaceManagerRequest>>,
+    reconnect_monitor_interval: &mut i64,
+    connectivity_monitor_timer: &mut fasync::Interval,
+    operation_futures: &mut FuturesUnordered<BoxFuture<'static, IfaceManagerOperation>>,
+    defect_receiver: &mut mpsc::UnboundedReceiver<Defect>,
+    recovery_action_receiver: &mut recovery::RecoveryActionReceiver,
+) {
+    let mut atomic_iface_manager_requests = requests.get_atomic_oneshot_stream();
+    select! {
+        (token, req) = atomic_iface_manager_requests.select_next_some() => {
+            handle_iface_manager_request(
+                iface_manager,
+                operation_futures,
+                token,
+                req
+            ).await;
+        }
+        terminated_fsm = iface_manager.fsm_futures.select_next_some() => {
+            info!("state machine exited: {:?}", terminated_fsm.1);
+            handle_terminated_state_machine(
+                terminated_fsm.1,
+                iface_manager,
+            ).await;
+        },
+        () = connectivity_monitor_timer.select_next_some() => {
+            initiate_automatic_connection_selection(
+                iface_manager,
+            ).await;
+        },
+        op = operation_futures.select_next_some() => match op {
+            IfaceManagerOperation::SetCountry(previous_state) => {
+                restore_state_after_setting_country_code(
+                    iface_manager,
+                    previous_state
+                ).await;
+            },
+            IfaceManagerOperation::ConfigureStateMachine
+            | IfaceManagerOperation::ReportDefect
+            | IfaceManagerOperation::PerformRecovery => {},
+        },
+        connection_selection_result = iface_manager.connection_selection_futures.select_next_some() => {
+            match connection_selection_result {
+                // Automatic network selection
+                Ok(ConnectionSelectionResponse::Autoconnect(candidate)) => {
+                    handle_automatic_connection_selection_results(
+                        candidate,
+                        iface_manager,
+                        reconnect_monitor_interval,
+                        connectivity_monitor_timer
+                    ).await
+                },
+                // Specific network connect request
+                Ok(ConnectionSelectionResponse::ConnectRequest {candidate, request}) => {
+                    handle_connection_selection_for_connect_request_results(
+                        request,
+                        candidate,
+                        iface_manager,
+                    ).await;
+                }
+                Err(..) => {
+                    error!("Connection selector unexpectedly dropped response sender.")
+                }
+            }
+        },
+        defect = defect_receiver.select_next_some() => {
+            operation_futures.push(initiate_record_defect(iface_manager.phy_manager.clone(), defect))
+        },
+        action = recovery_action_receiver.select_next_some() => {
+            operation_futures.push(initiate_recovery(iface_manager.phy_manager.clone(), action))
+        },
+    }
+}
+
 pub(crate) async fn serve_iface_manager_requests(
     mut iface_manager: IfaceManagerService,
     requests: mpsc::Receiver<IfaceManagerRequest>,
@@ -1330,71 +1405,16 @@ pub(crate) async fn serve_iface_manager_requests(
         fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
 
     loop {
-        let mut atomic_iface_manager_requests = requests.get_atomic_oneshot_stream();
-
-        select! {
-            terminated_fsm = iface_manager.fsm_futures.select_next_some() => {
-                info!("state machine exited: {:?}", terminated_fsm.1);
-                handle_terminated_state_machine(
-                    terminated_fsm.1,
-                    &mut iface_manager,
-                ).await;
-            },
-            () = connectivity_monitor_timer.select_next_some() => {
-                initiate_automatic_connection_selection(
-                    &mut iface_manager,
-                ).await;
-            },
-            op = operation_futures.select_next_some() => match op {
-                IfaceManagerOperation::SetCountry(previous_state) => {
-                    restore_state_after_setting_country_code(
-                        &mut iface_manager,
-                        previous_state
-                    ).await;
-                },
-                IfaceManagerOperation::ConfigureStateMachine
-                | IfaceManagerOperation::ReportDefect
-                | IfaceManagerOperation::PerformRecovery => {},
-            },
-            connection_selection_result = iface_manager.connection_selection_futures.select_next_some() => {
-                match connection_selection_result {
-                    // Automatic network selection
-                    Ok(ConnectionSelectionResponse::Autoconnect(candidate)) => {
-                        handle_automatic_connection_selection_results(
-                            candidate,
-                            &mut iface_manager,
-                            &mut reconnect_monitor_interval,
-                            &mut connectivity_monitor_timer
-                        ).await
-                    },
-                    // Specific network connect request
-                    Ok(ConnectionSelectionResponse::ConnectRequest {candidate, request}) => {
-                        handle_connection_selection_for_connect_request_results(
-                            request,
-                            candidate,
-                            &mut iface_manager,
-                        ).await;
-                    }
-                    Err(..) => {
-                        error!("Connection selector unexpectedly dropped response sender.")
-                    }
-                }
-            },
-            defect = defect_receiver.select_next_some() => {
-                operation_futures.push(initiate_record_defect(iface_manager.phy_manager.clone(), defect))
-            },
-            action = recovery_action_receiver.select_next_some() => {
-                operation_futures.push(initiate_recovery(iface_manager.phy_manager.clone(), action))
-            },
-            (token, req) = atomic_iface_manager_requests.select_next_some() => {
-                handle_iface_manager_request(
-                    &mut iface_manager,
-                    &mut operation_futures,
-                    token,
-                    req
-                ).await;
-            }
-        }
+        serve_all_iface_functionality(
+            &mut iface_manager,
+            &mut requests,
+            &mut reconnect_monitor_interval,
+            &mut connectivity_monitor_timer,
+            &mut operation_futures,
+            &mut defect_receiver,
+            &mut recovery_action_receiver,
+        )
+        .await;
     }
 }
 
