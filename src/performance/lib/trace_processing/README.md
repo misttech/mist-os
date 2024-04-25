@@ -17,8 +17,7 @@ Binary module includes:
 How to use `run_cpu_breakdown`:
 1. `fx set` with the flag: `--with-host //src/performance/lib/trace_processing:run_cpu_breakdown`
 1. `fx build`
-1. Search your `/out` directory for your host (e.g. `host_x64`) and navigate to `/obj/src/performance/lib/trace_processing`. There should be a `run_cpu_breakdown.pyz` file.
-1. Run `run_cpu_breakdown.pyz <path to trace JSON>`
+1. `fx run_cpu_breakdown <path to trace JSON> <path to output>`
 
 How to run tests for `cpu_breakdown`:
 1. `fx set` with the flag: `--with-host //src/performance/lib:tests,//src/performance/lib/trace_processing:run_cpu_breakdown`
