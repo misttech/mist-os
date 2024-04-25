@@ -152,17 +152,20 @@ impl FfxMain for DeviceTool {
 
                 match self.cmd.subcommand {
                     SubCommand::Gain(gain_cmd) => gain_state.gain_db = Some(gain_cmd.gain),
-                    SubCommand::Mute(..) => gain_state.muted = Some(true),
-                    SubCommand::Unmute(..) => gain_state.muted = Some(false),
+                    SubCommand::Mute(_) => gain_state.muted = Some(true),
+                    SubCommand::Unmute(_) => gain_state.muted = Some(false),
                     SubCommand::Agc(agc_command) => {
                         gain_state.agc_enabled = Some(agc_command.enable)
                     }
-                    _ => {}
+                    _ => unreachable!(),
                 }
 
                 device_set_gain_state(self.device_controller, selector, gain_state).await
             }
-            SubCommand::Set(set_command) => {
+            SubCommand::Set(_)
+            | SubCommand::Start(_)
+            | SubCommand::Stop(_)
+            | SubCommand::Reset(_) => {
                 let device_control = connect::connect_device_control(
                     &self.dev_class,
                     self.control_creator.as_ref(),
@@ -170,29 +173,26 @@ impl FfxMain for DeviceTool {
                 )
                 .await?;
 
-                device_set(device_control, set_command, writer).await
-            }
-            SubCommand::Start(_) => {
-                let device_control = connect::connect_device_control(
-                    &self.dev_class,
-                    self.control_creator.as_ref(),
-                    selector,
-                )
-                .await?;
-
-                let start_time = device_control.start().await?;
-                writeln!(writer, "Started at {}.", start_time).bug_context("Failed to write result")
-            }
-            SubCommand::Stop(_) => {
-                let device_control = connect::connect_device_control(
-                    &self.dev_class,
-                    self.control_creator.as_ref(),
-                    selector,
-                )
-                .await?;
-
-                let stop_time = device_control.stop().await?;
-                writeln!(writer, "Stopped at {}.", stop_time).bug_context("Failed to write result")
+                match self.cmd.subcommand {
+                    SubCommand::Set(set_command) => {
+                        device_set(device_control, set_command, writer).await
+                    }
+                    SubCommand::Start(_) => {
+                        let start_time = device_control.start().await?;
+                        writeln!(writer, "Started at {}.", start_time)
+                            .bug_context("Failed to write result")
+                    }
+                    SubCommand::Stop(_) => {
+                        let stop_time = device_control.stop().await?;
+                        writeln!(writer, "Stopped at {}.", stop_time)
+                            .bug_context("Failed to write result")
+                    }
+                    SubCommand::Reset(_) => {
+                        device_control.reset().await?;
+                        writeln!(writer, "Reset device.").bug_context("Failed to write result")
+                    }
+                    _ => unreachable!(),
+                }
             }
         }
     }

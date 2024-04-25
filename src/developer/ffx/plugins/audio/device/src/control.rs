@@ -21,6 +21,8 @@ pub trait DeviceControl {
     async fn start(&self) -> fho::Result<zx_types::zx_time_t>;
 
     async fn stop(&self) -> fho::Result<zx_types::zx_time_t>;
+
+    async fn reset(&self) -> fho::Result<()>;
 }
 
 pub struct HardwareCodec(pub fhaudio::CodecProxy);
@@ -51,6 +53,11 @@ impl DeviceControl for HardwareCodec {
         let stop_time = self.0.stop().await.bug_context("Failed to call Stop")?;
         Ok(stop_time)
     }
+
+    async fn reset(&self) -> fho::Result<()> {
+        let _ = self.0.reset().await.bug_context("Failed to call Reset")?;
+        Ok(())
+    }
 }
 
 pub struct HardwareComposite(pub fhaudio::CompositeProxy);
@@ -79,6 +86,16 @@ impl DeviceControl for HardwareComposite {
     async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
         Err(user_error!("stop is not supported for Composite devices"))
     }
+
+    async fn reset(&self) -> fho::Result<()> {
+        let _ = self
+            .0
+            .reset()
+            .await
+            .bug_context("Failed to call Reset")?
+            .map_err(|err| user_error!("Failed to reset: {:?}", err))?;
+        Ok(())
+    }
 }
 
 pub struct HardwareDai(#[allow(unused)] pub fhaudio::DaiProxy);
@@ -99,6 +116,11 @@ impl DeviceControl for HardwareDai {
 
     async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
         Err(user_error!("stop is not supported for DAI devices"))
+    }
+
+    async fn reset(&self) -> fho::Result<()> {
+        let _ = self.0.reset().await.bug_context("Failed to call Reset")?;
+        Ok(())
     }
 }
 
@@ -121,6 +143,10 @@ impl DeviceControl for HardwareStreamConfig {
     async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
         Err(user_error!("stop is not supported for StreamConfig devices"))
     }
+
+    async fn reset(&self) -> fho::Result<()> {
+        Err(user_error!("reset is not supported for StreamConfig devices"))
+    }
 }
 
 pub struct Registry(pub fadevice::ControlProxy);
@@ -141,7 +167,7 @@ impl DeviceControl for Registry {
             })
             .await
             .bug_context("Failed to call SetDaiFormat")?
-            .map_err(|err| user_error!("failed to set DAI format: {:?}", err))?;
+            .map_err(|err| user_error!("Failed to set DAI format: {:?}", err))?;
         Ok(())
     }
 
@@ -151,7 +177,7 @@ impl DeviceControl for Registry {
             .codec_start()
             .await
             .bug_context("Failed to call CodecStart")?
-            .map_err(|err| user_error!("failed to start: {:?}", err))?;
+            .map_err(|err| user_error!("Failed to start: {:?}", err))?;
         let start_time = response
             .start_time
             .ok_or_else(|| bug!("CodecStart response is missing 'start_time'"))?;
@@ -164,10 +190,20 @@ impl DeviceControl for Registry {
             .codec_stop()
             .await
             .bug_context("Failed to call CodecStop")?
-            .map_err(|err| user_error!("failed to stop: {:?}", err))?;
+            .map_err(|err| user_error!("Failed to stop: {:?}", err))?;
         let stop_time =
             response.stop_time.ok_or_else(|| bug!("CodecStop response is missing 'stop_time'"))?;
         Ok(stop_time)
+    }
+
+    async fn reset(&self) -> fho::Result<()> {
+        let _ = self
+            .0
+            .reset()
+            .await
+            .bug_context("Failed to call Reset")?
+            .map_err(|err| user_error!("Failed to reset: {:?}", err))?;
+        Ok(())
     }
 }
 
@@ -216,6 +252,9 @@ mod tests {
                 fhaudio::CodecRequest::Stop { responder } => {
                     responder.send(TEST_CODEC_STOP_TIME).unwrap();
                 }
+                fhaudio::CodecRequest::Reset { responder } => {
+                    responder.send().unwrap();
+                }
                 _ => unimplemented!(),
             }
         })
@@ -232,6 +271,9 @@ mod tests {
                 } => {
                     responder.send(Ok(())).unwrap();
                 }
+                fhaudio::CompositeRequest::Reset { responder } => {
+                    responder.send(Ok(())).unwrap();
+                }
                 _ => unimplemented!(),
             }
         })
@@ -241,6 +283,9 @@ mod tests {
     fn serve_hw_dai() -> fhaudio::DaiProxy {
         spawn_stream_handler(move |request| async move {
             match request {
+                fhaudio::DaiRequest::Reset { responder } => {
+                    responder.send().unwrap();
+                }
                 _ => unimplemented!(),
             }
         })
@@ -336,6 +381,10 @@ mod tests {
                             }))
                             .unwrap();
                     }
+                    fadevice::ControlRequest::Reset { responder } => {
+                        *state.lock().unwrap() = FakeRegistryControlState::default();
+                        responder.send(Ok(&fadevice::ControlResetResponse::default())).unwrap();
+                    }
                     _ => unimplemented!(),
                 }
             }
@@ -404,5 +453,24 @@ mod tests {
         // Codec must be started before it is stopped.
         assert_matches!(registry.start().await, Ok(TEST_CODEC_START_TIME));
         assert_matches!(registry.stop().await, Ok(TEST_CODEC_STOP_TIME));
+    }
+
+    #[fuchsia::test]
+    async fn test_reset() {
+        let codec: Box<dyn DeviceControl> = Box::new(HardwareCodec(serve_hw_codec()));
+        assert!(codec.reset().await.is_ok());
+
+        let composite: Box<dyn DeviceControl> = Box::new(HardwareComposite(serve_hw_composite()));
+        assert!(composite.reset().await.is_ok());
+
+        let dai: Box<dyn DeviceControl> = Box::new(HardwareDai(serve_hw_dai()));
+        assert!(dai.reset().await.is_ok());
+
+        let streamconfig: Box<dyn DeviceControl> =
+            Box::new(HardwareStreamConfig(serve_hw_streamconfig()));
+        assert!(streamconfig.reset().await.is_err());
+
+        let registry: Box<dyn DeviceControl> = Box::new(Registry(serve_registry_control()));
+        assert!(registry.reset().await.is_ok());
     }
 }

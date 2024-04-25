@@ -100,6 +100,7 @@ pub enum SubCommand {
     Set(SetCommand),
     Start(StartCommand),
     Stop(StopCommand),
+    Reset(ResetCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -268,6 +269,10 @@ pub struct StartCommand {}
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "stop", description = "Stop device hardware.")]
 pub struct StopCommand {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "reset", description = "Reset device hardware.")]
+pub struct ResetCommand {}
 
 fn string_to_enable(value: &str) -> Result<bool, String> {
     if value == "on" {
