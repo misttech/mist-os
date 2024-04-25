@@ -3482,7 +3482,7 @@ template("executable") {
         },
       ]
 
-      if (is_fuchsia) {
+      if (is_fuchsia || is_mistos) {
         if (!is_kernel) {
           # Used by the distribution_manifest() template.
           if (!defined(distribution_entries)) {
