@@ -21,7 +21,7 @@ zx::result<> BindPropertyVisitor::Visit(Node& node, const devicetree::PropertyDe
   auto property = node.properties().find(kCompatibleProp);
   if (property == node.properties().end()) {
     // TODO(https://fxbug.dev/42058369): support extra "bind,..." properties as bind properties.
-    FDF_LOG(DEBUG, "Node '%s' has no properties.", node.name().data());
+    FDF_LOG(DEBUG, "Node '%s' has no compatible property.", node.name().data());
     return zx::ok();
   }
 
@@ -38,7 +38,7 @@ zx::result<> BindPropertyVisitor::Visit(Node& node, const devicetree::PropertyDe
           std::string(*property->second.AsStringList()->begin())));
 
   FDF_LOG(DEBUG, "Added property %s to node '%s'", property->second.AsString()->data(),
-          node.name().data());
+          node.name().c_str());
   node.AddBindProperty(std::move(prop));
 
   return zx::ok();

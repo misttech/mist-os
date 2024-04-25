@@ -24,7 +24,7 @@
 namespace i2c_bus_dt {
 
 bool I2cBusVisitor::is_match(fdf_devicetree::Node& node) {
-  if (node.name().find("i2c-") == std::string::npos) {
+  if (node.name().find("i2c@") == std::string::npos) {
     return false;
   }
 

@@ -53,7 +53,7 @@ zx::result<> BootMetadataVisitor::Visit(Node& node, const devicetree::PropertyDe
         .zbi_extra = boot_metadata_array[index].zbi_extra(),
     }};
     FDF_LOG(DEBUG, "Boot metadata (0x%0x, 0x%0x) added to node '%s'.", *metadata.zbi_type(),
-            *metadata.zbi_extra(), node.name().data());
+            *metadata.zbi_extra(), node.name().c_str());
     node.AddBootMetadata(metadata);
   }
 

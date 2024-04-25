@@ -37,13 +37,15 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
     name_ = "dt-root";
   }
 
+  fdf_name_ = name_;
+  // '@' and ',' are not a valid character in Node names as per driver framework.
+  std::replace(fdf_name_.begin(), fdf_name_.end(), '@', '-');
+  std::replace(fdf_name_.begin(), fdf_name_.end(), ',', '-');
+
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;
   pbus_node_.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   pbus_node_.instance_id() = id;
-  // '@' and ',' are not a valid character in Node names as per driver framework.
-  std::replace(name_.begin(), name_.end(), '@', '-');
-  std::replace(name_.begin(), name_.end(), ',', '-');
-  pbus_node_.name() = name_;
+  pbus_node_.name() = fdf_name_;
 
   for (auto property : properties) {
     properties_.emplace(property.name, property.value);
@@ -147,7 +149,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
   bool add_non_platform_device = !add_platform_device_ && !node_properties_.empty();
 
   if (add_platform_device_) {
-    FDF_LOG(DEBUG, "Adding node '%s' to pbus with instance id %d.", name().c_str(), id_);
+    FDF_LOG(DEBUG, "Adding node '%s' to pbus with instance id %d.", fdf_name().c_str(), id_);
 
     // Pass properties to pbus node directly if we are not adding a composite spec.
     if (!composite_) {
@@ -166,9 +168,9 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
       return zx::error(result->error_value());
     }
   } else if (add_non_platform_device) {
-    FDF_LOG(DEBUG, "Adding node '%s' as board driver child.", name().c_str());
+    FDF_LOG(DEBUG, "Adding node '%s' as board driver child.", fdf_name().c_str());
     fuchsia_driver_framework::NodeAddArgs node_add_args;
-    node_add_args.name() = name();
+    node_add_args.name() = fdf_name();
 
     node_add_args.properties() = node_properties_;
 
@@ -224,11 +226,11 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
       parents_.insert(parents_.begin(), std::move(non_pbus_node));
     }
 
-    FDF_LOG(DEBUG, "Adding composite node spec to '%.*s' with %zu parents.",
-            static_cast<int>(name().size()), name().data(), parents_.size());
+    FDF_LOG(DEBUG, "Adding composite node spec to '%s' with %zu parents.", fdf_name().data(),
+            parents_.size());
 
     fdf::CompositeNodeSpec group;
-    group.name() = name() + "_group";
+    group.name() = fdf_name() + "_group";
     group.parents() = std::move(parents_);
 
     auto devicegroup_result = mgr->AddSpec({std::move(group)});

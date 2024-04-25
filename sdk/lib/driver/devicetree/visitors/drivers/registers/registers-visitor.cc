@@ -133,7 +133,7 @@ zx::result<> RegistersVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
     bind_rules.emplace_back(fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, *register_name));
     bind_properties.emplace_back(fdf::MakeProperty(bind_fuchsia_register::NAME, *register_name));
   } else {
-    bind_rules.emplace_back(fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, child.name()));
+    bind_rules.emplace_back(fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, child.fdf_name()));
   }
 
   auto register_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
@@ -172,7 +172,7 @@ zx::result<> RegistersVisitor::ParseRegisterChild(fdf_devicetree::Node& child,
   }
 
   // Check if a register for the name already exists.
-  std::string name = register_name.value_or(child.name());
+  std::string name = register_name.value_or(child.fdf_name());
   auto register_it = controller.registers.find(name);
   RegistersMetadataEntry register_entry =
       register_it != controller.registers.end() ? register_it->second : RegistersMetadataEntry();

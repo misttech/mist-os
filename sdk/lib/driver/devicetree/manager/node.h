@@ -61,6 +61,7 @@ class Node {
                        fidl::SyncClient<fuchsia_driver_framework::Node>& fdf_node);
 
   const std::string& name() const { return name_; }
+  const std::string& fdf_name() const { return fdf_name_; }
 
   ParentNode parent() const;
 
@@ -79,6 +80,7 @@ class Node {
  private:
   Node* parent_;
   std::string name_;
+  std::string fdf_name_;
   std::unordered_map<std::string_view, devicetree::PropertyValue> properties_;
   std::optional<Phandle> phandle_;
   std::vector<Node*> children_;
@@ -118,6 +120,7 @@ class ReferenceNode {
   }
 
   const std::string& name() const { return node_->name(); }
+  const std::string& fdf_name() const { return node_->fdf_name(); }
 
   uint32_t id() const { return node_->id(); }
 
@@ -136,6 +139,7 @@ class ParentNode {
   explicit ParentNode(Node* node) : node_(node) {}
 
   const std::string& name() const { return node_->name(); }
+  const std::string& fdf_name() const { return node_->fdf_name(); }
 
   uint32_t id() const { return node_->id(); }
 
@@ -158,6 +162,7 @@ class ChildNode {
   explicit ChildNode(Node* node) : node_(node) {}
 
   const std::string& name() const { return node_->name(); }
+  const std::string& fdf_name() const { return node_->fdf_name(); }
 
   uint32_t id() const { return node_->id(); }
 
