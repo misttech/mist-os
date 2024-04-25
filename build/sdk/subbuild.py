@@ -5,17 +5,18 @@
 """Build an sdk_collection target for a particular target_cpu and api_level."""
 
 import argparse
-import collections
-import json
+import logging
 import multiprocessing
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 import time
+
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
+
+logger = logging.getLogger("subbuild.py")
 
 _ARGS_GN_TEMPLATE = r"""# Auto-generated - DO NOT EDIT
 target_cpu = "{cpu}"
@@ -56,17 +57,6 @@ def get_host_tag() -> str:
     return "%s-%s" % (get_host_platform(), get_host_arch())
 
 
-def log(msg: str):
-    """Print log message to stderr."""
-    print("LOG: " + msg, file=sys.stderr)
-
-
-def error(msg: str) -> int:
-    """Print error message to stderr, then return 1."""
-    print("ERROR: " + msg, file=sys.stderr)
-    return 1
-
-
 def write_file_if_changed(path: Path, content: str) -> bool:
     """Write |content| into |path| if needed. Return True on write."""
     if path.exists() and path.read_text() == content:
@@ -100,7 +90,7 @@ def run_command(args: List, cwd=None, env=None):
     Returns:
         a subprocess.run() result value.
     """
-    log("RUN: " + command_args_to_string(args, env))
+    logger.info("RUN: " + command_args_to_string(args, env))
     start_time = time.time()
     if env is not None:
         new_vars = env
@@ -109,7 +99,7 @@ def run_command(args: List, cwd=None, env=None):
             env[name] = value
     result = subprocess.run([str(a) for a in args], cwd=cwd, env=env)
     end_time = time.time()
-    log("DURATION: %.1fs" % (end_time - start_time))
+    logger.info("DURATION: %.1fs" % (end_time - start_time))
     return result
 
 
@@ -133,7 +123,7 @@ def run_checked_command(args: List, cwd=None, env=None):
         return True
 
     args_str = command_args_to_string(args, env)
-    print(f"ERROR: When running command: {args_str}\n", file=sys.stderr)
+    logger.error(f"When running command: {args_str}\n")
     return True
 
 
@@ -209,8 +199,15 @@ def main():
     parser.add_argument(
         "--clean", action="store_true", help="Force clean build."
     )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Print more information."
+    )
 
     args = parser.parse_args()
+
+    logging.basicConfig(
+        stream=sys.stderr, level=logging.INFO if args.verbose else logging.WARN
+    )
 
     fuchsia_dir = Path(args.fuchsia_dir)
 
@@ -222,13 +219,19 @@ def main():
 
     gn_path = fuchsia_dir / "prebuilt" / "third_party" / "gn" / host_tag / "gn"
     if not gn_path.exists():
-        return error(f"Missing gn prebuilt binary: {gn_path}")
+        logger.error(f"Missing gn prebuilt binary: {gn_path}")
+        return 1
 
     ninja_path = (
         fuchsia_dir / "prebuilt" / "third_party" / "ninja" / host_tag / "ninja"
     )
     if not ninja_path.exists():
-        return error(f"Missing ninja prebuilt binary: {ninja_path}")
+        logger.error(f"Missing ninja prebuilt binary: {ninja_path}")
+        return 1
+
+    ninja_cmd_prefix = [ninja_path]
+    if not args.verbose:
+        ninja_cmd_prefix.append("--quiet")
 
     def sdk_label_partition(target_label: str) -> Tuple[str, str]:
         """Split an SDK GN label into a (dir, name) pair."""
@@ -254,11 +257,13 @@ def main():
 
     build_dir = Path(args.output_build_dir)
     build_dir.mkdir(exist_ok=True, parents=True)
-    log(f"{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}")
+    logger.info(
+        f"{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}"
+    )
 
     if args.clean and build_dir.exists():
-        log(f"{build_dir}: Cleaning build directory")
-        run_command([ninja_path, "-C", build_dir, "-t", "clean"])
+        logger.info(f"{build_dir}: Cleaning build directory")
+        run_command([*ninja_cmd_prefix, "-C", build_dir, "-t", "clean"])
 
     args_gn_content = _ARGS_GN_TEMPLATE.format(
         cpu=target_cpu,
@@ -299,7 +304,7 @@ def main():
 
     args_gn_content += f"override_target_api_level = {gn_api_level}\n"
 
-    log(f"{build_dir}: args.gn content:\n{args_gn_content}")
+    logger.info(f"{build_dir}: args.gn content:\n{args_gn_content}")
     if (
         write_file_if_changed(build_dir / "args.gn", args_gn_content)
         or not (build_dir / "build.ninja").exists()
@@ -326,7 +331,7 @@ def main():
 
     if run_checked_command(
         [
-            ninja_path,
+            *ninja_cmd_prefix,
             "-C",
             build_dir,
             "-j",

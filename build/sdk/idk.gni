@@ -74,6 +74,9 @@ template("_subbuild") {
         "${sdk_sub_build_max_load_average}",
       ]
     }
+    if (sdk_sub_build_verbose) {
+      args += [ "--verbose" ]
+    }
 
     if (cxx_rbe_enable) {
       args += [ "--cxx-rbe-enable" ]
