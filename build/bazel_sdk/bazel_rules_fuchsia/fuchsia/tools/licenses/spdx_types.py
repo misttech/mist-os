@@ -139,12 +139,7 @@ class SpdxPackage:
             # TODO(b/316188315): Remove once fixed upstream.
             name = name[len("third_party/") :]
 
-        try:
-            debug_hint = input.get_string_list("_hint") or None
-        except LicenseException:
-            # TODO(fxr/1035255): GN pipeline may produce hints that
-            # are strings. Remove once fxr/1035255 lands.
-            debug_hint = None
+        debug_hint = input.get_string_list("_hint")
 
         return SpdxPackage(
             spdx_id=input.get("SPDXID"),
@@ -227,12 +222,7 @@ class SpdxExtractedLicensingInfo:
 
         extracted_text = input.get("extractedText")
 
-        try:
-            debug_hint = input.get_string_list("_hint") or None
-        except LicenseException:
-            # TODO(fxr/1035255): GN pipeline may produce hints that
-            # are strings. Remove once fxr/1035255 lands.
-            debug_hint = None
+        debug_hint = input.get_string_list("_hint")
 
         return SpdxExtractedLicensingInfo(
             license_id=license_id,

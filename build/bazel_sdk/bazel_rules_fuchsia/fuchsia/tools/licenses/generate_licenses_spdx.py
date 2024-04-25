@@ -43,8 +43,15 @@ def _create_doc_from_licenses_used_json(
     assert "licenses" in licenses_used_dict
     json_list = licenses_used_dict["licenses"]
 
-    # Sort the list to make execution more deterministic.
-    json_list = sorted(json_list, key=lambda d: d["package_name"])
+    # Sort the licenses list to ensure deterministic output.
+    json_list = sorted(
+        json_list,
+        key=lambda d: (
+            d.get("package_name", None),
+            d.get("license_text", None),
+            d.get("package_url", None),
+        ),
+    )
 
     doc_builder: SpdxDocumentBuilder = SpdxDocumentBuilder.create(
         root_package_name=root_package_name,

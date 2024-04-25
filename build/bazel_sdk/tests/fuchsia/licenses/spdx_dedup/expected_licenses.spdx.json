@@ -21,12 +21,12 @@
         {
             "SPDXID": "SPDXRef-Package-1",
             "name": "license bar",
-            "licenseConcluded": "LicenseRef-0839dfb2a0be0df9ab64ee38eedfb053"
+            "licenseConcluded": "LicenseRef-ea07f3176348d446c17a1a8d2b831105"
         },
         {
             "SPDXID": "SPDXRef-Package-2",
             "name": "license bar",
-            "licenseConcluded": "LicenseRef-ea07f3176348d446c17a1a8d2b831105"
+            "licenseConcluded": "LicenseRef-0839dfb2a0be0df9ab64ee38eedfb053"
         },
         {
             "SPDXID": "SPDXRef-Package-3",
