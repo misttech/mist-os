@@ -10,9 +10,9 @@
 std::optional<uint32_t> GetGpuVendorId() {
   static std::optional<uint32_t> gpu_vendor_id = ([]() {
     auto c = config::Config::TakeFromStartupHandle();
-    std::string vendor_id_string = c.gpu_vendor_id();
-    if (!vendor_id_string.empty()) {
-      return std::optional<uint32_t>{strtol(vendor_id_string.c_str(), nullptr, 0)};
+    uint32_t vendor_id_int = c.gpu_vendor_id();
+    if (vendor_id_int != 0) {
+      return std::optional<uint32_t>{vendor_id_int};
     }
     return std::optional<uint32_t>{};
   })();

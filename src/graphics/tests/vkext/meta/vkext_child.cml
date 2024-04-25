@@ -16,8 +16,7 @@
             config: "fuchsia.gpu.test.GpuVendorId",
             key: "gpu_vendor_id",
             availability: "transitional",
-            type: "string",
-            max_size: 128,
+            type: "uint32",
         },
         {
             from: "parent",
@@ -55,10 +54,7 @@
         },
     ],
     config: {
-        gpu_vendor_id: {
-            type: "string",
-            max_size: 128,
-        },
+        gpu_vendor_id: { type: "uint32" },
         support_sysmem_yuv: { type: "bool" },
         support_sysmem_renderable_linear: { type: "bool" },
         support_sysmem_linear_nonrgba: { type: "bool" },
