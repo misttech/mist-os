@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use crate::DecodeError;
-
 /// A type that implements `Emitable` can be serialized.
 pub trait Emitable {
     /// Return the length of the serialized data.
@@ -26,8 +24,10 @@ where
     Self: Sized,
     T: ?Sized,
 {
+    type Error;
+
     /// Deserialize the current type.
-    fn parse(buf: &T) -> Result<Self, DecodeError>;
+    fn parse(buf: &T) -> Result<Self, Self::Error>;
 }
 
 /// A `Parseable` type can be used to deserialize data from the type `T` for
@@ -37,6 +37,8 @@ where
     Self: Sized,
     T: ?Sized,
 {
+    type Error;
+
     /// Deserialize the current type.
-    fn parse_with_param(buf: &T, params: P) -> Result<Self, DecodeError>;
+    fn parse_with_param(buf: &T, params: P) -> Result<Self, Self::Error>;
 }

@@ -8557,6 +8557,7 @@ rust_library("netlink-packet-route-v0_20_0") {
   deps += [ ":bitflags-v2_4_1" ]
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":log-v0_4_20" ]
+  deps += [ ":thiserror-v1_0_57" ]
 
   rustenv = []
 

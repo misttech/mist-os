@@ -12,8 +12,7 @@ No.
 
 # What differs from upstream?
 
-Currently nothing, this has been moved to forks
-in preparation for making changes.
+Imported pull request: https://github.com/rust-netlink/netlink-packet-utils/pull/13
 
 # Are there any restrictions to how it should be rolled?
 

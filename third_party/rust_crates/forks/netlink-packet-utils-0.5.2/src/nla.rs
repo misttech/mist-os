@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-use core::ops::Range;
-
-use anyhow::Context;
-use byteorder::{ByteOrder, NativeEndian};
-
 use crate::{
     traits::{Emitable, Parseable},
     DecodeError,
 };
+use byteorder::{ByteOrder, NativeEndian};
+use core::ops::Range;
+use thiserror::Error;
 
 /// Represent a multi-bytes field with a fixed size in a packet
 type Field = Range<usize>;
@@ -24,6 +22,20 @@ pub const NLA_TYPE_MASK: u16 = !(NLA_F_NET_BYTEORDER | NLA_F_NESTED);
 pub const NLA_ALIGNTO: usize = 4;
 /// NlA(RTA) header size. (unsigned short rta_len) + (unsigned short rta_type)
 pub const NLA_HEADER_SIZE: usize = 4;
+
+#[derive(Debug, Error)]
+pub enum NlaError {
+    #[error("buffer has length {buffer_len}, but an NLA header is {} bytes", TYPE.end)]
+    BufferTooSmall { buffer_len: usize },
+
+    #[error("buffer has length: {buffer_len}, but the NLA is {nla_len} bytes")]
+    LengthMismatch { buffer_len: usize, nla_len: u16 },
+
+    #[error(
+        "NLA has invalid length: {nla_len} (should be at least {} bytes", TYPE.end
+    )]
+    InvalidLength { nla_len: u16 },
+}
 
 #[macro_export]
 macro_rules! nla_align {
@@ -52,33 +64,26 @@ impl<T: AsRef<[u8]>> NlaBuffer<T> {
         NlaBuffer { buffer }
     }
 
-    pub fn new_checked(buffer: T) -> Result<NlaBuffer<T>, DecodeError> {
+    pub fn new_checked(buffer: T) -> Result<NlaBuffer<T>, NlaError> {
         let buffer = Self::new(buffer);
-        buffer.check_buffer_length().context("invalid NLA buffer")?;
+        buffer.check_buffer_length()?;
         Ok(buffer)
     }
 
-    pub fn check_buffer_length(&self) -> Result<(), DecodeError> {
+    pub fn check_buffer_length(&self) -> Result<(), NlaError> {
         let len = self.buffer.as_ref().len();
         if len < TYPE.end {
-            Err(format!(
-                "buffer has length {}, but an NLA header is {} bytes",
-                len, TYPE.end
-            )
-            .into())
+            Err(NlaError::BufferTooSmall { buffer_len: len }.into())
         } else if len < self.length() as usize {
-            Err(format!(
-                "buffer has length: {}, but the NLA is {} bytes",
-                len,
-                self.length()
-            )
+            Err(NlaError::LengthMismatch {
+                buffer_len: len,
+                nla_len: self.length(),
+            }
             .into())
         } else if (self.length() as usize) < TYPE.end {
-            Err(format!(
-                "NLA has invalid length: {} (should be at least {} bytes",
-                self.length(),
-                TYPE.end,
-            )
+            Err(NlaError::InvalidLength {
+                nla_len: self.length(),
+            }
             .into())
         } else {
             Ok(())
@@ -204,7 +209,9 @@ impl Nla for DefaultNla {
 impl<'buffer, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'buffer T>>
     for DefaultNla
 {
-    fn parse(buf: &NlaBuffer<&'buffer T>) -> Result<Self, DecodeError> {
+    type Error = DecodeError;
+
+    fn parse(buf: &NlaBuffer<&'buffer T>) -> Result<Self, Self::Error> {
         let mut kind = buf.kind();
 
         if buf.network_byte_order_flag() {
@@ -314,7 +321,7 @@ impl<T> NlasIterator<T> {
 impl<'buffer, T: AsRef<[u8]> + ?Sized + 'buffer> Iterator
     for NlasIterator<&'buffer T>
 {
-    type Item = Result<NlaBuffer<&'buffer [u8]>, DecodeError>;
+    type Item = Result<NlaBuffer<&'buffer [u8]>, NlaError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.position >= self.buffer.as_ref().len() {
