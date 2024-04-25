@@ -127,7 +127,7 @@ impl<T: std::borrow::Borrow<InfraBss>> BssOptionExt<T> for Option<T> {
     }
 }
 
-impl<D: DeviceOps + Send> crate::MlmeImpl for Ap<D> {
+impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     type Config = Bssid;
     type Device = D;
     type TimerEvent = TimedEvent;

@@ -7,12 +7,9 @@
 use {
     diagnostics_log::PublishOptions,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_async::SendExecutor,
+    fuchsia_async::LocalExecutor,
     fuchsia_zircon as zx,
-    std::{
-        ffi::c_void,
-        sync::{atomic::AtomicPtr, Once},
-    },
+    std::{ffi::c_void, sync::Once},
     tracing::error,
     wlan_mlme::{
         buffer::CBufferProvider,
@@ -73,6 +70,8 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     buffer_provider: CBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
+    let mut executor = LocalExecutor::new();
+
     // The Fuchsia syslog must not be initialized from Rust more than once per process. In the case
     // of MLME, that means we can only call it once for both the client and ap modules. Ensure this
     // by using a shared `Once::call_once()`.
@@ -90,22 +89,12 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         // is a valid handle.
         let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_client_handle) };
         let channel = fidl::Channel::from(handle);
-        fidl_softmac::WlanSoftmacBridgeSynchronousProxy::new(channel)
+        let channel = fidl::AsyncChannel::from_channel(channel);
+        fidl_softmac::WlanSoftmacBridgeProxy::new(channel)
     };
     let device = Device::new(device.into(), wlan_softmac_bridge_proxy, frame_sender.into());
 
-    // The `AtomicPtr` type wraps the pointer so that `init_completer` implements
-    // `Send` and `Sync`. Note that `AtomicPtr` only wraps the pointer and
-    // dereferencing the pointer is still unsafe. However, Rust code cannot
-    // meaningfully dereference a `*mut c_void` and the FFI contract supports sending
-    // the `*mut c_void` between threads. Thus, wrapping this field so that it
-    // implements `Send` and `Sync` is safe.
-    let init_completer = AtomicPtr::new(init_completer);
-
-    // Use two worker threads so the `Task` serving SME and MLME can synchronously block without
-    // blocking the `Task` for sending new `DriverEvent` values to the `DriverEventSink`.
-    let mut executor = SendExecutor::new(2);
-    let result = executor.run(wlansoftmac_rust::start_and_serve(
+    let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
         move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
             Ok(handle) => {
                 // Safety: This is safe because the caller of this function promised
@@ -113,7 +102,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
                 // its called.
                 unsafe {
                     run_init_completer(
-                        init_completer.into_inner(),
+                        init_completer,
                         zx::Status::OK.into_raw(),
                         Box::into_raw(Box::new(handle)),
                     );
@@ -124,11 +113,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
                 // `run_init_completer` is thread-safe and `init_completer` is valid until
                 // its called.
                 unsafe {
-                    run_init_completer(
-                        init_completer.into_inner(),
-                        status.into_raw(),
-                        std::ptr::null_mut(),
-                    );
+                    run_init_completer(init_completer, status.into_raw(), std::ptr::null_mut());
                 }
             }
         },
@@ -188,16 +173,9 @@ pub unsafe extern "C" fn stop_bridged_wlansoftmac(
     // Safety: The caller promises `softmac` is a `WlanSoftmacHandle`.
     let softmac = unsafe { Box::from_raw(softmac) };
 
-    // The `AtomicPtr` type wraps the pointer so that `stop_completer` implements
-    // `Send` and `Sync`. Note that `AtomicPtr` only wraps the pointer and
-    // dereferencing the pointer is still unsafe. However, Rust code cannot
-    // meaningfully dereference a `*mut c_void` and the FFI contract supports sending
-    // the `*mut c_void` between threads. Thus, wrapping this field so that it
-    // implements `Send` and `Sync` is safe.
-    let stop_completer = AtomicPtr::new(stop_completer);
     softmac.stop(StopCompleter::new(Box::new(move ||
                      // Safety: This is safe because the caller of this function promised
                      // `run_stop_completer` is thread-safe and `stop_completer` is valid until its
                      // called.
-                     unsafe { run_stop_completer(stop_completer.into_inner()) })));
+                     unsafe { run_stop_completer(stop_completer) })));
 }

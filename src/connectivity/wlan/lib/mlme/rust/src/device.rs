@@ -11,13 +11,7 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::{channel::mpsc, Future},
     ieee80211::MacAddr,
-    std::{
-        ffi::c_void,
-        fmt::Display,
-        marker::PhantomPinned,
-        pin::Pin,
-        sync::{atomic::AtomicPtr, Arc},
-    },
+    std::{ffi::c_void, fmt::Display, marker::PhantomPinned, pin::Pin, sync::Arc},
     trace::Id as TraceId,
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
@@ -30,14 +24,14 @@ pub mod completers {
 
     pub struct InitCompleter<F>
     where
-        F: FnOnce(Result<(), zx::Status>) + Send,
+        F: FnOnce(Result<(), zx::Status>),
     {
         completer: Option<F>,
     }
 
     impl<F> InitCompleter<F>
     where
-        F: FnOnce(Result<(), zx::Status>) + Send,
+        F: FnOnce(Result<(), zx::Status>),
     {
         pub fn new(completer: F) -> Self {
             Self { completer: Some(completer) }
@@ -57,7 +51,7 @@ pub mod completers {
 
     impl<F> Drop for InitCompleter<F>
     where
-        F: FnOnce(Result<(), zx::Status>) + Send,
+        F: FnOnce(Result<(), zx::Status>),
     {
         fn drop(&mut self) {
             if let Some(completer) = self.completer.take() {
@@ -74,11 +68,11 @@ pub mod completers {
         // TODO(42075638): Using dynamic dispatch since otherwise we would need to plumb generics
         // everywhere MLME uses a DriverEventSink. Since we will remove DriverEventSink soon, this
         // is not worthwhile.
-        completer: Option<Box<dyn FnOnce() + Send>>,
+        completer: Option<Box<dyn FnOnce()>>,
     }
 
     impl StopCompleter {
-        pub fn new(completer: Box<dyn FnOnce() + Send>) -> Self {
+        pub fn new(completer: Box<dyn FnOnce()>) -> Self {
             Self { completer: Some(completer) }
         }
 
@@ -185,7 +179,7 @@ pub struct Device {
     raw_device: DeviceInterface,
     frame_processor: Option<Pin<Box<FrameProcessor>>>,
     frame_sender: FrameSender,
-    wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
+    wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeProxy,
     minstrel: Option<crate::MinstrelWrapper>,
     event_receiver: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
     event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
@@ -194,7 +188,7 @@ pub struct Device {
 impl Device {
     pub fn new(
         raw_device: DeviceInterface,
-        wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
+        wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeProxy,
         frame_sender: FrameSender,
     ) -> Device {
         let (event_sink, event_receiver) = mpsc::unbounded();
@@ -239,19 +233,19 @@ pub trait DeviceOps {
     ) -> Result<zx::Handle, zx::Status>;
     fn wlan_softmac_query_response(
         &mut self,
-    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>> + Send;
+    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>>;
     fn discovery_support(
         &mut self,
-    ) -> impl Future<Output = Result<fidl_common::DiscoverySupport, zx::Status>> + Send;
+    ) -> impl Future<Output = Result<fidl_common::DiscoverySupport, zx::Status>>;
     fn mac_sublayer_support(
         &mut self,
-    ) -> impl Future<Output = Result<fidl_common::MacSublayerSupport, zx::Status>> + Send;
+    ) -> impl Future<Output = Result<fidl_common::MacSublayerSupport, zx::Status>>;
     fn security_support(
         &mut self,
-    ) -> impl Future<Output = Result<fidl_common::SecuritySupport, zx::Status>> + Send;
+    ) -> impl Future<Output = Result<fidl_common::SecuritySupport, zx::Status>>;
     fn spectrum_management_support(
         &mut self,
-    ) -> impl Future<Output = Result<fidl_common::SpectrumManagementSupport, zx::Status>> + Send;
+    ) -> impl Future<Output = Result<fidl_common::SpectrumManagementSupport, zx::Status>>;
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
     /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
     /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
@@ -272,43 +266,40 @@ pub trait DeviceOps {
     fn set_channel(
         &mut self,
         channel: fidl_common::WlanChannel,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn start_passive_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
-    ) -> impl Future<
-        Output = Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status>,
-    > + Send;
+    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status>>;
     fn start_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
-    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status>>
-           + Send;
+    ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status>>;
     fn cancel_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn join_bss(
         &mut self,
         request: &fidl_common::JoinBssRequest,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn enable_beaconing(
         &mut self,
         request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
-    fn disable_beaconing(&mut self) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
+    fn disable_beaconing(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
     fn install_key(
         &mut self,
         key_configuration: &fidl_softmac::WlanKeyConfiguration,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn notify_association_complete(
         &mut self,
         assoc_cfg: fidl_softmac::WlanAssociationConfig,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn clear_association(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn update_wmm_parameters(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
@@ -424,7 +415,7 @@ impl DeviceOps for Device {
         // `FrameProcessor::to_c_binding`.
         let status = unsafe {
             (self.raw_device.start)(
-                *self.raw_device.device.get_mut(),
+                self.raw_device.device,
                 wlan_softmac_ifc_bridge_client_handle,
                 &frame_processor,
                 &mut out_channel as *mut u32,
@@ -441,16 +432,13 @@ impl DeviceOps for Device {
     async fn wlan_softmac_query_response(
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
-        Self::flatten_and_log_error(
-            "Query",
-            self.wlan_softmac_bridge_proxy.query(zx::Time::INFINITE),
-        )
+        Self::flatten_and_log_error("Query", self.wlan_softmac_bridge_proxy.query().await)
     }
 
     async fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
         Self::flatten_and_log_error(
             "QueryDiscoverySupport",
-            self.wlan_softmac_bridge_proxy.query_discovery_support(zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.query_discovery_support().await,
         )
     }
 
@@ -459,14 +447,14 @@ impl DeviceOps for Device {
     ) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
         Self::flatten_and_log_error(
             "QueryMacSublayerSupport",
-            self.wlan_softmac_bridge_proxy.query_mac_sublayer_support(zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.query_mac_sublayer_support().await,
         )
     }
 
     async fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
         Self::flatten_and_log_error(
             "QuerySecuritySupport",
-            self.wlan_softmac_bridge_proxy.query_security_support(zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.query_security_support().await,
         )
     }
 
@@ -475,7 +463,7 @@ impl DeviceOps for Device {
     ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
         Self::flatten_and_log_error(
             "QuerySpectrumManagementSupport",
-            self.wlan_softmac_bridge_proxy.query_spectrum_management_support(zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.query_spectrum_management_support().await,
         )
     }
 
@@ -545,18 +533,16 @@ impl DeviceOps for Device {
     }
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.set_ethernet_status)(*self.raw_device.device.get_mut(), status.0))
+        zx::ok((self.raw_device.set_ethernet_status)(self.raw_device.device, status.0))
     }
 
     async fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
-            .set_channel(
-                &fidl_softmac::WlanSoftmacBaseSetChannelRequest {
-                    channel: Some(channel),
-                    ..Default::default()
-                },
-                zx::Time::INFINITE,
-            )
+            .set_channel(&fidl_softmac::WlanSoftmacBaseSetChannelRequest {
+                channel: Some(channel),
+                ..Default::default()
+            })
+            .await
             .map_err(|error| {
                 error!("SetChannel failed with FIDL error: {:?}", error);
                 zx::Status::INTERNAL
@@ -570,7 +556,7 @@ impl DeviceOps for Device {
     ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status> {
         Self::flatten_and_log_error(
             "StartPassiveScan",
-            self.wlan_softmac_bridge_proxy.start_passive_scan(request, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.start_passive_scan(request).await,
         )
     }
 
@@ -580,7 +566,7 @@ impl DeviceOps for Device {
     ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status> {
         Self::flatten_and_log_error(
             "StartActiveScan",
-            self.wlan_softmac_bridge_proxy.start_active_scan(request, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.start_active_scan(request).await,
         )
     }
 
@@ -590,14 +576,14 @@ impl DeviceOps for Device {
     ) -> Result<(), zx::Status> {
         Self::flatten_and_log_error(
             "CancelScan",
-            self.wlan_softmac_bridge_proxy.cancel_scan(request, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.cancel_scan(request).await,
         )
     }
 
     async fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
         Self::flatten_and_log_error(
             "JoinBss",
-            self.wlan_softmac_bridge_proxy.join_bss(request, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.join_bss(request).await,
         )
     }
 
@@ -606,7 +592,8 @@ impl DeviceOps for Device {
         request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
     ) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
-            .enable_beaconing(&request, zx::Time::INFINITE)
+            .enable_beaconing(&request)
+            .await
             .map_err(|error| {
                 error!("FIDL error during EnableBeaconing: {:?}", error);
                 zx::Status::INTERNAL
@@ -616,7 +603,8 @@ impl DeviceOps for Device {
 
     async fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
-            .disable_beaconing(zx::Time::INFINITE)
+            .disable_beaconing()
+            .await
             .map_err(|error| {
                 error!("DisableBeaconing failed with FIDL error: {:?}", error);
                 zx::Status::INTERNAL
@@ -629,7 +617,8 @@ impl DeviceOps for Device {
         key_configuration: &fidl_softmac::WlanKeyConfiguration,
     ) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
-            .install_key(&key_configuration, zx::Time::INFINITE)
+            .install_key(&key_configuration)
+            .await
             .map_err(|error| {
                 error!("FIDL error during InstallKey: {:?}", error);
                 zx::Status::INTERNAL
@@ -646,8 +635,7 @@ impl DeviceOps for Device {
         }
         Self::flatten_and_log_error(
             "NotifyAssociationComplete",
-            self.wlan_softmac_bridge_proxy
-                .notify_association_complete(&assoc_cfg, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.notify_association_complete(&assoc_cfg).await,
         )
     }
 
@@ -667,7 +655,7 @@ impl DeviceOps for Device {
         }
         Self::flatten_and_log_error(
             "ClearAssociation",
-            self.wlan_softmac_bridge_proxy.clear_association(request, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.clear_association(request).await,
         )
     }
 
@@ -677,7 +665,7 @@ impl DeviceOps for Device {
     ) -> Result<(), zx::Status> {
         Self::flatten_and_log_error(
             "UpdateWmmParameters",
-            self.wlan_softmac_bridge_proxy.update_wmm_parameters(request, zx::Time::INFINITE),
+            self.wlan_softmac_bridge_proxy.update_wmm_parameters(request).await,
         )
     }
 
@@ -938,7 +926,7 @@ pub struct CFrameSender {
 }
 
 pub struct FrameSender {
-    ctx: AtomicPtr<c_void>,
+    ctx: *mut c_void,
     /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
     ///
     /// # Safety
@@ -966,7 +954,7 @@ pub struct FrameSender {
 impl From<CFrameSender> for FrameSender {
     fn from(frame_sender: CFrameSender) -> Self {
         Self {
-            ctx: AtomicPtr::new(frame_sender.ctx),
+            ctx: frame_sender.ctx,
             wlan_tx: frame_sender.wlan_tx,
             ethernet_rx: frame_sender.ethernet_rx,
         }
@@ -988,7 +976,7 @@ impl FrameSender {
                 // Safety: The `self.wlan_tx` call is safe because the payload is a persisted
                 // `FrameSender.EthernetRx` request.
                 zx::Status::from_raw(unsafe {
-                    (self.wlan_tx)(*self.ctx.get_mut(), payload.as_slice().as_ptr(), payload.len())
+                    (self.wlan_tx)(self.ctx, payload.as_slice().as_ptr(), payload.len())
                 })
                 .into()
             }
@@ -1010,7 +998,7 @@ impl FrameSender {
                 // Safety: The `self.ethernet_rx` call is safe because the payload is a persisted
                 // `FrameSender.EthernetRx` request.
                 zx::Status::from_raw(unsafe {
-                    (self.ethernet_rx)(*self.ctx.get_mut(), payload.as_ptr(), payload.len())
+                    (self.ethernet_rx)(self.ctx, payload.as_ptr(), payload.len())
                 })
                 .into()
             }
@@ -1052,7 +1040,7 @@ pub struct CDeviceInterface {
 /// Each of the functions in this FFI are safe to call from another thread but not
 /// safe to call concurrently, i.e., they can only be called one at a time.
 pub struct DeviceInterface {
-    device: AtomicPtr<c_void>,
+    device: *mut c_void,
     /// Start operations on the underlying device and return the SME channel.
     ///
     /// # Lifetime
@@ -1080,9 +1068,7 @@ pub struct DeviceInterface {
 impl From<CDeviceInterface> for DeviceInterface {
     fn from(device_interface: CDeviceInterface) -> Self {
         Self {
-            // Safety: This is safe because `device_interface.device` will never become
-            // any other type than `*mut c_void`.
-            device: AtomicPtr::new(device_interface.device),
+            device: device_interface.device,
             start: device_interface.start,
             set_ethernet_status: device_interface.set_ethernet_status,
         }

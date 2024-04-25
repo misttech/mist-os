@@ -113,7 +113,7 @@ impl WlanTxPacketExt for fidl_softmac::WlanTxPacket {
 }
 
 pub trait MlmeImpl {
-    type Config: Send;
+    type Config;
     type Device: DeviceOps;
     type TimerEvent;
     fn new(
@@ -121,7 +121,7 @@ pub trait MlmeImpl {
         device: Self::Device,
         buffer_provider: buffer::CBufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
-    ) -> impl Future<Output = Result<Self, Error>> + Send
+    ) -> impl Future<Output = Result<Self, Error>>
     where
         Self: Sized;
     fn handle_mlme_request(

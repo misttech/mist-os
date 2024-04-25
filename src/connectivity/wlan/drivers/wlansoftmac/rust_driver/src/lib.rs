@@ -89,8 +89,8 @@ impl WlanSoftmacHandle {
 /// Generally, errors during initializations will be returned immediately after this function calls
 /// init_completer() with the same error. Later errors can be returned after this functoin calls
 /// init_completer().
-pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
-    init_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
+pub async fn start_and_serve<D: DeviceOps + 'static>(
+    init_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + 'static,
     device: D,
     buffer_provider: CBufferProvider,
 ) -> Result<(), zx::Status> {
@@ -142,7 +142,7 @@ struct StartedDriver<Mlme, Sme> {
 ///
 /// This function will use the provided |device| to make various calls into the vendor driver
 /// necessary to configure and create the components to run the futures.
-async fn start<D: DeviceOps + Send + 'static>(
+async fn start<D: DeviceOps + 'static>(
     mlme_init_sender: oneshot::Sender<Result<(), zx::Status>>,
     driver_event_sink: DriverEventSink,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
@@ -150,7 +150,7 @@ async fn start<D: DeviceOps + Send + 'static>(
     buffer_provider: CBufferProvider,
 ) -> Result<
     StartedDriver<
-        Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
+        Pin<Box<dyn Future<Output = Result<(), Error>>>>,
         Pin<Box<impl Future<Output = Result<(), Error>>>>,
     >,
     zx::Status,
@@ -242,7 +242,7 @@ async fn start<D: DeviceOps + Send + 'static>(
     };
 
     // Create an MLME future to serve
-    let mlme: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match device_info.role {
+    let mlme: Pin<Box<dyn Future<Output = Result<(), Error>>>> = match device_info.role {
         fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
@@ -302,11 +302,11 @@ async fn serve<F>(
     mlme_init_receiver: oneshot::Receiver<Result<(), zx::Status>>,
     driver_event_sink: DriverEventSink,
     softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,
-    mlme: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
+    mlme: Pin<Box<dyn Future<Output = Result<(), Error>>>>,
     sme: Pin<Box<impl Future<Output = Result<(), Error>>>>,
 ) -> Result<(), zx::Status>
 where
-    F: FnOnce(Result<(), zx::Status>) + Send,
+    F: FnOnce(Result<(), zx::Status>),
 {
     wtrace::duration_begin_scope!(c"rust_driver::serve");
 
@@ -314,7 +314,7 @@ where
     // server exits.
     let (bridge_exit_sender, bridge_exit_receiver) = oneshot::channel();
     // Spawn a Task to host the WlanSoftmacIfcBridge server.
-    let bridge = Task::spawn(async move {
+    let bridge = Task::local(async move {
         let _: Result<(), ()> = bridge_exit_sender
             .send(
                 serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream)
@@ -761,7 +761,7 @@ mod tests {
             impl Future<
                 Output = Result<
                     StartedDriver<
-                        Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
+                        Pin<Box<dyn Future<Output = Result<(), Error>>>>,
                         Pin<Box<impl Future<Output = Result<(), Error>>>>,
                     >,
                     zx::Status,

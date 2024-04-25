@@ -259,9 +259,9 @@ impl Deref for FinalizedBuffer {
 }
 
 // Assert both `Buffer` and `FinalizedBuffer` implement `Send` and `Sync` here to
-// provide an obvious compile-time error when either of them does not. When using
-// a multi-threaded executor, these two types are generally required to be `Send`
-// and `Sync`.
+// provide an obvious compile-time error when either of them does not. This is helpful
+// when trying to integrate these types into futures running on a multi-threaded
+// executor.
 const _: () = {
     fn assert_send_sync<T: Send + Sync>() {}
     let _ = assert_send_sync::<Buffer>;

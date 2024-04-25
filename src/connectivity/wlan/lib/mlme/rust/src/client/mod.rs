@@ -110,7 +110,7 @@ pub struct ClientMlme<D> {
     channel_state: ChannelState,
 }
 
-impl<D: DeviceOps + Send> crate::MlmeImpl for ClientMlme<D> {
+impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
     type Config = ClientConfig;
     type Device = D;
     type TimerEvent = TimedEvent;
