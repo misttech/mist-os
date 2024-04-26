@@ -13,7 +13,7 @@ def _fuchsia_package_checker_test_impl(ctx):
 
     args = [
         "--far={}".format(sdk.far.short_path),
-        "--ffx={}".format(sdk.ffx.short_path),
+        "--ffx={}".format(sdk.ffx_package.short_path),
         "--meta_far={}".format(meta_far.short_path),
         "--package_name={}".format(ctx.attr.package_name),
     ]
@@ -21,7 +21,7 @@ def _fuchsia_package_checker_test_impl(ctx):
     runfiles = [
         meta_far,
         sdk.far,
-        sdk.ffx,
+        sdk.ffx_package,
     ]
 
     # Find all of our blobs
