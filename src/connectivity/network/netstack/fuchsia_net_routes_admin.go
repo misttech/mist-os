@@ -30,6 +30,9 @@ const (
 	routeSetV4Name  = "fuchsia.net.routes.admin/RouteSetV4"
 	routeSetV6Name  = "fuchsia.net.routes.admin/RouteSetV6"
 	routesAdminName = "fuchsia.net.routes.admin"
+
+	v4MainTableId = 0
+	v6MainTableId = 1
 )
 
 type UnauthenticatedError struct {
@@ -138,10 +141,13 @@ func (r *routeSet[A]) close() {
 	r.ns.DelRouteSet(r.id)
 }
 
-type routesAdminMainRouteTable struct{}
+type routesAdminMainRouteTable struct {
+	tableId uint32
+	token   zx.Event
+}
 
 func (impl *routesAdminMainRouteTable) GetTableId(ctx_ fidl.Context) (uint32, error) {
-	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+	return impl.tableId, nil
 }
 
 func (impl *routesAdminMainRouteTable) Detach(ctx_ fidl.Context) error {
@@ -149,11 +155,15 @@ func (impl *routesAdminMainRouteTable) Detach(ctx_ fidl.Context) error {
 }
 
 func (impl *routesAdminMainRouteTable) Remove(ctx_ fidl.Context) (routesAdmin.BaseRouteTableRemoveResult, error) {
-	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+	return routesAdmin.BaseRouteTableRemoveResultWithErr(routesAdmin.BaseRouteTableRemoveErrorInvalidOpOnMainTable), nil
 }
 
 func (impl *routesAdminMainRouteTable) GetAuthorizationForRouteTable(ctx_ fidl.Context) (uint32, zx.Event, error) {
-	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+	token, err := impl.token.Duplicate(zx.RightTransfer | zx.RightDuplicate)
+	if err != nil {
+		return 0, token, err
+	}
+	return impl.tableId, token, nil
 }
 
 var _ routesAdmin.BaseRouteTableWithCtx = (*routesAdminMainRouteTable)(nil)

@@ -11,7 +11,7 @@ use fnet_routes_ext::{
     admin::{FidlRouteAdminIpExt, Responder as _, RouteSetRequest},
     FidlRouteIpExt,
 };
-use fuchsia_zircon::AsHandleRef;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
 use futures::{TryStream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
@@ -24,6 +24,13 @@ use crate::bindings::{
 };
 
 use super::WeakDeviceId;
+
+/// The IPv4 main table ID.
+const V4_MAIN_TABLE_ID: routes::TableId<Ipv4> =
+    const_unwrap::const_unwrap_option(routes::TableId::new(0));
+/// The IPv6 main table ID.
+const V6_MAIN_TABLE_ID: routes::TableId<Ipv6> =
+    const_unwrap::const_unwrap_option(routes::TableId::new(1));
 
 async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     ctx: crate::bindings::Ctx,
@@ -77,12 +84,16 @@ pub(crate) async fn serve_route_set<
         });
 }
 
+// TODO(https://fxbug.dev/337065118): The operations should be supported on all
+// route tables instead of just main table.
 pub(crate) async fn serve_route_table_v4(
     stream: fnet_routes_admin::RouteTableV4RequestStream,
     spawner: TaskWaitGroupSpawner,
     ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
+
+    let token = zx::Event::create();
 
     while let Some(req) = stream.try_next().await? {
         let () = match req {
@@ -93,19 +104,20 @@ pub(crate) async fn serve_route_table_v4(
                 let set_request_stream = route_set.into_stream()?;
                 spawner.spawn(serve_user_route_set::<Ipv4>(ctx.clone(), set_request_stream));
             }
-            fnet_routes_admin::RouteTableV4Request::GetTableId { responder: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            fnet_routes_admin::RouteTableV4Request::GetTableId { responder } => {
+                responder.send(V4_MAIN_TABLE_ID.into())?;
             }
-            fnet_routes_admin::RouteTableV4Request::Detach { control_handle: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            fnet_routes_admin::RouteTableV4Request::Detach { control_handle: _ } => {}
+            fnet_routes_admin::RouteTableV4Request::Remove { responder } => {
+                responder.send(Err(
+                    fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable,
+                ))?;
             }
-            fnet_routes_admin::RouteTableV4Request::Remove { responder: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
-            }
-            fnet_routes_admin::RouteTableV4Request::GetAuthorizationForRouteTable {
-                responder: _,
-            } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table")
+            fnet_routes_admin::RouteTableV4Request::GetAuthorizationForRouteTable { responder } => {
+                let token = token
+                    .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
+                    .expect("failed to duplicate");
+                responder.send(V4_MAIN_TABLE_ID.into(), token)?;
             }
         };
     }
@@ -113,12 +125,16 @@ pub(crate) async fn serve_route_table_v4(
     Ok(())
 }
 
+// TODO(https://fxbug.dev/337065118): The operations should be supported on all
+// route tables instead of just main table.
 pub(crate) async fn serve_route_table_v6(
     stream: fnet_routes_admin::RouteTableV6RequestStream,
     spawner: TaskWaitGroupSpawner,
     ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
+
+    let token = zx::Event::create();
 
     while let Some(req) = stream.try_next().await? {
         let () = match req {
@@ -129,19 +145,20 @@ pub(crate) async fn serve_route_table_v6(
                 let set_request_stream = route_set.into_stream()?;
                 spawner.spawn(serve_user_route_set::<Ipv6>(ctx.clone(), set_request_stream));
             }
-            fnet_routes_admin::RouteTableV6Request::GetTableId { responder: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            fnet_routes_admin::RouteTableV6Request::GetTableId { responder } => {
+                responder.send(V6_MAIN_TABLE_ID.into())?;
             }
-            fnet_routes_admin::RouteTableV6Request::Detach { control_handle: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            fnet_routes_admin::RouteTableV6Request::Detach { control_handle: _ } => {}
+            fnet_routes_admin::RouteTableV6Request::Remove { responder } => {
+                responder.send(Err(
+                    fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable,
+                ))?;
             }
-            fnet_routes_admin::RouteTableV6Request::Remove { responder: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
-            }
-            fnet_routes_admin::RouteTableV6Request::GetAuthorizationForRouteTable {
-                responder: _,
-            } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            fnet_routes_admin::RouteTableV6Request::GetAuthorizationForRouteTable { responder } => {
+                let token = token
+                    .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
+                    .expect("failed to duplicate");
+                responder.send(V6_MAIN_TABLE_ID.into(), token)?;
             }
         };
     }

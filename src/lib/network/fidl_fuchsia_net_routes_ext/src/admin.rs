@@ -242,6 +242,68 @@ pub async fn authenticate_for_interface<I: Ip + FidlRouteAdminIpExt + FidlRouteI
     result_fut.await
 }
 
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+struct RouteTableProxy<'a, I: FidlRouteAdminIpExt + FidlRouteIpExt> {
+    route_table: &'a <I::RouteTableMarker as ProtocolMarker>::Proxy,
+}
+
+/// Dispatches `detach` on either the `RouteTableV4` or `RouteTableV6` proxy.
+pub async fn detach_route_table<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+    route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
+) -> Result<(), fidl::Error> {
+    let IpInvariant(result) = net_types::map_ip_twice!(
+        I,
+        RouteTableProxy { route_table },
+        |RouteTableProxy { route_table }| { IpInvariant(route_table.detach()) }
+    );
+
+    result
+}
+
+/// Dispatches `remove` on either the `RouteTableV4` or `RouteTableV6` proxy.
+pub async fn remove_route_table<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+    route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
+) -> Result<Result<(), fnet_routes_admin::BaseRouteTableRemoveError>, fidl::Error> {
+    let IpInvariant(result_fut) = net_types::map_ip_twice!(
+        I,
+        RouteTableProxy { route_table },
+        |RouteTableProxy { route_table }| { IpInvariant(route_table.remove()) }
+    );
+
+    result_fut.await
+}
+
+/// Dispatches `get_table_id` on either the `RouteTableV4` or `RouteTableV6`
+/// proxy.
+pub async fn get_table_id<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+    route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
+) -> Result<u32, fidl::Error> {
+    let IpInvariant(result_fut) = net_types::map_ip_twice!(
+        I,
+        RouteTableProxy { route_table },
+        |RouteTableProxy { route_table }| IpInvariant(route_table.get_table_id()),
+    );
+
+    result_fut.await
+}
+
+/// Dispatches `get_authorization_for_route_table` on either the `RouteTableV4`
+/// or `RouteTableV6` proxy.
+pub async fn get_authorization_for_route_table<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+    route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
+) -> Result<(u32, fidl::Event), fidl::Error> {
+    let IpInvariant(result_fut) = net_types::map_ip_twice!(
+        I,
+        RouteTableProxy { route_table },
+        |RouteTableProxy { route_table }| IpInvariant(
+            route_table.get_authorization_for_route_table()
+        ),
+    );
+
+    result_fut.await
+}
+
 /// GenericOverIp version of RouteSetV{4, 6}Request.
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(I, Ip)]

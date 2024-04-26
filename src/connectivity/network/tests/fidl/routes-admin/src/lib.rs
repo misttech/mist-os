@@ -1480,3 +1480,69 @@ async fn unauthenticated_connections_cannot_remove_routes<
         None
     );
 }
+
+#[netstack_test]
+async fn main_table_remove<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let route_table = realm
+        .connect_to_protocol::<I::RouteTableMarker>()
+        .expect("connect to routes-admin RouteTable");
+    assert_eq!(
+        fnet_routes_ext::admin::remove_route_table::<I>(&route_table)
+            .await
+            .expect("fidl should succeed"),
+        Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable),
+    );
+}
+
+#[netstack_test]
+async fn unique_main_table_id<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let main_table_v4 = realm
+        .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()
+        .expect("connect to routes-admin RouteTable");
+    let main_table_v6 = realm
+        .connect_to_protocol::<fnet_routes_admin::RouteTableV6Marker>()
+        .expect("connect to routes-admin RouteTable");
+    let v4_id = fnet_routes_ext::admin::get_table_id::<Ipv4>(&main_table_v4)
+        .await
+        .expect("fidl should succeed");
+    let v6_id = fnet_routes_ext::admin::get_table_id::<Ipv6>(&main_table_v6)
+        .await
+        .expect("fidl should succeed");
+    assert_ne!(v4_id, v6_id);
+}
+
+#[netstack_test]
+async fn main_table_authorization<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let route_table = realm
+        .connect_to_protocol::<I::RouteTableMarker>()
+        .expect("connect to routes-admin RouteTable");
+    let table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&route_table).await.expect("fidl should succeed");
+    let (authorized_table_id, _token) =
+        fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
+            .await
+            .expect("fidl should succeed");
+    assert_eq!(table_id, authorized_table_id);
+}
