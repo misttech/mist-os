@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/i2c/drivers/i2c/fake-i2c-impl.h"
+#include "fake-i2c-impl.h"
 
 namespace i2c {
 const FakeI2cImpl::OnTransact FakeI2cImpl::kDefaultOnTransact =

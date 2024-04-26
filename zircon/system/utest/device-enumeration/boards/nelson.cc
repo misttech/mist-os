@@ -28,7 +28,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
@@ -50,7 +50,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
       "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-014/block",
       "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-015/block",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-57/tcs3400_light/tcs-3400",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:05:1c/aml_nna",
       "sys/platform/05:05:22/clocks",
       "sys/platform/05:05:22/clocks/clock-init",
@@ -74,9 +74,9 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/05:05:d/display/amlogic-display/display-coordinator",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-64/ti_ina231_speakers/ti-ina231",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-112/shtv3",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-64/ti_ina231_speakers/ti-ina231",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-112/shtv3",
       "sys/platform/1c:00:1/gt6853_touch/gt6853",
 
       // Amber LED.
@@ -96,8 +96,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "class/temperature/000",
       "class/temperature/001",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-45/tas58xx/TAS5805m",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
 
       "sys/platform/05:05:1:2/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
 
