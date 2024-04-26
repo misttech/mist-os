@@ -42,13 +42,6 @@ class BootZbi {
   // Returns the allocation size required for a kernel item.
   static Size GetKernelAllocationSize(Zbi::iterator kernel_item);
 
-  // The boot_alloc code uses arbitrary pages after the official bss space.
-  // So make sure to allocate some extra slop for the kernel.
-  //
-  // TODO(https://fxbug.dev/42164859): Remove this when ZBI kernels in use actually
-  // conform to the protocol and don't clobber extra memory.
-  static constexpr uint64_t kKernelBootAllocReserve = 1024 * 1024 * 32;
-
   // Default-constructible and move-only.
   BootZbi() = default;
   BootZbi(BootZbi&&) = default;
@@ -109,7 +102,7 @@ class BootZbi {
   }
 
   uint64_t KernelMemorySize() const {
-    return KernelLoadSize() + KernelHeader()->reserve_memory_size + kKernelBootAllocReserve;
+    return KernelLoadSize() + KernelHeader()->reserve_memory_size;
   }
 
   uint64_t KernelEntryAddress() const { return KernelLoadAddress() + KernelHeader()->entry; }
