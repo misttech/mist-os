@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA
 // Copyright 2020 The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
@@ -96,7 +97,11 @@ inline constexpr uint8_t kAsanInternalHeapMagic = 0xf0;
 inline constexpr uint8_t kAsanGlobalRedzoneMagic = 0xf9;
 inline constexpr uint8_t kAsanHeapLeftRedzoneMagic = 0xfa;
 inline constexpr uint8_t kAsanPmmFreeMagic = 0xfb;
+#if _KERNEL_MISTOS
+inline constexpr uint8_t kAsanContiguousContainerOOBMagic = 0xfc;
+#else
 inline constexpr uint8_t kAsanQuarantineMagic = 0xfc;
+#endif
 inline constexpr uint8_t kAsanHeapFreeMagic = 0xfd;
 inline constexpr uint8_t kAsanAllocHeader = 0xff;
 

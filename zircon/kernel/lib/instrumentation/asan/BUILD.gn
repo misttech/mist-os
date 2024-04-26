@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2020 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -78,6 +79,9 @@ if (is_asan) {
       "asan-stubs.cc",
     ]
     sources += [ "asan-init-$zircon_cpu.cc" ]
+    if (is_mistos) {
+      sources += [ "asan-poisoning-mistos.cc" ]
+    }
     deps = [
       "..:headers",
       "//zircon/kernel/lib/counters",

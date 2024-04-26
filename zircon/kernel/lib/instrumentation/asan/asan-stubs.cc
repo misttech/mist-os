@@ -248,25 +248,4 @@ void __asan_after_dynamic_init() {}
 void __asan_init() {}
 void __asan_version_mismatch_check_v8() {}
 
-#if _KERNEL_MISTOS
-// This is neded by std::vector / std::string  when asan is enabled.
-// Dummy implementation (very basic consitency check)
-void __sanitizer_annotate_contiguous_container(const void* beg_p, const void* end_p,
-                                               const void* old_mid_p, const void* new_mid_p) {
-  uintptr_t storage_beg = reinterpret_cast<uintptr_t>(beg_p);
-  uintptr_t storage_end = reinterpret_cast<uintptr_t>(end_p);
-  uintptr_t old_end = reinterpret_cast<uintptr_t>(old_mid_p);
-  uintptr_t new_end = reinterpret_cast<uintptr_t>(new_mid_p);
-  // uintptr_t old_beg = storage_beg;
-  // uintptr_t new_beg = storage_beg;
-  // uintptr_t granularity = kAsanGranularity;
-  if (!(storage_beg <= old_end && storage_beg <= new_end && old_end <= storage_end &&
-        new_end <= storage_end)) {
-    panic("bad param\n");
-  }
-
-  // TODO (Herrera): port compile-rt version.
-}
-#endif
-
 }  // extern "C"
