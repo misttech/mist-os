@@ -199,7 +199,7 @@ zx::result<> AmlSdmmc::InitResources(
       FDF_LOGL(ERROR, logger(), "Failed to map MMIO: %s", mmio_result.status_string());
       return mmio_result.take_error();
     }
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     mmio_ = std::move(mmio_result.value());
   }
 
@@ -244,7 +244,7 @@ zx::result<> AmlSdmmc::InitResources(
 
   {
     auto buffer_factory = dma_buffer::CreateBufferFactory();
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     zx_status_t status = buffer_factory->CreateContiguous(
         bti_, kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, &descs_buffer_);
     if (status != ZX_OK) {
@@ -447,8 +447,9 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
           case fuchsia_power_broker::LeaseStatus::kSatisfied: {
             const zx::time start = zx::clock::get_monotonic();
 
-            fbl::AutoLock tuning_lock(&tuning_lock_);  // If tuning was delayed, will do it now.
-            fbl::AutoLock lock(&lock_);
+            // If tuning was delayed, will do it now.
+            std::lock_guard<std::mutex> tuning_lock(tuning_lock_);
+            std::lock_guard<std::mutex> lock(lock_);
             // Actually raise the hardware's power level.
             zx_status_t status = ResumePower();
             if (status != ZX_OK) {
@@ -505,10 +506,10 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
                   auto* perform_tuning_completer =
                       std::get_if<PerformTuningCompleter::Async>(&task_info->completer);
                   if (perform_tuning_completer != nullptr) {
-                    lock_.Release();  // Tuning acquires lock_.
+                    lock_.unlock();  // Tuning acquires lock_.
                     DoTaskAndComplete(std::move(task_info->task), task_info->arena,
                                       *perform_tuning_completer);
-                    lock_.Acquire();
+                    lock_.lock();
                     continue;
                   }
                 }
@@ -529,8 +530,9 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
             break;
           }
           case fuchsia_power_broker::LeaseStatus::kPending: {
-            fbl::AutoLock tuning_lock(&tuning_lock_);  // Complete any ongoing tuning first.
-            fbl::AutoLock lock(&lock_);
+            // Complete any ongoing tuning first.
+            std::lock_guard<std::mutex> tuning_lock(tuning_lock_);
+            std::lock_guard<std::mutex> lock(lock_);
             // Actually lower the hardware's power level.
             zx_status_t status = SuspendPower();
             if (status != ZX_OK) {
@@ -737,7 +739,7 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
       [this, bus_width = request->bus_width]()
           __TA_NO_THREAD_SAFETY_ANALYSIS { return SetBusWidthImpl(bus_width); };
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
     zx_status_t status = ActivateWakeOnRequest();
@@ -790,7 +792,7 @@ void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
       [this, bus_freq = request->bus_freq]()
           __TA_NO_THREAD_SAFETY_ANALYSIS { return SetBusFreqImpl(bus_freq); };
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
     zx_status_t status = ActivateWakeOnRequest();
@@ -934,7 +936,7 @@ void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
   fit::function<zx_status_t()> task = [this]()
                                           __TA_NO_THREAD_SAFETY_ANALYSIS { return HwResetImpl(); };
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
     zx_status_t status = ActivateWakeOnRequest();
@@ -1021,7 +1023,7 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
       [this, timing = request->timing]()
           __TA_NO_THREAD_SAFETY_ANALYSIS { return SetTimingImpl(timing); };
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
     zx_status_t status = ActivateWakeOnRequest();
@@ -1367,7 +1369,7 @@ void AmlSdmmc::WaitForBus() const {
 }
 
 zx_status_t AmlSdmmc::TuningDoTransfer(const TuneContext& context) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
     FDF_LOGL(ERROR, logger(), "Rejecting TuningDoTransfer while power is suspended.");
@@ -1522,10 +1524,10 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
       [this, cmd_idx = request->cmd_idx]()
           __TA_NO_THREAD_SAFETY_ANALYSIS { return PerformTuningImpl(cmd_idx); };
 
-  fbl::AutoLock tuning_lock(&tuning_lock_);
+  std::lock_guard<std::mutex> tuning_lock(tuning_lock_);
 
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     if (power_suspended_) {
       zx_status_t status = ActivateWakeOnRequest();
       if (status != ZX_OK) {
@@ -1546,7 +1548,7 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
 zx_status_t AmlSdmmc::PerformTuningImpl(uint32_t tuning_cmd_idx) {
   // Using a lambda for the constness of the resulting variables.
   const auto result = [this]() -> zx::result<std::tuple<uint32_t, uint32_t, TuneSettings>> {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
 
     if (power_suspended_) {
       FDF_LOGL(ERROR, logger(), "Rejecting PerformTuning while power is suspended.");
@@ -1613,7 +1615,7 @@ zx_status_t AmlSdmmc::PerformTuningImpl(uint32_t tuning_cmd_idx) {
   }
 
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
 
     if (power_suspended_) {
       FDF_LOGL(ERROR, logger(), "Rejecting PerformTuning while power is suspended.");
@@ -1715,7 +1717,7 @@ zx_status_t AmlSdmmc::RegisterVmoImpl(uint32_t vmo_id, uint8_t client_id, zx::vm
     return status;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return registered_vmos_[client_id].RegisterWithKey(vmo_id, std::move(stored_vmo));
 }
 
@@ -1735,7 +1737,7 @@ zx_status_t AmlSdmmc::UnregisterVmoImpl(uint32_t vmo_id, uint8_t client_id, zx::
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   vmo_store::StoredVmo<OwnedVmoInfo>* const vmo_info = registered_vmos_[client_id].GetVmo(vmo_id);
   if (!vmo_info) {
@@ -1752,7 +1754,7 @@ zx_status_t AmlSdmmc::UnregisterVmoImpl(uint32_t vmo_id, uint8_t client_id, zx::
 
 void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
                        RequestCompleter::Sync& completer) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
     zx_status_t status = ActivateWakeOnRequest();
@@ -1847,7 +1849,7 @@ zx_status_t AmlSdmmc::RequestImpl(const fuchsia_hardware_sdmmc::wire::SdmmcReq& 
 
 zx_status_t AmlSdmmc::Init(
     const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   // The core clock must be enabled before attempting to access the start register.
   ConfigureDefaultRegs();
@@ -1879,7 +1881,7 @@ zx_status_t AmlSdmmc::Init(
 void AmlSdmmc::PrepareStop(fdf::PrepareStopCompleter completer) {
   // If there's a pending request, wait for it to complete (and any pages to be unpinned).
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     shutdown_ = true;
 
     descs_buffer_.reset();

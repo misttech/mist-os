@@ -26,6 +26,7 @@
 
 #include <array>
 #include <limits>
+#include <mutex>
 #include <vector>
 
 #include <fbl/auto_lock.h>
@@ -127,11 +128,11 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   // Visible for tests
   const zx::bti& bti() const { return bti_; }
   const fdf::MmioBuffer& mmio() TA_EXCL(lock_) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     return *mmio_;
   }
   void* descs_buffer() TA_EXCL(lock_) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     return descs_buffer_->virt();
   }
 
@@ -139,8 +140,8 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   bool power_suspended_ TA_GUARDED(lock_) = false;
 
   // TODO(https://fxbug.dev/42084501): Remove redundant locking when Banjo is removed.
-  fbl::Mutex lock_ TA_ACQ_AFTER(tuning_lock_);
-  fbl::Mutex tuning_lock_ TA_ACQ_BEFORE(lock_);
+  std::mutex lock_ TA_ACQ_AFTER(tuning_lock_);
+  std::mutex tuning_lock_ TA_ACQ_BEFORE(lock_);
 
  private:
   constexpr static size_t kResponseCount = 4;
