@@ -84,6 +84,9 @@ fuchsia_product_configuration(
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "embeddable",
+            "paravirtualization": {
+                "enabled": "required",
+            },
         },
     },
 )

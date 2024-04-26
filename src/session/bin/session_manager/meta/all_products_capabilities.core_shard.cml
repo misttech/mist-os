@@ -117,6 +117,7 @@
             protocol: [ "fuchsia.vsock.Connector" ],
             from: "#vsock",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: [

@@ -52,6 +52,7 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "kernel_args_userdebug",
     "kernel_debug_broker_userdebug",
     "netsvc",
+    "paravirtualization_support_bootstrap",
     "ptysvc",
 ]
 

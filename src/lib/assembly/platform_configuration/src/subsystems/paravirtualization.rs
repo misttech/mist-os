@@ -26,7 +26,12 @@ impl DefineSubsystemConfiguration<PlatformParavirtualizationConfig>
             (FeatureControl::Disabled, false) => (),
             (FeatureControl::Allowed, false) => (),
             (FeatureControl::Allowed, true) | (FeatureControl::Required, true) => {
-                builder.platform_bundle("paravirtualization_support");
+                match context.feature_set_level {
+                    FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap =>
+                builder.platform_bundle("paravirtualization_support_bootstrap"),
+                    FeatureSupportLevel::Utility | FeatureSupportLevel::Standard =>
+                        builder.platform_bundle("paravirtualization_support"),
+                };
             }
         }
         Ok(())

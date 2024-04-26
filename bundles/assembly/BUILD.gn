@@ -2879,6 +2879,36 @@ assembly_input_bundle("virtualization_support") {
 #
 assembly_input_bundle("paravirtualization_support") {
   base_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/zircon/bin/vsock_service/meta/vsock_service.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("paravirtualization_support_bootstrap") {
+  bootfs_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/zircon/bin/vsock_service/meta/vsock_service.bootstrap_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # AIB to include Netstack2 as the netstack for use by base networking.

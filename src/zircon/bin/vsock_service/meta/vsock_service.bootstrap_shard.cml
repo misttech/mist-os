@@ -1,0 +1,25 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "vsock",
+            url: "fuchsia-boot:///vsock_service#meta/vsock_service.cm",
+        },
+    ],
+    offer: [
+        {
+            directory: "dev-class",
+            from: "#devfs",
+            as: "dev-vsock",
+            to: "#vsock",
+            subdir: "vsock",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "#archivist",
+            to: "#vsock",
+        },
+    ],
+}
