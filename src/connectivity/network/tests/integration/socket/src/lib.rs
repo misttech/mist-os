@@ -76,7 +76,7 @@ use packet_formats::{
     ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
     ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder},
 };
-use sockaddr::{IntoSockAddr as _, PureIpSockaddr};
+use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::SockRef;
 use std::{num::NonZeroU64, pin::pin};
 use test_case::test_case;
@@ -190,6 +190,14 @@ async fn run_ip_endpoint_packet_socket_test(
     assert_eq!(recv_len, PAYLOAD.as_bytes().len());
     assert_eq!(&buf[..recv_len], PAYLOAD.as_bytes());
     assert_eq!(i32::from(from.family()), libc::AF_PACKET);
+    let from = from.try_to_sockaddr_ll().expect("unexpected peer SockAddress type");
+    assert_eq!(from.sll_protocol, sockaddr::sockaddr_ll_ip_protocol(ip_version));
+    // As defined by Linux in `if_packet.h``.
+    const PACKET_HOST: u8 = 0;
+    assert_eq!(from.sll_pkttype, PACKET_HOST);
+    // IP endpoints don't have a hardware address.
+    assert_eq!(from.sll_halen, 0);
+    assert_eq!(from.sll_addr, [0, 0, 0, 0, 0, 0, 0, 0]);
 }
 
 const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
