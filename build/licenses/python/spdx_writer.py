@@ -15,7 +15,7 @@ from spdx_types.spdx_types import (
     SpdxLicenseExpression,
     SpdxPackage,
 )
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from file_access import FileAccess
 from gn_label import GnLabel
@@ -44,12 +44,10 @@ class SpdxWriter:
         self,
         public_package_name: str,
         license_labels: Tuple[GnLabel, ...],
-        collection_hint: str | None,
+        collection_hints: Union[List[str], None],
     ) -> None:
         license_ids: List[str] = []
         nested_doc_paths: List[GnLabel] = []
-
-        debug_hint = [collection_hint] if collection_hint else None
 
         for license_label in license_labels:
             if license_label.is_spdx_json_document():
@@ -65,7 +63,7 @@ class SpdxWriter:
                 name=public_package_name,
                 extracted_text=license_text,
                 cross_refs=[license_label.code_search_url()],
-                debug_hint=debug_hint,
+                debug_hint=collection_hints,
             )
             self.builder.add_license(license)
 
@@ -79,7 +77,7 @@ class SpdxWriter:
             )
             if license_ids
             else None,
-            debug_hint=debug_hint,
+            debug_hint=collection_hints,
         )
         if not self.builder.has_package(package):
             self.builder.add_package(package)

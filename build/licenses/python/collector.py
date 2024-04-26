@@ -25,29 +25,21 @@ class CollectedLicense:
 
     public_name: str
     license_files: tuple[GnLabel, ...]
-    debug_hint: str = dataclasses.field(hash=False, compare=False, default="")
 
     @staticmethod
     def create(
         public_name: str,
         license_files: Tuple[GnLabel, ...],
-        collection_hint: str,
     ) -> "CollectedLicense":
         assert type(public_name) is str
         assert type(license_files) is tuple
-        GnLabel.check_types_in_list(list(license_files))
-        assert type(collection_hint) is str
-        return CollectedLicense(
-            public_name, tuple(sorted(license_files)), collection_hint
-        )
+        GnLabel.check_types_in_list(license_files)
+        return CollectedLicense(public_name, tuple(sorted(license_files)))
 
     def __str__(self) -> str:
-        return (
-            """License(name='{name}', files=[{files}], hint='{hint}')""".format(
-                name=self.public_name,
-                files=", ".join([str(f) for f in self.license_files]),
-                hint=self.debug_hint,
-            )
+        return """License(name='{name}', files=[{files}])""".format(
+            name=self.public_name,
+            files=", ".join([str(f) for f in self.license_files]),
         )
 
 
@@ -179,11 +171,15 @@ class Collector:
     readmes_db: ReadmesDB
     include_host_tools: bool
     default_license_file: GnLabel | None = None
+    generate_debug_hints: bool = False
     scan_result_by_label: Dict[GnLabel, bool] = dataclasses.field(
         default_factory=dict
     )
     unique_licenses: Set[CollectedLicense] = dataclasses.field(
         default_factory=set
+    )
+    license_debug_hints: Dict[CollectedLicense, List[str]] = dataclasses.field(
+        default_factory=dict
     )
     unique_resources: Set[GnLabel] = dataclasses.field(default_factory=set)
     errors: List[CollectorError] = dataclasses.field(default_factory=list)
@@ -198,16 +194,27 @@ class Collector:
         )
         self.errors.append(error)
 
-    def _add_license(self, lic: CollectedLicense) -> None:
+    def _add_license(
+        self,
+        public_name: str,
+        license_files: Tuple[GnLabel],
+        collection_hint: str,
+    ) -> None:
         logging.debug(
             "Collected license %s %s: %s",
-            lic.public_name,
-            lic.license_files,
-            lic.debug_hint,
+            public_name,
+            license_files,
+            collection_hint,
         )
+        assert isinstance(collection_hint, str)
+        lic = CollectedLicense.create(public_name, license_files)
         if lic not in self.unique_licenses:
             self.unique_licenses.add(lic)
             self.stats.unique_licenses += 1
+
+        if self.generate_debug_hints:
+            cur_hints = self.license_debug_hints.setdefault(lic, [])
+            cur_hints.append(collection_hint)
 
     def _add_license_from_metadata(
         self, license_metadata_label: GnLabel, used_by_target: GnLabel
@@ -236,11 +243,9 @@ class Collector:
         ]
 
         self._add_license(
-            CollectedLicense.create(
-                public_name=license_metadata.public_package_name,
-                license_files=license_metadata.license_files,
-                collection_hint=f"From {license_metadata.target_label} used by {used_by_target}",
-            )
+            public_name=license_metadata.public_package_name,
+            license_files=license_metadata.license_files,
+            collection_hint=f"From {license_metadata.target_label} used by {used_by_target}",
         )
 
     def _add_license_from_readme(
@@ -291,14 +296,12 @@ class Collector:
                 )
                 return False
 
-        license = CollectedLicense.create(
+        self.stats.licenses_from_readmes += len(readme.license_files)
+        self._add_license(
             public_name=readme.package_name,
             license_files=tuple(readme.license_files),
             collection_hint=f"For {due_to} via {readme.readme_label}",
         )
-
-        self.stats.licenses_from_readmes += len(readme.license_files)
-        self._add_license(license)
         return True
 
     def _add_licenses_for_golib(
@@ -334,11 +337,9 @@ class Collector:
         if license_files:
             self.stats.licenses_from_golibs += len(license_files)
             self._add_license(
-                CollectedLicense(
-                    public_name=public_package_name,
-                    license_files=tuple(license_files),
-                    debug_hint=f"Used by {label} (via custom license extraction for 3p golibs)",
-                )
+                public_name=public_package_name,
+                license_files=tuple(license_files),
+                collection_hint=f"Used by {label} (via custom license extraction for 3p golibs)",
             )
             return True
         else:
@@ -363,11 +364,9 @@ class Collector:
     def _add_default_license(self, label: GnLabel) -> bool:
         if self.default_license_file:
             self._add_license(
-                CollectedLicense.create(
-                    public_name="Fuchsia",
-                    license_files=(self.default_license_file,),
-                    collection_hint="Default license for non 3p targets",
-                )
+                public_name="Fuchsia",
+                license_files=(self.default_license_file,),
+                collection_hint="Default license for non 3p targets",
             )
             return True
         else:

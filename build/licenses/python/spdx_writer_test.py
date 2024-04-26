@@ -65,7 +65,7 @@ class SpdxWriterTest(unittest.TestCase):
         self.writer.add_package_with_licenses(
             public_package_name="Foo Pkg",
             license_labels=(GnLabel.from_str("//foo/license"),),
-            collection_hint="unit test",
+            collection_hints=["unit test"],
         )
         self.writer.add_package_with_licenses(
             public_package_name="Bar Pkg",
@@ -73,13 +73,13 @@ class SpdxWriterTest(unittest.TestCase):
                 GnLabel.from_str("//bar/license"),
                 GnLabel.from_str("//bar/license2"),
             ),
-            collection_hint="unit test",
+            collection_hints=["unit test"],
         )
         # Add again - should have no effect
         self.writer.add_package_with_licenses(
             public_package_name="Foo Pkg",
             license_labels=(GnLabel.from_str("//foo/license"),),
-            collection_hint="unit test",
+            collection_hints=["unit test"],
         )
 
         self.assertEqual(
@@ -246,7 +246,7 @@ class SpdxWriterTest(unittest.TestCase):
             license_labels=(
                 GnLabel.from_str("//some/path/to/license.spdx.json"),
             ),
-            collection_hint="unit test",
+            collection_hints=["unit test"],
         )
 
         self.assertEqual(

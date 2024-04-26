@@ -88,7 +88,7 @@ def main() -> int:
     parser.add_argument(
         "--log-level",
         type=str,
-        default="INFO",
+        default="WARNING",
         help="Python logging level",
     )
 
@@ -121,6 +121,7 @@ def main() -> int:
         readmes_db=readmes_db,
         include_host_tools=args.include_host_tools,
         default_license_file=GnLabel.from_str("//LICENSE"),
+        generate_debug_hints=bool(args.debug_hints),
     )
 
     collector.collect()
@@ -143,16 +144,14 @@ def main() -> int:
         file_access=file_access,
     )
 
-    debug_hints = args.debug_hints
-
     sorted_licenses = sorted(collector.unique_licenses)
     for collected_license in sorted_licenses:
         spdx_writer.add_package_with_licenses(
             public_package_name=collected_license.public_name,
             license_labels=collected_license.license_files,
-            collection_hint=collected_license.debug_hint
-            if debug_hints
-            else None,
+            collection_hints=sorted(
+                collector.license_debug_hints.get(collected_license, [])
+            ),
         )
 
     spdx_writer.save(args.spdx_output)
