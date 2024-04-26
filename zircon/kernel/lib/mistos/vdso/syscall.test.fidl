@@ -4,6 +4,7 @@
 // found in the LICENSE file.
 library linux;
 
+@no_protocol_prefix
 @transport("Syscall")
 closed protocol Syscall {
     /// ## Summary
