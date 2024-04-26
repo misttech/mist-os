@@ -73,6 +73,8 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   ModuleHandle(const ModuleHandle&) = delete;
   ModuleHandle(ModuleHandle&&) = default;
 
+  // See unmap-[posix|zircon|.cc for the dtor. On destruction, the module's load
+  // image is unmapped per the semantics of the OS implementation.
   ~ModuleHandle();
 
   // The name of the module handle is set to the filename passed to dlopen() to
@@ -101,6 +103,8 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
 
   const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
+
+  size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
 
  private:
   // A ModuleHandle can only be created with Module::Create...).

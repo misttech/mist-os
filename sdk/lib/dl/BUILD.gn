@@ -18,7 +18,6 @@ source_set("runtime") {
   }
 
   sources = [
-    "module.cc",
     "module.h",
     "runtime-dynamic-linker.cc",
   ]
