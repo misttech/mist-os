@@ -111,15 +111,24 @@ group("tests") {
 }
 
 group("msd-system") {
-  deps = [ ":msd-arm-mali" ]
+  deps = [
+    ":msd-arm-mali",
+    ":msd-arm-mali.bazel_input",
+  ]
 }
 
 fuchsia_driver_package("msd-arm-mali") {
   driver_components = [ ":msd_arm" ]
 }
 
-export_fuchsia_package_to_bazel("msd-arm-mali_for_bazel") {
+export_fuchsia_package_to_bazel("msd-arm-mali.bazel_input") {
   package = ":msd-arm-mali"
+}
+
+# TODO(https://fxbug.dev/42074238): Remove once //vendor/.. dependencies
+# use the above target instead.
+group("msd-arm-mali_for_bazel") {
+  deps = [ ":msd-arm-mali.bazel_input" ]
 }
 
 # This is the OOT built msd-arm-mali driver.

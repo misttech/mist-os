@@ -8,6 +8,6 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_prebuilt_package(
     name = "msd-arm-mali",
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    archive = "@legacy_ninja_build_outputs//:msd-arm-mali.far",
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    archive = "@gn_targets//src/graphics/drivers/msd-arm-mali:msd-arm-mali",
 )
