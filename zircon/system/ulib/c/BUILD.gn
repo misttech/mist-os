@@ -84,7 +84,13 @@ config("llvm-libc.config") {
   visibility = [ "./*" ]
   defines = [ "LIBC_COPT_USE_C_ASSERT=1" ]
   include_dirs = [
-    libc,
+    ".",
+
+    # TODO(https://fxbug.dev/42105189): This directory provides headers to
+    # preempt and wrap certain llvm-libc headers to work around the
+    # incompatibility of the namespace-unclean Zircon headers.
+    "include-preempt",
+
     llvm_libc,
   ]
 

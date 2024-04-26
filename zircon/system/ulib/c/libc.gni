@@ -260,6 +260,10 @@ template("libc_source_set") {
 #     - Type: dir
 #     - Default: "."
 #
+#   * public
+#     - Optional: As for source_set(), but $dir is prefixed if set.
+#     - Type: list(file)
+#
 #   * sources
 #     - Required: As for source_set(), but $dir is prefixed if set.
 #     - Type: list(file)
@@ -276,6 +280,7 @@ template("libc_test") {
                            [
                              "configs",
                              "dir",
+                             "public",
                              "remove_configs",
                              "sources",
                              "testonly",
@@ -286,8 +291,15 @@ template("libc_test") {
       foreach(file, invoker.sources) {
         sources += [ "${invoker.dir}/$file" ]
       }
+      if (defined(invoker.public)) {
+        public = []
+        foreach(file, invoker.public) {
+          public += [ "${invoker.dir}/$file" ]
+        }
+      }
     } else {
       sources = invoker.sources
+      forward_variables_from(invoker, [ "public" ])
     }
 
     if (defined(invoker.remove_configs)) {
@@ -361,10 +373,15 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     - Optional: See libc_source_set().
 #      These are combined with entries derived from `functions` et al.
 #
-#   * deps
+#   * test_sources
+#     - Optional: Additional sources added to the libc_test() but not the
+#       libc_source_set().  These sources are found in the test directory
+#       like the `${function}_test.cpp` sources for the $functions list.
+#
+#   * deps, test_deps
 #     - Optional: See llvm_libc_group().
 #
-#   * defines, visibility
+#   * defines, include_dirs, visibility
 #     - Optional: See source_set().
 #
 template("llvm_libc_source_set") {
@@ -405,6 +422,7 @@ template("llvm_libc_source_set") {
                              "basic_abi",
                              "configs",
                              "defines",
+                             "include_dirs",
                              "non_test_deps",
                              "non_test_vars",
                              "public",
@@ -471,11 +489,20 @@ template("llvm_libc_source_set") {
 
   libc_test(test_target) {
     dir = "$llvm_libc/test/src/$source_dir"
+
     deps = [ ":$main_target.testonly" ]
     sources = []
 
     foreach(function, invoker.functions - no_test_functions) {
       sources += [ "${function}_test.cpp" ]
+    }
+
+    if (defined(invoker.test_sources)) {
+      sources += invoker.test_sources
+    }
+
+    if (defined(invoker.test_deps)) {
+      deps += invoker.test_deps
     }
 
     if (defined(invoker.deps)) {
@@ -516,8 +543,15 @@ template("llvm_libc_source_set") {
 #     - Optional: A list of labels not used for test code.
 #     - Type: list(label_without_toolchain)
 #
+#   * test_deps
+#     - Optional: A list of labels used by tests themselves, rather than
+#       by any version of the code under test.  These are dependencies only
+#       of the unittests target, not the testonly target.
+#     - Type: list(label_without_toolchain)
+#
 #   * testonly_deps
-#     - Optional: A list of labels used *only* for test code.
+#     - Optional: A list of labels used *only* for testonly versions of code
+#       under test.  These are dependencies of the testonly target.
 #     - Type: list(label_without_toolchain)
 #
 template("llvm_libc_group") {
@@ -556,6 +590,16 @@ template("llvm_libc_group") {
       }
       if (suffix != "" && defined(invoker.testonly_deps)) {
         foreach(label, invoker.testonly_deps) {
+          assert(get_label_info(label, "label_with_toolchain") ==
+                 get_label_info(label, "label_no_toolchain") +
+                 "($current_toolchain)")
+          label = get_label_info(label, "label_no_toolchain")
+          label += ".$suffix"
+          deps += [ label ]
+        }
+      }
+      if (suffix == "unittests" && defined(invoker.test_deps)) {
+        foreach(label, invoker.test_deps) {
           assert(get_label_info(label, "label_with_toolchain") ==
                  get_label_info(label, "label_no_toolchain") +
                  "($current_toolchain)")

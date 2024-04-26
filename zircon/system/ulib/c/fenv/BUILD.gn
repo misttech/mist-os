@@ -4,61 +4,50 @@
 
 import("../libc.gni")
 
-libc_source_set("fenv") {
-  dir = "$llvm_libc/src/fenv"
-  public = [
-    "feclearexcept.h",
-    "fegetenv.h",
-    "fegetexceptflag.h",
-    "fegetround.h",
-    "feholdexcept.h",
-    "feraiseexcept.h",
-    "fesetenv.h",
-    "fesetexceptflag.h",
-    "fesetround.h",
-    "fetestexcept.h",
-    "feupdateenv.h",
+llvm_libc_source_set("fenv") {
+  functions = [
+    "feclearexcept",
+    "feenableexcept",
+    "feholdexcept",
+    "feupdateenv",
   ]
-  sources = [
-    "feclearexcept.cpp",
-    "fegetenv.cpp",
-    "fegetexceptflag.cpp",
-    "fegetround.cpp",
-    "feholdexcept.cpp",
-    "feraiseexcept.cpp",
-    "fesetenv.cpp",
-    "fesetexceptflag.cpp",
-    "fesetround.cpp",
-    "fetestexcept.cpp",
-    "feupdateenv.cpp",
+  no_test_functions = [
+    "fedisableexcept",
+    "fegetenv",
+    "fegetexcept",
+    "fegetexceptflag",
+    "fegetround",
+    "feraiseexcept",
+    "fesetenv",
+    "fesetexcept",
+    "fesetexceptflag",
+    "fesetround",
+    "fetestexcept",
+    "fetestexceptflag",
+  ]
+  functions += no_test_functions
+
+  test_sources = [
+    "enabled_exceptions_test.cpp",
+    "exception_flags_test.cpp",
+    "exception_status_test.cpp",
+    "getenv_and_setenv_test.cpp",
+    "rounding_mode_test.cpp",
   ]
 
-  # TODO(https://fxbug.dev/42053828): gcc doesn't provide some intrinsics that llvm-libc
-  # expects and clang provides. Remove this after these have been upstreamed
-  # into gcc.
+  test_deps = [ ":FEnvSafeTest" ]
+
+  # TODO(https://fxbug.dev/42053828): GCC's <arm_acle.h> doesn't provide some
+  # intrinsics that llvm-libc expects and clang provides.  Remove this after
+  # these have been upstreamed into GCC.
   if (is_gcc) {
     include_dirs = [ "." ]
   }
 }
 
-libc_test("unittests") {
-  dir = "$llvm_libc/test/src/fenv"
-  deps = [ ":fenv.testonly" ]
+libc_test("FEnvSafeTest") {
+  dir = "$llvm_libc/test/UnitTest"
 
-  # TODO(https://fxbug.dev/334985146): Disabled to allow next roll,
-  # when https://fxrev.dev/1028378 can land to re-enable it along
-  # with adding new functions the new upstream version now uses.
-  sources = []
-  if (false) {
-    sources = [
-      "enabled_exceptions_test.cpp",
-      "exception_flags_test.cpp",
-      "exception_status_test.cpp",
-      "feclearexcept_test.cpp",
-      "feholdexcept_test.cpp",
-      "feupdateenv_test.cpp",
-      "getenv_and_setenv_test.cpp",
-      "rounding_mode_test.cpp",
-    ]
-  }
+  public = [ "FEnvSafeTest.h" ]
+  sources = [ "FEnvSafeTest.cpp" ]
 }
