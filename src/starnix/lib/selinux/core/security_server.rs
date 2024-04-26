@@ -34,14 +34,6 @@ pub enum Mode {
     Fake,
 }
 
-pub trait SecurityServerStatus {
-    /// Returns true if access decisions by the security server should be enforced by hooks.
-    fn is_enforcing(&self) -> bool;
-
-    /// Returns true if the security server is using a hard-coded fake policy.
-    fn is_fake(&self) -> bool;
-}
-
 struct LoadedPolicy {
     /// Parsed policy structure.
     parsed: Policy<ByValue<Vec<u8>>>,
@@ -296,6 +288,10 @@ impl SecurityServer {
         self.with_state_and_update_status(|state| state.enforcing = enforcing);
     }
 
+    pub fn is_enforcing(&self) -> bool {
+        self.state.lock().enforcing
+    }
+
     /// Returns true if the policy requires unknown class / permissions to be
     /// denied. Defaults to true until a policy is loaded.
     pub fn deny_unknown(&self) -> bool {
@@ -465,14 +461,8 @@ impl SecurityServer {
         };
         state.status.set_value(new_value);
     }
-}
 
-impl SecurityServerStatus for SecurityServer {
-    fn is_enforcing(&self) -> bool {
-        self.state.lock().enforcing
-    }
-
-    fn is_fake(&self) -> bool {
+    pub fn is_fake(&self) -> bool {
         match self.mode {
             Mode::Fake => true,
             _ => false,

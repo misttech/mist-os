@@ -39,7 +39,7 @@ use fuchsia_zircon as zx;
 use futures::FutureExt;
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
-use selinux::security_server::{SecurityServer, SecurityServerStatus as _};
+use selinux::security_server::SecurityServer;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use starnix_logging::{log_error, CoreDumpList};
 use starnix_sync::{

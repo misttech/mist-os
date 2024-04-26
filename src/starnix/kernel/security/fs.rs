@@ -16,10 +16,7 @@ use crate::{
 };
 
 use bstr::ByteSlice;
-use selinux::{
-    security_server::{SecurityServer, SecurityServerStatus as _},
-    InitialSid, SecurityId,
-};
+use selinux::{security_server::SecurityServer, InitialSid, SecurityId};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
