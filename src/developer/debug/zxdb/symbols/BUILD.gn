@@ -243,7 +243,22 @@ if (is_host) {
     # loaded on the host platform.
     outputs = [ "$root_out_dir/test_data/zxdb/{{source_name_part}}.targetso" ]
 
-    deps = [ "test_data:zxdb_symbol_test(${default_toolchain}-shared)" ]
+    deps = [ "test_data/cpp:zxdb_symbol_test(${default_toolchain}-shared)" ]
+  }
+
+  host_test_data("rust_symbols") {
+    sources = [ "//prebuilt/test_data/debug/rust_test_data/rust_symbol_test" ]
+
+    # This executable is built with the target toolchain, but isn't packaged in a fuchsia component
+    # or package, so can't actually be executed on the target or the host.
+    outputs = [ "$root_out_dir/test_data/zxdb/{{source_file_part}}.targetexe" ]
+
+    # **NOTE**: Uncomment the below dep target when updating the rust CIPD package. See the notes in
+    # the test_data/README.md for instructions.
+
+    # deps = [
+    #   "test_data/rust:rust_bin",
+    # ]
   }
 
   host_test_data("dot_buildid") {
@@ -336,6 +351,7 @@ source_set("tests") {
     data_deps = [
       ":dot_buildid",
       ":fission",
+      ":rust_symbols",
       ":symbol_index_files",
       ":test_elf_file",
       ":test_so",

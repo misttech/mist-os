@@ -8,18 +8,15 @@
 
 #include <algorithm>
 #include <memory>
+#include <set>
 
 #include "llvm/DebugInfo/DIContext.h"
-#include "llvm/DebugInfo/DWARF/DWARFContext.h"
-#include "llvm/DebugInfo/DWARF/DWARFUnit.h"
 #include "llvm/Object/Binary.h"
-#include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/ObjectFile.h"
+#include "src/developer/debug/shared/address_range.h"
 #include "src/developer/debug/shared/largest_less_or_equal.h"
-#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/symbols/compile_unit.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_binary_impl.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_expr_eval.h"
@@ -31,7 +28,7 @@
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/line_details.h"
-#include "src/developer/debug/zxdb/symbols/line_table_impl.h"
+#include "src/developer/debug/zxdb/symbols/line_table.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/developer/debug/zxdb/symbols/module_indexer.h"
 #include "src/developer/debug/zxdb/symbols/resolve_options.h"
@@ -743,7 +740,38 @@ std::vector<Location> ModuleSymbolsImpl::ResolveElfName(const SymbolContext& sym
 //    for inlined function calls whose call location matches the input location. (Note: neither GDB
 //    nor LLDB do this as of this writing, this is more of a workaround for a Clang bug.)
 //
-// 3. The above step can find many different locations. Maybe some code from the file in question is
+// 3. Conversely, rustc emits too many line table entries for await points. This causes the "best"
+//    match (see below) to not actually be the lowest address for this particular line. To solve
+//    this, we cross reference the match with the LineDetails for each match's address to filter the
+//    matches to the minimal set of AddressRanges. From there, we query each match's address again
+//    for the most specific CodeBlock at that address. The match with the lowest address for each
+//    unique CodeBlock are the locations that we should return.
+//
+//    Rust await points are usually broken into a few discontiguous ranges where the generated code
+//    wraps the actual function call, giving us clear segments to set the breakpoint. Due to
+//    https://github.com/rust-lang/rust/issues/123341, the first segment is typically not where you
+//    want the breakpoint to be. We also want to avoid setting breakpoint locations on all of these
+//    discontiguous ranges, because the breakpoint would be hit multiple times, so we need to also
+//    compare the most specific CodeBlock associated with each of these discontiguous ranges for
+//    uniqueness. Rust await points generate a CodeBlock for the generated code to handle the state
+//    changes of the returned future which is distinct from the CodeBlock of the containing
+//    function, and is conveniently the first code that executes as part of the async function call
+//    on the line we're interested in.
+//
+//    GDB and LLDB handle this case by doing one of the above steps - GDB compares code blocks and
+//    LLDB collapses contiguous regions - and then install breakpoints in all of the resulting
+//    locations. This leads to LLDB installing a breakpoint before the synchronous part of the
+//    generated code (which is what the user primarily will want) and then also on the eventual
+//    dropping of the future that happens when the asynchronous operation is completed, which is
+//    confusing when the breakpoint hits twice. GDB installs a single additional breakpoint before
+//    the user's function is called, which is also what we do.
+//
+//    Synchronous inlined functions can also result in a set of discontiguous address ranges, but
+//    unlike Rust's await points, these will typically all refer to the same CodeBlock, namely the
+//    function being inlined. This results in the expected behavior of resolving a single location
+//    before any inline call chains begin.
+//
+// 4. The above step can find many different locations. Maybe some code from the file in question is
 //    inlined into the compilation unit, but not the function with the line in it. Or different
 //    template instantiations can mean that a line of code is in some instantiations but don't apply
 //    to others.
@@ -752,9 +780,11 @@ std::vector<Location> ModuleSymbolsImpl::ResolveElfName(const SymbolContext& sym
 //    and find the best one. Keep only those locations matching the best one (there can still be
 //    multiple).
 //
-// 4. Inlining and templates can mean there can be multiple matches of the exact same line. Only
-//    keep the first match per function or inlined function to catch the case where a line is spread
-//    across multiple line table entries.
+// 5. Inlining and templates can mean there can be multiple matches of the exact same line. To
+//    handle the case where one line is broken into multiple line table entries, we collapse the
+//    range of contiguous addresses for a line table entry to just the one with the smallest
+//    address. See complication #3 for the reasoning. This means that multiple addresses may match a
+//    single function on the line.
 void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& symbol_context,
                                                         const std::string& canonical_file,
                                                         int line_number,
@@ -819,6 +849,7 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
 
     if (checked_functions.find(match.function) != checked_functions.end())
       continue;  // Already checked this function.
+
     checked_functions.insert(match.function);
 
     if (auto fn = match.function.Get()->As<Function>()) {
@@ -830,8 +861,9 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
       // not checked it yet.
       auto containing_fn = fn->GetContainingFunction(Function::kPhysicalOnly);
       if (fn->GetDieOffset() != containing_fn->GetDieOffset() &&
-          checked_functions.find(fn->GetLazySymbol()) != checked_functions.end())
+          checked_functions.find(fn->GetLazySymbol()) != checked_functions.end()) {
         continue;  // Already checked this toplevel function.
+      }
 
       // Append any new matches.
       AppendLineMatchesForInlineCalls(containing_fn.get(), canonical_file, line_number,
@@ -839,9 +871,64 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
     }
   }
 
-  // Complications 3 & 4 above: Get all instances of the best match only with a max of one per
-  // function. The best match is the one with the lowest line number (found matches should all be
-  // bigger than the input line, so this will be the closest).
+  // Complication 3: Map the line details extent back to the match for this line, sorted by the
+  // beginning of the range. Using the extent from the LineDetails is the first thing we can use to
+  // discard unneeded matches. We only want to keep the match with the lowest address.
+  std::map<AddressRange, LineMatch, AddressRangeBeginCmp> range_to_match;
+  for (auto& match : matches) {
+    auto details = LineDetailsForAddress(symbol_context,
+                                         symbol_context.RelativeToAbsolute(match.address), true);
+
+    auto found = range_to_match.find(details.GetExtent());
+    if (found == range_to_match.end()) {
+      range_to_match[details.GetExtent()] = match;
+    } else if (match.address < found->second.address) {
+      found->second = match;
+    }
+  }
+
+  // We will repopulate |matches| with only the matches that refer to unique CodeBlocks. If multiple
+  // matches refer to the same CodeBlock, only the match with the lowest address is kept.
+  matches.clear();
+
+  // This ensures that the CodeBlock corresponding to the PC for each corresponding match is unique,
+  // which is important for finding all the locations that a NON-inlined function could have. This
+  // is particularly important when dealing with the generated code around Rust await points.
+  auto comparator = [&symbol_context](const CodeBlock* lhs, const CodeBlock* rhs) {
+    const auto& lhs_range = lhs->GetFullRange(symbol_context);
+    const auto& rhs_range = rhs->GetFullRange(symbol_context);
+    return debug::AddressRangeEqualityCmp()(lhs_range, rhs_range);
+  };
+
+  // If multiple matches resolve to the same actual range of code, only keep the first one. Since
+  // |range_to_matches| is sorted, the first match will always be the lowest address for that
+  // CodeBlock and therefore is the best location.
+  std::set<const CodeBlock*, decltype(comparator)> seen_code_blocks(comparator);
+  for (const auto& [_, match] : range_to_match) {
+    auto fn = match.function.Get()->As<Function>();
+
+    auto block =
+        fn->GetMostSpecificChild(symbol_context, symbol_context.RelativeToAbsolute(match.address));
+
+    // We already know this is a function location, so at worst we should get back |fn| from
+    // GetMostSpecificChild.
+    FX_DCHECK(block);
+
+    if (seen_code_blocks.find(block) != seen_code_blocks.end()) {
+      // This address is covered by another match's corresponding CodeBlock, we can discard it.
+      continue;
+    }
+
+    // New CodeBlock, keep it.
+    seen_code_blocks.insert(block);
+    matches.push_back(match);
+  }
+
+  // Complications 4 & 5 above: Get all instances of the best match only with a typical max of one
+  // per function. The best match is the one with the lowest line number (found matches should all
+  // be bigger than the input line, so this will be the closest). Some matches will appear twice
+  // here, indicating that the function was split into unique, discontiguous code regions, and we
+  // have to include the extra ones to accommodate https://github.com/rust-lang/rust/issues/123341.
   for (const LineMatch& match : GetBestLineMatches(matches)) {
     uint64_t abs_addr = symbol_context.RelativeToAbsolute(match.address);
     if (options.symbolize) {

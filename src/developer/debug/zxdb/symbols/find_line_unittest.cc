@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/developer/debug/zxdb/common/address_range.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
@@ -271,14 +272,21 @@ TEST(FindLine, GetBestLineMatches) {
   EXPECT_EQ(LineMatch(0x1000, 10, fn_null), out[0]);
   EXPECT_EQ(LineMatch(0x1002, 10, fn2), out[1]);
 
-  // Dupes in the same function should return the smallest match.
-  out = GetBestLineMatches({LineMatch(0x1002, 10, fn_null),  // Match, discarded due to higher addr.
-                            LineMatch(0x1001, 20, fn_null),  // No line match.
-                            LineMatch(0x1000, 10, fn_null),  // Match, this one last lowest addr.
-                            LineMatch(0x1003, 10, fn1)});    // Same line, different function.
+  // When a non-inlined function has multiple matches across the same line we will match all unique
+  // CodeBlocks returned from GetMostSpecificChild for each match.
+  auto fn4 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  symbol_factory.SetMockSymbol(0x5000, fn4);
+
+  // The existence of multiple matches for the same function on the same line at different addresses
+  // implies that it's been broken up into multiple CodeBlocks that correspond to this line, we
+  // should match both.
+  out = GetBestLineMatches({LineMatch(0x5010, 25, fn4), LineMatch(0x5024, 25, fn4)});
+
+  // We should have two matches, because fn4 has discontiguous matching regions that were passed to
+  // us (it's up to the caller to filter these out before passing us the results).
   ASSERT_EQ(2u, out.size());
-  EXPECT_EQ(LineMatch(0x1000, 10, fn_null), out[0]);
-  EXPECT_EQ(LineMatch(0x1003, 10, fn1), out[1]);
+  ASSERT_EQ(LineMatch(0x5010, 25, fn4), out[0]);
+  ASSERT_EQ(LineMatch(0x5024, 25, fn4), out[1]);
 }
 
 // Tests looking for a prologue end marker that's not present.

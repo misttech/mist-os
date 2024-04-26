@@ -322,6 +322,42 @@ TEST(ModuleSymbols, ResolveLineInputLocation_Inlines) {
       << ", " << kInlineFnSecondLine << ", " << kInlineCallLine << "}";
 }
 
+// This test has a similar setup to the above inline test, but this tests line resolution for lines
+// containing rust async function calls (in particular where it is awaited). From
+// https://fxbug.dev/331475631, rustc emits line tables that can point to invalid instructions at
+// the lowest address, which is where we'd typically install a breakpoint. This typically results in
+// breakpoints that will never be hit, which is surprising to the user.
+//
+// This test uses a prebuilt symbol file to verify that we break correctly before the synchronous
+// part of the user's function is called because the issue does not reproduce in all build
+// configurations and simplifies the the build logic for the rust code.
+TEST(ModuleSymbols, ResolveLineInputLocation_Await) {
+  TestSymbolModule setup(TestSymbolModule::GetPrebuiltRustTestFileName(), "");
+  ASSERT_TRUE(setup.Init().ok());
+
+  SymbolContext symbol_context(0x1F000);  // Fake base address.
+
+  auto file_matches = setup.symbols()->FindFileMatches("rust_symbol_test.rs");
+  ASSERT_EQ(1u, file_matches.size());
+  const std::string file_name = file_matches[0];
+
+  constexpr int kAwaitCallLine = 17;  // The line number where the async function is called.
+
+  ResolveOptions options;
+  options.symbolize = true;
+
+  std::vector<Location> addrs = setup.symbols()->ResolveInputLocation(
+      symbol_context, InputLocation(FileLine(file_name, kAwaitCallLine)), options);
+
+  // We'll always be testing an unoptimized debug build of the rust source, which should always
+  // produce exactly two addresses for the location. The first will be the address that will never
+  // actually be hit, and the second which should be the call site of the user's function.
+  EXPECT_EQ(addrs.size(), 2u);
+  EXPECT_TRUE(std::all_of(addrs.begin(), addrs.end(), [&](const Location& location) {
+    return location.file_line().line() == kAwaitCallLine;
+  }));
+}
+
 TEST(ModuleSymbols, ResolveGlobalVariable) {
   TestSymbolModule setup(TestSymbolModule::GetCheckedInTestFileName(), "");
   ASSERT_TRUE(setup.Init().ok());

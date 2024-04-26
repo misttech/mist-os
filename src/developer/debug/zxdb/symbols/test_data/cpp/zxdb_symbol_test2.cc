@@ -5,7 +5,7 @@
 // clang-format off
 // This file is used to check symbol information so should not be modified by the formatter.
 
-#include "src/developer/debug/zxdb/symbols/test_data/zxdb_symbol_test.h"
+#include "src/developer/debug/zxdb/symbols/test_data/cpp/zxdb_symbol_test.h"
 
 class ClassInTest2 {
   EXPORT static int FunctionInTest2();

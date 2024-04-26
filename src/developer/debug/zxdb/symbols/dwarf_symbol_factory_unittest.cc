@@ -176,7 +176,7 @@ TEST(DwarfSymbolFactory, InlinedFunction) {
 
   // Check the declaration location. This mostly verifies that the path name is relative to the
   // build directory and that there aren't any unnecessary "." or "..".
-  EXPECT_EQ("../../src/developer/debug/zxdb/symbols/test_data/type_test.cc",
+  EXPECT_EQ("../../src/developer/debug/zxdb/symbols/test_data/cpp/type_test.cc",
             inline_func->decl_line().file());
 
   // The containing block of the inline function should be the calling function. Note that the
@@ -316,19 +316,21 @@ TEST(DwarfSymbolFactory, Array2D) {
 // The new output changes the struct to have only 3 members, where "kConstInt" and
 // "kConstLongDouble" to be declared with a DW_TAG_variable outside of the struct:
 //
+// clang-format off
 // 0x00000136:   DW_TAG_variable
 //                 DW_AT_specification	(... "kConstInt")
 //                 DW_AT_const_value	(...)
 //
 // and in the struct:
 //
-// 0x00000175:       DW_TAG_variable
-//                     DW_AT_name	("kConstInt")
-//                     DW_AT_type	(0x0000027f "const int")
-//                     DW_AT_decl_file	("./../../src/developer/debug/zxdb/symbols/test_data/type_test.cc")
-//                     DW_AT_decl_line	(36)
-//                     DW_AT_external	(true)
-//                     DW_AT_declaration  (true)
+// 0x00000175:   DW_TAG_variable
+//                 DW_AT_name	("kConstInt")
+//                 DW_AT_type	(0x0000027f "const int")
+//                 DW_AT_decl_file ("./../../src/developer/debug/zxdb/symbols/test_data/cpp/type_test.cc")
+//                 DW_AT_decl_line	(36)
+//                 DW_AT_external	(true)
+//                 DW_AT_declaration  (true)
+// clang-format on
 //
 // "kConstLongDouble" is treated similarly.
 //

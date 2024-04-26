@@ -5,7 +5,7 @@
 // clang-format off
 // This file is compiled into a library and used in zxdb tests to query symbol information. The
 // actual code is not run. Line numbers matter and must not be changed.
-#include "src/developer/debug/zxdb/symbols/test_data/zxdb_symbol_test.h"
+#include "src/developer/debug/zxdb/symbols/test_data/cpp/zxdb_symbol_test.h"
 
 // DW_TAG_namespace
 //   DW_AT_name = "my_ns"

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/zxdb/symbols/test_data/zxdb_symbol_test.h"
+#include "src/developer/debug/zxdb/symbols/test_data/cpp/zxdb_symbol_test.h"
 
 // This code isn't executed but is used for ModuleSymbolsImpl unit tests.
 // clang-format off

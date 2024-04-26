@@ -7,7 +7,7 @@
 
 #include <cstddef>
 
-#include "src/developer/debug/zxdb/symbols/test_data/zxdb_symbol_test.h"
+#include "src/developer/debug/zxdb/symbols/test_data/cpp/zxdb_symbol_test.h"
 
 // This file is compiled into a library and used in the DWARFSymboLFactory
 // tests to query symbol information. The actual code is not run.

@@ -61,15 +61,19 @@ std::vector<LineMatch> GetAllLineTableMatchesInUnit(const LineTable& line_table,
 void AppendLineMatchesForInlineCalls(const CodeBlock* block, const std::string& full_path, int line,
                                      const Function* block_fn, std::vector<LineMatch>* accumulator);
 
-// Filters the set of matches to get all instances of the closest match for the line, with a maximum
-// of one per function. It's assumed that the LineMatches are all for the same file.
+// Filters the set of matches to get all instances of the closest match for the line. Typically this
+// will result in a maximum of one match per function. It's assumed that the LineMatches are all for
+// the same file.
 //
 // LineMatches are only generated for lines that cross the line in question, so the closest
 // LineMatch for this function is the one with the smallest line number.
 //
 // The "one per function" rule is because a line can often get broken into multiple line table
 // entries (sometimes disjoint, sometimes not), and when asking for a line we want the one with the
-// lowest address.
+// lowest address. This rule is occasionally violated for cases like lines that contain code
+// generated around rust await points, and generate line tables that would put a breakpoint on an
+// invalid instruction (https://github.com/rust-lang/rust/issues/123341). See the comment above
+// |ResolveInputLineForFile| for details.
 std::vector<LineMatch> GetBestLineMatches(const std::vector<LineMatch>& matches);
 
 // Computes the size in bytes of the given function's prologue. The line table corresponding to

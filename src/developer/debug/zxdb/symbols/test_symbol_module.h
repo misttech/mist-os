@@ -68,6 +68,10 @@ class TestSymbolModule {
   // different types of setup.
   static std::string GetTestFileName();
 
+  // Returns the name of the rust executable file used by this class for doing tests with it that
+  // involve different types of setup.
+  static std::string GetPrebuiltRustTestFileName();
+
   // Returns the checked in .so used for line testing. As the mapping changes between architectures,
   // the file is compiled offline and remains the same.
   static std::string GetCheckedInTestFileName();

@@ -17,6 +17,11 @@ platform variations.
   * Copy the stripped version from `$FUCHSIA_OUT_DIR/arm64-shared/libzxdb_symbol_test.so` to
     `libsymbol_test_so_stripped.targetso`
 
+# Rust symbol data
+
+Rust specific symbols are too large to check into the git tree, so they are uploaded to cipd. These
+will be downloaded with the default Fuchsia jiri configuration, unlike the large tests below.
+
 # Large tests
 
 There are some additional binaries that are too large to include with every checkout. These are
@@ -100,6 +105,16 @@ To explicitly set a version tag for an instance:
 ```
 cipd set-tag fuchsia_internal/test_data/debug/large_test_data -version FZIh6hPkZOZa7vbUXjLjUnfzu3tYxnZ-NRHLyf2HnrMC -tag git_revision:fa316074ae0f53a2562c76cb4637b6f2892b02f7
 ```
+
+## Adding to or updating rust test data
+
+Adding files or updating the binaries contained in the rust directory is exactly the same as for the
+large test data described above, except use the `rust_test_data.yaml` file instead. New executables
+can be added to the CIPD package with additional rust targets in the rust directory, make sure to
+update the `dep` in the `rust_symbols` target.
+
+If a binary in this package needs to be updated, you'll need to uncomment the dep in the
+`rust_symbols` target in `//src/developer/debug/zxdb/symbols/BUILD.gn`.
 
 ## Fetch configuration
 

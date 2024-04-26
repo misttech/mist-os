@@ -141,37 +141,51 @@ std::vector<LineMatch> GetBestLineMatches(const std::vector<LineMatch>& matches)
   // This will be populated with all matches for the line equal to the best one (one line can match
   // many addresses depending on inlining and code reodering).
   //
-  // We only want one per inlined function instance. One function can have a line split into
-  // multiple line entries (possibly disjoint or not) and we want only the first one (by address).
-  // But if the same helper is inlined into many places (or even twice into the same function), we
-  // want to catch all of those places.
+  // We only want one per inlined function instance. But if the same helper is inlined into many
+  // places (or even twice into the same function), we want to catch all of those places. One
+  // function can have a line split into multiple line entries (possibly disjoint or not) and we
+  // want only the first one (by address).
   //
-  // By indexing by the [inlined] subroutine, we can ensure there is only one match per subroutine,
-  // and resolve collisions by address.
-  std::map<LazySymbol, size_t> fn_to_match_index;
+  // The above is not always possible for non-inlined functions (e.g. rust await points
+  // https://fxbug.dev/331475631), so the value of the map is a vector. The function symbol will be
+  // contained in a CodeBlock, but the function might not be the most specific code block for the
+  // address specified in the line table for this match. The ModuleSymbols will sort out the most
+  // specific CodeBlock for the match's address, the vector of matches in |matches| are all
+  // referring to unique CodeBlocks, and we must set a breakpoint on all of them, even if they apply
+  // to the same function signature.
+  //
+  // By indexing by the [inlined] subroutine, we can ensure there is generally only one match per
+  // subroutine, and resolve collisions by address. Note: rust async functions cannot be inline at
+  // time of this writing, so inline subroutines should always have exactly one match.
+  // TODO(https://fxbug.dev/332614827): Remove this workaround so that function symbols map to
+  // exactly one address again.
+  std::map<LazySymbol, std::vector<size_t>> fn_to_match_index;
+  size_t size = 0;
   for (size_t i = 0; i < matches.size(); i++) {
     const LineMatch& match = matches[i];
     if (match.line != min_elt_iter->line) {
       continue;  // Not a match.
     }
 
-    auto existing = fn_to_match_index.find(match.function);
-    if (existing == fn_to_match_index.end()) {
-      // New entry for this function.
-      fn_to_match_index[match.function] = i;
-    } else {
-      // Duplicate in the same function, pick the lowest address.
-      const LineMatch& existing_match = matches[existing->second];
-      if (match.address < existing_match.address)
-        fn_to_match_index[match.function] = i;  // New one better.
-    }
+    // |matches| is sorted by the lowest address for each line match by the caller before calling
+    // this function, so the first address we find for each function will be the "best". If there
+    // are multiple regions after coalescing all of the contiguous regions and removing the
+    // corresponding matches on a non-inlined function, that means the most specific code block for
+    // the match's PC was different than a previous match that corresponded to the same subroutine.
+    // We need to include all of these matches.
+    fn_to_match_index[match.function].push_back(i);
+    size++;
   }
 
   // Convert back to a result vector.
   std::vector<LineMatch> result;
-  result.reserve(fn_to_match_index.size());
-  for (const auto& [die, match_index] : fn_to_match_index)
-    result.push_back(matches[match_index]);
+  result.reserve(size);
+  for (const auto& [die, match_address] : fn_to_match_index) {
+    for (const auto match_index : match_address) {
+      result.push_back(matches[match_index]);
+    }
+  }
+
   return result;
 }
 
