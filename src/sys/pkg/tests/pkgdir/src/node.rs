@@ -38,7 +38,11 @@ async fn get_attr_per_package_source(source: PackageSource) {
     #[derive(Debug)]
     struct Args {
         open_flags: fio::OpenFlags,
-        expected_mode: u32,
+        expected_mode_type: u32,
+        // TODO(https://fxbug.dev/327633753): Remove multiple mode protections. Nodes should only
+        // have a single protection mode. Multiple protection modes are supported to transition
+        // MetaFile and MetaAsFile from being read-write to read-only.
+        expected_mode_protections: Vec<u32>,
         id_verifier: Box<dyn U64Verifier>,
         expected_content_size: u64,
         storage_size_verifier: Box<dyn U64Verifier>,
@@ -49,7 +53,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         fn default() -> Self {
             Self {
                 open_flags: fio::OpenFlags::empty(),
-                expected_mode: 0,
+                expected_mode_type: 0,
+                expected_mode_protections: vec![],
                 id_verifier: Box::new(1),
                 expected_content_size: 0,
                 storage_size_verifier: Box::new(AnyU64),
@@ -62,7 +67,13 @@ async fn get_attr_per_package_source(source: PackageSource) {
         let node = fuchsia_fs::directory::open_node(root_dir, path, args.open_flags).await.unwrap();
         let (status, attrs) = node.get_attr().await.unwrap();
         let () = zx::Status::ok(status).unwrap();
-        assert_eq!(Mode(attrs.mode), Mode(args.expected_mode));
+        assert_eq!(Mode(attrs.mode & fio::MODE_TYPE_MASK), Mode(args.expected_mode_type));
+        assert!(
+            args.expected_mode_protections.contains(&(attrs.mode & fio::MODE_PROTECTION_MASK)),
+            "expected {:o} to be one of {:?}",
+            attrs.mode & fio::MODE_PROTECTION_MASK,
+            args.expected_mode_protections.iter().map(|n| format!("{:o}", n)).collect::<Vec<_>>()
+        );
         args.id_verifier.verify(attrs.id);
         assert_eq!(attrs.content_size, args.expected_content_size);
         args.storage_size_verifier.verify(attrs.storage_size);
@@ -76,7 +87,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         ".",
         Args {
             open_flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            expected_mode: fio::MODE_TYPE_DIRECTORY | 0o700,
+            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
+            expected_mode_protections: vec![0o700],
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -86,7 +98,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         root_dir,
         "dir",
         Args {
-            expected_mode: fio::MODE_TYPE_DIRECTORY | 0o700,
+            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
+            expected_mode_protections: vec![0o700],
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -97,7 +110,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         "file",
         Args {
             open_flags: fio::OpenFlags::RIGHT_READABLE,
-            expected_mode: fio::MODE_TYPE_FILE | 0o500,
+            expected_mode_type: fio::MODE_TYPE_FILE,
+            expected_mode_protections: vec![0o500],
             id_verifier: Box::new(AnyU64),
             expected_content_size: 4,
             time_verifier: Box::new(0),
@@ -110,7 +124,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         "meta",
         Args {
             open_flags: fio::OpenFlags::NOT_DIRECTORY,
-            expected_mode: fio::MODE_TYPE_FILE | 0o600,
+            expected_mode_type: fio::MODE_TYPE_FILE,
+            expected_mode_protections: vec![0o400, 0o600],
             expected_content_size: 64,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -122,7 +137,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         "meta",
         Args {
             open_flags: fio::OpenFlags::DIRECTORY,
-            expected_mode: fio::MODE_TYPE_DIRECTORY | 0o700,
+            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
+            expected_mode_protections: vec![0o700],
             expected_content_size: 75,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -133,7 +149,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         root_dir,
         "meta/dir",
         Args {
-            expected_mode: fio::MODE_TYPE_DIRECTORY | 0o700,
+            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
+            expected_mode_protections: vec![0o700],
             expected_content_size: 75,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -144,7 +161,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
         root_dir,
         "meta/file",
         Args {
-            expected_mode: fio::MODE_TYPE_FILE | 0o600,
+            expected_mode_type: fio::MODE_TYPE_FILE,
+            expected_mode_protections: vec![0o400, 0o600],
             expected_content_size: 9,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -246,7 +264,7 @@ async fn verify_describe_directory_success(
 async fn assert_describe_file(package_root: &fio::DirectoryProxy, path: &str) {
     for flag in [fio::OpenFlags::RIGHT_READABLE, fio::OpenFlags::NODE_REFERENCE] {
         let node = fuchsia_fs::directory::open_node(package_root, path, flag).await.unwrap();
-        if let Err(e) = verify_describe_file(node, flag, true).await {
+        if let Err(e) = verify_describe_file(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
                     error: {e:#}",
@@ -255,11 +273,7 @@ async fn assert_describe_file(package_root: &fio::DirectoryProxy, path: &str) {
     }
 }
 
-async fn verify_describe_file(
-    node: fio::NodeProxy,
-    flag: fio::OpenFlags,
-    content: bool,
-) -> Result<(), Error> {
+async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
     let protocol = node.query().await.context("failed to call query")?;
     if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
         if protocol == fio::NODE_PROTOCOL_NAME.as_bytes() {
@@ -272,25 +286,15 @@ async fn verify_describe_file(
             .describe()
             .await
             .context("failed to call describe")?;
-        match observer {
-            Some(observer) => {
-                if content {
-                    let _: zx::Signals = observer
-                        .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
-                        .context("FILE_SIGNAL_READABLE not set")?;
-                    Ok(())
-                } else {
-                    Err(anyhow!("observer unexpectedly set"))
-                }
-            }
-            None => {
-                if content {
-                    Err(anyhow!("expected observer to be set"))
-                } else {
-                    Ok(())
-                }
-            }
+        // Only blobfs blobs set the observer to indicate when the blob is readable. The blobs
+        // should be immediately readable here.
+        if let Some(observer) = observer {
+            let _: zx::Signals = observer
+                .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
+                .context("FILE_SIGNAL_READABLE not set")?;
         }
+        // TODO(https://fxbug.dev/327633753): Check for stream support.
+        Ok(())
     } else {
         Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)))
     }
@@ -299,7 +303,7 @@ async fn verify_describe_file(
 async fn assert_describe_meta_file(package_root: &fio::DirectoryProxy, path: &str) {
     for flag in [fio::OpenFlags::empty(), fio::OpenFlags::NODE_REFERENCE] {
         let node = fuchsia_fs::directory::open_node(package_root, path, flag).await.unwrap();
-        if let Err(e) = verify_describe_file(node, flag, false).await {
+        if let Err(e) = verify_describe_file(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
                     error: {e:#}"
@@ -605,9 +609,11 @@ async fn assert_sync(package_root: &fio::DirectoryProxy, path: &str, flags: fio:
 async fn verify_sync(node: fio::NodeProxy) -> Result<(), Error> {
     let result = node.sync().await.context("failed to call sync")?;
     let result = result.map_err(zx::Status::from_raw);
-    if result == Err(zx::Status::NOT_SUPPORTED) {
-        Ok(())
-    } else {
-        Err(anyhow!("wrong status returned: {:?}", result))
+    // All of the files and directories are immutable so it's valid to return either success or
+    // NOT_SUPPORTED.
+    match result {
+        Ok(()) => Ok(()),
+        Err(zx::Status::NOT_SUPPORTED) => Ok(()),
+        Err(_) => Err(anyhow!("wrong status returned: {:?}", result)),
     }
 }
