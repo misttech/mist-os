@@ -1052,7 +1052,9 @@ impl<B: Blobfs> TestEnv<B> {
             "event count different than expected, actual_events: {actual_events:?}"
         );
 
-        for (event, expected_codes) in actual_events.into_iter().zip(expected_event_codes) {
+        for ((i, event), expected_codes) in
+            actual_events.into_iter().enumerate().zip(expected_event_codes)
+        {
             assert_matches!(
                 event,
                 MetricEvent {
@@ -1060,7 +1062,7 @@ impl<B: Blobfs> TestEnv<B> {
                     event_codes,
                     payload: MetricEventPayload::Count(1),
                 } if metric_id == expected_metric_id && event_codes == expected_codes.as_event_codes(),
-                "expected metric id: {expected_metric_id}, expected codes: {expected_codes:?}",
+                "event {i} expected metric id: {expected_metric_id}, expected codes: {expected_codes:?}",
             )
         }
     }

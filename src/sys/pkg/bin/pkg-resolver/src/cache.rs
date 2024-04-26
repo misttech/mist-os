@@ -85,16 +85,61 @@ pub async fn cache_package<'a>(
     let blob_fetch_res = async {
         let mirrors = config.mirrors().to_vec().into();
 
-        // Only add the meta.far fetch to the queue if the meta.far is not already cached to avoid
-        // blocking resolves of fully cached packages behind in-progress resolves.
-        let meta_opener = get.make_open_meta_blob();
-        if let Some(needed_meta) = meta_opener.open().await? {
-            let () = meta_opener.register_opened_blob(needed_meta);
+        // Do not add the meta.far fetch to the queue if we are sure that the meta.far is already
+        // cached to avoid blocking resolves of fully cached packages behind blob fetches (in the
+        // case where the blob fetch queue is already at its concurrency limit).
+        //
+        // The NeededBlob created by this call to `make_open_meta_blob().open()` cannot be reused by
+        // the queue because the queue could already contain a fetch request for the blob, which
+        // would result in the NeededBlob being invalid by the time it is processed.
+        // Once c++blobfs is removed and fxblob is changed to support concurrent writes of the same
+        // blob that both complete successfully, we can pass the NeededBlob in, which will avoid
+        // making an additional pkg-resolver -> pkg-cache -> blobfs -> pkg-cache -> pkg-resolver
+        // FIDL loop, at the expense of sometimes downloading meta.fars multiple times.
+        //
+        // With fxblob, it is ok to open the blob for write (i.e. call `open` on the
+        // DeferredOpenBlob) outside of the queue because fxblob allows concurrent creation attempts
+        // as long as only one succeeds.
+        //
+        // With c++blob, it is *not* okay to open the blob for write (or even read) outside of the
+        // fetch queue to test for presence because open connections even to partially written blobs
+        // keep the blob alive. This means that this open creates the possibility for the following
+        // race condition:
+        // 1. this open occurs for resolve A
+        // 2. a concurrent resolve attempt B (perhaps for a package that has this package as a
+        //    subpackage) opens the blob for write
+        // 3. resolve B obtains the blob size from the network
+        // 4. resolve B calls Resize on the blob
+        // 5. resolve B encounters an error that qualifes for retrying the fetch and closes the blob
+        // 6. resolve B tries to open the blob for write again, which fails
+        //
+        // This is very unlikely to occur in practice because resolve A closes the connection
+        // immediately, so this would need to be delayed somehow until after resolve B has made a
+        // number of network operations and FIDL calls to remote services.
+        //
+        // Note that if this open occurs after resolve B has called Resize, the open will fail
+        // instead of creating a blocking connection.
+        //
+        // The race could be prevented entirely by adding a method to NeededBlobs that uses
+        // ReadDirents on /blob to check for blob presence.
+        //
+        // fxblob will soon fully support concurrent blob creation, pending
+        // https://fxbug.dev/335870456#comment9.
+        let fetch_meta_far = match get.make_open_meta_blob().open().await {
+            Ok(Some(pkg::cache::NeededBlob { blob: _, closer })) => {
+                let () = closer.close().await;
+                true
+            }
+            Ok(None) => false,
+            // The open for write will fail on c++blob if the queue is writing the blob.
+            Err(_) => true,
+        };
+        if fetch_meta_far {
             let () = blob_fetcher
                 .push(
                     merkle,
                     FetchBlobContext {
-                        opener: meta_opener,
+                        opener: get.make_open_meta_blob(),
                         mirrors: Arc::clone(&mirrors),
                         parent_trace_id: trace_id,
                     },
