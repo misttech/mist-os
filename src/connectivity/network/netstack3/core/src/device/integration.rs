@@ -22,7 +22,6 @@ use packet_formats::ethernet::EthernetIpExt;
 use crate::{
     context::{
         CoreCtxAndResource, CounterContext, Locked, RecvFrameContext, ResourceCounterContext,
-        SendFrameContext,
     },
     device::{
         config::DeviceConfigurationContext,
@@ -831,37 +830,6 @@ impl<BC: socket::DeviceSocketBindingsContext<DeviceId<BC>> + DeviceLayerEventDis
         whole_frame: &[u8],
     ) {
         self.receive_frame(state, &device.clone().into(), frame, whole_frame)
-    }
-}
-
-impl<BC: BindingsContext, L> SendFrameContext<BC, socket::DeviceSocketMetadata<DeviceId<BC>>>
-    for CoreCtx<'_, BC, L>
-where
-    Self: SendFrameContext<BC, socket::DeviceSocketMetadata<EthernetDeviceId<BC>>>
-        + SendFrameContext<BC, socket::DeviceSocketMetadata<LoopbackDeviceId<BC>>>
-        + SendFrameContext<BC, socket::DeviceSocketMetadata<PureIpDeviceId<BC>>>,
-{
-    fn send_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        metadata: socket::DeviceSocketMetadata<DeviceId<BC>>,
-        frame: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        let socket::DeviceSocketMetadata { device_id, header } = metadata;
-        for_any_device_id!(
-            DeviceId,
-            device_id,
-            device_id => SendFrameContext::send_frame(
-                self,
-                bindings_ctx,
-                socket::DeviceSocketMetadata { device_id, header },
-                frame,
-            )
-        )
     }
 }
 

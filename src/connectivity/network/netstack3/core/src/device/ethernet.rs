@@ -56,8 +56,9 @@ use crate::{
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
-            DatagramHeader, DeviceSocketBindingsContext, DeviceSocketHandler, DeviceSocketMetadata,
-            HeldDeviceSockets, ParseSentFrameError, ReceivedFrame, SentFrame,
+            DeviceSocketBindingsContext, DeviceSocketHandler, DeviceSocketMetadata,
+            DeviceSocketSendTypes, EthernetHeaderParams, HeldDeviceSockets, ParseSentFrameError,
+            ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTimerId,
@@ -81,8 +82,11 @@ use crate::{
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
-pub(crate) trait EthernetIpLinkDeviceBindingsContext: RngContext + TimerContext2 {}
-impl<BC: RngContext + TimerContext2> EthernetIpLinkDeviceBindingsContext for BC {}
+pub(crate) trait EthernetIpLinkDeviceBindingsContext:
+    RngContext + TimerContext2 + DeviceLayerTypes
+{
+}
+impl<BC: RngContext + TimerContext2 + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
 
 /// Provides access to an ethernet device's static state.
 pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
@@ -1375,26 +1379,35 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
         )
     }
 }
+
+impl DeviceSocketSendTypes for EthernetLinkDevice {
+    /// When `None`, data will be sent as a raw Ethernet frame without any
+    /// system-applied headers.
+    type Metadata = Option<EthernetHeaderParams>;
+}
+
 impl<
         BC: EthernetIpLinkDeviceBindingsContext,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    > SendFrameContext<BC, DeviceSocketMetadata<CC::DeviceId>> for CC
+    > SendFrameContext<BC, DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>> for CC
+where
+    CC: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<BC>>,
 {
     fn send_frame<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        metadata: DeviceSocketMetadata<CC::DeviceId>,
+        metadata: DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>,
         body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let DeviceSocketMetadata { device_id, header } = metadata;
-        match header {
-            Some(DatagramHeader { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
+        let DeviceSocketMetadata { device_id, metadata } = metadata;
+        match metadata {
+            Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
                 self,
                 bindings_ctx,
                 &device_id,

@@ -13,9 +13,11 @@
             type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/42051633): Support Pure IP devices in
-                // Netstack3.
+                // Netstack3. These tests currently timeout waiting to receive.
                 "ip_endpoints_socket_ns3_v4::packet_raw_socket",
                 "ip_endpoints_socket_ns3_v6::packet_raw_socket",
+                "ip_endpoints_socket_ns3_v4::packet_dgram_socket",
+                "ip_endpoints_socket_ns3_v6::packet_dgram_socket",
             ],
         },
         {
@@ -31,11 +33,6 @@
                 // SocketMap correctly takes bound devices into account.
                 "tcp_connect_bound_to_device_ns3",
                 "tcp_bind_with_zone_connect_unzoned_ns3",
-
-                // TODO(https://fxbug.dev/42051633): Support Pure IP devices in
-                // Netstack3.
-                "ip_endpoints_socket_ns3_v4::packet_dgram_socket",
-                "ip_endpoints_socket_ns3_v6::packet_dgram_socket",
             ],
         },
         {

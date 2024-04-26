@@ -21,7 +21,8 @@ use crate::{
         pure_ip::{
             DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
             PureIpDeviceReceiveFrameMetadata, PureIpDeviceStateContext,
-            PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId, PureIpWeakDeviceId,
+            PureIpDeviceTxQueueFrameMetadata, PureIpHeaderParams, PureIpPrimaryDeviceId,
+            PureIpWeakDeviceId,
         },
         queue::{
             tx::{
@@ -30,7 +31,9 @@ use crate::{
             },
             DequeueState,
         },
-        socket::{DeviceSocketMetadata, HeldDeviceSockets, ParseSentFrameError},
+        socket::{
+            DeviceSocketMetadata, DeviceSocketSendTypes, HeldDeviceSockets, ParseSentFrameError,
+        },
         state::IpLinkDeviceState,
         DeviceCollectionContext, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher,
         DeviceSendFrameError, RecvIpFrameMeta,
@@ -147,13 +150,18 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequ
     }
 }
 
-impl<BC: BindingsContext, L> SendFrameContext<BC, DeviceSocketMetadata<PureIpDeviceId<BC>>>
+impl DeviceSocketSendTypes for PureIpDevice {
+    type Metadata = PureIpHeaderParams;
+}
+
+impl<BC: BindingsContext, L>
+    SendFrameContext<BC, DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>>
     for CoreCtx<'_, BC, L>
 {
     fn send_frame<S>(
         &mut self,
         _bindings_ctx: &mut BC,
-        _metadata: DeviceSocketMetadata<PureIpDeviceId<BC>>,
+        _metadata: DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>,
         _body: S,
     ) -> Result<(), S>
     where

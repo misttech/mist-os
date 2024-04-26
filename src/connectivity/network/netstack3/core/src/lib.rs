@@ -81,7 +81,7 @@ pub mod device {
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
     pub use pure_ip::{
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
-        PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId,
+        PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
     pub use queue::tx::TransmitQueueConfiguration;
 }
@@ -91,9 +91,9 @@ pub mod device_socket {
     pub use crate::device::{
         base::FrameDestination,
         socket::{
-            DeviceSocketBindingsContext, DeviceSocketTypes, EthernetFrame, Frame, Protocol,
-            ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams,
-            SentFrame, SocketId, SocketInfo, TargetDevice,
+            DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
+            EthernetHeaderParams, Frame, Protocol, ReceivedFrame, SendFrameError, SentFrame,
+            SocketId, SocketInfo, TargetDevice,
         },
     };
 }

@@ -16,11 +16,14 @@ use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
 use net_types::ethernet::Mac;
 use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
+    device::{
+        DeviceId, EthernetLinkDevice, LoopbackDevice, PureIpDevice, PureIpHeaderParams,
+        WeakDeviceId,
+    },
     device_socket::{
-        DeviceSocketBindingsContext, DeviceSocketTypes, EthernetFrame, Frame, FrameDestination,
-        Protocol, ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError,
-        SendFrameParams, SentFrame, SocketId, SocketInfo, TargetDevice,
+        DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
+        EthernetHeaderParams, Frame, FrameDestination, Protocol, ReceivedFrame, SendFrameError,
+        SentFrame, SocketId, SocketInfo, TargetDevice,
     },
     sync::Mutex,
 };
@@ -35,7 +38,7 @@ use crate::bindings::{
         IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
     },
     util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryFromFidlWithContext,
+        DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryFromFidl,
         TryIntoCoreWithContext as _, TryIntoFidlWithContext,
     },
     BindingsCtx, Ctx,
@@ -372,24 +375,52 @@ impl<'a> RequestHandler<'a> {
         // NB: Packet sockets require the packet_info be provided to specify
         // the destination of the data.
         let packet_info = *packet_info.ok_or(fposix::Errno::Einval)?;
-        match kind {
-            fppacket::Kind::Network => {
-                let params = packet_info.try_into_core_with_ctx(ctx.bindings_ctx())?;
-                ctx.api()
-                    .device_socket()
-                    .send_datagram(id, params, data)
-                    .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
+        let device = match BindingId::new(packet_info.interface_id) {
+            None => Err(fposix::Errno::Enxio),
+            Some(id) => {
+                id.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)
             }
-            fppacket::Kind::Link => {
-                let params = packet_info
-                    .try_into_core_with_ctx(ctx.bindings_ctx())
-                    .map_err(IntoErrno::into_errno)?;
-                ctx.api()
-                    .device_socket()
-                    .send_frame(id, params, data)
-                    .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
+        }?;
+
+        let result = match device {
+            DeviceId::Loopback(device_id) => {
+                let metadata = match kind {
+                    fppacket::Kind::Network => {
+                        Some(EthernetHeaderParams::try_from_fidl(packet_info)?)
+                    }
+                    fppacket::Kind::Link => None,
+                };
+                ctx.api().device_socket().send_frame::<_, LoopbackDevice>(
+                    id,
+                    DeviceSocketMetadata { device_id, metadata },
+                    data,
+                )
             }
-        }
+            DeviceId::Ethernet(device_id) => {
+                let metadata = match kind {
+                    fppacket::Kind::Network => {
+                        Some(EthernetHeaderParams::try_from_fidl(packet_info)?)
+                    }
+                    fppacket::Kind::Link => None,
+                };
+                ctx.api().device_socket().send_frame::<_, EthernetLinkDevice>(
+                    id,
+                    DeviceSocketMetadata { device_id, metadata },
+                    data,
+                )
+            }
+            DeviceId::PureIp(device_id) => {
+                // NB: The behavior of packet sockets over pure IP device is
+                // agnostic to the socket kind.
+                let metadata = PureIpHeaderParams::try_from_fidl(packet_info)?;
+                ctx.api().device_socket().send_frame::<_, PureIpDevice>(
+                    id,
+                    DeviceSocketMetadata { device_id, metadata },
+                    data,
+                )
+            }
+        };
+        result.map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
     }
 
     fn handle_request(
@@ -611,17 +642,10 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties> for WeakDeviceId<Bind
     }
 }
 
-impl<D> TryFromFidlWithContext<fppacket::PacketInfo> for SendDatagramParams<D>
-where
-    D: TryFromFidlWithContext<BindingId, Error = DeviceNotFoundError>,
-{
+impl TryFromFidl<fppacket::PacketInfo> for EthernetHeaderParams {
     type Error = fposix::Errno;
 
-    fn try_from_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
-        ctx: &C,
-        packet_info: fppacket::PacketInfo,
-    ) -> Result<Self, Self::Error> {
-        let frame_params = packet_info.clone().try_into_core_with_ctx(ctx)?;
+    fn try_from_fidl(packet_info: fppacket::PacketInfo) -> Result<Self, Self::Error> {
         let fppacket::PacketInfo { protocol, interface_id: _, addr } = packet_info;
         let protocol = NonZeroU16::new(protocol).ok_or(fposix::Errno::Einval)?;
         let dest_addr = match addr {
@@ -630,30 +654,15 @@ where
             fppacket::HardwareAddressUnknown!() => None,
         }
         .ok_or(fposix::Errno::Einval)?;
-        Ok(Self { frame: frame_params, protocol, dest_addr })
+        Ok(EthernetHeaderParams { dest_addr, protocol: protocol.get().into() })
     }
 }
 
-impl<D> TryFromFidlWithContext<fppacket::PacketInfo> for SendFrameParams<D>
-where
-    D: TryFromFidlWithContext<BindingId, Error = DeviceNotFoundError>,
-{
+impl TryFromFidl<fppacket::PacketInfo> for PureIpHeaderParams {
     type Error = fposix::Errno;
 
-    fn try_from_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
-        ctx: &C,
-        packet_info: fppacket::PacketInfo,
-    ) -> Result<Self, Self::Error> {
-        // Ignore protocol and addr since the frame to send already includes
-        // any link-layer headers.
-        let fppacket::PacketInfo { protocol: _, interface_id, addr: _ } = packet_info;
-        match BindingId::new(interface_id) {
-            None => Err(fposix::Errno::Enxio),
-            Some(id) => id
-                .try_into_core_with_ctx(ctx)
-                .map(|device| SendFrameParams { device })
-                .map_err(IntoErrno::into_errno),
-        }
+    fn try_from_fidl(_packet_info: fppacket::PacketInfo) -> Result<Self, Self::Error> {
+        Ok(PureIpHeaderParams {})
     }
 }
 
@@ -698,18 +707,52 @@ impl RecvMsgParams {
     }
 }
 
-impl IntoErrno for SendDatagramError {
-    fn into_errno(self) -> fposix::Errno {
-        match self {
-            Self::Frame(f) => f.into_errno(),
-        }
-    }
-}
-
 impl IntoErrno for SendFrameError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             SendFrameError::SendFailed => fposix::Errno::Enobufs,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use net_declare::{fidl_mac, net_mac};
+    use packet_formats::ethernet::EtherType;
+    use test_case::test_case;
+
+    const IFACE: u64 = 1;
+    const FIDL_PROTO: u16 = 1234;
+    const PROTO: EtherType = EtherType::Other(1234);
+    const FIDL_MAC: fppacket::HardwareAddress =
+        fppacket::HardwareAddress::Eui48(fidl_mac!("00:11:22:33:44:55"));
+    const MAC: net_types::ethernet::Mac = net_mac!("00:11:22:33:44:55");
+
+    #[test_case(
+        fppacket::PacketInfo{interface_id: IFACE, protocol: FIDL_PROTO, addr: FIDL_MAC},
+        Ok(EthernetHeaderParams{dest_addr: MAC, protocol: PROTO});
+        "success"
+    )]
+    #[test_case(
+        fppacket::PacketInfo{interface_id: IFACE, protocol: 0, addr: FIDL_MAC},
+        Err(fposix::Errno::Einval);
+        "bad_protocol"
+    )]
+    #[test_case(
+        fppacket::PacketInfo{
+            interface_id: IFACE,
+            protocol: FIDL_PROTO,
+            addr: fppacket::HardwareAddress::None(fppacket::Empty),
+        },
+        Err(fposix::Errno::Einval);
+        "missing_addr"
+    )]
+    fn ethernet_header_params_from_packet_info(
+        packet_info: fppacket::PacketInfo,
+        expected_params: Result<EthernetHeaderParams, fposix::Errno>,
+    ) {
+        assert_eq!(EthernetHeaderParams::try_from_fidl(packet_info), expected_params);
     }
 }
