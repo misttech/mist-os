@@ -1009,6 +1009,21 @@ void ProcessDispatcher::OnProcessStartForJobDebugger(ThreadDispatcher* t,
   }
 }
 
+void ProcessDispatcher::OnUserExceptionForJobDebugger(ThreadDispatcher* t,
+                                                      const arch_exception_context_t* context) {
+  auto job = job_;
+  while (job) {
+    if (job->ForEachDebugExceptionate([t, context](Exceptionate* exceptionate) {
+          t->HandleSingleShotException(exceptionate, ZX_EXCP_USER, *context);
+        }) != ZX_OK) {
+      printf("KERN: failed to allocate memory to notify user exception in %lu\n", get_koid());
+      break;
+    }
+
+    job = job->parent();
+  }
+}
+
 VmAspace* ProcessDispatcher::aspace_at(vaddr_t va) {
   if (!restricted_aspace_) {
     // If there is no restricted aspace associated with the process, shortcut and return the normal

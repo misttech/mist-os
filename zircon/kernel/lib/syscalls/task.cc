@@ -182,9 +182,25 @@ zx_status_t sys_thread_write_state(zx_handle_t handle, uint32_t kind,
 
 // zx_status_t zx_thread_raise_exception
 zx_status_t sys_thread_raise_exception(uint32_t options, zx_excp_type_t type,
-                                       user_in_ptr<const zx_exception_context_t> context) {
-  // TODO(https://fxbug.dev/333900230): Implement this function.
-  return ZX_ERR_NOT_SUPPORTED;
+                                       user_in_ptr<const zx_exception_context_t> _user_context) {
+  if (options != ZX_EXCEPTION_TARGET_JOB_DEBUGGER || type != ZX_EXCP_USER || !_user_context) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  zx_exception_context_t user_context = {};
+  zx_status_t status = _user_context.copy_from_user(&user_context);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // TODO(https://fxbug.dev/42077468): Fill in the user registers once we have access.
+  arch_exception_context_t context = {};
+  context.user_synth_code = user_context.synth_code;
+  context.user_synth_data = user_context.synth_data;
+
+  auto thread = ThreadDispatcher::GetCurrent();
+  thread->process()->OnUserExceptionForJobDebugger(thread, &context);
+  return ZX_OK;
 }
 
 // zx_status_t zx_thread_legacy_yield

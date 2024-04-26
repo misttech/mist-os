@@ -463,8 +463,7 @@ closed protocol Thread {
     ///
     /// zx_status_t zx_thread_raise_exception(uint32_t options,
     ///                                       zx_excp_type_t type,
-    ///                                       const zx_exception_context_t* context
-    ///                                       size_t context_size);
+    ///                                       const zx_exception_context_t* context);
     /// ```
     ///
     /// ## Description
@@ -494,8 +493,8 @@ closed protocol Thread {
     /// ## Errors
     ///
     /// `ZX_ERR_INVALID_ARGS`  *options* is a value other than
-    /// `ZX_EXCEPTION_TARGET_JOB_DEBUGGER` or *type* is a value other than
-    /// *ZX_EXCP_USER*.
+    /// `ZX_EXCEPTION_TARGET_JOB_DEBUGGER`, *type* is a value other than
+    /// *ZX_EXCP_USER*, or *context* is an invalid pointer.
     ///
     /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     /// There is no good way for userspace to handle this (unlikely) error.

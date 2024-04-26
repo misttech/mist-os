@@ -278,6 +278,9 @@ class ProcessDispatcher final
   // space.
   VmAspace* restricted_aspace() { return restricted_aspace_.get(); }
 
+  // Dispatch a user exception to job debugger exception channels.
+  void OnUserExceptionForJobDebugger(ThreadDispatcher* t, const arch_exception_context_t* context);
+
  private:
   // Returns the normal address space for this process.
   //
