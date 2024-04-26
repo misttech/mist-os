@@ -102,6 +102,12 @@
 #     target listed here.
 #     Type: list(label)
 #
+#   gn_targets_name
+#     Optional: Name of the filegroup target that will be defined in the
+#     @gn_targets repository for this set of files. Default is target_name
+#     with any "_bazel_inputs" suffix removed.
+#     Type: string
+#
 template("bazel_input_resource") {
   _name = target_name
   if (defined(invoker.name)) {
@@ -119,6 +125,31 @@ template("bazel_input_resource") {
     assert(
         rebase_path(dst_path, "//") != dst_path,
         "`outputs` in bazel_input_resource() cannot start with /: ${dst_path}")
+  }
+
+  _gn_label = get_label_info(":$target_name", "label_with_toolchain")
+
+  # _generator_target is not empty if there is a single dependency that
+  # generates outputs.
+  _generator_target = ""
+  if (defined(invoker.deps)) {
+    _deps = invoker.deps
+    if (_deps != [] && _deps == [ _deps[0] ]) {
+      _generator_target = _deps[0]
+    }
+  }
+
+  if (defined(invoker.gn_targets_name)) {
+    _gn_targets_name = invoker.gn_targets_name
+  } else {
+    _gn_targets_name = target_name
+
+    # Remove optional '_bazel_inputs' suffix
+    _gn_targets_name_no_suffix =
+        string_replace("${_gn_targets_name}##", "_bazel_inputs##", "##")
+    if (_gn_targets_name_no_suffix != "${_gn_targets_name}##") {
+      _gn_targets_name = string_replace(_gn_targets_name_no_suffix, "##", "")
+    }
   }
 
   group(target_name) {
@@ -139,10 +170,23 @@ template("bazel_input_resource") {
           name = _name
           sources = _sources
           destinations = _dest
-          gn_label = get_label_info(":$target_name", "label_with_toolchain")
+          gn_label = _gn_label
+          gn_targets_name = _gn_targets_name
         },
       ]
       bazel_inputs_barrier = []
+
+      if (_generator_target != "") {
+        # Used by generate_gn_targets_repository_manifest().
+        gn_targets_repository_entries = [
+          {
+            generator_label =
+                get_label_info(_generator_target, "label_no_toolchain")
+            bazel_name = _gn_targets_name
+            output_files = rebase_path(invoker.sources, root_build_dir)
+          },
+        ]
+      }
     }
   }
 }
@@ -190,6 +234,12 @@ template("bazel_input_resource") {
 #     target listed here.
 #     Type: list(label)
 #
+#   gn_targets_name
+#     Optional: Name of the filegroup target that will be defined in the
+#     @gn_targets repository for this set of files. Default is target_name
+#     with any "_bazel_inputs" suffix removed.
+#     Type: string
+#
 template("bazel_input_resource_directory") {
   _name = target_name
   if (defined(invoker.name)) {
@@ -212,6 +262,27 @@ template("bazel_input_resource_directory") {
     dest_dir = string_replace(dest_dir + "//", "//", "/")
   }
 
+  _generator_target = ""
+  if (defined(invoker.deps)) {
+    _deps = invoker.deps
+    if (_deps != [] && _deps == [ _deps[0] ]) {
+      _generator_target = _deps[0]
+    }
+  }
+
+  if (defined(invoker.gn_targets_name)) {
+    _gn_targets_name = invoker.gn_targets_name
+  } else {
+    _gn_targets_name = target_name
+
+    # Remove optional '_bazel_inputs' suffix
+    _gn_targets_name_no_suffix =
+        string_replace("${_gn_targets_name}##", "_bazel_inputs##", "##")
+    if (_gn_targets_name_no_suffix != "${_gn_targets_name}##") {
+      _gn_targets_name = string_replace(_gn_targets_name_no_suffix, "##", "")
+    }
+  }
+
   group(target_name) {
     forward_variables_from(invoker,
                            [
@@ -227,9 +298,22 @@ template("bazel_input_resource_directory") {
           source_dir = rebase_path(invoker.source_dir, root_build_dir)
           dest_dir = dest_dir
           gn_label = get_label_info(":$target_name", "label_with_toolchain")
+          gn_targets_name = _gn_targets_name
         },
       ]
       bazel_inputs_barrier = []
+
+      if (_generator_target != "") {
+        # Used by generate_gn_targets_repository_manifest().
+        gn_targets_repository_entries = [
+          {
+            generator_label =
+                get_label_info(_generator_target, "label_no_toolchain")
+            bazel_name = _gn_targets_name
+            output_directory = rebase_path(invoker.source_dir, root_build_dir)
+          },
+        ]
+      }
     }
   }
 }
@@ -333,6 +417,98 @@ template("generate_bazel_inputs_manifest") {
     data_keys = [ "bazel_inputs" ]
     walk_keys = [ "bazel_inputs_barrier" ]
     deps = invoker.inputs_deps
+    output_conversion = "json"
+  }
+}
+
+# Generate a manifest file describing the content of the @gn_targets
+# repository. Only used internally by the Fuchsia platform build.
+# This should not be invoked by regular BUILD.gn files.
+#
+# Arguments:
+#  deps: List of root dependencies to walk from to collect all metadata.
+#  output: Output file path. Defaults to $target_gen_dir/$target_name.json
+#
+template("generate_gn_targets_repository_manifest") {
+  if (defined(invoker.output)) {
+    _output = invoker.output
+  } else {
+    _output = "$target_gen_dir/$target_name.json"
+  }
+
+  # There are two types of entries:
+  #
+  # ## REGULAR ENTRIES
+  #
+  #   These entries expose an explicit list of files, as a single file group,
+  #   they look like:
+  #
+  #     bazel_name: (required)
+  #        Bazel filegroup name.
+  #        Type: Bazel target name string
+  #
+  #     generator_label: (required)
+  #        GN target label that generates the file.
+  #        Type: GN label string
+  #
+  #     output_files: (required)
+  #        List of Ninja build artifacts, relative to the Ninja build directories.
+  #        These will appear in the 'srcs' attribute of the filegroup.
+  #        Type: list of paths relative to the root_build_dir
+  #
+  #   They should generate Bazel targets that look like:
+  #
+  #     # From @gn_targets//targets/<gn_dir>/BUILD.bazel
+  #     filegroup(
+  #        name = "<bazel_name>",
+  #        srcs = [
+  #            "_files/<output_file_1>",
+  #            "_files/<output_file_2>",
+  #            ...
+  #        ],
+  #     )
+  #
+  #   Where <gn_dir> corresponds to the directory of `generator_label`.
+  #   Where <output_file_N> is the N-th entry in `output_files`, and will be
+  #   the path to a symlink (in the repository) in the special @gn_targets//_files
+  #   package.
+  #
+  # ## DIRECTORY ENTRIES
+  #
+  #   These entries expose all files under a given Ninja output directory as
+  #   a single filegroup() using the glob() function. IMPORTANT: For
+  #   correctness, only use these when it is 100% sure that the content
+  #   of the source directory is re-created properly during incremental
+  #   builds. These look like:
+  #
+  #     bazel_name: (required)
+  #        Bazel filegroup name.
+  #        Type: Bazel target name string
+  #
+  #     generator_label: (required)
+  #        GN target label that generates the file.
+  #        Type: GN label string
+  #
+  #     output_directory: (required)
+  #        Path to the directory containing Ninja output files, relative to the Ninja build directories.
+  #        Type: directory path relative to the root_build_dir
+  #
+  #   They should generate Bazel targets that look like:
+  #
+  #     # From @gn_targets//targets/<gn_dir>/BUILD.bazel
+  #     filegroup(
+  #         name = "<bazel_name>",
+  #         srcs = glob(["_files/<output_directory>/**]),
+  #     )
+  #
+  #   Where <gn_dir> corresponds to the directory of `generator_label`.
+  #
+  generated_file(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
+    outputs = [ _output ]
+    data_keys = [ "gn_targets_repository_entries" ]
+    walk_keys = [ "gn_targets_repository_entries_barrier" ]
+    deps = invoker.deps
     output_conversion = "json"
   }
 }

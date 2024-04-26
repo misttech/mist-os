@@ -9,6 +9,7 @@ import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
 import("//build/config/compiler.gni")
 import("//build/config/fuchsia_cxx_version.gni")
+import("//build/licenses/generated_licenses_spdx.gni")
 
 declare_args() {
   # Suppress Bazel non-error output
@@ -190,6 +191,18 @@ declare_args() {
 #     The output_groups flag affects the execution phase and so should only be
 #     added to commands that execute a build.
 #     Type: list of string.
+#
+#   include_host_tools_licenses: (optional)
+#     Set this to true to include the licenses of host tool dependencies in
+#     @gn_targets//:all_licenses.spdx.json.
+#     Type: boolean
+#     Default: false
+#
+#   ignore_license_collection_errors: (optional)
+#     Set this to true to ignore errors when collecting license requirements
+#     from dependencies.
+#     Type: boolean
+#     Default: false
 #
 #   deps:
 #   metadata:
@@ -386,6 +399,17 @@ template("bazel_action") {
     _bazel_targets += [ "${dir}:${name}" ]
   }
 
+  # A group to depend on all bazel_input_xxx() dependencies.
+  _bazel_inputs_group_target = "$target_name.bazel_inputs"
+  group(_bazel_inputs_group_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    deps = _bazel_inputs
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+    visibility = [ ":*" ]
+  }
+
   # Generate a manifest file that references all transitive bazel_input_xxx()
   # dependencies from _bazel_inputs, which will be passed to bazel_action.py
   # for verification (and print a human-friendly message on error).
@@ -399,7 +423,49 @@ template("bazel_action") {
   generate_bazel_inputs_manifest(_ninja_inputs_target) {
     forward_variables_from(invoker, [ "testonly" ])
     output = _ninja_inputs_manifest
-    inputs_deps = _bazel_inputs
+    inputs_deps = [ ":${_bazel_inputs_group_target}" ]
+  }
+
+  # Generate a manifest file that references all transitive bazel_input_file()
+  # and bazel_input_directory() dependencies from 'deps' or 'bazel_inputs'.
+  #
+  # These are passed to bazel_action.py to populate the @gn_targets external
+  # repository with symlinks and filegroups().
+  #
+  _gn_targets_repository_manifest =
+      "$target_gen_dir/${target_name}.gn_targets_manifest.json"
+  _gn_targets_repository_target = "${target_name}.gn_targets"
+  generate_gn_targets_repository_manifest(_gn_targets_repository_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    output = _gn_targets_repository_manifest
+    deps = [ ":${_bazel_inputs_group_target}" ]
+  }
+
+  # Generate an SPDX file that contains license information for all
+  # dependencies of this bazel_action() GN target, this will be exposed
+  # through the special @gn_targets//all_licenses_spdx_json, which should
+  # be used in product-specific build rules instead of
+  # @legacy_ninja_build_outputs//:all_bazel_inputs_licenses_spdx_json
+
+  _all_licenses_spdx_target = "${target_name}.all_licenses_spdx"
+  _all_licenses_spdx_file =
+      "$target_out_dir/${target_name}.all_licenses.spdx.json"
+
+  generated_licenses_spdx(_all_licenses_spdx_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    target = ":${_bazel_inputs_group_target}"
+    output = _all_licenses_spdx_file
+    spdx_root_package_name = "Fuchsia"
+    debug_hints = true
+
+    include_host_tools = defined(invoker.include_host_tools_licenses) &&
+                         invoker.include_host_tools_licenses
+
+    ignore_collection_errors =
+        defined(invoker.ignore_license_collection_errors) &&
+        invoker.ignore_license_collection_errors
+
+    visibility = [ ":*" ]
   }
 
   action(target_name) {
@@ -452,6 +518,10 @@ template("bazel_action") {
              rebase_path(bazel_inputs_manifest, root_build_dir),
              "--ninja-inputs-manifest",
              rebase_path(_ninja_inputs_manifest, root_build_dir),
+             "--gn-targets-repository-manifest",
+             rebase_path(_gn_targets_repository_manifest, root_build_dir),
+             "--gn-targets-all-licenses-spdx",
+             rebase_path(_all_licenses_spdx_file, root_build_dir),
              "--bazel-outputs",
            ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
            [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
@@ -610,8 +680,12 @@ template("bazel_action") {
     if (!defined(deps)) {
       deps = []
     }
-    deps += [ ":${_ninja_inputs_target}" ]
-    deps += [ "//build/bazel:generate_main_workspace($default_toolchain)" ]
+    deps += [
+      ":${_all_licenses_spdx_target}",
+      ":${_gn_targets_repository_target}",
+      ":${_ninja_inputs_target}",
+      "//build/bazel:generate_main_workspace($default_toolchain)",
+    ]
 
     # Using the console pool prevents concurrent bazel build actions to run
     # (otherwise the `bazel-bin` symlink target would become unpredictable
