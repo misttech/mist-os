@@ -2,22 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
 use ffx_snapshot_args::SnapshotCommand;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{
+    bug, moniker, return_bug, return_user_error, Error, FfxMain, FfxTool, Result,
+    VerifiedMachineWriter,
+};
 use fidl_fuchsia_feedback::{
     Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
 };
 use fidl_fuchsia_io as fio;
 use futures::stream::{FuturesOrdered, StreamExt};
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::{
+    env::temp_dir,
     fs,
     io::Write,
     path::{Path, PathBuf},
     time::Duration,
 };
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandStatus {
+    /// Snapshot captured in specified file.
+    Snapshot { output_file: PathBuf },
+    /// Annotations
+    Annotations { annotations: String },
+    /// Unexpected error with string.
+    UnexpectedError { message: String },
+    /// A known kind of error that can be reported usefully to the user
+    UserError { message: String },
+}
 
 #[derive(FfxTool)]
 pub struct SnapshotTool {
@@ -31,9 +49,42 @@ fho::embedded_plugin!(SnapshotTool);
 
 #[async_trait(?Send)]
 impl FfxMain for SnapshotTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        snapshot_impl(self.data_provider_proxy, self.cmd, &mut writer).await?;
+        if self.cmd.dump_annotations {
+            match dump_annotations(self.data_provider_proxy).await {
+                Ok(s) => {
+                    writer.machine_or(&CommandStatus::Annotations { annotations: s.clone() }, s)
+                }
+                Err(Error::User(e)) => writer.machine_or_else(
+                    &CommandStatus::UserError { message: e.to_string() },
+                    || {
+                        return Error::User(e);
+                    },
+                ),
+                Err(e) => writer.machine_or_else(
+                    &CommandStatus::UnexpectedError { message: e.to_string() },
+                    || return e,
+                ),
+            }?;
+        } else {
+            match snapshot_impl(self.data_provider_proxy, self.cmd).await {
+                Ok(filepath) => writer.machine_or(
+                    &CommandStatus::Snapshot { output_file: filepath.clone() },
+                    format!("Exported {}", filepath.to_string_lossy()),
+                ),
+                Err(Error::User(e)) => writer.machine_or_else(
+                    &CommandStatus::UserError { message: e.to_string() },
+                    || {
+                        return Error::User(e);
+                    },
+                ),
+                Err(e) => writer.machine_or_else(
+                    &CommandStatus::UnexpectedError { message: e.to_string() },
+                    || return e,
+                ),
+            }?;
+        }
         Ok(())
     }
 }
@@ -56,13 +107,11 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
 
     let mut out = Vec::new();
 
-    let (status, attrs) = file
-        .get_attr()
-        .await
-        .context(format!("Error: Failed to get attributes of file (fidl failure)"))?;
+    let (status, attrs) =
+        file.get_attr().await.map_err(|e| bug!("Failed to get attributes of file: {e}"))?;
 
     if status != 0 {
-        bail!("Error: Failed to get attributes, status: {}", status);
+        return_bug!("Error: Failed to get attributes, status: {}", status);
     }
 
     let mut queue = FuturesOrdered::new();
@@ -72,24 +121,28 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
     }
 
     loop {
-        let mut bytes: Vec<u8> = queue
-            .next()
-            .await
-            .context("read stream closed prematurely")??
-            .map_err(|status: i32| anyhow!("read error: status={}", status))?;
+        if let Some(resp) = queue.next().await {
+            let mut bytes: Vec<u8> = resp
+                .map_err(|e| bug!("read stream error {e}"))?
+                .map_err(|status: i32| bug!("read error: status={status}"))?;
 
-        if bytes.is_empty() {
-            break;
+            if bytes.is_empty() {
+                break;
+            }
+            out.append(&mut bytes);
         }
-        out.append(&mut bytes);
 
         while queue.len() < CONCURRENCY.try_into().unwrap() {
             queue.push(file.read(fio::MAX_BUF));
         }
     }
 
-    if out.len() != usize::try_from(attrs.content_size).map_err(|e| anyhow!(e))? {
-        bail!("Error: Expected {} bytes, but instead read {} bytes", attrs.content_size, out.len());
+    if out.len() != usize::try_from(attrs.content_size).map_err(|e| bug!("{e}"))? {
+        return_bug!(
+            "Error: Expected {} bytes, but instead read {} bytes",
+            attrs.content_size,
+            out.len()
+        );
     }
 
     Ok(out)
@@ -140,14 +193,11 @@ fn format_annotations(mut annotations: Vec<Annotation>) -> String {
     output
 }
 
-pub async fn dump_annotations<W: Write>(
-    writer: &mut W,
-    data_provider_proxy: DataProviderProxy,
-) -> Result<()> {
+pub async fn dump_annotations(data_provider_proxy: DataProviderProxy) -> Result<String> {
     // Build parameters
     let params = GetAnnotationsParameters {
         collection_timeout_per_annotation: Some(
-            i64::try_from(Duration::from_secs(60).as_nanos()).map_err(|e| anyhow!(e))?,
+            i64::try_from(Duration::from_secs(60).as_nanos()).map_err(|e| bug!(e))?,
         ),
         ..Default::default()
     };
@@ -156,75 +206,66 @@ pub async fn dump_annotations<W: Write>(
     let annotations = data_provider_proxy
         .get_annotations(&params)
         .await
-        .map_err(|e| anyhow!("Could not get the annotations from the target: {:?}", e))?
+        .map_err(|e| bug!("Could not get the annotations from the target: {e:?}"))?
         .annotations
-        .ok_or(anyhow!("Received empty annotations."))?;
+        .ok_or(bug!("Received empty annotations."))?;
 
-    writeln!(writer, "{}", format_annotations(annotations))?;
-
-    Ok(())
+    Ok(format_annotations(annotations))
 }
 
-pub async fn snapshot_impl<W: Write>(
+pub async fn snapshot_impl(
     data_provider_proxy: DataProviderProxy,
     cmd: SnapshotCommand,
-    writer: &mut W,
-) -> Result<()> {
-    // Dump annotations doesn't capture the snapshot.
-    if cmd.dump_annotations {
-        dump_annotations(writer, data_provider_proxy).await?;
-    } else {
-        let output_dir = match cmd.output_file {
-            None => {
-                let dir = default_output_dir();
-                fs::create_dir_all(&dir)?;
-                dir
+) -> Result<PathBuf> {
+    let output_dir = match cmd.output_file {
+        None => {
+            let dir = default_output_dir();
+            fs::create_dir_all(&dir).map_err(|e| bug!(e))?;
+            dir
+        }
+        Some(file_dir) => {
+            let dir = Path::new(&file_dir);
+            if !dir.is_dir() {
+                return_user_error!("Path provided is not a directory: {file_dir}");
             }
-            Some(file_dir) => {
-                let dir = Path::new(&file_dir);
-                if !dir.is_dir() {
-                    bail!("ERROR: Path provided is not a directory");
-                }
-                dir.to_path_buf()
-            }
-        };
+            dir.to_path_buf()
+        }
+    };
 
-        // Make file proxy and channel for snapshot
-        let (file_proxy, file_server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()?;
+    // Make file proxy and channel for snapshot
+    let (file_proxy, file_server_end) =
+        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(|e| bug!(e))?;
 
-        // Build parameters
-        let params = GetSnapshotParameters {
-            collection_timeout_per_data: Some(
-                i64::try_from(Duration::from_secs(60).as_nanos()).map_err(|e| anyhow!(e))?,
-            ),
-            response_channel: Some(file_server_end.into_channel()),
-            ..Default::default()
-        };
+    // Build parameters
+    let params = GetSnapshotParameters {
+        collection_timeout_per_data: Some(
+            i64::try_from(Duration::from_secs(60).as_nanos()).map_err(|e| bug!(e))?,
+        ),
+        response_channel: Some(file_server_end.into_channel()),
+        ..Default::default()
+    };
 
-        // Request snapshot & send channel.
-        let _snapshot = data_provider_proxy
-            .get_snapshot(params)
-            .await
-            .map_err(|e| anyhow!("Error: Could not get the snapshot from the target: {:?}", e))?;
+    // Request snapshot & send channel.
+    let _snapshot = data_provider_proxy
+        .get_snapshot(params)
+        .await
+        .map_err(|e| bug!("Error: Could not get the snapshot from the target: {e:?}"))?;
 
-        // Read archive
-        let data = read_data(&file_proxy).await?;
+    // Read archive
+    let data = read_data(&file_proxy).await?;
 
-        // Write archive to file.
-        let file_path = output_dir.join("snapshot.zip");
-        let mut file = fs::File::create(&file_path)?;
-        file.write_all(&data)?;
+    // Write archive to file.
+    let file_path = output_dir.join("snapshot.zip");
+    let mut file = fs::File::create(&file_path).map_err(|e| bug!(e))?;
+    file.write_all(&data).map_err(|e| bug!(e))?;
 
-        writeln!(writer, "Exported {}", file_path.to_string_lossy())?;
-    }
-
-    Ok(())
+    Ok(file_path)
 }
 
 fn default_output_dir() -> PathBuf {
     let now = Local::now();
-
-    Path::new("/tmp").join("snapshots").join(format!(
+    let tmpdir = temp_dir();
+    tmpdir.join("snapshots").join(format!(
         "{}{:02}{:02}_{:02}{:02}{:02}",
         now.year(),
         now.month(),
@@ -241,6 +282,7 @@ fn default_output_dir() -> PathBuf {
 #[cfg(test)]
 mod test {
     use super::*;
+    use fho::{Format, TestBuffers};
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_feedback::{Annotations, DataProviderRequest, Snapshot};
     use futures::TryStreamExt;
@@ -306,26 +348,47 @@ mod test {
         })
     }
 
-    async fn run_snapshot_test(cmd: SnapshotCommand) {
+    #[fuchsia::test]
+    async fn test_snaphot() {
         let annotations = Annotations::default();
         let data_provider_proxy = setup_fake_data_provider_server(annotations);
 
-        let mut writer = Vec::new();
-        let result = snapshot_impl(data_provider_proxy, cmd, &mut writer).await;
+        let cmd = SnapshotCommand { output_file: None, dump_annotations: false };
+        let result = snapshot_impl(data_provider_proxy, cmd).await;
         assert!(result.is_ok());
-
-        let output = String::from_utf8(writer).unwrap();
-        assert!(output.starts_with("Exported"));
-        assert!(output.ends_with("snapshot.zip\n"));
+        let output = result.expect("snapshot path");
+        assert!(output.ends_with("snapshot.zip"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_error() -> Result<()> {
-        run_snapshot_test(SnapshotCommand { output_file: None, dump_annotations: false }).await;
-        Ok(())
+    #[fuchsia::test]
+    async fn test_snaphot_machine() {
+        let annotations = Annotations::default();
+        let data_provider_proxy = setup_fake_data_provider_server(annotations);
+        let tempdir = default_output_dir();
+        fs::create_dir_all(&tempdir).expect("temp dir");
+        let tool = SnapshotTool {
+            cmd: SnapshotCommand {
+                output_file: Some(tempdir.to_string_lossy().to_string()),
+                dump_annotations: false,
+            },
+            data_provider_proxy,
+        };
+        let buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::<CommandStatus>::new_test(Some(Format::Json), &buffers);
+
+        let result = tool.main(writer).await;
+        assert!(result.is_ok());
+        let output = buffers.into_stdout_str();
+        assert_eq!(
+            output,
+            format!(
+                "{{\"snapshot\":{{\"output_file\":\"{}/snapshot.zip\"}}}}\n",
+                tempdir.to_string_lossy()
+            )
+        );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_annotations() -> Result<()> {
         let annotation_vec: Vec<Annotation> = vec![
             annotation!("build.board", "x64"),
@@ -335,10 +398,7 @@ mod test {
         let annotations = Annotations { annotations: Some(annotation_vec), ..Default::default() };
         let data_provider_proxy = setup_fake_data_provider_server(annotations);
 
-        let mut writer = Vec::new();
-        dump_annotations(&mut writer, data_provider_proxy).await?;
-
-        let output = String::from_utf8(writer).unwrap();
+        let output = dump_annotations(data_provider_proxy).await?;
         assert_eq!(
             output,
             "build\n\
@@ -346,7 +406,7 @@ mod test {
         \x20   is_debug: false\n\
         hardware\n\
         \x20   board\n\
-        \x20       name: default-board\n\n"
+        \x20       name: default-board\n"
         );
         Ok(())
     }

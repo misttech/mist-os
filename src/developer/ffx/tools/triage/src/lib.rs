@@ -51,7 +51,7 @@ pub async fn triage(
 async fn triage_impl(
     data_provider_proxy: Option<DataProviderProxy>,
     cmd: TriageCommand,
-    mut writer: Writer,
+    writer: Writer,
 ) -> Result<()> {
     let TriageCommand { config, data, tags, exclude_tags } = cmd;
 
@@ -65,12 +65,7 @@ async fn triage_impl(
                 tempdir().context("Unable to create temporary snapshot directory.")?;
             let data_provider_proxy =
                 data_provider_proxy.ok_or(anyhow!("Unable to get data provider."))?;
-            let _ = snapshot::create_snapshot(
-                data_provider_proxy,
-                snapshot_tempdir.path(),
-                &mut writer,
-            )
-            .await?;
+            let _ = snapshot::create_snapshot(data_provider_proxy, snapshot_tempdir.path()).await?;
             snapshot_tempdir.into_path()
         }
     };
