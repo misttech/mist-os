@@ -370,8 +370,8 @@ template("zither_golden_test") {
                  ])
     } else if (case.backend == "rust" || case.backend == "kernel" ||
                case.backend == "legacy_syscall_cdecl" ||
-               case.backend == "rust_syscall" || case.backend == "go_runtime" ||
-               case.backend == "syscall_docs") {
+               case.backend == "mistos" || case.backend == "rust_syscall" ||
+               case.backend == "go_runtime" || case.backend == "syscall_docs") {
       # The generated rust library targets should already enforce compilation.
       #
       # The kernel and syscall-related backends generate sources that rely on a
