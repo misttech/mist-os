@@ -75,20 +75,23 @@ struct Args {
 #[fuchsia::main(logging_tags = ["remote_control_runner"])]
 async fn main() -> Result<()> {
     let args: Args = argh::from_env();
-    // Perform the compatibility checking between the caller (the daemon) and the platform (this program).
+    // Perform the compatibility checking between the caller (the ffx daemon or
+    // a standalone ffx command) and the platform (this program).
     if let Some(abi) = args.abi_revision {
-        let daemon_revision = AbiRevision::from_u64(abi);
+        let host_overnet_revision = AbiRevision::from_u64(abi);
         let platform_abi = HISTORY.get_misleading_version_for_ffx().abi_revision;
         let status: CompatibilityState;
-        let message = match HISTORY.check_abi_revision_for_runtime(daemon_revision) {
+        let message = match HISTORY.check_abi_revision_for_runtime(host_overnet_revision) {
             Ok(_) => {
-                tracing::info!("Daemon is running supported revision: {daemon_revision}");
+                tracing::info!(
+                    "Host overnet is running supported revision: {host_overnet_revision}"
+                );
                 status = CompatibilityState::Supported;
-                "Daemon is running supported revision".to_string()
+                "Host overnet is running supported revision".to_string()
             }
             Err(e) => {
                 status = e.clone().into();
-                let warning = format!("abi revision {daemon_revision} not supported: {e}");
+                let warning = format!("abi revision {host_overnet_revision} not supported: {e}");
                 tracing::warn!("{warning}");
                 warning
             }
