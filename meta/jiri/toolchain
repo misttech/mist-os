@@ -90,5 +90,17 @@
              version="git_revision:39c824b81c78a5cdbb8b0fbb33a053a4cb733628"
              path="prebuilt/tools/buildidtool/{{.OS}}-{{.Arch}}"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"/>
+
+     <!--   jq -->
+    <package name="fuchsia/third_party/jq/${platform}"
+             version="git_revision:a17dd3248a666d01be75f6b16be37e80e20b0954"
+             path="prebuilt/third_party/jq/{{.OS}}-{{.Arch}}"
+             platforms="linux-amd64,linux-arm64,mac-amd64"/>
+    <!--   TODO: merge the mac-arm64 jq package definition into the one above
+           once jq with oniguruma is available -->
+    <package name="fuchsia/third_party/jq/${platform}"
+             version="git_revision:949d38e6dc7330712b50697d7fe833eec85dede1"
+             path="prebuilt/third_party/jq/mac-arm64"
+             platforms="mac-arm64"/>
   </packages>
 </manifest>
