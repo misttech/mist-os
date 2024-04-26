@@ -16,11 +16,7 @@
 #include <vector>
 
 #include <ddktl/device.h>
-#include <soc/aml-a311d/a311d-power.h>
-#include <soc/aml-a5/a5-power.h>
 #include <soc/aml-common/aml-power.h>
-#include <soc/aml-s905d2/s905d2-power.h>
-#include <soc/aml-s905d3/s905d3-power.h>
 
 namespace power {
 
@@ -71,15 +67,6 @@ class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, dd
   zx_status_t PowerImplGetCurrentVoltage(uint32_t index, uint32_t* current_voltage);
   zx_status_t PowerImplWritePmicCtrlReg(uint32_t index, uint32_t addr, uint32_t value);
   zx_status_t PowerImplReadPmicCtrlReg(uint32_t index, uint32_t addr, uint32_t* value);
-
-  static constexpr uint32_t kLittleClusterDomain = 0;
-  static constexpr uint32_t kBigClusterDomain = 1;
-
-  static_assert(kLittleClusterDomain == static_cast<uint32_t>(A5PowerDomains::kArmCore));
-  static_assert(kLittleClusterDomain == static_cast<uint32_t>(S905d2PowerDomains::kArmCore));
-  static_assert(kLittleClusterDomain == static_cast<uint32_t>(S905d3PowerDomains::kArmCore));
-  static_assert(kBigClusterDomain == static_cast<uint32_t>(A311dPowerDomains::kArmCoreBig));
-  static_assert(kLittleClusterDomain == static_cast<uint32_t>(A311dPowerDomains::kArmCoreLittle));
 
  private:
   zx_status_t GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& pwm,

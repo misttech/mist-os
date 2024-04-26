@@ -20,7 +20,6 @@
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <soc/aml-common/aml-power.h>
-#include <soc/aml-s905d2/s905d2-power.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>
 
 #include "astro-gpios.h"
@@ -47,7 +46,7 @@ constexpr aml_voltage_table_t kS905D2VoltageTable[] = {
 constexpr voltage_pwm_period_ns_t kS905d2PwmPeriodNs = 1250;
 
 constexpr power_domain_t domains[] = {
-    {static_cast<uint32_t>(S905d2PowerDomains::kArmCore)},
+    {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE},
 };
 
 }  // namespace

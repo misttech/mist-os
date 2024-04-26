@@ -7,11 +7,6 @@
 
 #include <stdint.h>
 
-enum class A311dPowerDomains : uint32_t {
-  kArmCoreLittle = 0,
-  kArmCoreBig = 1,
-};
-
 static constexpr uint32_t kMinVoltageUv = 690'000;
 static constexpr uint32_t kMaxVoltageUv = 1'050'000;
 static_assert(kMaxVoltageUv >= kMinVoltageUv,

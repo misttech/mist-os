@@ -71,8 +71,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 
       // CPU devices.
       "sys/platform/05:06:1e",
-      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_big_core/power-1/aml_cpu/a311d-arm-a73",
-      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_big_core/power-1/aml_cpu/a311d-arm-a53",
+      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_little_core/power-0/aml_cpu/a311d-arm-a73",
+      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_little_core/power-0/aml_cpu/a311d-arm-a53",
 
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-93/fusb302",
 

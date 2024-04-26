@@ -142,8 +142,3 @@ uint GPIOE_PIN_ID {
     PIN_1 = 98,
     PIN_2 = 99,
 };
-
-uint POWER_DOMAIN {
-  ARM_CORE_BIG = 0,
-  ARM_CORE_LITTLE = 1,
-};

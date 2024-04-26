@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include <bind/fuchsia/power/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -391,9 +392,8 @@ zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-
-  zx_device_prop_t props[] = {
-      {BIND_POWER_DOMAIN, 0, index},
+  zx_device_str_prop_t props[] = {
+      {bind_fuchsia_power::POWER_DOMAIN.c_str(), str_prop_int_val(index)},
   };
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -414,7 +414,7 @@ zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
                            .set_fidl_service_offers(offers)
                            .set_outgoing_dir(endpoints->client.TakeChannel())
                            .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                           .set_props(props));
+                           .set_str_props(props));
   if (status != ZX_OK) {
     return status;
   }

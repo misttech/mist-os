@@ -12,6 +12,8 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <cstdint>
+
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -70,8 +72,8 @@ constexpr amlogic_cpu::operating_point_t operating_points[] = {
 // clang-format on
 
 constexpr amlogic_cpu::perf_domain_t performance_domains[] = {
-    {.id = kPdArmA73, .core_count = 4, .name = "a311d-arm-a73"},
     {.id = kPdArmA53, .core_count = 2, .name = "a311d-arm-a53"},
+    {.id = kPdArmA73, .core_count = 4, .name = "a311d-arm-a73"},
 };
 
 const std::vector<fpbus::Metadata> cpu_metadata{
@@ -100,9 +102,9 @@ const fpbus::Node cpu_dev = []() {
   return result;
 }();
 
-const std::map<A311dPowerDomains, std::string> kCpuPowerDomains = {
-    {A311dPowerDomains::kArmCoreBig, bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_BIG},
-    {A311dPowerDomains::kArmCoreLittle, bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_LITTLE},
+const std::vector<uint32_t> kCpuPowerDomains = {
+    bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE,
+    bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG,
 };
 
 const std::map<uint32_t, std::string> kClockFunctionMap = {
@@ -125,18 +127,18 @@ zx_status_t Vim3::CpuInit() {
   std::vector<fdf::ParentSpec> parents;
   parents.reserve(kClockFunctionMap.size() + kCpuPowerDomains.size());
 
-  for (auto& [board, generic] : kCpuPowerDomains) {
+  for (auto& domain : kCpuPowerDomains) {
     auto power_rules = std::vector{
         fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
                                 bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeAcceptBindRule(bind_fuchsia::POWER_DOMAIN, static_cast<uint32_t>(board)),
+        fdf::MakeAcceptBindRule(bind_fuchsia_power::POWER_DOMAIN, domain),
     };
     auto power_properties = std::vector{
         fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
                           bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN, generic),
+        fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN, domain),
     };
-    parents.push_back(fdf::ParentSpec{{power_rules, power_properties}});
+    parents.push_back(fdf::ParentSpec{{.bind_rules = power_rules, .properties = power_properties}});
   }
 
   for (auto& [clock_id, function] : kClockFunctionMap) {

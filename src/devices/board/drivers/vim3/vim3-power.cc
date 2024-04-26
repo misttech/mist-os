@@ -82,11 +82,11 @@ static const fpbus::Node power_dev = []() {
 }();
 
 constexpr power_domain_t big_domain[] = {
-    {static_cast<uint32_t>(A311dPowerDomains::kArmCoreBig)},
+    {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG},
 };
 
 constexpr power_domain_t little_domain[] = {
-    {static_cast<uint32_t>(A311dPowerDomains::kArmCoreLittle)},
+    {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE},
 };
 
 const ddk::BindRule kI2cRules[] = {
