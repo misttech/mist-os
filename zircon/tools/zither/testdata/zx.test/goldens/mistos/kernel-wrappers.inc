@@ -8,6 +8,34 @@
 
 extern "C" {
 
+syscall_result wrapper_channel_write(SafeSyscallArgument<zx_handle_t>::RawType handle,
+                                     SafeSyscallArgument<uint32_t>::RawType options,
+                                     SafeSyscallArgument<const void*>::RawType bytes,
+                                     SafeSyscallArgument<uint32_t>::RawType num_bytes,
+                                     SafeSyscallArgument<const zx_handle_t*>::RawType handles,
+                                     SafeSyscallArgument<uint32_t>::RawType num_handles,
+                                     uint64_t pc);
+syscall_result wrapper_channel_write(SafeSyscallArgument<zx_handle_t>::RawType handle,
+                                     SafeSyscallArgument<uint32_t>::RawType options,
+                                     SafeSyscallArgument<const void*>::RawType bytes,
+                                     SafeSyscallArgument<uint32_t>::RawType num_bytes,
+                                     SafeSyscallArgument<const zx_handle_t*>::RawType handles,
+                                     SafeSyscallArgument<uint32_t>::RawType num_handles,
+                                     uint64_t pc) {
+  return do_syscall(
+      ZX_SYS_channel_write, pc, &VDso::ValidSyscallPC::channel_write,
+      [&](ProcessDispatcher* current_process) -> uint64_t {
+        auto result = sys_channel_write(
+            SafeSyscallArgument<zx_handle_t>::Sanitize(handle),
+            SafeSyscallArgument<uint32_t>::Sanitize(options),
+            make_user_in_ptr(SafeSyscallArgument<const void*>::Sanitize(bytes)),
+            SafeSyscallArgument<uint32_t>::Sanitize(num_bytes),
+            make_user_in_ptr(SafeSyscallArgument<const zx_handle_t*>::Sanitize(handles)),
+            SafeSyscallArgument<uint32_t>::Sanitize(num_handles));
+        return result;
+      });
+}
+
 syscall_result wrapper_channel_read(SafeSyscallArgument<zx_handle_t>::RawType handle,
                                     SafeSyscallArgument<uint32_t>::RawType options,
                                     SafeSyscallArgument<void*>::RawType bytes,
@@ -38,34 +66,6 @@ syscall_result wrapper_channel_read(SafeSyscallArgument<zx_handle_t>::RawType ha
             SafeSyscallArgument<uint32_t>::Sanitize(num_handles),
             make_user_out_ptr(SafeSyscallArgument<uint32_t*>::Sanitize(actual_bytes)),
             make_user_out_ptr(SafeSyscallArgument<uint32_t*>::Sanitize(actual_handles)));
-        return result;
-      });
-}
-
-syscall_result wrapper_channel_write(SafeSyscallArgument<zx_handle_t>::RawType handle,
-                                     SafeSyscallArgument<uint32_t>::RawType options,
-                                     SafeSyscallArgument<const void*>::RawType bytes,
-                                     SafeSyscallArgument<uint32_t>::RawType num_bytes,
-                                     SafeSyscallArgument<const zx_handle_t*>::RawType handles,
-                                     SafeSyscallArgument<uint32_t>::RawType num_handles,
-                                     uint64_t pc);
-syscall_result wrapper_channel_write(SafeSyscallArgument<zx_handle_t>::RawType handle,
-                                     SafeSyscallArgument<uint32_t>::RawType options,
-                                     SafeSyscallArgument<const void*>::RawType bytes,
-                                     SafeSyscallArgument<uint32_t>::RawType num_bytes,
-                                     SafeSyscallArgument<const zx_handle_t*>::RawType handles,
-                                     SafeSyscallArgument<uint32_t>::RawType num_handles,
-                                     uint64_t pc) {
-  return do_syscall(
-      ZX_SYS_channel_write, pc, &VDso::ValidSyscallPC::channel_write,
-      [&](ProcessDispatcher* current_process) -> uint64_t {
-        auto result = sys_channel_write(
-            SafeSyscallArgument<zx_handle_t>::Sanitize(handle),
-            SafeSyscallArgument<uint32_t>::Sanitize(options),
-            make_user_in_ptr(SafeSyscallArgument<const void*>::Sanitize(bytes)),
-            SafeSyscallArgument<uint32_t>::Sanitize(num_bytes),
-            make_user_in_ptr(SafeSyscallArgument<const zx_handle_t*>::Sanitize(handles)),
-            SafeSyscallArgument<uint32_t>::Sanitize(num_handles));
         return result;
       });
 }

@@ -9,8 +9,8 @@
 #ifndef LIB_SYSCALLS_LINUX_SYSCALL_NUMBERS_H_
 #define LIB_SYSCALLS_LINUX_SYSCALL_NUMBERS_H_
 
-#define ZX_SYS_channel_read 0
-#define ZX_SYS_channel_write 1
+#define ZX_SYS_channel_write 0
+#define ZX_SYS_channel_read 1
 #define ZX_SYS_clock_get_monotonic_via_kernel 2
 #define ZX_SYS_handle_close_many 3
 #define ZX_SYS_ktrace_control 4

@@ -6,19 +6,19 @@
 // DO NOT EDIT. Generated from FIDL library linux by zither, a Fuchsia platform
 // tool.
 
-KERNEL_SYSCALL(
-    channel_read, zx_status_t, /* no attributes */, 8,
-    (handle, options, bytes, handles, num_bytes, num_handles, actual_bytes, actual_handles),
-    (_ZX_SYSCALL_ANNO(use_handle("FuchsiaUnchecked")) zx_handle_t handle, uint32_t options,
-     void* bytes, _ZX_SYSCALL_ANNO(acquire_handle("FuchsiaUnchecked")) zx_handle_t* handles,
-     uint32_t num_bytes, uint32_t num_handles, uint32_t* actual_bytes, uint32_t* actual_handles))
-
 KERNEL_SYSCALL(channel_write, zx_status_t, /* no attributes */, 6,
                (handle, options, bytes, num_bytes, handles, num_handles),
                (_ZX_SYSCALL_ANNO(use_handle("Fuchsia")) zx_handle_t handle, uint32_t options,
                 const void* bytes, uint32_t num_bytes,
                 _ZX_SYSCALL_ANNO(release_handle("Fuchsia")) const zx_handle_t* handles,
                 uint32_t num_handles))
+
+KERNEL_SYSCALL(
+    channel_read, zx_status_t, /* no attributes */, 8,
+    (handle, options, bytes, handles, num_bytes, num_handles, actual_bytes, actual_handles),
+    (_ZX_SYSCALL_ANNO(use_handle("FuchsiaUnchecked")) zx_handle_t handle, uint32_t options,
+     void* bytes, _ZX_SYSCALL_ANNO(acquire_handle("FuchsiaUnchecked")) zx_handle_t* handles,
+     uint32_t num_bytes, uint32_t num_handles, uint32_t* actual_bytes, uint32_t* actual_handles))
 
 VDSO_SYSCALL(clock_get_monotonic, zx_time_t, /* no attributes */, 0, (), (void))
 

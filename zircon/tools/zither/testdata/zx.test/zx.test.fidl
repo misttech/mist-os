@@ -24,6 +24,19 @@ resource_definition Handle : uint32 {
 
 @transport("Syscall")
 closed protocol Channel {
+    /// NOTE: mist-os: must respect the declaration order as it is the FIDL file.
+    /// Change the declaration order to guarantee it is not sorted in mist-os
+    strict Write(resource struct {
+        handle Handle:CHANNEL;
+        options uint32;
+        @voidptr
+        @size32
+        bytes vector<byte>;
+        @release
+        @size32
+        handles vector<Handle>;
+    }) -> () error Status;
+
     @handle_unchecked
     strict Read(resource struct {
         handle Handle:CHANNEL;
@@ -39,17 +52,6 @@ closed protocol Channel {
         actual_bytes uint32;
         actual_handles uint32;
     }) error Status;
-
-    strict Write(resource struct {
-        handle Handle:CHANNEL;
-        options uint32;
-        @voidptr
-        @size32
-        bytes vector<byte>;
-        @release
-        @size32
-        handles vector<Handle>;
-    }) -> () error Status;
 };
 
 @transport("Syscall")
