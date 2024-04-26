@@ -81,14 +81,8 @@ use crate::{
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
-pub(crate) trait EthernetIpLinkDeviceBindingsContext<DeviceId>:
-    RngContext + TimerContext2
-{
-}
-impl<DeviceId, BC: RngContext + TimerContext2> EthernetIpLinkDeviceBindingsContext<DeviceId>
-    for BC
-{
-}
+pub(crate) trait EthernetIpLinkDeviceBindingsContext: RngContext + TimerContext2 {}
+impl<BC: RngContext + TimerContext2> EthernetIpLinkDeviceBindingsContext for BC {}
 
 /// Provides access to an ethernet device's static state.
 pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
@@ -104,9 +98,8 @@ pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
 }
 
 /// Provides access to an ethernet device's dynamic state.
-pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
-    BC: EthernetIpLinkDeviceBindingsContext<Self::DeviceId>,
->: EthernetIpLinkDeviceStaticStateContext
+pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<BC: EthernetIpLinkDeviceBindingsContext>:
+    EthernetIpLinkDeviceStaticStateContext
 {
     /// Calls the function with the ethernet device's static state and immutable
     /// reference to the dynamic state.
@@ -379,7 +372,7 @@ fn send_as_ethernet_frame_to_dst<S, BC, CC>(
 where
     S: Serializer,
     S::Buffer: BufferMut,
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -412,7 +405,7 @@ fn send_ethernet_frame<S, BC, CC>(
 where
     S: Serializer,
     S::Buffer: BufferMut,
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -837,7 +830,7 @@ impl<I: Ip, D: device::WeakId> From<NudTimerId<I, EthernetLinkDevice, D>> for Et
 
 impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::WeakDeviceId>> for CC
 where
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::WeakDeviceId>>
         + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::WeakDeviceId>>,
@@ -865,7 +858,7 @@ pub(super) fn send_ip_frame<BC, CC, A, S>(
     broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
+    BC: EthernetIpLinkDeviceBindingsContext
         + DeviceSocketBindingsContext<CC::DeviceId>
         + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
@@ -948,7 +941,7 @@ impl DeviceReceiveFrameSpec for EthernetLinkDevice {
 
 impl<CC, BC> RecvFrameContext<BC, RecvEthernetFrameMeta<CC::DeviceId>> for CC
 where
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
+    BC: EthernetIpLinkDeviceBindingsContext
         + DeviceSocketBindingsContext<CC::DeviceId>
         + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
@@ -1074,7 +1067,7 @@ where
 // testonly.
 #[cfg(test)]
 pub(super) fn set_promiscuous_mode<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1102,7 +1095,7 @@ pub(super) fn set_promiscuous_mode<
 /// `join_link_multicast` joins an L2 multicast group, whereas
 /// `join_ip_multicast` joins an L3 multicast group.
 pub(super) fn join_link_multicast<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1149,7 +1142,7 @@ pub(super) fn join_link_multicast<
 ///
 /// If `device_id` is not in the multicast group `multicast_addr`.
 pub(super) fn leave_link_multicast<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1183,7 +1176,7 @@ pub(super) fn leave_link_multicast<
 
 /// Get the MTU associated with this device.
 pub(super) fn get_mtu<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1195,8 +1188,7 @@ pub(super) fn get_mtu<
 }
 
 impl<
-        BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
-            + DeviceSocketBindingsContext<CC::DeviceId>,
+        BC: EthernetIpLinkDeviceBindingsContext + DeviceSocketBindingsContext<CC::DeviceId>,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -1384,7 +1376,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
     }
 }
 impl<
-        BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+        BC: EthernetIpLinkDeviceBindingsContext,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -1417,7 +1409,7 @@ impl<
 
 pub(super) fn get_mac<
     'a,
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &'a mut CC,
@@ -1427,7 +1419,7 @@ pub(super) fn get_mac<
 }
 
 pub(super) fn set_mtu<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
