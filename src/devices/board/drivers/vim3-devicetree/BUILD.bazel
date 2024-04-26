@@ -93,7 +93,7 @@ fuchsia_package(
 # For testing
 fuchsia_package_resource(
     name = "vim3-dtb",
-    src = "@legacy_ninja_build_outputs//:vim3-dtb",
+    src = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
     dest = "test-data/khadas-vim3.dtb",
 )
 

@@ -57,7 +57,7 @@ bazel_fuchsia_test_package("vim3-devicetree-test-package") {
   #   - Platform bus driver (.far)
   #   - driver-test-realm package (.far)
   bazel_inputs = [
-    ":vim3",
+    ":vim3-dtb",
     "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
   ]
 }

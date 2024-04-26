@@ -73,7 +73,7 @@ fuchsia_package(
 
 fuchsia_package_resource(
     name = "test-dtb",
-    src = "@legacy_ninja_build_outputs//:test-dtb",
+    src = "@gn_targets//sdk/lib/driver/devicetree/examples/example-board:test-dtb",
     dest = "test-data/example-board.dtb",
 )
 

@@ -11,10 +11,10 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_prebuilt_package(
     name = "platform-bus-driver",
-    archive = "@legacy_ninja_build_outputs//:platform-bus.far",
+    archive = "@gn_targets//src/devices/bus/drivers/platform:platform-bus",
 )
 
 fuchsia_prebuilt_package(
     name = "driver_test_realm",
-    archive = "@legacy_ninja_build_outputs//:driver_test_realm.far",
+    archive = "@gn_targets//sdk/lib/driver_test_realm:driver_test_realm",
 )

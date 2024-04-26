@@ -33,7 +33,7 @@ fuchsia_board_configuration(
         ":main_bundle",
     ],
     board_name = "emac",
-    devicetree = "@legacy_ninja_build_outputs//:vim3-dtb",
+    devicetree = "@gn_targets//src/devices/boards/drivers/vim3-devicetree:vim3-dtb",
     filesystems = {
         "vbmeta": {
             "key": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_devkey_atx_psk.pem)",
