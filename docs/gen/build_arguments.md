@@ -393,7 +393,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:18
+From //build/bazel/bazel_action.gni:19
 
 ### bazel_upload_build_events
 
@@ -4670,6 +4670,16 @@ submitted commands.
 **Current value (from the default):** `true`
 
 From //src/graphics/drivers/msd-vsi-vip/BUILD.gn:14
+
+### netstack3_profile_rustc
+
+Adds compilation flags to emit rustc self-profiling when building netstack3
+targets. That helps us track down where time is spent and memory
+consumption to play nice with RBE.
+
+**Current value (from the default):** `false`
+
+From //src/connectivity/network/netstack3/BUILD.gn:9
 
 ### netsvc_extra_defines
 
