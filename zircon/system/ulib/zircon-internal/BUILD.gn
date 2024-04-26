@@ -24,11 +24,13 @@ library_headers("headers") {
     "lib/zircon-internal/paths.h",
     "lib/zircon-internal/unique-backtrace.h",
     "lib/zircon-internal/xorshiftrand.h",
+    "lib/zircon-internal/thread_annotations.h",
   ]
 }
 
 sdk_source_set("zircon-internal") {
   category = "internal"
+  sdk_name = "zircon-internal"
   public = [
     "include/lib/zircon-internal/align.h",
     "include/lib/zircon-internal/default_stack_size.h",
@@ -45,9 +47,11 @@ sdk_source_set("zircon-internal") {
     "include/lib/zircon-internal/macros.h",
     "include/lib/zircon-internal/mtrace.h",
     "include/lib/zircon-internal/paths.h",
+    "include/lib/zircon-internal/thread_annotations.h",
     "include/lib/zircon-internal/unique-backtrace.h",
     "include/lib/zircon-internal/xorshiftrand.h",
   ]
+  include_base = "include"
   non_sdk_deps = [ ":headers" ]
   deps = [ "//zircon/system/public" ]
 }

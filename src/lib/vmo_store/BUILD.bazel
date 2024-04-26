@@ -1,0 +1,26 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# vmo_store library that can be shared across drivers
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "vmo_store",
+    hdrs = [
+        "growable_slab.h",
+        "owned_vmo_store.h",
+        "storage_types.h",
+        "stored_vmo.h",
+        "vmo_store.h",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@fuchsia_sdk//pkg/fit-promise",
+        "@fuchsia_sdk//pkg/stdcompat",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//pkg/fbl",
+        "@internal_sdk//pkg/fzl",
+    ],
+)

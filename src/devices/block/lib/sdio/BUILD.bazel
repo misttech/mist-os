@@ -1,0 +1,21 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# sdio library that can be shared across sdmmc drivers
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "sdio",
+    hdrs = [
+        "include/lib/sdio/hw.h",
+    ],
+    includes = [
+        "include",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "//src/devices/block/lib/sdmmc",
+    ],
+)

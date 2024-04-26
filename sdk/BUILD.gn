@@ -756,6 +756,7 @@ sdk_molecule("platform_fidls") {
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_sdk($fidl_toolchain)",
