@@ -1101,7 +1101,7 @@ Makes clippy targets fail to build when any "deny" lints are found
 
 **Current value (from the default):** `true`
 
-From //build/rust/config.gni:67
+From //build/rust/config.gni:64
 
 ### clippy_force_warn_all
 
@@ -1111,7 +1111,7 @@ should only be used to collect stats about clippy lints in our source tree.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:64
+From //build/rust/config.gni:61
 
 ### clippy_warn_all
 
@@ -1120,7 +1120,7 @@ Note: setting lint levels in source takes precedence over this.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:59
+From //build/rust/config.gni:56
 
 ### cobalt_environment
 
@@ -3945,7 +3945,7 @@ causes clippy targets to get included in the build. This gets enabled by default
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:72
+From //build/rust/config.gni:69
 
 ### include_internal_fonts
 
@@ -7060,7 +7060,7 @@ ignore warnings.
 
 **Current value (from the default):** `"deny"`
 
-From //build/rust/config.gni:55
+From //build/rust/config.gni:52
 
 ### rust_debug_assertions
 
@@ -7211,14 +7211,6 @@ One of:
 **Current value (from the default):** `"remote"`
 
 From //build/toolchain/rbe.gni:93
-
-### rust_toolchain_triple_suffix
-
-Sets the fuchsia toolchain target triple suffix (after arch)
-
-**Current value (from the default):** `"fuchsia"`
-
-From //build/rust/config.gni:50
 
 ### rust_v0_symbol_mangling
 
