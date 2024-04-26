@@ -113,9 +113,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
             fsandbox::Capability::Data(data_capability) => {
                 Ok(crate::Data::try_from(data_capability)?.into())
             }
-            fsandbox::Capability::Cloneable(client_end) => {
-                try_from_handle_in_registry(client_end.as_handle_ref())
-            }
             fsandbox::Capability::Dictionary(client_end) => {
                 let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
                 match &any {

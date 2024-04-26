@@ -36,10 +36,9 @@ type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
     2: handle client_end:HandleCapability;
     3: data DataCapability;
-    4: cloneable client_end:fuchsia.unknown.Cloneable;
-    5: dictionary client_end:Dictionary;
-    6: sender client_end:Sender;
-    7: directory client_end:fuchsia.io.Directory;
+    4: dictionary client_end:Dictionary;
+    5: sender client_end:Sender;
+    6: directory client_end:fuchsia.io.Directory;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
