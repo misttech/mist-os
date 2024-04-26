@@ -24,7 +24,7 @@ use {
     vfs::{
         directory::{
             entry_container::Directory, helper::DirectlyMutable,
-            mutable::connection::MutableConnection, simple::Simple,
+            immutable::Simple as PseudoDirectory,
         },
         service,
     },
@@ -33,13 +33,13 @@ use {
 #[derive(Clone)]
 pub struct FsRealmState {
     running_filesystems: Arc<Mutex<HashMap<String, ServingSingleVolumeFilesystem>>>,
-    mnt: Arc<Simple<MutableConnection>>,
+    mnt: Arc<PseudoDirectory>,
 }
 
 impl FsRealmState {
-    fn new() -> (Arc<Simple<MutableConnection>>, Self) {
+    fn new() -> (Arc<PseudoDirectory>, Self) {
         let running_filesystems = Arc::new(Mutex::new(HashMap::new()));
-        let mnt = vfs::mut_pseudo_directory! {};
+        let mnt = vfs::pseudo_directory! {};
         (mnt.clone(), FsRealmState { running_filesystems, mnt })
     }
 
