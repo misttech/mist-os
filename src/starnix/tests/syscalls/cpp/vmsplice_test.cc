@@ -91,6 +91,78 @@ TEST(VmspliceTest, ModifyBufferInPipe) {
   EXPECT_THAT(read_buffer, testing::Each(kModifiedByte));
 }
 
+TEST(VmspliceTest, FileInPipe) {
+  constexpr char kInitialByte = 'A';
+  constexpr char kFirstModifiedByte = 'B';
+  constexpr char kLastModifiedByte = 'C';
+  constexpr size_t kFileSize = 10;
+
+  char path[] = "/tmp/tmpfile.XXXXXX";
+  fbl::unique_fd tmp_file = fbl::unique_fd(mkstemp(path));
+  ASSERT_TRUE(tmp_file) << strerror(errno);
+
+  auto write_to_file = [&](const fbl::unique_fd& fd, char c) {
+    char write_buf[kFileSize];
+    std::fill_n(&write_buf[0], std::size(write_buf), c);
+    ASSERT_EQ(pwrite(fd.get(), write_buf, sizeof(write_buf), 0),
+              static_cast<ssize_t>(sizeof(write_buf)))
+        << strerror(errno);
+  };
+  ASSERT_NO_FATAL_FAILURE(write_to_file(tmp_file, kInitialByte));
+
+  fbl::unique_fd fds[kNumPipeEndsCount];
+  ASSERT_NO_FATAL_FAILURE(MakePipe(fds));
+  {
+    void* write_buffer = mmap(NULL, kFileSize, PROT_READ, MAP_PRIVATE, tmp_file.get(), 0);
+    ASSERT_NE(write_buffer, MAP_FAILED) << strerror(errno);
+    auto unmap_write_buffer =
+        fit::defer([&]() { EXPECT_EQ(munmap(write_buffer, kFileSize), 0) << strerror(errno); });
+
+    iovec iov = {
+        .iov_base = write_buffer,
+        .iov_len = kFileSize,
+    };
+    for (int i = 0; i < 6; ++i) {
+      ASSERT_EQ(vmsplice(fds[1].get(), &iov, 1, 0), static_cast<ssize_t>(kFileSize))
+          << strerror(errno);
+    }
+  }
+
+  auto read_from_file = [&](const fbl::unique_fd& fd, char c) {
+    char read_buffer[kFileSize] = {};
+    ASSERT_EQ(read(fd.get(), read_buffer, sizeof(read_buffer)),
+              static_cast<ssize_t>(sizeof(read_buffer)))
+        << strerror(errno);
+    EXPECT_THAT(read_buffer, testing::Each(c));
+  };
+  ASSERT_NO_FATAL_FAILURE(read_from_file(fds[0], kInitialByte));
+
+  // Update the file contents and expect that the payload sitting in the pipe
+  // reflects the write, even after the FD is closed.
+  ASSERT_NO_FATAL_FAILURE(write_to_file(tmp_file, kFirstModifiedByte));
+  ASSERT_NO_FATAL_FAILURE(read_from_file(fds[0], kFirstModifiedByte));
+  tmp_file.reset();
+  ASSERT_NO_FATAL_FAILURE(read_from_file(fds[0], kFirstModifiedByte));
+
+  // Update the file contents through a new FD, and expect that the payload
+  // sitting in the pipe reflects the write, even after the FD is closed.
+  tmp_file = fbl::unique_fd(open(path, O_WRONLY));
+  ASSERT_TRUE(tmp_file) << strerror(errno);
+  ASSERT_NO_FATAL_FAILURE(write_to_file(tmp_file, kLastModifiedByte));
+  ASSERT_NO_FATAL_FAILURE(read_from_file(fds[0], kLastModifiedByte));
+  tmp_file.reset();
+  ASSERT_NO_FATAL_FAILURE(read_from_file(fds[0], kLastModifiedByte));
+
+  // Remove the file and expect the payload sitting in the pipe to still be
+  // valid for reading. This implies that pages allocated for a file will
+  // be kept in memory, even after the file is removed, while it sits in the
+  // pipe.
+  ASSERT_EQ(remove(path), 0) << strerror(errno);
+  ASSERT_EQ(access(path, 0), -1);
+  ASSERT_EQ(errno, ENOENT);
+  ASSERT_NO_FATAL_FAILURE(read_from_file(fds[0], kLastModifiedByte));
+}
+
 TEST(VmspliceTest, UnmapBufferInPipe) {
   constexpr size_t kMmapSize = 4096;
   constexpr char kInitialByte = 'A';

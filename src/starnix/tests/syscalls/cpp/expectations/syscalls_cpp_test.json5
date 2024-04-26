@@ -65,6 +65,7 @@
                 "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/11",
 
                 // TODO(https://fxbug.dev/335701084)
+                "VmspliceTest.FileInPipe",
                 "VmspliceTest.ModifyBufferInPipe",
                 "VmspliceTest.UnmapBufferInPipe",
                 "VmspliceTest.UnmapBufferInPipeThenMapInPlace",
