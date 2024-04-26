@@ -452,8 +452,7 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
   std::unique_ptr<AmlPower> power_impl_device =
       std::make_unique<AmlPower>(parent, std::move(domain_info));
 
-  st = power_impl_device->DdkAdd(
-      ddk::DeviceAddArgs("power-impl").forward_metadata(parent, DEVICE_METADATA_POWER_DOMAINS));
+  st = power_impl_device->DdkAdd("power-impl", DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
   if (st != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed, st = %d", __func__, st);
   }

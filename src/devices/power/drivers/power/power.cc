@@ -10,7 +10,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/fit/defer.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -18,6 +17,7 @@
 #include <memory>
 
 #include <bind/fuchsia/power/cpp/bind.h>
+#include <ddk/metadata/power.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
@@ -28,7 +28,7 @@ void GetUniqueId(uint64_t* id) {
 
 namespace power {
 
-void PowerDomainFragmentChild::RegisterPowerDomain(RegisterPowerDomainRequestView request,
+void PowerDeviceFragmentChild::RegisterPowerDomain(RegisterPowerDomainRequestView request,
                                                    RegisterPowerDomainCompleter::Sync& completer) {
   zx_status_t status = power_device_->RegisterPowerDomain(
       fragment_device_id_, request->min_needed_voltage, request->max_supported_voltage);
@@ -39,7 +39,7 @@ void PowerDomainFragmentChild::RegisterPowerDomain(RegisterPowerDomainRequestVie
   }
 }
 
-void PowerDomainFragmentChild::UnregisterPowerDomain(
+void PowerDeviceFragmentChild::UnregisterPowerDomain(
     UnregisterPowerDomainCompleter::Sync& completer) {
   zx_status_t status = power_device_->UnregisterPowerDomain(fragment_device_id_);
   if (status == ZX_OK) {
@@ -49,7 +49,7 @@ void PowerDomainFragmentChild::UnregisterPowerDomain(
   }
 }
 
-void PowerDomainFragmentChild::GetPowerDomainStatus(
+void PowerDeviceFragmentChild::GetPowerDomainStatus(
     GetPowerDomainStatusCompleter::Sync& completer) {
   power_domain_status_t out_status;
   zx_status_t status = power_device_->GetPowerDomainStatus(fragment_device_id_, &out_status);
@@ -60,7 +60,7 @@ void PowerDomainFragmentChild::GetPowerDomainStatus(
   }
 }
 
-void PowerDomainFragmentChild::GetSupportedVoltageRange(
+void PowerDeviceFragmentChild::GetSupportedVoltageRange(
     GetSupportedVoltageRangeCompleter::Sync& completer) {
   uint32_t out_min, out_max;
   zx_status_t status =
@@ -72,7 +72,7 @@ void PowerDomainFragmentChild::GetSupportedVoltageRange(
   }
 }
 
-void PowerDomainFragmentChild::RequestVoltage(RequestVoltageRequestView request,
+void PowerDeviceFragmentChild::RequestVoltage(RequestVoltageRequestView request,
                                               RequestVoltageCompleter::Sync& completer) {
   uint32_t out_actual_voltage;
   zx_status_t status =
@@ -84,7 +84,7 @@ void PowerDomainFragmentChild::RequestVoltage(RequestVoltageRequestView request,
   }
 }
 
-void PowerDomainFragmentChild::GetCurrentVoltage(GetCurrentVoltageRequestView request,
+void PowerDeviceFragmentChild::GetCurrentVoltage(GetCurrentVoltageRequestView request,
                                                  GetCurrentVoltageCompleter::Sync& completer) {
   uint32_t out_current_voltage;
   zx_status_t status =
@@ -96,7 +96,7 @@ void PowerDomainFragmentChild::GetCurrentVoltage(GetCurrentVoltageRequestView re
   }
 }
 
-void PowerDomainFragmentChild::WritePmicCtrlReg(WritePmicCtrlRegRequestView request,
+void PowerDeviceFragmentChild::WritePmicCtrlReg(WritePmicCtrlRegRequestView request,
                                                 WritePmicCtrlRegCompleter::Sync& completer) {
   zx_status_t status =
       power_device_->WritePmicCtrlReg(fragment_device_id_, request->reg_addr, request->value);
@@ -107,7 +107,7 @@ void PowerDomainFragmentChild::WritePmicCtrlReg(WritePmicCtrlRegRequestView requ
   }
 }
 
-void PowerDomainFragmentChild::ReadPmicCtrlReg(ReadPmicCtrlRegRequestView request,
+void PowerDeviceFragmentChild::ReadPmicCtrlReg(ReadPmicCtrlRegRequestView request,
                                                ReadPmicCtrlRegCompleter::Sync& completer) {
   uint32_t out_value;
   zx_status_t status =
@@ -119,7 +119,7 @@ void PowerDomainFragmentChild::ReadPmicCtrlReg(ReadPmicCtrlRegRequestView reques
   }
 }
 
-PowerDomainFragmentChild* PowerDomain::GetFragmentChildLocked(uint64_t fragment_device_id) {
+PowerDeviceFragmentChild* PowerDevice::GetFragmentChildLocked(uint64_t fragment_device_id) {
   for (auto& child : children_) {
     if (child->fragment_device_id() == fragment_device_id) {
       return child.get();
@@ -128,12 +128,12 @@ PowerDomainFragmentChild* PowerDomain::GetFragmentChildLocked(uint64_t fragment_
   return nullptr;
 }
 
-uint32_t PowerDomain::GetDependentCount() {
+uint32_t PowerDevice::GetDependentCount() {
   fbl::AutoLock al(&power_device_lock_);
   return GetDependentCountLocked();
 }
 
-uint32_t PowerDomain::GetDependentCountLocked() {
+uint32_t PowerDevice::GetDependentCountLocked() {
   uint32_t count = 0;
   for (const auto& child : children_) {
     if (child->registered()) {
@@ -143,7 +143,7 @@ uint32_t PowerDomain::GetDependentCountLocked() {
   return count;
 }
 
-zx_status_t PowerDomain::GetSuitableVoltageLocked(uint32_t voltage, uint32_t* suitable_voltage) {
+zx_status_t PowerDevice::GetSuitableVoltageLocked(uint32_t voltage, uint32_t* suitable_voltage) {
   uint32_t min_voltage_all_children = min_voltage_uV_;
   uint32_t max_voltage_all_children = max_voltage_uV_;
   for (auto& child : children_) {
@@ -167,12 +167,12 @@ zx_status_t PowerDomain::GetSuitableVoltageLocked(uint32_t voltage, uint32_t* su
   return ZX_OK;
 }
 
-zx_status_t PowerDomain::RegisterPowerDomain(uint64_t fragment_device_id,
+zx_status_t PowerDevice::RegisterPowerDomain(uint64_t fragment_device_id,
                                              uint32_t min_needed_voltage_uV,
                                              uint32_t max_supported_voltage_uV) {
   zx_status_t status = ZX_OK;
   fbl::AutoLock al(&power_device_lock_);
-  PowerDomainFragmentChild* child = GetFragmentChildLocked(fragment_device_id);
+  PowerDeviceFragmentChild* child = GetFragmentChildLocked(fragment_device_id);
   ZX_DEBUG_ASSERT(child != nullptr);
   child->set_min_needed_voltage_uV(std::max(min_needed_voltage_uV, min_voltage_uV_));
   child->set_max_supported_voltage_uV(std::min(max_supported_voltage_uV, max_voltage_uV_));
@@ -207,10 +207,10 @@ zx_status_t PowerDomain::RegisterPowerDomain(uint64_t fragment_device_id,
   return ZX_OK;
 }
 
-zx_status_t PowerDomain::UnregisterPowerDomain(uint64_t fragment_device_id) {
+zx_status_t PowerDevice::UnregisterPowerDomain(uint64_t fragment_device_id) {
   zx_status_t status = ZX_OK;
   fbl::AutoLock al(&power_device_lock_);
-  PowerDomainFragmentChild* child = GetFragmentChildLocked(fragment_device_id);
+  PowerDeviceFragmentChild* child = GetFragmentChildLocked(fragment_device_id);
   ZX_DEBUG_ASSERT(child != nullptr);
   if (!child->registered()) {
     return ZX_ERR_UNAVAILABLE;
@@ -241,12 +241,12 @@ zx_status_t PowerDomain::UnregisterPowerDomain(uint64_t fragment_device_id) {
   return ZX_OK;
 }
 
-zx_status_t PowerDomain::GetPowerDomainStatus(uint64_t fragment_device_id,
+zx_status_t PowerDevice::GetPowerDomainStatus(uint64_t fragment_device_id,
                                               power_domain_status_t* out_status) {
   return power_impl_.GetPowerDomainStatus(index_, out_status);
 }
 
-zx_status_t PowerDomain::GetSupportedVoltageRange(uint64_t fragment_device_id,
+zx_status_t PowerDevice::GetSupportedVoltageRange(uint64_t fragment_device_id,
                                                   uint32_t* min_voltage, uint32_t* max_voltage) {
   if (fixed_) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -256,7 +256,7 @@ zx_status_t PowerDomain::GetSupportedVoltageRange(uint64_t fragment_device_id,
   return ZX_OK;
 }
 
-zx_status_t PowerDomain::RequestVoltage(uint64_t fragment_device_id, uint32_t voltage,
+zx_status_t PowerDevice::RequestVoltage(uint64_t fragment_device_id, uint32_t voltage,
                                         uint32_t* actual_voltage) {
   fbl::AutoLock al(&power_device_lock_);
   if (fixed_) {
@@ -266,7 +266,7 @@ zx_status_t PowerDomain::RequestVoltage(uint64_t fragment_device_id, uint32_t vo
     zxlogf(ERROR, "The voltage is not within supported voltage range of the power domain");
     return ZX_ERR_INVALID_ARGS;
   }
-  PowerDomainFragmentChild* child = GetFragmentChildLocked(fragment_device_id);
+  PowerDeviceFragmentChild* child = GetFragmentChildLocked(fragment_device_id);
   ZX_DEBUG_ASSERT(child != nullptr);
   if (!child->registered()) {
     zxlogf(ERROR, "The device is not registered for the power domain");
@@ -283,39 +283,39 @@ zx_status_t PowerDomain::RequestVoltage(uint64_t fragment_device_id, uint32_t vo
   return power_impl_.RequestVoltage(index_, suitable_voltage, actual_voltage);
 }
 
-zx_status_t PowerDomain::GetCurrentVoltage(uint64_t fragment_device_id, uint32_t index,
+zx_status_t PowerDevice::GetCurrentVoltage(uint64_t fragment_device_id, uint32_t index,
                                            uint32_t* current_voltage) {
   fbl::AutoLock al(&power_device_lock_);
   return power_impl_.GetCurrentVoltage(index_, current_voltage);
 }
 
-zx_status_t PowerDomain::WritePmicCtrlReg(uint64_t fragment_device_id, uint32_t reg_addr,
+zx_status_t PowerDevice::WritePmicCtrlReg(uint64_t fragment_device_id, uint32_t reg_addr,
                                           uint32_t value) {
   fbl::AutoLock al(&power_device_lock_);
   return power_impl_.WritePmicCtrlReg(index_, reg_addr, value);
 }
 
-zx_status_t PowerDomain::ReadPmicCtrlReg(uint64_t fragment_device_id, uint32_t reg_addr,
+zx_status_t PowerDevice::ReadPmicCtrlReg(uint64_t fragment_device_id, uint32_t reg_addr,
                                          uint32_t* out_value) {
   fbl::AutoLock al(&power_device_lock_);
   return power_impl_.ReadPmicCtrlReg(index_, reg_addr, out_value);
 }
 
-void PowerDomain::DdkRelease() { delete this; }
+void PowerDevice::DdkRelease() { delete this; }
 
-fit::function<void(fidl::ServerEnd<fuchsia_hardware_power::Device>)> PowerDomain::GetHandler() {
+fit::function<void(fidl::ServerEnd<fuchsia_hardware_power::Device>)> PowerDevice::GetHandler() {
   return [this](fidl::ServerEnd<fuchsia_hardware_power::Device> server_end) {
     fbl::AutoLock al(&power_device_lock_);
     fbl::AllocChecker ac;
     uint64_t id = 0;
     GetUniqueId(&id);
-    std::unique_ptr<PowerDomainFragmentChild> child(new (&ac) PowerDomainFragmentChild(id, this));
+    std::unique_ptr<PowerDeviceFragmentChild> child(new (&ac) PowerDeviceFragmentChild(id, this));
     if (!ac.check()) {
       zxlogf(ERROR, "Failed to allocate PowerDeviceFragmentChild.");
       return;
     }
     children_.push_back(std::move(child));
-    PowerDomainFragmentChild* child_ptr = children_.back().get();
+    PowerDeviceFragmentChild* child_ptr = children_.back().get();
     auto close_handler = [this, id](fidl::UnbindInfo info) {
       fbl::AutoLock al(&power_device_lock_);
       for (auto iter = children_.begin(); iter != children_.end(); iter++) {
@@ -331,7 +331,7 @@ fit::function<void(fidl::ServerEnd<fuchsia_hardware_power::Device>)> PowerDomain
   };
 }
 
-zx_status_t PowerDomain::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+zx_status_t PowerDevice::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   fuchsia_hardware_power::Service::InstanceHandler handler({
       .device = GetHandler(),
   });
@@ -351,12 +351,21 @@ zx_status_t PowerDomain::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end
   return ZX_OK;
 }
 
-zx_status_t PowerDomain::Create(void* ctx, zx_device_t* parent,
-                                const ddk::PowerImplProtocolClient& power_impl,
-                                fuchsia_hardware_power::wire::Domain domain_info) {
-  auto index = domain_info.id();
+zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
+  auto power_domain = ddk::GetMetadata<power_domain_t>(parent, DEVICE_METADATA_POWER_DOMAINS);
+  if (!power_domain.is_ok()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", power_domain.status_string());
+    return power_domain.error_value();
+  }
+
+  auto index = power_domain->index;
   char name[20];
   snprintf(name, sizeof(name), "power-%u", index);
+  ddk::PowerImplProtocolClient power_impl(parent, "power-impl");
+  if (!power_impl.is_valid()) {
+    zxlogf(ERROR, "%s: ZX_PROTOCOL_POWER_IMPL not available", __func__);
+    return ZX_ERR_NO_RESOURCES;
+  }
 
   // This is optional.
   fidl::ClientEnd<fuchsia_hardware_power::Device> parent_power;
@@ -378,7 +387,7 @@ zx_status_t PowerDomain::Create(void* ctx, zx_device_t* parent,
     fixed = true;
   }
   fbl::AllocChecker ac;
-  std::unique_ptr<PowerDomain> dev(new (&ac) PowerDomain(
+  std::unique_ptr<PowerDevice> dev(new (&ac) PowerDevice(
       parent, index, power_impl, std::move(parent_power), min_voltage, max_voltage, fixed));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
@@ -416,45 +425,10 @@ zx_status_t PowerDomain::Create(void* ctx, zx_device_t* parent,
   return ZX_OK;
 }
 
-zx_status_t Power::Create(void* ctx, zx_device_t* parent) {
-  auto power_domains = ddk::GetEncodedMetadata<fuchsia_hardware_power::wire::DomainMetadata>(
-      parent, DEVICE_METADATA_POWER_DOMAINS);
-  if (!power_domains.is_ok()) {
-    zxlogf(ERROR, "Failed to get metadata: %s", power_domains.status_string());
-    return power_domains.error_value();
-  }
-
-  std::unique_ptr<Power> root = std::make_unique<Power>(parent);
-  auto status = root->DdkAdd(ddk::DeviceAddArgs("power-core").set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add power core: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  auto root_release = fit::defer([&root]() { [[maybe_unused]] auto ptr = root.release(); });
-
-  ddk::PowerImplProtocolClient power_impl(parent);
-  if (!power_impl.is_valid()) {
-    zxlogf(ERROR, "%s: ZX_PROTOCOL_POWER_IMPL not available", __func__);
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  for (const auto& domain : power_domains->domains()) {
-    status = PowerDomain::Create(ctx, root->zxdev(), power_impl, domain);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to add power domain - %d: %s", domain.id(),
-             zx_status_get_string(status));
-      return status;
-    }
-  }
-
-  return ZX_OK;
-}
-
 static constexpr zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = Power::Create;
+  ops.bind = PowerDevice::Create;
   return ops;
 }();
 

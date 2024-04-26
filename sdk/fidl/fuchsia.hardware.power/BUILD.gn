@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.power") {
   sources = [
     "config.fidl",
-    "metadata.fidl",
     "overview.fidl",
     "power.fidl",
   ]

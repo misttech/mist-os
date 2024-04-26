@@ -415,6 +415,7 @@ library_headers("ddk-metadata-headers") {
     "ddk/metadata/gpio.h",
     "ddk/metadata/lights.h",
     "ddk/metadata/nand.h",
+    "ddk/metadata/power.h",
     "ddk/metadata/test.h",
   ]
 

@@ -2,6 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite power_domain_arm_core;
+
+using fuchsia.platform;
 using fuchsia.power;
 
-fuchsia.BIND_PROTOCOL == fuchsia.power.BIND_PROTOCOL.IMPL;
+primary node "power-impl" {
+  fuchsia.BIND_PROTOCOL == fuchsia.power.BIND_PROTOCOL.IMPL;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_CORE;
+}

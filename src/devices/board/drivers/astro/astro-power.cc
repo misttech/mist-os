@@ -18,6 +18,7 @@
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
+#include <ddk/metadata/power.h>
 #include <soc/aml-common/aml-power.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>
 
@@ -44,19 +45,13 @@ constexpr aml_voltage_table_t kS905D2VoltageTable[] = {
 
 constexpr voltage_pwm_period_ns_t kS905d2PwmPeriodNs = 1250;
 
+constexpr power_domain_t domains[] = {
+    {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE},
+};
+
 }  // namespace
 
 zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  fuchsia_hardware_power::DomainMetadata domain_metadata = {
-      {.domains = {{{{.id = {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE}}}}}}};
-
-  const fit::result encoded_metadata = fidl::Persist(domain_metadata);
-  if (!encoded_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode power domain metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
-  }
-
   fpbus::Node dev;
   dev.name() = "aml-power-impl-composite";
   dev.vid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE;
@@ -74,10 +69,6 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs),
               reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs) + sizeof(kS905d2PwmPeriodNs)),
-      }},
-      {{
-          .type = DEVICE_METADATA_POWER_DOMAINS,
-          .data = encoded_metadata.value(),
       }},
   };
 
@@ -111,10 +102,64 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
   return ZX_OK;
 }
 
+zx_status_t AddPdArmcore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  fpbus::Node dev;
+  dev.name() = "composite-pd-armcore";
+  dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_POWER_CORE;
+  dev.metadata() = std::vector<fpbus::Metadata>{
+      {{
+          .type = DEVICE_METADATA_POWER_DOMAINS,
+          .data =
+              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&domains),
+                                   reinterpret_cast<const uint8_t*>(&domains) + sizeof(domains)),
+      }},
+  };
+
+  const std::vector<fdf::BindRule> kPowerArmcoreRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_power::BIND_PROTOCOL_IMPL),
+  };
+
+  const std::vector<fdf::NodeProperty> kPowerArmcoreProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_power::BIND_PROTOCOL_IMPL),
+  };
+
+  const std::vector<fdf::ParentSpec> kParents = {
+      {
+          kPowerArmcoreRules,
+          kPowerArmcoreProperties,
+      },
+  };
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('PDAC');
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, dev),
+      fidl::ToWire(fidl_arena,
+                   fdf::CompositeNodeSpec{{.name = "pd_armcore", .parents = kParents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add composite: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t Astro::PowerInit() {
   zx_status_t status = AddPowerImpl(pbus_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add power-impl composite device: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = AddPdArmcore(pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add pd-armcore composite device: %s", zx_status_get_string(status));
     return status;
   }
 
