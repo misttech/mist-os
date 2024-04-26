@@ -2,6 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+declare_args() {
+  # Adds compilation flags to emit rustc self-profiling when building netstack3
+  # targets. That helps us track down where time is spent and memory
+  # consumption to play nice with RBE.
+  netstack3_profile_rustc = false
+}
+
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
@@ -130,6 +137,22 @@ network_unified_binary("bin") {
   # Only add the netstack3 configs to the bin, not GUB because O3 in the default
   # config causes binary size increases here.
   bin_add_configs = [ ":netstack3_configs" ]
+  add_configs = []
+
+  # Profile the binary and GUB library builds when requested.
+  if (netstack3_profile_rustc) {
+    add_configs += [ ":compiler_profile" ]
+  }
+}
+
+# See netstack3_profile_rustc GN arg for details here.
+config("compiler_profile") {
+  rustflags = [
+    "-Ztime-passes",
+    "-Zllvm-time-trace",
+    "-Zself-profile",
+  ]
+  visibility = [ ":*" ]
 }
 
 # TODO(https://fxbug.dev/330735964): remove this config when Netstack3 doesn't
