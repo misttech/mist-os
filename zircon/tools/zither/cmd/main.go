@@ -22,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/golang"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/kernel"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/legacy_syscall_cdecl"
+	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/mistos"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/rust"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/rust_syscall"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/syscall_docs"
@@ -36,6 +37,7 @@ const (
 	zirconIFSBackend          string = "zircon_ifs"
 	kernelBackend             string = "kernel"
 	legacySyscallCDeclBackend string = "legacy_syscall_cdecl"
+	mistosBackend             string = "mistos"
 	rustSyscallBackend        string = "rust_syscall"
 	goRuntimeBackend          string = "go_runtime"
 	syscallDocsBackend        string = "syscall_docs"
@@ -153,6 +155,9 @@ func main() {
 	case legacySyscallCDeclBackend:
 		assertNoNamespace()
 		gen = legacy_syscall_cdecl.NewGenerator(f)
+	case mistosBackend:
+		assertNoNamespace()
+		gen = mistos.NewGenerator(f)
 	case rustSyscallBackend:
 		assertNoNamespace()
 		gen = rust_syscall.NewGenerator(f)

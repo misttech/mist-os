@@ -23,7 +23,12 @@ group("boot_tests") {
 ###
 group("default") {
   testonly = true
-  deps = [ "//bundles/boot_tests" ]
+  deps = [
+    "//bundles/boot_tests",
+
+    #
+    "//zircon/tools:tests",
+  ]
 }
 
 # A GN pool matching the special Ninja 'console' pool. Any action() that

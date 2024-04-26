@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -22,6 +23,7 @@ supported_zither_backends = [
   "legacy_syscall_cdecl",  # Legacy C syscall declarations.
   "zircon_ifs",  # Syscall text ABI bindings.
   "kernel",  # Internal kernel bindings.
+  "mistos",  # Internal mist-os kernel bindings.
   "go_runtime",  # go.git source files for Fuchsia support.
   "syscall_docs",  # Syscall documentation markdown.
 ]
@@ -200,6 +202,18 @@ supported_zither_backend_info = {
       ]
     }
     _library_template = "_zither_legacy_syscall_cdecl_sources"
+  }
+
+  mistos = {
+    formatter = _clang_format
+    output_namespace = {
+      prefix_parts = [
+        "lib",
+        "syscalls",
+      ]
+    }
+
+    _library_template = "_zither_mistos_sources"
   }
 
   if (support_rust) {
@@ -721,6 +735,57 @@ template("_zither_legacy_syscall_cdecl_sources") {
                              "visibility",
                            ])
     public_deps = [ ":$headers_target" ]
+  }
+}
+
+template("_zither_mistos_sources") {
+  assert(invoker.backend == "mistos")
+
+  main_target = target_name
+  zither_target = "$target_name.gen"
+
+  not_needed(invoker, [ "source_names" ])
+
+  forward_variables_from(invoker,
+                         [
+                           "output_dir",
+                           "output_namespace",
+                         ])
+  generated_files = [
+    "$output_dir/${output_namespace}/category.inc",
+    "$output_dir/${output_namespace}/kernel.inc",
+    "$output_dir/${output_namespace}/kernel-wrappers.inc",
+    "$output_dir/${output_namespace}/syscalls.inc",
+    "$output_dir/${output_namespace}/zx-syscall-numbers.h",
+  ]
+
+  _zither(zither_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                             "backend",
+                             "fidl_ir_json",
+                             "fidl_ir_target",
+                             "generated_files",
+                             "formatter",
+                           ])
+  }
+
+  library_headers(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "generated_files",
+                           ])
+    include_dir = output_dir
+    headers = rebase_path(generated_files, include_dir)
+    deps = [
+      ":${zither_target}($default_toolchain)",
+      ":${zither_target}.check($default_toolchain)",
+    ]
   }
 }
 

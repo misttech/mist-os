@@ -1,14 +1,13 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package kernel
+package mistos
 
 import (
 	"embed"
 	"path/filepath"
-	"sort"
-	"strings"
 	"text/template"
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
@@ -71,9 +70,6 @@ func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) 
 			}
 		}
 	}
-	sort.Slice(syscalls, func(i, j int) bool {
-		return strings.Compare(syscalls[i].Name, syscalls[j].Name) < 0
-	})
 
 	var outputs []string
 	for _, file := range includePaths {

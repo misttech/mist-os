@@ -49,6 +49,7 @@ if (is_host) {
       "backends/golang",
       "backends/kernel",
       "backends/legacy_syscall_cdecl",
+      "backends/mistos",
       "backends/rust",
       "backends/rust_syscall",
       "backends/syscall_docs",
@@ -670,6 +671,16 @@ zither_golden_test("zx.test") {
         "cdecls.inc",
         "testonly-cdecls.inc",
         "cdecls-next.inc",
+      ]
+    },
+    {
+      backend = "mistos"
+      files = [
+        "category.inc",
+        "kernel.inc",
+        "kernel-wrappers.inc",
+        "syscalls.inc",
+        "zx-syscall-numbers.h",
       ]
     },
     {
