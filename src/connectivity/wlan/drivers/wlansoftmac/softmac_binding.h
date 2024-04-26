@@ -133,7 +133,6 @@ class SoftmacBinding : public DeviceInterface {
   // `EthernetImplIfc.Start`.
   mutable std::optional<uint32_t> cached_ethernet_status_ __TA_GUARDED(ethernet_proxy_lock_);
 
-  fdf::Dispatcher softmac_bridge_server_dispatcher_;
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
 
   // The FIDL client to communicate with iwlwifi

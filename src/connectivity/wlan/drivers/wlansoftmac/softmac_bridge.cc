@@ -56,7 +56,6 @@ SoftmacBridge::~SoftmacBridge() {
 }
 
 zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
-    fdf::Dispatcher& softmac_bridge_server_dispatcher,
     std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
     fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
     fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
@@ -94,30 +93,21 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
     return softmac_bridge_endpoints.take_error();
   }
 
-  // Bind the WlanSoftmacBridge server on softmac_bridge_server_dispatcher. When the task
-  // completes, it will signal server_binding_task_complete, primarily to indicate the captured
-  // softmac_bridge pointer is no longer in use by the task.
-  libsync::Completion server_binding_task_complete;
-  async::PostTask(
-      softmac_bridge_server_dispatcher.async_dispatcher(),
-      [softmac_bridge = softmac_bridge.get(),
-       softmac_bridge_server_endpoint = std::move(softmac_bridge_endpoints->server),
-       &server_binding_task_complete]() mutable {
-        WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge server binding");
-        softmac_bridge->softmac_bridge_server_ =
-            std::make_unique<fidl::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacBridge>>(
-                fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                std::move(softmac_bridge_server_endpoint), softmac_bridge,
-                [](fidl::UnbindInfo info) {
-                  WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge close_handler");
-                  if (info.is_user_initiated()) {
-                    linfo("WlanSoftmacBridge server closed.");
-                  } else {
-                    lerror("WlanSoftmacBridge unexpectedly closed: %s", info.lossy_description());
-                  }
-                });
-        server_binding_task_complete.Signal();
-      });
+  {
+    WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge server binding");
+    softmac_bridge->softmac_bridge_server_ =
+        std::make_unique<fidl::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacBridge>>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+            std::move(softmac_bridge_endpoints->server), softmac_bridge.get(),
+            [](fidl::UnbindInfo info) {
+              WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge close_handler");
+              if (info.is_user_initiated()) {
+                linfo("WlanSoftmacBridge server closed.");
+              } else {
+                lerror("WlanSoftmacBridge unexpectedly closed: %s", info.lossy_description());
+              }
+            });
+  }
 
   auto init_completer = std::make_unique<InitCompleter>(
       [softmac_bridge = softmac_bridge.get(), completer = std::move(completer)](
@@ -163,10 +153,6 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
             wlansoftmac_rust_ops, frame_sender, rust_buffer_provider, softmac_bridge_client_end));
       });
 
-  // Wait for the tasks posted to softmac_bridge_server_dispatcher to complete before returning.
-  // Otherwise, the softmac_bridge pointer captured by the task might not be valid when the task
-  // runs.
-  server_binding_task_complete.Wait();
   return fit::success(std::move(softmac_bridge));
 }
 

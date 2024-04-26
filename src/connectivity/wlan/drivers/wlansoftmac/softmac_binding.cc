@@ -53,22 +53,6 @@ SoftmacBinding::SoftmacBinding()
 
   ethernet_proxy_lock_ = std::make_shared<std::mutex>();
 
-  // Create a dispatcher to serve the WlanSoftmacBridge protocol.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacbridge_server",
-        [](fdf_dispatcher_t*) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacbridge_server shutdown_handler");
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-
-    softmac_bridge_server_dispatcher_ = *std::move(dispatcher);
-  }
-
   // Create a dispatcher for WlanSoftmac method calls to the parent device.
   //
   // The Unbind hook relies on client_dispatcher_ implementing a shutdown
@@ -200,9 +184,9 @@ void SoftmacBinding::Init() {
 
   {
     std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
-    auto softmac_bridge = SoftmacBridge::New(
-        softmac_bridge_server_dispatcher_, std::move(completer), std::move(sta_shutdown_handler),
-        this, client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_);
+    auto softmac_bridge =
+        SoftmacBridge::New(std::move(completer), std::move(sta_shutdown_handler), this,
+                           client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_);
     if (softmac_bridge.is_error()) {
       lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
       device_init_reply(device_, softmac_bridge.error_value(), nullptr);
@@ -220,21 +204,24 @@ void SoftmacBinding::Unbind() {
 
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
+
+  // Synchronize SoftmacBridge::Stop returning before the StopCompleter
+  // calls destroys the SoftmacBridge.
   auto stop_returned = std::make_unique<libsync::Completion>();
   auto unowned_stop_returned = stop_returned.get();
+
   auto stop_completer = std::make_unique<StopCompleter>(
-      [softmac_bridge_server_dispatcher = softmac_bridge_server_dispatcher_.async_dispatcher(),
-       softmac_bridge, client_dispatcher = client_dispatcher_.release(),
+      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(), softmac_bridge,
+       client_dispatcher = client_dispatcher_.release(),
        stop_returned = std::move(stop_returned)]() mutable {
         WLAN_LAMBDA_TRACE_DURATION("StopCompleter");
-        async::PostTask(
-            softmac_bridge_server_dispatcher,
-            [softmac_bridge, client_dispatcher, stop_returned = std::move(stop_returned)]() {
-              WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
-              stop_returned->Wait();
-              delete softmac_bridge;
-              fdf_dispatcher_shutdown_async(client_dispatcher);
-            });
+        async::PostTask(main_device_dispatcher, [softmac_bridge, client_dispatcher,
+                                                 stop_returned = std::move(stop_returned)]() {
+          WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
+          stop_returned->Wait();
+          delete softmac_bridge;
+          fdf_dispatcher_shutdown_async(client_dispatcher);
+        });
       });
   softmac_bridge->Stop(std::move(stop_completer));
   unowned_stop_returned->Signal();
