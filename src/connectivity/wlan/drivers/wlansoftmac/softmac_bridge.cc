@@ -35,7 +35,7 @@ SoftmacBridge::SoftmacBridge(DeviceInterface* device_interface,
       ethernet_proxy_(ethernet_proxy) {
   WLAN_TRACE_DURATION();
   auto rust_dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac-mlme",
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "bridged-wlansoftmac",
       [](fdf_dispatcher_t* rust_dispatcher) {
         WLAN_LAMBDA_TRACE_DURATION("rust_dispatcher shutdown_handler");
         fdf_dispatcher_destroy(rust_dispatcher);

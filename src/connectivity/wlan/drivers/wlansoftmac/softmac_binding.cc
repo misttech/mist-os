@@ -46,46 +46,11 @@ namespace wlan::drivers::wlansoftmac {
 using ::wlan::drivers::fidl_bridge::FidlErrorToStatus;
 
 SoftmacBinding::SoftmacBinding()
-    : unbind_lock_(std::make_shared<std::mutex>()), unbind_called_(std::make_shared<bool>(false)) {
+    : ethernet_proxy_lock_(std::make_shared<std::mutex>()),
+      unbind_lock_(std::make_shared<std::mutex>()),
+      unbind_called_(std::make_shared<bool>(false)) {
   WLAN_TRACE_DURATION();
-  ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
-
-  ethernet_proxy_lock_ = std::make_shared<std::mutex>();
-
-  // Create a dispatcher for WlanSoftmac method calls to the parent device.
-  //
-  // The Unbind hook relies on client_dispatcher_ implementing a shutdown
-  // handler that performs the following steps in sequence.
-  //
-  //   - Asynchronously destroy softmac_ifc_bridge_
-  //   - Asynchronously call device_unbind_reply()
-  //
-  // Each step of the sequence must occur on its respective dispatcher
-  // to allow all queued task to complete.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
-        [&](fdf_dispatcher_t* client_dispatcher) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_client shutdown_handler");
-          // Every fidl::ServerBinding must be destroyed on the
-          // dispatcher its bound too.
-          async::PostTask(main_device_dispatcher_->async_dispatcher(), [&]() {
-            WLAN_LAMBDA_TRACE_DURATION("softmac_ifc_bridge reset + device_unbind_reply");
-            softmac_ifc_bridge_.reset();
-            device_unbind_reply(device_);
-          });
-          // Explicitly call destroy since Unbind() calls releases this dispatcher before
-          // calling ShutdownAsync().
-          fdf_dispatcher_destroy(client_dispatcher);
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating client dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-    client_dispatcher_ = *std::move(dispatcher);
-  }
 }
 
 // Disable thread safety analysis, as this is a part of device initialization.
@@ -139,29 +104,22 @@ void SoftmacBinding::Init() {
     device_init_reply(device_, status, nullptr);
     return;
   }
-  client_ = fdf::SharedClient(std::move(endpoints->client), client_dispatcher_.get());
+  client_ = fdf::SharedClient(std::move(endpoints->client), main_device_dispatcher_->get());
   linfo("Connected to WlanSoftmac service.");
 
   linfo("Starting up Rust WlanSoftmac...");
   auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
-      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
-       device = device_](zx_status_t status) {
-        WLAN_LAMBDA_TRACE_DURATION("startup_rust_completer");
+      [device = device_](zx_status_t status) {
+        WLAN_LAMBDA_TRACE_DURATION("startup_rust_completer + device_init_reply");
         if (status == ZX_OK) {
           linfo("Completed Rust WlanSoftmac startup.");
         } else {
           lerror("Failed to startup Rust WlanSoftmac: %s", zx_status_get_string(status));
         }
-
-        // device_init_reply() must be called on a driver framework managed
-        // dispatcher
-        async::PostTask(main_device_dispatcher, [device, status]() {
-          WLAN_LAMBDA_TRACE_DURATION("device_init_reply");
-          // Specify empty device_init_reply_args_t since SoftmacBinding
-          // does not currently support power or performance state
-          // information.
-          device_init_reply(device, status, nullptr);
-        });
+        // Specify empty device_init_reply_args_t since SoftmacBinding
+        // does not currently support power or performance state
+        // information.
+        device_init_reply(device, status, nullptr);
       });
 
   unbind_lock_->lock();
@@ -204,6 +162,7 @@ void SoftmacBinding::Unbind() {
 
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
+  auto softmac_ifc_bridge = softmac_ifc_bridge_.release();
 
   // Synchronize SoftmacBridge::Stop returning before the StopCompleter
   // calls destroys the SoftmacBridge.
@@ -212,15 +171,16 @@ void SoftmacBinding::Unbind() {
 
   auto stop_completer = std::make_unique<StopCompleter>(
       [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(), softmac_bridge,
-       client_dispatcher = client_dispatcher_.release(),
-       stop_returned = std::move(stop_returned)]() mutable {
+       softmac_ifc_bridge, device = device_, stop_returned = std::move(stop_returned)]() mutable {
         WLAN_LAMBDA_TRACE_DURATION("StopCompleter");
-        async::PostTask(main_device_dispatcher, [softmac_bridge, client_dispatcher,
+        async::PostTask(main_device_dispatcher, [softmac_bridge, softmac_ifc_bridge, device,
                                                  stop_returned = std::move(stop_returned)]() {
-          WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
+          WLAN_LAMBDA_TRACE_DURATION(
+              "SoftmacBridge destruction + softmac_ifc_bridge reset + device_unbind_reply");
           stop_returned->Wait();
           delete softmac_bridge;
-          fdf_dispatcher_shutdown_async(client_dispatcher);
+          delete softmac_ifc_bridge;
+          device_unbind_reply(device);
         });
       });
   softmac_bridge->Stop(std::move(stop_completer));

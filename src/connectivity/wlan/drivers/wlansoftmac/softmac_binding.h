@@ -150,9 +150,6 @@ class SoftmacBinding : public DeviceInterface {
   // unbind_called_ even if SoftmacBinding drops its reference to unbind_called_.
   std::shared_ptr<std::mutex> unbind_lock_;
   std::shared_ptr<bool> unbind_called_ __TA_GUARDED(unbind_lock_);
-
-  // Dispatcher for being a FIDL client firing requests on WlanSoftmac protocol.
-  fdf::Dispatcher client_dispatcher_;
 };
 
 }  // namespace wlan::drivers::wlansoftmac
