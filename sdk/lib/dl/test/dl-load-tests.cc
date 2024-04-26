@@ -174,7 +174,8 @@ TYPED_TEST(DlTests, BasicDep) {
 
 // Load a module that depends on a symbols provided directly and transitively by
 // several dependencies. Dependency ordering is serialized such that a module
-// depends on another module only one hop away (e.g. in its DT_NEEDED list):
+// depends on a symbol provided by a dependency only one hop away
+// (e.g. in its DT_NEEDED list):
 TYPED_TEST(DlTests, IndirectDeps) {
   constexpr int64_t kReturnValue = 17;
 
@@ -184,6 +185,35 @@ TYPED_TEST(DlTests, IndirectDeps) {
   this->Needed({"libindirect-deps-a.so", "libindirect-deps-b.so", "libindirect-deps-c.so"});
 
   auto result = this->DlOpen(kIndirectDepsFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+}
+
+// Load a module that depends on symbols provided directly and transitively by
+// several dependencies. Dependency ordering is DAG-like where several modules
+// share a dependency.
+TYPED_TEST(DlTests, ManyDeps) {
+  constexpr int64_t kReturnValue = 17;
+
+  constexpr const char* kManyDepsFile = "many-deps.module.so";
+
+  this->ExpectRootModule(kManyDepsFile);
+  this->Needed({
+      "libld-dep-a.so",
+      "libld-dep-b.so",
+      "libld-dep-f.so",
+      "libld-dep-c.so",
+      "libld-dep-d.so",
+      "libld-dep-e.so",
+  });
+
+  auto result = this->DlOpen(kManyDepsFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
