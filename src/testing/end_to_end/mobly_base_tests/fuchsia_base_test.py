@@ -18,17 +18,23 @@ from mobly_controller import fuchsia_device as fuchsia_device_mobly_controller
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SnapshotOn(enum.Enum):
+class SnapshotOn(enum.StrEnum):
     """How often we need to collect the snapshot"""
 
-    # Once per test class.
-    TEARDOWN_CLASS = enum.auto()
-    # Once per test class on failure only.
-    TEARDOWN_CLASS_ON_FAIL = enum.auto()
     # Once per test case.
-    TEARDOWN_TEST = enum.auto()
+    TEARDOWN_TEST = "teardown_test"
+
     # Once per test case on failure only.
-    ON_FAIL = enum.auto()
+    TEARDOWN_TEST_ON_FAIL = "teardown_test_on_fail"
+
+    # Once per test class.
+    TEARDOWN_CLASS = "teardown_class"
+
+    # Once per test class on failure only.
+    TEARDOWN_CLASS_ON_FAIL = "teardown_class_on_fail"
+
+    # Do not collect snapshot
+    NEVER = "never"
 
 
 class FuchsiaBaseTest(base_test.BaseTestClass):
@@ -138,7 +144,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
               "on_fail"
         """
         self._any_test_failed = True
-        if self.snapshot_on == SnapshotOn.ON_FAIL:
+        if self.snapshot_on == SnapshotOn.TEARDOWN_TEST_ON_FAIL:
             self._collect_snapshot(directory=self.test_case_path)
 
     def _collect_snapshot(self, directory: str) -> None:
@@ -154,7 +160,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         _LOGGER.info(
             "Collecting snapshots of all the FuchsiaDevice objects in '%s'...",
-            self.snapshot_on.name,
+            self.snapshot_on.value,
         )
         for fx_device in self.fuchsia_devices:
             try:
@@ -380,22 +386,24 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         try:
             snapshot_on: str = self.user_params.get(
-                "snapshot_on", SnapshotOn.TEARDOWN_CLASS_ON_FAIL.name
-            ).upper()
-            self.snapshot_on: SnapshotOn = SnapshotOn[snapshot_on]
-        except KeyError as err:
+                "snapshot_on", SnapshotOn.TEARDOWN_CLASS_ON_FAIL.value
+            ).lower()
+            self.snapshot_on: SnapshotOn = SnapshotOn(snapshot_on)
+        except ValueError:
             _LOGGER.warning(
-                "Invalid value %s passed in 'snapshot_on' test param. "
-                "Valid values for this test param are: '%s', '%s', '%s','%s'. "
+                "Invalid value '%s' passed in 'snapshot_on' test param. "
+                "Valid values for the test param are: '%s'. "
                 "Proceeding with default value: '%s'",
-                err,
-                SnapshotOn.TEARDOWN_CLASS.name,
-                SnapshotOn.TEARDOWN_CLASS_ON_FAIL.name,
-                SnapshotOn.TEARDOWN_TEST.name,
-                SnapshotOn.ON_FAIL.name,
-                SnapshotOn.TEARDOWN_CLASS_ON_FAIL.name,
+                snapshot_on,
+                [member.value for member in SnapshotOn],
+                SnapshotOn.TEARDOWN_CLASS_ON_FAIL.value,
             )
             self.snapshot_on = SnapshotOn.TEARDOWN_CLASS_ON_FAIL
+        _LOGGER.info(
+            "Frequency at which snapshots will be collected during this test "
+            "run is: '%s'",
+            self.snapshot_on,
+        )
 
 
 if __name__ == "__main__":
