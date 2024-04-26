@@ -55,7 +55,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/product:ffx_product",
   "//src/developer/ffx/plugins/repository:ffx_repository",
   "//src/developer/ffx/plugins/session:ffx_session",
-  "//src/developer/ffx/plugins/test:ffx_test",
 ]
 
 # The full set of plugins you'd expect in a 'large', fully integrated ffx
@@ -66,7 +65,6 @@ all_ffx_plugins = required_ffx_plugins + dual_mode_plugins
 dual_mode_defaults = [
   "//src/developer/ffx/plugins/product/data/config.json",
   "//src/developer/ffx/plugins/repository/data/config.json",
-  "//src/developer/ffx/plugins/test/data/config.json",
 ]
 
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to
