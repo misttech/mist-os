@@ -20,7 +20,7 @@ type RfcommParameters = table {
 
 /// The parameters associated with a connection over the L2CAP protocol.
 type L2capParameters = table {
-    /// Required. Dynamic PSM for the connection. See the defined PSMs in `service.fidl`.
+    /// Required. L2CAP PSM for the connection. See the defined PSMs in `service.fidl`.
     1: psm uint16;
 
     /// Optional. L2CAP channel parameters.
@@ -267,9 +267,6 @@ const MAX_SERVICES_PER_ADVERTISEMENT uint8 = 32;
 open protocol Profile {
     /// Register a set of services.
     ///
-    /// The call will resolve when the service advertisement terminates or if there was an error
-    /// when advertising.
-    ///
     /// These services will be discoverable via Service Discovery Protocol server.
     /// All services advertising the same channel must be added at once - if services are already
     /// registered on any channel advertised, registration will fail, the receiver will be closed
@@ -278,16 +275,31 @@ open protocol Profile {
     /// `protocol_descriptor` or `alternative_protocol_descriptors` in the services advertised.
     /// The receiver will be closed if there are any errors advertising.
     ///
+    /// The `ConnectionReceiver::OnRevoke` event can be used to synchronize revoking the
+    /// advertisement, if necessary. Closing the `ConnectionReceiver` protocol will also stop
+    /// advertising these services.
+    ///
     /// If the advertisement cannot be made for any reason, an error of `INVALID_ARGUMENTS`
     /// will be returned and the receiver will be closed with a suitable epitaph.
+    /// Returns the set of services that are registered via the Service Discovery Protocol
+    /// server. The returned services may differ from the input `services` if any L2CAP protocol
+    /// descriptors request `PSM_DYNAMIC`. In this case, the `Profile` server shall assign a valid
+    /// PSM and include this value in the returned services.
     flexible Advertise(resource table {
+        /// The set of definitions describing the services that will be registered.
         /// Required.
         1: services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
+        /// Receives connections made to the advertised services.
         /// Required.
         2: receiver client_end:ConnectionReceiver;
+        /// The default parameters used to configure L2CAP connections on the `receiver`.
         /// Optional. See `ChannelParameters` for defaults.
         3: parameters ChannelParameters;
-    }) -> () error fuchsia.bluetooth.ErrorCode;
+    }) -> (table {
+        /// Set of service definitions as registered by the SDP server, updated with definitions
+        /// for requested dyanmic PSM & RFCOMM assignments.
+        1: services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
+    }) error fuchsia.bluetooth.ErrorCode;
 
     /// Register a search for services on newly connected peers.  The SearchResults protocol will be
     /// used to report results for this search.  Any service result with a service matching
@@ -305,7 +317,7 @@ open protocol Profile {
     });
 
     /// Connect an L2CAP or RFCOMM channel to the connected peer identified by `peer_id` using the
-    /// desired `connection` parameters listed.  Dynamic PSMs can be specified in `connection`.
+    /// desired `connection` parameters listed. Dynamic PSMs can be specified in `connection`.
     ///
     /// Returns the channel connected once established, or an error code if the channel could not
     /// be connected.

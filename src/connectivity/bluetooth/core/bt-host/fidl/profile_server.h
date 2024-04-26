@@ -192,14 +192,10 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   // Advertised Services
   struct AdvertisedService {
     AdvertisedService(fidl::InterfacePtr<fuchsia::bluetooth::bredr::ConnectionReceiver> receiver,
-                      bt::sdp::Server::RegistrationHandle registration_handle,
-                      AdvertiseCallback disconnection_cb)
-        : receiver(std::move(receiver)),
-          registration_handle(registration_handle),
-          disconnection_cb(std::move(disconnection_cb)) {}
+                      bt::sdp::Server::RegistrationHandle registration_handle)
+        : receiver(std::move(receiver)), registration_handle(registration_handle) {}
     fidl::InterfacePtr<fuchsia::bluetooth::bredr::ConnectionReceiver> receiver;
     bt::sdp::Server::RegistrationHandle registration_handle;
-    AdvertiseCallback disconnection_cb;
   };
 
   uint64_t advertised_total_;

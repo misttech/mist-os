@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use async_utils::stream::{StreamItem, StreamWithEpitaph, WithEpitaph};
+use async_utils::stream::{StreamItem, StreamWithEpitaph, Tagged, WithEpitaph, WithTag};
 use bt_rfcomm::ServerChannel;
-use fidl::endpoints::{create_request_stream, ClientEnd};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fidl::endpoints::{create_request_stream, RequestStream};
 use fidl_fuchsia_bluetooth::ErrorCode;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_async as fasync;
@@ -14,47 +16,102 @@ use fuchsia_bluetooth::profile::{
 };
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Inspect;
-use futures::{
-    channel::mpsc, future::BoxFuture, select, sink::SinkExt, stream::StreamExt, Future, FutureExt,
-};
+use futures::stream::{FusedStream, Stream, StreamExt};
+use futures::{channel::mpsc, select};
 use std::collections::HashSet;
+use std::ops::RangeFrom;
 use tracing::{info, trace, warn};
 
 use crate::fidl_service::Service;
 use crate::profile::*;
 use crate::rfcomm::RfcommServer;
-use crate::types::{AdvertiseParams, ServiceGroup, ServiceGroupHandle, Services};
+use crate::types::{ServiceGroup, ServiceGroupHandle, Services};
 
-/// The returned result of a Profile.Advertise request.
-enum AdvertiseResult {
-    /// The Advertise request needed RFCOMM - the client's event stream is returned.
-    EventStream(StreamWithEpitaph<bredr::ConnectionReceiverEventStream, ServiceGroupHandle>),
-}
+/// Unique identifier assigned to the currently active managed advertisement ID.
+type ManagedAdvertisementId = u64;
 
-/// A connection request from the upstream server.
-#[derive(Debug)]
-enum ConnectionEvent {
-    /// A normal connection request.
-    Request(bredr::ConnectionReceiverRequest),
-    /// The upstream server canceled the advertisement, for any reason.
-    AdvertisementCanceled,
-}
+/// A stream associated with a FIDL client's `bredr.Advertise` request. Produces an event any time
+/// the client's `ConnectionReceiver` stream produces an event.
+/// On stream termination, returns the unique `ServiceGroupHandle` associated with this FIDL client.
+type ManagedAdvertisementEventStream = StreamWithEpitaph<
+    Tagged<ServiceGroupHandle, bredr::ConnectionReceiverEventStream>,
+    ServiceGroupHandle,
+>;
 
-/// The tasks associated with a service advertisement.
-struct AdvertiseTasks {
-    /// The Profile.Advertise() Future that resolves when advertisement terminates.
-    pub adv_task: BoxFuture<'static, ()>,
-    /// The relay task used to process incoming connection requests from the upstream
-    /// server.
-    pub relay_task: fasync::Task<()>,
+/// An advertisement made with the upstream `Profile` service that is managed by this server.
+struct ManagedAdvertisement {
+    /// Unique identifier describing this advertisement.
+    id: ManagedAdvertisementId,
+    /// The control handle associated with the `ConnectionReceiver` stream for this advertisement.
+    /// Used to send an `OnRevoke` event to cancel this advertisement.
+    connection_receiver_handle: bredr::ConnectionReceiverControlHandle,
+    /// The connection relay that processes incoming `bredr.ConnectionReceiver.Connect` requests
+    /// from the upstream `Profile` server. These represent incoming L2CAP connections made by a
+    /// remote peer.
+    connection_relay:
+        StreamWithEpitaph<bredr::ConnectionReceiverRequestStream, ManagedAdvertisementId>,
 }
 
 /// The current advertisement status of the `ProfileRegistrar`.
+#[derive(Default)]
 enum AdvertiseStatus {
-    /// Currently advertising with a set of tasks processing requests.
-    Advertising(AdvertiseTasks),
     /// We are not currently advertising.
+    #[default]
     NotAdvertising,
+    /// Currently advertising with a managed set of services. Incoming L2CAP/RFCOMM connections
+    /// will be forwarded to the appropriate FIDL client of the `bt-rfcomm` server.
+    /// Use the `AdvertiseStatus::Stream` implementation to receive connections.
+    Advertising(ManagedAdvertisement),
+}
+
+impl Stream for AdvertiseStatus {
+    type Item = StreamItem<
+        <bredr::ConnectionReceiverRequestStream as Stream>::Item,
+        ManagedAdvertisementId,
+    >;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = Pin::into_inner(self);
+        match this {
+            Self::NotAdvertising => Poll::Ready(None),
+            Self::Advertising(ManagedAdvertisement { connection_relay, .. }) => {
+                connection_relay.poll_next_unpin(cx)
+            }
+        }
+    }
+}
+
+impl FusedStream for AdvertiseStatus {
+    fn is_terminated(&self) -> bool {
+        match &self {
+            Self::NotAdvertising => true,
+            Self::Advertising(ManagedAdvertisement { connection_relay, .. }) => {
+                connection_relay.is_terminated()
+            }
+        }
+    }
+}
+
+impl AdvertiseStatus {
+    fn id(&self) -> Option<ManagedAdvertisementId> {
+        match &self {
+            Self::NotAdvertising => None,
+            Self::Advertising(managed) => Some(managed.id),
+        }
+    }
+}
+
+fn get_parameters_from_advertise_request(
+    payload: bredr::ProfileAdvertiseRequest,
+) -> Result<(bredr::ConnectionReceiverProxy, ChannelParameters), Error> {
+    let receiver = payload.receiver.unwrap().into_proxy()?;
+    let parameters = ChannelParameters::try_from(&payload.parameters.unwrap_or_default())?;
+    Ok((receiver, parameters))
+}
+
+/// TODO(https://fxbug.dev/330590954): Remove once advertise response is implemented.
+fn empty_advertise_response() -> bredr::ProfileAdvertiseResponse {
+    bredr::ProfileAdvertiseResponse { services: Some(vec![]), ..Default::default() }
 }
 
 /// The ProfileRegistrar handles requests over the `fidl.fuchsia.bluetooth.bredr.Profile` service.
@@ -69,21 +126,20 @@ enum AdvertiseStatus {
 /// connections over the RFCOMM PSM.
 #[derive(Inspect)]
 pub struct ProfileRegistrar {
-    /// An upstream provider of the Profile service. Typically provided by bt-host.
+    /// A connection to the upstream provider of the `bredr.Profile` service. Typically bt-host.
     profile_upstream: bredr::ProfileProxy,
-    /// The `active_registration` is the current processing task for connection requests
-    /// from the upstream server.
+    /// The next available unique identifier for a managed advertisement. Does not necessarily mean
+    /// we are advertising.
+    next_id: RangeFrom<ManagedAdvertisementId>,
+    /// The current advertisement status of the registrar. Manages the advertisement and holds the
+    /// connection relay stream which receives incoming L2CAP/RFCOMM connections and forwards to
+    /// the appropriate FIDL client.
     active_registration: AdvertiseStatus,
-    /// The currently advertised services.
+    /// The set of service definitions that are being advertised to the upstream `bredr.Profile`
+    /// server. This is a collection of services from various FIDL clients of this registrar.
     registered_services: Services,
-    /// Sender used to relay connection requests from the upstream server.
-    connection_sender: Option<mpsc::Sender<ConnectionEvent>>,
-    /// Advertise future relays, which complete Advertise calls that do not interact with
-    /// RFCOMM.  These must be polled separately from the handler_fut because of how fidl
-    /// asynchronous futures and select! interact.
-    advertise_relay_tasks: Vec<fasync::Task<()>>,
-    /// The RFCOMM server that handles allocating server channels, incoming
-    /// l2cap connections, outgoing l2cap connections, and multiplexing channels.
+    /// The server that handles allocating RFCOMM server channels, incoming/outgoing connections,
+    /// and multiplexing client channels over the RFCOMM L2CAP PSM.
     #[inspect(forward)]
     rfcomm_server: RfcommServer,
 }
@@ -92,10 +148,9 @@ impl ProfileRegistrar {
     pub fn new(profile_upstream: bredr::ProfileProxy) -> Self {
         Self {
             profile_upstream,
-            active_registration: AdvertiseStatus::NotAdvertising,
+            next_id: RangeFrom { start: 0 },
+            active_registration: AdvertiseStatus::default(),
             registered_services: Services::new(),
-            connection_sender: None,
-            advertise_relay_tasks: Vec::new(),
             rfcomm_server: RfcommServer::new(),
         }
     }
@@ -105,6 +160,10 @@ impl ProfileRegistrar {
     pub fn start(self, incoming_services: mpsc::Receiver<Service>) -> fasync::Task<()> {
         let handler_fut = self.handle_fidl_requests(incoming_services);
         fasync::Task::spawn(handler_fut)
+    }
+
+    fn get_next_id(&mut self) -> ManagedAdvertisementId {
+        self.next_id.next().unwrap()
     }
 
     /// Returns true if the requested `new_psms` do not overlap with the currently registered PSMs.
@@ -123,6 +182,7 @@ impl ProfileRegistrar {
     async fn unregister_all_services(&mut self) {
         self.registered_services = Services::new();
         self.rfcomm_server.free_all_server_channels().await;
+        let _ = self.refresh_advertisement().await;
     }
 
     /// Unregisters the group of services identified by `handle`. Re-registers any remaining
@@ -130,15 +190,17 @@ impl ProfileRegistrar {
     /// This should be called when a profile client decides to stop advertising its services.
     async fn unregister_service(&mut self, handle: ServiceGroupHandle) -> Result<(), Error> {
         if !self.registered_services.contains(handle) {
-            return Err(format_err!("Attempt to unregister non-existent service: {:?}", handle));
+            return Ok(()); // No-op
         }
 
         // Remove the entry for this client.
         let service_info = self.registered_services.remove(handle);
         self.rfcomm_server.free_server_channels(service_info.allocated_server_channels()).await;
 
-        // Attempt to re-advertise.
-        self.refresh_advertisement().await;
+        // Attempt to re-advertise - the returned services are ignored as the `ProfileRegistrar`
+        // already has an updated view of the world.
+        let _advertised_services =
+            self.refresh_advertisement().await.map_err(|e| format_err!("{e:?}"))?;
         Ok(())
     }
 
@@ -156,8 +218,8 @@ impl ProfileRegistrar {
     ) -> Result<(), Error> {
         trace!(%peer_id, ?protocol, "Incoming L2CAP connection request");
         let local = protocol.iter().map(|p| p.into()).collect();
-        // TODO(b/327758656): The RFCOMM server cannot relay dynamic PSM connections to the correct
-        // FIDL client.
+        // TODO(https://fxbug.dev/327758656): Support forwarding dynamic L2CAP connections to the
+        // correct client.
         match psm_from_protocol(&local).ok_or(format_err!("No PSM provided"))? {
             Psm::RFCOMM => self.rfcomm_server.new_l2cap_connection(peer_id, channel.try_into()?),
             psm => {
@@ -239,88 +301,56 @@ impl ProfileRegistrar {
         Ok(())
     }
 
-    /// Advertises `params` to the provided `profile_upstream`.
-    ///
-    /// Returns a Future for the advertisement; this future should be polled in order to detect
-    /// when the advertisement has finished.
-    fn advertise(
-        profile_upstream: bredr::ProfileProxy,
-        params: AdvertiseParams,
-        connect_client: ClientEnd<bredr::ConnectionReceiverMarker>,
-    ) -> impl Future<Output = ()> {
-        let fidl_services = params
-            .services
-            .iter()
-            .map(bredr::ServiceDefinition::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        let request = bredr::ProfileAdvertiseRequest {
-            receiver: Some(connect_client),
-            parameters: Some((&params.parameters).try_into().unwrap()),
-            services: Some(fidl_services),
-            ..Default::default()
-        };
-
-        profile_upstream.advertise(request).map(|_| ())
-    }
-
-    /// Processes requests from the ConnectionReceiver stream and relays to the `sender`.
-    async fn connection_request_relay(
-        mut connect_requests: bredr::ConnectionReceiverRequestStream,
-        mut sender: mpsc::Sender<ConnectionEvent>,
-    ) {
-        trace!("Starting connection request relay");
-        while let Some(connect_request) = connect_requests.next().await {
-            match connect_request {
-                Ok(request) => {
-                    let _ = sender.send(ConnectionEvent::Request(request)).await;
-                }
-                Err(e) => info!("Connection request error: {e:?}"),
-            }
-        }
-        // The upstream server has dropped the `ConnectionReceiver`. Notify the server main loop
-        // that the advertisement has been canceled.
-        trace!("`ConnectionReceiver` stream terminated. Notifying cancellation.");
-        let _ = sender.send(ConnectionEvent::AdvertisementCanceled).await;
-    }
-
-    /// Attempts to build and advertise services from `self.registered_services`.
-    async fn refresh_advertisement(&mut self) {
+    /// Refreshes the current advertisement with the upstream `Profile` service.
+    /// Returns the new set of services that is currently advertising. This list can be empty if
+    /// there are no services to advertise or we are not advertising.
+    async fn refresh_advertisement(
+        &mut self,
+    ) -> Result<Vec<bredr::ServiceDefinition>, fidl_fuchsia_bluetooth::ErrorCode> {
         let status =
             std::mem::replace(&mut self.active_registration, AdvertiseStatus::NotAdvertising);
-        match status {
-            AdvertiseStatus::Advertising(AdvertiseTasks { adv_task, relay_task }) => {
-                // If we are currently advertising, drop the stream processing task to unregister
-                // the services. Wait for the advertisement to resolve before attempting to
-                // re-advertise.
-                trace!("Unregistering existing advertisement");
-                drop(relay_task);
-                let _ = adv_task.await;
-                trace!("Finished waiting for unregistration");
-            }
-            AdvertiseStatus::NotAdvertising => {}
+        if let AdvertiseStatus::Advertising(ManagedAdvertisement {
+            id,
+            connection_receiver_handle,
+            connection_relay,
+        }) = status
+        {
+            // Revoke the current advertisement and wait for the upstream Profile server to
+            // process the cancellation. The `connection_relay` will terminate after
+            // the upstream has unregistered the advertisement.
+            trace!(id, "Unregistering existing advertisement");
+            let _ = connection_receiver_handle.send_on_revoke();
+            connection_relay.map(|_| ()).collect::<()>().await;
+            trace!(id, "Finished waiting for unregistration");
         }
 
-        // We are ready to advertise. Attempt to build the advertisement parameters, and create
-        // and save two tasks that 1) Make the Advertise request and wait for termination and
-        // 2) Process incoming requests from the upstream server.
-        if let Some(params) = self.registered_services.build_registration() {
-            trace!("Advertising from registered services: {:?}", params);
-            let (connect_client, connect_requests) =
-                create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-            // Advertise the `params` set of services.
-            let adv_fut =
-                ProfileRegistrar::advertise(self.profile_upstream.clone(), params, connect_client);
-            let adv_task = adv_fut.boxed();
-            // Spawn a task to handle incoming L2CAP connections.
-            let relay_task = fasync::Task::spawn(ProfileRegistrar::connection_request_relay(
-                connect_requests,
-                self.connection_sender.clone().unwrap(),
-            ));
-
-            self.active_registration =
-                AdvertiseStatus::Advertising(AdvertiseTasks { adv_task, relay_task });
-        }
+        // We are ready to advertise. Attempt to build the advertisement parameters and set up the
+        // managed advertisement.
+        let Some(params) = self.registered_services.build_registration() else {
+            trace!("No services to advertise");
+            return Ok(vec![]);
+        };
+        let id = self.get_next_id();
+        trace!(?id, ?params, "Refreshing advertisement from registered services");
+        let (connect_client, connect_requests) =
+            create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        // The control handle will be used to revoke the advertisement any time a refresh is
+        // requested.
+        let connection_receiver_handle = connect_requests.control_handle();
+        let advertise_request = params.into_advertise_request(connect_client);
+        let advertise_result = self
+            .profile_upstream
+            .advertise(advertise_request)
+            .await
+            .unwrap_or(Err(fidl_fuchsia_bluetooth::ErrorCode::ProtocolError))?;
+        self.active_registration = AdvertiseStatus::Advertising(ManagedAdvertisement {
+            id,
+            connection_receiver_handle,
+            connection_relay: connect_requests.with_epitaph(id),
+        });
+        let advertised_services = advertise_result.services.expect("included in response");
+        info!(?id, ?advertised_services, "Advertising via the upstream `Profile` server");
+        Ok(advertised_services)
     }
 
     /// Handles a request to advertise a group of profile `services` that will be managed by the
@@ -330,24 +360,22 @@ impl ProfileRegistrar {
     /// assigned ServerChannels. The services are registered together with any existing RFCOMM
     /// services.
     ///
-    /// Returns a stream of incoming connection requests tagged with a unique identifier for the
-    /// registered group of services. The event stream should be actively polled in order to detect
-    /// when the client terminates the advertisement.
+    /// Returns a stream of `ConnectionReceiverEvent`s. The event stream should be actively polled
+    /// in order to detect when the client terminates the advertisement.
     async fn add_managed_advertisement(
         &mut self,
         mut services: Vec<ServiceDefinition>,
         parameters: ChannelParameters,
         receiver: bredr::ConnectionReceiverProxy,
         responder: bredr::ProfileAdvertiseResponder,
-    ) -> Result<StreamWithEpitaph<bredr::ConnectionReceiverEventStream, ServiceGroupHandle>, Error>
-    {
+    ) -> Result<ManagedAdvertisementEventStream, Error> {
         // The requested PSMs must be disjoint from the existing set of PSMs as only one group
         // can allocate a specific PSM.
         let new_psms = psms_from_service_definitions(&services);
         trace!("Adding managed advertisement with PSMs: {new_psms:?}");
         if !self.is_disjoint_psms(&new_psms) {
             let _ = responder.send(Err(ErrorCode::Failed));
-            return Err(format_err!("New advertisement requests allocated PSMs"));
+            return Err(format_err!("PSMs already allocated"));
         }
 
         let next_handle =
@@ -359,7 +387,7 @@ impl ProfileRegistrar {
             services.iter().filter(|def| is_rfcomm_service_definition(def)).count();
         if required_server_channels > self.rfcomm_server.available_server_channels().await {
             let _ = responder.send(Err(ErrorCode::Failed));
-            return Err(format_err!("RfcommServer not enough free Server Channels"));
+            return Err(format_err!("Insufficient space in the RfcommServer"));
         }
         for mut service in services.iter_mut().filter(|def| is_rfcomm_service_definition(def)) {
             let server_channel = self
@@ -372,72 +400,109 @@ impl ProfileRegistrar {
 
         let service_info = self.registered_services.get_mut(next_handle).expect("just inserted");
         service_info.set_service_defs(services);
-        service_info.set_responder(responder);
 
-        // The services will be re-registered as a single group.
-        self.refresh_advertisement().await;
+        // Re-register the services as a single group.
+        // TODO(https://fxbug.dev/327758656): Use `advertised_services` to update the PSM cache for
+        // dynamic PSMs.
+        let _advertised_services = self.refresh_advertisement().await;
+        // TODO(https://fxbug.dev/330590954): Reply with a combined version of `services` and
+        // `advertised_services` since both Dynamic PSMs and RFCOMM ServerChannel #s are assigned
+        // after this step.
+        let _ = responder.send(Ok(&empty_advertise_response()));
 
-        Ok(receiver.take_event_stream().with_epitaph(next_handle))
+        let client_event_stream =
+            receiver.take_event_stream().tagged(next_handle).with_epitaph(next_handle);
+        Ok(client_event_stream)
     }
 
-    /// Makes a Profile.Advertise() request upstream, and returns a Future that relays the
-    /// result to the `responder` upon termination.
-    fn make_advertise_relay(
-        &self,
+    /// Forwards the `Profile.Advertise` `request` to the upstream Profile server.
+    async fn forward_advertisement_upstream(
+        profile_upstream: bredr::ProfileProxy,
         request: bredr::ProfileAdvertiseRequest,
         responder: bredr::ProfileAdvertiseResponder,
-    ) -> impl Future<Output = ()> {
-        let adv_fut = self.profile_upstream.advertise(request);
-        async move {
-            let _ = adv_fut
-                .await
-                .and_then(|r| responder.send(r))
-                .map_err(|e| trace!("Relayed advertisement terminated: {e:?}"));
+    ) {
+        let result = profile_upstream
+            .advertise(request)
+            .await
+            .unwrap_or(Err(fidl_fuchsia_bluetooth::ErrorCode::ProtocolError));
+
+        match result {
+            Ok(response) => {
+                let _ = responder.send(Ok(&response));
+            }
+            Err(e) => {
+                let _ = responder.send(Err(e));
+            }
         }
     }
 
-    /// Handles a request over the Profile protocol.
+    /// Handles a request over the `bredr.Profile` protocol.
     ///
-    /// If the request was an advertisement, returns either the event stream associated with
-    /// the advertise request, or a future to relay the advertisement request directly upstream.
+    /// Returns Some<T> if the request requires a managed BR/EDR advertisement, None otherwise.
     async fn handle_profile_request(
         &mut self,
         request: bredr::ProfileRequest,
-    ) -> Option<AdvertiseResult> {
+    ) -> Option<ManagedAdvertisementEventStream> {
         match request {
-            bredr::ProfileRequest::Advertise { payload, responder } => {
-                if payload.services.is_none() || payload.receiver.is_none() {
-                    let _ =
-                        responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::InvalidArguments));
-                    return None;
-                }
-                let services_local = payload
+            bredr::ProfileRequest::Advertise {
+                payload:
+                    original_payload @ bredr::ProfileAdvertiseRequest {
+                        services: Some(_),
+                        receiver: Some(_),
+                        ..
+                    },
+                responder,
+            } => {
+                let Ok(services_local) = original_payload
                     .services
                     .as_ref()
                     .unwrap()
                     .iter()
                     .map(ServiceDefinition::try_from)
                     .collect::<Result<Vec<_>, _>>()
-                    .ok()?;
+                else {
+                    let _ =
+                        responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::InvalidArguments));
+                    return None;
+                };
                 trace!("Advertise request: {services_local:?}");
-                if service_definitions_request_rfcomm(&services_local) {
-                    let receiver = payload.receiver.unwrap().into_proxy().ok()?;
-                    let parameters =
-                        ChannelParameters::try_from(&payload.parameters.unwrap_or_default())
-                            .ok()?;
-                    match self
-                        .add_managed_advertisement(services_local, parameters, receiver, responder)
-                        .await
-                    {
-                        Err(e) => {
-                            warn!("Error handling advertise request: {e:?}");
-                            return None;
-                        }
-                        Ok(evt_stream) => return Some(AdvertiseResult::EventStream(evt_stream)),
-                    }
+
+                // Non-RFCOMM requesting advertisements can be forwarded directly to the upstream
+                // Profile server.
+                if !service_definitions_request_rfcomm(&services_local) {
+                    Self::forward_advertisement_upstream(
+                        self.profile_upstream.clone(),
+                        original_payload,
+                        responder,
+                    )
+                    .await;
+                    return None;
                 }
-                let relay_fut = self.make_advertise_relay(payload, responder);
-                self.advertise_relay_tasks.push(fasync::Task::spawn(relay_fut));
+
+                // Otherwise, we need to locally manage the advertisement by setting up the RFCOMM
+                // service.
+                let result = get_parameters_from_advertise_request(original_payload);
+                let Ok((receiver, parameters)) = result else {
+                    warn!("Invalid parameters in `Advertise` request: {result:?}");
+                    let _ =
+                        responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::InvalidArguments));
+                    return None;
+                };
+
+                return match self
+                    .add_managed_advertisement(services_local, parameters, receiver, responder)
+                    .await
+                {
+                    Ok(evt_stream) => Some(evt_stream),
+                    Err(e) => {
+                        warn!("Failed to handle `Advertise` request: {e:?}");
+                        None
+                    }
+                };
+            }
+            bredr::ProfileRequest::Advertise { responder, .. } => {
+                // Otherwise, the Advertise `payload` is missing a required field.
+                let _ = responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::InvalidArguments));
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
                 let peer_id = peer_id.into();
@@ -461,32 +526,42 @@ impl ProfileRegistrar {
         None
     }
 
-    /// Handles incoming connection requests from the processing task of the active service
+    /// Handles incoming L2CAP/RFCOMM connect requests from the receiver of the active
     /// advertisement.
-    ///
-    /// There are two relevant cases:
-    ///   1) A connection request from the upstream Host Server. The incoming l2cap connection
-    ///      must be handled - if PSM_RFCOMM, send to the RfcommServer, otherwise, relay
-    ///      directly to the profile client.
-    ///   2) An epitaph of the relay task signaling the advertisement has canceled. This is
-    ///      usually due to an error in the upstream server. We must clear all of the services.
-    async fn handle_connection_request(&mut self, request: ConnectionEvent) -> Result<(), Error> {
+    /// Returns Ok(true) if the upstream `Profile` server terminated the advertisement, Ok(false)
+    /// otherwise.
+    /// Returns Error if the request couldn't be processed.
+    async fn handle_connection_request(
+        &mut self,
+        request: StreamItem<
+            Result<bredr::ConnectionReceiverRequest, fidl::Error>,
+            ManagedAdvertisementId,
+        >,
+    ) -> Result<bool, Error> {
+        use bredr::ConnectionReceiverRequest::*;
         match request {
-            ConnectionEvent::Request(request) => match request {
-                bredr::ConnectionReceiverRequest::Connected {
-                    peer_id, channel, protocol, ..
-                } => self.handle_incoming_l2cap_connection(peer_id.into(), channel, protocol),
-                bredr::ConnectionReceiverRequest::_UnknownMethod { .. } => {
-                    Err(format_err!("ConnectionReceiverRequest: unknown method"))
+            StreamItem::Item(Ok(Connected { peer_id, channel, protocol, .. })) => {
+                self.handle_incoming_l2cap_connection(peer_id.into(), channel, protocol)?;
+            }
+            StreamItem::Item(Ok(_UnknownMethod { .. })) => {
+                return Err(format_err!("`ConnectionReceiverRequest` unknown method"));
+            }
+            StreamItem::Item(Err(e)) => {
+                return Err(format_err!("Error in `ConnectionReceiver` stream: {e:?}"));
+            }
+            StreamItem::Epitaph(id) => {
+                // If the `id` matches the current advertisement, then the upstream unexpectedly
+                // canceled the advertisement and we need to notify our FIDL clients. Otherwise, it
+                // was an older advertisement and no action is needed (typically after we issue an
+                // `OnRevoke`).
+                if Some(id) == self.active_registration.id() {
+                    trace!("Upstream `Profile` server unexpectedly terminated advertisement");
+                    self.unregister_all_services().await;
+                    return Ok(true);
                 }
-            },
-            ConnectionEvent::AdvertisementCanceled => {
-                // The upstream server unexpectedly dropped the advertisement. We must clean up
-                // all of the state.
-                self.unregister_all_services().await;
-                Ok(())
             }
         }
+        Ok(false)
     }
 
     /// Processes incoming service requests and events generated by clients of the
@@ -497,12 +572,10 @@ impl ProfileRegistrar {
         // `RfcommTest` FIDL requests.
         let mut test_requests = futures::stream::SelectAll::new();
 
-        // Internal channel used to relay requests over the `ConnectionReceiver` protocol.
-        let (connection_sender, mut connection_receiver) = mpsc::channel(0);
-        self.connection_sender = Some(connection_sender);
-
-        // All client service advertisement event streams. Used to determine when the
-        // client wants to stop advertising its services.
+        // A collection of event streams. Each stream is the `ManagedAdvertisementEventStream` tied
+        // to a FIDL client's BR/EDR service advertisement request. The FIDL client can terminate
+        // its advertisement by issuing a `ConnectionReceiver.OnRevoke` event.
+        // Only used for service advertisements that are managed by `bt-rfcomm`.
         let mut client_event_streams = futures::stream::SelectAll::new();
 
         loop {
@@ -514,38 +587,38 @@ impl ProfileRegistrar {
                     }
                 }
                 profile_request = profile_requests.select_next_some() => {
-                    let profile_request = match profile_request {
-                        Ok(request) => request,
-                        Err(e) => {
-                            info!("Error from Profile request: {e:?}");
-                            continue;
-                        }
+                    let Ok(request) =  profile_request else {
+                        info!("Error from Profile request: {profile_request:?}");
+                        continue;
                     };
-                    match self.handle_profile_request(profile_request).await {
-                        Some(AdvertiseResult::EventStream(evt_stream)) => client_event_streams.push(evt_stream),
-                        _ => {},
+                    if let Some(evt_stream) = self.handle_profile_request(request).await {
+                        client_event_streams.push(evt_stream);
                     }
                 }
-                connection_request = connection_receiver.select_next_some() => {
-                    // Incoming connection request from the upstream Profile server.
-                    if let Err(e) = self.handle_connection_request(connection_request).await {
-                        warn!("Error processing incoming l2cap connection request: {e:?}");
+                connection_req = self.active_registration.select_next_some() => {
+                    match self.handle_connection_request(connection_req).await {
+                        Ok(true) => client_event_streams.clear(),
+                        Ok(false) => {},
+                        Err(e) => warn!("Error processing incoming l2cap connection request: {e:?}"),
                     }
                 }
-                service_event = client_event_streams.next() => {
+                client_event = client_event_streams.next() => {
                     // `Profile` client has terminated their service advertisement.
-                    if let Some(StreamItem::Epitaph(service_id)) = service_event {
-                        // Unregister the service from the ProfileRegistrar.
-                        info!("Client {service_id:?} unregistered service advertisement");
-                        if let Err(e) = self.unregister_service(service_id).await {
-                            warn!("Error unregistering service {service_id:?}: {e:?}");
-                        }
+                    let (service_id, log_str) = match client_event {
+                        Some(StreamItem::Item((id, Ok(bredr::ConnectionReceiverEvent::OnRevoke {})))) => (id, "revoked"),
+                        Some(StreamItem::Epitaph(id)) => (id, "closed"),
+                        _ => continue,
+                    };
+                    info!(?service_id, "Client {log_str} service advertisement");
+                    // Unregister the service from the ProfileRegistrar.
+                    if let Err(e) = self.unregister_service(service_id).await {
+                        warn!(?service_id, "Error unregistering service: {e:?}");
                     }
                 }
                 request = test_requests.select_next_some() => {
                     match request {
                         Ok(req) => self.rfcomm_server.handle_test_request(req).await,
-                        Err(e) => warn!("RfcommTest request is error: {e:?}"),
+                        Err(e) => warn!("Handling `RfcommTest` request error: {e:?}"),
                     }
                 }
                 complete => break,
@@ -562,10 +635,13 @@ mod tests {
         obex_service_definition, other_service_definition, rfcomm_service_definition,
     };
 
+    use assert_matches::assert_matches;
+    use async_test_helpers::{
+        expect_stream_item, expect_stream_pending, expect_stream_terminated, run_while,
+    };
     use async_utils::PollExt;
     use fidl::endpoints::create_proxy_and_stream;
-    use futures::task::{Context, Poll};
-    use futures_test::task::new_count_waker;
+    use futures::{Future, FutureExt, SinkExt};
     use std::pin::pin;
 
     /// Returns true if the provided `service` has an assigned Server Channel.
@@ -600,9 +676,9 @@ mod tests {
         });
         assert!(search_result.is_ok());
 
-        match exec.run_until_stalled(&mut s.next()) {
-            Poll::Ready(Some(Ok(x))) => (x, server),
-            x => panic!("Expected ProfileRequest but got: {:?}", x),
+        match expect_stream_item(exec, &mut s) {
+            Ok(req) => (req, server),
+            x => panic!("Expected ProfileRequest but got: {x:?}"),
         }
     }
 
@@ -625,8 +701,8 @@ mod tests {
             })
             .is_ok());
 
-        match exec.run_until_stalled(&mut profile_request_stream.next()) {
-            Poll::Ready(Some(Ok(request))) => (request, receiver_server),
+        match expect_stream_item(exec, &mut profile_request_stream) {
+            Ok(request) => (request, receiver_server),
             x => panic!("Expected ProfileRequest but got: {:?}", x),
         }
     }
@@ -638,7 +714,7 @@ mod tests {
         services: Vec<bredr::ServiceDefinition>,
     ) -> (
         bredr::ConnectionReceiverRequestStream,
-        impl Future<Output = Result<Result<(), ErrorCode>, fidl::Error>>,
+        impl Future<Output = Result<Result<Vec<bredr::ServiceDefinition>, ErrorCode>, fidl::Error>>,
     ) {
         let (connection, connection_stream) =
             create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
@@ -647,7 +723,9 @@ mod tests {
             receiver: Some(connection),
             ..Default::default()
         };
-        let adv_fut = client.advertise(request);
+        let adv_fut = client.advertise(request).map(|fidl_result| {
+            fidl_result.map(|advertise_result| advertise_result.map(|res| res.services.unwrap()))
+        });
         (connection_stream, adv_fut)
     }
 
@@ -664,15 +742,18 @@ mod tests {
         )
     }
 
+    #[track_caller]
     fn new_client(
         exec: &mut fasync::TestExecutor,
         mut service_sender: mpsc::Sender<Service>,
+        server_fut: &mut (impl Future<Output = ()> + Unpin),
     ) -> bredr::ProfileProxy {
         let (profile_client, profile_server) =
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let send_fut = service_sender.send(Service::Profile(profile_server));
         let mut send_fut = pin!(send_fut);
-        let _ = exec.run_until_stalled(&mut send_fut);
+        let (send_result, _server_fut) = run_while(exec, server_fut, &mut send_fut);
+        assert!(send_result.is_ok());
         profile_client
     }
 
@@ -697,256 +778,218 @@ mod tests {
     /// In practice, the upstream Host Server will reject this request but the RFCOMM
     /// server will still classify the request as non-RFCOMM only, and relay directly
     /// to the Profile Server.
-    /// This test validates that the parameters are relayed directly to the Profile Server. Also
-    /// validates that when the upstream Advertise call resolves, the result is relayed to the
-    /// client.
+    /// This test validates that the parameters are relayed directly to the Profile Server.
     #[fuchsia::test]
-    fn test_handle_empty_advertise_request() {
+    fn handle_empty_advertise_request() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connects to `bt-rfcomm`.
-        let client = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
 
         // Client decides to advertise empty services.
         let services = vec![];
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
         let mut adv_fut = pin!(adv_fut);
-        exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
-
-        let _ = exec.run_until_stalled(&mut handler_fut);
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // The advertisement request should be relayed directly upstream.
-        let responder = match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { responder, .. }))) => responder,
+        match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
+                assert_eq!(payload.services, Some(vec![]));
+                // Upstream responds with an empty set of services.
+                let _ = responder.send(Ok(&empty_advertise_response()));
+            }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
 
-        // Upstream decides to resolve the Advertise call.
-        let _ = responder.send(Ok(()));
-
-        let _ = exec.run_until_stalled(&mut handler_fut);
-        // Client should be notified, and it's advertisement should terminate.
-        assert!(exec.run_until_stalled(&mut adv_fut).is_ready());
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        // Client should be notified that the advertisement was successful.
+        let result = exec
+            .run_until_stalled(&mut adv_fut)
+            .expect("advertisement ready")
+            .expect("fidl success");
+        assert_eq!(result, Ok(vec![]));
     }
 
     /// Exercises a service advertisement with no RFCOMM services.
     /// The ProfileRegistrar server should classify the request as non-RFCOMM only, and relay
     /// directly to the upstream Profile Server.
     #[fuchsia::test]
-    fn test_handle_advertise_request_with_no_rfcomm() -> Result<(), Error> {
+    fn handle_advertise_request_with_no_rfcomm() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connects to bt-rfcomm.
-        let client = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
 
         // Client decides to advertise.
-        let services =
-            vec![bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(1)))?];
-        let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
+        let service =
+            bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(1))).unwrap();
+        let (_connection_stream, adv_fut) = make_advertise_request(&client, vec![service.clone()]);
         let mut adv_fut = pin!(adv_fut);
-        exec.run_until_stalled(&mut adv_fut).expect_pending("should be advertising");
-
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // The advertisement request should be relayed directly upstream.
-        match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { .. }))) => {}
-            x => panic!("Expected advertise request, got: {:?}", x),
+        match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, .. }) => {
+                assert_eq!(payload.services, Some(vec![service]));
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
         };
-        Ok(())
     }
 
     /// Exercises connecting l2cap channels while advertising.
-    /// The ProfileRegistrar should classify the request as non-RFCOMM, relaying the advertisement
-    /// directly, and also relay all l2cap channel requests at the same time.
+    /// The ProfileRegistrar should classify the request as non-RFCOMM, relaying the Advertise
+    /// request directly, and relay all incoming l2cap channel requests to the client.
     #[fuchsia::test]
-    fn test_connect_l2cap_channels_while_advertising() {
+    fn advertise_and_make_outgoing_l2cap_connection() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connects to bt-rfcomm.
-        let client = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
 
         // Client decides to advertise.
-        let services =
-            vec![
-                bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(1))).unwrap()
-            ];
-        let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
+        let service =
+            bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(1))).unwrap();
+        let (_connection_stream, adv_fut) = make_advertise_request(&client, vec![service.clone()]);
         let mut adv_fut = pin!(adv_fut);
-        exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
-
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // The advertisement request should be relayed directly upstream.
-        let _adv_responder = match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { responder, .. }))) => responder,
-            x => panic!("Expected advertise request, got: {:?}", x),
+        match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { responder, .. }) => {
+                let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse {
+                    services: Some(vec![service]),
+                    ..Default::default()
+                }));
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
         };
 
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
-        exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        let _advertised_services =
+            exec.run_until_stalled(&mut adv_fut).expect("got advertise response");
 
-        // Connect an l2cap channel to a peer, which should be relayed directly upstream.
+        // Client requests to make an outgoing L2CAP connection. The request should be forwarded
+        // directly to the upstream Profile server.
         let expected_peer_id = PeerId(1);
         let connect_fut =
             make_l2cap_connection_request(&client, expected_peer_id, bredr::PSM_AVDTP);
         let mut connect_fut = pin!(connect_fut);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        let _ = exec.run_until_stalled(&mut handler_fut);
         // The advertisement request should be relayed directly upstream.
-        let connect_responder = match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Connect {
-                responder, peer_id, ..
-            }))) => {
+        let connect_responder = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Connect { peer_id, connection, responder }) => {
                 assert_eq!(peer_id, expected_peer_id.into());
+                assert_eq!(
+                    connection,
+                    bredr::ConnectParameters::L2cap(bredr::L2capParameters {
+                        psm: Some(bredr::PSM_AVDTP),
+                        parameters: Some(bredr::ChannelParameters {
+                            channel_mode: Some(bredr::ChannelMode::Basic),
+                            ..bredr::ChannelParameters::default()
+                        }),
+                        ..bredr::L2capParameters::default()
+                    })
+                );
                 responder
             }
             x => panic!("Expected connect request, got: {:?}", x),
         };
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        exec.run_until_stalled(&mut connect_fut).expect_pending("waiting for connect response");
 
-        let (waker, fut_wake_count) = new_count_waker();
-        let mut counting_ctx = Context::from_waker(&waker);
-
-        // Polling the handler should register the waker for this connect response.
-        handler_fut
-            .as_mut()
-            .poll(&mut counting_ctx)
-            .expect_pending("shouldn't be done while service_sender is live");
-
-        let woke_count_before = fut_wake_count.get();
-
-        // Send a response from the upstream Profile request
+        // Upstream profile server responds with an error.
         connect_responder.send(Err(ErrorCode::TimedOut)).expect("upstream connect response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        // Run all the other background tasks that got awoke.
-        // This signals counting_ctx's waker because the advertising task is woken bv the send,
-        // which will read from the FIDL channel and wake anyone who received a message.
-        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-
-        // Should be woken now
-        let woke_count_after = fut_wake_count.get();
-        assert!(
-            woke_count_after > woke_count_before,
-            "connection didn't get woken: {} <= {}",
-            woke_count_after,
-            woke_count_before
-        );
-
-        // Polling again should return the result.
-        handler_fut
-            .as_mut()
-            .poll(&mut counting_ctx)
-            .expect_pending("shouldn't be done while service_sender is live");
-        match exec.run_until_stalled(&mut connect_fut) {
-            Poll::Ready(Ok(Err(ErrorCode::TimedOut))) => {}
-            x => panic!("Expected connect request to be complete, got {:?}", x),
+        // The client should receive the Error response to its Connect request.
+        match exec.run_until_stalled(&mut connect_fut).expect("response") {
+            Ok(Err(ErrorCode::TimedOut)) => {}
+            x => panic!("Expected connect reply error, got {x:?}"),
         }
     }
 
     /// Service advertisement with only RFCOMM services. The services should be assigned
     /// Server Channels and be relayed upstream.
     #[fuchsia::test]
-    fn test_handle_advertise_request_with_only_rfcomm() -> Result<(), Error> {
+    fn handle_advertise_request_with_only_rfcomm() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connects to bt-rfcomm.
-        let client = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
 
         // Client decides to advertise.
-        let services = vec![bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?];
+        let services =
+            vec![bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap()];
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
         let mut adv_fut = pin!(adv_fut);
-        exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
-
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // Upstream should receive Advertise request for a service with an assigned server channel.
-        match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { payload, .. }))) => {
+        match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
                 let services = payload.services.unwrap();
                 assert_eq!(services.len(), 1);
                 assert!(service_def_has_assigned_server_channel(&services[0]));
+                let _ = responder.send(Ok(&empty_advertise_response())); // Reply not important
             }
-            x => panic!("Expected advertise request, got: {:?}", x),
-        };
-        Ok(())
+            x => panic!("Expected advertise request, got: {x:?}"),
+        }
+
+        let (_advertised_services, _handler_fut) =
+            run_while(&mut exec, &mut handler_fut, &mut adv_fut);
     }
 
     /// Service advertisement with both RFCOMM and non-RFCOMM services. Only the RFCOMM
     /// services should be assigned Server Channels, and the group should be registered upstream.
     #[fuchsia::test]
-    fn test_handle_advertise_request_with_all_services() -> Result<(), Error> {
+    fn handle_advertise_request_with_all_services() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connects to bt-rfcomm.
-        let client = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
 
         // Client decides to advertise.
         let services = vec![
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
-            bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(10)))?,
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
+            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
+            bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(10))).unwrap(),
+            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
         let n = services.len();
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
         let mut adv_fut = pin!(adv_fut);
-        exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
-
-        let _ = exec.run_until_stalled(&mut handler_fut);
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // Expect an advertise request with all n services - validate that the RFCOMM services
         // have assigned server channels.
-        match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { payload, .. }))) => {
+        match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
                 let services = payload.services.unwrap();
                 assert_eq!(services.len(), n);
                 let res = services
@@ -957,123 +1000,110 @@ mod tests {
                     .map(|service| service_def_has_assigned_server_channel(&service))
                     .fold(true, |acc, elt| acc || elt);
                 assert!(res);
+                let _ = responder.send(Ok(&empty_advertise_response()));
             }
-            x => panic!("Expected advertise request, got: {:?}", x),
+            x => panic!("Expected advertise request, got: {x:?}"),
         }
-        Ok(())
     }
 
     /// Tests handling two advertise requests with overlapping PSMs. The first one
     /// should succeed and be relayed upstream. The second one should fail since it
     /// is requesting already-allocated PSMs - the responder should be notified of the error.
     #[fuchsia::test]
-    fn test_handle_advertise_requests_same_psm() -> Result<(), Error> {
+    fn advertise_requests_same_psm() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connects to bt-rfcomm.
-        let client1 = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client1 = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
 
         // Client decides to advertise.
         let psm = Psm::new(10);
         let services1 = vec![
-            bredr::ServiceDefinition::try_from(&other_service_definition(psm))?,
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
+            bredr::ServiceDefinition::try_from(&other_service_definition(psm)).unwrap(),
+            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
-        let (_connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
+        let (mut connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
         let mut adv_fut1 = pin!(adv_fut1);
-        exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
+        exec.run_until_stalled(&mut adv_fut1).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
-
-        // Save the Advertise parameters.
-        let _adv_req1 = match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(request))) => request,
-            x => panic!("Expected advertise request, got: {:?}", x),
+        // First request should be received by upstream and handled successfully.
+        let _adv_req1 = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                payload
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
         };
+        let (_advertised_services1, mut handler_fut) =
+            run_while(&mut exec, &mut handler_fut, &mut adv_fut1);
 
         // A different client connects to bt-rfcomm. It decides to try to advertise over same PSM.
-        let client2 = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client2 = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
         let services2 = vec![
-            bredr::ServiceDefinition::try_from(&other_service_definition(psm))?,
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
+            bredr::ServiceDefinition::try_from(&other_service_definition(psm)).unwrap(),
+            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
-        let (_connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
+        let (mut connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
         let mut adv_fut2 = pin!(adv_fut2);
         exec.run_until_stalled(&mut adv_fut2).expect_pending("should should be advertising");
 
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
-
-        // Advertisement 1 is OK. Advertisement 2 should resolve immediately with an ErrorCode.
-        exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
-        match exec.run_until_stalled(&mut adv_fut2) {
-            Poll::Ready(Ok(Err(e))) => assert_eq!(e, ErrorCode::Failed),
-            x => panic!("Expected Ready with ErrorCode but got {:?}", x),
-        }
-
-        Ok(())
+        // Advertise request #2 should fail with an error code.
+        let (result, _handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut2);
+        assert_matches!(result, Ok(Err(ErrorCode::Failed)));
+        // The second advertise request shouldn't be propagated to the upstream.
+        // The first client should still have an active connection receiver. The second client's
+        // connection receiver should be closed due to failure.
+        expect_stream_pending(&mut exec, &mut upstream_requests);
+        expect_stream_pending(&mut exec, &mut connection_stream1);
+        expect_stream_terminated(&mut exec, &mut connection_stream2);
     }
 
-    /// Tests that independent service advertisements from multiple clients are correctly
-    /// grouped together and re-registered.
+    /// Tests that service advertisements from multiple clients are correctly registered.
     #[fuchsia::test]
-    fn test_handle_multiple_service_advertisements() {
+    fn multiple_fidl_client_advertisements() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
         let mut handler_fut = pin!(handler_fut);
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        // A new client connects to bt-rfcomm.
-        let client1 = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
-
-        // Client decides to advertise.
+        // Client1 connects to `bt-rfcomm` and advertises two things.
+        let client1 = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
         let psm1 = Psm::new(10);
         let services1 = vec![
             bredr::ServiceDefinition::try_from(&other_service_definition(psm1)).unwrap(),
             bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
         let n1 = services1.len();
-        let (_connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
+        let (mut connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
         let mut adv_fut1 = pin!(adv_fut1);
-        exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
+        exec.run_until_stalled(&mut adv_fut1).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        exec.run_until_stalled(&mut handler_fut)
-            .expect_pending("shouldn't be done while service_sender is live");
-
-        // First advertisement request relayed upstream.
-        let (_receiver1, responder1) = match exec.run_until_stalled(&mut upstream_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                payload, responder, ..
-            }))) => (payload.receiver.unwrap(), responder),
+        // First advertisement request should be relayed upstream with the 2 services.
+        let receiver1 = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload: bredr::ProfileAdvertiseRequest { services, receiver, .. },
+                responder,
+                ..
+            }) => {
+                assert_eq!(services.unwrap().len(), n1);
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                receiver.unwrap().into_proxy().unwrap()
+            }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
+        // Client #1's advertisement should be active and connection receiver open.
+        let (_adv_result1, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut1);
+        expect_stream_pending(&mut exec, &mut connection_stream1);
 
-        // A different client connects to bt-rfcomm and advertises 3 services.
-        let client2 = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        // A different client connects to bt-rfcomm and advertises 1 RFCOMM and 2 other services.
+        let client2 = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
         let psm2 = Psm::new(15);
         let psm3 = Psm::new(2000);
         let n2 = 3;
@@ -1082,31 +1112,183 @@ mod tests {
             bredr::ServiceDefinition::try_from(&obex_service_definition(psm3)).unwrap(),
             bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
-        let (_connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
+        let (mut connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
         let mut adv_fut2 = pin!(adv_fut2);
-        exec.run_until_stalled(&mut adv_fut2).expect_pending("should still be advertising");
+        exec.run_until_stalled(&mut adv_fut2).expect_pending("waiting for advertise response2");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        let _ = exec.run_until_stalled(&mut handler_fut);
-
-        // We expect ProfileRegistrar to unregister the current active advertisement. Respond to
-        // the unregister request by responding over the responder.
-        let _ = responder1.send(Ok(()));
-        let _ = exec.run_until_stalled(&mut handler_fut);
-        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-
-        // We expect a new advertisement upstream.
-        let (_receiver2, _responder2) = match exec.run_until_stalled(&mut upstream_requests.next())
+        // We expect the registrar to unregister the current advertisement by issuing a `Revoke`
+        // event to the upstream Profile server.
         {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                payload, responder, ..
-            }))) => {
-                assert_eq!(payload.services.unwrap().len(), n1 + n2);
-                (payload.receiver.unwrap(), responder)
+            let mut event_stream1 = receiver1.take_event_stream();
+            let revoke1 = expect_stream_item(&mut exec, &mut event_stream1);
+            assert_matches!(revoke1, Ok(bredr::ConnectionReceiverEvent::OnRevoke {}));
+        }
+        // Simulate the upstream Profile server acknowledging it by terminating the advertisement.
+        drop(receiver1);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // We expect a new advertisement upstream with the combined set of services.
+        let _receiver2 = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload: bredr::ProfileAdvertiseRequest { services, receiver, .. },
+                responder,
+                ..
+            }) => {
+                assert_eq!(services.unwrap().len(), n1 + n2);
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                receiver.unwrap()
             }
-            x => panic!("Expected advertise request, got: {:?}", x),
+            x => panic!("Expected advertise request, got: {x:?}"),
         };
-        exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
-        exec.run_until_stalled(&mut adv_fut2).expect_pending("should still be advertising");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // Both Client #1 and Client #2 should be advertising with their connection receivers open.
+        let (_adv_result2, _handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut2);
+        expect_stream_pending(&mut exec, &mut connection_stream1);
+        expect_stream_pending(&mut exec, &mut connection_stream2);
+    }
+
+    #[fuchsia::test]
+    fn fidl_client_revokes_advertisement() {
+        let (mut exec, server, mut upstream_requests) = setup_server();
+
+        let (service_sender, handler_fut) = setup_handler_fut(server);
+        let mut handler_fut = pin!(handler_fut);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // FIDL client advertises a single RFCOMM service.
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
+        let services =
+            vec![bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap()];
+        let (mut connection_stream, adv_fut) = make_advertise_request(&client, services);
+        let mut adv_fut = pin!(adv_fut);
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload: bredr::ProfileAdvertiseRequest { receiver, .. },
+                responder,
+                ..
+            }) => {
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                receiver.unwrap().into_proxy().unwrap()
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
+        };
+        // Client advertisement should be active.
+        let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
+        expect_stream_pending(&mut exec, &mut connection_stream);
+        let mut upstream_event_stream = receiver.take_event_stream();
+        expect_stream_pending(&mut exec, &mut upstream_event_stream);
+
+        // Client revokes its advertisement. The registrar should handle the disconnection and
+        // unregister the active advertisement by issuing an `OnRevoke` event upstream.
+        connection_stream.control_handle().send_on_revoke().expect("can send FIDL revoke event");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        let revoke = expect_stream_item(&mut exec, &mut upstream_event_stream);
+        assert_matches!(revoke, Ok(bredr::ConnectionReceiverEvent::OnRevoke {}));
+        // Simulate upstream processing the Revoke.
+        drop(upstream_event_stream);
+        drop(receiver);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        // In this case, there was only one FIDL client advertisement so no new `Advertise` request
+        // should be received upstream.
+        expect_stream_pending(&mut exec, &mut upstream_requests);
+
+        drop(connection_stream);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+    }
+
+    #[fuchsia::test]
+    fn fidl_client_drops_advertisement() {
+        let (mut exec, server, mut upstream_requests) = setup_server();
+
+        let (service_sender, handler_fut) = setup_handler_fut(server);
+        let mut handler_fut = pin!(handler_fut);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // FIDL client advertises a single RFCOMM service.
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
+        let services =
+            vec![bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap()];
+        let (mut connection_stream, adv_fut) = make_advertise_request(&client, services);
+        let mut adv_fut = pin!(adv_fut);
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload: bredr::ProfileAdvertiseRequest { receiver, .. },
+                responder,
+                ..
+            }) => {
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                receiver.unwrap().into_proxy().unwrap()
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
+        };
+        // Client advertisement should be active.
+        let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
+        expect_stream_pending(&mut exec, &mut connection_stream);
+        let mut upstream_event_stream = receiver.take_event_stream();
+        expect_stream_pending(&mut exec, &mut upstream_event_stream);
+
+        // Client closes its `ConnectionReceiver` to indicate advertisement termination. Typically,
+        // we expect the FIDL client to use `OnRevoke` to signal termination. The registrar should
+        // still be resilient to this case.
+        drop(connection_stream);
+        // The registrar should handle the FIDL client disconnection and unregister the active
+        // advertisement by issuing the `OnRevoke` event.
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        let revoke = expect_stream_item(&mut exec, &mut upstream_event_stream);
+        assert_matches!(revoke, Ok(bredr::ConnectionReceiverEvent::OnRevoke {}));
+        // Simulate upstream processing the Revoke.
+        drop(upstream_event_stream);
+        drop(receiver);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        // In this case, there was only one FIDL client advertisement so no new `Advertise` request
+        // should be received upstream.
+        expect_stream_pending(&mut exec, &mut upstream_requests);
+    }
+
+    /// Verifies that a FIDL client of `bt-rfcomm` (e.g. a profile) gets notified when its
+    /// advertisement gets unexpectedly terminated by the upstream Profile server.
+    #[fuchsia::test]
+    fn upstream_profile_server_drops_advertisement() {
+        let (mut exec, server, mut upstream_requests) = setup_server();
+
+        let (service_sender, handler_fut) = setup_handler_fut(server);
+        let mut handler_fut = pin!(handler_fut);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // FIDL client advertises a single RFCOMM service.
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
+        let services =
+            vec![bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap()];
+        let (mut connection_stream, adv_fut) = make_advertise_request(&client, services);
+        let mut adv_fut = pin!(adv_fut);
+        exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                payload.receiver.unwrap().into_proxy().unwrap()
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
+        };
+        // Client advertisement should be active.
+        let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
+        expect_stream_pending(&mut exec, &mut connection_stream);
+
+        // Upstream server unexpectedly closes the advertisement. We expect the registrar to handle
+        // this and notify the FIDL client that its advertisement is no longer active - no more
+        // incoming connections.
+        drop(receiver);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        expect_stream_terminated(&mut exec, &mut connection_stream);
     }
 
     #[fuchsia::test]
@@ -1118,11 +1300,8 @@ mod tests {
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connection to bt-rfcomm and advertises an OBEX service.
-        let client = {
-            let client = new_client(&mut exec, service_sender.clone());
-            let _ = exec.run_until_stalled(&mut handler_fut);
-            client
-        };
+        let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
+
         let obex_psm = Psm::new(0x1003);
         let services =
             vec![bredr::ServiceDefinition::try_from(&obex_service_definition(obex_psm)).unwrap()];
@@ -1132,18 +1311,14 @@ mod tests {
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // The advertisement request should be relayed upstream.
-        let (receiver, _adv_responder) = match exec.run_until_stalled(&mut upstream_requests.next())
-        {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                payload, responder, ..
-            }))) => {
-                let receiver = payload.receiver.unwrap().into_proxy().unwrap();
-                (receiver, responder)
+        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
+                let _ = responder.send(Ok(&empty_advertise_response()));
+                payload.receiver.unwrap().into_proxy().unwrap()
             }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
-        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
-        exec.run_until_stalled(&mut adv_fut).expect_pending("still advertising");
+        let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
 
         // Simulate an incoming L2CAP connection over the L2CAP PSM of the OBEX service.
         let id = PeerId(123);
@@ -1157,144 +1332,44 @@ mod tests {
 
         // bt-rfcomm server should receive, parse, and pass to upstream FIDL client.
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
-
-        let connect_fut = connection_stream.next();
-        let mut connect_fut = pin!(connect_fut);
-        let _handle = match exec.run_until_stalled(&mut connect_fut).expect("ready result") {
-            Some(Ok(bredr::ConnectionReceiverRequest::Connected {
-                peer_id,
-                protocol,
-                control_handle,
-                ..
-            })) => {
+        match expect_stream_item(&mut exec, &mut connection_stream) {
+            Ok(bredr::ConnectionReceiverRequest::Connected { peer_id, protocol, .. }) => {
                 assert_eq!(peer_id, id.into());
                 assert_eq!(protocol, l2cap_protocol);
-                control_handle
             }
             x => panic!("Expected incoming L2CAP request. got: {x:?}"),
         };
     }
 
-    /// This test validates that client Search requests are relayed directly upstream.
+    /// Validates that client Search requests are relayed directly upstream.
     #[fuchsia::test]
-    fn test_handle_search_request() {
+    fn handle_search_request() {
         let (mut exec, mut server, mut profile_requests) = setup_server();
 
         let (search_request, _stream) = generate_search_request(&mut exec);
-
         let handle_fut = server.handle_profile_request(search_request);
         let mut handle_fut = pin!(handle_fut);
+        let handle_result = exec.run_until_stalled(&mut handle_fut).expect("processed request");
+        assert!(handle_result.is_none());
 
-        assert!(exec.run_until_stalled(&mut handle_fut).is_ready());
-
-        // The search request should be relayed directly to the Profile Server.
-        let () = match exec.run_until_stalled(&mut profile_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Search { .. }))) => {}
-            x => panic!("Expected search request, got: {:?}", x),
-        };
+        // The search request should be relayed directly to the upstream Profile server.
+        let result = expect_stream_item(&mut exec, &mut profile_requests);
+        assert_matches!(result, Ok(bredr::ProfileRequest::Search { .. }));
     }
 
-    /// This test validates that client ConnectSco requests are relayed directly upstream.
+    /// Validates that client ConnectSco requests are relayed directly upstream.
     #[fuchsia::test]
-    fn test_handle_connect_sco_request() {
+    fn handle_connect_sco_request() {
         let (mut exec, mut server, mut profile_requests) = setup_server();
 
         let (connect_sco_request, _receiver_server) = generate_connect_sco_request(&mut exec);
-
         let handle_fut = server.handle_profile_request(connect_sco_request);
         let mut handle_fut = pin!(handle_fut);
+        let handle_result = exec.run_until_stalled(&mut handle_fut).expect("processed request");
+        assert!(handle_result.is_none());
 
-        assert!(exec.run_until_stalled(&mut handle_fut).is_ready());
-
-        // The connect request should be relayed directly to the Profile Server.
-        let () = match exec.run_until_stalled(&mut profile_requests.next()) {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::ConnectSco { .. }))) => {}
-            x => panic!("Expected ConnectSco request, got: {:?}", x),
-        };
-    }
-
-    /// This tests validates that 1) The call to Profile.Advertise correctly registers upstream and
-    /// 2) When the call resolves, the Future resolves.
-    #[fuchsia::test]
-    fn test_advertise_relay() {
-        let mut exec = fasync::TestExecutor::new();
-        let (upstream, mut upstream_server) =
-            create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
-        let (connect_client, _connect_requests) =
-            create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let params = AdvertiseParams { services: vec![], parameters: ChannelParameters::default() };
-
-        let advertise_fut = ProfileRegistrar::advertise(upstream, params, connect_client);
-        let mut advertise_fut = pin!(advertise_fut);
-        exec.run_until_stalled(&mut advertise_fut).expect_pending("should still be advertising");
-
-        let (_connection_receiver, responder) = match exec
-            .run_until_stalled(&mut upstream_server.next())
-        {
-            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
-                payload, responder, ..
-            }))) => (payload.receiver.unwrap(), responder),
-            x => panic!("Expected Advertise request but got: {:?}", x),
-        };
-
-        exec.run_until_stalled(&mut advertise_fut).expect_pending("should still be advertising");
-
-        // Upstream server decides to terminate advertisement - we expect the Future to finish.
-        let _ = responder.send(Ok(()));
-        let _ = exec.run_until_stalled(&mut advertise_fut).expect("advertisement should finish");
-    }
-
-    /// This test validates that incoming connection requests are correctly relayed
-    /// to the Sender of the connection task.
-    #[fuchsia::test]
-    fn test_connection_request_relay() {
-        let mut exec = fasync::TestExecutor::new();
-
-        let (connect_client, connect_requests) =
-            create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let (sender, mut receiver) = mpsc::channel(0);
-
-        let relay_fut = ProfileRegistrar::connection_request_relay(connect_requests, sender);
-        let mut relay_fut = pin!(relay_fut);
-
-        let receiver_fut = receiver.next();
-        let mut receiver_fut = pin!(receiver_fut);
-
-        // The task should still be active and no messages sent.
-        exec.run_until_stalled(&mut relay_fut)
-            .expect_pending("shouldn't be done while receiver is live");
-        exec.run_until_stalled(&mut receiver_fut).expect_pending("should wait for connection");
-
-        // Upstream server gives us a connection.
-        let id = PeerId(123);
-        let protocol = &[];
-        assert!(connect_client.connected(&id.into(), bredr::Channel::default(), protocol).is_ok());
-
-        // Run the relay fut - should still be running.
-        exec.run_until_stalled(&mut relay_fut)
-            .expect_pending("shouldn't be done while receiver is live");
-
-        // The relay should've sent the ConnectionEvent to the receiver.
-        match exec.run_until_stalled(&mut receiver_fut) {
-            Poll::Ready(Some(ConnectionEvent::Request(
-                bredr::ConnectionReceiverRequest::Connected { .. },
-            ))) => {}
-            x => panic!("Expected connection request but got {:?}", x),
-        }
-
-        // Upstream drops ConnectionReceiver client for some reason.
-        drop(connect_client);
-
-        // The relay should notify the sender that the stream has terminated (i.e relay Canceled).
-        exec.run_until_stalled(&mut relay_fut)
-            .expect_pending("shouldn't be done while receiver is live");
-        match exec.run_until_stalled(&mut receiver_fut) {
-            Poll::Ready(Some(ConnectionEvent::AdvertisementCanceled)) => {}
-            x => panic!("Expected Canceled but got: {:?}", x),
-        }
-
-        // Relay should be finished since the channel is closed.
-        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        exec.run_until_stalled(&mut relay_fut).expect("relay should finish");
+        // The connect SCO request should be relayed directly to the upstream Profile server.
+        let result = expect_stream_item(&mut exec, &mut profile_requests);
+        assert_matches!(result, Ok(bredr::ProfileRequest::ConnectSco { .. }));
     }
 }

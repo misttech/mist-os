@@ -10,7 +10,7 @@ use fidl_fuchsia_bluetooth_deviceid as di;
 use futures::{future::FusedFuture, stream::StreamFuture, Future, FutureExt, StreamExt};
 use tracing::{debug, info, warn};
 
-use crate::device_id::server::BrEdrAdvertisement;
+use crate::device_id::server::BrEdrProfileAdvertisement;
 use crate::device_id::service_record::DeviceIdentificationService;
 
 /// A token representing a FIDL client's Device Identification advertisement request.
@@ -18,20 +18,20 @@ pub struct DeviceIdRequestToken {
     /// The DI service that was requested by the client to be advertised.
     service: DeviceIdentificationService,
     /// The upstream BR/EDR advertisement request.
-    advertisement: Option<BrEdrAdvertisement>,
+    advertisement: Option<BrEdrProfileAdvertisement>,
     /// The channel representing the FIDL client's request.
     client_request: Option<StreamFuture<di::DeviceIdentificationHandleRequestStream>>,
     /// The responder used to notify the FIDL client that the request has terminated.
     ///
-    /// This will be set as long as the `fut` is active and will be consumed when the token is
-    /// dropped.
+    /// This will be Some<T> as long as the `DeviceIdRequestToken::Future` is active, and will be
+    /// consumed when the token is dropped or upstream advertisement finished.
     responder: Option<di::DeviceIdentificationSetDeviceIdentificationResponder>,
 }
 
 impl DeviceIdRequestToken {
     pub fn new(
         service: DeviceIdentificationService,
-        advertisement: BrEdrAdvertisement,
+        advertisement: BrEdrProfileAdvertisement,
         client_request: di::DeviceIdentificationHandleRequestStream,
         responder: di::DeviceIdentificationSetDeviceIdentificationResponder,
     ) -> Self {
@@ -64,8 +64,8 @@ impl Future for DeviceIdRequestToken {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut advertisement = self.advertisement.take().expect("can't poll future twice");
         let mut client_request = self.client_request.take().expect("can't poll future twice");
-        if let Poll::Ready(_x) = advertisement.poll_unpin(cx) {
-            debug!("Upstream BR/EDR server terminated DI advertisement: {:?}", _x);
+        if let Poll::Ready(res) = advertisement.poll_unpin(cx) {
+            debug!("Upstream BR/EDR server terminated DI advertisement: {:?}", res);
             Self::notify_responder(self.responder.take().expect("responder exists"));
             return Poll::Ready(());
         }
@@ -90,6 +90,8 @@ impl Future for DeviceIdRequestToken {
 
 impl FusedFuture for DeviceIdRequestToken {
     fn is_terminated(&self) -> bool {
+        // The token is considered terminated if either the upstream BR/EDR Profile advertisement
+        // or FIDL client request is terminated.
         self.advertisement.is_none() || self.client_request.is_none()
     }
 }
@@ -97,7 +99,7 @@ impl FusedFuture for DeviceIdRequestToken {
 impl Drop for DeviceIdRequestToken {
     fn drop(&mut self) {
         if let Some(responder) = self.responder.take() {
-            warn!("DeviceIdRequestToken for service {:?} dropped unexpectedly", self.service);
+            warn!(service = ?self.service, "DeviceIdRequestToken unexpectedly dropped");
             let _ = responder.send(Err(fuchsia_zircon::Status::CANCELED.into_raw()));
         }
     }
@@ -107,13 +109,12 @@ impl Drop for DeviceIdRequestToken {
 mod tests {
     use super::*;
 
+    use assert_matches::assert_matches;
     use async_utils::PollExt;
     use fidl::client::QueryResponseFut;
-    use fidl_fuchsia_bluetooth_bredr::{
-        ConnectionReceiverMarker, ConnectionReceiverProxy, ProfileAdvertiseRequest, ProfileMarker,
-    };
+    use fidl::endpoints::Proxy;
+    use fidl_fuchsia_bluetooth_bredr::{ConnectionReceiverMarker, ConnectionReceiverProxy};
     use fuchsia_async as fasync;
-    use futures::future::MaybeDone;
     use std::pin::pin;
 
     use crate::device_id::service_record::tests::minimal_record;
@@ -143,43 +144,23 @@ mod tests {
         }
     }
 
-    /// Makes a DeviceIdRequestToken from the provided `responder`. If `done` is true, then the
-    /// upstream advertisement emulated by this function will immediately resolve.
-    /// Returns the token, the proxy associated with the upstream advertisement, and a "junk" task
-    /// that should be kept alive for the duration of the test.
+    /// Makes a DeviceIdRequestToken from the provided `responder`.
+    /// Returns the token and the `ConnectionReceiver` client that represents the upstream
+    /// `bredr.Profile` end of the Device ID advertisement.
     fn make_token(
         responder: di::DeviceIdentificationSetDeviceIdentificationResponder,
         request_server: di::DeviceIdentificationHandleRequestStream,
-        done: bool,
-    ) -> (DeviceIdRequestToken, ConnectionReceiverProxy, fasync::Task<()>) {
-        let (adv_fut, junk_task) = if done {
-            (QueryResponseFut(MaybeDone::Done(Ok(Ok(())))), fasync::Task::local(async {}))
-        } else {
-            // Otherwise, we need a future that will not resolve yet.
-            let (c, _s) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
-            let (c2, _s2) =
-                fidl::endpoints::create_request_stream::<ConnectionReceiverMarker>().unwrap();
-            let fut = c.advertise(ProfileAdvertiseRequest {
-                services: Some(vec![]),
-                receiver: Some(c2),
-                ..Default::default()
-            });
-            let task = fasync::Task::local(async {
-                let (_s, _s2, _c) = (_s, _s2, c); // Keep everything alive.
-                futures::future::pending::<()>().await;
-            });
-            (fut, task)
-        };
+    ) -> (DeviceIdRequestToken, ConnectionReceiverProxy) {
         // Use a random service definition.
         let svc = DeviceIdentificationService::from_di_records(&vec![minimal_record(false)])
             .expect("should parse record");
         // A BR/EDR advertise request.
-        let (connect_client, connect_server) =
+        let (connect_client, connect_stream) =
             fidl::endpoints::create_proxy_and_stream::<ConnectionReceiverMarker>().unwrap();
-        let advertisement = BrEdrAdvertisement { adv_fut, connect_server };
+        let advertisement = BrEdrProfileAdvertisement { connect_stream };
         let token = DeviceIdRequestToken::new(svc, advertisement, request_server, responder);
 
-        (token, connect_client, junk_task)
+        (token, connect_client)
     }
 
     #[fuchsia::test]
@@ -191,8 +172,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, _connect_client, _junk_task) =
-            make_token(responder, request_server.into_stream().unwrap(), /* done= */ false);
+        let (token, _connect_client) = make_token(responder, request_server.into_stream().unwrap());
 
         // The client request should still be alive since the `token` is alive.
         exec.run_until_stalled(&mut client_fut).expect_pending("Token is still alive");
@@ -214,17 +194,15 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, _connect_client, _junk_task) =
-            make_token(responder, request_server.into_stream().unwrap(), /* done= */ true);
+        let (token, connect_client) = make_token(responder, request_server.into_stream().unwrap());
         let mut token = pin!(token);
 
         // The client request should still be alive since the `token` is alive.
         exec.run_until_stalled(&mut client_fut).expect_pending("Token is still alive");
 
-        // Because the `advertisement` used in `make_token` is done, we expect the `token` to
-        // resolve.
-        let () = exec
-            .run_until_stalled(&mut token)
+        // Simulate upstream `Profile` server terminating the advertisement.
+        drop(connect_client);
+        exec.run_until_stalled(&mut token)
             .expect("Upstream advertisement done, token should resolve");
         assert!(token.is_terminated());
         // The FIDL client should then receive the response that the closure has been processed.
@@ -244,9 +222,9 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, _connect_client, _junk_task) =
-            make_token(responder, request_server.into_stream().unwrap(), /* done= */ false);
+        let (token, connect_client) = make_token(responder, request_server.into_stream().unwrap());
         let mut token = pin!(token);
+
         assert!(!token.is_terminated());
 
         // The client request should still be alive since the `token` is alive.
@@ -256,15 +234,19 @@ mod tests {
 
         // Because the FIDL client closed its end of the channel, we expect the `token` to resolve.
         drop(_request_client);
-        let () = exec
-            .run_until_stalled(&mut token)
+        exec.run_until_stalled(&mut token)
             .expect("FIDL client request terminated, token should resolve");
         assert!(token.is_terminated());
-        // The FIDL client should then receive the response that its close request is processed.
+        // The FIDL client should receive a response indicating that the DI advertisement has been
+        // stopped.
         let res = exec
             .run_until_stalled(&mut client_fut)
             .expect("Token terminated, client fut should resolve")
             .expect("fidl response");
-        assert_eq!(res, Ok(()));
+        assert_matches!(res, Ok(_));
+        // The DI advertisement should be unregistered from the upstream `bredr.Profile` server.
+        let mut closed_fut = pin!(connect_client.on_closed());
+        let result = exec.run_until_stalled(&mut closed_fut).expect("ConnectionReceiver closed");
+        assert_matches!(result, Ok(_));
     }
 }

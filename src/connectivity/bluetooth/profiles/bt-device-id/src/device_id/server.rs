@@ -7,11 +7,12 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use fidl::client::QueryResponseFut;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_deviceid as di;
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, select, stream::FuturesUnordered, Future, FutureExt, StreamExt};
+use futures::channel::mpsc;
+use futures::stream::FuturesUnordered;
+use futures::{ready, select, Future, StreamExt};
 use tracing::{info, warn};
 
 use crate::device_id::service_record::DeviceIdentificationService;
@@ -19,21 +20,28 @@ use crate::device_id::token::DeviceIdRequestToken;
 use crate::error::Error;
 
 /// Represents a classic advertisement with the upstream BR/EDR server.
-pub struct BrEdrAdvertisement {
-    /// The advertisement request future.
-    pub adv_fut: QueryResponseFut<bredr::ProfileAdvertiseResult>,
-    // Although we don't expect any connection requests, this channel must be kept alive for the
-    // duration of the advertisement.
-    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub connect_server: bredr::ConnectionReceiverRequestStream,
+pub struct BrEdrProfileAdvertisement {
+    // Although we don't expect any stream items (connection requests), this channel must be kept
+    // alive for the duration of the advertisement.
+    // The upstream `Profile` service may close this channel to signal the termination of the
+    // advertisement.
+    pub connect_stream: bredr::ConnectionReceiverRequestStream,
 }
 
-impl Future for BrEdrAdvertisement {
-    type Output = Result<bredr::ProfileAdvertiseResult, fidl::Error>;
+impl Future for BrEdrProfileAdvertisement {
+    type Output = Result<(), fidl::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.adv_fut.poll_unpin(cx)
+        loop {
+            let result = ready!(self.connect_stream.poll_next_unpin(cx));
+            match result {
+                None => return Poll::Ready(Ok(())),
+                Some(Err(e)) => return Poll::Ready(Err(e)),
+                // Otherwise, it's a spurious `bredr.ConnectionReceiver.Connect` request which
+                // can be ignored.
+                _ => {}
+            }
+        }
     }
 }
 
@@ -105,15 +113,16 @@ impl DeviceIdServer {
     fn advertise(
         profile: &bredr::ProfileProxy,
         defs: Vec<bredr::ServiceDefinition>,
-    ) -> Result<BrEdrAdvertisement, Error> {
-        let (connect_client, connect_server) =
+    ) -> Result<BrEdrProfileAdvertisement, Error> {
+        let (connect_client, connect_stream) =
             fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>()?;
-        let adv_fut = profile.advertise(bredr::ProfileAdvertiseRequest {
+        // The result of advertise (registered services) is not needed.
+        let _advertise_fut = profile.advertise(bredr::ProfileAdvertiseRequest {
             services: Some(defs),
             receiver: Some(connect_client),
             ..Default::default()
         });
-        Ok(BrEdrAdvertisement { adv_fut, connect_server })
+        Ok(BrEdrProfileAdvertisement { connect_stream })
     }
 
     /// Ensures that the `service` can be registered. Returns true if the service needs to be
@@ -142,12 +151,10 @@ impl DeviceIdServer {
             request;
         info!("Received SetDeviceIdentification request: {:?}", records);
 
-        let mut service = match DeviceIdentificationService::from_di_records(&records) {
-            Err(e) => {
-                let _ = responder.send(Err(zx::Status::INVALID_ARGS.into_raw()));
-                return Err(e);
-            }
-            Ok(defs) => defs,
+        let parsed_result = DeviceIdentificationService::from_di_records(&records);
+        let Ok(mut service) = parsed_result else {
+            let _ = responder.send(Err(zx::Status::INVALID_ARGS.into_raw()));
+            return Err(parsed_result.unwrap_err());
         };
 
         match self.validate_service(&service) {
@@ -190,7 +197,8 @@ pub(crate) mod tests {
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
-    use fidl_fuchsia_bluetooth::ErrorCode;
+    use fidl::client::QueryResponseFut;
+    use fidl::endpoints::Proxy;
     use fuchsia_async as fasync;
     use futures::SinkExt;
     use std::pin::pin;
@@ -253,14 +261,18 @@ pub(crate) mod tests {
         (token_client, request_fut)
     }
 
+    #[track_caller]
     fn expect_advertise_request(
         exec: &mut fasync::TestExecutor,
         profile_server: &mut bredr::ProfileRequestStream,
-    ) -> bredr::ProfileRequest {
+    ) -> bredr::ConnectionReceiverProxy {
         let mut profile_requests = Box::pin(profile_server.next());
         match exec.run_until_stalled(&mut profile_requests).expect("Should have request") {
-            Some(Ok(req @ bredr::ProfileRequest::Advertise { .. })) => req,
-            x => panic!("Expected Advertise request, got: {:?}", x),
+            Some(Ok(bredr::ProfileRequest::Advertise { payload, responder, .. })) => {
+                let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse::default()));
+                payload.receiver.unwrap().into_proxy().unwrap()
+            }
+            x => panic!("Expected Advertise request, got: {x:?}"),
         }
     }
 
@@ -277,9 +289,7 @@ pub(crate) mod tests {
         let mut fidl_client_fut = pin!(fidl_client_fut);
 
         // Should expect the server to attempt to advertise over BR/EDR.
-        let _adv_request = expect_advertise_request(&mut exec, &mut profile_server)
-            .into_advertise()
-            .expect("Advertise request");
+        let upstream_receiver = expect_advertise_request(&mut exec, &mut profile_server);
 
         // FIDL client request should still be alive because the server is still advertising.
         let _ = exec.run_until_stalled(&mut fidl_client_fut).expect_pending("still active");
@@ -287,6 +297,10 @@ pub(crate) mod tests {
         drop(token);
         let (fidl_client_result, _server_fut) = run_while(&mut exec, server_fut, fidl_client_fut);
         assert_matches!(fidl_client_result, Ok(Ok(_)));
+        // Upstream receiver should be closed.
+        let mut closed_fut = pin!(upstream_receiver.on_closed());
+        let result = exec.run_until_stalled(&mut closed_fut).expect("receiver should be closed");
+        assert_matches!(result, Ok(_));
     }
 
     #[fuchsia::test]
@@ -302,15 +316,12 @@ pub(crate) mod tests {
         let mut fidl_client_fut = pin!(fidl_client_fut);
 
         // Should expect the server to attempt to advertise over BR/EDR.
-        let (_request, responder) = expect_advertise_request(&mut exec, &mut profile_server)
-            .into_advertise()
-            .expect("Advertise request");
-
+        let receiver = expect_advertise_request(&mut exec, &mut profile_server);
         // FIDL client request should still be alive because the server is still advertising.
         let _ = exec.run_until_stalled(&mut fidl_client_fut).expect_pending("still active");
 
         // Upstream BR/EDR Profile server terminates advertisement for some reason.
-        let _ = responder.send(Err(ErrorCode::TimedOut));
+        drop(receiver);
         let (fidl_client_result, _server_fut) = run_while(&mut exec, server_fut, fidl_client_fut);
         assert_matches!(fidl_client_result, Ok(Ok(_)));
     }
@@ -334,10 +345,11 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut fidl_client_fut1).expect_pending("still active");
         let _ = exec.run_until_stalled(&mut fidl_client_fut2).expect_pending("still active");
 
-        // Upstream BR/EDR server should receive both requests.
-        let _adv_request1 = expect_advertise_request(&mut exec, &mut profile_server);
-        let _adv_request2 = expect_advertise_request(&mut exec, &mut profile_server);
+        // Upstream BR/EDR Profile server should receive both requests.
+        let _adv_receiver1 = expect_advertise_request(&mut exec, &mut profile_server);
+        let _adv_receiver2 = expect_advertise_request(&mut exec, &mut profile_server);
 
+        // Both DI advertise requests should be active.
         let _ = exec.run_until_stalled(&mut fidl_client_fut1).expect_pending("still active");
         let _ = exec.run_until_stalled(&mut fidl_client_fut2).expect_pending("still active");
     }

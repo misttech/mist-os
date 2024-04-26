@@ -353,23 +353,22 @@ impl MockPiconetServerInner {
     ) {
         let res = match self.peers.entry(id) {
             Entry::Vacant(_) => {
-                info!("Peer {} not registered.", id);
+                info!(%id, "Peer not registered");
                 return;
             }
             Entry::Occupied(mut entry) => entry.get_mut().new_advertisement(services, receiver),
         };
 
         match res {
-            Ok((svc_ids, adv_fut)) => {
-                fasync::Task::spawn(async move {
-                    adv_fut.await;
-                    // Reply to the hanging-get responder when the advertisement completes.
-                    let _ = responder.send(Ok(()));
-                })
-                .detach();
+            Ok((registered_services, svc_ids, closed_fut)) => {
+                let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse {
+                    services: Some(registered_services),
+                    ..Default::default()
+                }));
+                fasync::Task::spawn(closed_fut).detach();
                 self.find_matching_searches(id, svc_ids);
             }
-            Err(e) => info!("Peer {} error advertising service: {:?}", id, e),
+            Err(e) => info!(%id, "Couldn't advertise services: {e:?}"),
         }
     }
 

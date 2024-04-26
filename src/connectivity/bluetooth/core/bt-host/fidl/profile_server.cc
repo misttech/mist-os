@@ -224,7 +224,6 @@ ProfileServer::~ProfileServer() {
     // Unregister anything that we have registered.
     for (const auto& it : current_advertised_) {
       adapter()->bredr()->UnregisterService(it.second.registration_handle);
-      it.second.disconnection_cb(fpromise::ok());
     }
     for (const auto& it : searches_) {
       adapter()->bredr()->RemoveServiceSearch(it.second.search_id);
@@ -566,9 +565,13 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
     OnConnectionReceiverClosed(ad_id);
   });
 
-  current_advertised_.try_emplace(next, std::move(receiver), registration_handle,
-                                  std::move(callback));
+  current_advertised_.try_emplace(next, std::move(receiver), registration_handle);
   advertised_total_ = next;
+  // TODO(https://fxbug.dev/330590954): Return the services that were registered by the SDP server.
+  fuchsia::bluetooth::bredr::Profile_Advertise_Response result;
+  std::vector<fuchsia::bluetooth::bredr::ServiceDefinition> registered_definitions;
+  result.set_services(std::move(registered_definitions));
+  callback(fuchsia::bluetooth::bredr::Profile_Advertise_Result::WithResponse(std::move(result)));
 }
 
 void ProfileServer::Search(::fuchsia::bluetooth::bredr::ProfileSearchRequest request) {
@@ -772,7 +775,6 @@ void ProfileServer::OnConnectionReceiverClosed(uint64_t ad_id) {
   }
 
   adapter()->bredr()->UnregisterService(it->second.registration_handle);
-  it->second.disconnection_cb(fpromise::ok());
 
   current_advertised_.erase(it);
 }

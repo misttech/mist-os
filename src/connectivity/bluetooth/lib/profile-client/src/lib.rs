@@ -98,7 +98,7 @@ impl TryFrom<bredr::ConnectionReceiverRequest> for ProfileEvent {
 ///
 /// Currently, this implementation supports a single advertisement and multiple searches.
 /// Search result events can be returned for any of the registered services. In the case of
-/// multiple registered searches, consider using the `fuchsia_bluetooth::profile::find_service_class`
+/// multiple registered searches, consider using the `profile::find_service_class`
 /// function in the `fuchsia_bluetooth` crate to identify the Service Class of the returned event.
 ///
 /// The `ProfileClient` is typically used as a stream of ConnectionReceiver connection requests
@@ -110,7 +110,7 @@ impl TryFrom<bredr::ConnectionReceiverRequest> for ProfileEvent {
 pub struct ProfileClient {
     /// The proxy that is used to start new searches and advertise.
     proxy: bredr::ProfileProxy,
-    /// The result for the advertisement. Terminates when the advertisement has completed.
+    /// The result for the advertisement.
     advertisement: Option<QueryResponseFut<bredr::ProfileAdvertiseResult>>,
     connection_receiver: Option<bredr::ConnectionReceiverRequestStream>,
     /// The registered results from the search streams. Polled in order.
@@ -183,6 +183,9 @@ impl ProfileClient {
         }
         Ok(())
     }
+
+    // TODO(https://fxbug.dev/333456020): Consider adding a shutdown method to revoke the active
+    // advertisement.
 }
 
 impl FusedStream for ProfileClient {
@@ -200,13 +203,10 @@ impl Stream for ProfileClient {
         }
 
         if let Some(advertisement) = self.advertisement.as_mut() {
-            if let Poll::Ready(result) = advertisement.poll_unpin(cx) {
-                self.terminated = true;
-                let error = match result {
-                    Ok(result) => Error::Advertisement { result },
-                    Err(fidl_error) => fidl_error.into(),
-                };
-                return Poll::Ready(Some(Err(error)));
+            if let Poll::Ready(_result) = advertisement.poll_unpin(cx) {
+                // TODO(https://fxbug.dev/333456020): Consider returning to the client of the
+                // library. Not required by any profiles right now.
+                self.advertisement = None;
             };
         }
 
@@ -275,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn service_advertisement_and_ends_when_advertisement_ends() {
+    fn service_advertisement_result_is_no_op() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
             .expect("Profile proxy should be created");
@@ -302,15 +302,19 @@ mod tests {
             let mut event_fut = pin!(event_fut);
             assert!(exec.run_until_stalled(&mut event_fut).is_pending());
 
-            adv_responder.send(Ok(())).expect("able to respond");
+            // The lifetime of the advertisement is not tied to the `Advertise` response. The
+            // `ProfileClient` stream should still be active.
+            adv_responder
+                .send(Ok(&bredr::ProfileAdvertiseResponse::default()))
+                .expect("able to respond");
 
             match exec.run_until_stalled(&mut event_fut) {
-                Poll::Ready(Some(Err(Error::Advertisement { result: Ok(()) }))) => {}
-                x => panic!("Expected an error from the advertisement, got {:?}", x),
+                Poll::Pending => {}
+                x => panic!("Expected pending but got {x:?}"),
             };
         }
 
-        assert!(profile.is_terminated());
+        assert!(!profile.is_terminated());
     }
 
     #[test]
@@ -366,6 +370,7 @@ mod tests {
         assert!(profile.is_terminated());
     }
 
+    #[track_caller]
     fn expect_advertisement_registration(
         exec: &mut fasync::TestExecutor,
         profile_stream: &mut bredr::ProfileRequestStream,
@@ -387,6 +392,7 @@ mod tests {
         }
     }
 
+    #[track_caller]
     fn expect_search_registration(
         exec: &mut fasync::TestExecutor,
         profile_stream: &mut bredr::ProfileRequestStream,

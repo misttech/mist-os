@@ -36,12 +36,6 @@ where
     }
 }
 
-/// Polls the provided `stream` and expects that it is Pending (e.g no stream items).
-#[track_caller]
-pub fn expect_stream_pending<S: Stream + Unpin>(exec: &mut fasync::TestExecutor, stream: &mut S) {
-    let _ = exec.run_until_stalled(&mut stream.next()).expect_pending("stream pending");
-}
-
 /// Polls the provided `stream` and expects a non-null item to be produced.
 #[track_caller]
 pub fn expect_stream_item<S: Stream + Unpin>(
@@ -49,4 +43,20 @@ pub fn expect_stream_item<S: Stream + Unpin>(
     stream: &mut S,
 ) -> S::Item {
     exec.run_until_stalled(&mut stream.next()).expect("stream item").expect("not terminated")
+}
+
+/// Polls the provided `stream` and expects that it is Pending (e.g no stream items).
+#[track_caller]
+pub fn expect_stream_pending<S: Stream + Unpin>(exec: &mut fasync::TestExecutor, stream: &mut S) {
+    let _ = exec.run_until_stalled(&mut stream.next()).expect_pending("stream pending");
+}
+
+/// Polls the provided `stream` and expects that it is terminated (e.g. returns None).
+#[track_caller]
+pub fn expect_stream_terminated<S: Stream + Unpin>(
+    exec: &mut fasync::TestExecutor,
+    stream: &mut S,
+) {
+    let result = exec.run_until_stalled(&mut stream.next()).expect("stream item");
+    assert!(result.is_none());
 }

@@ -26,6 +26,7 @@ pub enum ConnectChannel {
 /// fuchsia.bluetooth.bredr.Profile. Provides helper methods for common test related tasks.
 /// Some fields are optional because they are not populated until the Profile has completed
 /// registration.
+// TODO(b/333456020): Clean up `advertise_responder`
 pub struct TestProfileServer {
     profile_request_stream: bredr::ProfileRequestStream,
     search_results_proxy: Option<bredr::SearchResultsProxy>,
@@ -98,7 +99,7 @@ impl TestProfileServer {
                 self.connection_receiver_proxy =
                     Some(payload.receiver.unwrap().into_proxy().unwrap());
                 if let Some(_old_responder) = self.advertise_responder.replace(responder) {
-                    panic!("Got new advertise request before old request is comeplete.");
+                    panic!("Got new advertise request before old request is complete.");
                 }
             }
             _ => panic!(
@@ -187,8 +188,11 @@ impl Stream for TestProfileServer {
 
 impl Drop for TestProfileServer {
     fn drop(&mut self) {
+        // TODO(b/333456020): Clean-up to not store responder.
         if let Some(responder) = self.advertise_responder.take() {
-            responder.send(Ok(())).expect("Drop responder");
+            responder
+                .send(Ok(&bredr::ProfileAdvertiseResponse::default()))
+                .expect("Drop responder");
         }
     }
 }

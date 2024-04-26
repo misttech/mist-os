@@ -295,7 +295,9 @@ TEST_F(ProfileServerTest, ErrorOnInvalidDefinition) {
 
   services.emplace_back(std::move(def));
 
-  auto cb = [](fidlbredr::Profile_Advertise_Result result) {
+  size_t cb_count = 0;
+  auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb_count++;
     EXPECT_TRUE(result.is_err());
     EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
@@ -307,7 +309,8 @@ TEST_F(ProfileServerTest, ErrorOnInvalidDefinition) {
 
   RunLoopUntilIdle();
 
-  // Server should close because it's not a good definition.
+  ASSERT_EQ(cb_count, 1u);
+  // Server should close because it's an invalid definition.
   zx_signals_t signals;
   request.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time(0), &signals);
   EXPECT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
@@ -320,9 +323,12 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
   std::vector<fidlbredr::ServiceDefinition> services1;
   services1.emplace_back(MakeFIDLServiceDefinition());
 
-  // First callback should never be called since the first advertisement is valid.
   size_t cb1_count = 0;
-  auto cb1 = [&](auto) { cb1_count++; };
+  auto cb1 = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb1_count++;
+    EXPECT_TRUE(result.is_response());
+    // TODO(https://fxbug.dev/330590954): Verify the services that were registered
+  };
 
   fidlbredr::ProfileAdvertiseRequest adv_request1;
   adv_request1.set_services(std::move(services1));
@@ -331,7 +337,8 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
 
   RunLoopUntilIdle();
 
-  ASSERT_EQ(cb1_count, 0u);
+  // First callback should be invoked with success since the advertisement is valid.
+  ASSERT_EQ(cb1_count, 1u);
 
   fidlbredr::ConnectionReceiverHandle receiver_handle2;
   fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request2 = receiver_handle2.NewRequest();
@@ -354,18 +361,13 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
 
   RunLoopUntilIdle();
 
-  ASSERT_EQ(cb1_count, 0u);
+  ASSERT_EQ(cb1_count, 1u);
   ASSERT_EQ(cb2_count, 1u);
 
   // Second channel should close.
   zx_signals_t signals;
   request2.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time(0), &signals);
   EXPECT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
-
-  // Unregister the first advertisement.
-  request1 = receiver_handle1.NewRequest();
-  RunLoopUntilIdle();
-  EXPECT_EQ(cb1_count, 1u);
 }
 
 TEST_F(ProfileServerTest, ErrorOnInvalidConnectParametersNoPsm) {
@@ -407,36 +409,6 @@ TEST_F(ProfileServerTest, ErrorOnInvalidConnectParametersRfcomm) {
   RunLoopUntilIdle();
 }
 
-TEST_F(ProfileServerTest, UnregisterAdvertisementTriggersCallback) {
-  fidlbredr::ConnectionReceiverHandle receiver_handle;
-  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request = receiver_handle.NewRequest();
-
-  std::vector<fidlbredr::ServiceDefinition> services;
-  services.emplace_back(MakeFIDLServiceDefinition());
-
-  size_t cb_count = 0;
-  auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
-    cb_count++;
-    EXPECT_TRUE(result.is_response());
-  };
-
-  fidlbredr::ProfileAdvertiseRequest adv_request;
-  adv_request.set_services(std::move(services));
-  adv_request.set_receiver(std::move(receiver_handle));
-  client()->Advertise(std::move(adv_request), std::move(cb));
-  RunLoopUntilIdle();
-
-  // Advertisement is still active, callback shouldn't get triggered.
-  ASSERT_EQ(cb_count, 0u);
-
-  // Overwrite the server end of the ConnectionReceiver.
-  request = receiver_handle.NewRequest();
-  RunLoopUntilIdle();
-
-  // Profile server should drop the advertisement and notify the callback of termination.
-  ASSERT_EQ(cb_count, 1u);
-}
-
 TEST_F(ProfileServerTest, RevokeConnectionReceiverUnregistersAdvertisement) {
   fidlbredr::ConnectionReceiverHandle receiver_handle;
   FakeConnectionReceiver connect_receiver(receiver_handle.NewRequest(), dispatcher());
@@ -448,6 +420,7 @@ TEST_F(ProfileServerTest, RevokeConnectionReceiverUnregistersAdvertisement) {
   auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
     cb_count++;
     EXPECT_TRUE(result.is_response());
+    // TODO(https://fxbug.dev/330590954): Verify the services that were registered
   };
 
   fidlbredr::ProfileAdvertiseRequest adv_request;
@@ -456,17 +429,16 @@ TEST_F(ProfileServerTest, RevokeConnectionReceiverUnregistersAdvertisement) {
   client()->Advertise(std::move(adv_request), std::move(cb));
   RunLoopUntilIdle();
 
-  // Advertisement is still active, callback shouldn't get triggered.
-  ASSERT_EQ(cb_count, 0u);
+  // Advertisement should be registered. The callback should be invoked with the advertised set
+  // of services, and the `ConnectionReceiver` should still be open.
+  ASSERT_EQ(cb_count, 1u);
   ASSERT_FALSE(connect_receiver.closed());
 
   // Server end of `ConnectionReceiver` revokes the advertisement.
   connect_receiver.Revoke();
   RunLoopUntilIdle();
 
-  // Profile server should drop the advertisement and notify the callback of termination. The
-  // `connect_receiver` should be closed.
-  ASSERT_EQ(cb_count, 1u);
+  // Profile server should drop the advertisement - the `connect_receiver` should be closed.
   ASSERT_TRUE(connect_receiver.closed());
 }
 
@@ -1320,11 +1292,44 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseChannelParametersContainsFlushTime
   RunLoopUntilIdle();
 }
 
+TEST_F(ProfileServerTestFakeAdapter, ClientClosesAdvertisement) {
+  fidlbredr::ConnectionReceiverHandle receiver_handle;
+  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request = receiver_handle.NewRequest();
+
+  std::vector<fidlbredr::ServiceDefinition> services;
+  services.emplace_back(MakeFIDLServiceDefinition());
+
+  size_t cb_count = 0;
+  auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb_count++;
+    EXPECT_TRUE(result.is_response());
+    // TODO(https://fxbug.dev/330590954): Verify the services that were registered
+  };
+
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(receiver_handle));
+  client()->Advertise(std::move(adv_request), std::move(cb));
+  RunLoopUntilIdle();
+  ASSERT_EQ(cb_count, 1u);
+  ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 1u);
+
+  // Client closes Advertisement by dropping the `ConnectionReceiver`. This is OK, and the profile
+  // server should handle this by unregistering the advertisement.
+  request = receiver_handle.NewRequest();
+  RunLoopUntilIdle();
+  ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 0u);
+}
+
 TEST_F(ProfileServerTestFakeAdapter, AdvertiseWithMissingFields) {
-  auto adv_ok_cb = [](fidlbredr::Profile_Advertise_Result result) {
+  size_t cb_ok_count = 0;
+  auto adv_ok_cb = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb_ok_count++;
     EXPECT_TRUE(result.is_response());
   };
-  auto adv_err_cb = [](fidlbredr::Profile_Advertise_Result result) {
+  size_t cb_err_count = 0;
+  auto adv_err_cb = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb_err_count++;
     ASSERT_TRUE(result.is_err());
     EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
@@ -1336,6 +1341,7 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseWithMissingFields) {
   adv_request_missing_receiver.set_parameters(::fuchsia::bluetooth::bredr::ChannelParameters());
   client()->Advertise(std::move(adv_request_missing_receiver), adv_err_cb);
   RunLoopUntilIdle();
+  ASSERT_EQ(cb_err_count, 1u);
   ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 0u);
 
   fidlbredr::ConnectionReceiverHandle connect_receiver_handle1;
@@ -1346,6 +1352,7 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseWithMissingFields) {
   adv_request_missing_services.set_parameters(::fuchsia::bluetooth::bredr::ChannelParameters());
   client()->Advertise(std::move(adv_request_missing_services), adv_err_cb);
   RunLoopUntilIdle();
+  ASSERT_EQ(cb_err_count, 2u);
   ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 0u);
 
   // Missing parameters is allowed.
@@ -1358,6 +1365,7 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseWithMissingFields) {
   adv_request_missing_parameters.set_receiver(std::move(connect_receiver_handle2));
   client()->Advertise(std::move(adv_request_missing_parameters), adv_ok_cb);
   RunLoopUntilIdle();
+  ASSERT_EQ(cb_ok_count, 1u);
   ASSERT_EQ(adapter()->fake_bredr()->registered_services().size(), 1u);
 }
 
