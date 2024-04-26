@@ -18,7 +18,7 @@ use {
     std::sync::Arc,
     std::{fs::File, str::FromStr},
     vfs::directory::{
-        entry_container::Directory, helper::DirectlyMutable, mutable::simple::Simple,
+        entry_container::Directory, helper::DirectlyMutable, immutable::simple::Simple,
     },
 };
 
@@ -254,7 +254,7 @@ pub async fn run_devhost_ota(
     // ota_main.rs. To do that, we'll need to remove the run_devhost_ota call
     // from //src/recovery/system/src/main.rs and make run_*_ota public to only ota_main.rs.
     // Also, remove out_dir - ota_main.rs should provide an outgoing directory already spun up.
-    let outgoing_dir_vfs = vfs::mut_pseudo_directory! {};
+    let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
     let scope = vfs::execution_scope::ExecutionScope::new();
     outgoing_dir_vfs.clone().open(
@@ -536,7 +536,7 @@ mod tests {
             let directory_handle = take_startup_handle(HandleType::DirectoryRequest.into())
                 .expect("cannot take startup handle");
             let outgoing_dir = fuchsia_zircon::Channel::from(directory_handle).into();
-            let outgoing_dir_vfs = vfs::mut_pseudo_directory! {};
+            let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
             let scope = vfs::execution_scope::ExecutionScope::new();
             outgoing_dir_vfs.clone().open(
