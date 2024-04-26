@@ -15,6 +15,7 @@
 #include "src/developer/debug/debug_agent/breakpoint.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
+#include "src/developer/debug/debug_agent/job_exception_observer.h"
 #include "src/developer/debug/debug_agent/limbo_provider.h"
 #include "src/developer/debug/debug_agent/remote_api.h"
 #include "src/developer/debug/debug_agent/remote_api_adapter.h"
@@ -31,7 +32,10 @@ namespace debug_agent {
 class SystemInterface;
 
 // Main state and control for the debug agent.
-class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public debug::LogBackend {
+class DebugAgent : public RemoteAPI,
+                   public Breakpoint::ProcessDelegate,
+                   public debug::LogBackend,
+                   public JobExceptionObserver {
  public:
   // A MessageLoopZircon should already be set up on the current thread.
   //
@@ -58,7 +62,7 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   Breakpoint* GetBreakpoint(uint32_t breakpoint_id);
   void RemoveBreakpoint(uint32_t breakpoint_id);
 
-  void OnProcessStart(std::unique_ptr<ProcessHandle> process);
+  void OnProcessStarting(std::unique_ptr<ProcessHandle> process) override;
 
   // Notified by ComponentManager.
   void OnComponentDiscovered(const std::string& moniker, const std::string& url);

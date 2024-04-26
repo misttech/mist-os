@@ -7,6 +7,7 @@
 
 #include <lib/zx/job.h>
 
+#include "src/developer/debug/debug_agent/job_exception_observer.h"
 #include "src/developer/debug/debug_agent/job_handle.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/shared/zircon_exception_watcher.h"
@@ -25,7 +26,7 @@ class ZirconJobHandle final : public JobHandle, public debug::ZirconExceptionWat
   std::string GetName() const override;
   std::vector<std::unique_ptr<JobHandle>> GetChildJobs() const override;
   std::vector<std::unique_ptr<ProcessHandle>> GetChildProcesses() const override;
-  debug::Status WatchJobExceptions(fit::function<void(std::unique_ptr<ProcessHandle>)> cb) override;
+  debug::Status WatchJobExceptions(JobExceptionObserver* observer) override;
 
  private:
   // ZirconExceptionWatcher implementation.
@@ -36,7 +37,7 @@ class ZirconJobHandle final : public JobHandle, public debug::ZirconExceptionWat
   zx::job job_;
 
   debug::MessageLoop::WatchHandle job_watch_handle_;
-  fit::function<void(std::unique_ptr<ProcessHandle>)> process_callback_;
+  JobExceptionObserver* exception_observer_ = nullptr;
 };
 
 }  // namespace debug_agent

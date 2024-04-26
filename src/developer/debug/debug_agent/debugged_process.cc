@@ -568,7 +568,7 @@ void DebuggedProcess::OnProcessStarting(std::unique_ptr<ProcessHandle> new_proce
     sw_bp->UninstallFromMemorySpace(*new_process_handle);
   }
 
-  debug_agent_->OnProcessStart(std::move(new_process_handle));
+  debug_agent_->OnProcessStarting(std::move(new_process_handle));
 #endif
 }
 

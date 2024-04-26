@@ -446,7 +446,6 @@ void MessageLoopFuchsia::OnJobException(const WatchInfo& info, zx::exception exc
   // Currently job exceptions only track process starting exceptions.
   // TODO(https://fxbug.dev/42109444): Debugger job exception ports should receive all exceptions.
   if (exception_info.type != ZX_EXCP_PROCESS_STARTING) {
-    FX_NOTREACHED();
     return;
   }
 

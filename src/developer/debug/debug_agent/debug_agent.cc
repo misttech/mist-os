@@ -107,8 +107,7 @@ void DebugAgent::Connect(std::unique_ptr<debug::BufferedStream> stream) {
 #ifdef __Fuchsia__
   // Watch the root job.
   root_job_ = system_interface_->GetRootJob();
-  auto status = root_job_->WatchJobExceptions(
-      [this](std::unique_ptr<ProcessHandle> process) { OnProcessStart(std::move(process)); });
+  auto status = root_job_->WatchJobExceptions(this);
   if (status.has_error()) {
     LOGS(Error) << "Failed to watch the root job: " << status.message();
   }
@@ -798,7 +797,7 @@ void DebugAgent::LaunchProcess(const debug_ipc::RunBinaryRequest& request,
   reply->process_name = new_process->process_handle().GetName();
 }
 
-void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
+void DebugAgent::OnProcessStarting(std::unique_ptr<ProcessHandle> process_handle) {
   if (procs_.find(process_handle->GetKoid()) != procs_.end()) {
     return;  // The process might have been attached in |LaunchProcess|.
   }

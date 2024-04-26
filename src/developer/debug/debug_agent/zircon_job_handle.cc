@@ -39,14 +39,13 @@ std::vector<std::unique_ptr<ProcessHandle>> ZirconJobHandle::GetChildProcesses()
   return result;
 }
 
-debug::Status ZirconJobHandle::WatchJobExceptions(
-    fit::function<void(std::unique_ptr<ProcessHandle>)> cb) {
+debug::Status ZirconJobHandle::WatchJobExceptions(JobExceptionObserver* observer) {
   debug::Status status;
 
-  if (!cb) {
+  if (!observer) {
     // Unregistering.
     job_watch_handle_.StopWatching();
-  } else if (!process_callback_) {
+  } else if (!exception_observer_) {
     // Registering for the first time.
     debug::MessageLoopFuchsia* loop = debug::MessageLoopFuchsia::Current();
     FX_DCHECK(loop);  // Loop must be created on this thread first.
@@ -59,7 +58,7 @@ debug::Status ZirconJobHandle::WatchJobExceptions(
     status = debug::ZxStatus(loop->WatchJobExceptions(std::move(config), &job_watch_handle_));
   }
 
-  process_callback_ = std::move(cb);
+  exception_observer_ = observer;
   return status;
 }
 
@@ -69,7 +68,8 @@ void ZirconJobHandle::OnProcessStarting(zx::exception exception_token,
   zx_status_t status = zx_exception_get_process(exception_token.get(), &zircon_handle);
   FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
 
-  process_callback_(std::make_unique<ZirconProcessHandle>(zx::process(zircon_handle)));
+  exception_observer_->OnProcessStarting(
+      std::make_unique<ZirconProcessHandle>(zx::process(zircon_handle)));
 
   // Attached to the process. At that point it will get a new thread notification for the initial
   // thread which it can stop or continue as it desires. Therefore, we can always resume the thread

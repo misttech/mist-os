@@ -22,7 +22,7 @@ class LinuxJobHandle : public JobHandle {
   std::string GetName() const override { return "<root>"; }
   std::vector<std::unique_ptr<JobHandle>> GetChildJobs() const override { return {}; }
   std::vector<std::unique_ptr<ProcessHandle>> GetChildProcesses() const override;
-  debug::Status WatchJobExceptions(fit::function<void(std::unique_ptr<ProcessHandle>)> cb) override;
+  debug::Status WatchJobExceptions(JobExceptionObserver* observer) override;
 };
 
 }  // namespace debug_agent
