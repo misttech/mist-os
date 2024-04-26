@@ -37,7 +37,7 @@ use {
     vfs::{
         directory::{
             entry::OpenRequest, entry_container::Directory, helper::DirectlyMutable as _,
-            mutable::simple::Simple as SimpleMutableDir,
+            immutable::simple::Simple as SimpleImmutableDir,
         },
         remote::RemoteLike,
     },
@@ -167,7 +167,7 @@ impl<'a> UniqueCapability<'a> {
 async fn create_realm_instance(
     RealmOptions { name, children, .. }: RealmOptions,
     prefix: &str,
-    devfs: Arc<SimpleMutableDir>,
+    devfs: Arc<SimpleImmutableDir>,
     devfs_proxy: fio::DirectoryProxy,
 ) -> Result<RealmInstance, CreateRealmError> {
     // Keep track of all the protocols exposed by components in the test realm, so that we can
@@ -312,7 +312,7 @@ async fn create_realm_instance(
                                 let capability_name = capability_name
                                     .ok_or(CreateRealmError::DevfsCapabilityNameNotProvided)?;
                                 if let Some(subdir) = subdir.as_ref() {
-                                    let _: Arc<SimpleMutableDir> = open_or_create_dir(
+                                    let _: Arc<SimpleImmutableDir> = open_or_create_dir(
                                         devfs.clone(),
                                         &std::path::Path::new(subdir),
                                     )
@@ -505,7 +505,7 @@ async fn create_realm_instance(
 struct ManagedRealm {
     server_end: ServerEnd<ManagedRealmMarker>,
     realm: RealmInstance,
-    devfs: Arc<SimpleMutableDir>,
+    devfs: Arc<SimpleImmutableDir>,
 }
 
 // This represents a device in devfs. It can serve both the device's FIDL protocol as well
@@ -818,9 +818,9 @@ fn split_path_into_dir_and_file_name<'a>(
 }
 
 async fn open_or_create_dir(
-    root: Arc<SimpleMutableDir>,
+    root: Arc<SimpleImmutableDir>,
     path: &std::path::Path,
-) -> Result<Arc<SimpleMutableDir>> {
+) -> Result<Arc<SimpleImmutableDir>> {
     let root = futures::stream::iter(path.components())
         .map(Ok)
         .try_fold(root, |root, component| async move {
@@ -836,7 +836,7 @@ async fn open_or_create_dir(
                 Err(status) => match status {
                     zx::Status::NOT_FOUND => {
                         let () = root
-                            .add_entry(entry, vfs::directory::mutable::simple::simple())
+                            .add_entry(entry, vfs::directory::immutable::simple::simple())
                             .context("failed to add directory entry")?;
                         root.get_entry(entry).context("failed to get directory entry")?
                     }
@@ -853,24 +853,11 @@ async fn open_or_create_dir(
             // Downcast the entry to a directory so that we can perform directory operations on it.
             Ok(entry
                 .into_any()
-                .downcast::<SimpleMutableDir>()
+                .downcast::<SimpleImmutableDir>()
                 .expect("could not downcast entry to a directory"))
         })
         .await?;
     Ok(root)
-}
-
-fn make_devfs() -> Result<(fio::DirectoryProxy, Arc<SimpleMutableDir>)> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-        .context("create directory proxy")?;
-    let dir = vfs::directory::mutable::simple::simple();
-    let () = dir.clone().open(
-        vfs::execution_scope::ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        vfs::path::Path::dot(),
-        server.into_channel().into(),
-    );
-    Ok((proxy, dir))
 }
 
 async fn handle_sandbox(
@@ -897,7 +884,8 @@ async fn handle_sandbox(
                     } => {
                         let index = realm_index.fetch_add(1, Ordering::SeqCst);
                         let prefix = format!("{}{}", sandbox_name, index);
-                        let (proxy, devfs) = make_devfs().context("creating devfs")?;
+                        let devfs = vfs::directory::immutable::simple::simple();
+                        let proxy = vfs::directory::spawn_directory(devfs.clone());
                         match create_realm_instance(options, &prefix, devfs.clone(), proxy).await {
                             Ok(realm) => tx
                                 .send(ManagedRealm { server_end, realm, devfs })
