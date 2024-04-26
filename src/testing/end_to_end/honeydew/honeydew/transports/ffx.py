@@ -272,7 +272,7 @@ class FFX(ffx_interface.FFX):
 
     def add_target(
         self,
-        timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"],
+        timeout: float = ffx_interface.TIMEOUTS["TARGET_ADD"],
     ) -> None:
         """Adds a target to the ffx collection
 
