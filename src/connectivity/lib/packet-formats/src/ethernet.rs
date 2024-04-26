@@ -5,7 +5,7 @@
 //! Parsing and serialization of Ethernet frames.
 
 use net_types::ethernet::Mac;
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use packet::{
     BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, SerializeTarget,
@@ -31,6 +31,16 @@ create_protocol_enum!(
         _, "EtherType {}";
     }
 );
+
+impl EtherType {
+    /// Constructs the relevant [`EtherType`] from the given [`IpVersion`].
+    pub fn from_ip_version(ip_version: IpVersion) -> Self {
+        match ip_version {
+            IpVersion::V4 => EtherType::Ipv4,
+            IpVersion::V6 => EtherType::Ipv6,
+        }
+    }
+}
 
 /// An extension trait adding IP-related functionality to `Ipv4` and `Ipv6`.
 pub trait EthernetIpExt: Ip {

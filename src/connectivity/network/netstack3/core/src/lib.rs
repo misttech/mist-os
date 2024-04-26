@@ -92,8 +92,8 @@ pub mod device_socket {
         base::FrameDestination,
         socket::{
             DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-            EthernetHeaderParams, Frame, Protocol, ReceivedFrame, SendFrameError, SentFrame,
-            SocketId, SocketInfo, TargetDevice,
+            EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SendFrameError,
+            SentFrame, SocketId, SocketInfo, TargetDevice,
         },
     };
 }

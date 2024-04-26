@@ -10,17 +10,6 @@
             ],
         },
         {
-            type: "skip",
-            matchers: [
-                // TODO(https://fxbug.dev/42051633): Support Pure IP devices in
-                // Netstack3. These tests currently timeout waiting to receive.
-                "ip_endpoints_socket_ns3_v4::packet_raw_socket",
-                "ip_endpoints_socket_ns3_v6::packet_raw_socket",
-                "ip_endpoints_socket_ns3_v4::packet_dgram_socket",
-                "ip_endpoints_socket_ns3_v6::packet_dgram_socket",
-            ],
-        },
-        {
             type: "expect_failure",
             matchers: [
                 "tcp_bind_with_zone_connect_unzoned_ns2",

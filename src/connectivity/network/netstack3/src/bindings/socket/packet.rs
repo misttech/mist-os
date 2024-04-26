@@ -14,7 +14,7 @@ use fidl::{
 };
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
-use net_types::ethernet::Mac;
+use net_types::{ethernet::Mac, ip::IpVersion};
 use netstack3_core::{
     device::{
         DeviceId, EthernetLinkDevice, LoopbackDevice, PureIpDevice, PureIpHeaderParams,
@@ -22,12 +22,13 @@ use netstack3_core::{
     },
     device_socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-        EthernetHeaderParams, Frame, FrameDestination, Protocol, ReceivedFrame, SendFrameError,
-        SentFrame, SocketId, SocketInfo, TargetDevice,
+        EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
+        SendFrameError, SentFrame, SocketId, SocketInfo, TargetDevice,
     },
     sync::Mutex,
 };
 use packet::Buf;
+use packet_formats::ethernet::EtherType;
 use tracing::error;
 
 use crate::bindings::{
@@ -164,6 +165,7 @@ struct MessageData {
 #[derive(Debug)]
 enum MessageDataInfo {
     Ethernet { src_mac: Mac, protocol: u16 },
+    Ip { ip_version: IpVersion },
 }
 
 impl MessageData {
@@ -173,6 +175,7 @@ impl MessageData {
                 fppacket::PacketType::Outgoing,
                 match sent {
                     SentFrame::Ethernet(frame) => MessageDataInfo::new_ethernet(frame),
+                    SentFrame::Ip(frame) => MessageDataInfo::new_ip(frame),
                 },
             ),
             Frame::Received(ReceivedFrame::Ethernet { destination, frame }) => {
@@ -184,6 +187,9 @@ impl MessageData {
                         .unwrap_or(fppacket::PacketType::OtherHost),
                 };
                 (packet_type, MessageDataInfo::new_ethernet(frame))
+            }
+            Frame::Received(ReceivedFrame::Ip(frame)) => {
+                (fppacket::PacketType::Host, MessageDataInfo::new_ip(frame))
             }
         };
 
@@ -198,8 +204,13 @@ impl MessageData {
 
 impl MessageDataInfo {
     fn new_ethernet(frame: &EthernetFrame<&[u8]>) -> Self {
-        let EthernetFrame { src_mac, dst_mac: _, protocol, body: _ } = *frame;
-        Self::Ethernet { src_mac, protocol: protocol.unwrap_or(0) }
+        let EthernetFrame { src_mac, dst_mac: _, ethertype, body: _ } = *frame;
+        Self::Ethernet { src_mac, protocol: ethertype.map_or(0, Into::into) }
+    }
+
+    fn new_ip(frame: &IpFrame<&[u8]>) -> Self {
+        let IpFrame { ip_version, body: _ } = frame;
+        Self::Ip { ip_version: *ip_version }
     }
 }
 
@@ -651,7 +662,7 @@ impl TryFromFidl<fppacket::PacketInfo> for EthernetHeaderParams {
         let dest_addr = match addr {
             fppacket::HardwareAddress::Eui48(mac) => Some(mac.into_core()),
             fppacket::HardwareAddress::None(fppacket::Empty) => None,
-            fppacket::HardwareAddressUnknown!() => None,
+            fppacket::HardwareAddress::__SourceBreaking { .. } => None,
         }
         .ok_or(fposix::Errno::Einval)?;
         Ok(EthernetHeaderParams { dest_addr, protocol: protocol.get().into() })
@@ -661,8 +672,21 @@ impl TryFromFidl<fppacket::PacketInfo> for EthernetHeaderParams {
 impl TryFromFidl<fppacket::PacketInfo> for PureIpHeaderParams {
     type Error = fposix::Errno;
 
-    fn try_from_fidl(_packet_info: fppacket::PacketInfo) -> Result<Self, Self::Error> {
-        Ok(PureIpHeaderParams {})
+    fn try_from_fidl(packet_info: fppacket::PacketInfo) -> Result<Self, Self::Error> {
+        let fppacket::PacketInfo { protocol, interface_id: _, addr } = packet_info;
+        match addr {
+            fppacket::HardwareAddress::None(fppacket::Empty) => {}
+            fppacket::HardwareAddress::Eui48(_)
+            | fppacket::HardwareAddress::__SourceBreaking { .. } => {
+                return Err(fposix::Errno::Einval)
+            }
+        }
+        let ip_version = match protocol.into() {
+            EtherType::Ipv4 => IpVersion::V4,
+            EtherType::Ipv6 => IpVersion::V6,
+            EtherType::Arp | EtherType::Other(_) => return Err(fposix::Errno::Einval),
+        };
+        Ok(PureIpHeaderParams { ip_version })
     }
 }
 
@@ -694,6 +718,15 @@ impl RecvMsgParams {
                     interface_id,
                     addr: fppacket::HardwareAddress::Eui48(src_mac.into_fidl()),
                 },
+                MessageDataInfo::Ip { ip_version } => {
+                    let protocol = EtherType::from_ip_version(ip_version).into();
+                    fppacket::PacketInfo {
+                        protocol,
+                        interface_id,
+                        // IP Devices don't have hardware addresses.
+                        addr: fppacket::HardwareAddress::None(fppacket::Empty),
+                    }
+                }
             };
 
             fppacket::RecvPacketInfo { packet_type, interface_type, packet_info }
@@ -720,7 +753,6 @@ mod tests {
     use super::*;
 
     use net_declare::{fidl_mac, net_mac};
-    use packet_formats::ethernet::EtherType;
     use test_case::test_case;
 
     const IFACE: u64 = 1;
@@ -729,6 +761,8 @@ mod tests {
     const FIDL_MAC: fppacket::HardwareAddress =
         fppacket::HardwareAddress::Eui48(fidl_mac!("00:11:22:33:44:55"));
     const MAC: net_types::ethernet::Mac = net_mac!("00:11:22:33:44:55");
+    const EMPTY_HWADDR: fppacket::HardwareAddress =
+        fppacket::HardwareAddress::None(fppacket::Empty);
 
     #[test_case(
         fppacket::PacketInfo{interface_id: IFACE, protocol: FIDL_PROTO, addr: FIDL_MAC},
@@ -744,7 +778,7 @@ mod tests {
         fppacket::PacketInfo{
             interface_id: IFACE,
             protocol: FIDL_PROTO,
-            addr: fppacket::HardwareAddress::None(fppacket::Empty),
+            addr: EMPTY_HWADDR,
         },
         Err(fposix::Errno::Einval);
         "missing_addr"
@@ -754,5 +788,34 @@ mod tests {
         expected_params: Result<EthernetHeaderParams, fposix::Errno>,
     ) {
         assert_eq!(EthernetHeaderParams::try_from_fidl(packet_info), expected_params);
+    }
+
+    const IPV4_PROTO: u16 = 0x0800;
+    const IPV6_PROTO: u16 = 0x86DD;
+    #[test_case(
+        fppacket::PacketInfo{interface_id: IFACE, protocol: IPV4_PROTO, addr: EMPTY_HWADDR},
+        Ok(PureIpHeaderParams{ip_version: IpVersion::V4});
+        "success_ipv4"
+    )]
+    #[test_case(
+        fppacket::PacketInfo{interface_id: IFACE, protocol: IPV6_PROTO, addr: EMPTY_HWADDR},
+        Ok(PureIpHeaderParams{ip_version: IpVersion::V6});
+        "success_ipv6"
+    )]
+    #[test_case(
+        fppacket::PacketInfo{interface_id: IFACE, protocol: FIDL_PROTO, addr: EMPTY_HWADDR},
+        Err(fposix::Errno::Einval);
+        "bad_protocol"
+    )]
+    #[test_case(
+        fppacket::PacketInfo{interface_id: IFACE, protocol: IPV4_PROTO, addr: FIDL_MAC},
+        Err(fposix::Errno::Einval);
+        "bad_addr"
+    )]
+    fn pure_ip_header_params_from_packet_info(
+        packet_info: fppacket::PacketInfo,
+        expected_params: Result<PureIpHeaderParams, fposix::Errno>,
+    ) {
+        assert_eq!(PureIpHeaderParams::try_from_fidl(packet_info), expected_params);
     }
 }

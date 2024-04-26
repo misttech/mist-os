@@ -14,7 +14,7 @@ use lock_order::{
     relation::LockBefore,
     wrap::prelude::*,
 };
-use net_types::ethernet::Mac;
+use net_types::{ethernet::Mac, ip::IpVersion};
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::{
     error::ParseError,
@@ -563,13 +563,18 @@ pub trait DeviceSocketHandler<D: Device, BC>: DeviceIdContext<D> {
 /// A frame received on a device.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReceivedFrame<B> {
-    /// An ethernet frame received on a socket.
+    /// An ethernet frame received on a device.
     Ethernet {
         /// Where the frame was destined.
         destination: FrameDestination,
         /// The parsed ethernet frame.
         frame: EthernetFrame<B>,
     },
+    /// An IP frame received on a device.
+    ///
+    /// Note that this is not an IP packet within an Ethernet Frame. This is an
+    /// IP packet received directly from the device (e.g. a pure IP device).
+    Ip(IpFrame<B>),
 }
 
 /// A frame sent on a device.
@@ -577,6 +582,11 @@ pub enum ReceivedFrame<B> {
 pub enum SentFrame<B> {
     /// An ethernet frame sent on a device.
     Ethernet(EthernetFrame<B>),
+    /// An IP frame sent on a device.
+    ///
+    /// Note that this is not an IP packet within an Ethernet Frame. This is an
+    /// IP Packet send directly on the device (e.g. a pure IP device).
+    Ip(IpFrame<B>),
 }
 
 /// A frame couldn't be parsed as a [`SentFrame`].
@@ -601,10 +611,26 @@ pub struct EthernetFrame<B> {
     pub src_mac: Mac,
     /// The destination address of the frame.
     pub dst_mac: Mac,
-    /// The protocol of the frame, or `None` if there was none.
-    pub protocol: Option<u16>,
+    /// The EtherType of the frame, or `None` if there was none.
+    pub ethertype: Option<EtherType>,
     /// The body of the frame.
     pub body: B,
+}
+
+/// Data from an IP frame.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IpFrame<B> {
+    /// The IP version of the frame.
+    pub ip_version: IpVersion,
+    /// The body of the frame.
+    pub body: B,
+}
+
+impl<B> IpFrame<B> {
+    fn ethertype(&self) -> EtherType {
+        let IpFrame { ip_version, body: _ } = self;
+        EtherType::from_ip_version(*ip_version)
+    }
 }
 
 /// A frame sent or received on a device
@@ -633,7 +659,7 @@ impl<'a> From<packet_formats::ethernet::EthernetFrame<&'a [u8]>> for EthernetFra
         Self {
             src_mac: frame.src_mac(),
             dst_mac: frame.dst_mac(),
-            protocol: frame.ethertype().map(Into::into),
+            ethertype: frame.ethertype(),
             body: frame.into_body(),
         }
     }
@@ -650,19 +676,23 @@ impl<'a> ReceivedFrame<&'a [u8]> {
 
 impl<B> Frame<B> {
     fn protocol(&self) -> Option<u16> {
-        match self {
+        let ethertype = match self {
             Self::Sent(SentFrame::Ethernet(frame))
-            | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.protocol,
-        }
+            | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.ethertype,
+            Self::Sent(SentFrame::Ip(frame)) | Self::Received(ReceivedFrame::Ip(frame)) => {
+                Some(frame.ethertype())
+            }
+        };
+        ethertype.map(Into::into)
     }
 
     /// Convenience method for consuming the `Frame` and producing the body.
     pub fn into_body(self) -> B {
         match self {
             Self::Received(ReceivedFrame::Ethernet { destination: _, frame })
-            | Self::Sent(SentFrame::Ethernet(frame)) => {
-                let EthernetFrame { src_mac: _, dst_mac: _, protocol: _, body } = frame;
-                body
+            | Self::Sent(SentFrame::Ethernet(frame)) => frame.body,
+            Self::Received(ReceivedFrame::Ip(frame)) | Self::Sent(SentFrame::Ip(frame)) => {
+                frame.body
             }
         }
     }
@@ -977,14 +1007,25 @@ mod tests {
                         frame: frame.cloned(),
                     })
                 }
+                Self::Sent(SentFrame::Ip(frame)) => Frame::Sent(SentFrame::Ip(frame.cloned())),
+                Self::Received(super::ReceivedFrame::Ip(frame)) => {
+                    Frame::Received(super::ReceivedFrame::Ip(frame.cloned()))
+                }
             }
         }
     }
 
     impl EthernetFrame<&[u8]> {
         fn cloned(self) -> EthernetFrame<Vec<u8>> {
-            let Self { src_mac, dst_mac, protocol, body } = self;
-            EthernetFrame { src_mac, dst_mac, protocol, body: Vec::from(body) }
+            let Self { src_mac, dst_mac, ethertype, body } = self;
+            EthernetFrame { src_mac, dst_mac, ethertype, body: Vec::from(body) }
+        }
+    }
+
+    impl IpFrame<&[u8]> {
+        fn cloned(self) -> IpFrame<Vec<u8>> {
+            let Self { ip_version, body } = self;
+            IpFrame { ip_version, body: Vec::from(body) }
         }
     }
 
@@ -1699,7 +1740,7 @@ mod tests {
                         frame: EthernetFrame {
                             src_mac: TestData::SRC_MAC,
                             dst_mac: TestData::DST_MAC,
-                            protocol: Some(TestData::PROTO.into()),
+                            ethertype: Some(TestData::PROTO.get().into()),
                             body: Vec::from(TestData::BODY),
                         }
                     }),

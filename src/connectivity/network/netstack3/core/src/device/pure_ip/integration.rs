@@ -32,13 +32,13 @@ use crate::{
             DequeueState,
         },
         socket::{
-            DeviceSocketMetadata, DeviceSocketSendTypes, HeldDeviceSockets, ParseSentFrameError,
+            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame,
+            HeldDeviceSockets, IpFrame, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::IpLinkDeviceState,
         DeviceCollectionContext, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher,
         DeviceSendFrameError, RecvIpFrameMeta,
     },
-    device_socket::SentFrame,
     neighbor::NudUserConfig,
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -93,7 +93,8 @@ where
     CC: DeviceIdContext<PureIpDevice>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>
+        + DeviceSocketHandler<PureIpDevice, BC>,
 {
     fn receive_frame<B: BufferMut + Debug>(
         &mut self,
@@ -101,10 +102,19 @@ where
         metadata: PureIpDeviceReceiveFrameMetadata<CC::DeviceId>,
         buffer: B,
     ) {
-        // TODO(https://fxbug.dev/42051633): Deliver the received frame to
-        // the device socket handler.
         let PureIpDeviceReceiveFrameMetadata { device_id, ip_version } = metadata;
         self.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
+
+        // NB: For conformance with Linux, don't verify that the contents of
+        // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
+        // allowed to receive malformed packets.
+        self.handle_frame(
+            bindings_ctx,
+            &device_id,
+            Frame::Received(ReceivedFrame::Ip(IpFrame { ip_version, body: buffer.as_ref() })),
+            buffer.as_ref(),
+        );
+
         match ip_version {
             IpVersion::V4 => self.receive_frame(
                 bindings_ctx,
@@ -154,23 +164,35 @@ impl DeviceSocketSendTypes for PureIpDevice {
     type Metadata = PureIpHeaderParams;
 }
 
-impl<BC: BindingsContext, L>
-    SendFrameContext<BC, DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>>
+impl<
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::AllDeviceSockets>
+            + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
+    > SendFrameContext<BC, DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>>
     for CoreCtx<'_, BC, L>
 {
     fn send_frame<S>(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _metadata: DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>,
-        _body: S,
+        bindings_ctx: &mut BC,
+        metadata: DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>,
+        body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        // TODO(https://fxbug.dev/42051633): Handle sending IP packets from
-        // device sockets, by enqueuing the packet in the TX queue.
-        Ok(())
+        let DeviceSocketMetadata { device_id, metadata: PureIpHeaderParams { ip_version } } =
+            metadata;
+        net_types::for_any_ip_version!(
+            ip_version,
+            I,
+            crate::device::pure_ip::send_ip_frame::<_, _, I, _>(
+                self,
+                bindings_ctx,
+                &device_id,
+                body
+            )
+        )
     }
 }
 
@@ -181,10 +203,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 
-    fn parse_outgoing_frame(_buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
-        // TODO(https://fxbug.dev/42051633): Parse the outgoing IP packet so
-        // that it can be delivered to device sockets.
-        Err(ParseSentFrameError)
+    fn parse_outgoing_frame<'a, 'b>(
+        buf: &'a [u8],
+        meta: &'b Self::Meta,
+    ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
+        let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
+        // NB: For conformance with Linux, don't verify that the contents of
+        // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
+        // allowed to receive malformed packets.
+        Ok(SentFrame::Ip(IpFrame { ip_version: *ip_version, body: buf }))
     }
 }
 

@@ -729,7 +729,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 
-    fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+    fn parse_outgoing_frame<'a, 'b>(
+        buf: &'a [u8],
+        (): &'b Self::Meta,
+    ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
         SentFrame::try_parse_as_ethernet(buf)
     }
 }
@@ -1858,8 +1861,11 @@ mod tests {
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
 
-        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
-            FakeInnerCtx::parse_outgoing_frame(buf)
+        fn parse_outgoing_frame<'a>(
+            buf: &'a [u8],
+            meta: &'a Self::Meta,
+        ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
+            FakeInnerCtx::parse_outgoing_frame(buf, meta)
         }
     }
 
@@ -1868,7 +1874,10 @@ mod tests {
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
 
-        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+        fn parse_outgoing_frame<'a, 'b>(
+            buf: &'a [u8],
+            (): &'b Self::Meta,
+        ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
             SentFrame::try_parse_as_ethernet(buf)
         }
     }

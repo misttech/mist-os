@@ -55,7 +55,10 @@ pub trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
     type Buffer: GrowBufferMut + ContiguousBuffer;
 
     /// Parses an outgoing frame for packet socket delivery.
-    fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError>;
+    fn parse_outgoing_frame<'a, 'b>(
+        buf: &'a [u8],
+        meta: &'a Self::Meta,
+    ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError>;
 }
 
 /// The execution context for a transmit queue.
@@ -135,9 +138,10 @@ pub(super) fn deliver_to_device_sockets<
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     buffer: &CC::Buffer,
+    meta: &CC::Meta,
 ) {
     let bytes = buffer.as_ref();
-    match CC::parse_outgoing_frame(bytes) {
+    match CC::parse_outgoing_frame(bytes, meta) {
         Ok(sent_frame) => DeviceSocketHandler::handle_frame(
             core_ctx,
             bindings_ctx,
@@ -207,8 +211,7 @@ where
             EnqueueStatus::NotAttempted((body, meta)) => {
                 // TODO(https://fxbug.dev/42077654): Deliver the frame to packet
                 // sockets and to the device atomically.
-                deliver_to_device_sockets(self, bindings_ctx, device_id, &body);
-
+                deliver_to_device_sockets(self, bindings_ctx, device_id, &body, &meta);
                 // Send the frame while not holding the TX queue exclusively to
                 // not block concurrent senders from making progress.
                 self.send_frame(bindings_ctx, device_id, meta, body).map_err(|_| {
@@ -281,7 +284,10 @@ mod tests {
         type Buffer = Buf<Vec<u8>>;
         type Allocator = BufVecU8Allocator;
 
-        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+        fn parse_outgoing_frame<'a, 'b>(
+            buf: &'a [u8],
+            (): &'b Self::Meta,
+        ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
             Ok(fake_sent_ethernet_with_body(buf))
         }
     }
@@ -290,7 +296,7 @@ mod tests {
         SentFrame::Ethernet(EthernetFrame {
             src_mac: SRC_MAC,
             dst_mac: DEST_MAC,
-            protocol: None,
+            ethertype: None,
             body,
         })
     }
