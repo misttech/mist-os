@@ -8,6 +8,7 @@ use alloc::{format, string::ToString as _, sync::Arc, vec::Vec};
 use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
+    num::NonZeroU16,
 };
 
 use derivative::Derivative;
@@ -46,12 +47,41 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// If invoked in an installed routine, equivalent to `Accept`, given
     /// packets are accepted by default in the absence of any matching rules.
     Return,
+    /// Redirect the packet to a local socket without changing the packet header
+    /// in any way.
+    ///
+    /// This is a terminal action, i.e. no further rules will be evaluated for
+    /// this packet, even in other routines on the same hook. This action is
+    /// only valid in the INGRESS hook. This action is also only valid in a rule
+    /// that ensures the presence of a TCP or UDP header by matching on the
+    /// transport protocol, so that the packet can be properly dispatched.
+    TransparentProxy(TransparentProxy<I>),
+}
+
+/// Transparently intercept the packet and deliver it to a local socket without
+/// changing the packet header.
+///
+/// When a local address is specified, it is the bound address of the local
+/// socket to redirect the packet to. When absent, the destination IP address of
+/// the packet is used for local delivery.
+///
+/// When a local port is specified, it is the bound port of the local socket to
+/// redirect the packet to. When absent, the destination port of the packet is
+/// used for local delivery.
+#[derive(Debug, Clone)]
+#[allow(missing_docs)]
+pub enum TransparentProxy<I: IpExt> {
+    LocalAddr(I::Addr),
+    LocalPort(NonZeroU16),
+    LocalAddrAndPort(I::Addr, NonZeroU16),
 }
 
 impl<I: IpExt, DeviceClass: Debug> Inspectable for Action<I, DeviceClass, ()> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let value = match self {
-            Self::Accept | Self::Drop | Self::Return => format!("{self:?}"),
+            Self::Accept | Self::Drop | Self::Return | Self::TransparentProxy { .. } => {
+                format!("{self:?}")
+            }
             Self::Jump(UninstalledRoutine { routine: _, id }) => {
                 format!("Jump(UninstalledRoutine({id:?}))")
             }

@@ -11,18 +11,31 @@ use core::fmt::Debug;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use packet_formats::ip::IpExt;
+use net_types::ip::{GenericOverIp, Ip};
+use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
-use crate::{Action, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, UninstalledRoutine};
+use crate::{
+    Action, Hook, IpRoutines, NatRoutines, PacketMatcher, Routine, Routines, Rule,
+    TransportProtocolMatcher, UninstalledRoutine,
+};
 
 /// Provided filtering state was invalid.
-#[derive(Derivative, Debug)]
+#[derive(Derivative, Debug, GenericOverIp)]
+#[generic_over_ip()]
 #[cfg_attr(test, derivative(PartialEq(bound = "RuleInfo: PartialEq")))]
 pub enum ValidationError<RuleInfo> {
     /// A rule matches on a property that is unavailable in the context in which it
     /// will be evaluated. For example, matching on the input interface in the
     /// EGRESS hook.
     RuleWithInvalidMatcher(RuleInfo),
+    /// A rule has an action that is unavailable in the context in which it will be
+    /// evaluated. For example, the TransparentProxy action is only valid in the
+    /// INGRESS hook.
+    RuleWithInvalidAction(RuleInfo),
+    /// A rule has a TransparentProxy action without a corresponding valid matcher:
+    /// the rule must match on transport protocol to ensure that the packet has
+    /// either a TCP or UDP header.
+    TransparentProxyWithInvalidMatcher(RuleInfo),
 }
 
 /// Witness type ensuring that the contained filtering state has been validated.
@@ -58,18 +71,42 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
 
         // Ensure that no rule has a matcher that is unavailable in the context in which
         // the rule will be evaluated.
-        let IpRoutines { ingress, local_ingress, egress, local_egress, forwarding: _ } =
-            ip_routines;
-        validate_hook(&ingress, UnavailableMatcher::OutInterface)?;
-        validate_hook(&local_ingress, UnavailableMatcher::OutInterface)?;
-        validate_hook(&egress, UnavailableMatcher::InInterface)?;
-        validate_hook(&local_egress, UnavailableMatcher::InInterface)?;
+        let IpRoutines { ingress, local_ingress, egress, local_egress, forwarding } = ip_routines;
+        validate_hook(&ingress, &[UnavailableMatcher::OutInterface], &[])?;
+        validate_hook(
+            &local_ingress,
+            &[UnavailableMatcher::OutInterface],
+            &[UnavailableAction::TransparentProxy],
+        )?;
+        validate_hook(&forwarding, &[], &[UnavailableAction::TransparentProxy])?;
+        validate_hook(
+            &egress,
+            &[UnavailableMatcher::InInterface],
+            &[UnavailableAction::TransparentProxy],
+        )?;
+        validate_hook(
+            &local_egress,
+            &[UnavailableMatcher::InInterface],
+            &[UnavailableAction::TransparentProxy],
+        )?;
 
         let NatRoutines { ingress, local_ingress, egress, local_egress } = nat_routines;
-        validate_hook(&ingress, UnavailableMatcher::OutInterface)?;
-        validate_hook(&local_ingress, UnavailableMatcher::OutInterface)?;
-        validate_hook(&egress, UnavailableMatcher::InInterface)?;
-        validate_hook(&local_egress, UnavailableMatcher::InInterface)?;
+        validate_hook(&ingress, &[UnavailableMatcher::OutInterface], &[])?;
+        validate_hook(
+            &local_ingress,
+            &[UnavailableMatcher::OutInterface],
+            &[UnavailableAction::TransparentProxy],
+        )?;
+        validate_hook(
+            &egress,
+            &[UnavailableMatcher::InInterface],
+            &[UnavailableAction::TransparentProxy],
+        )?;
+        validate_hook(
+            &local_egress,
+            &[UnavailableMatcher::InInterface],
+            &[UnavailableAction::TransparentProxy],
+        )?;
 
         // TODO(https://fxbug.dev/318717702): ensure that no rule has an action
         // that is not valid for the routine and hook to which the rule is
@@ -88,14 +125,54 @@ enum UnavailableMatcher {
     OutInterface,
 }
 
+impl UnavailableMatcher {
+    fn validate<I: IpExt, DeviceClass, RuleInfo: Clone>(
+        &self,
+        matcher: &PacketMatcher<I, DeviceClass>,
+        rule: &RuleInfo,
+    ) -> Result<(), ValidationError<RuleInfo>> {
+        let unavailable_matcher = match self {
+            UnavailableMatcher::InInterface => matcher.in_interface.as_ref(),
+            UnavailableMatcher::OutInterface => matcher.out_interface.as_ref(),
+        };
+        if unavailable_matcher.is_some() {
+            Err(ValidationError::RuleWithInvalidMatcher(rule.clone()))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum UnavailableAction {
+    TransparentProxy,
+}
+
+impl UnavailableAction {
+    fn validate<I: IpExt, DeviceClass, RuleInfo: Clone>(
+        &self,
+        action: &Action<I, DeviceClass, RuleInfo>,
+        rule: &RuleInfo,
+    ) -> Result<(), ValidationError<RuleInfo>> {
+        let UnavailableAction::TransparentProxy = self;
+        match action {
+            Action::Accept | Action::Drop | Action::Return | Action::Jump(_) => Ok(()),
+            Action::TransparentProxy(_) => {
+                Err(ValidationError::RuleWithInvalidAction(rule.clone()))
+            }
+        }
+    }
+}
+
 /// Ensures that no rules reachable from this hook match on
 /// `unavailable_matcher`.
 fn validate_hook<I: IpExt, DeviceClass, RuleInfo: Clone>(
     Hook { routines }: &Hook<I, DeviceClass, RuleInfo>,
-    unavailable_matcher: UnavailableMatcher,
+    unavailable_matchers: &[UnavailableMatcher],
+    unavailable_actions: &[UnavailableAction],
 ) -> Result<(), ValidationError<RuleInfo>> {
     for routine in routines {
-        validate_routine(routine, unavailable_matcher)?;
+        validate_routine(routine, unavailable_matchers, unavailable_actions)?;
     }
 
     Ok(())
@@ -105,21 +182,47 @@ fn validate_hook<I: IpExt, DeviceClass, RuleInfo: Clone>(
 /// `unavailable_matcher`.
 fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
     Routine { rules }: &Routine<I, DeviceClass, RuleInfo>,
-    unavailable_matcher: UnavailableMatcher,
+    unavailable_matchers: &[UnavailableMatcher],
+    unavailable_actions: &[UnavailableAction],
 ) -> Result<(), ValidationError<RuleInfo>> {
     for Rule { matcher, action, validation_info } in rules {
-        let matcher = match unavailable_matcher {
-            UnavailableMatcher::InInterface => &matcher.in_interface,
-            UnavailableMatcher::OutInterface => &matcher.out_interface,
-        };
-        if matcher.is_some() {
-            return Err(ValidationError::RuleWithInvalidMatcher(validation_info.clone()));
+        for unavailable in unavailable_matchers {
+            unavailable.validate(matcher, validation_info)?;
         }
+        for unavailable in unavailable_actions {
+            unavailable.validate(action, validation_info)?;
+        }
+
         match action {
             Action::Accept | Action::Drop | Action::Return => {}
+            Action::TransparentProxy(_) => {
+                let Some(TransportProtocolMatcher { proto, .. }) = matcher.transport_protocol
+                else {
+                    return Err(ValidationError::TransparentProxyWithInvalidMatcher(
+                        validation_info.clone(),
+                    ));
+                };
+                // TransparentProxy is only valid in a rule that matchers on
+                // either TCP or UDP.
+                I::map_ip::<_, Result<_, _>>(
+                    proto,
+                    |proto| match proto {
+                        Ipv4Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
+                        _ => Err(ValidationError::TransparentProxyWithInvalidMatcher(
+                            validation_info.clone(),
+                        )),
+                    },
+                    |proto| match proto {
+                        Ipv6Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
+                        _ => Err(ValidationError::TransparentProxyWithInvalidMatcher(
+                            validation_info.clone(),
+                        )),
+                    },
+                )?;
+            }
             Action::Jump(target) => {
                 let UninstalledRoutine { routine, id: _ } = target;
-                validate_routine(&*routine, unavailable_matcher)?
+                validate_routine(&*routine, unavailable_matchers, unavailable_actions)?;
             }
         }
     }
@@ -259,6 +362,7 @@ impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Action<I, DeviceClas
             Self::Accept => Action::Accept,
             Self::Drop => Action::Drop,
             Self::Return => Action::Return,
+            Self::TransparentProxy(proxy) => Action::TransparentProxy(proxy),
             Self::Jump(target) => {
                 let converted = index.get_or_insert_with(target.clone(), |index| {
                     // Recursively strip debug info from the target routine.
@@ -277,14 +381,18 @@ impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Action<I, DeviceClas
 #[cfg(test)]
 mod tests {
     use alloc::vec;
+    use core::num::NonZeroU16;
 
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use net_types::ip::{Ipv4, Ipv6};
     use test_case::test_case;
 
     use super::*;
-    use crate::{context::testutil::FakeDeviceClass, InterfaceMatcher, PacketMatcher};
+    use crate::{
+        context::testutil::FakeDeviceClass, InterfaceMatcher, PacketMatcher, TransparentProxy,
+    };
 
     #[derive(Debug, Clone, PartialEq)]
     enum RuleId {
@@ -414,7 +522,189 @@ mod tests {
         hook: Hook<I, FakeDeviceClass, RuleId>,
         unavailable_matcher: UnavailableMatcher,
     ) -> Result<(), ValidationError<RuleId>> {
-        validate_hook(&hook, unavailable_matcher)
+        validate_hook(&hook, &[unavailable_matcher], &[])
+    }
+
+    fn hook_with_rule<I: IpExt>(
+        rule: Rule<I, FakeDeviceClass, RuleId>,
+    ) -> Hook<I, FakeDeviceClass, RuleId> {
+        Hook { routines: vec![Routine { rules: vec![rule] }] }
+    }
+
+    fn transport_matcher<I: IpExt>(proto: I::Proto) -> PacketMatcher<I, FakeDeviceClass> {
+        PacketMatcher {
+            transport_protocol: Some(TransportProtocolMatcher {
+                proto,
+                src_port: None,
+                dst_port: None,
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn udp_matcher<I: IpExt>() -> PacketMatcher<I, FakeDeviceClass> {
+        transport_matcher(I::map_ip(
+            (),
+            |()| Ipv4Proto::Proto(IpProto::Udp),
+            |()| Ipv6Proto::Proto(IpProto::Udp),
+        ))
+    }
+
+    fn tcp_matcher<I: IpExt>() -> PacketMatcher<I, FakeDeviceClass> {
+        transport_matcher(I::map_ip(
+            (),
+            |()| Ipv4Proto::Proto(IpProto::Tcp),
+            |()| Ipv6Proto::Proto(IpProto::Tcp),
+        ))
+    }
+
+    fn icmp_matcher<I: IpExt>() -> PacketMatcher<I, FakeDeviceClass> {
+        transport_matcher(I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6))
+    }
+
+    const TPROXY_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+
+    #[ip_test]
+    #[test_case(
+        Routines {
+            ip: IpRoutines {
+                ingress: hook_with_rule(Rule {
+                    matcher: udp_matcher(),
+                    action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                    validation_info: RuleId::Valid,
+                }),
+                ..Default::default()
+            },
+            nat: NatRoutines {
+                ingress: hook_with_rule(Rule {
+                    matcher: tcp_matcher(),
+                    action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                    validation_info: RuleId::Valid,
+                }),
+                ..Default::default()
+            },
+        } =>
+        Ok(());
+        "transparent proxy available in IP and NAT INGRESS routines"
+    )]
+    #[test_case(
+        Routines {
+            ip: IpRoutines {
+                ingress: hook_with_rule(Rule {
+                    matcher: PacketMatcher::default(),
+                    action: Action::Jump(UninstalledRoutine::new(
+                        vec![Rule {
+                            matcher: udp_matcher(),
+                            action: Action::TransparentProxy(
+                                TransparentProxy::LocalPort(TPROXY_PORT)
+                            ),
+                            validation_info: RuleId::Valid,
+                        }],
+                        0,
+                    )),
+                    validation_info: RuleId::Valid,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        } =>
+        Ok(());
+        "transparent proxy available in target routine reachable from INGRESS"
+    )]
+    #[test_case(
+        Routines {
+            ip: IpRoutines {
+                egress: hook_with_rule(Rule {
+                    matcher: udp_matcher(),
+                    action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                    validation_info: RuleId::Invalid,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        } =>
+        Err(ValidationError::RuleWithInvalidAction(RuleId::Invalid));
+        "transparent proxy unavailable in IP EGRESS routine"
+    )]
+    #[test_case(
+        Routines {
+            ip: IpRoutines {
+                egress: hook_with_rule(Rule {
+                    matcher: PacketMatcher::default(),
+                    action: Action::Jump(UninstalledRoutine::new(
+                        vec![Rule {
+                            matcher: udp_matcher(),
+                            action: Action::TransparentProxy(
+                                TransparentProxy::LocalPort(TPROXY_PORT)
+                            ),
+                            validation_info: RuleId::Invalid,
+                        }],
+                        0,
+                    )),
+                    validation_info: RuleId::Valid,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        } =>
+        Err(ValidationError::RuleWithInvalidAction(RuleId::Invalid));
+        "transparent proxy unavailable in target routine reachable from EGRESS"
+    )]
+    fn validate_action_available<I: Ip + IpExt>(
+        routines: Routines<I, FakeDeviceClass, RuleId>,
+    ) -> Result<(), ValidationError<RuleId>> {
+        ValidRoutines::new(routines).map(|_| ())
+    }
+
+    #[ip_test]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: tcp_matcher(),
+                action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                validation_info: RuleId::Valid,
+            }],
+        } =>
+        Ok(());
+        "transparent proxy valid with TCP matcher"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: udp_matcher(),
+                action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                validation_info: RuleId::Valid,
+            }],
+        } =>
+        Ok(());
+        "transparent proxy valid with UDP matcher"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: icmp_matcher(),
+                action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                validation_info: RuleId::Invalid,
+            }],
+        } =>
+        Err(ValidationError::TransparentProxyWithInvalidMatcher(RuleId::Invalid));
+        "transparent proxy invalid with ICMP matcher"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: PacketMatcher::default(),
+                action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                validation_info: RuleId::Invalid,
+            }],
+        } =>
+        Err(ValidationError::TransparentProxyWithInvalidMatcher(RuleId::Invalid));
+        "transparent proxy invalid with no transport protocol matcher"
+    )]
+    fn validate_transparent_proxy_matcher<I: Ip + IpExt>(
+        routine: Routine<I, FakeDeviceClass, RuleId>,
+    ) -> Result<(), ValidationError<RuleId>> {
+        validate_routine(&routine, &[], &[])
     }
 
     #[test]

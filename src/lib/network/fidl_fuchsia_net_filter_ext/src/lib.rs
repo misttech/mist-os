@@ -11,7 +11,12 @@
 //! is evolved in order to enforce that it is updated along with the FIDL
 //! library itself.
 
-use std::{collections::HashMap, fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    num::{NonZeroU16, NonZeroU64},
+    ops::RangeInclusive,
+};
 
 use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
@@ -53,6 +58,8 @@ pub enum FidlConversionError {
     SubnetHostBitsSet,
     #[error("invalid port range (start must be <= end)")]
     InvalidPortRange,
+    #[error("transparent proxy action specified an invalid local port of 0")]
+    UnspecifiedTransparentProxyPort,
     #[error("non-error result variant could not be converted to an error")]
     NotAnError,
 }
@@ -70,6 +77,7 @@ mod type_names {
     pub(super) const ADDRESS_MATCHER_TYPE: &str = "fuchsia.net.filter/AddressMatcherType";
     pub(super) const TRANSPORT_PROTOCOL: &str = "fuchsia.net.filter/TransportProtocol";
     pub(super) const ACTION: &str = "fuchsia.net.filter/Action";
+    pub(super) const TRANSPARENT_PROXY: &str = "fuchsia.net.filter/TransparentProxy";
     pub(super) const RESOURCE: &str = "fuchsia.net.filter/Resource";
     pub(super) const EVENT: &str = "fuchsia.net.filter/Event";
     pub(super) const CHANGE: &str = "fuchsia.net.filter/Change";
@@ -832,6 +840,15 @@ pub enum Action {
     Drop,
     Jump(String),
     Return,
+    TransparentProxy(TransparentProxy),
+}
+
+/// Extension type for [`fnet_filter::TransparentProxy_`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum TransparentProxy {
+    LocalAddr(fnet::IpAddress),
+    LocalPort(NonZeroU16),
+    LocalAddrAndPort(fnet::IpAddress, NonZeroU16),
 }
 
 impl From<Action> for fnet_filter::Action {
@@ -840,6 +857,20 @@ impl From<Action> for fnet_filter::Action {
             Action::Accept => Self::Accept(fnet_filter::Empty {}),
             Action::Drop => Self::Drop(fnet_filter::Empty {}),
             Action::Jump(target) => Self::Jump(target),
+            Action::TransparentProxy(proxy) => Self::TransparentProxy(match proxy {
+                TransparentProxy::LocalAddr(addr) => {
+                    fnet_filter::TransparentProxy_::LocalAddr(addr)
+                }
+                TransparentProxy::LocalPort(port) => {
+                    fnet_filter::TransparentProxy_::LocalPort(port.get())
+                }
+                TransparentProxy::LocalAddrAndPort(addr, port) => {
+                    fnet_filter::TransparentProxy_::LocalAddrAndPort(fnet_filter::SocketAddr {
+                        addr,
+                        port: port.get(),
+                    })
+                }
+            }),
             Action::Return => Self::Return_(fnet_filter::Empty {}),
         }
     }
@@ -854,6 +885,31 @@ impl TryFrom<fnet_filter::Action> for Action {
             fnet_filter::Action::Drop(fnet_filter::Empty {}) => Ok(Self::Drop),
             fnet_filter::Action::Jump(target) => Ok(Self::Jump(target)),
             fnet_filter::Action::Return_(fnet_filter::Empty {}) => Ok(Self::Return),
+            fnet_filter::Action::TransparentProxy(proxy) => {
+                Ok(Self::TransparentProxy(match proxy {
+                    fnet_filter::TransparentProxy_::LocalAddr(addr) => {
+                        TransparentProxy::LocalAddr(addr)
+                    }
+                    fnet_filter::TransparentProxy_::LocalPort(port) => {
+                        let port = NonZeroU16::new(port)
+                            .ok_or(FidlConversionError::UnspecifiedTransparentProxyPort)?;
+                        TransparentProxy::LocalPort(port)
+                    }
+                    fnet_filter::TransparentProxy_::LocalAddrAndPort(fnet_filter::SocketAddr {
+                        addr,
+                        port,
+                    }) => {
+                        let port = NonZeroU16::new(port)
+                            .ok_or(FidlConversionError::UnspecifiedTransparentProxyPort)?;
+                        TransparentProxy::LocalAddrAndPort(addr, port)
+                    }
+                    fnet_filter::TransparentProxy_::__SourceBreaking { .. } => {
+                        return Err(FidlConversionError::UnknownUnionVariant(
+                            type_names::TRANSPARENT_PROXY,
+                        ))
+                    }
+                }))
+            }
             fnet_filter::Action::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::ACTION))
             }
@@ -1222,6 +1278,8 @@ pub enum ChangeValidationError {
     InvalidAddressMatcher,
     #[error("rule specifies an invalid port matcher")]
     InvalidPortMatcher,
+    #[error("rule specifies an invalid transparent proxy action")]
+    InvalidTransparentProxyAction,
 }
 
 impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
@@ -1239,6 +1297,9 @@ impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
                 Ok(Self::InvalidAddressMatcher)
             }
             fnet_filter::ChangeValidationError::InvalidPortMatcher => Ok(Self::InvalidPortMatcher),
+            fnet_filter::ChangeValidationError::InvalidTransparentProxyAction => {
+                Ok(Self::InvalidTransparentProxyAction)
+            }
             fnet_filter::ChangeValidationError::Ok
             | fnet_filter::ChangeValidationError::NotReached => {
                 Err(FidlConversionError::NotAnError)
@@ -1311,6 +1372,10 @@ pub enum CommitError {
     RuleWithInvalidMatcher(RuleId),
     #[error("rule has an action that is invalid for its routine: {0:?}")]
     RuleWithInvalidAction(RuleId),
+    #[error(
+        "rule has a TransparentProxy action but not a valid transport protocol matcher: {0:?}"
+    )]
+    TransparentProxyWithInvalidMatcher(RuleId),
     #[error("routine forms a cycle {0:?}")]
     CyclicalRoutineGraph(RoutineId),
     #[error("invalid change was pushed: {0:?}")]
@@ -1404,13 +1469,15 @@ impl Controller {
             fnet_filter::ChangeValidationResult::ErrorOnChange(results) => {
                 let errors: Result<_, PushChangesError> = changes.iter().zip(results).try_fold(
                     Vec::new(),
-                    |mut errors, (change, result)| match result {
+                    |mut errors, (change, result)| {
+                        match result {
                         fnet_filter::ChangeValidationError::Ok
                         | fnet_filter::ChangeValidationError::NotReached => Ok(errors),
                         error @ (fnet_filter::ChangeValidationError::MissingRequiredField
                         | fnet_filter::ChangeValidationError::InvalidInterfaceMatcher
                         | fnet_filter::ChangeValidationError::InvalidAddressMatcher
-                        | fnet_filter::ChangeValidationError::InvalidPortMatcher) => {
+                        | fnet_filter::ChangeValidationError::InvalidPortMatcher
+                        | fnet_filter::ChangeValidationError::InvalidTransparentProxyAction) => {
                             let error = error
                                 .try_into()
                                 .expect("`Ok` and `NotReached` are handled in another arm");
@@ -1423,6 +1490,7 @@ impl Controller {
                             )
                             .into())
                         }
+                    }
                     },
                 );
                 Err(PushChangesError::ErrorOnChange(errors?))
@@ -1451,6 +1519,9 @@ impl Controller {
             }
             fnet_filter::CommitResult::RuleWithInvalidAction(rule_id) => {
                 Err(CommitError::RuleWithInvalidAction(rule_id.into()))
+            }
+            fnet_filter::CommitResult::TransparentProxyWithInvalidMatcher(rule_id) => {
+                Err(CommitError::TransparentProxyWithInvalidMatcher(rule_id.into()))
             }
             fnet_filter::CommitResult::CyclicalRoutineGraph(routine_id) => {
                 Err(CommitError::CyclicalRoutineGraph(routine_id.into()))

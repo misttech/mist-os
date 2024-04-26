@@ -22,7 +22,7 @@ pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, state::Conntr
 
 pub use api::FilterApi;
 pub use context::{FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext};
-pub use logic::{FilterHandler, FilterImpl, ProofOfEgressCheck, Verdict};
+pub use logic::{FilterHandler, FilterImpl, IngressVerdict, ProofOfEgressCheck, Verdict};
 pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,
     PortMatcher, TransportProtocolMatcher,
@@ -34,7 +34,7 @@ pub use packets::{
 pub use state::{
     validation::{ValidRoutines, ValidationError},
     Action, ConntrackExternalData, FilterIpMetadata, Hook, IpRoutines, NatRoutines, Routine,
-    Routines, Rule, State, UninstalledRoutine,
+    Routines, Rule, State, TransparentProxy, UninstalledRoutine,
 };
 
 /// Testing-related utilities for use by other crates.

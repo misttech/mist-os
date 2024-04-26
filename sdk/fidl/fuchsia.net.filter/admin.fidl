@@ -108,6 +108,9 @@ closed protocol NamespaceController {
             INVALID_ADDRESS_MATCHER = 5;
             /// The change included a rule with an invalid port matcher.
             INVALID_PORT_MATCHER = 6;
+            /// The change included a transparent proxy action with an invalid
+            /// configuration (e.g., a local port of 0).
+            INVALID_TRANSPARENT_PROXY_ACTION = 7;
         }>:MAX_BATCH_SIZE;
     });
 
@@ -167,6 +170,10 @@ closed protocol NamespaceController {
             /// The change includes a rule that jumps to an installed routine.
             TARGET_ROUTINE_IS_INSTALLED = 7;
         }>:MAX_COMMIT_SIZE;
+        /// A rule has a TransparentProxy action without a corresponding valid
+        /// matcher: the rule must match on transport protocol to ensure that
+        /// the packet has either a TCP or UDP header.
+        6: transparent_proxy_with_invalid_matcher RuleId;
     });
 };
 

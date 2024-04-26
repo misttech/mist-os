@@ -113,13 +113,13 @@ pub mod filter {
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
         FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines,
-        PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule,
+        PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule, TransparentProxy,
         TransportProtocolMatcher, UninstalledRoutine, ValidationError,
     };
     pub(crate) use netstack3_filter::{
         ConntrackConnection, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
-        FilterIpMetadata, ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
-        RxPacket, State, TransportPacketSerializer, TxPacket, Verdict,
+        FilterIpMetadata, ForwardedPacket, IngressVerdict, IpPacket, MaybeTransportPacket,
+        NestedWithInnerIpPacket, RxPacket, State, TransportPacketSerializer, TxPacket, Verdict,
     };
 }
 

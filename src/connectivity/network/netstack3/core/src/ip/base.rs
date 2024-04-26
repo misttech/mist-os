@@ -37,7 +37,7 @@ use packet_formats::{
     ipv6::Ipv6Packet,
 };
 use thiserror::Error;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use crate::{
     context::{
@@ -49,8 +49,8 @@ use crate::{
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
-        FilterHandlerProvider, FilterIpMetadata, ForwardedPacket, IpPacket, MaybeTransportPacket,
-        NestedWithInnerIpPacket,
+        FilterHandlerProvider, FilterIpMetadata, ForwardedPacket, IngressVerdict, IpPacket,
+        MaybeTransportPacket, NestedWithInnerIpPacket,
     },
     inspect::{Inspectable, Inspector},
     ip::{
@@ -2182,11 +2182,18 @@ pub(crate) fn receive_ipv4_packet<
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().ingress_hook(&mut packet, device, &mut packet_metadata) {
-        crate::filter::Verdict::Drop => {
+        IngressVerdict::Verdict(crate::filter::Verdict::Accept) => {}
+        IngressVerdict::Verdict(crate::filter::Verdict::Drop) => {
             packet_metadata.acknowledge_drop();
             return;
         }
-        crate::filter::Verdict::Accept => {}
+        IngressVerdict::ImmediateLocalDelivery { addr, port } => {
+            error!(
+                "TODO(https://fxbug.dev/331819771): short circuit normal packet processing and \
+                immediately deliver packet to any socket bound to {addr}:{port} based on filtering \
+                rule"
+            );
+        }
     }
 
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
@@ -2443,11 +2450,18 @@ pub(crate) fn receive_ipv6_packet<
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().ingress_hook(&mut packet, device, &mut packet_metadata) {
-        crate::filter::Verdict::Drop => {
+        IngressVerdict::Verdict(crate::filter::Verdict::Accept) => {}
+        IngressVerdict::Verdict(crate::filter::Verdict::Drop) => {
             packet_metadata.acknowledge_drop();
             return;
         }
-        crate::filter::Verdict::Accept => {}
+        IngressVerdict::ImmediateLocalDelivery { addr, port } => {
+            error!(
+                "TODO(https://fxbug.dev/331819771): short circuit normal packet processing and \
+                immediately deliver packet to any socket bound to {addr}:{port} based on filtering \
+                rule"
+            );
+        }
     }
 
     match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
