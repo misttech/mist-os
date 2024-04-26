@@ -302,7 +302,11 @@ pub async fn resolve_target_address(
     // If it's already an address, return it
     if let TargetInfoQuery::Addr(a) = query {
         let scope_id = if let SocketAddr::V6(addr) = a { addr.scope_id() } else { 0 };
-        return Ok(Some(TargetAddr::new(a.ip(), scope_id, SSH_PORT_DEFAULT).into()));
+        let port = match a.port() {
+            0 => SSH_PORT_DEFAULT,
+            p => p,
+        };
+        return Ok(Some(TargetAddr::new(a.ip(), scope_id, port).into()));
     }
     let handles = resolve_target_query(query, env_context).await?;
     if handles.len() == 0 {
@@ -486,15 +490,15 @@ pub struct DirectConnection {
 }
 
 impl DirectConnection {
-    pub async fn new(target_spec: String, context: EnvironmentContext) -> Result<Self> {
+    pub async fn new(target_spec: String, context: &EnvironmentContext) -> Result<Self> {
         let addr = resolve_target_address(Some(target_spec.clone()), &context)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Unable to resolve address of target '{target_spec}'"))
             .context("resolving target address")?;
+        tracing::debug!("Resolved {target_spec:?} to {addr:?}");
         let node = overnet_core::Router::new(None)?;
-        let fidl_pipe = FidlPipe::new(context.clone(), addr, node.clone())
-            .await
-            .context("starting fidl pipe")?;
+        let fidl_pipe =
+            FidlPipe::new(context, addr, node.clone()).await.context("starting fidl pipe")?;
         Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_proxy: Default::default() })
     }
 
@@ -554,7 +558,7 @@ pub async fn knock_target_daemonless(
     target_spec: String,
     context: &EnvironmentContext,
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
-    let conn = DirectConnection::new(target_spec, context.clone()).await?;
+    let conn = DirectConnection::new(target_spec, context).await?;
     conn.knock_rcs().await
 }
 
