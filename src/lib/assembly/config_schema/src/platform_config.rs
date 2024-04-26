@@ -74,10 +74,12 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the connectivity area.
     #[serde(default)]
+    #[file_relative_paths]
     pub connectivity: connectivity_config::PlatformConnectivityConfig,
 
     /// Platform configuration options for enabling developer support.
     #[serde(default)]
+    #[file_relative_paths]
     pub development_support: development_support_config::DevelopmentSupportConfig,
 
     /// Platform configuration options for the diagnostics area.
@@ -123,6 +125,7 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the SWD subsystem.
     #[serde(default)]
+    #[file_relative_paths]
     pub software_delivery: swd_config::SwdConfig,
 
     /// Platform configuration options for the starnix area.
@@ -131,6 +134,7 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for storage support.
     #[serde(default)]
+    #[file_relative_paths]
     pub storage: storage_config::StorageConfig,
 
     /// Platform configuration options for the UI area.

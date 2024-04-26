@@ -127,7 +127,6 @@ pub struct PackagedDriverDetails {
 #[serde(deny_unknown_fields)]
 pub struct PackageDetails {
     /// A package to add.
-    #[file_relative_paths]
     pub package: FileRelativePathBuf,
 
     /// Which set this package belongs to.

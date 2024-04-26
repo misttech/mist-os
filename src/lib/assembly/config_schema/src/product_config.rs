@@ -39,6 +39,7 @@ pub struct ProductConfig {
     /// The policy given to component_manager that restricts where sensitive capabilities can be
     /// routed.
     #[serde(default)]
+    #[file_relative_paths]
     pub component_policy: ComponentPolicyConfig,
 }
 
@@ -87,7 +88,6 @@ pub struct ProductPackagesConfig {
 #[serde(deny_unknown_fields)]
 pub struct ProductPackageDetails {
     /// Path to the package manifest for this package.
-    #[file_relative_paths]
     pub manifest: FileRelativePathBuf,
 
     /// Map of config_data entries for this package, from the destination path
@@ -142,16 +142,12 @@ pub struct BuildInfoConfig {
     /// Name of the product build target.
     pub name: String,
     /// Path to the version file.
-    #[file_relative_paths]
     pub version: FileRelativePathBuf,
     /// Path to the jiri snapshot.
-    #[file_relative_paths]
     pub jiri_snapshot: FileRelativePathBuf,
     /// Path to the latest commit date.
-    #[file_relative_paths]
     pub latest_commit_date: FileRelativePathBuf,
     /// Path to the minimum UTC stamp.
-    #[file_relative_paths]
     pub minimum_utc_stamp: FileRelativePathBuf,
 }
 
@@ -161,6 +157,7 @@ pub struct BuildInfoConfig {
 pub struct ComponentPolicyConfig {
     /// The file paths to a product-provided component policies.
     #[serde(default)]
+    #[file_relative_paths]
     pub product_policies: Vec<FileRelativePathBuf>,
 }
 

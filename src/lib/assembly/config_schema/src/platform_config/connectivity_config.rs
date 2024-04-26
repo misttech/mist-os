@@ -2,19 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use camino::Utf8PathBuf;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the connectivity area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConnectivityConfig {
     #[serde(default)]
+    #[file_relative_paths]
     pub network: PlatformNetworkConfig,
     #[serde(default)]
     pub wlan: PlatformWlanConfig,
     #[serde(default)]
+    #[file_relative_paths]
     pub mdns: MdnsConfig,
     #[serde(default)]
     pub thread: ThreadConfig,
@@ -23,7 +27,9 @@ pub struct PlatformConnectivityConfig {
 }
 
 /// Platform configuration options for the network area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformNetworkConfig {
     /// Only used to control networking for the `utility` and `minimal`
@@ -34,16 +40,19 @@ pub struct PlatformNetworkConfig {
     pub netstack_version: NetstackVersion,
 
     #[serde(default)]
+    #[file_relative_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub netcfg_config_path: Option<Utf8PathBuf>,
+    pub netcfg_config_path: Option<FileRelativePathBuf>,
 
     #[serde(default)]
+    #[file_relative_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub netstack_config_path: Option<Utf8PathBuf>,
+    pub netstack_config_path: Option<FileRelativePathBuf>,
 
     #[serde(default)]
+    #[file_relative_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub google_maps_api_key_path: Option<Utf8PathBuf>,
+    pub google_maps_api_key_path: Option<FileRelativePathBuf>,
 
     /// Controls how long the http client will wait when it is idle before it
     /// escrows its FIDL connections back to the component framework and exits.
@@ -92,7 +101,7 @@ pub enum NetworkingConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformWlanConfig {
-    /// Enable the use of legacy security types like WEP and/or WPA1.
+    /// Enable the use of legacy security types like WEP and/or WPA1
     #[serde(default)]
     pub legacy_privacy_support: bool,
     #[serde(default)]
@@ -133,15 +142,18 @@ pub enum WlanRoamingProfile {
     StationaryRoaming,
 }
 /// Platform configuration options to use for the mdns area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct MdnsConfig {
     /// Enable a wired service so that ffx can discover the device.
     pub publish_fuchsia_dev_wired_service: Option<bool>,
 
     /// Service config file.
+    #[file_relative_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub config: Option<Utf8PathBuf>,
+    pub config: Option<FileRelativePathBuf>,
 }
 
 /// Platform configuration options to use for the thread area.

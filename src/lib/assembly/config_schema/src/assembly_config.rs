@@ -173,6 +173,7 @@ mod tests {
     use super::*;
     use crate::common::{FeatureControl, PackageSet};
     use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
+    use crate::platform_config::swd_config::{OtaConfigs, UpdateChecker};
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_file_relative_path::FileRelativePathBuf;
@@ -353,16 +354,50 @@ mod tests {
         {
           platform: {
             build_type: "eng",
+            connectivity: {
+              network: {
+                netcfg_config_path: "a/b/c",
+                netstack_config_path: "a/b/c",
+                google_maps_api_key_path: "a/b/c",
+              },
+              mdns: {
+                config: "a/b/c",
+              },
+            },
+            development_support: {
+              authorized_ssh_keys_path: "a/b/c",
+              authorized_ssh_ca_certs_path: "a/b/c",
+            },
+            software_delivery: {
+              update_checker: {
+                omaha_client: {
+                  channels_path: "a/b/c",
+                },
+              },
+              tuf_config_paths: [
+                "a/b/c"
+              ],
+            },
+            storage: {
+              component_id_index: {
+                product_index: "component/id/index",
+              },
+            },
           },
           product: {
-              packages: {
-                  base: [
-                      { manifest: "base/package_manifest.json" }
-                  ],
-                  cache: [
-                      { manifest: "cache/package_manifest.json" }
-                  ]
-              },
+            packages: {
+              base: [
+                { manifest: "base/package_manifest.json" }
+              ],
+              cache: [
+                { manifest: "cache/package_manifest.json" }
+              ],
+            },
+            component_policy: {
+              product_policies: [
+                "component/policy",
+              ],
+            },
           },
           file_relative_paths: true,
         }
@@ -385,6 +420,51 @@ mod tests {
                 manifest: "path/to/cache/package_manifest.json".into(),
                 config_data: Vec::default()
             }]
+        );
+        assert_eq!(
+            config.platform.connectivity.network.netcfg_config_path.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.connectivity.network.netstack_config_path.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.connectivity.network.google_maps_api_key_path.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.connectivity.mdns.config.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.development_support.authorized_ssh_ca_certs_path.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.development_support.authorized_ssh_keys_path.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.software_delivery.tuf_config_paths[0],
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            match config.platform.software_delivery.update_checker {
+                Some(UpdateChecker::OmahaClient(OtaConfigs { channels_path, .. })) => channels_path,
+                Some(_) => None,
+                None => None,
+            }
+            .unwrap(),
+            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
+        );
+        assert_eq!(
+            config.platform.storage.component_id_index.product_index.unwrap(),
+            FileRelativePathBuf::Resolved("path/to/component/id/index".into())
+        );
+        assert_eq!(
+            config.product.component_policy.product_policies[0],
+            FileRelativePathBuf::Resolved("path/to/component/policy".into())
         );
     }
 

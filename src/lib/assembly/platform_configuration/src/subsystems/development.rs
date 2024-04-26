@@ -52,7 +52,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
                 builder
                     .package("sshd-host")
                     .config_data(FileEntry {
-                        source: authorized_ssh_keys_path.clone(),
+                        source: authorized_ssh_keys_path.clone().into(),
                         destination: "authorized_keys".into(),
                     })
                     .context("Setting authorized_keys")?;
@@ -68,7 +68,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
                 builder
                     .package("sshd-host")
                     .config_data(FileEntry {
-                        source: authorized_ssh_ca_certs_path.clone(),
+                        source: authorized_ssh_ca_certs_path.clone().into(),
                         destination: "ssh_ca_pub_keys".into(),
                     })
                     .context("Setting authorized ssh ca certs")?;
