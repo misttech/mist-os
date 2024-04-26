@@ -21,8 +21,7 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
-      const fdf::Dispatcher& softmac_ifc_server_dispatcher,
-      const frame_processor_t* frame_processor,
+      const fdf::Dispatcher& dispatcher, const frame_processor_t* frame_processor,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);
 

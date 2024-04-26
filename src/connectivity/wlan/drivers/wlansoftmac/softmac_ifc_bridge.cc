@@ -24,7 +24,7 @@ namespace wlan::drivers::wlansoftmac {
 using ::wlan::drivers::fidl_bridge::ForwardResult;
 
 zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
-    const fdf::Dispatcher& softmac_ifc_server_dispatcher, const frame_processor_t* frame_processor,
+    const fdf::Dispatcher& dispatcher, const frame_processor_t* frame_processor,
     fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
     fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
         softmac_ifc_bridge_client_endpoint) {
@@ -36,7 +36,7 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
   // softmac_ifc_bridge_server_dispatcher.
   libsync::Completion binding_task_complete;
   async::PostTask(
-      softmac_ifc_server_dispatcher.async_dispatcher(),
+      dispatcher.async_dispatcher(),
       [softmac_ifc_bridge = softmac_ifc_bridge.get(), server_endpoint = std::move(server_endpoint),
        softmac_ifc_bridge_client_endpoint = std::move(softmac_ifc_bridge_client_endpoint),
        &binding_task_complete]() mutable {

@@ -139,8 +139,6 @@ class SoftmacBinding : public DeviceInterface {
   // The FIDL client to communicate with iwlwifi
   fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
-  fdf::Dispatcher softmac_ifc_server_dispatcher_;
-
   // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
   // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
   // again until its reset upon the framework calling the unbind hook.

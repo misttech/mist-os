@@ -69,22 +69,6 @@ SoftmacBinding::SoftmacBinding()
     softmac_bridge_server_dispatcher_ = *std::move(dispatcher);
   }
 
-  // Create a dispatcher to serve the WlanSoftmacIfc protocol.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifc_server",
-        [](fdf_dispatcher_t*) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacifc_server shutdown_handler");
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-
-    softmac_ifc_server_dispatcher_ = *std::move(dispatcher);
-  }
-
   // Create a dispatcher for WlanSoftmac method calls to the parent device.
   //
   // The Unbind hook relies on client_dispatcher_ implementing a shutdown
@@ -102,7 +86,7 @@ SoftmacBinding::SoftmacBinding()
           WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_client shutdown_handler");
           // Every fidl::ServerBinding must be destroyed on the
           // dispatcher its bound too.
-          async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
+          async::PostTask(main_device_dispatcher_->async_dispatcher(), [&]() {
             WLAN_LAMBDA_TRACE_DURATION("softmac_ifc_bridge reset + device_unbind_reply");
             softmac_ifc_bridge_.reset();
             device_unbind_reply(device_);
@@ -395,18 +379,17 @@ void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* ne
   auto op = std::make_unique<eth::BorrowedOperation<>>(netbuf, callback, cookie,
                                                        sizeof(ethernet_netbuf_t));
 
-  // Post a task to `softmac_ifc_server_dispatcher_` to sequence queuing the Ethernet frame
-  // with other calls from `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The
-  // `SoftmacIfcBridge` class is not designed to be thread-safe. Making calls to its methods
-  // from different dispatchers could result in unexpected behavior.
-  async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(),
-                  [&, op = std::move(op), async_id]() {
-                    auto result = softmac_ifc_bridge_->EthernetTx(op.get(), async_id);
-                    if (!result.is_ok()) {
-                      WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
-                    }
-                    op->Complete(result.status_value());
-                  });
+  // Post a task to sequence queuing the Ethernet frame with other calls from
+  // `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The `SoftmacIfcBridge`
+  // class is not designed to be thread-safe. Making calls to its methods from
+  // different dispatchers could result in unexpected behavior.
+  async::PostTask(main_device_dispatcher_->async_dispatcher(), [&, op = std::move(op), async_id]() {
+    auto result = softmac_ifc_bridge_->EthernetTx(op.get(), async_id);
+    if (!result.is_ok()) {
+      WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
+    }
+    op->Complete(result.status_value());
+  });
 }
 
 zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
@@ -455,9 +438,9 @@ zx_status_t SoftmacBinding::Start(zx_handle_t softmac_ifc_bridge_client_handle,
       std::move(softmac_ifc_bridge_client_channel));
 
   unbind_lock_->lock();
-  auto softmac_ifc_bridge = SoftmacIfcBridge::New(softmac_ifc_server_dispatcher_, frame_processor,
-                                                  std::move(endpoints->server),
-                                                  std::move(softmac_ifc_bridge_client_endpoint));
+  auto softmac_ifc_bridge =
+      SoftmacIfcBridge::New(*main_device_dispatcher_, frame_processor, std::move(endpoints->server),
+                            std::move(softmac_ifc_bridge_client_endpoint));
   unbind_lock_->unlock();
 
   if (softmac_ifc_bridge.is_error()) {
