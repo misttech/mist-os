@@ -14,10 +14,10 @@ package(
 # GN's target `//src/fonts/asset_providers:open-fonts-collection-bazel`.
 fuchsia_prebuilt_package(
     name = "open-fonts-collection",
-    archive = "@legacy_ninja_build_outputs//:open-fonts-collection.asset-provider.package.far",
+    archive = "@gn_targets//src/fonts/asset_providers:open-fonts-collection-bazel",
 )
 
 fuchsia_prebuilt_package(
     name = "small-open-fonts-collection",
-    archive = "@legacy_ninja_build_outputs//:small-open-fonts-collection.asset-provider.package.far",
+    archive = "@gn_targets//src/fonts/asset_providers:small-open-fonts-collection-bazel",
 )

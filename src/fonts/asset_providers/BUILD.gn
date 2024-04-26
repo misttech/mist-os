@@ -89,8 +89,6 @@ font_asset_provider("open-fonts-collection") {
   deps = [ "//src/fonts/collections:open-fonts-collection" ]
 }
 
-# Makes "@legacy_ninja_build_outputs//:open-fonts-collection.asset-provider.package.far"
-# available to the Bazel build, pointing to the correct far package.
 export_fuchsia_package_to_bazel("open-fonts-collection-bazel") {
   package = ":open-fonts-collection.asset-provider.package"
 }
@@ -99,8 +97,6 @@ font_asset_provider("small-open-fonts-collection") {
   deps = [ "//src/fonts/collections:small-open-fonts-collection" ]
 }
 
-# Makes "@legacy_ninja_build_outputs//:small-open-fonts-collection.asset-provider.package.far"
-# available to the Bazel build, pointing to the correct far package.
 export_fuchsia_package_to_bazel("small-open-fonts-collection-bazel") {
   package = ":small-open-fonts-collection.asset-provider.package"
 }
