@@ -53,7 +53,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // CPU Device.
       "sys/platform/03:03:6",
       "class/cpu-ctrl/000",
-      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/pd_armcore/power-0/aml_cpu/s905d2-arm-a53",
+      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/power-core/power-0/aml_cpu/s905d2-arm-a53",
       // LED.
       "sys/platform/05:00:1c/aml_light",
       // RAM (DDR) control.
@@ -61,8 +61,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
 
       // Power Device.
       "sys/platform/03:03:26/aml-power-impl-composite",
-      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/pd_armcore",
-      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/pd_armcore/power-0",
+      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/power-core",
+      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/power-core/power-0",
 
       // Thermal
       "sys/platform/05:03:a/thermal",
