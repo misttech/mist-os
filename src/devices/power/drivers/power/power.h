@@ -19,20 +19,36 @@
 #include <fbl/mutex.h>
 
 namespace power {
-class PowerDeviceFragmentChild;
-class PowerDevice;
-using PowerDeviceType = ddk::Device<PowerDevice>;
+class PowerDomainFragmentChild;
 
-// Each power domain is modelled to be a power device and the power device class talks to
-// a driver that implements ZX_PROTOCOL_POWER_IMPL, passing in the index of this power domain.
-// For each dependent composite device of a PowerDevice(power domain), a PowerDeviceFragmentChild
-// is created.
-class PowerDevice : public PowerDeviceType {
+class Power;
+using PowerType = ddk::Device<Power>;
+
+// The core power device that binds to the power implementation and creates necessary power domain
+// devices.
+class Power : public PowerType {
  public:
-  PowerDevice(zx_device_t* parent, uint32_t index, const ddk::PowerImplProtocolClient& power_impl,
+  explicit Power(zx_device_t* parent) : PowerType(parent) {}
+
+  static zx_status_t Create(void* ctx, zx_device_t* parent);
+
+  void DdkRelease() {}
+
+ private:
+};
+
+class PowerDomain;
+using PowerDomainType = ddk::Device<PowerDomain>;
+
+// Each power domain is modelled to be a device and this device class talks to a driver that
+// implements ZX_PROTOCOL_POWER_IMPL, passing in the index of this power domain. For each dependent
+// composite device of a PowerDomain, a PowerDomainFragmentChild is created.
+class PowerDomain : public PowerDomainType {
+ public:
+  PowerDomain(zx_device_t* parent, uint32_t index, const ddk::PowerImplProtocolClient& power_impl,
               fidl::ClientEnd<fuchsia_hardware_power::Device> parent_power, uint32_t min_voltage,
               uint32_t max_voltage, bool fixed)
-      : PowerDeviceType(parent),
+      : PowerDomainType(parent),
         index_(index),
         power_impl_(power_impl),
         parent_power_(std::move(parent_power)),
@@ -40,7 +56,9 @@ class PowerDevice : public PowerDeviceType {
         max_voltage_uV_(max_voltage),
         fixed_(fixed) {}
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  static zx_status_t Create(void* ctx, zx_device_t* parent,
+                            const ddk::PowerImplProtocolClient& power_impl,
+                            fuchsia_hardware_power::wire::Domain domain_info);
   void DdkRelease();
 
   zx_status_t RegisterPowerDomain(uint64_t fragment_device_id, uint32_t min_needed_voltage_uV,
@@ -61,7 +79,7 @@ class PowerDevice : public PowerDeviceType {
   zx_status_t Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
  private:
-  PowerDeviceFragmentChild* GetFragmentChildLocked(uint64_t fragment_device_id)
+  PowerDomainFragmentChild* GetFragmentChildLocked(uint64_t fragment_device_id)
       __TA_REQUIRES(power_device_lock_);
   zx_status_t GetSuitableVoltageLocked(uint32_t voltage, uint32_t* suitable_voltage)
       __TA_REQUIRES(power_device_lock_);
@@ -73,7 +91,7 @@ class PowerDevice : public PowerDeviceType {
   fidl::ClientEnd<fuchsia_hardware_power::Device> parent_power_;
 
   fbl::Mutex power_device_lock_;
-  std::vector<std::unique_ptr<PowerDeviceFragmentChild>> children_ __TA_GUARDED(power_device_lock_);
+  std::vector<std::unique_ptr<PowerDomainFragmentChild>> children_ __TA_GUARDED(power_device_lock_);
   // Min supported voltage of this domain
   uint32_t min_voltage_uV_;
   // Max supported voltage of this domain
@@ -90,9 +108,9 @@ class PowerDevice : public PowerDeviceType {
 // to the composite device. All the power protocol ops made by the composite device first
 // arrive on this calss and are forwarded to the PowerDevice with the corresponding composite
 // device context(fragment_device_id).
-class PowerDeviceFragmentChild : public fidl::WireServer<fuchsia_hardware_power::Device> {
+class PowerDomainFragmentChild : public fidl::WireServer<fuchsia_hardware_power::Device> {
  public:
-  explicit PowerDeviceFragmentChild(uint64_t fragment_device_id, PowerDevice* parent)
+  explicit PowerDomainFragmentChild(uint64_t fragment_device_id, PowerDomain* parent)
       : fragment_device_id_(fragment_device_id), power_device_(parent) {}
 
   void RegisterPowerDomain(RegisterPowerDomainRequestView request,
@@ -119,7 +137,7 @@ class PowerDeviceFragmentChild : public fidl::WireServer<fuchsia_hardware_power:
 
  private:
   uint64_t fragment_device_id_;
-  PowerDevice* power_device_;
+  PowerDomain* power_device_;
   uint32_t min_needed_voltage_uV_ = 0;
   uint32_t max_supported_voltage_uV_ = 0;
   bool registered_ = false;

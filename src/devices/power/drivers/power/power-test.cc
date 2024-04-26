@@ -134,7 +134,7 @@ class GenericPowerTest : public zxtest::Test {
     zx::result parent_power_client = parent_power_.SyncCall(&FakePower::BindServer);
     ASSERT_OK(parent_power_client);
 
-    dut_ = std::make_unique<PowerDevice>(fake_parent_.get(), 0, power_impl_->GetClient(),
+    dut_ = std::make_unique<PowerDomain>(fake_parent_.get(), 0, power_impl_->GetClient(),
                                          std::move(parent_power_client.value()), 10, 1000, false);
   }
 
@@ -157,7 +157,7 @@ class GenericPowerTest : public zxtest::Test {
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ =
       fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
-  std::unique_ptr<PowerDevice> dut_;
+  std::unique_ptr<PowerDomain> dut_;
   async_patterns::TestDispatcherBound<FakePower> parent_power_{env_dispatcher_->async_dispatcher(),
                                                                std::in_place};
   std::unique_ptr<FakePowerImpl> power_impl_;
@@ -341,7 +341,7 @@ TEST_F(GenericPowerTest, FixedVoltageDomain) {
   ASSERT_OK(parent_power_client);
 
   auto dut_fixed =
-      std::make_unique<PowerDevice>(fake_parent_.get(), 1, power_impl_->GetClient(),
+      std::make_unique<PowerDomain>(fake_parent_.get(), 1, power_impl_->GetClient(),
                                     std::move(parent_power_client.value()), 1000, 1000, true);
   auto endpoints = fidl::Endpoints<fuchsia_hardware_power::Device>::Create();
   dut_fixed->GetHandler()(std::move(endpoints.server));
