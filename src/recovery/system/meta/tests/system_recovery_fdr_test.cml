@@ -25,7 +25,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.fshost.Admin",
