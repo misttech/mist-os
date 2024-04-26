@@ -72,7 +72,7 @@ def main():
     parser.add_argument(
         "--current-os",
         help="Target operating system.",
-        choices=["fuchsia", "linux", "mac", "win"],
+        choices=["fuchsia", "mistos", "linux", "mac", "win"],
         required=True,
     )
     parser.add_argument("--buildidtool", help="The path to the buildidtool.")
@@ -169,6 +169,7 @@ def main():
     }[args.current_cpu]
     goos = {
         "fuchsia": "fuchsia",
+        "mistos": "linux",
         "linux": "linux",
         "mac": "darwin",
         "win": "windows",
