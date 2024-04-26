@@ -55,6 +55,7 @@
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.settings.Audio",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
 
                 // Tracing is not provided on all builds.
                 "fuchsia.tracing.provider.Registry",

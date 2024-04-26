@@ -171,6 +171,7 @@
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmQuery.root",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
             ],
             from: "parent",
             to: "#sl4f",

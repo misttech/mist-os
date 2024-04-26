@@ -30,7 +30,10 @@
             to: "#sl4f",
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "parent",
             to: "#flatland_view_provider_example",
         },

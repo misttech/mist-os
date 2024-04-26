@@ -16,6 +16,7 @@
                 "fuchsia.camera3.DeviceWatcher",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.ui.scenic.Scenic",
             ],
         },

@@ -39,7 +39,10 @@
             to: "#termina-guest-manager",
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "parent",
             to: "#termina-guest-manager",
         },

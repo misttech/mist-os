@@ -33,7 +33,10 @@
             subdir: "data",
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "#sysmem",
             to: "#virtual_console",
         },

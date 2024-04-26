@@ -61,6 +61,7 @@
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
             ],
         },
         {

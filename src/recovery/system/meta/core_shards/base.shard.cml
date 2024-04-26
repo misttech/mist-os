@@ -8,6 +8,7 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
             ],
             from: "parent",
             to: "#system_recovery",

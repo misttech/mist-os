@@ -40,6 +40,7 @@
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",

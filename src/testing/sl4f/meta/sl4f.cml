@@ -79,6 +79,7 @@
                 "fuchsia.settings.Intl",
                 "fuchsia.settings.Setup",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.test.audio.recording.AudioRecordingControl",
                 "fuchsia.testing.proxy.TcpProxyControl",
                 "fuchsia.tracing.controller.Controller",
@@ -165,6 +166,7 @@
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
