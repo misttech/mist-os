@@ -572,6 +572,9 @@ INSTANTIATE_TEST_SUITE_P(
 #ifdef IPV6_RECVPKTINFO
                     MakeSockOptParam("ipv6-recvpktinfo", "1", IPPROTO_IPV6, IPV6_RECVPKTINFO, 1),
 #endif
+#ifdef IP_TRANSPARENT
+                    MakeSockOptParam("transparent", "1", IPPROTO_IP, IP_TRANSPARENT, 1),
+#endif
                     MakeSockOptParam("reuseaddr", "1", SOL_SOCKET, SO_REUSEADDR, 1),
                     MakeSockOptParam("reuseport", "1", SOL_SOCKET, SO_REUSEPORT, 1),
                     MakeSockOptParam("unicast-ttl", "20", IPPROTO_IP, IP_TTL, 20),
