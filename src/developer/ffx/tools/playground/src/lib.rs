@@ -124,7 +124,7 @@ pub async fn exec_playground(
     let query = rcs::root_realm_query(&remote_proxy, std::time::Duration::from_secs(5)).await?;
     let toolbox = toolbox_directory(&*remote_proxy, &query).await?;
     let cf_root = cf_fs::CFDirectory::new_root(query);
-    let fs_root_simple = vfs::directory::mutable::simple();
+    let fs_root_simple = vfs::directory::immutable::simple();
     let root_dir_client = vfs::directory::spawn_directory(Arc::clone(&fs_root_simple));
     fs_root_simple.add_entry("host", host_fs::HostDirectory::new("/"))?;
     fs_root_simple.add_entry("toolbox", toolbox)?;
