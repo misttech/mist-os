@@ -579,7 +579,7 @@ class FFX(ffx_interface.FFX):
         self,
         cmd: list[str],
         **kwargs,
-    ) -> subprocess.Popen:  # type: ignore[type-arg]
+    ) -> subprocess.Popen[Any]:
         """Executes the command `ffx -t {target} ... {cmd}` via `subprocess.Popen`.
 
         Intended for executing daemons or processing streamed output. Given

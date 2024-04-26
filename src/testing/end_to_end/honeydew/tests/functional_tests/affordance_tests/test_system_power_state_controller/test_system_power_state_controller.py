@@ -25,13 +25,25 @@ class SystemPowerStateControllerAffordanceTests(
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-    def test_idle_idle_suspend_auto_resume(self) -> None:
+    def test_idle_suspend_auto_resume(self) -> None:
         """Test case for SystemPowerStateController.idle_suspend_auto_resume()"""
         if self.user_params["is_starnix_supported"]:
             self.device.system_power_state_controller.idle_suspend_auto_resume()
         else:
             with asserts.assert_raises(errors.NotSupportedError):
                 self.device.system_power_state_controller.idle_suspend_auto_resume()
+
+    def test_idle_suspend_timer_based_resume(self) -> None:
+        """Test case for SystemPowerStateController.idle_suspend_timer_based_resume()"""
+        if self.user_params["is_starnix_supported"]:
+            self.device.system_power_state_controller.idle_suspend_timer_based_resume(
+                duration=3
+            )
+        else:
+            with asserts.assert_raises(errors.NotSupportedError):
+                self.device.system_power_state_controller.idle_suspend_timer_based_resume(
+                    duration=3
+                )
 
 
 if __name__ == "__main__":

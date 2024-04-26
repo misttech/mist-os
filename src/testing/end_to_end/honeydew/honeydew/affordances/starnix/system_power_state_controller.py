@@ -2,16 +2,19 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""SystemPowerStateController affordance implementation using sysfs."""
+"""SystemPowerStateController affordance implementation using startnix."""
 
+import contextlib
 import enum
+import io
 import logging
 import os
 import pty
 import re
 import subprocess
 import time
-from typing import Any
+import typing
+from collections.abc import Generator
 
 from honeydew import errors
 from honeydew.interfaces.affordances import (
@@ -41,6 +44,19 @@ class _StarnixCmds:
     ]
 
 
+class _FuchsiaCmds:
+    """Class to hold Fuchsia commands."""
+
+    SSH_PREFIX: list[str] = [
+        "target",
+        "ssh",
+    ]
+
+    @staticmethod
+    def set_timer_command(duration: int) -> str:
+        return f"hrtimer-ctl --id 2 --event {duration}"
+
+
 class _Timeouts(enum.IntEnum):
     """Class to hold the timeouts."""
 
@@ -58,11 +74,11 @@ class _RegExPatterns:
     )
 
     SUSPEND_OPERATION: re.Pattern[str] = re.compile(
-        r"\[(\d+).\d+\].*?\[system-activity-governor\].+?Suspending"
+        r"\[(\d+?\.\d+?)\].*?\[system-activity-governor\].+?Suspending"
     )
 
     RESUME_OPERATION: re.Pattern[str] = re.compile(
-        r"\[(\d+?).\d+?\].*?\[system-activity-governor\].+?Resuming.+?Ok"
+        r"\[(\d+?\.\d+?)\].*?\[system-activity-governor\].+?Resuming.+?Ok"
     )
 
     HONEYDEW_SUSPEND_RESUME_START: re.Pattern[str] = re.compile(
@@ -79,6 +95,10 @@ class _RegExPatterns:
         RESUME_OPERATION,
         HONEYDEW_SUSPEND_RESUME_END,
     ]
+
+    TIMER_STARTED: re.Pattern[str] = re.compile(r"Timer started")
+
+    TIMER_ENDED: re.Pattern[str] = re.compile(r"Event trigged")
 
 
 _MAX_READ_SIZE: int = 1024
@@ -163,32 +183,18 @@ class SystemPowerStateController(
         )
 
         suspend_resume_start_time: float = time.time()
-        if isinstance(
-            resume_mode, system_power_state_controller_interface.AutomaticResume
-        ):
-            pass
-            # Device will resume automatically
-        else:
-            raise errors.NotSupportedError(
-                f"Resuming the device using '{resume_mode}' is not yet supported."
-            )
-        if isinstance(
-            suspend_state, system_power_state_controller_interface.IdleSuspend
-        ):
-            self._perform_idle_suspend()
-        else:
-            raise errors.NotSupportedError(
-                f"Suspending the device to '{suspend_state}' state is not yet "
-                f"supported."
-            )
+
+        with self._set_resume_mode(resume_mode=resume_mode):
+            self._suspend(suspend_state=suspend_state)
+
         suspend_resume_end_time: float = time.time()
-        suspend_resume_duration: float = (
+        suspend_resume_execution_time: float = (
             suspend_resume_end_time - suspend_resume_start_time
         )
 
         log_message = (
             f"Completed '{suspend_state}' followed by '{resume_mode}' "
-            f"operations on '{self._device_name}' in {suspend_resume_duration} "
+            f"operations on '{self._device_name}' in {suspend_resume_execution_time} "
             f"seconds."
         )
         self._device_logger.log_message_to_device(
@@ -201,10 +207,10 @@ class SystemPowerStateController(
 
         if verify:
             self._verify_suspend_resume(
-                suspend_state,
-                resume_mode,
-                suspend_resume_duration,
-                logs_duration,
+                suspend_state=suspend_state,
+                resume_mode=resume_mode,
+                suspend_resume_execution_time=suspend_resume_execution_time,
+                logs_duration=logs_duration,
             )
 
     def idle_suspend_auto_resume(self, verify: bool = True) -> None:
@@ -223,7 +229,67 @@ class SystemPowerStateController(
             verify=verify,
         )
 
+    def idle_suspend_timer_based_resume(
+        self, duration: int, verify: bool = True
+    ) -> None:
+        """Perform idle-suspend and timer-based-resume operation on the device.
+
+        Args:
+            duration: Resume timer duration in seconds.
+            verify: Whether or not to verify if suspend-resume operation
+                performed successfully. Optional and default is True.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure
+        """
+        self.suspend_resume(
+            suspend_state=system_power_state_controller_interface.IdleSuspend(),
+            resume_mode=system_power_state_controller_interface.TimerResume(
+                duration=duration,
+            ),
+            verify=verify,
+        )
+
     # List all the private methods
+    def _suspend(
+        self,
+        suspend_state: system_power_state_controller_interface.SuspendState,
+    ) -> None:
+        """Perform suspend operation on the device.
+
+        This is a synchronous operation on the device and thus this call will be
+        hanged until resume operation finishes.
+
+        Args:
+            suspend_state: Which state to suspend the Fuchsia device into.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure
+            errors.NotSupportedError: If any of the suspend_state or resume_type
+                is not yet supported
+        """
+        _LOGGER.info(
+            "Putting '%s' into '%s'",
+            self._device_name,
+            suspend_state,
+        )
+
+        if isinstance(
+            suspend_state, system_power_state_controller_interface.IdleSuspend
+        ):
+            self._perform_idle_suspend()
+        else:
+            raise errors.NotSupportedError(
+                f"Suspending the device to '{suspend_state}' state is not yet "
+                f"supported."
+            )
+
+        _LOGGER.info(
+            "'%s' has been resumed from '%s'",
+            self._device_name,
+            suspend_state,
+        )
+
     def _perform_idle_suspend(self) -> None:
         """Perform Idle mode suspend operation.
 
@@ -238,6 +304,175 @@ class SystemPowerStateController(
             raise errors.SystemPowerStateControllerError(
                 f"Failed to put {self._device_name} into idle-suspend mode"
             ) from err
+
+    @contextlib.contextmanager
+    def _set_resume_mode(
+        self,
+        resume_mode: system_power_state_controller_interface.ResumeMode,
+    ) -> Generator[None, None, None]:
+        """Perform resume operation on the device.
+
+        This is a synchronous operation on the device and thus call will be
+        hanged until resume operation finishes. So we will be using a context
+        manager which will start resume mode using subprocess, saves the proc
+        and yields and when called again will wait for resume operation to be
+        finished using the saved proc.
+
+        Args:
+            resume_mode: Information about how to resume the device.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure
+            errors.NotSupportedError: If any of the suspend_state or resume_type
+                is not yet supported
+            errors.HoneydewTimeoutError: If timer has not been started in 2 sec
+        """
+        _LOGGER.info(
+            "Informing '%s' to resume using '%s'",
+            self._device_name,
+            resume_mode,
+        )
+
+        if isinstance(
+            resume_mode, system_power_state_controller_interface.AutomaticResume
+        ):
+            # Nothing to do for AutomaticResume
+            pass
+        elif isinstance(
+            resume_mode, system_power_state_controller_interface.TimerResume
+        ):
+            proc: subprocess.Popen[str] = self._set_timer(resume_mode.duration)
+            self._wait_for_timer_start(proc=proc)
+        else:
+            raise errors.NotSupportedError(
+                f"Resuming the device using '{resume_mode}' is not yet supported."
+            )
+
+        yield
+
+        if isinstance(
+            resume_mode, system_power_state_controller_interface.AutomaticResume
+        ):
+            # Device will resume automatically
+            return
+        elif isinstance(
+            resume_mode, system_power_state_controller_interface.TimerResume
+        ):
+            self._wait_for_timer_end(proc=proc, resume_mode=resume_mode)
+        else:
+            raise errors.NotSupportedError(
+                f"Resuming the device using '{resume_mode}' is not yet supported."
+            )
+
+    def _set_timer(self, duration: int) -> subprocess.Popen[str]:
+        """Sets the timer.
+
+        Args:
+            duration: Resume timer duration in seconds.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure.
+        """
+        try:
+            _LOGGER.info(
+                "Setting a timer for '%s sec' on '%s'",
+                duration,
+                self._device_name,
+            )
+            proc: subprocess.Popen[str] = self._ffx.popen(
+                cmd=_FuchsiaCmds.SSH_PREFIX
+                + [_FuchsiaCmds.set_timer_command(duration=duration)],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            return proc
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.SystemPowerStateControllerError(
+                f"Failed to set timer on {self._device_name}"
+            ) from err
+
+    def _wait_for_timer_start(self, proc: subprocess.Popen[str]) -> None:
+        """Wait for the timer to start on the device.
+
+        Args:
+            proc: process used to set the timer.
+
+        Raises:
+            errors.SystemPowerStateControllerError: Timer start failed.
+            errors.HoneydewTimeoutError: Wait for timer start resulted in
+                timeout.
+        """
+        timeout: int = 2
+        start_time: float = time.time()
+        end_time: float = start_time + timeout
+
+        std_out: typing.IO[str] | None = proc.stdout
+        if not isinstance(std_out, io.TextIOWrapper):
+            raise errors.SystemPowerStateControllerError(
+                f"Failed to read hrtimer-ctl output on {self._device_name}"
+            )
+        while time.time() < end_time:
+            try:
+                line: str = std_out.readline()
+                _LOGGER.debug(
+                    "Line read from the hrtimer-ctl command output: %s",
+                    line.strip(),
+                )
+
+                if _RegExPatterns.TIMER_STARTED.search(line):
+                    _LOGGER.info(
+                        "Timer has been started on %s", self._device_name
+                    )
+                    break
+                elif line == "":  # End of output
+                    raise errors.SystemPowerStateControllerError(
+                        "hrtimer-ctl completed without starting a timer"
+                    )
+            except Exception as err:  # pylint: disable=broad-except
+                raise errors.SystemPowerStateControllerError(
+                    f"Timer has not been started on {self._device_name}"
+                ) from err
+        else:
+            raise errors.HoneydewTimeoutError(
+                f"Timer has not been started on {self._device_name} in "
+                f"{timeout} sec"
+            )
+
+    def _wait_for_timer_end(
+        self,
+        proc: subprocess.Popen[str],
+        resume_mode: system_power_state_controller_interface.TimerResume,
+    ) -> None:
+        """Wait for the timer to end on the device.
+
+        Args:
+            proc: process used to set the timer.
+            resume_mode: Information about how to resume the device.
+
+        Raises:
+            errors.SystemPowerStateControllerError: Timer end failed.
+        """
+        output: str
+        error: str
+        output, error = proc.communicate(timeout=resume_mode.duration)
+
+        if proc.returncode != 0:
+            message: str = (
+                f"hrtimer-ctl returned a failure while waiting for the timer "
+                f"to end. returncode={proc.returncode}"
+            )
+            if error:
+                message = f"{message}, error='{error}'"
+            raise errors.SystemPowerStateControllerError(message)
+
+        if _RegExPatterns.TIMER_ENDED.search(output):
+            _LOGGER.info("Timer has been ended on %s", self._device_name)
+        else:
+            raise errors.SystemPowerStateControllerError(
+                "hrtimer-ctl completed without ending the timer"
+            )
 
     def _run_starnix_console_shell_cmd(
         self, cmd: list[str], timeout: float | None = _Timeouts.STARNIX_CMD
@@ -263,7 +498,7 @@ class SystemPowerStateController(
 
         starnix_cmd: list[str] = _StarnixCmds.PREFIX + cmd
         starnix_cmd_str: str = " ".join(starnix_cmd)
-        process: subprocess.Popen[Any] = self._ffx.popen(
+        process: subprocess.Popen[str] = self._ffx.popen(
             cmd=starnix_cmd,
             stdin=child_fd,
             stdout=child_fd,
@@ -314,7 +549,7 @@ class SystemPowerStateController(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_resume_duration: float,
+        suspend_resume_execution_time: float,
         logs_duration: float,
     ) -> None:
         """Verifies suspend resume operation has been indeed performed
@@ -323,7 +558,8 @@ class SystemPowerStateController(
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            suspend_resume_duration: How long suspend-resume operation took.
+            suspend_resume_execution_time: How long suspend-resume operation
+                took.
             logs_duration: How many seconds of logs need to be captured for
                 the log analysis.
         Raises:
@@ -341,7 +577,9 @@ class SystemPowerStateController(
         self._verify_suspend_resume_using_duration(
             suspend_state=suspend_state,
             resume_mode=resume_mode,
-            suspend_resume_duration=suspend_resume_duration,
+            suspend_resume_duration=suspend_resume_execution_time,
+            min_buffer_duration=0,
+            max_buffer_duration=3,
         )
 
         # TODO (https://fxbug.dev/335494603): Use inspect based verification
@@ -364,6 +602,8 @@ class SystemPowerStateController(
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
         suspend_resume_duration: float,
+        min_buffer_duration: float,
+        max_buffer_duration: float,
     ) -> None:
         """Verify that suspend-resume operation was indeed triggered by checking
         the duration it took to perform suspend-resume operation.
@@ -372,28 +612,38 @@ class SystemPowerStateController(
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
             suspend_resume_duration: How long suspend-resume operation took.
+            min_buffer_duration: How much minimum buffer time to consider while
+                verifying the duration.
+            max_buffer_duration: How much maximum buffer time to consider while
+                verifying the duration.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of verification
                 failure.
         """
         if isinstance(
-            resume_mode, system_power_state_controller_interface.AutomaticResume
+            resume_mode,
+            (
+                system_power_state_controller_interface.AutomaticResume,
+                system_power_state_controller_interface.TimerResume,
+            ),
         ):
-            buffer_duration: float = 3
+            min_expected_duration: float = (
+                resume_mode.duration - min_buffer_duration
+            )
             max_expected_duration: float = (
-                resume_mode.duration + buffer_duration
+                resume_mode.duration + max_buffer_duration
             )
 
             if (
-                suspend_resume_duration < resume_mode.duration
+                suspend_resume_duration < min_expected_duration
                 or suspend_resume_duration > max_expected_duration
             ):
                 raise errors.SystemPowerStateControllerError(
                     f"'{suspend_state}' followed by '{resume_mode}' operation "
-                    f"took  {suspend_resume_duration} seconds on "
-                    f"'{self._device_name}'. Expected duration "
-                    f"range: [{resume_mode.duration}, {max_expected_duration}] "
+                    f"took {suspend_resume_duration} seconds on "
+                    f"'{self._device_name}'. Expected duration range: "
+                    f"[{min_expected_duration}, {max_expected_duration}] "
                     f"seconds.",
                 )
 
@@ -431,8 +681,8 @@ class SystemPowerStateController(
             timeout=_Timeouts.FFX_LOGS_CMD,
         ).split("\n")
 
-        suspend_time: int = 0
-        resume_time: int = 0
+        suspend_time: float = 0
+        resume_time: float = 0
 
         expected_patterns: list[
             re.Pattern[str]
@@ -442,9 +692,9 @@ class SystemPowerStateController(
             match: re.Match[str] | None = reg_ex.search(suspend_resume_log)
             if match:
                 if reg_ex == _RegExPatterns.SUSPEND_OPERATION:
-                    suspend_time = int(match.group(1))
+                    suspend_time = float(match.group(1))
                 elif reg_ex == _RegExPatterns.RESUME_OPERATION:
-                    resume_time = int(match.group(1))
+                    resume_time = float(match.group(1))
                 expected_patterns.remove(reg_ex)
                 if not expected_patterns:
                     break
@@ -457,9 +707,19 @@ class SystemPowerStateController(
                 f"Following patterns were not found: {expected_patterns}"
             )
 
-        suspend_resume_duration: int = resume_time - suspend_time
+        suspend_resume_duration: float = round(resume_time - suspend_time, 2)
+        _LOGGER.info(
+            "'%s' followed by '%s' operations on '%s' took %s seconds as per "
+            "device logs.",
+            suspend_state,
+            resume_mode,
+            self._device_name,
+            suspend_resume_duration,
+        )
         self._verify_suspend_resume_using_duration(
             suspend_state=suspend_state,
             resume_mode=resume_mode,
             suspend_resume_duration=suspend_resume_duration,
+            min_buffer_duration=1,
+            max_buffer_duration=0.5,
         )

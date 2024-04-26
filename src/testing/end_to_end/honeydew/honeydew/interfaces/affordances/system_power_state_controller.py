@@ -31,10 +31,20 @@ class ResumeMode(abc.ABC):
 class AutomaticResume(ResumeMode):
     """Automatically resume after 5sec"""
 
-    duration: ClassVar[float] = 5
+    duration: ClassVar[int] = 5
 
     def __str__(self) -> str:
         return f"AutomaticResume after {self.duration}sec"
+
+
+@dataclass(frozen=True)
+class TimerResume(ResumeMode):
+    """Automatically resume after the given duration"""
+
+    duration: int
+
+    def __str__(self) -> str:
+        return f"TimerResume after {self.duration}sec"
 
 
 @dataclass(frozen=True)
@@ -76,10 +86,30 @@ class SystemPowerStateController(abc.ABC):
         """
 
     @abc.abstractmethod
-    def idle_suspend_auto_resume(self, verify: bool = True) -> None:
+    def idle_suspend_auto_resume(
+        self,
+        verify: bool = True,
+    ) -> None:
         """Perform idle-suspend and auto-resume operation on the device.
 
         Args:
+            verify: Whether or not to verify if suspend-resume operation
+                performed successfully. Optional and default is True.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure
+        """
+
+    @abc.abstractmethod
+    def idle_suspend_timer_based_resume(
+        self,
+        duration: int,
+        verify: bool = True,
+    ) -> None:
+        """Perform idle-suspend and timer-based-resume operation on the device.
+
+        Args:
+            duration: Resume timer duration in seconds.
             verify: Whether or not to verify if suspend-resume operation
                 performed successfully. Optional and default is True.
 
