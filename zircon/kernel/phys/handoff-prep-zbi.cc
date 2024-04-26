@@ -137,7 +137,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
                 using dcfg_type = ktl::decay_t<decltype(uart.config())>;
                 if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
                   uart_periph_range = {
-                      .paddr = uart.config().mmio_phys,
+                      .paddr = fbl::round_down(uart.config().mmio_phys, ZX_PAGE_SIZE),
                       .length = ZX_PAGE_SIZE,
                       .type = ZBI_MEM_TYPE_PERIPHERAL,
                   };
