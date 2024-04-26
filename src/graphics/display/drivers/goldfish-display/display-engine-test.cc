@@ -65,10 +65,8 @@ class GoldfishDisplayEngineTest : public testing::Test {
                       fidl::WireClient<fuchsia_logger::LogSink>{}};
 
   std::array<std::array<layer_t, kMaxLayerCount>, kDisplayCount> layer_ = {};
-  std::array<const layer_t*, kDisplayCount> layer_ptrs = {};
 
   std::array<display_config_t, kDisplayCount> configs_ = {};
-  std::array<const display_config_t*, kDisplayCount> configs_ptrs_ = {};
 
   std::array<client_composition_opcode_t, kMaxLayerCount * kDisplayCount> results_ = {};
 
@@ -97,10 +95,8 @@ void GoldfishDisplayEngineTest::SetUp() {
       std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher());
 
   for (size_t i = 0; i < kDisplayCount; i++) {
-    configs_ptrs_[i] = &configs_[i];
-    layer_ptrs[i] = layer_[i].data();
     configs_[i].display_id = i + 1;
-    configs_[i].layer_list = &layer_ptrs[i];
+    configs_[i].layer_list = layer_[i].data();
     configs_[i].layer_count = 1;
   }
 
@@ -119,8 +115,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigNoDisplay) {
   // Test No display
   size_t client_composition_opcodes_actual = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), 0, results_.data(), results_.size(),
-      &client_composition_opcodes_actual);
+      configs_.data(), 0, results_.data(), results_.size(), &client_composition_opcodes_actual);
   EXPECT_OK(res);
 }
 
@@ -132,7 +127,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kMaxLayerCount);
   int result_cfg_offset = 0;
@@ -155,7 +150,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -190,7 +185,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -222,7 +217,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -254,7 +249,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -287,7 +282,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -320,7 +315,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -353,7 +348,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -390,7 +385,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
-      configs_ptrs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {

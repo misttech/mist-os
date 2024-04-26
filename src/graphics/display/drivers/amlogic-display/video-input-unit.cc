@@ -209,8 +209,8 @@ uint32_t VideoInputUnit::FloatToFixed3_10(float f) {
   return fixed_num & kFloatToFixed3_10Mask;
 }
 
-void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config) {
-  if (!config->cc_flags) {
+void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t& config) {
+  if (!config.cc_flags) {
     // Disable color conversion engine
     rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_EN_CTRL,
                              vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) & ~(1 << 0));
@@ -222,25 +222,25 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
                            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL) | (1 << 0));
 
   // Load PreOffset values (or 0 if none entered)
-  auto offset0_1 = (config->cc_flags & COLOR_CONVERSION_PREOFFSET
-                        ? (FloatToFixed2_10(config->cc_preoffsets[0]) << 16 |
-                           FloatToFixed2_10(config->cc_preoffsets[1]) << 0)
+  auto offset0_1 = (config.cc_flags & COLOR_CONVERSION_PREOFFSET
+                        ? (FloatToFixed2_10(config.cc_preoffsets[0]) << 16 |
+                           FloatToFixed2_10(config.cc_preoffsets[1]) << 0)
                         : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET0_1, offset0_1);
-  auto offset2 = (config->cc_flags & COLOR_CONVERSION_PREOFFSET
-                      ? (FloatToFixed2_10(config->cc_preoffsets[2]) << 0)
+  auto offset2 = (config.cc_flags & COLOR_CONVERSION_PREOFFSET
+                      ? (FloatToFixed2_10(config.cc_preoffsets[2]) << 0)
                       : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
   zxlogf(TRACE, "pre offset0_1=%u offset2=%u", offset0_1, offset2);
 
   // Load PostOffset values (or 0 if none entered)
-  offset0_1 = (config->cc_flags & COLOR_CONVERSION_POSTOFFSET
-                   ? (FloatToFixed2_10(config->cc_postoffsets[0]) << 16 |
-                      FloatToFixed2_10(config->cc_postoffsets[1]) << 0)
+  offset0_1 = (config.cc_flags & COLOR_CONVERSION_POSTOFFSET
+                   ? (FloatToFixed2_10(config.cc_postoffsets[0]) << 16 |
+                      FloatToFixed2_10(config.cc_postoffsets[1]) << 0)
                    : 0);
-  offset2 = (config->cc_flags & COLOR_CONVERSION_PREOFFSET
-                 ? (FloatToFixed2_10(config->cc_postoffsets[2]) << 0)
+  offset2 = (config.cc_flags & COLOR_CONVERSION_PREOFFSET
+                 ? (FloatToFixed2_10(config.cc_postoffsets[2]) << 0)
                  : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET0_1, offset0_1);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET2, offset2);
@@ -256,7 +256,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
   // clang-format on
 
   const auto* ccm =
-      (config->cc_flags & COLOR_CONVERSION_COEFFICIENTS) ? config->cc_coefficients : identity;
+      (config.cc_flags & COLOR_CONVERSION_COEFFICIENTS) ? config.cc_coefficients : identity;
 
   // Load up the coefficient matrix registers
   auto coef00_01 = FloatToFixed3_10(ccm[0][0]) << 16 | FloatToFixed3_10(ccm[0][1]) << 0;
@@ -274,9 +274,9 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
          coef02_10, coef11_12, coef20_21, coef22);
 }
 
-void VideoInputUnit::FlipOnVsync(const display_config_t* config,
+void VideoInputUnit::FlipOnVsync(const display_config_t& config,
                                  display::ConfigStamp config_stamp) {
-  auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image_handle);
+  auto info = reinterpret_cast<ImageInfo*>(config.layer_list[0].cfg.primary.image_handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
     zxlogf(ERROR, "No table available!");
@@ -286,7 +286,7 @@ void VideoInputUnit::FlipOnVsync(const display_config_t* config,
   zxlogf(TRACE, "Table index %d used", next_table_idx);
   zxlogf(TRACE, "AFBC %s", info->is_afbc ? "enabled" : "disabled");
 
-  const display::DisplayTiming display_timing = display::ToDisplayTiming(config[0].mode);
+  const display::DisplayTiming display_timing = display::ToDisplayTiming(config.mode);
 
   PixelGridSize2D display_contents_size = {.width = display_timing.horizontal_active_px,
                                            .height = display_timing.vertical_active_lines};
@@ -361,9 +361,9 @@ void VideoInputUnit::FlipOnVsync(const display_config_t* config,
   osd_ctrl_stat_val.set_global_alpha(kMaximumAlpha);
 
   // This is guaranteed by DisplayEngine::CheckConfiguration().
-  ZX_DEBUG_ASSERT(config->layer_count > 0);
-  ZX_DEBUG_ASSERT(config->layer_list[0]->type == LAYER_TYPE_PRIMARY);
-  const primary_layer_t& primary_layer = config->layer_list[0]->cfg.primary;
+  ZX_DEBUG_ASSERT(config.layer_count > 0);
+  ZX_DEBUG_ASSERT(config.layer_list[0].type == LAYER_TYPE_PRIMARY);
+  const primary_layer_t& primary_layer = config.layer_list[0].cfg.primary;
   if (primary_layer.alpha_mode != ALPHA_DISABLE) {
     // If a global alpha value is provided, apply it.
     if (!isnan(primary_layer.alpha_layer_val)) {

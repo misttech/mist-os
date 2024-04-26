@@ -300,7 +300,6 @@ type DisplayConfig = struct {
     cc_coefficients array<array<float32, 3>, 3>;
     cc_postoffsets array<float32, 3>;
 
-    @out_of_line_contents
     layer vector<Layer>:MAX;
 };
 
@@ -469,7 +468,6 @@ closed protocol DisplayControllerImpl {
     ///
     /// The driver must not retain references to the configuration after this function returns.
     strict CheckConfiguration(struct {
-        @inner_pointer
         display_config vector<DisplayConfig>:MAX;
     }) -> (struct {
         config_check_result ConfigCheckResult;
@@ -493,7 +491,6 @@ closed protocol DisplayControllerImpl {
     ///
     /// The driver must not retain references to the configuration after this function returns.
     strict ApplyConfiguration(struct {
-        @inner_pointer
         display_config vector<DisplayConfig>:MAX;
 
         /// Identifies the configuration to be applied. Must be a valid value.

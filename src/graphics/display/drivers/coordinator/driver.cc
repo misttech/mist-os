@@ -89,7 +89,7 @@ zx::result<> Driver::ReleaseCapture(DriverCaptureImageId driver_capture_image_id
 }
 
 config_check_result_t Driver::CheckConfiguration(
-    const display_config_t** display_config_list, size_t display_config_count,
+    const display_config_t* display_config_list, size_t display_config_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   if (use_engine_) {
@@ -102,7 +102,7 @@ config_check_result_t Driver::CheckConfiguration(
       client_composition_opcodes_count, out_client_composition_opcodes_actual);
 }
 
-void Driver::ApplyConfiguration(const display_config_t** display_config_list,
+void Driver::ApplyConfiguration(const display_config_t* display_config_list,
                                 size_t display_config_count, const config_stamp_t* config_stamp) {
   if (use_engine_) {
     return;

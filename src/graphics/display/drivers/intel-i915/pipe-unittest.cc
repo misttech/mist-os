@@ -115,7 +115,7 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   layer_t layer_3 = CreatePrimaryLayerConfig(kImageHandle3, 2u);
 
   // Applies configuration with only one layer (layer_1).
-  const layer_t* test_layers_1[] = {&layer_1};
+  const layer_t test_layers_1[] = {layer_1};
   display_config_t config = {
       .display_id = 1u,
       .mode = {},
@@ -139,7 +139,7 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
 
   // Applies another configuration with two layers (layer_2 replacing layer_1,
   // and a new layer layer_3).
-  const layer_t* test_layers_2[] = {&layer_2, &layer_3};
+  const layer_t test_layers_2[] = {layer_2, layer_3};
   display_config_t config_2 = {
       .display_id = 1u,
       .mode = {},

@@ -287,7 +287,7 @@ void DisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
 }
 
 config_check_result_t DisplayEngine::CheckConfiguration(
-    cpp20::span<const display_config_t*> display_configs,
+    cpp20::span<const display_config_t> display_configs,
     cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
     size_t* out_client_composition_opcodes_actual) {
   if (out_client_composition_opcodes_actual != nullptr) {
@@ -298,49 +298,49 @@ config_check_result_t DisplayEngine::CheckConfiguration(
     ZX_DEBUG_ASSERT(display_configs.size() == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0].display_id) == kDisplayId);
 
-  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= display_configs[0]->layer_count);
+  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= display_configs[0].layer_count);
   std::fill(out_client_composition_opcodes.begin(), out_client_composition_opcodes.end(), 0);
   if (out_client_composition_opcodes_actual != nullptr) {
     *out_client_composition_opcodes_actual = out_client_composition_opcodes.size();
   }
 
   bool success;
-  if (display_configs[0]->layer_count != 1) {
-    success = display_configs[0]->layer_count == 0;
+  if (display_configs[0].layer_count != 1) {
+    success = display_configs[0].layer_count == 0;
   } else {
-    const primary_layer_t* layer = &display_configs[0]->layer_list[0]->cfg.primary;
+    const primary_layer_t* layer = &display_configs[0].layer_list[0].cfg.primary;
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,
         .width = current_display_.scanout_info.geometry.width,
         .height = current_display_.scanout_info.geometry.height,
     };
-    success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
+    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
               layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
               layer->image_metadata.width == current_display_.scanout_info.geometry.width &&
               layer->image_metadata.height == current_display_.scanout_info.geometry.height &&
               memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
-              display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
+              display_configs[0].cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
+    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
       out_client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void DisplayEngine::ApplyConfiguration(cpp20::span<const display_config_t*> display_configs,
+void DisplayEngine::ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
                                        const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
-  uint64_t handle = display_configs.empty() || display_configs[0]->layer_count == 0
+  uint64_t handle = display_configs.empty() || display_configs[0].layer_count == 0
                         ? 0
-                        : display_configs[0]->layer_list[0]->cfg.primary.image_handle;
+                        : display_configs[0].layer_list[0].cfg.primary.image_handle;
 
   {
     fbl::AutoLock al(&flush_lock_);

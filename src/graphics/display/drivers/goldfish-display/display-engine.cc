@@ -353,7 +353,7 @@ void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   if (out_client_composition_opcodes_actual != nullptr) {
@@ -366,7 +366,7 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
 
   int total_layer_count = std::accumulate(
       display_configs, display_configs + display_count, 0,
-      [](int total, const display_config_t* config) { return total += config->layer_count; });
+      [](int total, const display_config_t& config) { return total += config.layer_count; });
   ZX_DEBUG_ASSERT(client_composition_opcodes_count >= static_cast<size_t>(total_layer_count));
   if (out_client_composition_opcodes_actual != nullptr) {
     *out_client_composition_opcodes_actual = total_layer_count;
@@ -376,16 +376,16 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
 
   int client_composition_opcodes_offset = 0;
   for (unsigned i = 0; i < display_count; i++) {
-    const size_t layer_count = display_configs[i]->layer_count;
+    const size_t layer_count = display_configs[i].layer_count;
     cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
         client_composition_opcodes.subspan(client_composition_opcodes_offset, layer_count);
     client_composition_opcodes_offset += layer_count;
 
-    const display::DisplayId display_id = display::ToDisplayId(display_configs[i]->display_id);
+    const display::DisplayId display_id = display::ToDisplayId(display_configs[i].display_id);
     if (layer_count > 0) {
       ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
 
-      if (display_configs[i]->cc_flags != 0) {
+      if (display_configs[i].cc_flags != 0) {
         // Color Correction is not supported, but we will pretend we do.
         // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
         // requests color correction. For now, lets pretend we support it, until a proper fix is
@@ -393,12 +393,12 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
         FDF_LOG(WARNING, "%s: Color Correction not support. No error reported", __func__);
       }
 
-      if (display_configs[i]->layer_list[0]->type != LAYER_TYPE_PRIMARY) {
+      if (display_configs[i].layer_list[0].type != LAYER_TYPE_PRIMARY) {
         // We only support PRIMARY layer. Notify client to convert layer to
         // primary type.
         current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
       } else {
-        const primary_layer_t* layer = &display_configs[i]->layer_list[0]->cfg.primary;
+        const primary_layer_t* layer = &display_configs[i].layer_list[0].cfg.primary;
         // Scaling is allowed if destination frame match display and
         // source frame match image.
         frame_t dest_frame = {
@@ -542,18 +542,18 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
 }
 
 void DisplayEngine::DisplayControllerImplApplyConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
-  cpp20::span<const display_config_t*> display_configs_span(display_configs, display_count);
-  for (const display_config* display_config : display_configs_span) {
-    if (display::ToDisplayId(display_config->display_id) == kPrimaryDisplayId) {
-      if (display_config->layer_count) {
+  cpp20::span<const display_config_t> display_configs_span(display_configs, display_count);
+  for (const display_config& display_config : display_configs_span) {
+    if (display::ToDisplayId(display_config.display_id) == kPrimaryDisplayId) {
+      if (display_config.layer_count) {
         driver_image_id =
-            display::ToDriverImageId(display_config->layer_list[0]->cfg.primary.image_handle);
+            display::ToDriverImageId(display_config.layer_list[0].cfg.primary.image_handle);
       }
       break;
     }

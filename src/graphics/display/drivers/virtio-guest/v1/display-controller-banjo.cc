@@ -106,11 +106,11 @@ void DisplayControllerBanjo::DisplayControllerImplReleaseImage(uint64_t banjo_im
 }
 
 config_check_result_t DisplayControllerBanjo::DisplayControllerImplCheckConfiguration(
-    const display_config_t** banjo_display_configs, size_t banjo_display_configs_count,
+    const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual) {
-  cpp20::span<const display_config_t*> display_configs(banjo_display_configs,
-                                                       banjo_display_configs_count);
+  cpp20::span<const display_config_t> display_configs(banjo_display_configs,
+                                                      banjo_display_configs_count);
   cpp20::span<client_composition_opcode_t> out_client_composition_opcodes(
       out_client_composition_opcodes_list, out_client_composition_opcodes_size);
 
@@ -119,10 +119,10 @@ config_check_result_t DisplayControllerBanjo::DisplayControllerImplCheckConfigur
 }
 
 void DisplayControllerBanjo::DisplayControllerImplApplyConfiguration(
-    const display_config_t** banjo_display_configs, size_t banjo_display_configs_count,
+    const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
     const config_stamp_t* banjo_config_stamp) {
-  cpp20::span<const display_config_t*> display_configs(banjo_display_configs,
-                                                       banjo_display_configs_count);
+  cpp20::span<const display_config_t> display_configs(banjo_display_configs,
+                                                      banjo_display_configs_count);
   return engine_.ApplyConfiguration(display_configs, banjo_config_stamp);
 }
 

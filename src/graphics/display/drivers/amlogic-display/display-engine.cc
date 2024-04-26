@@ -424,7 +424,7 @@ void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   if (out_client_composition_opcodes_actual != nullptr) {
@@ -438,11 +438,11 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
   fbl::AutoLock lock(&display_mutex_);
 
   // no-op, just wait for the client to try a new config
-  if (!display_attached_ || display::ToDisplayId(display_configs[0]->display_id) != display_id_) {
+  if (!display_attached_ || display::ToDisplayId(display_configs[0].display_id) != display_id_) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0]->mode);
+  display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0].mode);
   if (!IgnoreDisplayMode()) {
     // `current_display_timing_` is already applied to the display so it's
     // guaranteed to be supported. We only perform the timing check if there
@@ -454,31 +454,31 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
 
   bool success = true;
 
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0]->layer_count);
+  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0].layer_count);
   cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, display_configs[0]->layer_count);
+      out_client_composition_opcodes_list, display_configs[0].layer_count);
   std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
   if (out_client_composition_opcodes_actual != nullptr) {
     *out_client_composition_opcodes_actual = client_composition_opcodes.size();
   }
 
-  if (display_configs[0]->layer_count > 1) {
+  if (display_configs[0].layer_count > 1) {
     // We only support 1 layer
     success = false;
   }
 
   // TODO(https://fxbug.dev/42080882): Move color conversion validation code to a common
   // library.
-  if (success && display_configs[0]->cc_flags) {
+  if (success && display_configs[0].cc_flags) {
     // Make sure cc values are correct
-    if (display_configs[0]->cc_flags & COLOR_CONVERSION_PREOFFSET) {
-      for (float cc_preoffset : display_configs[0]->cc_preoffsets) {
+    if (display_configs[0].cc_flags & COLOR_CONVERSION_PREOFFSET) {
+      for (float cc_preoffset : display_configs[0].cc_preoffsets) {
         success = success && cc_preoffset > -1;
         success = success && cc_preoffset < 1;
       }
     }
-    if (success && display_configs[0]->cc_flags & COLOR_CONVERSION_POSTOFFSET) {
-      for (float cc_postoffset : display_configs[0]->cc_postoffsets) {
+    if (success && display_configs[0].cc_flags & COLOR_CONVERSION_POSTOFFSET) {
+      for (float cc_postoffset : display_configs[0].cc_postoffsets) {
         success = success && cc_postoffset > -1;
         success = success && cc_postoffset < 1;
       }
@@ -488,8 +488,9 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
   if (success) {
     const uint32_t width = display_timing.horizontal_active_px;
     const uint32_t height = display_timing.vertical_active_lines;
-    // Make sure ther layer configuration is supported
-    const primary_layer_t& layer = display_configs[0]->layer_list[0]->cfg.primary;
+
+    // Make sure the layer configuration is supported.
+    const primary_layer_t& layer = display_configs[0].layer_list[0].cfg.primary;
     // TODO(https://fxbug.dev/42080883) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison opeartors.
@@ -504,7 +505,7 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
       // we don't support pre-multiplied alpha mode
       client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
     }
-    success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
+    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
               layer.transform_mode == FRAME_TRANSFORM_IDENTITY &&
               layer.image_metadata.width == width && layer.image_metadata.height == height &&
               memcmp(&layer.dest_frame, &frame, sizeof(frame_t)) == 0 &&
@@ -512,7 +513,7 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
   }
   if (!success) {
     client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
+    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
       client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
@@ -520,7 +521,7 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
 }
 
 void DisplayEngine::DisplayControllerImplApplyConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp);
@@ -528,14 +529,14 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
 
   fbl::AutoLock lock(&display_mutex_);
 
-  if (display_count == 1 && display_configs[0]->layer_count) {
+  if (display_count == 1 && display_configs[0].layer_count) {
     if (!IgnoreDisplayMode()) {
       // Perform Vout modeset iff there's a new display mode.
       //
       // Setting up OSD may require Vout framebuffer information, which may be
       // changed on each ApplyConfiguration(), so we need to apply the
       // configuration to Vout first before initializing the display and OSD.
-      display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0]->mode);
+      display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0].mode);
       if (IsNewDisplayTiming(display_timing)) {
         zx::result<> apply_config_result = vout_->ApplyConfiguration(display_timing);
         if (!apply_config_result.is_ok()) {
@@ -549,7 +550,7 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
     // The only way a checked configuration could now be invalid is if display was
     // unplugged. If that's the case, then the upper layers will give a new configuration
     // once they finish handling the unplug event. So just return.
-    if (!display_attached_ || display::ToDisplayId(display_configs[0]->display_id) != display_id_) {
+    if (!display_attached_ || display::ToDisplayId(display_configs[0].display_id) != display_id_) {
       return;
     }
 
@@ -574,7 +575,7 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
   // This fakes a vsync to let clients know we are ready until we actually initialize hardware
   if (!fully_initialized()) {
     if (dc_intf_.is_valid()) {
-      if (display_count == 0 || display_configs[0]->layer_count == 0) {
+      if (display_count == 0 || display_configs[0].layer_count == 0) {
         const config_stamp_t banjo_config_stamp_out = display::ToBanjoConfigStamp(config_stamp);
         dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), zx_clock_get_monotonic(),
                                 &banjo_config_stamp_out);

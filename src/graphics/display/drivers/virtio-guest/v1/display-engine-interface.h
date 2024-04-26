@@ -55,12 +55,12 @@ class DisplayEngineInterface {
 
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
   virtual config_check_result_t CheckConfiguration(
-      cpp20::span<const display_config_t*> display_configs,
+      cpp20::span<const display_config_t> display_configs,
       cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
       size_t* out_client_composition_opcodes_actual) = 0;
 
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
-  virtual void ApplyConfiguration(cpp20::span<const display_config_t*> display_configs,
+  virtual void ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
                                   const config_stamp_t* banjo_config_stamp) = 0;
 
   virtual void SetEld(display::DisplayId display_id, cpp20::span<const uint8_t> raw_eld) = 0;

@@ -688,9 +688,6 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   std::array<const layer_t, kLayerCount> kLayers = {
       CreatePrimaryLayerConfig(framebuffer_image_handle, kFramebufferImageMetadata),
   };
-  std::array<const layer_t*, kLayerCount> kLayerPtrs = {
-      kLayers.data(),
-  };
 
   // Must match kDisplayId in fake-display.cc.
   // TODO(https://fxbug.dev/42078942): Do not hardcode the display ID.
@@ -706,12 +703,9 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
           .cc_coefficients = {},
           .cc_postoffsets = {},
 
-          .layer_list = kLayerPtrs.data(),
-          .layer_count = kLayerPtrs.size(),
+          .layer_list = kLayers.data(),
+          .layer_count = kLayers.size(),
       },
-  };
-  std::array<const display_config_t*, kDisplayCount> kDisplayConfigPtrs = {
-      kDisplayConfigs.data(),
   };
 
   std::array<client_composition_opcode_t, kLayerCount> client_composition_opcodes = {0u};
@@ -719,14 +713,14 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
 
   // Check and apply the display configuration.
   config_check_result_t config_check_result = display()->DisplayControllerImplCheckConfiguration(
-      kDisplayConfigPtrs.data(), kDisplayConfigPtrs.size(), client_composition_opcodes.data(),
+      kDisplayConfigs.data(), kDisplayConfigs.size(), client_composition_opcodes.data(),
       client_composition_opcodes.size(), &client_composition_opcodes_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::ConfigStamp config_stamp(1);
   const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
-  display()->DisplayControllerImplApplyConfiguration(
-      kDisplayConfigPtrs.data(), kDisplayConfigPtrs.size(), &banjo_config_stamp);
+  display()->DisplayControllerImplApplyConfiguration(kDisplayConfigs.data(), kDisplayConfigs.size(),
+                                                     &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
   EXPECT_FALSE(display_capture_completion.completed().signaled());

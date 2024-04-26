@@ -88,14 +88,18 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 
   // Go through all the display mode timings and record whether or not
   // a basic layer configuration is acceptable.
-  layer_t test_layer = {};
-  const layer_t* test_layers[] = {&test_layer};
-  test_layer.type = LAYER_TYPE_PRIMARY;
-  display_config_t test_config;
-  const display_config_t* test_configs[] = {&test_config};
-  test_config.display_id = ToBanjoDisplayId(info->id);
-  test_config.layer_count = 1;
-  test_config.layer_list = test_layers;
+  layer_t test_layers[] = {
+      {
+          .type = LAYER_TYPE_PRIMARY,
+      },
+  };
+  display_config_t test_configs[] = {
+      {
+          .display_id = ToBanjoDisplayId(info->id),
+          .layer_list = test_layers,
+          .layer_count = 1,
+      },
+  };
 
   for (auto edid_timing = edid::timing_iterator(&info->edid->base); edid_timing.is_valid();
        ++edid_timing) {
@@ -115,12 +119,19 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     if (duplicate) {
       continue;
     }
+
+    layer_t& test_layer = test_layers[0];
+    ZX_DEBUG_ASSERT_MSG(
+        static_cast<const layer_t*>(&test_layer) == &test_configs[0].layer_list[0],
+        "test_layer should be a non-const alias for the first layer in test_configs");
     test_layer.cfg.primary.image_metadata.width = width;
     test_layer.cfg.primary.image_metadata.height = height;
     test_layer.cfg.primary.src_frame.width = width;
     test_layer.cfg.primary.src_frame.height = height;
     test_layer.cfg.primary.dest_frame.width = width;
     test_layer.cfg.primary.dest_frame.height = height;
+
+    display_config_t& test_config = test_configs[0];
     test_config.mode = display::ToBanjoDisplayMode(timing);
 
     uint32_t display_cfg_result;
@@ -490,7 +501,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   // TODO(https://fxbug.dev/42080631): Replace VLA with fixed-size array once we have a
   // limit on the number of connected displays.
   const int32_t display_configs_size = std::max(1, count);
-  const display_config_t* display_configs[display_configs_size];
+  display_config_t display_configs[display_configs_size];
   uint32_t display_count = 0;
 
   // The applied configuration's stamp.
@@ -561,7 +572,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
         continue;
       }
 
-      display_configs[display_count++] = config->current_config();
+      display_configs[display_count++] = *config->current_config();
 
       for (auto& layer_node : config->get_current_layers()) {
         Layer* layer = layer_node.layer;
@@ -947,12 +958,12 @@ void Controller::DdkRelease() {
   loop_.Shutdown();
 
   // Set an empty config so that the display driver releases resources.
-  const display_config_t* configs;
+  display_config_t empty_config;
   {
     fbl::AutoLock lock(mtx());
     ++controller_stamp_;
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-    driver_.ApplyConfiguration(&configs, 0, &banjo_config_stamp);
+    driver_.ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
   }
   driver_.ResetDisplayControllerInterface();
   delete this;

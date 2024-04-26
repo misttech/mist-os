@@ -73,10 +73,10 @@ class SimpleDisplay : public DeviceType,
   }
   void DisplayControllerImplReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayControllerImplCheckConfiguration(
-      const display_config_t** display_configs, size_t display_count,
+      const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
+  void DisplayControllerImplApplyConfiguration(const display_config_t* display_config,
                                                size_t display_count,
                                                const config_stamp_t* banjo_config_stamp);
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,

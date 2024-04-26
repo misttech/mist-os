@@ -322,7 +322,7 @@ void FakeDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   if (out_client_composition_opcodes_actual != nullptr) {
@@ -333,28 +333,28 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0].display_id) == kDisplayId);
 
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0]->layer_count);
+  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0].layer_count);
   cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, display_configs[0]->layer_count);
+      out_client_composition_opcodes_list, display_configs[0].layer_count);
   std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
   if (out_client_composition_opcodes_actual != nullptr) {
     *out_client_composition_opcodes_actual = client_composition_opcodes.size();
   }
 
   bool success;
-  if (display_configs[0]->layer_count != 1) {
-    success = display_configs[0]->layer_count == 0;
+  if (display_configs[0].layer_count != 1) {
+    success = display_configs[0].layer_count == 0;
   } else {
-    const primary_layer_t& layer = display_configs[0]->layer_list[0]->cfg.primary;
+    const primary_layer_t& layer = display_configs[0].layer_list[0].cfg.primary;
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,
         .width = kWidth,
         .height = kHeight,
     };
-    success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
+    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
               layer.transform_mode == FRAME_TRANSFORM_IDENTITY &&
               layer.image_metadata.width == kWidth && layer.image_metadata.height == kHeight &&
               memcmp(&layer.dest_frame, &frame, sizeof(frame_t)) == 0 &&
@@ -363,7 +363,7 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
   }
   if (!success) {
     client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
+    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
       client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
@@ -371,16 +371,16 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
 }
 
 void FakeDisplay::DisplayControllerImplApplyConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   {
     fbl::AutoLock lock(&image_mutex_);
-    if (display_count == 1 && display_configs[0]->layer_count) {
+    if (display_count == 1 && display_configs[0].layer_count) {
       // Only support one display.
       current_image_to_capture_id_ =
-          display::ToDriverImageId(display_configs[0]->layer_list[0]->cfg.primary.image_handle);
+          display::ToDriverImageId(display_configs[0].layer_list[0].cfg.primary.image_handle);
     } else {
       current_image_to_capture_id_ = display::kInvalidDriverImageId;
     }
