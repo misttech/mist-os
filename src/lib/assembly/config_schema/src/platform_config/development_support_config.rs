@@ -17,6 +17,10 @@ pub struct DevelopmentSupportConfig {
     /// access.
     pub enabled: Option<bool>,
 
+    // Whether to use vsock based development connection.
+    #[serde(default)]
+    pub vsock_development: bool,
+
     /// Path to a file containing ssh keys that are authorized to connect to the
     /// device.
     #[file_relative_paths]

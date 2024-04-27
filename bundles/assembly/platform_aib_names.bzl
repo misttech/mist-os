@@ -45,6 +45,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "bootstrap_userdebug",
+    "bootstrap_realm_vsock_development_access",
     "clock_development_tools",
     "console_userdebug",
     "embeddable_userdebug",

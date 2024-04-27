@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
-use assembly_util::FileEntry;
+use assembly_util::{BootfsDestination, FileEntry};
 
 pub(crate) struct DevelopmentConfig;
 impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfig {
@@ -44,18 +44,35 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("kernel_debug_broker_user");
         }
 
+        if config.vsock_development
+            && matches!(context.feature_set_level, FeatureSupportLevel::Embeddable)
+            && matches!(context.build_type, BuildType::Eng | BuildType::UserDebug)
+        {
+            builder.platform_bundle("bootstrap_realm_vsock_development_access");
+        }
+
         match (context.build_type, &config.authorized_ssh_keys_path) {
             (BuildType::User, Some(_)) => {
                 anyhow::bail!("authorized_ssh_keys cannot be provided on user builds")
             }
             (_, Some(authorized_ssh_keys_path)) => {
-                builder
-                    .package("sshd-host")
-                    .config_data(FileEntry {
-                        source: authorized_ssh_keys_path.clone().into(),
-                        destination: "authorized_keys".into(),
-                    })
-                    .context("Setting authorized_keys")?;
+                if config.vsock_development {
+                    builder
+                        .bootfs()
+                        .file(FileEntry {
+                            source: authorized_ssh_keys_path.clone().into(),
+                            destination: BootfsDestination::SshAuthorizedKeys,
+                        })
+                        .context("Setting authorized_keys")?;
+                } else {
+                    builder
+                        .package("sshd-host")
+                        .config_data(FileEntry {
+                            source: authorized_ssh_keys_path.clone().into(),
+                            destination: "authorized_keys".into(),
+                        })
+                        .context("Setting authorized_keys")?;
+                }
             }
             _ => {}
         }

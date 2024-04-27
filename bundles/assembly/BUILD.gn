@@ -1451,6 +1451,36 @@ assembly_input_bundle("core_realm_development_access") {
   ]
 }
 
+assembly_input_bundle("bootstrap_realm_vsock_development_access") {
+  bootfs_files_labels = [
+    "//src/developer/vsock-sshd-host:bootfs",
+    "//src/developer/remote-control/runner:bootfs",
+  ]
+  bootfs_packages = [
+    # SSH is necessary for remote access for development
+    "//src/developer/vsock-sshd-host",
+
+    # ffx's remote-control (remote access) components:
+    "//src/developer/remote-control:remote-control-package",
+  ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [
+                    "//src/developer/remote-control/meta/remote-control.bootstrap_shard.cml",
+                    "//src/developer/vsock-sshd-host/meta/vsock-sshd-host.bootstrap_shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 assembly_input_bundle("mdns_fuchsia_device_wired_service") {
   config_data_labels =
       [ "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config" ]

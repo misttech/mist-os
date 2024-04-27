@@ -85,6 +85,7 @@ bootstrap_userdebug_platform_aib_names = [
   "kernel_args_userdebug",
 
   # Developer
+  "bootstrap_realm_vsock_development_access",
   "kernel_debug_broker_userdebug",
   "netsvc",
   "ptysvc",
@@ -357,6 +358,7 @@ required_userdebug_aib_names = required_user_aib_names + [
 # on userdebug builds as long as scrutiny is not run on those builds.
 experimental_aib_names = [
   "adb_support",
+  "bootstrap_realm_vsock_development_access",
   "paravirtualization_support_bootstrap",
   "power_framework",
 ]

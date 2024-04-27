@@ -13,6 +13,7 @@ load(
     "fuchsia_product_configuration",
     "fuchsia_virtual_device",
 )
+load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 
 package(default_visibility = [
     "//build/bazel/assembly:__pkg__",
@@ -86,6 +87,10 @@ fuchsia_product_configuration(
             "feature_set_level": "embeddable",
             "paravirtualization": {
                 "enabled": "required",
+            },
+            "development_support": {
+                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
+                "vsock_development": True,
             },
         },
     },

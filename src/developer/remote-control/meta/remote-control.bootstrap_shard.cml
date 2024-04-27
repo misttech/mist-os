@@ -1,32 +1,42 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
-    program: {
-        runner: "elf",
-        binary: "bin/remote_control_bin",
-        args: [ "remote-control" ],
-    },
-    capabilities: [
-        { protocol: "fuchsia.developer.remotecontrol.RemoteControl" },
-        { protocol: "fuchsia.developer.remotecontrol.connector.Connector" },
-    ],
-    use: [
+    children: [
         {
-            directory: "dev-overnet-usb",
-            rights: [ "r*" ],
-            path: "/dev/class/overnet-usb",
-            availability: "optional",
+            name: "remote-control",
+            url: "fuchsia-boot:///remote-control#meta/remote-control.cm",
         },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.boot.Arguments",
+            from: "parent",
+            to: "#remote-control",
+        },
+
+        // Note: These protocols are scoped to the root of the component topoology,
+        // hence the `.root` suffix
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
                 "fuchsia.sys2.RouteValidator.root",
             ],
+            from: "parent",
+            to: "#remote-control",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "#archivist",
+            to: "#remote-control",
+        },
+        {
+            directory: "dev-overnet-usb",
+            from: "void",
+            to: "#remote-control",
+            availability: "optional",
         },
         {
             protocol: [
@@ -41,17 +51,9 @@
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
             ],
+            from: "void",
+            to: "#remote-control",
             availability: "optional",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.developer.remotecontrol.connector.Connector",
-            from: "self",
         },
     ],
 }
