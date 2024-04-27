@@ -26,7 +26,7 @@ fuchsia_driver_component("component") {
   component_name = "simple_dfv1"
   deps = [ ":driver" ]
   info = "simple-info.json"
-  colocate = true
+  manifest = "meta/component.cml"
 }
 
 fuchsia_driver_package("pkg") {

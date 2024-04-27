@@ -24,12 +24,10 @@ import("//tools/cmc/build/cmc.gni")
 # Parameters
 #
 #   manifest (optional)
-#     The component manifest. If this and `cm_label` are not present then this target will
-#     generate a component manifest for the driver.
+#     The component manifest. Either this or `cm_label` must be specified.
 #     Type: path
 #   cm_label (optional)
-#     A `fuchsia_component_manifest` target label. If this and `manifest` are not present then this
-#     target will generate a component manifest for the driver.
+#     A `fuchsia_component_manifest` target label. Either this or `manifest` must be specified.
 #     Type: GN label, e.g. `:my_manifest`
 #   is_v1_driver (optional)
 #     If this is true then the driver is a v1 driver and it will be placed in a
@@ -87,116 +85,13 @@ import("//tools/cmc/build/cmc.gni")
 #   visibility
 template("fuchsia_driver_component") {
   if (current_toolchain == default_toolchain) {
-    generate_manifest = true
-    if (defined(invoker.manifest) || defined(invoker.cm_label)) {
-      generate_manifest = false
-    }
     assert(!(defined(invoker.manifest) && defined(invoker.cm_label)),
            "`manifest` and `cm_label` cannot be defined simultaneously")
+    assert(defined(invoker.manifest) || defined(invoker.cm_label),
+           "`manifest` or `cm_label` must be defined")
     is_v1_driver = true
     if (defined(invoker.is_v1_driver)) {
       is_v1_driver = invoker.is_v1_driver
-    }
-
-    if (generate_manifest) {
-      distribution_manifest_target = "${target_name}_distribution_manifest"
-      distribution_manifest_file =
-          "${target_gen_dir}/${target_name}.distribution_manifest"
-      distribution_manifest(distribution_manifest_target) {
-        visibility = [ ":*" ]
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "deps",
-                                 "testonly",
-                               ])
-        outputs = [ "${distribution_manifest_file}" ]
-      }
-
-      manifest_target = "${target_name}_manifest"
-      manifest_path = "${target_gen_dir}/meta/${target_name}.cml"
-      fallback = false
-      if (defined(invoker.fallback)) {
-        fallback = invoker.fallback
-      }
-      action(manifest_target) {
-        visibility = [ ":*" ]
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "testonly",
-                               ])
-        deps = [ ":${distribution_manifest_target}" ]
-        script = "//build/drivers/create_component_manifest.py"
-        inputs = [ distribution_manifest_file ]
-        outputs = [ manifest_path ]
-        args = [
-          "--distribution_manifest",
-          rebase_path(distribution_manifest_file, root_build_dir),
-          "--output",
-          rebase_path(outputs[0], root_build_dir),
-        ]
-        if (is_v1_driver) {
-          args += [ "--is_v1" ]
-        }
-        if (fallback) {
-          args += [ "--fallback" ]
-        }
-        if (invoker.colocate) {
-          args += [ "--colocate" ]
-        }
-        if (defined(invoker.root_resource) && invoker.root_resource) {
-          args += [ "--root_resource" ]
-        }
-        if (defined(invoker.uses_profiles) && invoker.uses_profiles) {
-          args += [ "--profile_provider" ]
-        }
-        if (defined(invoker.uses_sysmem) && invoker.uses_sysmem) {
-          args += [ "--sysmem" ]
-        }
-        if (defined(invoker.uses_boot_args) && invoker.uses_boot_args) {
-          args += [ "--boot_args" ]
-        }
-
-        if (defined(invoker.device_categories)) {
-          path = "${target_gen_dir}/device_categories.json"
-          write_file(path, invoker.device_categories, "json")
-          args += [
-            "--device_categories_file",
-            rebase_path(path, root_build_dir),
-          ]
-          inputs += [ path ]
-        }
-
-        # TODO(https://fxbug.dev/42181741): set allow_sync_calls for v1 drivers
-        # if they did not specify any opts.
-        if (defined(invoker.default_dispatcher_opts)) {
-          args += [ "--default_dispatcher_opts" ]
-          args += invoker.default_dispatcher_opts
-        }
-        if (defined(invoker.default_dispatcher_scheduler_role)) {
-          args += [
-            "--default_dispatcher_scheduler_role",
-            invoker.default_dispatcher_scheduler_role,
-          ]
-        }
-      }
-
-      full_manifest_target = "${target_name}_full_manifest"
-      cmc_merge(full_manifest_target) {
-        visibility = [ ":*" ]
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "testonly",
-                               ])
-        output_name = invoker.target_name + ".cml"
-        deps = [ ":${manifest_target}" ]
-        sources = []
-        foreach(dep, deps) {
-          sources += get_target_outputs(dep)
-        }
-      }
     }
 
     driver_path =
@@ -268,17 +163,6 @@ template("fuchsia_driver_component") {
                                "testonly",
                                "visibility",
                              ])
-      if (generate_manifest) {
-        if (!defined(manifest_deps)) {
-          manifest_deps = []
-        }
-        manifest_deps += [ ":${full_manifest_target}" ]
-        manifest = get_target_outputs(":${full_manifest_target}")
-        manifest = manifest[0]
-        if (!defined(restricted_features)) {
-          restricted_features = []
-        }
-      }
       if (!defined(deps)) {
         deps = []
       }

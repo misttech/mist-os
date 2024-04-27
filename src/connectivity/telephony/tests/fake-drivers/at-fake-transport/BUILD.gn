@@ -48,7 +48,7 @@ fuchsia_driver_component("fake_at_driver") {
   component_name = "at-fake-transport"
   deps = [ ":fake_at_driver-driver" ]
   info = "fake_at_driver-info.json"
-  colocate = true
+  manifest = "meta/fake_at_driver.cml"
 }
 
 group("at-fake-transport") {

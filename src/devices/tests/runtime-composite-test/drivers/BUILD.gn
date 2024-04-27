@@ -81,7 +81,7 @@ fuchsia_driver_component("leaf") {
   component_name = "leaf-driver"
   deps = [ ":leaf-driver" ]
   info = "leaf-driver-info.json"
-  colocate = true
+  manifest = "meta/leaf.cml"
 }
 
 driver_bind_rules("composite-bind") {

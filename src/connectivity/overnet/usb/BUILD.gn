@@ -62,7 +62,7 @@ fuchsia_driver_component("overnet-usb") {
   component_name = "overnet-usb"
   deps = [ ":overnet-usb-driver" ]
   info = "overnet-usb-info.json"
-  colocate = true
+  manifest = "meta/overnet-usb.cml"
 }
 
 fuchsia_driver_package("overnet-usb-package") {
