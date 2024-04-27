@@ -30,8 +30,7 @@ class ZirconJobHandle final : public JobHandle, public debug::ZirconExceptionWat
 
  private:
   // ZirconExceptionWatcher implementation.
-  void OnProcessStarting(zx::exception exception_token,
-                         zx_exception_info_t exception_info) override;
+  void OnJobException(zx::exception exception_token, zx_exception_info_t exception_info) override;
 
   zx_koid_t job_koid_;
   zx::job job_;

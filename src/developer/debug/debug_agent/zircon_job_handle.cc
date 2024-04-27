@@ -62,21 +62,35 @@ debug::Status ZirconJobHandle::WatchJobExceptions(JobExceptionObserver* observer
   return status;
 }
 
-void ZirconJobHandle::OnProcessStarting(zx::exception exception_token,
-                                        zx_exception_info_t exception_info) {
-  zx_handle_t zircon_handle = ZX_HANDLE_INVALID;
-  zx_status_t status = zx_exception_get_process(exception_token.get(), &zircon_handle);
+void ZirconJobHandle::OnJobException(zx::exception exception, zx_exception_info_t exception_info) {
+  zx::process process;
+  zx_status_t status = exception.get_process(&process);
   FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
+  auto process_handle = std::make_unique<ZirconProcessHandle>(std::move(process));
 
-  exception_observer_->OnProcessStarting(
-      std::make_unique<ZirconProcessHandle>(zx::process(zircon_handle)));
+  if (exception_info.type == ZX_EXCP_PROCESS_STARTING) {
+    exception_observer_->OnProcessStarting(std::move(process_handle));
+  } else if (exception_info.type == ZX_EXCP_USER) {
+    zx::thread thread;
+    status = exception.get_thread(&thread);
+    FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
+
+    zx_exception_report_t report = {};
+    status =
+        thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report, sizeof(report), nullptr, nullptr);
+    FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
+
+    if (report.context.synth_code == ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED) {
+      exception_observer_->OnProcessNameChanged(std::move(process_handle));
+    }
+  }
 
   // Attached to the process. At that point it will get a new thread notification for the initial
   // thread which it can stop or continue as it desires. Therefore, we can always resume the thread
   // in the "new process" exception.
   //
   // Technically it's not necessary to reset the handle, but being explicit here helps readability.
-  exception_token.reset();
+  exception.reset();
 }
 
 }  // namespace debug_agent

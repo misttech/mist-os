@@ -798,6 +798,14 @@ void DebugAgent::LaunchProcess(const debug_ipc::RunBinaryRequest& request,
 }
 
 void DebugAgent::OnProcessStarting(std::unique_ptr<ProcessHandle> process_handle) {
+  OnProcessChanged(true, std::move(process_handle));
+}
+
+void DebugAgent::OnProcessNameChanged(std::unique_ptr<ProcessHandle> process_handle) {
+  OnProcessChanged(false, std::move(process_handle));
+}
+
+void DebugAgent::OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> process_handle) {
   if (procs_.find(process_handle->GetKoid()) != procs_.end()) {
     return;  // The process might have been attached in |LaunchProcess|.
   }
@@ -807,8 +815,8 @@ void DebugAgent::OnProcessStarting(std::unique_ptr<ProcessHandle> process_handle
   std::string process_name_override;
   const debug_ipc::Filter* matched_filter = nullptr;
 
-  if (system_interface_->GetComponentManager().OnProcessStart(*process_handle, &stdio,
-                                                              &process_name_override)) {
+  if (starting && system_interface_->GetComponentManager().OnProcessStart(*process_handle, &stdio,
+                                                                          &process_name_override)) {
     type = debug_ipc::NotifyProcessStarting::Type::kLaunch;
   } else if (std::any_of(filters_.begin(), filters_.end(), [&](const Filter& filter) {
                if (filter.MatchesProcess(*process_handle, *system_interface_)) {
@@ -855,6 +863,8 @@ void DebugAgent::OnProcessStarting(std::unique_ptr<ProcessHandle> process_handle
   }
 
   SendNotification(notify);
+
+  new_process->PopulateCurrentThreads();
 
   // If this wasn't a weak attach, we need to send modules here. We cannot wait for the client to
   // request all the modules later because we won't be able to load symbols early enough to set

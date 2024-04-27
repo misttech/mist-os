@@ -63,6 +63,9 @@ class DebugAgent : public RemoteAPI,
   void RemoveBreakpoint(uint32_t breakpoint_id);
 
   void OnProcessStarting(std::unique_ptr<ProcessHandle> process) override;
+  void OnProcessNameChanged(std::unique_ptr<ProcessHandle> process) override;
+
+  void OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> process);
 
   // Notified by ComponentManager.
   void OnComponentDiscovered(const std::string& moniker, const std::string& url);

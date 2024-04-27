@@ -14,6 +14,7 @@ class ProcessHandle;
 class JobExceptionObserver {
  public:
   virtual void OnProcessStarting(std::unique_ptr<ProcessHandle> process) = 0;
+  virtual void OnProcessNameChanged(std::unique_ptr<ProcessHandle> process) = 0;
 };
 
 }  // namespace debug_agent

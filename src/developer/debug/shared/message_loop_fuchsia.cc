@@ -443,13 +443,7 @@ void MessageLoopFuchsia::OnProcessTerminated(const WatchInfo& info, zx_signals_t
 
 void MessageLoopFuchsia::OnJobException(const WatchInfo& info, zx::exception exception,
                                         zx_exception_info_t exception_info) {
-  // Currently job exceptions only track process starting exceptions.
-  // TODO(https://fxbug.dev/42109444): Debugger job exception ports should receive all exceptions.
-  if (exception_info.type != ZX_EXCP_PROCESS_STARTING) {
-    return;
-  }
-
-  info.exception_watcher->OnProcessStarting(std::move(exception), exception_info);
+  info.exception_watcher->OnJobException(std::move(exception), exception_info);
 }
 
 void MessageLoopFuchsia::OnSocketSignal(int watch_id, const WatchInfo& info,
