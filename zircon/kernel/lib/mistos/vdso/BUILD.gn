@@ -26,7 +26,6 @@ fidl("linux") {
   # Order matters! It needs to match linux syscall numbers.
   # NOSORT
   sources = [ "fs.fidl" ]
-
   if (!exclude_testonly_syscalls) {
     sources += [ "syscall.test.fidl" ]
   }
@@ -77,7 +76,7 @@ group("private") {
     "//zircon/kernel/lib/mistos/userabi/*",
     "//zircon/kernel/lib/syscalls/*",
   ]
-  public_deps = [ ":linux_zither.kernel" ]
+  public_deps = [ ":linux_zither.mistos" ]
   metadata = barrier_metadata
 }
 

@@ -33,9 +33,9 @@ source_set("impl") {
     "test.cc",
   ]
   deps = [
+    "//zircon/kernel/lib/mistos/linux_uapi",
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/object",
-    "//zircon/kernel/lib/mistos/linux_uapi",
   ]
 }
