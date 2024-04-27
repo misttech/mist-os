@@ -1,56 +1,88 @@
 # Garbage collection
 
-## Static vs dynamic indexing
+Garbage Collection (GC) is the process for removing "unnecessary" blobs from a
+device. It is usually performed to free up disk space so that new ephemeral
+packages can be resolved or to OTA (which internally makes use of package
+resolution).
 
-Static indexing is used for base packages. At `pkgfs` startup, base packages are
-pre-populated in `/pkgfs/packages` based on the `static_packages` index located in
-`/system/data/static_packages`. These static packages are then used to bootstrap
-the system, so that core components like `pkg_resolver`, `pkg_cache` and
-`netstack` can be started.
+## How to trigger
 
-`pkgfs` doesn't maintain state across reboots but the base package set is
-guaranteed to always be present. Base packages cannot be deleted.
+GC is implemented by pkg-cache, which exposes the functionality via [fuchsia.space/Manager.GC][src_gc_fidl].
 
-The dynamic index stores a mapping of all ephemerally fetched packages. `pkgfs`
-will pre-populate the dynamic index with any present packages (i.e. `meta.far`
-and all `BLOB`s resolved) listed in `/system/data/cache_packages.json`. In memory, the
-dynamic index has the most recently resolved version of a package with the same name
-by keying on the `$name/$variant` of the package. `pkgfs` then "forgets" about
-the old version of the package. The old version of the package is still present
-in the system but no longer referenced. The dynamic index is then used to implement
-garbage collection.
+It can be triggered manually by running `fx shell pkgctl gc`.
 
-## How to garbage collect
+It is automatically triggered (if necessary) at various points during OTA by the
+[system-updater][src_system_updater_gc].
 
-There is no notion of installing a package in fuchsia and likewise no notion of
-deleting a package. Rather, garbage collection can be thought of as a means to
-reclaim space. Garbage collection can be triggered manually by running `pkgctl gc`
-or it can be triggered by the `system-updater`. The implementation of garbage
-collection uses the [`fuchsia.space/Manager` protocol](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/fidl/fuchsia.space/space.fidl).
-The `system-updater` trigger happens twice; once before a system update and once
-after fetching the [update package](update_pkg.md).
+It is automatically triggered (if necessary) by the [system-update-checker][src_system_update_checker_gc],
+which is the update checker used by engineering builds.
 
-The `pkgfs` garbage collector currently uses set differences to determine which
-packages are live packages. A package is considered live if any of the following
-is true:
+## The algorithm
 
-* A package is a base package in the static index.
-* A package is in the process of being updated (by tracking the `meta.far` merkle
-  root and any missing `BLOB`s until they’ve been fully resolved).
-* A package is the most recently resolved version of an ephemeral package according to its `meta` or `package` in the dynamic index.
+The [current algorithm][src_pkg_cache_implementation] is based on the design
+proposed by the [Open Package Tracking RFC][rfc_0217].
 
-When garbage collection runs, it deletes every `BLOB` in `blobfs` that is not referenced
-by a live package.
 
-## Known issues
+### Definitions
 
-Existing garbage collection implementation is suboptimal.
+* **[Base packages][src_base_packages]**
+  * The "base" or "system_image" package (identified by hash in the boot
+  arguments) and the packages listed (by hash) in its `data/static_packages`
+  file.
+  * Generally intended to be the minimal set of packages required to run a
+  particular configuration.
+* **[Cache packages][src_cache_packages]**
+  * The packages listed (by hash) in the "base" package's
+    `data/cache_packages.json` file.
+  * Conceptually packages that we would like to use without networking but still want the
+    option to ephemerally update.
+* **[Open packages][src_root_dir_cache]**
+  * Packages whose package directories are [currently being served][src_pkg_cache_open_packages]
+    by pkg-cache
+* **[Writing index][src_writing_index]**
+  * Packages whose blobs are currently being written as part of a resolve
+* **[Retained index][src_retained_index]**
+  * Packages that were/will be downloaded during OTA and are used during the OTA
+    process or are necessary for the next system version.
+  * [Manipulated][src_retained_index_fidl] by the
+    [system-updater][src_system_updater_retained] during the OTA process to meet
+    the OTA storage requirements.
+* **Package blobs**
+  * All the blobs required by a package.
+  * The meta.far and content blobs, plus the package blobs of all subpackages,
+    recursively.
+  * As a result of this definition, protecting a package from GC protects all of
+    its subpackages. The subpackages, as packages themselves, may or may not be
+    protected independently of protection provided by a superpackage.
 
-* An old version of an ephemeral package that is open can be garbage
-collected. This may lead the garbage collector to erase a package out
-from under a component.
+### Implementation
 
-* If `system-updater` fails to download a new package, the garbage collector
- protects both the base package and the most recent package version, which leads
- to duplicate copies of every package. If this happens, you should reboot the
- Fuchsia device to clear the list of activated packages.
+1. Fail if the current boot partition has not been marked healthy, to avoid
+   deleting blobs needed by the previous system in case of fallback
+2. Determine the set of all resident blobs, `Br`
+3. Lock the Writing and Retained indices
+4. Determine the set of all protected blobs, `Bp`, which is the package blobs of
+   all of the following packages:
+  * Base packages
+  * Cache packages
+  * Open packages
+  * Writing index packages
+  * Retained index packages
+5. Delete the blobs of the set difference `Br - Bp`
+6. Unlock the Writing and Retained indices
+
+
+[rfc_0217]: /docs/contribute/governance/rfcs/0217_open_package_tracking.md
+
+[src_gc_fidl]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.space/space.fidl;l=18;drc=4eae0501e94a15718fea7e2410b55ef0e0fef979
+[src_system_updater_gc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/system-updater/src/update.rs;l=1254;drc=f183b2bad311eb09c2be4d72411ddfd8e8db6e63
+[src_system_update_checker_gc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/system-update-checker/src/check.rs;l=178;drc=f183b2bad311eb09c2be4d72411ddfd8e8db6e63
+[src_pkg_cache_implementation]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/pkg-cache/src/gc_service.rs;l=52;drc=c33e19363ac233f6be9d8cb9df460fc0e30551ad
+[src_base_packages]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/pkg-cache/src/base_packages.rs;l=36;drc=d7e51f5a7d6b09dcc24b684aa19ccda7eb6c0757
+[src_cache_packages]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/lib/system-image/src/cache_packages.rs;l=16;drc=156eb8041a38d097e146c99f54fcb06aaa3c7fe6
+[src_retained_index]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/pkg-cache/src/index/retained.rs;l=14;drc=e3239bddfc70bc7076a1c54f97f2408a95a4b207
+[src_retained_index_fidl]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.pkg/cache.fidl;l=292;drc=905c18c5ba0899a26963cb9dc5fcf1343068c0cc
+[src_writing_index]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/pkg-cache/src/index/writing.rs;l=21;drc=fe32c41fc7cec966080646c47cb1f4ff1874452f
+[src_system_updater_retained]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/system-updater/src/update.rs;l=1402;drc=f183b2bad311eb09c2be4d72411ddfd8e8db6e63
+[src_root_dir_cache]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/lib/package-directory/src/root_dir_cache.rs;l=45;drc=a507f17eb78a603033c068d1f7f0d4d05c28cf20
+[src_pkg_cache_open_packages]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/pkg-cache/src/main.rs;l=187;drc=3adb26a7b1c4589755132a1fe3b918b6128bac6f
