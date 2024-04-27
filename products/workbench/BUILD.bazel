@@ -152,5 +152,5 @@ fuchsia_product_configuration(
 
 fuchsia_prebuilt_package(
     name = "workbench_session",
-    archive = "@legacy_ninja_build_outputs//:workbench_session.far",
+    archive = "@gn_targets//products/workbench/workbench_session:workbench_session_archive",
 )

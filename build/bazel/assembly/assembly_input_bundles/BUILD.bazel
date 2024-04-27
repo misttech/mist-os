@@ -16,31 +16,27 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_legacy_bundle(
     name = "legacy_fuchsia",
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    directory = "@legacy_ninja_build_outputs//:obj/build/images/fuchsia/fuchsia/fuchsia.bazel_legacy_aib",
-    files = "@legacy_ninja_build_outputs//:fuchsia.bazel_legacy_aib",
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    files = "@gn_targets//build/images/fuchsia:fuchsia.bazel_legacy_aib",
 )
 
 fuchsia_legacy_bundle(
     name = "legacy_bringup",
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    directory = "@legacy_ninja_build_outputs//:obj/build/images/bringup/bringup/bringup.bazel_legacy_aib",
-    files = "@legacy_ninja_build_outputs//:bringup.bazel_legacy_aib",
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    files = "@gn_targets//build/images/bringup:bringup.bazel_legacy_aib",
 )
 
 fuchsia_legacy_bundle(
     name = "legacy_zedboot",
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    directory = "@legacy_ninja_build_outputs//:obj/build/images/zedboot/zedboot/zedboot.bazel_legacy_aib",
-    files = "@legacy_ninja_build_outputs//:zedboot.bazel_legacy_aib",
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    files = "@gn_targets//build/images/zedboot:zedboot.bazel_legacy_aib",
 )
 
 [
     fuchsia_platform_artifacts(
         name = aib,
-        applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-        directory = "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib),
-        files = "@legacy_ninja_build_outputs//:{}_bazel_inputs".format(aib),
+        applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+        files = "@gn_targets//bundles/assembly:{}".format(aib),
     )
     for aib in ENG_PLATFORM_AIB_NAMES
 ]
@@ -48,23 +44,23 @@ fuchsia_legacy_bundle(
 platform_aibs(
     name = "platform_bringup",
     aibs = [":{}".format(aib) for aib in BRINGUP_PLATFORM_AIB_NAMES],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
 )
 
 platform_aibs(
     name = "platform_user",
     aibs = [":{}".format(aib) for aib in USER_PLATFORM_AIB_NAMES],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
 )
 
 platform_aibs(
     name = "platform_userdebug",
     aibs = [":{}".format(aib) for aib in USERDEBUG_PLATFORM_AIB_NAMES],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
 )
 
 platform_aibs(
     name = "platform_eng",
     aibs = [":{}".format(aib) for aib in ENG_PLATFORM_AIB_NAMES],
-    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
 )

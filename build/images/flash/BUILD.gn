@@ -29,6 +29,7 @@ bazel_input_resource("esp.bazel_input") {
   sources = [ "${root_build_dir}/fuchsia.esp.blk" ]
   outputs = [ "fuchsia.esp.blk" ]
   deps = [ ":esp" ]
+  gn_targets_name = "fuchsia_esp"
 }
 
 if (use_gigaboot) {

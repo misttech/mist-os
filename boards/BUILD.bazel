@@ -8,25 +8,25 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_prebuilt_board_configuration(
     name = "x64",
-    directory = "@legacy_ninja_build_outputs//:x64.bazel_input",
+    directory = "@gn_targets//boards/x64",
 )
 
 fuchsia_prebuilt_board_configuration(
     name = "qemu-x64",
-    directory = "@legacy_ninja_build_outputs//:qemu-x64.bazel_input",
+    directory = "@gn_targets//boards/x64:qemu-x64",
 )
 
 fuchsia_prebuilt_board_configuration(
     name = "arm64",
-    directory = "@legacy_ninja_build_outputs//:arm64.bazel_input",
+    directory = "@gn_targets//boards/arm64",
 )
 
 fuchsia_prebuilt_board_configuration(
     name = "vim3",
-    directory = "@legacy_ninja_build_outputs//:vim3.bazel_input",
+    directory = "@gn_targets//boards/vim3",
 )
 
 fuchsia_prebuilt_board_configuration(
     name = "riscv64",
-    directory = "@legacy_ninja_build_outputs//:riscv64.bazel_input",
+    directory = "@gn_targets//boards/riscv64",
 )
