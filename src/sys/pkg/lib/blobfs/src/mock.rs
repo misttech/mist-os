@@ -195,29 +195,18 @@ impl Mock {
         }
     }
 
-    /// Expects and handles a call to [`Client::filter_to_missing_blobs`], handling its internal
-    /// heuristic when more than 20 blobs are specified.  Verifies the call intends to determine
-    /// whether the blobs specified in `readable` and `missing` are readable or not, responding to
-    /// the check based on which collection the hash is in.
+    /// Expects and handles a call to [`Client::filter_to_missing_blobs`], returning
+    /// `blobfs_contents` over ReadDirents.
     ///
     /// # Panics
     ///
     /// Panics on error or assertion violation (unexpected requests, request for unspecified blob)
-    pub async fn expect_filter_to_missing_blobs_with_readable_missing_ids(
+    pub async fn expect_filter_to_missing_blobs_with_blobfs_contents(
         &mut self,
-        readable: &[Hash],
-        missing: &[Hash],
+        blobfs_contents: &[Hash],
     ) {
-        // TODO(https://fxbug.dev/42157763) re-evaluate filter_to_missing_blobs heuristic.
-        if readable.len() + missing.len() > 20 {
-            // heuristic path, handle the readdir, and trigger the fast path indicating
-            // none of the missing blobs may be present by excluding them from the readdir.
-            let mut readdir_connection = self.expect_clone().await;
-            readdir_connection.expect_readdir(readable.iter().copied()).await;
-            self.expect_readable_missing_checks(readable, &[]).await;
-        } else {
-            self.expect_readable_missing_checks(readable, missing).await;
-        }
+        let mut readdir_connection = self.expect_clone().await;
+        readdir_connection.expect_readdir(blobfs_contents.iter().copied()).await;
     }
 
     /// Asserts that the request stream closes without any further requests.

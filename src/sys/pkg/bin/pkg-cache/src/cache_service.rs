@@ -406,6 +406,9 @@ enum ServeNeededBlobsError {
 
     #[error("while creating a RootDir for the package")]
     CreatePackageRootDir(#[source] package_directory::Error),
+
+    #[error("while determining which of a package's blobs are missing")]
+    DetermineMissingBlobs(#[source] blobfs::BlobfsError),
 }
 
 /// Adds all of a package's content and subpackage blobs (discovered during the caching process by
@@ -1482,9 +1485,7 @@ mod serve_needed_blobs_tests {
 
         let ((), ()) = future::join(
             async {
-                blobfs
-                    .expect_filter_to_missing_blobs_with_readable_missing_ids(&[], &expected[..])
-                    .await;
+                blobfs.expect_filter_to_missing_blobs_with_blobfs_contents(&[]).await;
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
@@ -1599,9 +1600,7 @@ mod serve_needed_blobs_tests {
 
         let ((), ()) = future::join(
             async {
-                blobfs
-                    .expect_filter_to_missing_blobs_with_readable_missing_ids(&[], &missing[..])
-                    .await;
+                blobfs.expect_filter_to_missing_blobs_with_blobfs_contents(&[]).await;
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
@@ -1642,9 +1641,7 @@ mod serve_needed_blobs_tests {
         // Enumerate the needs successfully once.
         let ((), ()) = future::join(
             async {
-                blobfs
-                    .expect_filter_to_missing_blobs_with_readable_missing_ids(&[], &missing[..])
-                    .await;
+                blobfs.expect_filter_to_missing_blobs_with_blobfs_contents(&[]).await;
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
@@ -1684,12 +1681,7 @@ mod serve_needed_blobs_tests {
 
         let ((), ()) = future::join(
             async {
-                blobfs
-                    .expect_filter_to_missing_blobs_with_readable_missing_ids(
-                        &readable[..],
-                        &missing[..],
-                    )
-                    .await;
+                blobfs.expect_filter_to_missing_blobs_with_blobfs_contents(&readable[..]).await;
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =

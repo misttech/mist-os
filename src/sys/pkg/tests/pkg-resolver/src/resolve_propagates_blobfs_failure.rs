@@ -105,6 +105,12 @@ impl DirectoryWithFileCreateOverride {
                 }
                 fio::DirectoryRequest::Close { .. } => (),
                 fio::DirectoryRequest::GetToken { .. } => (),
+                fio::DirectoryRequest::Rewind { responder } => {
+                    responder.send(Status::OK.into_raw()).unwrap()
+                }
+                fio::DirectoryRequest::ReadDirents { max_bytes: _, responder } => {
+                    let () = responder.send(Status::OK.into_raw(), &[]).unwrap();
+                }
                 req => panic!("DirectoryStreamHandler unhandled request {:?}", req),
             }
         }
