@@ -12,6 +12,7 @@ driver_bind_rules("aml-pwm-regulator-bind") {
   tests = "bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.pwm",

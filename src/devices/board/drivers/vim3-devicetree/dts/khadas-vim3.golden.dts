@@ -33,6 +33,26 @@
 		registers = <0x0f 0x88 0x04 0x00 0x1000>;
 	};
 
+	pwm_a-regulator {
+		compatible = "amlogic,pwm-regulator";
+		pinctrl-0 = <0x1d>;
+		pwms = <0x0d 0x00 0x4e2>;
+		regulator-max-microvolt = <0x100590>;
+		regulator-min-microvolt = <0xa8750>;
+		regulator-name = "pwm_vreg_big";
+		regulator-step-microvolt = <0x3e8>;
+	};
+
+	pwm_a0_d-regulator {
+		compatible = "amlogic,pwm-regulator";
+		pinctrl-0 = <0x1c>;
+		pwms = <0x0d 0x09 0x4e2>;
+		regulator-max-microvolt = <0x100590>;
+		regulator-min-microvolt = <0xa8750>;
+		regulator-name = "pwm_vreg_little";
+		regulator-step-microvolt = <0x3e8>;
+	};
+
 	reserved-memory {
 		#address-cells = <0x02>;
 		#size-cells = <0x02>;
@@ -226,6 +246,18 @@
 				function = <0x00 0x02>;
 				phandle = <0x0c>;
 				pins = <0x1f 0x1e>;
+			};
+
+			pwm-a-regulator-pins {
+				function = <0x00 0x03>;
+				phandle = <0x1d>;
+				pins = <0x63>;
+			};
+
+			pwm-a0-d-regulator-pins {
+				function = <0x00 0x03>;
+				phandle = <0x1c>;
+				pins = <0x62>;
 			};
 
 			sdcard-clk-cfg {

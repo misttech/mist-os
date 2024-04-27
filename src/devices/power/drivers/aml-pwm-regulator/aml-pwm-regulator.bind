@@ -8,16 +8,21 @@ using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.hardware.pwm;
 using fuchsia.pwm;
+using fuchsia.devicetree;
 
 primary node "pwm" {
     fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
 }
 
 node "pdev" {
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,pwm-regulator" {
+    true;
+  } else {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.PWM_VREG;
+  }
 }
 
 node "gpio-init" {

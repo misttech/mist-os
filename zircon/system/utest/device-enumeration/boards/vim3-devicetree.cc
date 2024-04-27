@@ -63,7 +63,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/pt/dt-root",
       "sys/platform/pt/suspend",
       "sys/platform/pwm-ffd1b000/aml-pwm-device",
+      "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-0/pwm_a-regulator_group/pwm_vreg_big",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-4/pwm-init_group/aml-pwm-init",
+      "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-9/pwm_a0_d-regulator_group/pwm_vreg_little",
       "sys/platform/register-controller-1000",
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
   };

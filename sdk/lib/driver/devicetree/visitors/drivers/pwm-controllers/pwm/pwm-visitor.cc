@@ -11,6 +11,7 @@
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
+#include <regex>
 #include <vector>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -31,7 +32,10 @@ PwmVisitor::PwmVisitor() {
   parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(pwm_properties));
 }
 
-bool PwmVisitor::is_match(const std::string& name) { return name.find("pwm") != std::string::npos; }
+bool PwmVisitor::is_match(const std::string& name) {
+  std::regex name_regex("^pwm@[0-9a-f]+$");
+  return std::regex_match(name, name_regex);
+}
 
 zx::result<> PwmVisitor::Visit(fdf_devicetree::Node& node,
                                const devicetree::PropertyDecoder& decoder) {
