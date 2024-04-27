@@ -2,27 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Capability, CapabilityTrait, Dict};
+use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken};
 use async_trait::async_trait;
 use bedrock_error::BedrockError;
 use cm_types::Availability;
+use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
+use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
+use futures::TryStreamExt;
 use std::fmt::Debug;
-use std::{any::Any, fmt, sync::Arc};
-
-/// The trait that `WeakComponentToken` holds.
-pub trait WeakComponentTokenAny: Debug + Send + Sync {
-    fn as_any(&self) -> &dyn Any;
-}
-
-/// A type representing a weak pointer to a component.
-/// This is type erased because the bedrock library shouldn't depend on
-/// Component Manager types.
-#[derive(Clone, Debug)]
-pub struct WeakComponentToken {
-    pub inner: Arc<dyn WeakComponentTokenAny>,
-}
+use std::{fmt, sync::Arc};
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -60,7 +50,11 @@ impl fmt::Debug for Router {
 }
 
 // TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability
-impl CapabilityTrait for Router {}
+impl CapabilityTrait for Router {
+    fn into_fidl(self) -> fsandbox::Capability {
+        self.into()
+    }
+}
 
 /// Syntax sugar within the framework to express custom routing logic using a function
 /// that takes a request and returns such future.
@@ -109,11 +103,62 @@ impl Router {
     pub async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         self.routable.route(request).await
     }
+
+    async fn serve_router(
+        self,
+        mut stream: fsandbox::RouterRequestStream,
+    ) -> Result<(), fidl::Error> {
+        async fn do_route(
+            router: &Router,
+            payload: fsandbox::RouteRequest,
+        ) -> Result<fsandbox::Capability, fsandbox::BedrockError> {
+            let Some(availability) = payload.availability else {
+                return Err(fsandbox::BedrockError::InvalidArgs);
+            };
+            let Some(token) = payload.requesting else {
+                return Err(fsandbox::BedrockError::InvalidArgs);
+            };
+            let capability =
+                crate::registry::remove(token.token.as_handle_ref().get_koid().unwrap());
+            let component = match capability {
+                Some(crate::Capability::Component(c)) => c,
+                Some(_) => return Err(fsandbox::BedrockError::InvalidArgs),
+                None => return Err(fsandbox::BedrockError::InvalidArgs),
+            };
+            let request = Request { availability: to_cm_type(availability), target: component };
+            router.route(request).await.map(Into::into).map_err(|_| fsandbox::BedrockError::Routing)
+        }
+
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                fsandbox::RouterRequest::Route { payload, responder } => {
+                    responder.send(do_route(&self, payload).await)?;
+                }
+                fsandbox::RouterRequest::_UnknownMethod { ordinal, .. } => {
+                    tracing::warn!("Received unknown Router request with ordinal {ordinal}");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Serves the `fuchsia.sandbox.Router` protocol and moves ourself into the registry.
+    pub fn serve_and_register(self, stream: fsandbox::RouterRequestStream, koid: zx::Koid) {
+        let router = self.clone();
+
+        // Move this capability into the registry.
+        crate::registry::spawn_task(self.into(), koid, async move {
+            router.serve_router(stream).await.expect("failed to serve Router");
+        });
+    }
 }
 
 impl From<Router> for fsandbox::Capability {
-    fn from(_router: Router) -> Self {
-        unimplemented!("TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability")
+    fn from(router: Router) -> Self {
+        let (client_end, sender_stream) =
+            fidl::endpoints::create_request_stream::<fsandbox::RouterMarker>().unwrap();
+        router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
+        fsandbox::Capability::Router(client_end)
     }
 }
 
@@ -141,10 +186,20 @@ impl Routable for BedrockError {
     }
 }
 
+fn to_cm_type(value: fsandbox::Availability) -> cm_types::Availability {
+    match value {
+        fsandbox::Availability::Required => cm_types::Availability::Required,
+        fsandbox::Availability::Optional => cm_types::Availability::Optional,
+        fsandbox::Availability::SameAsTarget => cm_types::Availability::SameAsTarget,
+        fsandbox::Availability::Transitional => cm_types::Availability::Transitional,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Message, Receiver};
+    use assert_matches::assert_matches;
     use fuchsia_zircon as zx;
 
     #[derive(Debug)]
@@ -156,8 +211,8 @@ mod tests {
         }
     }
 
-    impl WeakComponentTokenAny for FakeComponentToken {
-        fn as_any(&self) -> &dyn Any {
+    impl crate::WeakComponentTokenAny for FakeComponentToken {
+        fn as_any(&self) -> &dyn std::any::Any {
             self
         }
     }
@@ -184,5 +239,88 @@ mod tests {
         drop(receiver);
         let (ch1, _ch2) = zx::Channel::create();
         assert!(sender.send(Message { channel: ch1 }).is_err());
+    }
+
+    #[fuchsia::test]
+    async fn serve_router() {
+        let component = FakeComponentToken::new();
+        let (component_client, server) = zx::EventPair::create();
+        let koid = server.basic_info().unwrap().related_koid;
+        component.register(koid, server);
+
+        let (_, sender) = Receiver::new();
+        let router = Router::new_ok(sender);
+        let (client, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
+        let _stream = fuchsia_async::Task::spawn(router.serve_router(stream));
+
+        let capability = client
+            .route(fsandbox::RouteRequest {
+                availability: Some(fsandbox::Availability::Required),
+                requesting: Some(fsandbox::ComponentToken { token: component_client }),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_matches!(capability, fsandbox::Capability::Sender(_));
+    }
+
+    #[fuchsia::test]
+    async fn serve_router_bad_arguments() {
+        let (_, sender) = Receiver::new();
+        let router = Router::new_ok(sender);
+        let (client, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
+        let _stream = fuchsia_async::Task::spawn(router.serve_router(stream));
+
+        // Check with no component token.
+        let capability = client
+            .route(fsandbox::RouteRequest {
+                availability: Some(fsandbox::Availability::Required),
+                requesting: None,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+
+        let component = FakeComponentToken::new();
+        let (component_client, server) = zx::EventPair::create();
+        let koid = server.basic_info().unwrap().related_koid;
+        component.register(koid, server);
+
+        // Check with no availability.
+        let capability = client
+            .route(fsandbox::RouteRequest {
+                availability: None,
+                requesting: Some(fsandbox::ComponentToken { token: component_client }),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+    }
+
+    #[fuchsia::test]
+    async fn serve_router_bad_token() {
+        let (_, sender) = Receiver::new();
+        let router = Router::new_ok(sender);
+        let (client, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
+        let _stream = fuchsia_async::Task::spawn(router.serve_router(stream));
+
+        // Create the client but don't register it.
+        let (component_client, _server) = zx::EventPair::create();
+
+        let capability = client
+            .route(fsandbox::RouteRequest {
+                availability: Some(fsandbox::Availability::Required),
+                requesting: Some(fsandbox::ComponentToken { token: component_client }),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
     }
 }

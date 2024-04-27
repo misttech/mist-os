@@ -39,6 +39,7 @@ type Capability = flexible resource union {
     4: dictionary client_end:Dictionary;
     5: sender client_end:Sender;
     6: directory client_end:fuchsia.io.Directory;
+    7: router client_end:Router;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -171,6 +172,46 @@ open protocol Sender {
 
     /// Sends a channel over this sender.
     flexible Send(ProtocolPayload);
+};
+
+/// This represents a component within the framework.
+/// There are currently no methods here as this is used as a token.
+@available(added=HEAD)
+type ComponentToken = resource struct {
+    token zx.Handle:EVENTPAIR;
+};
+
+/// A request for a route.
+@available(added=HEAD)
+type RouteRequest = resource table {
+    /// The requested availability for this capability.
+    1: availability Availability;
+    /// The component that is requesting the capability.
+    2: requesting ComponentToken;
+};
+
+@available(added=HEAD)
+type BedrockError = flexible enum : uint32 {
+    /// Routing the capability failed.
+    ROUTING = 1;
+
+    /// A lifecycle transition failed for some capability in the
+    /// routing chain.
+    LIFECYCLE = 2;
+
+    /// Could not open the capability in the provider component.
+    OPEN = 3;
+
+    /// The arguments provided to the function are invalid.
+    INVALID_ARGS = 4;
+};
+
+/// A router allows a client to request a capability.
+@available(added=HEAD)
+open protocol Router {
+    flexible Route(RouteRequest) -> (resource struct {
+        capability Capability;
+    }) error BedrockError;
 };
 
 /// A receiver is served by clients and allows them to receive channels

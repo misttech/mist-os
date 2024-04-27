@@ -44,6 +44,7 @@ pub enum Capability {
     Directory(crate::Directory),
     OneShotHandle(crate::OneShotHandle),
     Router(crate::Router),
+    Component(crate::WeakComponentToken),
 }
 
 impl Capability {
@@ -64,6 +65,7 @@ impl Capability {
             Capability::Unit(s) => s.into_fidl(),
             Capability::Directory(s) => s.into_fidl(),
             Capability::OneShotHandle(s) => s.into_fidl(),
+            Capability::Component(s) => s.into_fidl(),
         }
     }
 
@@ -77,6 +79,7 @@ impl Capability {
             Capability::Unit(s) => s.try_into_directory_entry(),
             Capability::Directory(s) => s.try_into_directory_entry(),
             Capability::OneShotHandle(s) => s.try_into_directory_entry(),
+            Capability::Component(s) => s.try_into_directory_entry(),
         }
     }
 }
@@ -138,6 +141,14 @@ impl TryFrom<fsandbox::Capability> for Capability {
                     ),
                 };
                 Ok(crate::Directory::new(client_end).into())
+            }
+            fsandbox::Capability::Router(client_end) => {
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::Router(_) => (),
+                    _ => panic!("BUG: registry has a non-Router capability under a Router koid"),
+                };
+                Ok(any)
             }
             fsandbox::CapabilityUnknown!() => Err(RemoteError::UnknownVariant),
         }

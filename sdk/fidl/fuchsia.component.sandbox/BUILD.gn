@@ -9,6 +9,7 @@ fidl("fuchsia.component.sandbox") {
   sdk_area = "Unknown"
 
   sources = [
+    "availability.fidl",
     "overview.fidl",
     "sandbox.fidl",
   ]
