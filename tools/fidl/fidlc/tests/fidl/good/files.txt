@@ -221,3 +221,4 @@ fi-0208.test.fidl
 fi-0209-a.test.fidl
 fi-0209-b.test.fidl
 fi-0209-c.test.fidl
+fi-0210.test.fidl

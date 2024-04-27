@@ -1284,6 +1284,133 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::AnotherDiscov
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+template <>
+class ::fidl::internal::NaturalClientImpl<::test_protocols::PlatformServer> final : public ::fidl::internal::NaturalClientBase {
+ public:
+  using NaturalClientBase::NaturalClientBase;
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::PlatformServer> final
+    : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocols::PlatformServer>> {
+ public:
+ private:
+  ::fidl::UnownedClientEnd<::test_protocols::PlatformServer> _client_end() const {
+    return ::fidl::UnownedClientEnd<::test_protocols::PlatformServer>(
+        _transport().get<::fidl::internal::ChannelTransport>());
+  }
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+class ::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer> : public ::fidl::internal::BaseEventHandlerInterface {
+ public:
+  NaturalEventHandlerInterface() = default;
+  virtual ~NaturalEventHandlerInterface() = default;
+};
+
+template <>
+class ::fidl::AsyncEventHandler<::test_protocols::PlatformServer>
+    : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>, public ::fidl::internal::AsyncEventHandler {
+ public:
+  AsyncEventHandler() = default;
+};
+
+template <>
+class ::fidl::SyncEventHandler<::test_protocols::PlatformServer>
+    : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>, public ::fidl::internal::SyncEventHandler {
+ public:
+  SyncEventHandler() = default;
+
+  // Handle all possible events defined in this protocol.
+  // Blocks to consume exactly one message from the channel, then call the corresponding virtual
+  // method.
+  ::fidl::Status HandleOneEvent(
+      ::fidl::UnownedClientEnd<::test_protocols::PlatformServer> client_end);
+};
+
+template <>
+class ::fidl::internal::NaturalEventDispatcher<::test_protocols::PlatformServer> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>> {
+ public:
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+template <>
+class ::fidl::internal::NaturalWeakEventSender<::test_protocols::PlatformServer> : public ::fidl::internal::WeakEventSenderBase {
+ public:
+  using WeakEventSenderBase::WeakEventSenderBase;
+};
+
+template <>
+class ::fidl::internal::NaturalEventSender<::test_protocols::PlatformServer>
+    : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalEventSender<::test_protocols::PlatformServer>> {
+ public:
+  using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
+};
+
+#endif  // __Fuchsia__
+
+template <>
+class ::fidl::Server<::test_protocols::PlatformServer> : public ::fidl::internal::IncomingMessageDispatcher {
+ public:
+  Server() = default;
+  virtual ~Server() = default;
+
+  // The FIDL protocol type that is implemented by this server.
+  using _EnclosingProtocol = ::test_protocols::PlatformServer;
+
+  using Handler = fidl::ProtocolHandler<::test_protocols::PlatformServer>;
+
+  // |bind_handler| returns a handler that binds incoming connections to this
+  // server implementation.
+  //
+  // The returned handler borrows the server instance.
+  // The server must outlive the provided |dispatcher|. Only after
+  // the dispatcher is shutdown will it be safe to destroy the servers.
+  // The server should not be moved.
+  Handler bind_handler(async_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::PlatformServer> request) {
+      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
+
+ private:
+  void dispatch_message(
+      ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
+      ::fidl::internal::MessageStorageViewBase* storage_view) final;
+};
+
+#ifdef __Fuchsia__
+
+template <>
+struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::PlatformServer> final {
+  NaturalServerDispatcher() = delete;
+  static void Dispatch(::fidl::Server<::test_protocols::PlatformServer>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
+                       internal::MessageStorageViewBase* storage_view,
+                       ::fidl::Transaction* txn);
+
+ private:
+  static const ::fidl::internal::MethodEntry entries_[];
+  static const ::fidl::internal::MethodEntry* entries_end_;
+  static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
+      ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
+};
+
+#endif  // __Fuchsia__
+
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::HandleRightsProtocol::NoResponseMethod> {
   using Request = ::test_protocols::HandleRightsProtocolNoResponseMethodRequest;

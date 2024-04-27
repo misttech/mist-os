@@ -192,3 +192,4 @@ fi-0206.test.fidl
 fi-0207.test.fidl
 fi-0208.test.fidl
 fi-0209.noformat.test.fidl
+fi-0210.test.fidl

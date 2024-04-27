@@ -10,6 +10,7 @@
 
 #include <re2/re2.h>
 
+#include "src/lib/fxl/strings/split_string.h"
 #include "tools/fidl/fidlc/src/reporter.h"
 
 namespace fidlc {
@@ -39,6 +40,23 @@ bool IsValidFullyQualifiedMethodIdentifier(std::string_view fq_identifier) {
 bool IsValidDiscoverableName(std::string_view discoverable_name) {
   static const re2::RE2 kPattern("^" + kLibraryPattern + "\\." + kIdentifierComponentPattern + "$");
   return re2::RE2::FullMatch(discoverable_name, kPattern);
+}
+
+bool IsValidImplementationLocation(std::string_view location) {
+  return location == "platform" || location == "external";
+}
+
+bool IsValidImplementationLocations(std::string_view locations) {
+  return ParseImplementationLocations(locations).has_value();
+}
+
+std::optional<std::vector<std::string_view>> ParseImplementationLocations(
+    std::string_view locations) {
+  auto parts = fxl::SplitString(locations, ",", fxl::kTrimWhitespace, fxl::kSplitWantAll);
+  if (std::all_of(parts.begin(), parts.end(), IsValidImplementationLocation)) {
+    return parts;
+  }
+  return std::nullopt;
 }
 
 std::string StripStringLiteralQuotes(std::string_view str) {

@@ -1099,6 +1099,41 @@ func (s_ *MethodWithUnionWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_b
 
 type MethodWithUnionEventProxy _bindings.ChannelProxy
 
+const ()
+
+type PlatformServerWithCtxInterface _bindings.ChannelProxy
+
+type PlatformServerWithCtx interface {
+}
+type PlatformServerWithCtxInterfaceRequest _bindings.InterfaceRequest
+
+func NewPlatformServerWithCtxInterfaceRequest() (PlatformServerWithCtxInterfaceRequest, *PlatformServerWithCtxInterface, error) {
+	req, cli, err := _bindings.NewInterfaceRequest()
+	return PlatformServerWithCtxInterfaceRequest(req), (*PlatformServerWithCtxInterface)(cli), err
+}
+
+// Implements ServiceRequest.
+func (_ PlatformServerWithCtxInterfaceRequest) Name() string {
+	return "platform"
+}
+func (c PlatformServerWithCtxInterfaceRequest) ToChannel() _zx.Channel {
+	return c.Channel
+}
+
+const PlatformServerName = "platform"
+
+type PlatformServerWithCtxStub struct {
+	Impl PlatformServerWithCtx
+}
+
+func (s_ *PlatformServerWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
+	switch args_.Ordinal {
+	}
+	return nil, false, _bindings.ErrUnknownOrdinal
+}
+
+type PlatformServerEventProxy _bindings.ChannelProxy
+
 const (
 	WithAndWithoutRequestResponseNoRequestNoResponseOrdinal      uint64 = 0x4b212a6c8c5f7bab
 	WithAndWithoutRequestResponseNoRequestEmptyResponseOrdinal   uint64 = 0x16a329d17f458668

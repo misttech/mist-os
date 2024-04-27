@@ -84,6 +84,12 @@ class AnotherDiscoverableProtocol_TestBase : public ::test::protocols::AnotherDi
   virtual void NotImplemented_(const std::string& name) = 0;
 };
 
+class PlatformServer_TestBase : public ::test::protocols::PlatformServer {
+ public:
+  virtual ~PlatformServer_TestBase() {}
+  virtual void NotImplemented_(const std::string& name) = 0;
+};
+
 class HandleRightsProtocol_TestBase : public ::test::protocols::HandleRightsProtocol {
  public:
   virtual ~HandleRightsProtocol_TestBase() {}

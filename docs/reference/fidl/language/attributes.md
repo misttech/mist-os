@@ -77,7 +77,7 @@ Note: Not implemented.
 
 ## `@discoverable` {#discoverable}
 
-**USAGE**: `@discoverable(`_name_`)`
+**USAGE**: `@discoverable(name=`_name_`)`
 
 **MEANING**:
 Assigns a name to use for service discovery. That is to say, a `@discoverable`

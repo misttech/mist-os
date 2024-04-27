@@ -83,6 +83,20 @@ uint32_t StringLiteralLength(std::string_view str);
 inline std::string_view FirstComponent(std::string_view name) {
   return name.substr(0, name.find('.'));
 }
+// IsValidImplementationLocation validates the name of a place that could
+// implement a protocol endpoint, encode a type or decode a type. It must be
+// one of "platform" or "external".
+bool IsValidImplementationLocation(std::string_view location);
+
+// IsValidImplementationLocations validates a comma separated list of
+// location names, as constrained by IsValidImplementationLocation.
+// Items must be separated by commas but may have additional whitespace.
+bool IsValidImplementationLocations(std::string_view locations);
+
+// ParseImplementationLocations parses a string containing a comma separated
+// list of implementation locations, or std::nullopt if the list is malformed.
+std::optional<std::vector<std::string_view>> ParseImplementationLocations(
+    std::string_view locations);
 
 // Removes all whitespace characters from a string.
 inline std::string RemoveWhitespace(std::string str) {

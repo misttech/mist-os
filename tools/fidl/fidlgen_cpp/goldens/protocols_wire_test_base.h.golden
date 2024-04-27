@@ -159,6 +159,20 @@ class WireSyncEventHandlerTestBase<::test_protocols::AnotherDiscoverableProtocol
 };
 
 template <>
+class WireTestBase<::test_protocols::PlatformServer> : public ::fidl::WireServer<::test_protocols::PlatformServer> {
+ public:
+  virtual ~WireTestBase<::test_protocols::PlatformServer>() = default;
+  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) = 0;
+};
+
+template <>
+class WireSyncEventHandlerTestBase<::test_protocols::PlatformServer> : public ::fidl::WireSyncEventHandler<::test_protocols::PlatformServer> {
+ public:
+  virtual ~WireSyncEventHandlerTestBase<::test_protocols::PlatformServer>() = default;
+  virtual void NotImplemented_(const std::string& name) = 0;
+};
+
+template <>
 class WireTestBase<::test_protocols::HandleRightsProtocol> : public ::fidl::WireServer<::test_protocols::HandleRightsProtocol> {
  public:
   virtual ~WireTestBase<::test_protocols::HandleRightsProtocol>() = default;

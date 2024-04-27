@@ -2970,6 +2970,264 @@ impl MethodWithUnionUnionMethodResponder {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct PlatformServer_Marker;
+
+impl fidl::endpoints::ProtocolMarker for PlatformServer_Marker {
+    type Proxy = PlatformServer_Proxy;
+    type RequestStream = PlatformServer_RequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = PlatformServer_SynchronousProxy;
+
+    const DEBUG_NAME: &'static str = "platform";
+}
+impl fidl::endpoints::DiscoverableProtocolMarker for PlatformServer_Marker {}
+
+pub trait PlatformServer_ProxyInterface: Send + Sync {}
+
+#[derive(Debug)]
+#[cfg(target_os = "fuchsia")]
+pub struct PlatformServer_SynchronousProxy {
+    client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for PlatformServer_SynchronousProxy {
+    type Proxy = PlatformServer_Proxy;
+    type Protocol = PlatformServer_Marker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl PlatformServer_SynchronousProxy {
+    pub fn new(channel: fidl::Channel) -> Self {
+        let protocol_name = <PlatformServer_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        Self { client: fidl::client::sync::Client::new(channel, protocol_name) }
+    }
+
+    pub fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    /// Waits until an event arrives and returns it. It is safe for other
+    /// threads to make concurrent requests while waiting for an event.
+    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<PlatformServer_Event, fidl::Error> {
+        PlatformServer_Event::decode(self.client.wait_for_event(deadline)?)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PlatformServer_Proxy {
+    client: fidl::client::Client,
+}
+
+impl fidl::endpoints::Proxy for PlatformServer_Proxy {
+    type Protocol = PlatformServer_Marker;
+
+    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> Result<::fidl::AsyncChannel, Self> {
+        self.client.into_channel().map_err(|client| Self { client })
+    }
+
+    fn as_channel(&self) -> &::fidl::AsyncChannel {
+        self.client.as_channel()
+    }
+}
+
+impl PlatformServer_Proxy {
+    /// Create a new Proxy for test.protocols/PlatformServer.
+    pub fn new(channel: fidl::AsyncChannel) -> Self {
+        let protocol_name = <PlatformServer_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        Self { client: fidl::client::Client::new(channel, protocol_name) }
+    }
+
+    /// Get a Stream of events from the remote end of the protocol.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the event stream was already taken.
+    pub fn take_event_stream(&self) -> PlatformServer_EventStream {
+        PlatformServer_EventStream { event_receiver: self.client.take_event_receiver() }
+    }
+}
+
+impl PlatformServer_ProxyInterface for PlatformServer_Proxy {}
+
+pub struct PlatformServer_EventStream {
+    event_receiver: fidl::client::EventReceiver,
+}
+
+impl std::marker::Unpin for PlatformServer_EventStream {}
+
+impl futures::stream::FusedStream for PlatformServer_EventStream {
+    fn is_terminated(&self) -> bool {
+        self.event_receiver.is_terminated()
+    }
+}
+
+impl futures::Stream for PlatformServer_EventStream {
+    type Item = Result<PlatformServer_Event, fidl::Error>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+            &mut self.event_receiver,
+            cx
+        )?) {
+            Some(buf) => std::task::Poll::Ready(Some(PlatformServer_Event::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum PlatformServer_Event {}
+
+impl PlatformServer_Event {
+    /// Decodes a message buffer as a [`PlatformServer_Event`].
+    fn decode(mut buf: fidl::MessageBufEtc) -> Result<PlatformServer_Event, fidl::Error> {
+        let (bytes, _handles) = buf.split_mut();
+        let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
+            _ => Err(fidl::Error::UnknownOrdinal {
+                ordinal: tx_header.ordinal,
+                protocol_name:
+                    <PlatformServer_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+            }),
+        }
+    }
+}
+
+/// A Stream of incoming requests for test.protocols/PlatformServer.
+pub struct PlatformServer_RequestStream {
+    inner: std::sync::Arc<fidl::ServeInner>,
+    is_terminated: bool,
+}
+
+impl std::marker::Unpin for PlatformServer_RequestStream {}
+
+impl futures::stream::FusedStream for PlatformServer_RequestStream {
+    fn is_terminated(&self) -> bool {
+        self.is_terminated
+    }
+}
+
+impl fidl::endpoints::RequestStream for PlatformServer_RequestStream {
+    type Protocol = PlatformServer_Marker;
+    type ControlHandle = PlatformServer_ControlHandle;
+
+    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+        Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
+    }
+
+    fn control_handle(&self) -> Self::ControlHandle {
+        PlatformServer_ControlHandle { inner: self.inner.clone() }
+    }
+
+    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+        (self.inner, self.is_terminated)
+    }
+
+    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+        Self { inner, is_terminated }
+    }
+}
+
+impl futures::Stream for PlatformServer_RequestStream {
+    type Item = Result<PlatformServer_Request, fidl::Error>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let this = &mut *self;
+        if this.inner.check_shutdown(cx) {
+            this.is_terminated = true;
+            return std::task::Poll::Ready(None);
+        }
+        if this.is_terminated {
+            panic!("polled PlatformServer_RequestStream after completion");
+        }
+        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
+            match this.inner.channel().read_etc(cx, bytes, handles) {
+                std::task::Poll::Ready(Ok(())) => {}
+                std::task::Poll::Pending => return std::task::Poll::Pending,
+                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                    this.is_terminated = true;
+                    return std::task::Poll::Ready(None);
+                }
+                std::task::Poll::Ready(Err(e)) => {
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                }
+            }
+
+            // A message has been received from the channel
+            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+
+            std::task::Poll::Ready(Some(match header.ordinal {
+                _ => Err(fidl::Error::UnknownOrdinal {
+                    ordinal: header.ordinal,
+                    protocol_name:
+                        <PlatformServer_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                }),
+            }))
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum PlatformServer_Request {}
+
+impl PlatformServer_Request {
+    /// Name of the method defined in FIDL
+    pub fn method_name(&self) -> &'static str {
+        match *self {}
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PlatformServer_ControlHandle {
+    inner: std::sync::Arc<fidl::ServeInner>,
+}
+
+impl fidl::endpoints::ControlHandle for PlatformServer_ControlHandle {
+    fn shutdown(&self) {
+        self.inner.shutdown()
+    }
+
+    fn shutdown_with_epitaph(&self, status: zx_status::Status) {
+        self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
+    }
+
+    fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
+        self.inner.channel().on_closed()
+    }
+}
+
+impl PlatformServer_ControlHandle {}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct WithAndWithoutRequestResponseMarker;
 
 impl fidl::endpoints::ProtocolMarker for WithAndWithoutRequestResponseMarker {

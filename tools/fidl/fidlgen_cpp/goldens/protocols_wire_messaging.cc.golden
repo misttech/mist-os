@@ -2966,6 +2966,76 @@ void fidl::WireServer<::test_protocols::AnotherDiscoverableProtocol>::dispatch_m
 
   
 
+
+  
+
+#ifdef __Fuchsia__
+
+
+#endif  // __Fuchsia__
+
+
+
+
+
+#ifdef __Fuchsia__
+
+
+
+  ::fidl::Status fidl::WireSyncEventHandler<::test_protocols::PlatformServer>::HandleOneEvent(
+      ::fidl::UnownedClientEnd<::test_protocols::PlatformServer> client_end) {
+      ::fidl::internal::IncomingEventsStorage<::test_protocols::PlatformServer> event_storage;
+      fidl::internal::WireEventDispatcher<::test_protocols::PlatformServer> dispatcher{this};
+      return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
+  }
+
+#endif  // __Fuchsia__
+
+
+#ifdef __Fuchsia__
+
+
+
+constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer>::entries_[] = {
+};
+
+const ::fidl::internal::MethodEntry* fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer>::entries_end_ =
+    &entries_[0];
+
+::fidl::DispatchResult fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer>::TryDispatch(
+    ::fidl::WireServer<::test_protocols::PlatformServer>* impl, ::fidl::IncomingHeaderAndMessage& msg,
+    internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+  return ::fidl::internal::TryDispatch(
+    impl, msg, storage_view, txn, entries_, entries_end_);
+}
+
+
+
+void fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer>::Dispatch(::fidl::WireServer<::test_protocols::PlatformServer>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
+    internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+  ::fidl::internal::Dispatch(impl, msg, storage_view, txn, entries_, entries_end_,
+  &unknown_method_handler_entry_);
+}
+
+void fidl::WireServer<::test_protocols::PlatformServer>::dispatch_message(
+    ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
+    ::fidl::internal::MessageStorageViewBase* storage_view) {
+  ::fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer>::Dispatch(this, std::move(msg), storage_view, txn);
+}
+
+#endif  // __Fuchsia__
+
+  
+
+
+#ifdef __Fuchsia__
+
+
+#endif  // __Fuchsia__
+
+
+  
+
 namespace test_protocols {
 
 [[maybe_unused]]

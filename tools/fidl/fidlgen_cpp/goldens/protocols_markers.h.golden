@@ -310,6 +310,15 @@ class AnotherDiscoverableProtocol final {
   static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
 };
 
+class PlatformServer final {
+  PlatformServer() = delete;
+
+ public:
+  using Transport = ::fidl::internal::ChannelTransport;
+
+  static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
+};
+
 class HandleRightsProtocol final {
   HandleRightsProtocol() = delete;
 
@@ -479,6 +488,9 @@ struct IsProtocol<::test_protocols::DiscoverableProtocol> : public std::true_typ
 
 template <>
 struct IsProtocol<::test_protocols::AnotherDiscoverableProtocol> : public std::true_type {};
+
+template <>
+struct IsProtocol<::test_protocols::PlatformServer> : public std::true_type {};
 
 template <>
 struct IsProtocol<::test_protocols::HandleRightsProtocol> : public std::true_type {};
