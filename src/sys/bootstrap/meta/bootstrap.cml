@@ -20,10 +20,6 @@
             name: "shutdown_shim",
             url: "fuchsia-boot:///shutdown-shim#meta/shutdown-shim.cm",
         },
-        {
-            name: "role_manager",
-            url: "fuchsia-boot:///role_manager#meta/role_manager.cm",
-        },
     ],
     offer: [
         {
@@ -61,25 +57,12 @@
             availability: "optional",
         },
         {
-            directory: "boot",
-            from: "parent",
-            as: "config-profiles",
-            to: "#role_manager",
-            rights: [ "r*" ],
-            subdir: "config/profiles",
-        },
-        {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [
                 "#critical-services",
                 "#shutdown_shim",
             ],
-        },
-        {
-            protocol: [ "fuchsia.kernel.ProfileResource" ],
-            from: "parent",
-            to: [ "#role_manager" ],
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
@@ -121,7 +104,6 @@
             from: "#archivist",
             to: [
                 "#critical-services",
-                "#role_manager",
                 "#shutdown_shim",
             ],
         },
@@ -221,13 +203,6 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
-        },
-        {
-            protocol: [
-                "fuchsia.scheduler.deprecated.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
-            ],
-            from: "#role_manager",
         },
     ],
 }

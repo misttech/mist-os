@@ -166,6 +166,7 @@
             ],
             from: "#role_manager",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             directory: "dev-topological",

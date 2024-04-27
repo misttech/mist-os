@@ -217,6 +217,7 @@
                 "#boot-drivers",
                 "#driver-hosts",
             ],
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],

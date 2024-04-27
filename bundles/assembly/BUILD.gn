@@ -108,7 +108,6 @@ assembly_input_bundle("embeddable") {
     "//src/power/shutdown-shim:package",
     "//src/sys/root:package",
     "//src/sys/startup:package",
-    "//src/zircon/bin/role_manager:package",
   ]
 
   compiled_packages = [
@@ -147,6 +146,7 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/device-name-provider:package",
     "//src/bringup/bin/sysinfo:package",
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
+    "//src/zircon/bin/role_manager:package",
   ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
@@ -162,6 +162,7 @@ assembly_input_bundle("bootstrap") {
                     "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml",
                     "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
                     "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
+                    "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
                   ],
                   root_build_dir)
         },
