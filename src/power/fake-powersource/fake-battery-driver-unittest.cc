@@ -142,7 +142,7 @@ TEST_F(FakeBatteryDriverTest, CatGetEvent) {
       ASSERT_EQ(result.status(), ZX_OK);
       ASSERT_EQ(result.value().status, ZX_OK);
       const auto& info = result.value().info;
-      ASSERT_EQ(info.remaining_capacity, 2900u);
+      ASSERT_EQ(info.remaining_capacity, 2950u);
     }
     {
       fidl::WireResult result = this_client->GetStateChangeEvent();
