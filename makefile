@@ -28,6 +28,7 @@ args: ## Set up build dir and arguments file
 .PHONY: args
 
 gen: ## Generate ninja
+	$(NOECHO)echo "Running:$(GN) gen $(OUTPUT)"
 	$(NOECHO)$(GN) gen $(OUTPUT)
 .PHONY: gen
 
@@ -39,7 +40,7 @@ it: args gen info ## Build multiboot(bootloader) and kernel zircon binary image(
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
 .PHONY: it
 
-all: args gen info ## Build all targets
+all: gen info ## Build all targets
 	$(NOECHO)$(NINJA) -C $(OUTPUT)
 .PHONY: all
 
@@ -49,22 +50,29 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 	-z $(OUTPUT)/kernel_x64/kernel.zbi -c "kernel.shell=true" -- -no-reboot
 .PHONY: rain
 
-kasan: ## Compile with Kernel Address Sanitazier enabled
+kasan: args ## Compile with Kernel Address Sanitazier enabled
 	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
 .PHONY: kasan
 
-zxtest: ## Enable zxtest
+zxtest: args ## Enable zxtest
 	$(NOECHO)echo "register_zxtest=true" >> $(OUTPUT)/args.gn
 .PHONY: zxtest
 
-#test: args zxtest kasan gen info ## Run test kernel-zxtest.zbi ZBI (with kasan enabled)
-test: args zxtest gen info ## Run test kernel-zxtest.zbi ZBI 
+test: zxtest gen info ## Run test kernel-zxtest.zbi
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-zxtest
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-zxtest.zbi -s1 \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: test
+
+ci: zxtest kasan info gen ## Run test kernel-zxtest.zbi with kasan
+	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-zxtest
+	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
+	-t $(OUTPUT)/multiboot.bin \
+	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-zxtest.zbi -s1 \
+	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
+.PHONY: ci
 
 %: ## Make any ninja target
 	$(NOECHO)$(NINJA) -C $(OUTPUT) $@
