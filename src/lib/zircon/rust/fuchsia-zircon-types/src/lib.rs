@@ -993,6 +993,14 @@ multiconst!(zx_excp_type_t, [
     ZX_EXCP_USER                  = 0x309 | ZX_EXCP_SYNTH;
 ]);
 
+multiconst!(u32, [
+    ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED = 0x0001;
+
+    ZX_EXCP_USER_CODE_USER0                = 0xF000;
+    ZX_EXCP_USER_CODE_USER1                = 0xF001;
+    ZX_EXCP_USER_CODE_USER2                = 0xF002;
+]);
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "zerocopy", derive(FromZeros, FromBytes, NoCell, AsBytes))]
