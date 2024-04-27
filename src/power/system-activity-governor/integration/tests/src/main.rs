@@ -136,15 +136,16 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
     let power_elements = activity_governor.get_power_elements().await?;
     let fwh_token = power_elements.full_wake_handling.unwrap().active_dependency_token.unwrap();
 
-    let full_wake_controller = PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
-            dependent_level: 1,
-            requires_token: fwh_token,
-            requires_level: 1,
-        }])
-        .build()
-        .await?;
+    let full_wake_controller =
+        PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Active,
+                dependent_level: 1,
+                requires_token: fwh_token,
+                requires_level: 1,
+            }])
+            .build()
+            .await?;
 
     Ok(full_wake_controller)
 }
@@ -1394,6 +1395,259 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
         }
     );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_element_info_provider() -> Result<()> {
+    let (realm, _, suspend_device) = create_realm().await?;
+
+    let suspend_states = vec![
+        fhsuspend::SuspendState { resume_latency: Some(1000), ..Default::default() },
+        fhsuspend::SuspendState { resume_latency: Some(100), ..Default::default() },
+        fhsuspend::SuspendState { resume_latency: Some(10), ..Default::default() },
+    ];
+
+    suspend_device
+        .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
+            suspend_states: Some(suspend_states),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    let full_wake_controller = create_full_wake_topology(&realm).await?;
+    let wake_controller = create_wake_topology(&realm).await?;
+    let suspend_controller = create_suspend_topology(&realm).await?;
+    let expected_latencies = vec![1000i64, 100i64, 10i64];
+    let erl_controller = create_latency_topology(&realm, &expected_latencies).await?;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    assert_eq!(
+        [
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("execution_state".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("WakeHandling".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(2),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("application_activity".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("full_wake_handling".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("wake_handling".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("boot_control".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("execution_resume_latency".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("1000 ns".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("100 ns".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(2),
+                        name: Some("10 ns".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+        ],
+        TryInto::<[fbroker::ElementPowerLevelNames; 6]>::try_into(
+            element_info_provider.get_element_power_level_names().await?.unwrap()
+        )
+        .unwrap()
+    );
+
+    let status_endpoints: std::collections::HashMap<String, fbroker::StatusProxy> =
+        element_info_provider
+            .get_status_endpoints()
+            .await?
+            .unwrap()
+            .into_iter()
+            .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+            .collect();
+
+    let es_status = status_endpoints.get("execution_state".into()).unwrap();
+    let aa_status = status_endpoints.get("application_activity".into()).unwrap();
+    let fwh_status = status_endpoints.get("full_wake_handling".into()).unwrap();
+    let wh_status = status_endpoints.get("wake_handling".into()).unwrap();
+    let bc_status = status_endpoints.get("boot_control".into()).unwrap();
+    let erl_status = status_endpoints.get("execution_resume_latency".into()).unwrap();
+
+    // First watch should return immediately with default values.
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+    assert_eq!(aa_status.watch_power_level().await?.unwrap(), 0);
+    assert_eq!(fwh_status.watch_power_level().await?.unwrap(), 0);
+    assert_eq!(wh_status.watch_power_level().await?.unwrap(), 0);
+    assert_eq!(bc_status.watch_power_level().await?.unwrap(), 1);
+    assert_eq!(erl_status.watch_power_level().await?.unwrap(), 0);
+
+    // Trigger "boot complete" logic.
+    let suspend_lease_control = lease(&suspend_controller, 1).await?;
+
+    assert_eq!(aa_status.watch_power_level().await?.unwrap(), 1);
+    assert_eq!(bc_status.watch_power_level().await?.unwrap(), 0);
+
+    drop(suspend_lease_control);
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+    assert_eq!(aa_status.watch_power_level().await?.unwrap(), 0);
+
+    // Check suspend is triggered and resume.
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Test full wake handling state (full_wake_handling ->1, execution_state -> 1)
+    let full_wake_handling_lease_control = lease(&full_wake_controller, 1).await?;
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 1);
+    assert_eq!(fwh_status.watch_power_level().await?.unwrap(), 1);
+
+    drop(full_wake_handling_lease_control);
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+    assert_eq!(fwh_status.watch_power_level().await?.unwrap(), 0);
+
+    // Check suspend is triggered and resume.
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Test wake handling state (wake_handling ->1, execution_state -> 1)
+    let wake_handling_lease_control = lease(&wake_controller, 1).await?;
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 1);
+    assert_eq!(wh_status.watch_power_level().await?.unwrap(), 1);
+
+    drop(wake_handling_lease_control);
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+    assert_eq!(wh_status.watch_power_level().await?.unwrap(), 0);
+
+    // Check suspend is triggered and resume.
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Test execution resume latency power levels
+    for i in 1..3 {
+        let erl_lease_control = lease(&erl_controller, i).await?;
+        assert_eq!(erl_status.watch_power_level().await?.unwrap(), i);
+        drop(erl_lease_control);
+        assert_eq!(erl_status.watch_power_level().await?.unwrap(), 0);
+    }
 
     Ok(())
 }

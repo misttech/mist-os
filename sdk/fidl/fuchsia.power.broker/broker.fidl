@@ -180,7 +180,7 @@ type Permissions = strict bits : uint32 {
 ///   required level.
 /// * The operator calls CurrentLevel.Update to inform Power Broker
 ///   that it has completed the transition to the new level.
-/// Established via ElementControl.AddElement.
+/// Established via Topology.AddElement.
 open protocol CurrentLevel {
     /// Sent by the element on initial startup and whenever there is a change
     /// in power level.
@@ -195,7 +195,7 @@ type CurrentLevelError = flexible enum {
 
 /// Part of the power level handshake with Power Broker used for receiving
 /// required levels from Power Broker. See above note on CurrentLevel.
-/// Established via ElementControl.AddElement.
+/// Established via Topology.AddElement.
 open protocol RequiredLevel {
     /// Returns the required power level for this element. The first call on
     /// this channel will return immediately. Subsequent calls will block until
