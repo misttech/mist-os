@@ -18,6 +18,8 @@ namespace dl::testing {
 // override this (e.g. via DlLoadZirconTestsBase).
 class DlLoadTestsBase : public DlTestsBase {
  public:
+  // The Expect/Needed API checks that the test files exist in test paths as
+  // expected, or are missing if the test files are expected to not be found.
   static void ExpectRootModule(std::string_view name);
 
   static void ExpectMissing(std::string_view name);
