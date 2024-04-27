@@ -178,24 +178,28 @@ bool IsValidConfig(const pwm_config_t* config) {
 
 void CopyConfig(pwm_config_t* dest, const pwm_config_t* src) {
   ZX_DEBUG_ASSERT(dest->mode_config_buffer);
-  ZX_DEBUG_ASSERT(dest->mode_config_size == src->mode_config_size);
-  ZX_DEBUG_ASSERT(dest->mode_config_size == sizeof(mode_config));
+  ZX_DEBUG_ASSERT(dest->mode_config_size >= src->mode_config_size);
+  ZX_DEBUG_ASSERT(dest->mode_config_size >= sizeof(mode_config));
 
   dest->polarity = src->polarity;
   dest->period_ns = src->period_ns;
   dest->duty_cycle = src->duty_cycle;
   memcpy(dest->mode_config_buffer, src->mode_config_buffer, src->mode_config_size);
+  dest->mode_config_size = src->mode_config_size;
 }
 
 }  // namespace
 
 zx_status_t AmlPwm::PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config) {
   if (idx > 1) {
+    zxlogf(ERROR, "Invalid index: %d", idx);
     return ZX_ERR_INVALID_ARGS;
   }
   if (out_config->mode_config_buffer == nullptr ||
-      out_config->mode_config_size != configs_[idx].mode_config_size ||
-      out_config->mode_config_size != sizeof(mode_config)) {
+      out_config->mode_config_size < configs_[idx].mode_config_size ||
+      out_config->mode_config_size < sizeof(mode_config)) {
+    zxlogf(ERROR, "Invalid mode config buffer: %p, size: %zu (expected atleast %lu)",
+           out_config->mode_config_buffer, out_config->mode_config_size, sizeof(mode_config));
     return ZX_ERR_INVALID_ARGS;
   }
   CopyConfig(out_config, &configs_[idx]);
@@ -592,6 +596,7 @@ zx_status_t AmlPwmDevice::Init(std::vector<fdf::MmioBuffer> mmios,
 
 zx_status_t AmlPwmDevice::PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config) {
   if (idx > max_pwm_id_ || out_config == nullptr) {
+    zxlogf(ERROR, "Invalid arguments index: %d out_config: %p", idx, out_config);
     return ZX_ERR_INVALID_ARGS;
   }
   return pwms_[idx / 2]->PwmImplGetConfig(idx % 2, out_config);

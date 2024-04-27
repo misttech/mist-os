@@ -42,8 +42,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:d/display/amlogic-display/display-coordinator",
       "sys/platform/05:06:1d",  // pwm
       "sys/platform/05:06:1d/aml-pwm-device/pwm-4/pwm_init",
-      "sys/platform/05:06:1d/aml-pwm-device/pwm-0/vreg-0/pwm-0-regulator",
-      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg-9/pwm-9-regulator",
+      "sys/platform/05:06:1d/aml-pwm-device/pwm-0/pwm_vreg_big/pwm_vreg_big",
+      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/pwm_vreg_little/pwm_vreg_little",
       "sys/platform/05:06:26/aml-power-impl-composite",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/power-core/power-0",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/power-core/power-1",

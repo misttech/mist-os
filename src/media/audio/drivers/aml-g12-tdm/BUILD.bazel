@@ -29,6 +29,7 @@ fuchsia_driver_bind_bytecode(
         "@fuchsia_sdk//bind/fuchsia.platform",
         "@fuchsia_sdk//bind/fuchsia.power",
         "@fuchsia_sdk//bind/fuchsia.register",
+        "@fuchsia_sdk//bind/fuchsia.regulator",
         "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     ],
 )

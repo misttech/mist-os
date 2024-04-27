@@ -245,7 +245,7 @@ zx_status_t AmlPower::Update(const fidl::WireSyncClient<fuchsia_hardware_vreg::V
     return step.status();
   }
   if (step->is_error()) {
-    zxlogf(ERROR, "Failed to set voltage step: %s", step.error().status_string());
+    zxlogf(ERROR, "Failed to set voltage step: %s", zx_status_get_string(step->error_value()));
     return step->error_value();
   }
   usleep(kVoltageSettleTimeUs);

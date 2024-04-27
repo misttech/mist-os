@@ -60,7 +60,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.hardware.vreg.Service": "fuchsia.hardware.vreg.Service.ZirconTransport",
-                    "fuchsia.amlogic.platform.PWM_ID": "fuchsia.amlogic.platform.PWM_ID.AO_D"
+                    "fuchsia.regulator.NAME": "fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_LITTLE"
                 }
             }
         ]
@@ -73,7 +73,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.hardware.vreg.Service": "fuchsia.hardware.vreg.Service.ZirconTransport",
-                    "fuchsia.amlogic.platform.PWM_ID": "fuchsia.amlogic.platform.PWM_ID.A"
+                    "fuchsia.regulator.NAME": "fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_BIG"
                 }
             }
         ]

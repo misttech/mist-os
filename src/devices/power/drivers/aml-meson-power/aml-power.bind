@@ -5,9 +5,11 @@
 composite aml_power_impl;
 
 using fuchsia.amlogic.platform;
+using fuchsia.amlogic.platform.a311d;
 using fuchsia.google.platform;
 using fuchsia.hardware.vreg;
 using fuchsia.hardware.pwm;
+using fuchsia.regulator;
 
 primary node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.POWER;
@@ -35,10 +37,10 @@ optional node "pwm-big" {
 
 optional node "vreg-pwm-little" {
   fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
-  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.AO_D;
+  fuchsia.regulator.NAME == fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_LITTLE;
 }
 
 optional node "vreg-pwm-big" {
   fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
-  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.A;
+  fuchsia.regulator.NAME == fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_BIG;
 }

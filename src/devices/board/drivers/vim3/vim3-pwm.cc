@@ -106,6 +106,17 @@ zx_status_t Vim3::PwmInit() {
       {{.id = A311D_PWM_AO_D}},
   }}}};
 
+  for (auto& channel : *metadata.channels()) {
+    // Copy the config for specific channels as requested by other devices.
+    for (auto& config : pwm_channel_configs_) {
+      if (config.id() == channel.id()) {
+        channel.period_ns() = config.period_ns();
+        channel.polarity() = config.polarity();
+        break;
+      }
+    }
+  }
+
   fit::result encoded_metadata = fidl::Persist(metadata);
   if (encoded_metadata.is_error()) {
     zxlogf(ERROR, "Failed to encode pwm channels metadata: %s",

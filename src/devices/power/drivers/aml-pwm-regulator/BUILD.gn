@@ -27,6 +27,7 @@ group("common") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.regulator:fuchsia.regulator_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -63,7 +64,6 @@ test("aml-pwm-regulator-test-bin") {
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
-    "//src/devices/lib/metadata:llcpp",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

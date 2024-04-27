@@ -16,16 +16,16 @@
 
 namespace aml_pwm_regulator {
 
-using fuchsia_hardware_vreg::wire::PwmVregMetadata;
+using fuchsia_hardware_vreg::wire::VregMetadata;
 
 class AmlPwmRegulatorDriver;
 
 class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
  public:
-  explicit AmlPwmRegulator(const PwmVregMetadata& vreg_range,
+  explicit AmlPwmRegulator(const VregMetadata& vreg_range,
                            fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client,
-                           AmlPwmRegulatorDriver* driver, std::string_view name);
-  static zx::result<std::unique_ptr<AmlPwmRegulator>> Create(const PwmVregMetadata& metadata,
+                           AmlPwmRegulatorDriver* driver);
+  static zx::result<std::unique_ptr<AmlPwmRegulator>> Create(const VregMetadata& metadata,
                                                              AmlPwmRegulatorDriver* driver);
 
   // Vreg Implementation.
@@ -35,14 +35,12 @@ class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
   void GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) override;
 
  private:
-  uint32_t pwm_index_;
-  uint32_t period_ns_;
+  const std::string name_;
   uint32_t min_voltage_uv_;
   uint32_t voltage_step_uv_;
   uint32_t num_steps_;
 
   uint32_t current_step_;
-  const std::string name_;
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client_;
   compat::SyncInitializedDeviceServer compat_server_;

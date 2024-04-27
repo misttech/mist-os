@@ -546,6 +546,7 @@ sdk_molecule("core_bindlib") {
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_sdk",
     "//src/devices/bind/fuchsia.realtek.platform:fuchsia.realtek.platform_sdk",
     "//src/devices/bind/fuchsia.register:fuchsia.register_sdk",
+    "//src/devices/bind/fuchsia.regulator:fuchsia.regulator_sdk",
     "//src/devices/bind/fuchsia.sdio:fuchsia.sdio_sdk",
     "//src/devices/bind/fuchsia.serial:fuchsia.serial_sdk",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_sdk",

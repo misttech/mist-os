@@ -5,6 +5,7 @@
 #include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator.h"
 
 #include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.vreg/cpp/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -14,9 +15,9 @@
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/sync/cpp/completion.h>
 
-#include <zxtest/zxtest.h>
-#include "src/devices/lib/metadata/llcpp/vreg.h"
+#include <list>
 
+#include <zxtest/zxtest.h>
 bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
                 const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
@@ -56,6 +57,14 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
     completer.ReplySuccess();
   }
 
+  void GetConfig(GetConfigCompleter::Sync& completer) override {
+    ASSERT_TRUE(expect_default_configs_.size() > 0);
+    auto default_config = expect_default_configs_.front();
+
+    expect_default_configs_.pop_front();
+    completer.ReplySuccess(default_config);
+  }
+
   void Enable(EnableCompleter::Sync& completer) override {
     ASSERT_TRUE(expect_enable_);
     expect_enable_ = false;
@@ -74,6 +83,10 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
         fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
     expect_configs_.push_back(std::move(copy));
     mode_config_buffers_.push_back(std::move(mode_config));
+  }
+
+  void ExpectGetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
+    expect_default_configs_.push_back(std::move(config));
   }
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
@@ -115,6 +128,7 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   fidl::ServerBindingGroup<fuchsia_hardware_pwm::Pwm> bindings_;
 
   std::list<fuchsia_hardware_pwm::wire::PwmConfig> expect_configs_;
+  std::list<fuchsia_hardware_pwm::wire::PwmConfig> expect_default_configs_;
   std::list<std::unique_ptr<uint8_t[]>> mode_config_buffers_;
 
   bool expect_enable_ = false;
@@ -145,13 +159,15 @@ class AmlPwmRegulatorTest : public zxtest::Test {
       incoming->compat_server.Init("pdev", "");
 
       // Setup metadata.
-      fidl::Arena<2048> allocator;
-      fuchsia_hardware_vreg::wire::PwmVregMetadata metadata =
-          vreg::BuildMetadata(allocator, 0, 1250, 690'000, 1'000, 11);
-      auto encoded = fidl::Persist(metadata);
-      ASSERT_TRUE(encoded.is_ok());
-      incoming->compat_server.AddMetadata(DEVICE_METADATA_VREG, encoded.value().data(),
-                                          encoded.value().size());
+      fuchsia_hardware_vreg::VregMetadata metadata_vreg = {};
+      metadata_vreg.name() = "pwm-0-regulator";
+      metadata_vreg.min_voltage_uv() = 690000;
+      metadata_vreg.voltage_step_uv() = 1000;
+      metadata_vreg.num_steps() = 11;
+      auto encoded_vreg = fidl::Persist(metadata_vreg);
+      ASSERT_TRUE(encoded_vreg.is_ok());
+      incoming->compat_server.AddMetadata(DEVICE_METADATA_VREG, encoded_vreg.value().data(),
+                                          encoded_vreg.value().size());
 
       zx_status_t status =
           incoming->compat_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
@@ -223,15 +239,22 @@ TEST_F(AmlPwmRegulatorTest, RegulatorTest) {
   fuchsia_hardware_pwm::wire::PwmConfig cfg = {
       .polarity = false,
       .period_ns = 1250,
-      .duty_cycle = 70,
-      .mode_config =
-          fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&mode), sizeof(mode)),
   };
+
+  incoming_.SyncCall(
+      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectGetConfig(cfg); });
+
+  cfg.duty_cycle = 70;
+  cfg.mode_config =
+      fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&mode), sizeof(mode));
 
   incoming_.SyncCall(
       [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectSetConfig(cfg); });
 
   set_and_expect_voltage_step(vreg_client, 3);
+
+  incoming_.SyncCall(
+      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectGetConfig(cfg); });
 
   cfg.duty_cycle = 10;
   incoming_.SyncCall(

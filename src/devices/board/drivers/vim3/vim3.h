@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <lib/ddk/device.h>
 #include <threads.h>
 
@@ -133,6 +134,7 @@ class Vim3 : public Vim3Type {
   fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
+  std::vector<fuchsia_hardware_pwm::PwmChannelInfo> pwm_channel_configs_;
   thrd_t thread_;
 };
 

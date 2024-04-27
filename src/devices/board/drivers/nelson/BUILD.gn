@@ -140,7 +140,6 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/fidl-metadata",
-    "//src/devices/lib/metadata:llcpp",
     "//src/devices/lib/mmio",
     "//src/devices/lib/thermal",
     "//src/devices/lib/ti",
