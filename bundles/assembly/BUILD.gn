@@ -1699,8 +1699,6 @@ assembly_input_bundle("common_standard") {
           component_name = "core"
           shards = rebase_path(
                   [
-                    # TODO(https://fxbug.dev/326315218): delete kcounter cml after soft migration
-                    "//src/diagnostics/kcounter/meta/diagnostics-kcounter.core_shard.cml",
                     "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
                     "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
                     "//src/diagnostics/sampler/meta/sampler.core_shard.cml",

@@ -1,9 +1,0 @@
-# Copyright 2021 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-import("//src/sys/core/build/core_shard.gni")
-
-core_shard("core_shard") {
-  shard_file = "meta/diagnostics-kcounter.core_shard.cml"
-}
