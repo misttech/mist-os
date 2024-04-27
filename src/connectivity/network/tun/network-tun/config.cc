@@ -11,6 +11,8 @@ std::optional<BasePortConfig> BasePortConfig::Create(
     const fuchsia_net_tun::wire::BasePortConfig& config) {
   BasePortConfig out{
       .mtu = config.has_mtu() ? config.mtu() : fuchsia_net_tun::wire::kMaxMtu,
+      .port_class = config.has_port_class() ? config.port_class()
+                                            : fuchsia_hardware_network::wire::PortClass::kVirtual,
   };
   // Check validity.
   if (out.mtu == 0 || out.mtu > fuchsia_net_tun::wire::kMaxMtu) {

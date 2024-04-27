@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::SupportsFileRelativePaths;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub mod battery_config;
@@ -35,7 +37,7 @@ pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// The minimum service-level that the platform will provide, or the main
@@ -72,10 +74,12 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the connectivity area.
     #[serde(default)]
+    #[file_relative_paths]
     pub connectivity: connectivity_config::PlatformConnectivityConfig,
 
     /// Platform configuration options for enabling developer support.
     #[serde(default)]
+    #[file_relative_paths]
     pub development_support: development_support_config::DevelopmentSupportConfig,
 
     /// Platform configuration options for the diagnostics area.
@@ -121,6 +125,7 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the SWD subsystem.
     #[serde(default)]
+    #[file_relative_paths]
     pub software_delivery: swd_config::SwdConfig,
 
     /// Platform configuration options for the starnix area.
@@ -129,6 +134,7 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for storage support.
     #[serde(default)]
+    #[file_relative_paths]
     pub storage: storage_config::StorageConfig,
 
     /// Platform configuration options for the UI area.
@@ -202,7 +208,7 @@ pub struct PlatformConfig {
 ///
 /// The standard (default) level is `Minimal`. It is the level that should be
 /// used by products' main system.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 pub enum FeatureSupportLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
     ///
@@ -210,9 +216,17 @@ pub enum FeatureSupportLevel {
     #[serde(rename = "empty")]
     Empty,
 
+    /// This is a small build of fuchsia which is not meant to support
+    /// self-updates, but rather be updated externally. It is meant for truly
+    /// memory constrained environments where fuchsia does not need to driver a
+    /// large amount of hardware. It includes a minimal subset of bootstrap and
+    /// doesn't bring in any of core.
+    #[serde(rename = "embeddable")]
+    Embeddable,
+
     /// Bootable, but serial-only.  This is only the `/bootstrap` realm.  No
-    /// netstack, no storage drivers, etc.  this is the smallest bootable system
-    /// created by assembly, and is primarily used for board-level bringup.
+    /// netstack, no storage drivers, etc.  This is one of the smallest bootable
+    /// systems created by assembly, and is primarily used for board-level bringup.
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
     #[serde(rename = "bootstrap")]
@@ -240,7 +254,7 @@ pub enum FeatureSupportLevel {
 /// These control security and behavioral settings within the platform, and can
 /// change the platform packages placed into the assembled product image.
 ///
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub enum BuildType {
     #[serde(rename = "eng")]
     Eng,

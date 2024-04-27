@@ -332,7 +332,22 @@ TEST(VersioningAttributeTests, BadLibraryReplaced) {
   TestLibrary library;
   library.AddFile("bad/fi-0204.test.fidl");
   library.SelectVersion("test", "HEAD");
-  library.ExpectFail(ErrLibraryReplaced);
+  library.ExpectFail(ErrCannotBeReplaced, Element::Kind::kLibrary);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadComposeReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Foo {
+    @available(replaced=2)
+    compose Bar;
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrCannotBeReplaced, Element::Kind::kProtocolCompose);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

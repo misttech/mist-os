@@ -56,8 +56,9 @@ use crate::{
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
-            DatagramHeader, DeviceSocketBindingsContext, DeviceSocketHandler, DeviceSocketMetadata,
-            HeldDeviceSockets, ParseSentFrameError, ReceivedFrame, SentFrame,
+            DeviceSocketBindingsContext, DeviceSocketHandler, DeviceSocketMetadata,
+            DeviceSocketSendTypes, EthernetHeaderParams, HeldDeviceSockets, ParseSentFrameError,
+            ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTimerId,
@@ -81,14 +82,11 @@ use crate::{
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
-pub(crate) trait EthernetIpLinkDeviceBindingsContext<DeviceId>:
-    RngContext + TimerContext2
+pub(crate) trait EthernetIpLinkDeviceBindingsContext:
+    RngContext + TimerContext2 + DeviceLayerTypes
 {
 }
-impl<DeviceId, BC: RngContext + TimerContext2> EthernetIpLinkDeviceBindingsContext<DeviceId>
-    for BC
-{
-}
+impl<BC: RngContext + TimerContext2 + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
 
 /// Provides access to an ethernet device's static state.
 pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
@@ -104,9 +102,8 @@ pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
 }
 
 /// Provides access to an ethernet device's dynamic state.
-pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
-    BC: EthernetIpLinkDeviceBindingsContext<Self::DeviceId>,
->: EthernetIpLinkDeviceStaticStateContext
+pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<BC: EthernetIpLinkDeviceBindingsContext>:
+    EthernetIpLinkDeviceStaticStateContext
 {
     /// Calls the function with the ethernet device's static state and immutable
     /// reference to the dynamic state.
@@ -379,7 +376,7 @@ fn send_as_ethernet_frame_to_dst<S, BC, CC>(
 where
     S: Serializer,
     S::Buffer: BufferMut,
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -412,7 +409,7 @@ fn send_ethernet_frame<S, BC, CC>(
 where
     S: Serializer,
     S::Buffer: BufferMut,
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -732,7 +729,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 
-    fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+    fn parse_outgoing_frame<'a, 'b>(
+        buf: &'a [u8],
+        (): &'b Self::Meta,
+    ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
         SentFrame::try_parse_as_ethernet(buf)
     }
 }
@@ -837,7 +837,7 @@ impl<I: Ip, D: device::WeakId> From<NudTimerId<I, EthernetLinkDevice, D>> for Et
 
 impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::WeakDeviceId>> for CC
 where
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::WeakDeviceId>>
         + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::WeakDeviceId>>,
@@ -865,7 +865,7 @@ pub(super) fn send_ip_frame<BC, CC, A, S>(
     broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
+    BC: EthernetIpLinkDeviceBindingsContext
         + DeviceSocketBindingsContext<CC::DeviceId>
         + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
@@ -948,7 +948,7 @@ impl DeviceReceiveFrameSpec for EthernetLinkDevice {
 
 impl<CC, BC> RecvFrameContext<BC, RecvEthernetFrameMeta<CC::DeviceId>> for CC
 where
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
+    BC: EthernetIpLinkDeviceBindingsContext
         + DeviceSocketBindingsContext<CC::DeviceId>
         + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
@@ -1074,7 +1074,7 @@ where
 // testonly.
 #[cfg(test)]
 pub(super) fn set_promiscuous_mode<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1102,7 +1102,7 @@ pub(super) fn set_promiscuous_mode<
 /// `join_link_multicast` joins an L2 multicast group, whereas
 /// `join_ip_multicast` joins an L3 multicast group.
 pub(super) fn join_link_multicast<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1149,7 +1149,7 @@ pub(super) fn join_link_multicast<
 ///
 /// If `device_id` is not in the multicast group `multicast_addr`.
 pub(super) fn leave_link_multicast<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1183,7 +1183,7 @@ pub(super) fn leave_link_multicast<
 
 /// Get the MTU associated with this device.
 pub(super) fn get_mtu<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1195,8 +1195,7 @@ pub(super) fn get_mtu<
 }
 
 impl<
-        BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
-            + DeviceSocketBindingsContext<CC::DeviceId>,
+        BC: EthernetIpLinkDeviceBindingsContext + DeviceSocketBindingsContext<CC::DeviceId>,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -1383,26 +1382,35 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
         )
     }
 }
+
+impl DeviceSocketSendTypes for EthernetLinkDevice {
+    /// When `None`, data will be sent as a raw Ethernet frame without any
+    /// system-applied headers.
+    type Metadata = Option<EthernetHeaderParams>;
+}
+
 impl<
-        BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+        BC: EthernetIpLinkDeviceBindingsContext,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    > SendFrameContext<BC, DeviceSocketMetadata<CC::DeviceId>> for CC
+    > SendFrameContext<BC, DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>> for CC
+where
+    CC: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<BC>>,
 {
     fn send_frame<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        metadata: DeviceSocketMetadata<CC::DeviceId>,
+        metadata: DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>,
         body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let DeviceSocketMetadata { device_id, header } = metadata;
-        match header {
-            Some(DatagramHeader { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
+        let DeviceSocketMetadata { device_id, metadata } = metadata;
+        match metadata {
+            Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
                 self,
                 bindings_ctx,
                 &device_id,
@@ -1417,7 +1425,7 @@ impl<
 
 pub(super) fn get_mac<
     'a,
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &'a mut CC,
@@ -1427,7 +1435,7 @@ pub(super) fn get_mac<
 }
 
 pub(super) fn set_mtu<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
@@ -1853,8 +1861,11 @@ mod tests {
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
 
-        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
-            FakeInnerCtx::parse_outgoing_frame(buf)
+        fn parse_outgoing_frame<'a>(
+            buf: &'a [u8],
+            meta: &'a Self::Meta,
+        ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
+            FakeInnerCtx::parse_outgoing_frame(buf, meta)
         }
     }
 
@@ -1863,7 +1874,10 @@ mod tests {
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
 
-        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+        fn parse_outgoing_frame<'a, 'b>(
+            buf: &'a [u8],
+            (): &'b Self::Meta,
+        ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
             SentFrame::try_parse_as_ethernet(buf)
         }
     }

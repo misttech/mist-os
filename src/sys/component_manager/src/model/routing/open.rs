@@ -7,7 +7,6 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
-            error::{CapabilityProviderError, ModelError, OpenError},
             routing::{
                 providers::{
                     DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
@@ -25,6 +24,7 @@ use {
     },
     ::routing::component_instance::ComponentInstanceInterface,
     cm_moniker::InstancedExtendedMoniker,
+    errors::{CapabilityProviderError, ModelError, OpenError},
     fidl_fuchsia_io as fio,
     moniker::MonikerBase,
     std::sync::Arc,

@@ -880,8 +880,8 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     return true;
   }
   const size_t layers_size = std::max(static_cast<size_t>(1), layers_.size());
-  const display_config_t* configs[configs_.size()];
-  const layer_t* layers[layers_size];
+  display_config_t configs[configs_.size()];
+  layer_t layers[layers_size];
 
   // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
@@ -892,56 +892,58 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   bool config_fail = false;
   size_t config_idx = 0;
   size_t layer_idx = 0;
-  for (auto& display_config : configs_) {
-    if (display_config.pending_layers_.is_empty()) {
+  for (display::DisplayConfig& source_display_config : configs_) {
+    if (source_display_config.pending_layers_.is_empty()) {
       continue;
     }
 
-    // Put this display's display_config_t* into the compact array
-    configs[config_idx] = &display_config.pending_;
-
+    // Put this display's display_config_t into the array.
+    display_config_t& banjo_display_config = configs[config_idx];
     ++config_idx;
 
-    // Create this display's compact layer_t* array
-    display_config.pending_.layer_list = layers + layer_idx;
+    // Create this display's compact layer_t array
+    banjo_display_config = source_display_config.pending_;
+    banjo_display_config.layer_list = layers + layer_idx;
 
     // Frame used for checking that each layer's dest_frame lies entirely
     // within the composed output.
     frame_t display_frame = {
         .x_pos = 0,
         .y_pos = 0,
-        .width = display_config.pending_.mode.h_addressable,
-        .height = display_config.pending_.mode.v_addressable,
+        .width = banjo_display_config.mode.h_addressable,
+        .height = banjo_display_config.mode.v_addressable,
     };
 
     // Do any work that needs to be done to make sure that the pending layer_t structs
     // are up to date, and validate that the configuration doesn't violate any API
     // constraints.
-    for (auto& layer_node : display_config.pending_layers_) {
-      layers[layer_idx++] = &layer_node.layer->pending_layer_;
+    for (display::LayerNode& source_layer_node : source_display_config.pending_layers_) {
+      layer_t& banjo_layer = layers[layer_idx];
+      ++layer_idx;
+
+      banjo_layer = source_layer_node.layer->pending_layer_;
       ++client_composition_opcodes_count;
 
       bool invalid = false;
-      if (layer_node.layer->pending_layer_.type == LAYER_TYPE_PRIMARY) {
-        primary_layer_t* layer = &layer_node.layer->pending_layer_.cfg.primary;
+      if (banjo_layer.type == LAYER_TYPE_PRIMARY) {
+        primary_layer_t* primary_layer = &banjo_layer.cfg.primary;
         // Frame for checking that the layer's src_frame lies entirely
         // within the source image.
         frame_t image_frame = {
             .x_pos = 0,
             .y_pos = 0,
-            .width = layer->image_metadata.width,
-            .height = layer->image_metadata.height,
+            .width = primary_layer->image_metadata.width,
+            .height = primary_layer->image_metadata.height,
         };
-        invalid = (!frame_contains(image_frame, layer->src_frame) ||
-                   !frame_contains(display_frame, layer->dest_frame));
+        invalid = (!frame_contains(image_frame, primary_layer->src_frame) ||
+                   !frame_contains(display_frame, primary_layer->dest_frame));
         // The formats of layer images are negotiated by sysmem between clients
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.
-      } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_COLOR) {
+      } else if (banjo_layer.type == LAYER_TYPE_COLOR) {
         // There aren't any API constraints on valid colors.
-        layer_node.layer->pending_layer_.cfg.color.color_list =
-            layer_node.layer->pending_color_bytes_;
-        layer_node.layer->pending_layer_.cfg.color.color_count = 4;
+        banjo_layer.cfg.color.color_list = source_layer_node.layer->pending_color_bytes_;
+        banjo_layer.cfg.color.color_count = 4;
       } else {
         invalid = true;
       }
@@ -1048,7 +1050,7 @@ void Client::ApplyConfig() {
 
   bool config_missing_image = false;
   // Clients can apply zero-layer configs. Ensure that the VLA is at least 1 element long.
-  const layer_t* layers[layers_.size() + 1];
+  layer_t layers[layers_.size() + 1];
   int layer_idx = 0;
 
   // Layers may have pending images, and it is possible that a layer still
@@ -1086,7 +1088,7 @@ void Client::ApplyConfig() {
       }
 
       display_config.current_.layer_count++;
-      layers[layer_idx++] = &layer->current_layer_;
+      layers[layer_idx++] = layer->current_layer_;
       if (layer->current_layer_.type != LAYER_TYPE_COLOR) {
         if (layer->current_image() == nullptr) {
           config_missing_image = true;

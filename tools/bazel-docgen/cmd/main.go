@@ -6,10 +6,8 @@ package main
 
 import (
 	"flag"
-	"io"
 	"log"
 	"os"
-	"path/filepath"
 
 	"google.golang.org/protobuf/encoding/prototext"
 
@@ -18,13 +16,15 @@ import (
 )
 
 type docGenFlags struct {
-	outDir string
-	proto  string
+	outDir  string
+	zipFile string
+	proto   string
 }
 
 func parseFlags() docGenFlags {
 	var flags docGenFlags
 	flag.StringVar(&flags.outDir, "out_dir", "", "path to a directory which will contain output files.")
+	flag.StringVar(&flags.zipFile, "zip_file", "", "path to a file containing the zip file.")
 	flag.StringVar(&flags.proto, "proto", "", "path to a protobuf, as a textproto, file which contains the docs")
 	flag.Parse()
 
@@ -44,19 +44,22 @@ func main() {
 		log.Fatalln("Failed to parse module info:", err)
 	}
 
-	generator := bazel_docgen.NewDocGenerator()
 	renderer := bazel_docgen.NewMarkdownRenderer()
 
-	// Create a simple file creation function which just creates a file. In the
-	// future it will be easier to use the zip writer to create one zip file and
-	// then unzip into the outDir for testing if it is specified.
-	makeFileFn := func(s string) io.Writer {
-		f, err := os.Create(filepath.Join(flags.outDir, s))
-		if err != nil {
-			log.Fatalln("Failed to create new file:", err)
+	var fileProvider bazel_docgen.FileProvider
+
+	if flags.outDir != "" {
+		if flags.zipFile != "" {
+			log.Fatalln("--zip_file must not be set when using --out_dir.")
 		}
-		return f
+		fp := bazel_docgen.NewDirectoryFileProvider(flags.outDir)
+		fileProvider = &fp
+	} else if flags.zipFile != "" {
+		fp := bazel_docgen.NewZipFileProvider(flags.zipFile)
+		fileProvider = &fp
+	} else {
+		log.Fatalln("Either --zip_file or --out_dir must be set.")
 	}
 
-	generator.RenderModuleInfo(root, &renderer, makeFileFn)
+	bazel_docgen.RenderModuleInfo(root, renderer, fileProvider)
 }

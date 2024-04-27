@@ -29,7 +29,7 @@ use {
         marker::PhantomData,
         mem::MaybeUninit,
         ops::Range,
-        sync::{Arc, Mutex, Weak},
+        sync::{Arc, Mutex, MutexGuard, Weak},
     },
     storage_device::buffer,
     vfs::execution_scope::ExecutionScope,
@@ -191,17 +191,24 @@ impl Pager {
         });
     }
 
+    /// Set the current profile recorder, or set to None to not record.
     pub fn set_recorder(&self, recorder: Option<Recorder>) {
         // Drop the old one outside of the lock.
         let _ = std::mem::replace(&mut (*self.recorder.lock().unwrap()), recorder);
     }
 
+    /// Borrow the profile recorder. Used to record file opens.
+    pub fn recorder(&self) -> MutexGuard<'_, Option<Recorder>> {
+        self.recorder.lock().unwrap()
+    }
+
+    /// Record a range into a profile if one is being recorded.
     pub fn record_page_in<P: PagerBacked>(&self, node: Arc<P>, range: Range<u64>) {
         if let Ok(blob) = node.into_any().downcast::<FxBlob>() {
             let mut recorder_holder = self.recorder.lock().unwrap();
             if let Some(recorder) = &mut (*recorder_holder) {
                 // If the message fails to send, so will all the rest.
-                if let Err(_) = recorder.record(blob.root(), range.start) {
+                if let Err(_) = recorder.record(&blob.root(), range.start) {
                     *recorder_holder = None;
                 }
             }

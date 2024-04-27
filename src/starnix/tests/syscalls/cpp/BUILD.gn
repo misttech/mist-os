@@ -182,6 +182,8 @@ test("syscalls_cpp_test_bin") {
         [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64" ]
   }
 
+  configs += [ "//build/config:rtti" ]
+
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 

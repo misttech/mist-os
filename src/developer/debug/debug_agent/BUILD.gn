@@ -35,6 +35,7 @@ static_library("lib") {
     "general_registers.h",
     "hardware_breakpoint.cc",
     "hardware_breakpoint.h",
+    "job_exception_observer.h",
     "job_handle.cc",
     "job_handle.h",
     "limbo_provider.h",

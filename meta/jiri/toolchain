@@ -2,13 +2,16 @@
 <manifest>
   <!--
   Configuration of toolchain packages.
+
   To manually fetch packages after local edits to this file, please regenerate
   the corresponding lock files first by running:
   `//integration/update-lockfiles.sh`
+
   Then fetch the packages:
   `jiri fetch-packages -local-manifest=true`
   -->
   <packages>
+
     <!-- Binutils & GDB for diagnostic use
          Built by bots at https://ci.chromium.org/p/fuchsia/g/binutils/
     -->
@@ -16,13 +19,15 @@
              version="git_revision:b8a175b415454df6a039ba0b5d2ff13c3c180275"
              platforms="linux-amd64,linux-arm64,mac-amd64"
              path="prebuilt/third_party/binutils-gdb/{{.OS}}-{{.Arch}}"/>
+
     <!-- Clang
          TODO(mcgrathr): repo/bot link about provenance
     -->
     <package name="fuchsia/third_party/clang/${platform}"
-             version="git_revision:b1d2e8510b58893e58558ffdf3f8ba29c1e25e5a"
+             version="git_revision:a2692ac23f1421097f0d51c7325045ed38db6408"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/clang/{{.OS}}-{{.Arch}}"/>
+
     <!-- GCC
          TODO(mcgrathr): repo/bot link about provenance
     -->
@@ -30,13 +35,15 @@
              version="git_revision:fbe5e908de76aa240bbcd2f144c156eccc863604,25558d2fc0e8b77d4c522c322012b048db4c1485"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/gcc/{{.OS}}-{{.Arch}}"/>
+
     <!-- Go
          TODO(phosek): repo/bot link about provenance
     -->
     <package name="fuchsia/go/${platform}"
-             version="git_revision:84d157557b5f07d05226ff9425afcea8014cb96a"
+             version="git_revision:ae287a22599190c2a20136bede0687451c5d1f3e"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/go/{{.OS}}-{{.Arch}}"/>
+
     <!-- Rust host tools https://ci.chromium.org/p/fuchsia/g/rust/console
          From Rust on Fuchsia team
     -->
@@ -44,6 +51,7 @@
              version="git_revision:703dc9ce64d9b31a239a7280d9b5f9ddd85ffed6"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
+
     <!-- Rust targets https://ci.chromium.org/p/fuchsia/g/rust/console
          From Rust on Fuchsia team
     -->
@@ -59,6 +67,7 @@
              version="git_revision:703dc9ce64d9b31a239a7280d9b5f9ddd85ffed6"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
+
     <!-- sysroot trees built from public OS images
          TODO(mcgrathr): repo/bot link about provenance
     -->
@@ -66,23 +75,27 @@
              version="git_revision:cf821ee2dbc2ed61dfc25a814dcc8d090f9fda03"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/sysroot/linux"/>
+
     <!-- GN from https://gn.googlesource.com/gn/ -->
     <package name="gn/gn/${platform}"
-             version="git_revision:d823fd85da3fb83146f734377da454473b93a2b2"
+             version="git_revision:f284b6b47039a2d7edfcbfc51f52664f82b5a789"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/gn/{{.OS}}-{{.Arch}}"/>
+
     <!-- Ninja from https://ninja-build.org/ -->
     <!-- TODO(phosek): link to bot/recipe/autoroller(?) -->
     <package name="fuchsia/third_party/ninja/${platform}"
              version="git_revision:7fdd96a48def7f0d7909d045ce8afffb4d04ebbc"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/ninja/{{.OS}}-{{.Arch}}"/>
+
     <!-- Python3 interpreter, used for host tools after bootstrap.
     -->
     <package name="infra/3pp/tools/cpython3/${platform}"
              version="version:2@3.11.3.chromium.29"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/python3/{{.OS}}-{{.Arch}}"/>
+
     <!-- buildidtool from
          https://fuchsia.googlesource.com/tools/+/{{.git_revision}}/cmd/buildidtool
     -->
@@ -102,5 +115,6 @@
              version="git_revision:949d38e6dc7330712b50697d7fe833eec85dede1"
              path="prebuilt/third_party/jq/mac-arm64"
              platforms="mac-arm64"/>
+
   </packages>
 </manifest>

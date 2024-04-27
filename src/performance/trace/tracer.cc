@@ -11,14 +11,15 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/fields.h>
 
+#include <memory>
 #include <utility>
 
 #include <trace-reader/reader.h>
 
 namespace tracing {
 
-Tracer::Tracer(controller::Controller* controller)
-    : controller_(controller), dispatcher_(nullptr), wait_(this) {
+Tracer::Tracer(fidl::Client<controller::Controller> controller)
+    : controller_(std::move(controller)), dispatcher_(nullptr), wait_(this) {
   FX_DCHECK(controller_);
   wait_.set_trigger(ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED);
 }
@@ -39,12 +40,19 @@ void Tracer::Initialize(controller::TraceConfig config, bool binary, BytesConsum
     return;
   }
 
-  controller_->InitializeTracing(std::move(config), std::move(outgoing_socket));
+  auto res = controller_->InitializeTracing(
+      {{.config = std::move(config), .output = std::move(outgoing_socket)}});
+  if (res.is_error()) {
+    FX_LOGS(ERROR) << "Failed to initialize tracing: " << res.error_value();
+    Fail();
+    return;
+  }
   BeginWatchAlert();
 
   binary_ = binary;
   bytes_consumer_ = std::move(bytes_consumer);
-  reader_.reset(new trace::TraceReader(std::move(record_consumer), std::move(error_handler)));
+  reader_ =
+      std::make_unique<trace::TraceReader>(std::move(record_consumer), std::move(error_handler));
 
   fail_callback_ = std::move(fail_callback);
   done_callback_ = std::move(done_callback);
@@ -66,12 +74,10 @@ void Tracer::Start(StartCallback start_callback) {
   // All our categories are passed when we initialize, and we're just
   // starting tracing so the buffer is already empty, so there's nothing to
   // pass for |StartOptions| here.
-  controller::StartOptions start_options{};
-
-  controller_->StartTracing(std::move(start_options),
-                            [this](controller::Controller_StartTracing_Result result) {
-                              start_callback_(std::move(result));
-                            });
+  controller_->StartTracing({}).Then(
+      [this](fidl::Result<controller::Controller::StartTracing> result) {
+        start_callback_(result);
+      });
 
   state_ = State::kStarted;
 }
@@ -80,12 +86,11 @@ void Tracer::Terminate() {
   // Note: The controller will close the consumer socket when finished.
   FX_DCHECK(state_ != State::kReady);
   state_ = State::kTerminating;
-  controller::TerminateOptions terminate_options{};
-  terminate_options.set_write_results(true);
-  controller_->TerminateTracing(std::move(terminate_options),
-                                [](controller::Controller_TerminateTracing_Result result) {
-                                  // TODO(dje): Print provider stats.
-                                });
+  controller::TerminateOptions terminate_options{{.write_results = true}};
+  controller_->TerminateTracing(std::move(terminate_options))
+      .Then([](const fidl::Result<controller::Controller::TerminateTracing>& result) {
+        // TODO(dje): Print provider stats.
+      });
 }
 
 void Tracer::OnHandleReady(async_dispatcher_t* dispatcher, async::WaitBase* wait,
@@ -186,13 +191,13 @@ void Tracer::Done() {
 }
 
 void Tracer::BeginWatchAlert() {
-  controller_->WatchAlert([this](controller::Controller_WatchAlert_Result result) {
-    if (result.is_response()) {
-      alert_callback_(std::move(result.response().alert_name));
-      BeginWatchAlert();
-    } else {
-      FX_LOGS(ERROR) << "Error retrieving WatchAlert";
+  controller_->WatchAlert().Then([this](fidl::Result<controller::Controller::WatchAlert> result) {
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Failed to watch alert: " << result.error_value();
+      return;
     }
+    alert_callback_(std::move(result->alert_name()));
+    BeginWatchAlert();
   });
 }
 

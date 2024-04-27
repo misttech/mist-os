@@ -83,8 +83,7 @@ fit::result<EfiBootZbi::Zbi::Error, EfiBootZbi::Zbi> EfiBootZbi::Load(
   // But allocate enough extra space after it to guarantee "in-place" loading.
   const size_t kernel_load_size =
       offsetof(arch::ZbiKernelImage, data_kernel) + kernel_item->header->length;
-  size_t kernel_alloc_size =
-      kernel_load_size + kernel_header.reserve_memory_size + kKernelBootAllocReserve;
+  size_t kernel_alloc_size = kernel_load_size + kernel_header.reserve_memory_size;
   if (auto result = zbi_copy(kernel_alloc_size, memalloc::Type::kKernel,
                              arch::kZbiBootKernelAlignment, kernel_item, it);
       result.is_ok()) {

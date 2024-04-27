@@ -10,6 +10,8 @@ executable("shutdown-shim") {
   deps = [
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
     "//sdk/lib/component/incoming/cpp",

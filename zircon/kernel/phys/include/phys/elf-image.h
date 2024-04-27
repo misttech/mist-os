@@ -123,11 +123,7 @@ class ElfImage {
   // the lifetime of the ElfImage. In general, the returned allocation should
   // not be consulted for addresses within the load image; that is what
   // memory_image() is for.
-  Allocation Load(ktl::optional<uint64_t> relocation_address = {}, bool in_place_ok = true,
-                  // TODO(https://fxbug.dev/42164859): This won't be needed once kernels
-                  // in use no longer use the old boot_alloc code that blindly
-                  // uses memory off the end of the kernel image.
-                  size_t extra_vaddr_size = 0);
+  Allocation Load(ktl::optional<uint64_t> relocation_address = {}, bool in_place_ok = true);
 
   size_t vaddr_size() const { return load_info_.vaddr_size(); }
 

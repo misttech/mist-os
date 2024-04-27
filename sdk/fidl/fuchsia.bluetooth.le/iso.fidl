@@ -91,29 +91,6 @@ open protocol IsochronousStream {
         2: established_params CisEstablishedParameters;
     });
 
-    /// Retrieve the range of controller delay for the codec specified with the provided stream
-    /// attributes.
-    ///
-    /// On success, returns the minimum and maximum allowed delay.
-    ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if the controller does not support this operation.
-    /// Returns ZX_ERR_INTERNAL for all other failures.
-    flexible ReadSupportedDelayRange(table {
-        /// Indicates direction of data flow. Required.
-        1: data_direction bt.DataDirection;
-
-        /// Codec being used over the air. Required.
-        2: codec_attributes bt.CodecAttributes;
-    }) -> (table {
-        /// Minimum controller delay for the specified configuration, in the range [0, 4] seconds.
-        /// Always provided on success.
-        1: min_controller_delay zx.Duration;
-
-        /// Maximum controller delay for the specified configuration, in the range [0, 4] seconds.
-        /// Always provided on success.
-        2: max_controller_delay zx.Duration;
-    }) error zx.Status;
-
     /// Create an isochronous data path with the specified parameters. Only in-band (HCI) ISO
     /// transport is currently supported.
     ///

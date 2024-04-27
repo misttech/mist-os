@@ -64,7 +64,7 @@ fuchsia_component("vkreadback_test_child_component") {
 fuchsia_structured_config_values("default_config") {
   cm_label = ":vkreadback-manifest"
   values = {
-    gpu_vendor_id = ""
+    gpu_vendor_id = 0
   }
 }
 

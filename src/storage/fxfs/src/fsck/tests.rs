@@ -485,13 +485,10 @@ async fn test_allocation_mismatch() {
             device_range.clone()
         };
         // Replace owner_object_id with a different owner and bump count to something impossible.
-        allocator
-            .tree()
-            .replace_or_insert(Item::new(
-                AllocatorKey { device_range: range.clone() },
-                AllocatorValue::Abs { count: 2, owner_object_id: 10 },
-            ))
-            .await;
+        allocator.tree().replace_or_insert(Item::new(
+            AllocatorKey { device_range: range.clone() },
+            AllocatorValue::Abs { count: 2, owner_object_id: 10 },
+        ));
         allocator.flush().await.expect("flush failed");
     }
 
@@ -577,13 +574,10 @@ async fn test_volume_allocation_mismatch() {
                 iter.advance().await.expect("advance failed");
             }
         };
-        allocator
-            .tree()
-            .replace_or_insert(Item::new(
-                AllocatorKey { device_range: range },
-                AllocatorValue::Abs { count: 2, owner_object_id: 42 },
-            ))
-            .await;
+        allocator.tree().replace_or_insert(Item::new(
+            AllocatorKey { device_range: range },
+            AllocatorValue::Abs { count: 2, owner_object_id: 42 },
+        ));
         allocator.flush().await.expect("flush failed");
         store_id
     };
@@ -626,7 +620,7 @@ async fn test_missing_allocation() {
             key.clone()
         };
         let lower_bound = key.lower_bound_for_merge_into();
-        allocator.tree().merge_into(Item::new(key, AllocatorValue::None), &lower_bound).await;
+        allocator.tree().merge_into(Item::new(key, AllocatorValue::None), &lower_bound);
     }
     // We intentionally don't remount here, since the above tree mutation wouldn't persist
     // otherwise.

@@ -98,14 +98,14 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: FIDL fuchsia.hardware.clockimpl/InitMetadata
 #define DEVICE_METADATA_CLOCK_INIT 0x494B4C43  // CLKI
 
-// type: array of power_domain_t
+// type: FIDL fuchsia.hardware.power/DomainMetadata
 #define DEVICE_METADATA_POWER_DOMAINS 0x52574F50  // POWR
 
 // type: clock_id_t
 #define DEVICE_METADATA_CLOCK_IDS 0x4B4F4C43  // CLOK
 
-// type: pwm_idx_t
-#define DEVICE_METADATA_PWM_IDS 0x004D5750  // PWM\0
+// type: FIDL fuchsia.hardware.pwm/PwmChannelsMetadata
+#define DEVICE_METADATA_PWM_CHANNELS 0x004D5750  // PWM\0
 
 // type: vendor specific Wifi configuration
 #define DEVICE_METADATA_WIFI_CONFIG 0x49464957  // WIFI

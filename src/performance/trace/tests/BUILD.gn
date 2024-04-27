@@ -6,18 +6,7 @@ import("//build/components.gni")
 
 group("tests") {
   testonly = true
-  deps = [
-    ":basic_integration_test_app",
-    ":integration_test_utils",
-    ":integration_test_utils_with_trace_with_static_engine",
-    ":run_test",
-    ":self_contained_provider",
-    ":trace_integration_tests",
-    ":trace_tests",
-    ":trace_tests_bin",
-    ":two_providers_one_engine",
-    ":two_providers_two_engines_test_app",
-  ]
+  deps = [ ":trace_tests" ]
 }
 
 source_set("component_context") {
@@ -42,31 +31,12 @@ source_set("component_context") {
   ]
 }
 
-# Generic main entry point target for GTest executables.
-# This augments src/lib/fxl/test by adding component context.
-source_set("gtest_main") {
-  testonly = true
-
-  sources = [ "gtest_main.cc" ]
-
-  deps = [
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl:fxl_cli",
-    "//src/lib/fxl/test:test_settings",
-  ]
-
-  public_deps = [
-    ":component_context",
-    "//third_party/googletest:gtest",
-  ]
-}
-
 executable("trace_tests_bin") {
   testonly = true
 
   output_name = "trace_tests"
 
-  deps = [ ":gtest_main" ]
+  deps = [ "//src/lib/fxl/test:gtest_main" ]
 }
 
 source_set("run_test") {
@@ -84,7 +54,6 @@ source_set("run_test") {
   ]
 
   deps = [
-    ":component_context",
     ":integration_test_utils",
     "//sdk/lib/fdio",
     "//src/lib/fxl:fxl_cli",
@@ -159,11 +128,11 @@ executable("trace_integration_tests") {
   sources = [ "trace_integration_tests.cc" ]
 
   deps = [
-    ":gtest_main",
     ":integration_test_utils",
     ":run_test",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
+    "//src/lib/fxl/test:gtest_main",
     "//src/lib/fxl/test:test_settings",
     "//src/performance/lib/test_utils",
     "//third_party/googletest:gtest",
@@ -264,9 +233,9 @@ executable("return_child_result_tests") {
   sources = [ "return_child_result_tests.cc" ]
 
   deps = [
-    ":gtest_main",
     ":integration_test_utils",
     ":run_test",
+    "//src/lib/fxl/test:gtest_main",
     "//src/performance/lib/test_utils",
     "//third_party/googletest:gtest",
   ]
@@ -286,10 +255,10 @@ executable("detach_tests") {
   sources = [ "detach_tests.cc" ]
 
   deps = [
-    ":gtest_main",
     ":integration_test_utils",
     ":run_test",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]
@@ -318,10 +287,10 @@ executable("shared_provider_integration_tests") {
   sources = [ "shared_provider_integration_tests.cc" ]
 
   deps = [
-    ":gtest_main",
     ":integration_test_utils",
     ":run_test",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace-reader",
     "//zircon/system/ulib/zx",
@@ -350,9 +319,9 @@ executable("provider_destruction_tests") {
   sources = [ "provider_destruction_tests.cc" ]
 
   deps = [
-    ":gtest_main",
     ":integration_test_utils",
     ":run_test",
+    "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace-reader",
     "//zircon/system/ulib/zx",

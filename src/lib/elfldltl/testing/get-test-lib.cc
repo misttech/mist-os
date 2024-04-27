@@ -54,15 +54,28 @@ zx::vmo GetTestLibVmo(std::string_view libname) {
   return vmo;
 }
 
-// Fuchsia-specific implementation of GetTestLib; a custom implementation is needed
-// because fdio open does not support returning an executable fd.
-fbl::unique_fd GetTestLib(std::string_view libname) {
-  zx::vmo lib_vmo = GetTestLibVmo(libname);
-  int fd;
-  zx_status_t status = fdio_fd_create(lib_vmo.release(), &fd);
+// Fuchsia-specific implementation of TryGetTestLib (see get-test-data-path.cc);
+// a custom implementation is needed because fdio open does not support
+// returning an executable fd.
+fbl::unique_fd TryGetTestLib(std::string_view libname) {
+  fbl::unique_fd fd;
+  zx::vmo lib_vmo = TryGetTestLibVmo(libname);
+  // If the VMO is not found, return the default-constructed invalid fd to the
+  // caller.
+  if (!lib_vmo) {
+    return fd;
+  }
+  // Create and return a valid FD for the VMO handle.
+  int fd_out;
+  zx_status_t status = fdio_fd_create(lib_vmo.release(), &fd_out);
   EXPECT_EQ(status, ZX_OK) << libname << ": fdio_fd_create: " << zx_status_get_string(status);
+  return fbl::unique_fd{fd_out};
+}
 
-  return fbl::unique_fd{fd};
+fbl::unique_fd GetTestLib(std::string_view libname) {
+  auto fd = TryGetTestLib(libname);
+  EXPECT_TRUE(fd) << "elfldltl::GetTestLib(\"" << libname << "\"): VMO not found";
+  return fd;
 }
 
 }  // namespace elfldltl::testing

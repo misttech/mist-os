@@ -13,7 +13,7 @@ class ListCategoriesCommand : public CommandWithController {
  public:
   static Info Describe();
 
-  explicit ListCategoriesCommand(sys::ComponentContext* context);
+  explicit ListCategoriesCommand();
 
  protected:
   void Start(const fxl::CommandLine& command_line) override;

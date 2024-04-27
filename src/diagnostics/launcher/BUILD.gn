@@ -10,7 +10,6 @@ launcher_sources = [ "src/main.rs" ]
 
 launcher_deps = [
   "//src/diagnostics/detect:lib",
-  "//src/diagnostics/kcounter:lib",
   "//src/diagnostics/lib/util/v2-argh-wrapper",
   "//src/diagnostics/persistence:lib",
   "//src/diagnostics/sampler:lib",

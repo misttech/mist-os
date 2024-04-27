@@ -1525,21 +1525,21 @@ mod tests {
         });
 
         process_occurence_tester(EventCountTesterParams {
-            new_val: Property::Uint("count".to_string(), std::u64::MAX),
+            new_val: Property::Uint("count".to_string(), u64::MAX),
             old_val: None,
             process_ok: false,
             event_made: false,
             diff: -1,
         });
 
-        let i64_max_in_u64: u64 = std::i64::MAX.try_into().unwrap();
+        let i64_max_in_u64: u64 = i64::MAX.try_into().unwrap();
 
         process_occurence_tester(EventCountTesterParams {
             new_val: Property::Uint("count".to_string(), i64_max_in_u64 + 1),
             old_val: Some(Property::Uint("count".to_string(), 1)),
             process_ok: true,
             event_made: true,
-            diff: std::i64::MAX,
+            diff: i64::MAX,
         });
 
         process_occurence_tester(EventCountTesterParams {
@@ -1616,9 +1616,9 @@ mod tests {
     #[fuchsia::test]
     fn test_int_edge_cases() {
         process_int_tester(IntTesterParams {
-            new_val: Property::Int("count".to_string(), std::i64::MAX),
+            new_val: Property::Int("count".to_string(), i64::MAX),
             process_ok: true,
-            sample: std::i64::MAX,
+            sample: i64::MAX,
         });
 
         process_int_tester(IntTesterParams {
@@ -1627,12 +1627,12 @@ mod tests {
             sample: std::i64::MIN,
         });
 
-        let i64_max_in_u64: u64 = std::i64::MAX.try_into().unwrap();
+        let i64_max_in_u64: u64 = i64::MAX.try_into().unwrap();
 
         process_int_tester(IntTesterParams {
             new_val: Property::Uint("count".to_string(), i64_max_in_u64),
             process_ok: true,
-            sample: std::i64::MAX,
+            sample: i64::MAX,
         });
 
         process_int_tester(IntTesterParams {

@@ -186,19 +186,22 @@ impl Display for PackageSource {
 #[derive(Deserialize, Serialize)]
 pub enum FileSource {
     /// Name for the target file as a key in the meta/contents mapping from the package.
-    MetaContents(String),
+    PackageMetaContents(String),
     /// Possible paths within the package archive. If multiple files are found, validation will fail.
     /// Multiple paths are only supported to enable backwards compatibility during file migrations.
     PackageFar(Vec<String>),
+    /// Name for the target file in the bootfs file collection.
+    BootfsFile(String),
 }
 
 impl Display for FileSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FileSource::MetaContents(path) => write!(f, "meta-contents: {}", path),
+            FileSource::PackageMetaContents(path) => write!(f, "meta-contents: {}", path),
             FileSource::PackageFar(paths) => {
                 write!(f, "package-far: {}", paths.join(", "))
             }
+            FileSource::BootfsFile(path) => write!(f, "bootfs-file: {}", path),
         }
     }
 }
@@ -217,6 +220,8 @@ pub struct BuildCheckSpec {
     pub additional_boot_args_checks: Option<ContentCheckSpec>,
     /// Checks which involve reading the contents of specific packages in the build.
     pub package_checks: Vec<PackageCheckSpec>,
+    /// Checks which involve reading contents of boofs files.
+    pub bootfs_file_checks: Vec<FileCheckSpec>,
 }
 
 /// Package checks operate on the content of individual packages.
@@ -232,7 +237,7 @@ pub struct PackageCheckSpec {
 
 #[derive(Deserialize, Serialize)]
 pub struct FileCheckSpec {
-    /// How the file is sourced from the package contents.
+    /// How the file is sourced from the package contents or bootfs file collection.
     pub source: FileSource,
     /// Expected state of the file: present, absent, absent or empty.
     pub state: FileState,
@@ -261,12 +266,14 @@ pub struct ContentCheckSpec {
 ///
 /// * `validation_policy` - A policy file describing checks to perform
 /// * `boot_args_data` - Mapping of arg name to vector of values delimited by `+`
+/// * `bootfs_files` - Mapping of file name to contents of file
 /// * `static_pkgs` - Mapping of pkg name to merkle hash string
 /// * `blobs_artifact_reader` - ArtifactReader backed by a build's blob set
 /// * 'golden_files_dir` - Directory containing golden files for matching
 pub fn validate_build_checks(
     validation_policy: BuildCheckSpec,
     boot_args_data: HashMap<String, Vec<String>>,
+    bootfs_files: &HashMap<String, Vec<u8>>,
     static_pkgs: HashMap<String, String>,
     blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
     golden_files_dir: &str,
@@ -278,6 +285,13 @@ pub fn validate_build_checks(
         for error in validate_additional_boot_args(additional_boot_args_checks, &boot_args_data) {
             errors_found.push(error);
         }
+    }
+
+    // If the policy specifies bootfs file checks, run them.
+    for error in
+        validate_bootfs_files(validation_policy.bootfs_file_checks, &bootfs_files, golden_files_dir)
+    {
+        errors_found.push(error);
     }
 
     for package_check in validation_policy.package_checks {
@@ -300,7 +314,7 @@ pub fn validate_build_checks(
 
         // Run the validations specified by the policy.
         // Specification of the concrete PackageFileValidator impl should remain internal to build_checks.
-        for error in validate_package::<PackageFileValidator>(
+        for error in validate_package::<PackageFileChecker>(
             &package_check,
             &pkg_merkle_string,
             blobs_artifact_reader,
@@ -391,7 +405,42 @@ fn validate_additional_boot_args(
     errors
 }
 
-fn validate_package<FV: FileValidator>(
+fn validate_bootfs_files(
+    bootfs_file_checks: Vec<FileCheckSpec>,
+    bootfs_files: &HashMap<String, Vec<u8>>,
+    golden_files_dir: &str,
+) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    for check in bootfs_file_checks {
+        match resolve_bootfs_file(&check.source, &bootfs_files) {
+            Ok((file_name, file_contents)) => {
+                for error in validate_file(&check, file_contents, &file_name, golden_files_dir) {
+                    errors.push(error);
+                }
+            }
+            Err(e) => {
+                // This error happens if the policy specified a package file source for a bootfs file check.
+                errors.push(e);
+            }
+        }
+    }
+    errors
+}
+
+/// File checker trait exists for easier testing.
+trait FileChecker {
+    /// check_file is responsible for both resolving and validating the file.
+    fn check_file(
+        check: &FileCheckSpec,
+        package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
+        blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+        golden_files_dir: &str,
+    ) -> Vec<ValidationError>
+    where
+        Self: Sized;
+}
+
+fn validate_package<FC: FileChecker>(
     check: &PackageCheckSpec,
     pkg_merkle_string: &String,
     blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
@@ -425,7 +474,7 @@ fn validate_package<FV: FileValidator>(
 
     for file_check in &check.file_checks {
         errors.extend(
-            FV::validate_file(
+            FC::check_file(
                 &file_check,
                 &mut package_far_reader,
                 blobs_artifact_reader,
@@ -439,23 +488,29 @@ fn validate_package<FV: FileValidator>(
     errors
 }
 
-/// File validation trait exists for easier testing.
-trait FileValidator {
-    fn validate_file(
-        check: &FileCheckSpec,
-        package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
-        blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
-        golden_files_dir: &str,
-    ) -> Vec<ValidationError>
-    where
-        Self: Sized;
+/// Given a `FileSource` (`BootfsFile`), return the contents from the bootfs_file map.
+fn resolve_bootfs_file(
+    source: &FileSource,
+    bootfs_files: &HashMap<String, Vec<u8>>,
+) -> Result<(String, Option<Vec<u8>>), ValidationError> {
+    match source {
+        FileSource::BootfsFile(file_name) => {
+            // File not found is represented by `None` for `bytes`.
+            let bytes = match bootfs_files.get(file_name) {
+                Some(bytes) => Some(bytes.clone()),
+                None => None,
+            };
+            Ok((file_name.to_string(), bytes))
+        }
+        _ => Err(ValidationError::InvalidPolicyConfiguration {
+            error: "Policy specified non-bootfs file source for a bootfs file check".to_string(),
+        }),
+    }
 }
-
-struct PackageFileValidator;
 
 /// Given a `FileSource` (`MetaContents` or `PackageFar`), find and read a file.
 /// Returns (file path found, optional bytes read) or `ValidationError`.
-fn resolve_file(
+fn resolve_package_file(
     source: &FileSource,
     package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
     blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
@@ -463,7 +518,7 @@ fn resolve_file(
     // First, find the file and read its contents if it is present.
     // File absence is represented by `file_contents_bytes` = `None`.
     match source {
-        FileSource::MetaContents(ref path) => {
+        FileSource::PackageMetaContents(ref path) => {
             // Read `meta/contents` to find merkle, then read the corresponding blob's bytes.
             match read_content_blob(package_far_reader, blobs_artifact_reader, &path) {
                 Ok(bytes) => {
@@ -508,7 +563,69 @@ fn resolve_file(
 
             Ok((String::new(), None))
         }
+        _ => Err(ValidationError::InvalidPolicyConfiguration {
+            error: "Policy specified non-package file source for a package file check".to_string(),
+        }
+        .into()),
     }
+}
+
+/// Checks the state of the file (present, absent, absent or empty) before calling
+/// `validate_file_contents`, if content checks are specified.
+fn validate_file(
+    check: &FileCheckSpec,
+    content_bytes: Option<Vec<u8>>,
+    content_source: &str,
+    golden_files_dir: &str,
+) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+
+    // Check that the state of the file (present or absent) matches policy expectations.
+    match check.state {
+        FileState::Present => {
+            let bytes = match content_bytes {
+                Some(bytes) => bytes,
+                None => {
+                    errors.push(ValidationError::FailedToFindFile {
+                        file_paths: check.source.to_string(),
+                    });
+                    return errors;
+                }
+            };
+
+            // If we have content checks beyond just the file being there, run them.
+            if let Some(content_checks) = &check.content_checks {
+                for error_found in
+                    validate_file_contents(content_checks, bytes, content_source, golden_files_dir)
+                {
+                    errors.push(error_found);
+                }
+            }
+        }
+        FileState::Absent => {
+            // To pass this check, file_contents_bytes must be None, indicating that a file was not found.
+            if content_bytes.is_some() {
+                errors.push(ValidationError::UnexpectedFilePresence {
+                    // Package name is not known here and needs to be supplied by error handler.
+                    package_name: String::new(),
+                    file_path: content_source.to_string(),
+                });
+            }
+        }
+        FileState::AbsentOrEmpty => {
+            // To pass this check, file_contents_bytes must be either None or an empty byte vector.
+            if let Some(bytes) = content_bytes {
+                if bytes.len() > 0 {
+                    errors.push(ValidationError::UnexpectedFilePresenceOrHasContents {
+                        // Package name is not known here and needs to be supplied by error handler.
+                        package_name: String::new(),
+                        file_path: content_source.to_string(),
+                    });
+                }
+            }
+        }
+    }
+    errors
 }
 
 /// `content_source` is the file path from where the bytes were read.
@@ -836,8 +953,10 @@ fn json_contents_contain_key_value_pair(
     }
 }
 
-impl FileValidator for PackageFileValidator {
-    fn validate_file(
+struct PackageFileChecker;
+
+impl FileChecker for PackageFileChecker {
+    fn check_file(
         check: &FileCheckSpec,
         package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
         blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
@@ -847,7 +966,7 @@ impl FileValidator for PackageFileValidator {
         // First, find the file and read its contents if it is present.
         // File absence is represented by file_contents_bytes = None.
         let (file_path_found, file_contents_bytes) =
-            match resolve_file(&check.source, package_far_reader, blobs_artifact_reader) {
+            match resolve_package_file(&check.source, package_far_reader, blobs_artifact_reader) {
                 Ok((path, bytes)) => (path, bytes),
                 Err(e) => {
                     errors.push(ValidationError::FailedToPerformFileCheck {
@@ -859,54 +978,8 @@ impl FileValidator for PackageFileValidator {
                     return errors;
                 }
             };
-
-        // Second, check that the state of the file (present or absent) matches policy expectations.
-        match check.state {
-            FileState::Present => {
-                let bytes = match file_contents_bytes {
-                    Some(bytes) => bytes,
-                    None => {
-                        errors.push(ValidationError::FailedToFindFile {
-                            file_paths: check.source.to_string(),
-                        });
-                        return errors;
-                    }
-                };
-
-                // If we have content checks beyond just the file being there, run them.
-                if let Some(content_checks) = &check.content_checks {
-                    for error_found in validate_file_contents(
-                        content_checks,
-                        bytes,
-                        &file_path_found,
-                        golden_files_dir,
-                    ) {
-                        errors.push(error_found);
-                    }
-                }
-            }
-            FileState::Absent => {
-                // To pass this check, file_contents_bytes must be None, indicating that a file was not found.
-                if file_contents_bytes.is_some() {
-                    errors.push(ValidationError::UnexpectedFilePresence {
-                        // Package name is not known here and needs to be supplied by error handler.
-                        package_name: String::new(),
-                        file_path: file_path_found,
-                    });
-                }
-            }
-            FileState::AbsentOrEmpty => {
-                // To pass this check, file_contents_bytes must be either None or an empty byte vector.
-                if let Some(bytes) = file_contents_bytes {
-                    if bytes.len() > 0 {
-                        errors.push(ValidationError::UnexpectedFilePresenceOrHasContents {
-                            // Package name is not known here and needs to be supplied by error handler.
-                            package_name: String::new(),
-                            file_path: file_path_found,
-                        });
-                    }
-                }
-            }
+        for error in validate_file(check, file_contents_bytes, &file_path_found, golden_files_dir) {
+            errors.push(error);
         }
         errors
     }
@@ -959,10 +1032,10 @@ mod tests {
         }
     }
 
-    struct TestErrorFreeFileValidator;
+    struct TestErrorFreeFileChecker;
 
-    impl FileValidator for TestErrorFreeFileValidator {
-        fn validate_file(
+    impl FileChecker for TestErrorFreeFileChecker {
+        fn check_file(
             _check: &FileCheckSpec,
             _package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
             _blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
@@ -1004,6 +1077,7 @@ mod tests {
                 matches_golden: None,
             }),
             package_checks: Vec::new(),
+            bootfs_file_checks: Vec::new(),
         };
         let boot_args_data = hashmap! {
             expected_key.to_string() => vec![expected_value.to_string()]
@@ -1011,9 +1085,15 @@ mod tests {
 
         let mut artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
-        let errors =
-            validate_build_checks(policy, boot_args_data, HashMap::new(), &mut artifact_reader, "")
-                .unwrap();
+        let errors = validate_build_checks(
+            policy,
+            boot_args_data,
+            &HashMap::new(),
+            HashMap::new(),
+            &mut artifact_reader,
+            "",
+        )
+        .unwrap();
 
         assert_eq!(errors.len(), 0);
     }
@@ -1022,17 +1102,26 @@ mod tests {
     fn test_validate_build_checks_tolerates_absent_boot_args_policy() {
         let expected_key = "test_key";
         let expected_value = "test_value";
-        let policy =
-            BuildCheckSpec { additional_boot_args_checks: None, package_checks: Vec::new() };
+        let policy = BuildCheckSpec {
+            additional_boot_args_checks: None,
+            package_checks: Vec::new(),
+            bootfs_file_checks: Vec::new(),
+        };
         let boot_args_data = hashmap! {
             expected_key.to_string() => vec![expected_value.to_string()]
         };
 
         let mut artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
-        let errors =
-            validate_build_checks(policy, boot_args_data, HashMap::new(), &mut artifact_reader, "")
-                .unwrap();
+        let errors = validate_build_checks(
+            policy,
+            boot_args_data,
+            &HashMap::new(),
+            HashMap::new(),
+            &mut artifact_reader,
+            "",
+        )
+        .unwrap();
 
         assert_eq!(errors.len(), 0);
     }
@@ -1188,6 +1277,91 @@ mod tests {
     }
 
     #[test]
+    fn test_bootfs_file_check_success() {
+        let content_source = "bootfs_file_name";
+        let expected_string = "sample_contents";
+
+        let bootfs_files = hashmap![
+            content_source.to_string() => expected_string.as_bytes().to_vec()
+        ];
+        let bootfs_file_checks = vec![FileCheckSpec {
+            source: FileSource::BootfsFile(content_source.to_string()),
+            state: FileState::Present,
+            content_checks: Some(ContentCheckSpec {
+                must_not_contain: None,
+                must_contain: Some(vec![ContentType::String(expected_string.to_string())]),
+                matches_golden: None,
+            }),
+        }];
+
+        let errors = validate_bootfs_files(bootfs_file_checks, &bootfs_files, "");
+
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_bootfs_file_check_failure() {
+        let content_source = "bootfs_file_name";
+        let expected_string = "sample_contents";
+
+        let bootfs_files = hashmap![
+            content_source.to_string() => expected_string.as_bytes().to_vec()
+        ];
+        let bootfs_file_checks = vec![FileCheckSpec {
+            source: FileSource::BootfsFile(content_source.to_string()),
+            state: FileState::Present,
+            content_checks: Some(ContentCheckSpec {
+                must_not_contain: Some(vec![ContentType::String(expected_string.to_string())]),
+                must_contain: None,
+                matches_golden: None,
+            }),
+        }];
+
+        let errors = validate_bootfs_files(bootfs_file_checks, &bootfs_files, "");
+
+        assert_eq!(errors.len(), 1);
+
+        match &errors[0] {
+            ValidationError::ContentMustNotContainValuePresent {
+                value,
+                content_source: reported_source,
+            } => {
+                assert_eq!(expected_string, value);
+                assert_eq!(content_source, reported_source);
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_bootfs_file_check_error() {
+        let content_source = "bootfs_file_name";
+        let expected_string = "sample_contents";
+
+        let bootfs_files = hashmap![
+            content_source.to_string() => expected_string.as_bytes().to_vec()
+        ];
+        let bootfs_file_checks = vec![FileCheckSpec {
+            source: FileSource::PackageMetaContents(content_source.to_string()),
+            state: FileState::Present,
+            content_checks: Some(ContentCheckSpec {
+                must_not_contain: None,
+                must_contain: None,
+                matches_golden: None,
+            }),
+        }];
+
+        let errors = validate_bootfs_files(bootfs_file_checks, &bootfs_files, "");
+
+        assert_eq!(errors.len(), 1);
+
+        match &errors[0] {
+            ValidationError::InvalidPolicyConfiguration { .. } => {}
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+    }
+
+    #[test]
     fn test_package_check_fails_to_open_blob() {
         // Create mocks with nothing in them and verify validate_package returns an error.
         let check =
@@ -1196,7 +1370,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let validation_errors = validate_package::<TestErrorFreeFileValidator>(
+        let validation_errors = validate_package::<TestErrorFreeFileChecker>(
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
@@ -1222,7 +1396,7 @@ mod tests {
             ],
         ));
 
-        let validation_errors = validate_package::<TestErrorFreeFileValidator>(
+        let validation_errors = validate_package::<TestErrorFreeFileChecker>(
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
@@ -1244,7 +1418,7 @@ mod tests {
         let check = PackageCheckSpec {
             source: PackageSource::SystemImage,
             file_checks: vec![FileCheckSpec {
-                source: FileSource::MetaContents("sample/path".to_string()),
+                source: FileSource::PackageMetaContents("sample/path".to_string()),
                 state: FileState::Present,
                 content_checks: None,
             }],
@@ -1259,10 +1433,10 @@ mod tests {
             ]));
         // The mock file validator will return 4 errors to exercise the error handling code.
         // These 4 errors will not supply a package name to match the FileValidator's real impl.
-        struct TestFileValidatorWithErrors;
+        struct TestFileCheckerWithErrors;
 
-        impl FileValidator for TestFileValidatorWithErrors {
-            fn validate_file(
+        impl FileChecker for TestFileCheckerWithErrors {
+            fn check_file(
                 check: &FileCheckSpec,
                 _package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
                 _blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
@@ -1290,7 +1464,7 @@ mod tests {
             }
         }
 
-        let validation_errors = validate_package::<TestFileValidatorWithErrors>(
+        let validation_errors = validate_package::<TestFileCheckerWithErrors>(
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
@@ -1339,7 +1513,7 @@ mod tests {
         let check = PackageCheckSpec {
             source: PackageSource::SystemImage,
             file_checks: vec![FileCheckSpec {
-                source: FileSource::MetaContents("sample/path".to_string()),
+                source: FileSource::PackageMetaContents("sample/path".to_string()),
                 state: FileState::Present,
                 content_checks: None,
             }],
@@ -1353,7 +1527,7 @@ mod tests {
                 PathBuf::from_str(&pkg_merkle_string).unwrap() => pkg_far_bytes
             ]));
 
-        let validation_errors = validate_package::<TestErrorFreeFileValidator>(
+        let validation_errors = validate_package::<TestErrorFreeFileChecker>(
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
@@ -1377,7 +1551,7 @@ mod tests {
                 PathBuf::from_str(&pkg_merkle_string).unwrap() => pkg_far_bytes
             ]));
 
-        let validation_errors = validate_package::<TestErrorFreeFileValidator>(
+        let validation_errors = validate_package::<TestErrorFreeFileChecker>(
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
@@ -1395,7 +1569,7 @@ mod tests {
         let file_name = "some/file";
         let file_merkle_string = "merkle";
         let file_contents_bytes = "some file contents".as_bytes();
-        let source: FileSource = FileSource::MetaContents(file_name.to_string());
+        let source: FileSource = FileSource::PackageMetaContents(file_name.to_string());
         let meta_contents_file_contents = format!("{}={}", file_name, file_merkle_string);
         let pkg_far_contents =
             hashmap![ META_CONTENTS_PATH => meta_contents_file_contents.as_bytes()];
@@ -1408,7 +1582,7 @@ mod tests {
             ]));
 
         let (file_found, bytes_found) =
-            resolve_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
+            resolve_package_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
 
         assert_eq!(file_found, file_name.to_string());
         assert_eq!(bytes_found.unwrap(), file_contents_bytes.to_vec());
@@ -1420,7 +1594,7 @@ mod tests {
         // Set up blobs artifact reader to be empty.
         // Verify resolve_file returns None for bytes found, indicating missing file.
         let file_name = "some/file";
-        let source = FileSource::MetaContents(file_name.to_string());
+        let source = FileSource::PackageMetaContents(file_name.to_string());
         let pkg_far_contents =
             hashmap![ META_CONTENTS_PATH => "random/other/file=othermerkle".as_bytes()];
         let pkg_far = create_package_far(pkg_far_contents);
@@ -1430,7 +1604,7 @@ mod tests {
             Box::new(TestArtifactReader::new(HashMap::new()));
 
         let (file_found, bytes_found) =
-            resolve_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
+            resolve_package_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
 
         assert!(file_found.is_empty());
         assert!(bytes_found.is_none());
@@ -1441,7 +1615,7 @@ mod tests {
         // Set up a package with meta/contents that isn't parseable as key-value pairs.
         // This is one of several ways to trigger the error flow we want to exercise.
         let file_name = "some/file";
-        let source = FileSource::MetaContents(file_name.to_string());
+        let source = FileSource::PackageMetaContents(file_name.to_string());
         let pkg_far_contents =
             hashmap![ META_CONTENTS_PATH => "something that is not a key value pair".as_bytes()];
         let pkg_far = create_package_far(pkg_far_contents);
@@ -1450,7 +1624,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let res = resolve_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader);
+        let res = resolve_package_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader);
 
         assert!(res.is_err());
     }
@@ -1470,7 +1644,7 @@ mod tests {
             Box::new(TestArtifactReader::new(HashMap::new()));
 
         let (file_found, bytes_found) =
-            resolve_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
+            resolve_package_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
 
         assert_eq!(file_found, file_name.to_string());
         assert_eq!(bytes_found.unwrap(), file_contents_bytes.to_vec());
@@ -1490,7 +1664,7 @@ mod tests {
             Box::new(TestArtifactReader::new(HashMap::new()));
 
         let (file_found, bytes_found) =
-            resolve_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
+            resolve_package_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader).unwrap();
 
         assert!(file_found.is_empty());
         assert!(bytes_found.is_none());
@@ -1512,7 +1686,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let res = resolve_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader);
+        let res = resolve_package_file(&source, &mut pkg_far_reader, &mut blobs_artifact_reader);
 
         assert!(res.is_err());
     }
@@ -2368,7 +2542,7 @@ mod tests {
         // This is one of several ways to trigger the error flow we want to exercise.
         // This is similar to the test scoped to resolve_file, except is for validate_file.
         let file_name = "some/file";
-        let source = FileSource::MetaContents(file_name.to_string());
+        let source = FileSource::PackageMetaContents(file_name.to_string());
         let file_check = FileCheckSpec { source, state: FileState::Present, content_checks: None };
         let pkg_far_contents =
             hashmap![ META_CONTENTS_PATH => "something that is not a key value pair".as_bytes()];
@@ -2378,7 +2552,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
@@ -2411,7 +2585,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
@@ -2435,7 +2609,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
@@ -2467,7 +2641,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
@@ -2492,7 +2666,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
@@ -2523,7 +2697,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
@@ -2547,7 +2721,7 @@ mod tests {
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
 
-        let errors = PackageFileValidator::validate_file(
+        let errors = PackageFileChecker::check_file(
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,

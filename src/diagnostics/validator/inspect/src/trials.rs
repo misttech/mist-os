@@ -98,7 +98,7 @@ fn basic_int() -> Trial {
         name: "Basic Int".into(),
         steps: vec![Step::Actions(vec![
             crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "int", value: Value::IntT(10)),
-            crate::set_number!(id: 5, value: Value::IntT(std::i64::MAX)),
+            crate::set_number!(id: 5, value: Value::IntT(i64::MAX)),
             crate::subtract_number!(id: 5, value: Value::IntT(3)),
             crate::set_number!(id: 5, value: Value::IntT(std::i64::MIN)),
             crate::add_number!(id: 5, value: Value::IntT(2)),
@@ -112,7 +112,7 @@ fn basic_uint() -> Trial {
         name: "Basic Uint".into(),
         steps: vec![Step::Actions(vec![
             crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "uint", value: Value::UintT(1)),
-            crate::set_number!(id: 5, value: Value::UintT(std::u64::MAX)),
+            crate::set_number!(id: 5, value: Value::UintT(u64::MAX)),
             crate::subtract_number!(id: 5, value: Value::UintT(3)),
             crate::set_number!(id: 5, value: Value::UintT(0)),
             crate::add_number!(id: 5, value: Value::UintT(2)),
@@ -155,7 +155,7 @@ fn array_indexes_to_test() -> Vec<u64> {
     let mut ret: Vec<u64> = (0..10).collect();
     ret.push(1000);
     ret.push(10000);
-    ret.push(std::u64::MAX);
+    ret.push(u64::MAX);
     ret
 }
 
@@ -252,7 +252,7 @@ fn int_histogram_ops_trial() -> Trial {
                                  initial_step: 2, step_multiplier: 4,
                                  buckets: 3, type: IntT),
     ];
-    for value in &[std::i64::MIN, std::i64::MAX, 0] {
+    for value in &[std::i64::MIN, i64::MAX, 0] {
         push_ops(&mut actions, *value);
     }
     for value in vec![-10_i64, -5_i64, 0_i64, 3_i64, 100_i64] {
@@ -277,7 +277,7 @@ fn uint_histogram_ops_trial() -> Trial {
                                  initial_step: 2, step_multiplier: 4,
                                  buckets: 3, type: UintT),
     ];
-    for value in &[std::u64::MAX, 0] {
+    for value in &[u64::MAX, 0] {
         push_ops(&mut actions, *value);
     }
     for value in vec![0_u64, 5_u64, 8_u64, 20u64, 200_u64] {

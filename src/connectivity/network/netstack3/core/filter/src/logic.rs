@@ -2,23 +2,46 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::num::NonZeroU16;
 use packet_formats::ip::IpExt;
+use tracing::error;
 
 use crate::{
     context::{FilterBindingsTypes, FilterIpContext},
     matchers::InterfaceProperties,
-    packets::IpPacket,
-    state::{Action, Hook, Routine, Rule},
-    FilterIpMetadata,
+    packets::{IpPacket, TransportPacket},
+    state::{Action, Hook, Routine, Rule, TransparentProxy},
+    FilterIpMetadata, MaybeTransportPacket,
 };
 
-/// The result of packet processing at a given filtering hook.
-#[cfg_attr(test, derive(Debug, Clone, Copy, PartialEq))]
+/// The final result of packet processing at a given filtering hook.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Verdict {
     /// The packet should continue traversing the stack.
     Accept,
     /// The packet should be dropped immediately.
     Drop,
+}
+
+/// The final result of packet processing at the INGRESS hook.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum IngressVerdict<I: IpExt> {
+    /// A verdict that is valid at any hook.
+    Verdict(Verdict),
+    /// The packet should be immediately redirected to a local socket without its
+    /// header being changed in any way.
+    ImmediateLocalDelivery {
+        /// The bound address of the local socket to redirect the packet to.
+        addr: I::Addr,
+        /// The bound port of the local socket to redirect the packet to.
+        port: NonZeroU16,
+    },
+}
+
+impl<I: IpExt> From<Verdict> for IngressVerdict<I> {
+    fn from(verdict: Verdict) -> Self {
+        IngressVerdict::Verdict(verdict)
+    }
 }
 
 /// A witness type to indicate that the egress filtering hook has been run.
@@ -33,8 +56,9 @@ pub(crate) struct Interfaces<'a, D> {
 }
 
 /// The result of packet processing for a given routine.
-#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-enum RoutineResult {
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+enum RoutineResult<I: IpExt> {
     /// The packet should stop traversing the rest of the current installed
     /// routine, but continue travsering other routines installed in the hook.
     Accept,
@@ -42,13 +66,21 @@ enum RoutineResult {
     Return,
     /// The packet should be dropped immediately.
     Drop,
+    /// The packet should be immediately redirected to a local socket without its
+    /// header being changed in any way.
+    ImmediateLocalDelivery {
+        /// The bound address of the local socket to redirect the packet to.
+        addr: I::Addr,
+        /// The bound port of the local socket to redirect the packet to.
+        port: NonZeroU16,
+    },
 }
 
 fn check_routine<I, P, D, DeviceClass>(
     Routine { rules }: &Routine<I, DeviceClass, ()>,
     packet: &mut P,
     interfaces: &Interfaces<'_, D>,
-) -> RoutineResult
+) -> RoutineResult<I>
 where
     I: IpExt,
     P: IpPacket<I>,
@@ -63,9 +95,37 @@ where
                 // TODO(https://fxbug.dev/332739892): enforce some kind of maximum depth on the
                 // routine graph to prevent a stack overflow here.
                 Action::Jump(target) => match check_routine(target.get(), packet, interfaces) {
-                    result @ (RoutineResult::Accept | RoutineResult::Drop) => return result,
+                    result @ (RoutineResult::Accept
+                    | RoutineResult::Drop
+                    | RoutineResult::ImmediateLocalDelivery { .. }) => return result,
                     RoutineResult::Return => continue,
                 },
+                Action::TransparentProxy(proxy) => {
+                    let (addr, port) = match proxy {
+                        TransparentProxy::LocalPort(port) => (packet.dst_addr(), *port),
+                        TransparentProxy::LocalAddr(addr) => {
+                            let maybe_transport_packet = packet.transport_packet();
+                            let Some(transport_packet) = maybe_transport_packet.transport_packet()
+                            else {
+                                // We ensure that TransparentProxy rules are always accompanied by a
+                                // TCP or UDP matcher when filtering state is provided to Core, but
+                                // given this invariant is enforced far from here, we log an error
+                                // and drop the packet, which would likely happen at the transport
+                                // layer anyway.
+                                error!(
+                                    "transparent proxy action is only valid on a rule that matches \
+                                    on transport protocol, but this packet has no transport header",
+                                );
+                                return RoutineResult::Drop;
+                            };
+                            let port = NonZeroU16::new(transport_packet.dst_port())
+                                .expect("TCP and UDP destination port is always non-zero");
+                            (*addr, port)
+                        }
+                        TransparentProxy::LocalAddrAndPort(addr, port) => (*addr, *port),
+                    };
+                    return RoutineResult::ImmediateLocalDelivery { addr, port };
+                }
             }
         }
     }
@@ -87,9 +147,37 @@ where
         match check_routine(&routine, packet, &interfaces) {
             RoutineResult::Accept | RoutineResult::Return => {}
             RoutineResult::Drop => return Verdict::Drop,
+            result @ RoutineResult::ImmediateLocalDelivery { .. } => {
+                unreachable!(
+                    "immediate local delivery is only valid in INGRESS hook; got {result:?}"
+                )
+            }
         }
     }
     Verdict::Accept
+}
+
+fn check_routines_for_ingress<I, P, D, DeviceClass>(
+    hook: &Hook<I, DeviceClass, ()>,
+    packet: &mut P,
+    interfaces: Interfaces<'_, D>,
+) -> IngressVerdict<I>
+where
+    I: IpExt,
+    P: IpPacket<I>,
+    D: InterfaceProperties<DeviceClass>,
+{
+    let Hook { routines } = hook;
+    for routine in routines {
+        match check_routine(&routine, packet, &interfaces) {
+            RoutineResult::Accept | RoutineResult::Return => {}
+            RoutineResult::Drop => return Verdict::Drop.into(),
+            RoutineResult::ImmediateLocalDelivery { addr, port } => {
+                return IngressVerdict::ImmediateLocalDelivery { addr, port };
+            }
+        }
+    }
+    Verdict::Accept.into()
 }
 
 /// An implementation of packet filtering logic, providing entry points at
@@ -97,7 +185,12 @@ where
 pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     /// The ingress hook intercepts incoming traffic before a routing decision
     /// has been made.
-    fn ingress_hook<P, D, M>(&mut self, packet: &mut P, interface: &D, metadata: &mut M) -> Verdict
+    fn ingress_hook<P, D, M>(
+        &mut self,
+        packet: &mut P,
+        interface: &D,
+        metadata: &mut M,
+    ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
@@ -166,7 +259,12 @@ pub struct FilterImpl<'a, CC>(pub &'a mut CC);
 impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandler<I, BT>
     for FilterImpl<'_, CC>
 {
-    fn ingress_hook<P, D, M>(&mut self, packet: &mut P, interface: &D, _metadata: &mut M) -> Verdict
+    fn ingress_hook<P, D, M>(
+        &mut self,
+        packet: &mut P,
+        interface: &D,
+        _metadata: &mut M,
+    ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
@@ -174,7 +272,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
-            check_routines_for_hook(
+            check_routines_for_ingress(
                 &state.installed_routines.get().ip.ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
@@ -284,13 +382,13 @@ pub mod testutil {
     pub struct NoopImpl;
 
     impl<I: IpExt, BT: FilterBindingsTypes> FilterHandler<I, BT> for NoopImpl {
-        fn ingress_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &mut M) -> Verdict
+        fn ingress_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &mut M) -> IngressVerdict<I>
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
             M: FilterIpMetadata<I, BT>,
         {
-            Verdict::Accept
+            Verdict::Accept.into()
         }
 
         fn local_ingress_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &mut M) -> Verdict
@@ -346,6 +444,7 @@ pub mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
+    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, Ipv4, Ipv6};
     use test_case::test_case;
@@ -550,6 +649,37 @@ mod tests {
     }
 
     #[test]
+    fn transparent_proxy_terminal_for_entire_hook() {
+        const TPROXY_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+
+        let ingress = Hook {
+            routines: vec![
+                Routine {
+                    rules: vec![Rule::new(
+                        PacketMatcher::default(),
+                        Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+                    )],
+                },
+                Routine {
+                    rules: vec![
+                        // Accept all traffic.
+                        Rule::new(PacketMatcher::default(), Action::Accept),
+                    ],
+                },
+            ],
+        };
+
+        assert_eq!(
+            check_routines_for_ingress::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
+                &ingress,
+                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                Interfaces { ingress: None, egress: None },
+            ),
+            IngressVerdict::ImmediateLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
+        );
+    }
+
+    #[test]
     fn jump_recursively_evaluates_target_routine() {
         // Drop result from a target routine is propagated to the calling
         // routine.
@@ -661,7 +791,7 @@ mod tests {
                 &wlan_interface(),
                 &mut NullMetadata {},
             ),
-            Verdict::Drop
+            Verdict::Drop.into()
         );
 
         // Local ingress hook should use local ingress routines and check the

@@ -1,8 +1,5 @@
 # Audio Drivers Architecture
 
-Caution: This page may contain information that is specific to the legacy
-version of the driver framework (DFv1).
-
 In Fuchsia there are many ways drivers can be architected as defined by the
 number of drivers used, how they communicate and their responsibilities. Audio
 drivers responsibilities are determined by the interface(s) exposed to driver
@@ -13,138 +10,76 @@ facilities.
 
 | Term                 | Definition                                           |
 | -------------------- | ---------------------------------------------------- |
-| Codec                | A real or virtual device that encodes/decodes a      |
+| Hardware Codec       | A real or virtual device that encodes/decodes a      |
 :                      : signal from digital/analog to/from analog/digital    :
 :                      : including all combinations, e.g. digital to digital. :
 :                      : Example codecs include DAC-Amplifiers combos and ADC :
 :                      : converters.                                          :
-| Controller or engine | The HW part of a system that manages the audio       |
+| Controller or engine | The hardware part of a system that manages the audio |
 :                      : signals, for example an SOC's audio subsystem.       :
-| DAI                  | Digital Audio Interface. Interface between audio HW, |
-:                      : for instance a TDM or PDM link between controllers   :
-:                      : and codecs.                                          :
+| DAI                  | Digital Audio Interface. Interface between audio     |
+:                      : hardware for instance a TDM or PDM link between      :
+:                      : controllers and codecs.                              :
+| Ring buffer          | Abstracts management of the shared memory area (in   |
+:                      : main memory) used for data transfer; this shared     :
+:                      : memory area is provided by a VMO object.             :
 
 # Audio interfaces
 
-The main API in use by applications is the
-[Audio Streaming Interface](streaming.md). This API allows applications to
-capture or render audio. Examples of audio applications using audio drivers with
-the streaming interface include
-[audio_core](/src/media/audio/audio_core/v1/README.md) and
-[audio-driver-ctl](/src/media/audio/tools/audio-driver-ctl). The former is the
-core of the audio system (providing software mixing, routing, etc.) and the
-latter is a utility used for testing and bringup of new platforms.
+The API to be used by applications/clients users of audio drivers is the
+[Audio Composite Interface](composite.md). This API allows applications to
+access audio hardware functionality exposed by drivers. It allows drivers to
+expose the functionality of various types of hardware including hardware codecs
+with one or more DAIs, controllers with
+[Ring Buffers](/sdk/fidl/fuchsia.hardware.audio/ring_buffer.fidl) and DAIs, and
+any combination of processing elements allowed by the
+[Audio Signal Processing](signal-processing.md) APIs.
 
-A driver providing the streaming interface abstracts the HW functionality
-described in the API, but it does not need to be the driver actually configuring
-all the HW. A common split in audio HW is to have an audio engine that
-configures a DAI communicating with an audio HW codec. In this split we can have
-one driver for the audio engine and one for the codec. The
-[Codec Interface](codec.md) allows having a driver for the codec implementation
-and another driver configuring the audio engine HW including the DAI and driving
-the codec(s) configuration. In this configuration the codec(s) are secondary to
-the controller. For instance the mt8167-tdm-output was a driver for the MediaTek
-MT8167S audio subsystem (audio engine) also providing the streaming interface
-for applications and communicating with any codec driver, for example a
-[tas58xx](/src/media/audio/drivers/codecs/tas58xx) exposing the codec interface
-as shown below:
+A common split in audio hardware is to have an audio engine that configures a
+DAI communicating with an audio hardware codec. In this split we can have
+one driver for the audio engine and one for the codec. Both drivers can expose
+their relevant functionality using the [Audio Composite Interface](composite.md).
+The codec driver would expose one or more DAI interconnect interfaces and the
+audio engine driver would configure the audio engine hardware including the DAI
+or DAIs that connect to the codec driver or drivers.
 
-```
-                           +-----------------+
-                           |   audio_core    |
-                           +-----------------+
-                                    |
-                           Streaming Interface
-                                    |
-                           +-----------------+
-                           |mt8167-tdm-output|
-                           +-----------------+
-                                    |
-                             Codec Interface
-                                    |
-                           +-----------------+
-                           |     tas58xx     |
-                           +-----------------+
-```
-
-Another way to architect drivers with the engine/codec split is to have a codec
-providing the streaming audio interface, and the audio engine providing a
-[DAI interface](dai.md). For example a
-[aml-g12-tdm-dai](/src/media/audio/drivers/aml-g12-tdm/dai.cc) driver for the
-AMLogic g12 audio subsystem (audio engine) providing the DAI interface for other
-drivers or applications to use, and a codec can drive the engine and provide the
-streaming interface to applications like audio-driver-ctl.
-
-```
-                           +-----------------+
-                           |audio-driver-ctl |
-                           +-----------------+
-                                    |
-                           Streaming Interface
-                                    |
-                           +-----------------+
-                           |  codec-driver   |
-                           +-----------------+
-                                    |
-                              DAI Interface
-                                    |
-                           +-----------------+
-                           | aml-g12-tdm-dai |
-                           +-----------------+
-```
-
-We can also have a non-driver component use either DAI or codec interface to
-access an audio engine or audio HW codec directly. In the figure below we have
-Bluetooth Audio providing the streaming interface and making use of the DAI
-interface to configure the AMLogic g12 audio subsystem:
-
-```
-         +-----------------+    Streaming    +-----------------+
-         |    BT Stack     +-----------------+   audio_core    |
-         +-----------------+    Interface    +-----------------+
-                  |
-             DAI Interface
-                  |
-         +-----------------+
-         | aml-g12-tdm-dai |
-         +-----------------+
-```
-
-It is also possible to have both the DAI and codec interfaces in use, for
-example tied with another driver providing the streaming interface. An example
+Clients of these drivers are expected to configure all drivers. An example
 usage of this architecture for a system with two different codecs physically
-connected to the same DAI stream.
+connected to the engine, e.g. abstracting the audio subsystem of an SoC.
 
 ```
                            +-----------------+
-                           |   audio_core    |
-                           +-----------------+
-                                    |
-                           Streaming Interface
-                                    |
-                           +-----------------+
-                +----------+   glue driver   +----------+
+                +----------+     Client      +----------+
                 |          +-----------------+          |
                 |                   |                   |
-          DAI Interface      Codec Interface     Codec Interface
+          Composite API       Composite API      Composite API
                 |                   |                   |
        +-----------------+ +-----------------+ +-----------------+
-       | aml-g12-tdm-dai | |    tas-5720     | |    tas-5720     |
+       | audio subsystem | |     Codec 1     | |     Codec 2     |
        +-----------------+ +-----------------+ +-----------------+
 ```
+# Deprecated interfaces
 
-Finally, it is also possible to just have one driver configuring all HW and
-exposing the streaming interface. This should be used when there is no logical
-DAI or codec HW separation:
+Deprecated interfaces include:
 
-```
-                           +-----------------+
-                           |   audio_core    |
-                           +-----------------+
-                                    |
-                           Streaming Interface
-                                    |
-                           +-----------------+
-                           |USB audio driver |
-                           +-----------------+
-```
+1. [StreamConfig](/sdk/fidl/fuchsia.hardware.audio/stream_config.fidl):
+Used to capture or render audio by
+[audio_core](/src/media/audio/audio_core/v1/README.md) and
+[audio-driver-ctl](/src/media/audio/tools/audio-driver-ctl). The former is the
+version 1 of the core of the audio system (providing software mixing, routing,
+etc.) and the latter is a utility used for testing and bringup of new platforms.
+
+Drivers that previously would use the StreamConfig API can be implemented using
+[Audio Composite](composite.md) with one Ring Buffer.
+
+1. [Codec](/sdk/fidl/fuchsia.hardware.audio/codec.fidl): Used to abstract
+hardware codecs with one DAI. Drivers that previously would use the Codec API
+can be implemented using
+[Audio Composite](composite.md) with one DAI and no Ring Buffers.
+
+1. [DAI](/sdk/fidl/fuchsia.hardware.audio/dai.fidl): Used to abstract SoC
+hardware with one Ring Buffer and one DAI. Drivers that previously would use the
+DAI API can be implemented using
+[Audio Composite](composite.md) with one DAI and one Ring Buffer.
+
+

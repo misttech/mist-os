@@ -1,5 +1,5 @@
 #!/usr/bin/env fuchsia-vendored-python
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Mobly test for UserInput affordance."""
@@ -40,9 +40,11 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_user_input_tap(self) -> None:
         self.device.session.add_component(TOUCH_APP)
 
+        touch_device = self.device.user_input.create_touch_device()
+
         before = self.device.screenshot.take()
 
-        self.device.user_input.tap(
+        touch_device.tap(
             location=ui_custom_types.Coordinate(x=1, y=2), tap_event_count=1
         )
 

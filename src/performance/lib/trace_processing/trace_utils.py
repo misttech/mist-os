@@ -194,26 +194,60 @@ def get_nearest_following_event(
     return next(iter(filtered_following_events), None)
 
 
-# This method looks for a possible race between trace event start in Scenic and magma.
-# We can safely skip these events. See https://fxbug.dev/322849857 for more details.
-def find_valid_vsync_start_index(vsyncs: List[trace_model.Event]) -> int:
-    """Find the index of the first valid vsync flow.
+# This method looks for a possible race between trace collection start in multiple processes.
+#
+# This problem usually occurs between Scenic and Magma processes. The flow connection between
+# these processes happen through koids of objects passed to Vulkan, which may be reused. When
+# there is a gap in process trace collection starts, we may see the initial vsync event(s)
+# connecting to multiple flows. We can safely skip these initial events. See
+# https://fxbug.dev/322849857 for more detailed examples with screenshots.
+def adjust_to_common_process_start(
+    model: trace_model.Model, process_and_thread_names: List[tuple[str, str]]
+) -> trace_model.Model:
+    """Adjust model to a consistent start time tracking the latest first event recorded from a
+    list of processes. The list of processes are selected through matching process_name exactly
+    and thread_name as substring.
 
     Args:
-      vsyncs: List of vsync events.
+      model: Trace model.
+      process_and_thread_names: Tuples of strings representing (process_name, thread_name).
 
     Returns:
-      The first index where vsyncs are chronologically ordered and the vsync[0]'s flows
-      aren't interfering.
+      Model adjusted to a start time tracking the latest first event recorded from the given
+      processes. KeyError if no match is found from the process and thread name keys.
     """
-    if len(vsyncs) < 2 or vsyncs[0] is None:
-        return 0
-    i = 1
-    while i < len(vsyncs) and (
-        vsyncs[i] is None or vsyncs[i].start < vsyncs[0].start
-    ):
-        i += 1
-    return 0 if i == 1 else i
+    processes = []
+    for process_name, thread_name in process_and_thread_names:
+        process_matches = [p for p in model.processes if process_name == p.name]
+        if not process_matches:
+            raise KeyError(
+                f"Error, expected traces with process_name '{process_name}'"
+            )
+        for i, process_match in enumerate(process_matches):
+            thread_match = next(
+                (t for t in process_match.threads if thread_name in t.name),
+                None,
+            )
+            if thread_match:
+                processes.append(process_match)
+                break
+            elif i == len(process_matches) - 1:
+                raise KeyError(
+                    f"Error, expected traces with process_name '{process_name}' "
+                    f"and thread name `{thread_name}`"
+                )
+    consistent_start_time = max(
+        min(
+            (
+                event.start
+                for thread in process.threads
+                for event in thread.events
+            ),
+            default=trace_time.TimePoint(),
+        )
+        for process in processes
+    )
+    return model.slice(start=consistent_start_time)
 
 
 def standard_metrics_set(

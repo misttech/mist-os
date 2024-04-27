@@ -117,7 +117,7 @@ template("cmc_check_includes") {
                            ])
   }
 
-  cmc_label = "//tools/cmc:install"
+  cmc_label = "//tools/cmc:install($host_toolchain)"
   cmc_out_path = "${root_build_dir}/host-tools/cmc"
 
   _expected_includes_label = ":" + _expected_includes_label

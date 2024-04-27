@@ -60,6 +60,7 @@
           "prebuilt/starnix/tests/syscalls/linux-riscv64": true,
           "prebuilt/test_data/connectivity/acts": true,
           "prebuilt/test_data/debug/sample_core/core": true,
+          "prebuilt/test_data/debug/rust_test_data": true,
           "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/third_party/def_parser": true,
           "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/third_party/grpc": true,
           "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/third_party/ijar": true,

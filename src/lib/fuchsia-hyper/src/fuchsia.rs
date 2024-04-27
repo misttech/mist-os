@@ -373,7 +373,7 @@ mod test {
             while let Some(req) = stream.try_next().await.unwrap_or(None) {
                 match req {
                     ProviderRequest::InterfaceNameToIndex { name: _, responder } => {
-                        responder.send(Ok(std::u64::MAX)).unwrap()
+                        responder.send(Ok(u64::MAX)).unwrap()
                     }
                     _ => panic!("unexpected request"),
                 }

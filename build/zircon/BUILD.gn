@@ -17,3 +17,39 @@ basic_toolchain("sysroot_toolchain") {
     select_variant_canonical = _select_variant_canonical
   }
 }
+
+# The zx_library() template accepts an optional `sdk_publishable` argument that
+# indicates that the library should be included in the SDK in the specified
+# category. Since "partner" is the only category that is published, this should
+# be the only value passed. However, for historical reasons, other categories
+# are specified (see https://fxbug.dev/333125197). These allowlists prevent
+# adding more such instances.
+group("sdk_category_partner_allowlist") {
+  # This is the only expected category.
+  # All libraries actually for the SDK should be in one of these directories.
+  visibility = [
+    "//sdk/lib/*",
+    "//zircon/system/ulib/*",
+
+    # TODO(https://fxbug.dev/335188356): Move to `//sdk/lib/mmio/` and/or
+    # migrate it off this template.
+    "//src/devices/lib/mmio/*",
+  ]
+}
+group("sdk_category_internal_allowlist") {
+  # See https://fxbug.dev/331961405. This can be removed once the "internal IDK" is eliminated.
+  visibility = [
+    "//src/devices/lib/mmio/*",
+    "//src/devices/testing/*",
+    "//zircon/kernel/lib/devicetree/*",
+    "//zircon/system/ulib/fzl/*",
+    "//zircon/system/ulib/mmio-ptr/*",
+  ]
+}
+group("sdk_category_cts_allowlist") {
+  visibility = [ "//zircon/system/ulib/fbl" ]
+}
+group("sdk_category_excluded_allowlist") {
+  # See https://fxbug.dev/331961405.
+  visibility = [ "//src/firmware/lib/*" ]
+}

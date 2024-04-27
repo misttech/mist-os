@@ -5,6 +5,13 @@ library fuchsia.hardware.audio;
 
 /// For an overview of the DAI protocols see
 /// [Digital Audio Interface](//docs/concepts/drivers/driver_architectures/audio_drivers/audio_dai.md)
+/// # Deprecation
+///
+/// Not supported anymore, instead use an
+/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
+/// with one DAI and one Ring Buffer, see
+/// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
+@available(deprecated=20)
 closed protocol DaiConnector {
     /// This connects to a DAI protocol server.
     strict Connect(resource struct {
@@ -12,6 +19,13 @@ closed protocol DaiConnector {
     });
 };
 
+/// # Deprecation
+///
+/// Not supported anymore, instead use an
+/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
+/// with one DAI and one Ring Buffer, see
+/// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
+@available(deprecated=20)
 service DaiConnectorService {
     dai_connector client_end:DaiConnector;
 };

@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
-        routing::router::{Request, Routable, Router},
+        routing::router_ext::{RouterExt, WeakComponentTokenExt},
     },
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
@@ -22,7 +22,7 @@ use {
     },
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
-    sandbox::{Capability, Dict, Message, Open, Sendable, Sender},
+    sandbox::{Capability, Dict, Message, Open, Request, Routable, Router, Sendable, Sender},
     std::{fmt::Debug, sync::Arc},
     tracing::warn,
     vfs::{
@@ -226,7 +226,17 @@ impl LaunchTaskOnReceive {
     }
 
     pub fn into_router(self) -> Router {
-        Router::new(Arc::new(self))
+        #[derive(Debug)]
+        struct LaunchTaskRouter {
+            inner: Arc<LaunchTaskOnReceive>,
+        }
+        #[async_trait]
+        impl Routable for LaunchTaskRouter {
+            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+                Ok(self.inner.clone().into_sender(request.target.to_instance()).into())
+            }
+        }
+        Router::new(LaunchTaskRouter { inner: Arc::new(self) })
     }
 
     fn launch_task(&self, channel: zx::Channel, instance: WeakComponentInstance) {
@@ -300,13 +310,6 @@ impl LaunchTaskOnReceive {
     }
 }
 
-#[async_trait]
-impl Routable for Arc<LaunchTaskOnReceive> {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
-        Ok(self.clone().into_sender(request.target).into())
-    }
-}
-
 /// Porcelain methods on [`Routable`] objects.
 pub trait RoutableExt: Routable {
     /// Returns a router that resolves with a [`sandbox::Sender`] that watches for
@@ -334,10 +337,12 @@ impl<T: Routable + 'static> RoutableExt for T {
         #[async_trait]
         impl Routable for OnReadableRouter {
             async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
-                let target = request.target.upgrade().map_err(RoutingError::from)?;
+                let target =
+                    request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?;
                 let entry = self.router.clone().into_directory_entry(
                     request,
                     self.entry_type,
+                    target.execution_scope.clone(),
                     move |err| {
                         // TODO(https://fxbug.dev/319754472): Improve the fidelity of error logging.
                         // This should log into the component's log sink using the proper
@@ -446,7 +451,7 @@ pub mod tests {
     use cm_rust::Availability;
     use cm_types::RelativePath;
     use fuchsia_async::TestExecutor;
-    use sandbox::{Data, Receiver};
+    use sandbox::{Data, Receiver, WeakComponentToken};
     use std::{pin::pin, sync::Weak, task::Poll};
 
     #[fuchsia::test]
@@ -533,7 +538,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar/data").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentToken::invalid(),
                 },
             )
             .await;
@@ -550,7 +555,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentToken::invalid(),
                 },
             )
             .await;
@@ -572,7 +577,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentToken::invalid(),
                 },
             )
             .await;
@@ -592,7 +597,7 @@ pub mod tests {
                 &RelativePath::new("foo").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentToken::invalid(),
                 },
             )
             .await;
@@ -603,7 +608,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentToken::invalid(),
                 },
             )
             .await;
@@ -654,7 +659,10 @@ pub mod tests {
         )
         .await;
         let capability = router
-            .route(Request { availability: Availability::Required, target: component.as_weak() })
+            .route(Request {
+                availability: Availability::Required,
+                target: WeakComponentToken::new(component.as_weak()),
+            })
             .await
             .unwrap();
 
@@ -702,7 +710,10 @@ pub mod tests {
         )
         .await;
         let capability = router
-            .route(Request { availability: Availability::Required, target: component.as_weak() })
+            .route(Request {
+                availability: Availability::Required,
+                target: WeakComponentToken::new(component.as_weak()),
+            })
             .await
             .unwrap();
 
@@ -749,7 +760,7 @@ pub mod tests {
         let capability = downscoped_router
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
+                target: WeakComponentToken::invalid(),
             })
             .await
             .unwrap();
@@ -793,7 +804,7 @@ pub mod tests {
         let capability = downscoped_router
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
+                target: WeakComponentToken::invalid(),
             })
             .await
             .unwrap();

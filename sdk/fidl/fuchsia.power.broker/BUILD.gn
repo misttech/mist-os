@@ -11,6 +11,7 @@ fidl("fuchsia.power.broker") {
 
   # This is still experimental, so restricting visibility for now.
   visibility = [
+    "//sdk:*",
     "//sdk/fidl/fuchsia.hardware.hrtimer/*:*",
     "//sdk/fidl/fuchsia.power.system/*:*",
     "//sdk/fidl/fuchsia.session.power/*:*",
@@ -19,6 +20,7 @@ fidl("fuchsia.power.broker") {
     "//src/devices/bus/drivers/platform/test/*:*",
     "//src/devices/hrtimer/drivers/aml-hrtimer/*:*",
     "//src/power/broker/*:*",
+    "//src/power/shutdown-shim/*:*",
     "//src/power/system-activity-governor/*:*",
     "//src/power/testing/fake-broker/*:*",
     "//src/session/bin/*",

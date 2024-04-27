@@ -4,7 +4,7 @@
 
 use {
     crate::inspect_util, fidl_fuchsia_pkg as fpkg, fuchsia_inspect::Node,
-    fuchsia_url::AbsolutePackageUrl, fuchsia_zircon as zx,
+    fuchsia_url::AbsolutePackageUrl, fuchsia_zircon as zx, futures::future::BoxFuture,
 };
 
 fn now_monotonic_nanos() -> i64 {
@@ -52,6 +52,17 @@ impl ResolverService {
         node.record_int("resolve_ts", now_monotonic_nanos());
         node.record_string("gc_protection", format!("{gc_protection:?}"));
         Package { node }
+    }
+
+    /// Add a child node for the raw WorkQueue underlying the QueuedResolver.
+    pub fn record_raw_queue(
+        &self,
+        lazy_callback: impl Fn() -> BoxFuture<'static, Result<fuchsia_inspect::Inspector, anyhow::Error>>
+            + Send
+            + Sync
+            + 'static,
+    ) {
+        let () = self._node.record_lazy_child("raw_queue", lazy_callback);
     }
 }
 

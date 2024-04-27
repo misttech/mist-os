@@ -19,12 +19,17 @@ fuchsia_licenses_classification(
     spdx_input = "input.spdx.json",
 )
 
-# To update the expected file:
-# cp \
-# ~/fuchsia/build/bazel_sdk/tests/bazel-bin/fuchsia/licenses/classification/actual_classification.json \
-# ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/classification/expected_classification.json
 diff_test(
     name = "classification_test",
+    failure_message = """
+To update the expected file, run:
+   ./build/bazel_sdk/tests/scripts/bazel_test.py \\
+     --test_target //:licenses_tests \\
+     --output_base /tmp/bazel_sdk_tests_output
+   cp \\
+     /tmp/bazel_sdk_tests_output/execroot/sdk-integration/bazel-out/aarch64-fastbuild/bin/fuchsia/licenses/classification/actual_classification.json \\
+     ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/classification/expected_classification.json
+""",
     file1 = ":actual_classification.json",
     file2 = "expected_classification.json",
     visibility = ["//visibility:public"],

@@ -8,24 +8,21 @@ use ffx_snapshot_args::SnapshotCommand;
 use fidl_fuchsia_feedback::DataProviderProxy;
 use std::{
     fs::File,
-    io::{copy, Write},
+    io::copy,
     path::{Path, PathBuf},
 };
 use zip::ZipArchive;
 
 /// Creates new snapshot at given directory path and unzips it.
-pub async fn create_snapshot<W: Write>(
+pub async fn create_snapshot(
     data_provider_proxy: DataProviderProxy,
     directory: &Path,
-    writer: &mut W,
 ) -> Result<()> {
     let cmd = SnapshotCommand {
         dump_annotations: false,
         output_file: Some(directory.to_string_lossy().into()),
     };
-    snapshot_impl(data_provider_proxy, cmd, writer)
-        .await
-        .context("Unable to take snapshot of target.")?;
+    snapshot_impl(data_provider_proxy, cmd).await.context("Unable to take snapshot of target.")?;
 
     let snapshot_zip_path = directory.join("snapshot.zip");
 

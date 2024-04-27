@@ -55,49 +55,47 @@ void FakeCodecAdapter::CoreCodecInit(
   // nothing to do here
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-FakeCodecAdapter::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+FakeCodecAdapter::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
   // If test harness has set an override, just return that.
   if (buffer_collection_constraints_[port]) {
-    return fidl::Clone(*buffer_collection_constraints_[port]);
+    return *buffer_collection_constraints_[port];
   }
 
   ZX_DEBUG_ASSERT(false);
-  fuchsia::sysmem::BufferCollectionConstraints result;
-  ZX_DEBUG_ASSERT(result.usage.cpu == 0);
-  ZX_DEBUG_ASSERT(result.usage.display == 0);
-  ZX_DEBUG_ASSERT(result.usage.video == 0);
-  ZX_DEBUG_ASSERT(result.usage.vulkan == 0);
+  fuchsia_sysmem2::BufferCollectionConstraints result;
+  ZX_DEBUG_ASSERT(!result.usage().has_value());
   if (port == kInputPort) {
-    result.min_buffer_count_for_camping = kInputMinBufferCountForCamping;
+    result.min_buffer_count_for_camping() = kInputMinBufferCountForCamping;
   } else {
     ZX_DEBUG_ASSERT(port == kOutputPort);
-    result.min_buffer_count_for_camping = kOutputMinBufferCountForCamping;
+    result.min_buffer_count_for_camping() = kOutputMinBufferCountForCamping;
   }
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
-  ZX_DEBUG_ASSERT(result.min_buffer_count == 0);
-  // 0 is treated as 0xFFFFFFFF.
-  ZX_DEBUG_ASSERT(result.max_buffer_count == 0);
-  result.has_buffer_memory_constraints = true;
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.min_buffer_count().has_value());
+  // un-set is treated as 0xFFFFFFFF.
+  ZX_DEBUG_ASSERT(!result.max_buffer_count().has_value());
+  auto& bmc = result.buffer_memory_constraints().emplace();
   if (port == kInputPort) {
-    // Despite the defaults being fine for the fake, CodecImpl wants this bool
-    // set to true.  All real CodecAdapter implementations will likely want to
-    // have some constraints on buffer size - or if they don't, they can also
-    // just set has_buffer_memory_constraints true with defaults for all fields.
-    ZX_DEBUG_ASSERT(result.has_buffer_memory_constraints);
+    // Despite the defaults being fine for the fake, CodecImpl wants
+    // buffer_memory_constraints to have a value.  All real CodecAdapter
+    // implementations will likely want to have some constraints on buffer size
+    // - or if they don't, they can also just emplace buffer_memory_constraints
+    // with defaults for all fields.
+    ZX_DEBUG_ASSERT(result.buffer_memory_constraints().has_value());
   } else {
-    result.buffer_memory_constraints.min_size_bytes = kPerPacketBufferBytesMin;
-    ZX_DEBUG_ASSERT(result.buffer_memory_constraints.cpu_domain_supported);
+    bmc.min_size_bytes() = kPerPacketBufferBytesMin;
+    bmc.cpu_domain_supported() = true;
   }
-  ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+  ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
   return result;
 }
 
 void FakeCodecAdapter::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   // nothing to do here
 }
 
@@ -146,8 +144,8 @@ FakeCodecAdapter::CoreCodecBuildNewOutputConstraints(
   fuchsia::media::StreamOutputConstraints result;
   result.set_stream_lifetime_ordinal(stream_lifetime_ordinal);
   result.set_buffer_constraints_action_required(buffer_constraints_action_required);
-  result.mutable_buffer_constraints()
-      ->set_buffer_constraints_version_ordinal(new_output_buffer_constraints_version_ordinal);
+  result.mutable_buffer_constraints()->set_buffer_constraints_version_ordinal(
+      new_output_buffer_constraints_version_ordinal);
   return std::make_unique<const fuchsia::media::StreamOutputConstraints>(std::move(result));
 }
 
@@ -190,6 +188,6 @@ void FakeCodecAdapter::CoreCodecMidStreamOutputBufferReConfigFinish() {
 }
 
 void FakeCodecAdapter::SetBufferCollectionConstraints(
-    CodecPort port, fuchsia::sysmem::BufferCollectionConstraints constraints) {
+    CodecPort port, fuchsia_sysmem2::BufferCollectionConstraints constraints) {
   buffer_collection_constraints_[port] = std::move(constraints);
 }

@@ -9,6 +9,8 @@
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
+#include <regex>
+
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
@@ -23,7 +25,9 @@ UsbPhyVisitor::UsbPhyVisitor() {
 }
 
 bool UsbPhyVisitor::is_match(const std::string& name) {
-  return name.find("usb") != std::string::npos;
+  // Check that it starts with "usb" and optionally contains a unit address (eg: usb@ffaa0000).
+  std::regex name_regex("^usb(@.*)?");
+  return std::regex_match(name, name_regex);
 }
 
 zx::result<> UsbPhyVisitor::Visit(fdf_devicetree::Node& node,

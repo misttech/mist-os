@@ -440,14 +440,10 @@ mod tests {
             .source(UseSource::Framework)
             .name("fuchsia.component.Realm")
             .build();
-        let use_from_child_decl = UseBuilder::protocol()
-            .source(UseSource::Child("my_child".into()))
-            .name("foo.bar")
-            .build();
-        let expose_from_child_decl = ExposeBuilder::protocol()
-            .name("foo.bar")
-            .source(ExposeSource::Child("my_child".to_string()))
-            .build();
+        let use_from_child_decl =
+            UseBuilder::protocol().source_static_child("my_child").name("foo.bar").build();
+        let expose_from_child_decl =
+            ExposeBuilder::protocol().name("foo.bar").source_static_child("my_child").build();
         let expose_from_self_decl =
             ExposeBuilder::protocol().name("foo.bar").source(ExposeSource::Self_).build();
 
@@ -556,11 +552,9 @@ mod tests {
     #[fuchsia::test]
     async fn validate_error() {
         let invalid_source_name_use_from_child_decl =
-            UseBuilder::protocol().source(UseSource::Child("my_child".into())).name("a").build();
-        let invalid_source_name_expose_from_child_decl = ExposeBuilder::protocol()
-            .name("c")
-            .source(ExposeSource::Child("my_child".to_string()))
-            .build();
+            UseBuilder::protocol().source_static_child("my_child").name("a").build();
+        let invalid_source_name_expose_from_child_decl =
+            ExposeBuilder::protocol().name("c").source_static_child("my_child").build();
 
         let components = vec![
             (
@@ -636,14 +630,14 @@ mod tests {
             .name("fuchsia.component.Realm")
             .build();
         let use_from_child_decl = UseBuilder::protocol()
-            .source(UseSource::Child("my_child".into()))
+            .source_static_child("my_child")
             .name("biz.buz")
             .path("/svc/foo.bar")
             .build();
         let expose_from_child_decl = ExposeBuilder::protocol()
             .name("biz.buz")
             .target_name("foo.bar")
-            .source(ExposeSource::Child("my_child".into()))
+            .source_static_child("my_child")
             .build();
         let expose_from_self_decl =
             ExposeBuilder::protocol().name("biz.buz").source(ExposeSource::Self_).build();
@@ -761,7 +755,7 @@ mod tests {
         let expose_from_child_decl = ExposeBuilder::resolver()
             .name("qax.qux")
             .target_name("foo.buz")
-            .source(ExposeSource::Child("my_child".into()))
+            .source_static_child("my_child")
             .build();
         let expose_from_self_decl =
             ExposeBuilder::resolver().name("qax.qux").source(ExposeSource::Self_).build();
@@ -838,12 +832,12 @@ mod tests {
         let expose_from_child_decl = ExposeBuilder::protocol()
             .name("qax.qux")
             .target_name("foo.buz")
-            .source(ExposeSource::Child("my_child".into()))
+            .source_static_child("my_child")
             .build();
         let expose_from_child_decl2 = ExposeBuilder::protocol()
             .name("qax.qux")
             .target_name("foo.biz")
-            .source(ExposeSource::Child("my_child".into()))
+            .source_static_child("my_child")
             .build();
         let expose_from_child_decl3 =
             ExposeBuilder::protocol().name("no.match").source(ExposeSource::Framework).build();
@@ -1094,11 +1088,9 @@ mod tests {
     #[fuchsia::test]
     async fn route_error() {
         let invalid_source_name_use_from_child_decl =
-            UseBuilder::protocol().source(UseSource::Child("my_child".into())).name("a").build();
-        let invalid_source_name_expose_from_child_decl = ExposeBuilder::protocol()
-            .name("c")
-            .source(ExposeSource::Child("my_child".to_string()))
-            .build();
+            UseBuilder::protocol().source_static_child("my_child").name("a").build();
+        let invalid_source_name_expose_from_child_decl =
+            ExposeBuilder::protocol().name("c").source_static_child("my_child").build();
 
         let components = vec![
             (

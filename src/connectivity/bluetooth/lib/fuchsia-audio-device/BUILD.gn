@@ -11,8 +11,10 @@ rustc_library("fuchsia-audio-device") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
+    "//sdk/fidl/fuchsia.hardware.audio.signalprocessing:fuchsia.hardware.audio.signalprocessing_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/connectivity/bluetooth/lib/async-helpers",
+    "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",

@@ -74,6 +74,11 @@ std::string TestSymbolModule::GetTestFileName() {
 }
 
 // static
+std::string TestSymbolModule::GetPrebuiltRustTestFileName() {
+  return GetTestDataDir() + "rust_symbol_test.targetexe";
+}
+
+// static
 std::string TestSymbolModule::GetCheckedInTestFileName() {
   return GetTestDataDir() + "libsymbol_test_so.targetso";
 }

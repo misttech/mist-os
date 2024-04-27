@@ -1,0 +1,21 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+  "include": [
+    "inspect/client.shard.cml",
+    "syslog/client.shard.cml",
+    "//sdk/lib/driver/compat/compat.shard.cml"
+  ],
+  "program": {
+    "runner": "driver",
+    "bind": "meta/bind/my_driver_cpp.bindbc",
+    "fallback": "false",
+    "default_dispatcher_opts": [
+      "allow_sync_calls"
+    ],
+    "compat": "driver/my-driver-cpp.so",
+    "colocate": "true"
+  },
+  "use": []
+}

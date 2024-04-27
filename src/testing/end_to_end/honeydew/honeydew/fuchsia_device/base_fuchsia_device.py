@@ -51,6 +51,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 class BaseFuchsiaDevice(
     fuchsia_device_interface.FuchsiaDevice,
     affordances_capable.RebootCapableDevice,
+    affordances_capable.FuchsiaDeviceLogger,
 ):
     """Common implementation for Fuchsia devices using different transports.
     Every device running Fuchsia contains common functionality as well as the
@@ -294,7 +295,9 @@ class BaseFuchsiaDevice(
             errors.NotSupportedError: If Fuchsia device does not support Starnix
         """
         return system_power_state_controller_starnix.SystemPowerStateController(
-            device_name=self.device_name, ffx=self.ffx
+            device_name=self.device_name,
+            ffx=self.ffx,
+            device_logger=self,
         )
 
     # List all the public methods

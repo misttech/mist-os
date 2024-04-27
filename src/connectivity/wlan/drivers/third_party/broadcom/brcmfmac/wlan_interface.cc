@@ -13,12 +13,13 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/wlan_interface.h"
 
-#include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include <cstdio>
 #include <cstring>
+
+#include <bind/fuchsia/wlan/fullmac/cpp/bind.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
@@ -36,49 +37,64 @@ constexpr uint32_t kEthernetMtu = 1500;
 
 }  // namespace
 
-WlanInterface::WlanInterface(wlan::brcmfmac::Device* device,
-                             const network_device_ifc_protocol_t& proto, uint8_t port_id,
-                             const char* name)
-    : NetworkPort(proto, *this, port_id), wdev_(nullptr), device_(nullptr), name_(name) {}
+WlanInterface::WlanInterface(
+    wlan::brcmfmac::Device* device,
+    fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc>&& netdev_ifc,
+    uint8_t port_id, const char* name, uint16_t iface_id)
+    : NetworkPort(std::move(netdev_ifc), *this, port_id), name_(name), iface_id_(iface_id) {}
 
-zx::result<std::unique_ptr<WlanInterface>> WlanInterface::Create(
+void WlanInterface::Create(
     wlan::brcmfmac::Device* device, const char* name, wireless_dev* wdev,
-    fuchsia_wlan_common_wire::WlanMacRole role) {
-  std::unique_ptr<WlanInterface> interface(new WlanInterface(
-      device, device->NetDev()->NetDevIfcProto(), ndev_to_if(wdev->netdev)->ifidx, name));
-  {
-    std::lock_guard<std::shared_mutex> guard(interface->lock_);
+    fuchsia_wlan_common_wire::WlanMacRole role, uint16_t iface_id,
+    fit::callback<void(zx::result<std::unique_ptr<WlanInterface>>)>&& on_complete) {
+  std::unique_ptr<WlanInterface> interface(
+      new WlanInterface(device, device->NetDev().NetDevIfcClient().Clone(),
+                        ndev_to_if(wdev->netdev)->ifidx, name, iface_id));
+
+  const zx_status_t status = [&] {
     interface->device_ = device;
     interface->wdev_ = wdev;
-  }
+    interface->role_ = role;
 
-  interface->role_ = role;
-  zx_status_t status;
+    if (zx_status_t status = interface->AddWlanFullmacDevice(); status != ZX_OK) {
+      BRCMF_ERR("Error while adding fullmac dev: %s", zx_status_get_string(status));
+      return status;
+    }
+    NetworkPort::Role net_port_role;
+    switch (role) {
+      case fuchsia_wlan_common_wire::WlanMacRole::kClient:
+        net_port_role = NetworkPort::Role::Client;
+        break;
+      case fuchsia_wlan_common_wire::WlanMacRole::kAp:
+        net_port_role = NetworkPort::Role::Ap;
+        break;
+      default:
+        BRCMF_ERR("Unsupported role %u", uint32_t(role));
+        return ZX_ERR_INVALID_ARGS;
+    }
+    // Acquire a raw pointer since the smart pointer will be moved from.
+    WlanInterface* interface_ptr = interface.get();
+    interface_ptr->NetworkPort::Init(
+        net_port_role, fdf::Dispatcher::GetCurrent()->get(),
+        [interface = std::move(interface),
+         on_complete = std::move(on_complete)](zx_status_t status) mutable {
+          if (status != ZX_OK) {
+            BRCMF_ERR("Failed to initialize port: %s", zx_status_get_string(status));
+            on_complete(zx::error(status));
+            return;
+          }
 
-  if ((status = interface->AddWlanFullmacDevice()) != ZX_OK) {
-    BRCMF_ERR("Error while adding fullmac dev: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-  NetworkPort::Role net_port_role;
-  switch (role) {
-    case fuchsia_wlan_common_wire::WlanMacRole::kClient:
-      net_port_role = NetworkPort::Role::Client;
-      break;
-    case fuchsia_wlan_common_wire::WlanMacRole::kAp:
-      net_port_role = NetworkPort::Role::Ap;
-      break;
-    default:
-      BRCMF_ERR("Unsupported role %u", uint32_t(role));
-      return zx::error(ZX_ERR_INVALID_ARGS);
-  }
+          on_complete(zx::ok(std::move(interface)));
+        });
 
-  status = interface->NetworkPort::Init(net_port_role);
+    return ZX_OK;
+  }();
+
+  // Only call on_complete on failure. On success the NetworkPort::Init callback will call
+  // on_complete asynchronously.
   if (status != ZX_OK) {
-    BRCMF_ERR("Failed to initialize port: %s", zx_status_get_string(status));
-    return zx::error(status);
+    on_complete(zx::error(status));
   }
-
-  return zx::ok(std::move(interface));
 }
 
 zx_status_t WlanInterface::AddWlanFullmacDevice() {
@@ -103,7 +119,8 @@ zx_status_t WlanInterface::AddWlanFullmacDevice() {
 
   fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers(arena, 1);
   offers[0] = fdf::MakeOffer2<fuchsia_wlan_fullmac::Service>(arena, GetName());
-  auto property = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_WLAN_FULLMAC_IMPL);
+  auto property = fdf::MakeProperty(arena, bind_fuchsia_wlan_fullmac::SERVICE,
+                                    bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
 
   auto args = fdf::wire::NodeAddArgs::Builder(arena)
                   .name(arena, GetName())
@@ -156,30 +173,57 @@ zx_status_t WlanInterface::RemoveWlanFullmacDevice() {
   return ZX_OK;
 }
 
-zx_status_t WlanInterface::DestroyIface() {
+void WlanInterface::DestroyIface(fit::callback<void(zx_status_t)>&& on_complete) {
+  // Use this to asynchronously call on_complete.
+  auto call_on_complete = [on_complete = std::move(on_complete)](zx_status_t status) mutable {
+    async::PostTask(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+        [status, on_complete = std::move(on_complete)]() mutable { on_complete(status); });
+  };
+
+  {
+    std::lock_guard lock(lock_);
+    if (destroying_) {
+      // Interface already destroyed or in the process of being destroyed, nothing to do.
+      call_on_complete(ZX_ERR_NOT_FOUND);
+      return;
+    }
+    destroying_ = true;
+  }
+
   zx_status_t status = RemoveWlanFullmacDevice();
   if (status != ZX_OK) {
-    BRCMF_ERR("Device::RemoveWlanFullmacDevice() failed for Client interface : %s",
-              zx_status_get_string(status));
-
+    BRCMF_ERR("Failed to remove interface Fullmac Device: %s", zx_status_get_string(status));
     // If ZX_ERR_BAD_STATE is returned, we may have previously called RemoveWlanFullmacDevice
     // successfully but failed to delete the iface from firmware.
     // In that case, we don't return here to try deleting the iface from firmware again to avoid
     // having an iface in firmware that we can never delete.
     if (status != ZX_ERR_BAD_STATE) {
-      return status;
+      call_on_complete(status);
+      return;
     }
   }
 
-  RemovePort();
-  wireless_dev* wdev = take_wdev();
+  RemovePort([this, call_on_complete = std::move(call_on_complete)](zx_status_t status) mutable {
+    // ZX_ERR_NOT_FOUND means the port was most likely already removed. This makes sense if the
+    // request to destroy the interface came about as a result of the removal of the port or if
+    // the netdevice child closed (thus calling Removed on the port) before interface
+    // destruction was initiated. In that case continue with the interface removal.
+    if (status != ZX_OK && status != ZX_ERR_NOT_FOUND) {
+      BRCMF_ERR("Failed to remove port: %s", zx_status_get_string(status));
+      call_on_complete(status);
+      return;
+    }
+    wireless_dev* wdev = take_wdev();
 
-  if ((status = brcmf_cfg80211_del_iface(device_->drvr()->config, wdev)) != ZX_OK) {
-    BRCMF_ERR("Failed to del iface, status: %s", zx_status_get_string(status));
-    set_wdev(wdev);
-    return status;
-  }
-  return ZX_OK;
+    if (status = brcmf_cfg80211_del_iface(device_->drvr()->config, wdev); status != ZX_OK) {
+      BRCMF_ERR("Failed to del iface, status: %s", zx_status_get_string(status));
+      set_wdev(wdev);
+      call_on_complete(status);
+      return;
+    }
+    call_on_complete(ZX_OK);
+  });
 }
 
 void WlanInterface::set_wdev(wireless_dev* wdev) {
@@ -192,13 +236,6 @@ wireless_dev* WlanInterface::take_wdev() {
   wireless_dev* wdev = wdev_;
   wdev_ = nullptr;
   return wdev;
-}
-
-void WlanInterface::Remove(fit::callback<void()>&& on_remove) {
-  {
-    std::lock_guard lock(lock_);
-    on_remove_ = std::move(on_remove);
-  }
 }
 
 void WlanInterface::ServiceConnectHandler(
@@ -532,32 +569,32 @@ void WlanInterface::OnLinkStateChanged(OnLinkStateChangedRequestView request, fd
 
 uint32_t WlanInterface::PortGetMtu() { return kEthernetMtu; }
 
-void WlanInterface::MacGetAddress(mac_address_t* out_mac) {
+void WlanInterface::MacGetAddress(fuchsia_net::MacAddress* out_mac) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ == nullptr) {
     BRCMF_WARN("Interface not available, returning empty MAC address");
-    memset(out_mac, 0, MAC_SIZE);
+    out_mac->octets().fill(0);
     return;
   }
-  memcpy(out_mac->octets, ndev_to_if(wdev_->netdev)->mac_addr, MAC_SIZE);
+  memcpy(out_mac->octets().data(), ndev_to_if(wdev_->netdev)->mac_addr, out_mac->octets().size());
 }
 
-void WlanInterface::MacGetFeatures(features_t* out_features) {
-  *out_features = {
-      .multicast_filter_count = 0,
-      .supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER |
-                         SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS,
-  };
+void WlanInterface::MacGetFeatures(fuchsia_hardware_network_driver::Features* out_features) {
+  out_features->multicast_filter_count() = 0;
+  out_features->supported_modes() =
+      fuchsia_hardware_network_driver::wire::SupportedMacFilterMode::kMulticastFilter |
+      fuchsia_hardware_network_driver::wire::SupportedMacFilterMode::kMulticastPromiscuous;
 }
 
-void WlanInterface::MacSetMode(mode_t mode, cpp20::span<const mac_address_t> multicast_macs) {
+void WlanInterface::MacSetMode(fuchsia_hardware_network::wire::MacFilterMode mode,
+                               cpp20::span<const ::fuchsia_net::wire::MacAddress> multicast_macs) {
   zx_status_t status = ZX_OK;
   std::shared_lock<std::shared_mutex> guard(lock_);
   switch (mode) {
-    case MAC_FILTER_MODE_MULTICAST_FILTER:
+    case fuchsia_hardware_network::wire::MacFilterMode::kMulticastFilter:
       status = brcmf_if_set_multicast_promisc(wdev_->netdev, false);
       break;
-    case MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
+    case fuchsia_hardware_network::wire::MacFilterMode::kMulticastPromiscuous:
       status = brcmf_if_set_multicast_promisc(wdev_->netdev, true);
       break;
     default:
@@ -568,6 +605,12 @@ void WlanInterface::MacSetMode(mode_t mode, cpp20::span<const mac_address_t> mul
   if (status != ZX_OK) {
     BRCMF_ERR("MacSetMode failed: %s", zx_status_get_string(status));
   }
+}
+
+void WlanInterface::PortRemoved() {
+  // The network device port was unexpectedly removed. Destroy the interface to signal that it can
+  // no longer be used.
+  device_->DestroyIface(iface_id_, [](zx_status_t status) {});
 }
 
 }  // namespace brcmfmac

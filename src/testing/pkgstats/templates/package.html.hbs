@@ -1,0 +1,31 @@
+{{! Copyright 2024 The Fuchsia Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file. }}
+<div>
+    <h2>Package: {{this.[0]}}</h2>
+    {{#if this.[1].components}}
+    <table class="contents-table">
+        <thead>
+            <th>Component</th>
+        </thead>
+        {{#each this.[1].components}}
+        <tr>
+            <td>{{@key}}</td>
+        </tr>
+        {{/each}}
+    </table>
+    {{/if}}
+
+    <table class="contents-table">
+        <thead>
+            <th>File</th>
+            <th>Hash</th>
+        </thead>
+        {{#each this.[1].files }}
+        <tr>
+            <td>{{this.name}}</td>
+            <td><a href="{{(content_link this.hash)}}">{{this.hash}}</a></td>
+        </tr>
+        {{/each}}
+    </table>
+</div>

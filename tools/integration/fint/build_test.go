@@ -418,10 +418,9 @@ func TestBuild(t *testing.T) {
 					{Name: "other", Path: "other.tgz", Type: "tgz"},
 				},
 			},
-			expectedTargets: append(extraTargetsForImages, "p.tar.gz", "b.tgz"),
+			expectedTargets: append(extraTargetsForImages, "b.tgz"),
 			expectedArtifacts: &fintpb.BuildArtifacts{
 				BuiltArchives: []*structpb.Struct{
-					mustStructPB(t, build.Archive{Name: "packages", Path: "p.tar.gz", Type: "tgz"}),
 					mustStructPB(t, build.Archive{Name: "archive", Path: "b.tgz", Type: "tgz"}),
 				},
 			},

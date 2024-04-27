@@ -1295,13 +1295,6 @@ magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info
     icd_info[i].support_flags = msd::ICD_SUPPORT_FLAG_VULKAN;
   }
 
-  {
-    size_t media_index = std::size(kSuffixes);
-    icd_info[media_index].component_url =
-        "fuchsia-pkg://fuchsia.com/codec_runner_intel_gen#meta/codec_runner_intel_gen.cm";
-    icd_info[media_index].support_flags = msd::ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY;
-  }
-
   icd_info.swap(*icd_info_out);
 
   return MAGMA_STATUS_OK;

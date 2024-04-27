@@ -199,6 +199,8 @@ sdk_molecule("fidl") {
     "//sdk:*",
   ]
 
+  category = "partner"
+
   deps = []
   foreach(target, sdk_fidl_targets) {
     deps += [ "${target}_sdk($fidl_toolchain)" ]
@@ -260,6 +262,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.power.metrics",
   "fuchsia.starnix.container",
   "fuchsia.sys2",
+  "fuchsia.testing.harness",
   "fuchsia.vulkan.loader",
 
   # keep-sorted: end

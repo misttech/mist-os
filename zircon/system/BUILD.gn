@@ -1,0 +1,37 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/target_api_level.gni")
+
+# This target exist solely to ensure that the test file builds without error.
+# It is never actually linked into anything or included in the IDK.
+# To improve test coverage, the IDK builds it at both PLATFORM and supported
+# API levels with different expected results based on a preprocessor define.
+# It cannot be marked testonly for the reasons described in //sdk:fuchsia_idk_atoms.
+static_library("availability_test") {
+  visibility = [ "//sdk/*" ]
+
+  if (override_target_api_level != "PLATFORM") {
+    # Define values used by the test.
+
+    # Due to the way the macros are defined, only literals can be specified.
+    # Therefore, separate literal values must be provided for relative levels.
+    _override_target_api_level_minus_one = override_target_api_level - 1
+    _override_target_api_level_plus_one = override_target_api_level + 1
+
+    # TODO(https://fxbug.dev/305961460): Replace the RHS with another mechanism.
+    _highest_supported_api_level_plus_one =
+        platform_version.in_development_api_level + 1
+
+    defines = [
+      "BUILT_AT_SPECIFIC_API_LEVEL=$override_target_api_level",
+      "BUILT_AT_SPECIFIC_API_LEVEL_MINUS_ONE=$_override_target_api_level_minus_one",
+      "BUILT_AT_SPECIFIC_API_LEVEL_PLUS_ONE=$_override_target_api_level_plus_one",
+      "FUCHSIA_INTERNAL_LEVEL_${_highest_supported_api_level_plus_one}_()=${_highest_supported_api_level_plus_one}",
+    ]
+  }
+
+  sources = [ "availability_test.c" ]
+}

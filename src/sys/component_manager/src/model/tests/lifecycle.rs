@@ -9,7 +9,6 @@ use {
             actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
             component::instance::InstanceState,
             component::{ComponentInstance, IncomingCapabilities, StartReason},
-            error::{ActionError, ModelError, StartActionError},
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
@@ -34,6 +33,7 @@ use {
     },
     cm_rust_testing::*,
     cm_types::Name,
+    errors::{ActionError, ModelError, StartActionError},
     fidl::endpoints::{create_endpoints, ProtocolMarker, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
@@ -371,7 +371,7 @@ async fn bind_eager_children_reentrant() {
                     }))
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("foo").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("foo").build()),
         ],
         hook.hooks(),
     )

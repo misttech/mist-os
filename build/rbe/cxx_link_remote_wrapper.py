@@ -311,6 +311,9 @@ class CxxLinkRemoteAction(object):
                     unwindlib=self.unwindlib,
                     profile=self.cxx_action.any_profile,
                     sanitizers=self.cxx_action.sanitizers,
+                    # Grab the entire runtime directory without trying to
+                    # select the right subset based on variant.
+                    want_all_libclang_rt=True,
                 )
             )
         elif self.cxx_action.compiler_is_gcc:

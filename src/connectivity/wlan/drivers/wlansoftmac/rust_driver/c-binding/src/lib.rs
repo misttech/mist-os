@@ -7,11 +7,10 @@
 use {
     diagnostics_log::PublishOptions,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_async::SendExecutor,
+    fuchsia_async::LocalExecutor,
     fuchsia_zircon as zx,
     std::{ffi::c_void, sync::Once},
     tracing::error,
-    wlan_common::pointers::SendPtr,
     wlan_mlme::{
         buffer::CBufferProvider,
         device::{completers::StopCompleter, CDeviceInterface, CFrameSender, Device},
@@ -71,6 +70,8 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     buffer_provider: CBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
+    let mut executor = LocalExecutor::new();
+
     // The Fuchsia syslog must not be initialized from Rust more than once per process. In the case
     // of MLME, that means we can only call it once for both the client and ap modules. Ensure this
     // by using a shared `Once::call_once()`.
@@ -88,18 +89,12 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         // is a valid handle.
         let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_client_handle) };
         let channel = fidl::Channel::from(handle);
-        fidl_softmac::WlanSoftmacBridgeSynchronousProxy::new(channel)
+        let channel = fidl::AsyncChannel::from_channel(channel);
+        fidl_softmac::WlanSoftmacBridgeProxy::new(channel)
     };
     let device = Device::new(device.into(), wlan_softmac_bridge_proxy, frame_sender.into());
 
-    // Safety: This is safe because `init_completer` will never be cast to any other type, i.e.,
-    // its type will always be `*mut c_void`.
-    let init_completer = unsafe { SendPtr::from_always_void(init_completer) };
-
-    // Use two worker threads so the `Task` serving SME and MLME can synchronously block without
-    // blocking the `Task` for sending new `DriverEvent` values to the `DriverEventSink`.
-    let mut executor = SendExecutor::new(2);
-    let result = executor.run(wlansoftmac_rust::start_and_serve(
+    let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
         move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
             Ok(handle) => {
                 // Safety: This is safe because the caller of this function promised
@@ -107,7 +102,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
                 // its called.
                 unsafe {
                     run_init_completer(
-                        init_completer.as_ptr(),
+                        init_completer,
                         zx::Status::OK.into_raw(),
                         Box::into_raw(Box::new(handle)),
                     );
@@ -118,11 +113,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
                 // `run_init_completer` is thread-safe and `init_completer` is valid until
                 // its called.
                 unsafe {
-                    run_init_completer(
-                        init_completer.as_ptr(),
-                        status.into_raw(),
-                        std::ptr::null_mut(),
-                    );
+                    run_init_completer(init_completer, status.into_raw(), std::ptr::null_mut());
                 }
             }
         },
@@ -181,12 +172,10 @@ pub unsafe extern "C" fn stop_bridged_wlansoftmac(
     }
     // Safety: The caller promises `softmac` is a `WlanSoftmacHandle`.
     let softmac = unsafe { Box::from_raw(softmac) };
-    // Safety: This is safe because `stop_completer` will never be cast to any other type, i.e., its
-    // type will always be `*mut c_void`.
-    let stop_completer = unsafe { SendPtr::from_always_void(stop_completer) };
+
     softmac.stop(StopCompleter::new(Box::new(move ||
                      // Safety: This is safe because the caller of this function promised
                      // `run_stop_completer` is thread-safe and `stop_completer` is valid until its
                      // called.
-                     unsafe { run_stop_completer(stop_completer.as_ptr()) })));
+                     unsafe { run_stop_completer(stop_completer) })));
 }

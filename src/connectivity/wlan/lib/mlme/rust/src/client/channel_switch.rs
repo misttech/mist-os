@@ -9,6 +9,7 @@ use {
     },
     anyhow::bail,
     fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::Future,
     tracing::error,
     wlan_common::{ie, mac::BeaconHdr, timer::EventId, TimeUnit},
     zerocopy::ByteSlice,
@@ -18,9 +19,9 @@ pub trait ChannelActions {
     fn switch_channel(
         &mut self,
         new_main_channel: fidl_common::WlanChannel,
-    ) -> Result<(), zx::Status>;
+    ) -> impl Future<Output = Result<(), zx::Status>>;
     fn schedule_channel_switch_timeout(&mut self, time: zx::Time) -> EventId;
-    fn disable_scanning(&mut self) -> Result<(), zx::Status>;
+    fn disable_scanning(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
     fn enable_scanning(&mut self);
     fn disable_tx(&mut self) -> Result<(), zx::Status>;
     fn enable_tx(&mut self);
@@ -32,18 +33,18 @@ pub struct ChannelActionHandle<'a, D> {
 }
 
 impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
-    fn switch_channel(
+    async fn switch_channel(
         &mut self,
         new_main_channel: fidl_common::WlanChannel,
     ) -> Result<(), zx::Status> {
-        self.ctx.device.set_channel(new_main_channel)
+        self.ctx.device.set_channel(new_main_channel).await
     }
     fn schedule_channel_switch_timeout(&mut self, time: zx::Time) -> EventId {
         self.ctx.timer.schedule_at(time, TimedEvent::ChannelSwitch)
     }
-    fn disable_scanning(&mut self) -> Result<(), zx::Status> {
+    async fn disable_scanning(&mut self) -> Result<(), zx::Status> {
         let mut bound_scanner = self.scanner.bind(self.ctx);
-        bound_scanner.disable_scanning()
+        bound_scanner.disable_scanning().await
     }
     fn enable_scanning(&mut self) {
         let mut bound_scanner = self.scanner.bind(self.ctx);
@@ -112,12 +113,12 @@ impl ChannelState {
 
 impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
     /// Immediately set a new main channel in the device.
-    pub fn set_main_channel(
+    pub async fn set_main_channel(
         &mut self,
         new_main_channel: fidl_common::WlanChannel,
     ) -> Result<(), zx::Status> {
         self.channel_state.pending_channel_switch.take();
-        let result = self.actions.switch_channel(new_main_channel);
+        let result = self.actions.switch_channel(new_main_channel).await;
         match result {
             Ok(()) => {
                 tracing::info!("Switched to new main channel {:?}", new_main_channel);
@@ -148,21 +149,24 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         self.actions.enable_tx();
     }
 
-    pub fn handle_beacon(
+    pub async fn handle_beacon(
         &mut self,
         header: &BeaconHdr,
         elements: &[u8],
     ) -> Result<(), anyhow::Error> {
         self.channel_state.last_beacon_timestamp.replace(fasync::Time::now());
         self.channel_state.beacon_interval.replace(header.beacon_interval);
-        self.handle_channel_switch_elements_if_present(elements, false)
+        self.handle_channel_switch_elements_if_present(elements, false).await
     }
 
-    pub fn handle_announcement_frame(&mut self, elements: &[u8]) -> Result<(), anyhow::Error> {
-        self.handle_channel_switch_elements_if_present(elements, true)
+    pub async fn handle_announcement_frame(
+        &mut self,
+        elements: &[u8],
+    ) -> Result<(), anyhow::Error> {
+        self.handle_channel_switch_elements_if_present(elements, true).await
     }
 
-    fn handle_channel_switch_elements_if_present(
+    async fn handle_channel_switch_elements_if_present(
         &mut self,
         elements: &[u8],
         action_frame: bool,
@@ -198,13 +202,13 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
             }
         }
         match csa_builder.build() {
-            ChannelSwitchResult::ChannelSwitch(cs) => self.handle_channel_switch(cs),
+            ChannelSwitchResult::ChannelSwitch(cs) => self.handle_channel_switch(cs).await,
             ChannelSwitchResult::NoChannelSwitch => Ok(()),
             ChannelSwitchResult::Error(err) => Err(err.into()),
         }
     }
 
-    fn handle_channel_switch(
+    async fn handle_channel_switch(
         &mut self,
         channel_switch: ChannelSwitch,
     ) -> Result<(), anyhow::Error> {
@@ -212,9 +216,9 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
             bail!("Incompatible channel switch announcement received.");
         }
 
-        self.actions.disable_scanning()?;
+        self.actions.disable_scanning().await?;
         if channel_switch.channel_switch_count == 0 {
-            self.set_main_channel(channel_switch.new_channel).map_err(|e| e.into())
+            self.set_main_channel(channel_switch.new_channel).await.map_err(|e| e.into())
         } else {
             if channel_switch.pause_transmission {
                 // TODO(b/254334420): Determine if this should be fatal to the switch.
@@ -229,7 +233,7 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         }
     }
 
-    pub fn handle_channel_switch_timeout(
+    pub async fn handle_channel_switch_timeout(
         &mut self,
         event_id: EventId,
     ) -> Result<(), anyhow::Error> {
@@ -237,7 +241,7 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         {
             if event_id == switch_id {
                 // This is the most recently scheduled channel switch. Execute it.
-                self.set_main_channel(channel_switch.new_channel)?;
+                self.set_main_channel(channel_switch.new_channel).await?;
             } else {
                 self.channel_state.pending_channel_switch.replace((channel_switch, switch_id));
             }
@@ -388,6 +392,8 @@ impl<B: ByteSlice> ChannelSwitchBuilder<B> {
 mod tests {
     use {
         super::*,
+        futures::task::Poll,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::{assert_variant, mac::CapabilityInfo},
         zerocopy::AsBytes,
@@ -666,7 +672,7 @@ mod tests {
     }
 
     impl ChannelActions for &mut MockChannelActions {
-        fn switch_channel(
+        async fn switch_channel(
             &mut self,
             new_main_channel: fidl_common::WlanChannel,
         ) -> Result<(), zx::Status> {
@@ -678,7 +684,7 @@ mod tests {
             self.actions.push(ChannelAction::Timeout(self.event_id_ctr, time.into()));
             self.event_id_ctr
         }
-        fn disable_scanning(&mut self) -> Result<(), zx::Status> {
+        async fn disable_scanning(&mut self) -> Result<(), zx::Status> {
             self.actions.push(ChannelAction::DisableScanning);
             Ok(())
         }
@@ -694,9 +700,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn channel_state_ignores_empty_beacon_frame() {
-        let _exec = fasync::TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn channel_state_ignores_empty_beacon_frame() {
         let mut channel_state = ChannelState::default();
         let mut actions = MockChannelActions::default();
         let header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
@@ -704,14 +709,14 @@ mod tests {
         channel_state
             .test_bind(&mut actions)
             .handle_beacon(&header, &elements[..])
+            .await
             .expect("Failed to handle beacon");
 
         assert!(actions.actions.is_empty());
     }
 
-    #[test]
-    fn channel_state_handles_immediate_csa_in_beacon_frame() {
-        let _exec = fasync::TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn channel_state_handles_immediate_csa_in_beacon_frame() {
         let mut channel_state = ChannelState::default();
 
         let mut actions = MockChannelActions::default();
@@ -721,6 +726,7 @@ mod tests {
         channel_state
             .test_bind(&mut actions)
             .handle_beacon(&header, &elements[..])
+            .await
             .expect("Failed to handle beacon");
 
         assert_eq!(actions.actions.len(), 4);
@@ -734,7 +740,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_delayed_csa_in_beacon_frame() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
         let mut time = fasync::Time::from_nanos(0);
@@ -742,10 +748,17 @@ mod tests {
         let mut actions = MockChannelActions::default();
 
         // First channel switch announcement (count = 2)
-        channel_state
-            .test_bind(&mut actions)
-            .handle_beacon(&bcn_header, &csa_bytes(0, NEW_CHANNEL, 2)[..])
-            .expect("Failed to handle beacon");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let elements = csa_bytes(0, NEW_CHANNEL, 2);
+            let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle beacon"
+            );
+        }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
         let (first_event_id, event_time) =
@@ -757,10 +770,17 @@ mod tests {
         exec.set_fake_time(time);
 
         // Second channel switch announcement (count = 1)
-        channel_state
-            .test_bind(&mut actions)
-            .handle_beacon(&bcn_header, &csa_bytes(0, NEW_CHANNEL, 1)[..])
-            .expect("Failed to handle beacon");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let elements = csa_bytes(0, NEW_CHANNEL, 1);
+            let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle beacon"
+            );
+        }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
         let (second_event_id, event_time) =
@@ -772,17 +792,29 @@ mod tests {
         exec.set_fake_time(time);
 
         // First timeout is ignored.
-        channel_state
-            .test_bind(&mut actions)
-            .handle_channel_switch_timeout(first_event_id)
-            .expect("Failed to handle channel switch timeout");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let fut = bound_channel_state.handle_channel_switch_timeout(first_event_id);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle channel switch timeout"
+            );
+        }
         assert!(actions.actions.is_empty());
 
         // Second timeout results in completion.
-        channel_state
-            .test_bind(&mut actions)
-            .handle_channel_switch_timeout(second_event_id)
-            .expect("Failed to handle channel switch timeout");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let fut = bound_channel_state.handle_channel_switch_timeout(second_event_id);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle channel switch timeout"
+            );
+        }
         assert_eq!(actions.actions.len(), 3);
         let new_channel =
             assert_variant!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
@@ -791,9 +823,8 @@ mod tests {
         assert_variant!(actions.actions[2], ChannelAction::EnableTx);
     }
 
-    #[test]
-    fn channel_state_cannot_pause_tx() {
-        let _exec = fasync::TestExecutor::new_with_fake_time();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn channel_state_cannot_pause_tx() {
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
         let mut actions = MockChannelActions::default();
@@ -801,13 +832,13 @@ mod tests {
         channel_state
             .test_bind(&mut actions)
             .handle_beacon(&bcn_header, &csa_bytes(1, NEW_CHANNEL, 2)[..])
+            .await
             .expect_err("Shouldn't handle channel switch with tx pause");
         assert_eq!(actions.actions.len(), 0);
     }
 
-    #[test]
-    fn channel_state_cannot_parse_malformed_csa() {
-        let _exec = fasync::TestExecutor::new_with_fake_time();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn channel_state_cannot_parse_malformed_csa() {
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
         let mut actions = MockChannelActions::default();
@@ -818,19 +849,20 @@ mod tests {
         channel_state
             .test_bind(&mut actions)
             .handle_beacon(&bcn_header, &element[..])
+            .await
             .expect_err("Should not handle malformed beacon");
         assert_eq!(actions.actions.len(), 0);
     }
 
-    #[test]
-    fn channel_state_handles_immediate_csa_in_action_frame() {
-        let _exec = fasync::TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn channel_state_handles_immediate_csa_in_action_frame() {
         let mut channel_state = ChannelState::default();
 
         let mut actions = MockChannelActions::default();
         channel_state
             .test_bind(&mut actions)
             .handle_announcement_frame(&csa_bytes(0, NEW_CHANNEL, 0)[..])
+            .await
             .expect("Failed to handle beacon");
 
         assert_eq!(actions.actions.len(), 4);
@@ -844,7 +876,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_delayed_csa_in_announcement_frame() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(100), CapabilityInfo(0));
         let bcn_time: fasync::Time =
@@ -853,18 +885,32 @@ mod tests {
         let mut actions = MockChannelActions::default();
 
         // Empty beacon frame to configure beacon parameters.
-        channel_state
-            .test_bind(&mut actions)
-            .handle_beacon(&bcn_header, &[])
-            .expect("Failed to handle beacon");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let elements = [];
+            let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle beacon"
+            );
+        }
         assert!(actions.actions.is_empty());
 
         // CSA action frame arrives some time between beacons.
         exec.set_fake_time(bcn_time - fasync::Duration::from_micros(500));
-        channel_state
-            .test_bind(&mut actions)
-            .handle_announcement_frame(&csa_bytes(0, NEW_CHANNEL, 1)[..])
-            .expect("Failed to handle beacon");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let elements = csa_bytes(0, NEW_CHANNEL, 1);
+            let fut = bound_channel_state.handle_announcement_frame(&elements[..]);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle announcement"
+            );
+        }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
         let (event_id, event_time) =
@@ -874,10 +920,16 @@ mod tests {
 
         // Timeout arrives.
         exec.set_fake_time(bcn_time);
-        channel_state
-            .test_bind(&mut actions)
-            .handle_channel_switch_timeout(event_id)
-            .expect("Failed to handle channel switch timeout");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let fut = bound_channel_state.handle_channel_switch_timeout(event_id);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle channel switch timeout"
+            );
+        }
         assert_eq!(actions.actions.len(), 3);
         let new_channel =
             assert_variant!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
@@ -888,17 +940,24 @@ mod tests {
 
     #[test]
     fn channel_state_handles_delayed_csa_in_announcement_frame_with_missed_beacon() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(100), CapabilityInfo(0));
         exec.set_fake_time(fasync::Time::from_nanos(0));
         let mut actions = MockChannelActions::default();
 
         // Empty beacon frame to configure beacon parameters.
-        channel_state
-            .test_bind(&mut actions)
-            .handle_beacon(&bcn_header, &[])
-            .expect("Failed to handle beacon");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let elements = [];
+            let fut = bound_channel_state.handle_beacon(&bcn_header, &elements[..]);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle beacon"
+            );
+        }
         assert!(actions.actions.is_empty());
 
         // Advance time by a bit more than one beacon, simulating a missed frame.
@@ -909,10 +968,17 @@ mod tests {
         );
 
         // CSA action frame arrives after the missed beacon.
-        channel_state
-            .test_bind(&mut actions)
-            .handle_announcement_frame(&csa_bytes(0, NEW_CHANNEL, 1)[..])
-            .expect("Failed to handle beacon");
+        {
+            let mut bound_channel_state = channel_state.test_bind(&mut actions);
+            let elements = csa_bytes(0, NEW_CHANNEL, 1);
+            let fut = bound_channel_state.handle_announcement_frame(&elements[..]);
+            let mut fut = pin!(fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Ok(_)),
+                "Failed to handle announcement"
+            );
+        }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
         let (_event_id, event_time) =

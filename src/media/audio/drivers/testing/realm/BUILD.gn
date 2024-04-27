@@ -46,7 +46,7 @@ fuchsia_driver("audio-test-root-driver") {
 fuchsia_driver_component("audio-test-root") {
   deps = [ ":audio-test-root-driver" ]
   info = "audio-test-root-info.json"
-  colocate = true
+  manifest = "meta/audio-test-root.cml"
 }
 
 fuchsia_driver("codec-test-driver") {

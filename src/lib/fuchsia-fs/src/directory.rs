@@ -844,10 +844,9 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_rejects_fake_root_namespace_entry() {
-        assert_matches!(
-            open_in_namespace("/fake", fio::OpenFlags::RIGHT_READABLE),
-            Err(OpenError::Namespace(zx_status::Status::NOT_FOUND))
-        );
+        let result = open_in_namespace("/fake", fio::OpenFlags::RIGHT_READABLE);
+        assert_matches!(result, Err(OpenError::Namespace(zx_status::Status::NOT_FOUND)));
+        assert_matches!(result, Err(e) if e.is_not_found_error());
     }
 
     // open_directory_no_describe
@@ -882,10 +881,9 @@ mod tests {
     async fn open_directory_rejects_fake_dir() {
         let pkg = open_pkg();
 
-        assert_matches!(
-            open_directory(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).await,
-            Err(OpenError::OpenError(zx_status::Status::NOT_FOUND))
-        );
+        let result = open_directory(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).await;
+        assert_matches!(result, Err(OpenError::OpenError(zx_status::Status::NOT_FOUND)));
+        assert_matches!(result, Err(e) if e.is_not_found_error());
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -995,10 +993,9 @@ mod tests {
     async fn open_file_rejects_fake_file() {
         let pkg = open_pkg();
 
-        assert_matches!(
-            open_file(&pkg, "data/fake", fio::OpenFlags::RIGHT_READABLE).await,
-            Err(OpenError::OpenError(zx_status::Status::NOT_FOUND))
-        );
+        let result = open_file(&pkg, "data/fake", fio::OpenFlags::RIGHT_READABLE).await;
+        assert_matches!(result, Err(OpenError::OpenError(zx_status::Status::NOT_FOUND)));
+        assert_matches!(result, Err(e) if e.is_not_found_error());
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1712,14 +1709,24 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn teat_read_file() {
+    async fn test_read_file() {
         let contents = read_file(&open_pkg(), "/data/file").await.unwrap();
         assert_eq!(&contents, DATA_FILE_CONTENTS.as_bytes());
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn teat_read_file_to_string() {
+    async fn test_read_file_to_string() {
         let contents = read_file_to_string(&open_pkg(), "/data/file").await.unwrap();
         assert_eq!(contents, DATA_FILE_CONTENTS);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_read_missing_file() {
+        let result = read_file(&open_pkg(), "/data/missing").await;
+        assert_matches!(
+            result,
+            Err(ReadError::Open(OpenError::OpenError(zx_status::Status::NOT_FOUND)))
+        );
+        assert_matches!(result, Err(e) if e.is_not_found_error());
     }
 }

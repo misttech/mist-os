@@ -17,6 +17,13 @@
 #include <optional>
 #include <string>
 
+// Pretty prints an sockaddr_ll hardware address.
+struct PrintHardwareAddress {
+  const unsigned char len;
+  const unsigned char (&addr_bytes)[8];
+};
+std::ostream& operator<<(std::ostream& out, const PrintHardwareAddress ha);
+
 std::string Format(const sockaddr_storage& addr);
 
 // Parse an address of the form \[IP[%ID]\]:PORT.

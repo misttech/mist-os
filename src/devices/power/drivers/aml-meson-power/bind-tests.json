@@ -27,7 +27,7 @@
         ]
     },
     {
-        "node": "pwm-ao-d",
+        "node": "pwm-little",
         "tests": [
             {
                 "name": "Match",
@@ -40,7 +40,7 @@
         ]
     },
     {
-        "node": "pwm-a",
+        "node": "pwm-big",
         "tests": [
             {
                 "name": "Match",
@@ -53,27 +53,27 @@
         ]
     },
     {
-        "node": "vreg-pwm-ao-d",
+        "node": "vreg-pwm-little",
         "tests": [
             {
                 "name": "Match",
                 "expected": "match",
                 "device": {
                     "fuchsia.hardware.vreg.Service": "fuchsia.hardware.vreg.Service.ZirconTransport",
-                    "fuchsia.amlogic.platform.PWM_ID": "fuchsia.amlogic.platform.PWM_ID.AO_D"
+                    "fuchsia.regulator.NAME": "fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_LITTLE"
                 }
             }
         ]
     },
     {
-        "node": "vreg-pwm-a",
+        "node": "vreg-pwm-big",
         "tests": [
             {
                 "name": "Match",
                 "expected": "match",
                 "device": {
                     "fuchsia.hardware.vreg.Service": "fuchsia.hardware.vreg.Service.ZirconTransport",
-                    "fuchsia.amlogic.platform.PWM_ID": "fuchsia.amlogic.platform.PWM_ID.A"
+                    "fuchsia.regulator.NAME": "fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_BIG"
                 }
             }
         ]

@@ -7,6 +7,7 @@
 
 #include <array>
 #include <initializer_list>
+#include <optional>
 #include <string>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
@@ -104,7 +105,7 @@ class DeviceAddress {
   static Type LeAddrToDeviceAddr(pw::bluetooth::emboss::LEPeerAddressType type);
   static Type LeAddrToDeviceAddr(
       pw::bluetooth::emboss::LEPeerAddressTypeNoAnon type);
-  static Type LeAddrToDeviceAddr(
+  static std::optional<Type> LeAddrToDeviceAddr(
       pw::bluetooth::emboss::LEExtendedAddressType type);
 
   // The default constructor initializes the address to 00:00:00:00:00:00 and

@@ -42,6 +42,7 @@ struct UpdateDispatcherInner {
 enum CommitError {
     RuleWithInvalidMatcher(fnet_filter_ext::RuleId),
     RuleWithInvalidAction(fnet_filter_ext::RuleId),
+    TransparentProxyWithInvalidMatcher(fnet_filter_ext::RuleId),
     CyclicalRoutineGraph(fnet_filter_ext::RoutineId),
     ErrorOnChange { index: usize, error: fnet_filter::CommitError },
 }
@@ -129,6 +130,12 @@ impl UpdateDispatcherInner {
             netstack3_core::filter::ValidationError::RuleWithInvalidMatcher(rule_id) => {
                 CommitError::RuleWithInvalidMatcher(rule_id)
             }
+            netstack3_core::filter::ValidationError::RuleWithInvalidAction(rule_id) => {
+                CommitError::RuleWithInvalidAction(rule_id)
+            }
+            netstack3_core::filter::ValidationError::TransparentProxyWithInvalidMatcher(
+                rule_id,
+            ) => CommitError::TransparentProxyWithInvalidMatcher(rule_id),
         })?;
 
         // Only if validation was successful do we actually commit the changes.
@@ -430,6 +437,11 @@ async fn serve_controller(
                                 FidlConversionError::InvalidPortRange => {
                                     Error::ReturnToClient(ChangeValidationError::InvalidPortMatcher)
                                 }
+                                FidlConversionError::UnspecifiedTransparentProxyPort => {
+                                    Error::ReturnToClient(
+                                        ChangeValidationError::InvalidTransparentProxyAction,
+                                    )
+                                }
                                 FidlConversionError::NotAnError => unreachable!(
                                     "should not get this error when converting a `Change`"
                                 ),
@@ -483,6 +495,11 @@ async fn serve_controller(
                         }
                         CommitError::RuleWithInvalidAction(rule) => {
                             fnet_filter::CommitResult::RuleWithInvalidAction(rule.into())
+                        }
+                        CommitError::TransparentProxyWithInvalidMatcher(rule) => {
+                            fnet_filter::CommitResult::TransparentProxyWithInvalidMatcher(
+                                rule.into(),
+                            )
                         }
                         CommitError::CyclicalRoutineGraph(routine) => {
                             fnet_filter::CommitResult::CyclicalRoutineGraph(routine.into())

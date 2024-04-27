@@ -58,7 +58,7 @@ use netstack_testing_common::{
 };
 
 use netstack_testing_macros::netstack_test;
-use packet::{serialize::Buf, InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
+use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
     arp::{ArpOp, ArpPacketBuilder},
     ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
@@ -76,7 +76,7 @@ use packet_formats::{
     ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
     ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder},
 };
-use sockaddr::{IntoSockAddr as _, PureIpSockaddr};
+use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::SockRef;
 use std::{num::NonZeroU64, pin::pin};
 use test_case::test_case;
@@ -126,17 +126,17 @@ async fn run_udp_socket_test(
 async fn run_ip_endpoint_packet_socket_test(
     server: &netemul::TestRealm<'_>,
     server_iface_id: u64,
-    server_addr: fnet::IpAddress,
     client: &netemul::TestRealm<'_>,
     client_iface_id: u64,
-    client_addr: fnet::IpAddress,
+    ip_version: IpVersion,
+    kind: fpacket::Kind,
 ) {
     async fn new_packet_socket_in_realm(
         realm: &netemul::TestRealm<'_>,
         addr: PureIpSockaddr,
+        kind: fpacket::Kind,
     ) -> Result<fasync::net::DatagramSocket> {
-        let socket =
-            realm.packet_socket(fpacket::Kind::Network).await.context("creating packet socket")?;
+        let socket = realm.packet_socket(kind).await.context("creating packet socket")?;
         let sockaddr = libc::sockaddr_ll::from(addr).into_sockaddr();
         let () = socket.bind(&sockaddr).context("binding packet_socket")?;
         let socket = fasync::net::DatagramSocket::new_from_socket(socket)
@@ -144,55 +144,13 @@ async fn run_ip_endpoint_packet_socket_test(
         Ok(socket)
     }
 
-    let (ip_version, packet) = {
-        const PAYLOAD: &'static str = "Hello World";
-        const HOP_LIMIT: u8 = 1;
-        let data = PAYLOAD.bytes().collect::<Vec<_>>();
-        match (client_addr, server_addr) {
-            (fnet::IpAddress::Ipv4(client), fnet::IpAddress::Ipv4(server)) => {
-                let builder = Ipv4PacketBuilder::new(
-                    std::net::Ipv4Addr::from(client.addr),
-                    std::net::Ipv4Addr::from(server.addr),
-                    HOP_LIMIT,
-                    Ipv4Proto::Other(u8::MAX),
-                );
-                (
-                    IpVersion::V4,
-                    Buf::new(data, ..)
-                        .encapsulate(builder)
-                        .serialize_vec_outer()
-                        .expect("serialize")
-                        .into_inner()
-                        .into_inner(),
-                )
-            }
-            (fnet::IpAddress::Ipv6(client), fnet::IpAddress::Ipv6(server)) => {
-                let builder = Ipv6PacketBuilder::new(
-                    std::net::Ipv6Addr::from(client.addr),
-                    std::net::Ipv6Addr::from(server.addr),
-                    HOP_LIMIT,
-                    Ipv6Proto::NoNextHeader,
-                );
-                (
-                    IpVersion::V6,
-                    Buf::new(data, ..)
-                        .encapsulate(builder)
-                        .serialize_vec_outer()
-                        .expect("serialize")
-                        .into_inner()
-                        .into_inner(),
-                )
-            }
-            addrs => panic!("client and server addresses are not the same IP version: {addrs:?}"),
-        }
-    };
-
     let client_iface_id = NonZeroU64::new(client_iface_id).expect("client iface id is 0");
     let server_iface_id = NonZeroU64::new(server_iface_id).expect("server iface id is 0");
 
     let client_sock = new_packet_socket_in_realm(
         client,
         PureIpSockaddr { interface_id: Some(client_iface_id), protocol: ip_version },
+        kind,
     )
     .await
     .expect("failed to create client socket");
@@ -200,17 +158,19 @@ async fn run_ip_endpoint_packet_socket_test(
     let server_sock = new_packet_socket_in_realm(
         server,
         PureIpSockaddr { interface_id: Some(server_iface_id), protocol: ip_version },
+        kind,
     )
     .await
     .expect("failed to create server socket");
 
+    const PAYLOAD: &'static str = "Hello World";
     let send_to_addr = libc::sockaddr_ll::from(PureIpSockaddr {
         interface_id: Some(client_iface_id),
         protocol: ip_version,
     })
     .into_sockaddr();
-    let r = client_sock.send_to(&packet, send_to_addr).await.expect("sendto failed");
-    assert_eq!(r, packet.len());
+    let r = client_sock.send_to(PAYLOAD.as_bytes(), send_to_addr).await.expect("sendto failed");
+    assert_eq!(r, PAYLOAD.as_bytes().len());
 
     let mut buf = [0u8; 1024];
     // Receive from the socket, ignoring all spurious data that may be observed
@@ -219,14 +179,25 @@ async fn run_ip_endpoint_packet_socket_test(
         loop {
             let (recv_len, from) =
                 server_sock.recv_from(&mut buf[..]).await.expect("failed to receive");
-            if !is_packet_spurious(ip_version, &buf[..recv_len]).expect("failed to parse packet") {
-                break (recv_len, from);
+            match is_packet_spurious(ip_version, &buf[..recv_len]) {
+                // NB: IPv4/IPv6 Parse errors are expected, since we're sending
+                // "Hello World" and not a valid packet.
+                Err(_) | Ok(false) => break (recv_len, from),
+                Ok(true) => continue,
             }
         }
     };
-    assert_eq!(recv_len, packet.len());
-    assert_eq!(&buf[..recv_len], &packet);
+    assert_eq!(recv_len, PAYLOAD.as_bytes().len());
+    assert_eq!(&buf[..recv_len], PAYLOAD.as_bytes());
     assert_eq!(i32::from(from.family()), libc::AF_PACKET);
+    let from = from.try_to_sockaddr_ll().expect("unexpected peer SockAddress type");
+    assert_eq!(from.sll_protocol, sockaddr::sockaddr_ll_ip_protocol(ip_version));
+    // As defined by Linux in `if_packet.h``.
+    const PACKET_HOST: u8 = 0;
+    assert_eq!(from.sll_pkttype, PACKET_HOST);
+    // IP endpoints don't have a hardware address.
+    assert_eq!(from.sll_halen, 0);
+    assert_eq!(from.sll_addr, [0, 0, 0, 0, 0, 0, 0, 0]);
 }
 
 const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
@@ -2052,13 +2023,14 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
 enum IpEndpointsSocketTestCase {
     Udp,
     Tcp,
-    Packet,
+    Packet(fpacket::Kind),
 }
 
 #[netstack_test]
 #[test_case(IpEndpointsSocketTestCase::Udp; "udp_socket")]
 #[test_case(IpEndpointsSocketTestCase::Tcp; "tcp_socket")]
-#[test_case(IpEndpointsSocketTestCase::Packet; "packet_socket")]
+#[test_case(IpEndpointsSocketTestCase::Packet(fpacket::Kind::Network); "packet_dgram_socket")]
+#[test_case(IpEndpointsSocketTestCase::Packet(fpacket::Kind::Link); "packet_raw_socket")]
 async fn ip_endpoints_socket<N: Netstack, I: net_types::ip::Ip>(
     name: &str,
     socket_type: IpEndpointsSocketTestCase,
@@ -2109,14 +2081,14 @@ async fn ip_endpoints_socket<N: Netstack, I: net_types::ip::Ip>(
         IpEndpointsSocketTestCase::Tcp => {
             run_tcp_socket_test(&server, server_addr.addr, &client, client_addr.addr).await
         }
-        IpEndpointsSocketTestCase::Packet => {
+        IpEndpointsSocketTestCase::Packet(kind) => {
             run_ip_endpoint_packet_socket_test(
                 &server,
                 server_id,
-                server_addr.addr,
                 &client,
                 client_id,
-                client_addr.addr,
+                I::VERSION,
+                kind,
             )
             .await
         }

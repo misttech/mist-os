@@ -2,6 +2,50 @@
     "displayTimeUnit": "ns",
     "traceEvents": [
         {
+            "args": {
+                "name": "scenic.cm"
+            },
+            "cat": "__metadata",
+            "name": "process_name",
+            "ph": "M",
+            "pid": 582653,
+            "tid": 0,
+            "ts": 0
+        },
+        {
+            "args": {
+                "name": "Scenic Thread"
+            },
+            "cat": "__metadata",
+            "name": "thread_name",
+            "ph": "M",
+            "pid": 582653,
+            "tid": 582658,
+            "ts": 0
+        },
+        {
+            "args": {
+                "name": "driver_host.cm"
+            },
+            "cat": "__metadata",
+            "name": "process_name",
+            "ph": "M",
+            "pid": 5693,
+            "tid": 0,
+            "ts": 0
+        },
+        {
+            "args": {
+                "name": "DeviceThread"
+            },
+            "cat": "__metadata",
+            "name": "thread_name",
+            "ph": "M",
+            "pid": 5693,
+            "tid": 14044,
+            "ts": 0
+        },
+        {
             "cat": "gfx",
             "name": "RenderFrame",
             "ts": 5,

@@ -247,6 +247,15 @@ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev* sdiodev) {
       disable_irq_wake(sdiodev->irq_handle);
       sdiodev->irq_wake = false;
     }
+
+    fidl::WireResult result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->ReleaseInterrupt();
+    if (!result.ok()) {
+      BRCMF_ERR("Release Interrupt on IRQ GPIO failed: %s", result.FormatDescription().c_str());
+    } else if (result->is_error()) {
+      BRCMF_ERR("Failed to get IRQ GPIO interrupt: %s",
+                zx_status_get_string(result->error_value()));
+    }
+
     zx_handle_close(sdiodev->irq_handle);
     if (sdiodev->isr_dispatcher.get()) {
       sdiodev->isr_dispatcher.ShutdownAsync();

@@ -34,9 +34,10 @@ template("compatibility_test_suite") {
   }
 
   # Host Tool Tests
-  host_tests = "${target_name}_host"
+  host_tests = "${target_name}_host${invoker.api_level}"
   if (is_host) {
     prebuilt_host_test_manifest(host_tests) {
+      suffix = invoker.api_level
       forward_variables_from(invoker, [ "disabled_tests" ])
       archive_dir = rebase_path(invoker.path)
     }

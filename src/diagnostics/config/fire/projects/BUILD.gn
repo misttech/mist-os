@@ -11,6 +11,7 @@ import("//build/config.gni")
 project_files = [
   "cpu.json5",
   "crashes.json5",
+  "escrow.json5",
 ]
 
 config_data_for_assembly("fire_config_projects") {

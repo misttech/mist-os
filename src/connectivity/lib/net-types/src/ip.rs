@@ -85,6 +85,34 @@ pub enum IpVersion {
     V6,
 }
 
+/// Evaluates `expression` for any given `ip_version`.
+///
+/// `type_param` will be defined to be [`crate::ip::Ipv4`] for
+/// [`crate::ip::IpVersion::V4`], and [`crate::ip::Ipv6`] for
+/// [`crate::ip::IpVersion::V6`].
+///
+/// Example usage:
+///
+/// ```
+/// let ip_version: IpVersion = foo();
+/// for_any_ip_version!(ip_version, I, some_ip_generic_fn::<I>());
+/// ```
+#[macro_export]
+macro_rules! for_any_ip_version {
+    ($ip_version:expr, $type_param:ident, $expression:expr) => {
+        match $ip_version {
+            $crate::ip::IpVersion::V4 => {
+                type $type_param = $crate::ip::Ipv4;
+                $expression
+            }
+            $crate::ip::IpVersion::V6 => {
+                type $type_param = $crate::ip::Ipv6;
+                $expression
+            }
+        }
+    };
+}
+
 /// A zero-sized type that carries IP version information.
 ///
 /// `IpVersionMarker` is typically used by types that are generic over IP

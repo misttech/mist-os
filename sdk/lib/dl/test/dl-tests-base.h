@@ -29,8 +29,6 @@ class DlTestsBase : public ::testing::Test {
   static constexpr bool kCanMatchExactError = true;
   // Whether the dlopen implementation validates the mode argument.
   static constexpr bool kCanValidateMode = true;
-  // Whether the implementation can look up a dependency file.
-  static constexpr bool kCanLookUpDeps = true;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);

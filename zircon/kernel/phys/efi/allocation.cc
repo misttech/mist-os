@@ -156,3 +156,7 @@ void operator delete(void* ptr) { operator delete(ptr, std::nothrow); }
 void* operator new[](size_t size) { return operator new(size, std::nothrow); }
 
 void operator delete[](void* ptr) { operator delete(ptr, std::nothrow); }
+
+void operator delete(void* ptr, size_t size) { operator delete(ptr, std::nothrow); }
+
+void operator delete[](void* ptr, size_t size) { operator delete(ptr, std::nothrow); }

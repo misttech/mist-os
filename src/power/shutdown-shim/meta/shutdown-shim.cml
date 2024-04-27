@@ -2,34 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "//src/power/shutdown-shim/meta/shutdown-shim.base.cml" ],
     program: {
-        runner: "elf",
-        binary: "bin/shutdown-shim",
-        lifecycle: { stop_event: "notify" },
         main_process_critical: "true",
         forward_stdout_to: "none",
         forward_stderr_to: "none",
     },
-    capabilities: [
-        { protocol: "fuchsia.device.manager.SystemStateTransition" },
-        { protocol: "fuchsia.hardware.power.statecontrol.Admin" },
-    ],
-    use: [
-        {
-            protocol: [
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.sys2.SystemController",
-            ],
-        },
-    ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.device.manager.SystemStateTransition",
-                "fuchsia.hardware.power.statecontrol.Admin",
-            ],
-            from: "self",
-        },
-    ],
 }

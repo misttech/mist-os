@@ -21,6 +21,7 @@
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
             ],
         },
         { service: "fuchsia.hardware.pci.Service" },

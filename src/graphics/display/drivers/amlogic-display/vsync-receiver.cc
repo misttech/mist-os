@@ -57,10 +57,10 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> init_result = vsync_receiver->Init();
-  if (init_result.is_error()) {
-    zxlogf(ERROR, "Failed to initalize VsyncReceiver: %s", init_result.status_string());
-    return init_result.take_error();
+  zx::result<> start_result = vsync_receiver->SetReceivingState(/*receiving=*/true);
+  if (start_result.is_error()) {
+    zxlogf(ERROR, "Failed to start VsyncReceiver: %s", start_result.status_string());
+    return start_result.take_error();
   }
 
   return zx::ok(std::move(vsync_receiver));
@@ -88,14 +88,36 @@ VsyncReceiver::~VsyncReceiver() {
   irq_handler_dispatcher_.reset();
 }
 
-zx::result<> VsyncReceiver::Init() {
+zx::result<> VsyncReceiver::SetReceivingState(bool receiving) {
+  if (is_receiving_ == receiving) {
+    return zx::ok();
+  }
+  if (receiving) {
+    return Start();
+  }
+  return Stop();
+}
+
+zx::result<> VsyncReceiver::Start() {
+  ZX_DEBUG_ASSERT(!is_receiving_);
   zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the Vsync handler to the async loop: %s",
            zx_status_get_string(status));
     return zx::error(status);
   }
+  is_receiving_ = true;
+  return zx::ok();
+}
 
+zx::result<> VsyncReceiver::Stop() {
+  ZX_DEBUG_ASSERT(is_receiving_);
+  zx_status_t status = irq_handler_.Cancel();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to cancel the Vsync handler: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  is_receiving_ = false;
   return zx::ok();
 }
 

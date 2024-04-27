@@ -16,17 +16,8 @@ use {
             },
             context::ModelContext,
             environment::Environment,
-            error::{
-                ActionError, AddDynamicChildError, DestroyActionError, ModelError,
-                OpenExposedDirError, OpenOutgoingDirError, ResolveActionError, StartActionError,
-                StopActionError, StructuredConfigError,
-            },
             hooks::{Event, EventPayload, Hooks},
-            routing::{
-                self,
-                router::{Request, Routable, Router},
-                RoutingError,
-            },
+            routing::{self, RoutingError},
             start::Start,
         },
     },
@@ -48,6 +39,11 @@ use {
     cm_util::TaskGroup,
     component_id_index::InstanceId,
     config_encoder::ConfigFields,
+    errors::{
+        ActionError, AddDynamicChildError, DestroyActionError, ModelError, OpenExposedDirError,
+        OpenOutgoingDirError, ResolveActionError, StartActionError, StopActionError,
+        StructuredConfigError,
+    },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -61,7 +57,7 @@ use {
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, DictEntries, Open},
+    sandbox::{Capability, Dict, DictEntries, Open, Request, Routable, Router},
     std::{
         clone::Clone,
         collections::{HashMap, HashSet},
@@ -190,7 +186,7 @@ impl Component {
 #[derive(Clone, Debug)]
 pub struct Package {
     /// The URL of the package itself.
-    pub package_url: String,
+    pub _package_url: String,
     /// The package that this resolved component belongs to
     pub package_dir: fio::DirectoryProxy,
 }
@@ -200,7 +196,7 @@ impl TryFrom<ResolvedPackage> for Package {
 
     fn try_from(package: ResolvedPackage) -> Result<Self, Self::Error> {
         Ok(Self {
-            package_url: package.url,
+            _package_url: package.url,
             package_dir: package
                 .directory
                 .into_proxy()
@@ -260,12 +256,9 @@ pub struct ComponentInstance {
     /// Tasks owned by this component instance that will be cancelled if the component is
     /// destroyed.
     nonblocking_task_group: TaskGroup,
-    /// Tasks owned by this component instance that will block destruction if the component is
-    /// destroyed.
-    blocking_task_group: TaskGroup,
     /// The ExecutionScope for this component. Pseudo directories should be hosted with this scope
     /// to tie their life-time to that of the component. Tasks can block component destruction by
-    /// using `active_guard()` (as an alternative to `blocking_task_group`).
+    /// using `active_guard()`.
     pub execution_scope: ExecutionScope,
 }
 
@@ -321,7 +314,6 @@ impl ComponentInstance {
             actions: Mutex::new(ActionSet::new()),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
-            blocking_task_group: TaskGroup::new(),
             persistent_storage,
             execution_scope: ExecutionScope::new(),
         })
@@ -343,12 +335,6 @@ impl ComponentInstance {
     /// in this group will be cancelled when the component is destroyed.
     pub fn nonblocking_task_group(&self) -> TaskGroup {
         self.nonblocking_task_group.clone()
-    }
-
-    /// Returns a group for this instance where tasks can be run scoped to this instance. Tasks run
-    /// in this group will block destruction if the component is destroyed.
-    pub fn blocking_task_group(&self) -> TaskGroup {
-        self.blocking_task_group.clone()
     }
 
     /// Returns true if the component is started, i.e. when it has a runtime.
@@ -527,9 +513,7 @@ impl ComponentInstance {
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
-                if let Err(_) =
-                    child_dict_entries.insert(key.clone(), Capability::Router(Box::new(router)))
-                {
+                if let Err(_) = child_dict_entries.insert(key.clone(), router.into()) {
                     return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
                 }
             }
@@ -636,6 +620,7 @@ impl ComponentInstance {
 
         let stop_result = {
             if let Some(started) = started {
+                let started_timestamp = started.timestamp;
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
                         self.environment.stop_timeout(),
@@ -673,7 +658,7 @@ impl ComponentInstance {
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                     top_instance.trigger_reboot().await;
                 }
-                Some(ret)
+                Some((ret, started_timestamp))
             } else {
                 None
             }
@@ -692,7 +677,9 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some(StopOutcomeWithEscrow { outcome, escrow_request }) = stop_result {
+        if let Some((StopOutcomeWithEscrow { outcome, escrow_request }, start_time)) = stop_result {
+            let requested_escrow = escrow_request.is_some();
+
             // Store any escrowed state.
             {
                 let mut state = self.lock_state().await;
@@ -703,11 +690,14 @@ impl ComponentInstance {
                 };
             }
 
+            let stop_time = zx::Time::get_monotonic();
             let event = Event::new(
                 self,
                 EventPayload::Stopped {
                     status: outcome.component_exit_status,
-                    stop_time: zx::Time::get_monotonic(),
+                    stop_time,
+                    execution_duration: stop_time - start_time,
+                    requested_escrow,
                 },
             );
             self.hooks.dispatch(&event).await;
@@ -1351,15 +1341,27 @@ impl std::fmt::Debug for ComponentInstance {
 }
 
 #[cfg(test)]
+pub mod testing {
+    use crate::model::{events::stream::EventStream, hooks::EventType};
+    use fuchsia_zircon as zx;
+    use moniker::{Moniker, MonikerBase};
+
+    pub async fn wait_until_event_get_timestamp(
+        event_stream: &mut EventStream,
+        event_type: EventType,
+    ) -> zx::Time {
+        event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
+    }
+}
+
+#[cfg(test)]
 pub mod tests {
     use {
+        super::testing::wait_until_event_get_timestamp,
         super::*,
         crate::model::{
-            actions::shutdown,
-            actions::test_utils::is_discovered,
-            actions::StopAction,
-            error::{AddChildError, DynamicOfferError},
-            events::{registry::EventSubscription, stream::EventStream},
+            actions::{shutdown, test_utils::is_discovered, StopAction},
+            events::registry::EventSubscription,
             hooks::EventType,
             structured_dict::ComponentInput,
             testing::{
@@ -1377,10 +1379,11 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::*,
+        errors::{AddChildError, DynamicOfferError},
         fasync::TestExecutor,
         fidl::endpoints::DiscoverableProtocolMarker,
-        fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_zircon as zx,
-        fuchsia_zircon::AsHandleRef,
+        fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
+        fuchsia_zircon::{self as zx, AsHandleRef},
         futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt},
         instance::UnresolvedInstanceState,
         routing_test_helpers::component_id_index::make_index_file,
@@ -1613,13 +1616,6 @@ pub mod tests {
         assert_eq!(None, a_realm.instance_id());
     }
 
-    async fn wait_until_event_get_timestamp(
-        event_stream: &mut EventStream,
-        event_type: EventType,
-    ) -> zx::Time {
-        event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
-    }
-
     #[fuchsia::test]
     async fn shutdown_component_interface_no_dynamic() {
         let example_offer = OfferBuilder::directory()
@@ -1676,11 +1672,11 @@ pub mod tests {
             vec![
                 shutdown::Child {
                     moniker: "a".try_into().unwrap(),
-                    environment_name: Some("env_a".to_string()),
+                    environment_name: Some("env_a".parse().unwrap()),
                 },
                 shutdown::Child {
                     moniker: "b".try_into().unwrap(),
-                    environment_name: Some("env_b".to_string()),
+                    environment_name: Some("env_b".parse().unwrap()),
                 },
                 shutdown::Child { moniker: "c".try_into().unwrap(), environment_name: None },
             ],
@@ -1748,11 +1744,11 @@ pub mod tests {
 
         let example_dynamic_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
-                name: "a".into(),
+                name: "a".parse().unwrap(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
             target: OfferTarget::Child(ChildRef {
-                name: "b".into(),
+                name: "b".parse().unwrap(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
             source_dictionary: Default::default(),
@@ -1773,7 +1769,7 @@ pub mod tests {
                 vec![
                     shutdown::Child {
                         moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".to_string()),
+                        environment_name: Some("env_a".parse().unwrap()),
                     },
                     shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
@@ -1786,7 +1782,7 @@ pub mod tests {
                     },
                     shutdown::Child {
                         moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".to_string()),
+                        environment_name: Some("env_b".parse().unwrap()),
                     },
                 ],
                 children
@@ -1812,7 +1808,7 @@ pub mod tests {
                 vec![
                     shutdown::Child {
                         moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".to_string()),
+                        environment_name: Some("env_a".parse().unwrap()),
                     },
                     shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
@@ -1821,7 +1817,7 @@ pub mod tests {
                     },
                     shutdown::Child {
                         moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".to_string()),
+                        environment_name: Some("env_b".parse().unwrap()),
                     },
                 ],
                 children
@@ -1841,7 +1837,7 @@ pub mod tests {
             fcomponent::CreateChildArgs {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "a".into(),
+                        name: "a".parse().unwrap(),
                         collection: Some("coll_2".parse().unwrap()),
                     })),
                     source_name: Some("dyn_offer2_source_name".to_string()),
@@ -1857,11 +1853,11 @@ pub mod tests {
 
         let example_dynamic_offer2 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
-                name: "a".into(),
+                name: "a".parse().unwrap(),
                 collection: Some("coll_2".parse().unwrap()),
             }),
             target: OfferTarget::Child(ChildRef {
-                name: "b".into(),
+                name: "b".parse().unwrap(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
             source_name: "dyn_offer2_source_name".parse().unwrap(),
@@ -1880,7 +1876,7 @@ pub mod tests {
                 vec![
                     shutdown::Child {
                         moniker: "a".try_into().unwrap(),
-                        environment_name: Some("env_a".to_string()),
+                        environment_name: Some("env_a".parse().unwrap()),
                     },
                     shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
@@ -1893,7 +1889,7 @@ pub mod tests {
                     },
                     shutdown::Child {
                         moniker: "coll_2:a".try_into().unwrap(),
-                        environment_name: Some("env_b".to_string()),
+                        environment_name: Some("env_b".parse().unwrap()),
                     },
                 ],
                 children
@@ -2242,7 +2238,7 @@ pub mod tests {
                     Some(offers),
                     None,
                     &ChildDecl {
-                        name: "foo".to_string(),
+                        name: "foo".parse().unwrap(),
                         url: "http://foo".to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -2279,7 +2275,7 @@ pub mod tests {
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef {
-                    name: "foo".into(),
+                    name: "foo".parse().unwrap(),
                     collection: Some("col".parse().unwrap()),
                 }),
                 target_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2306,7 +2302,7 @@ pub mod tests {
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef {
-                    name: "foo".into(),
+                    name: "foo".parse().unwrap(),
                     collection: Some("col".parse().unwrap()),
                 }),
                 target_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2337,13 +2333,13 @@ pub mod tests {
             if err == DynamicOfferError::SourceNotFound {
                 offer: OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
-                        name: "doesnt-exist".into(),
+                        name: "doesnt-exist".parse().unwrap(),
                         collection: Some("col".parse().unwrap()),
                     }),
                     source_name: "fuchsia.example.Echo".parse().unwrap(),
                     source_dictionary: Default::default(),
                     target: OfferTarget::Child(ChildRef {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         collection: Some("col".parse().unwrap()),
                     }),
                     target_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2383,7 +2379,7 @@ pub mod tests {
                     None,
                     Some(capabilities),
                     &ChildDecl {
-                        name: "foo".to_string(),
+                        name: "foo".parse().unwrap(),
                         url: "http://foo".to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -2620,7 +2616,7 @@ pub mod tests {
     async fn open_outgoing_failed_to_start_component() {
         let components = vec![(
             "root",
-            ComponentDeclBuilder::new_empty_component().add_program("invalid").build(),
+            ComponentDeclBuilder::new_empty_component().program_runner("invalid").build(),
         )];
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
 

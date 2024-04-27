@@ -545,18 +545,11 @@ impl<'a> DeviceInfoRef<'a> {
     }
 
     pub(super) fn is_wlan_ap(&self) -> bool {
-        /// The string present in the topological path of a WLAN AP interface.
-        const WLAN_AP_TOPO_PATH_CONTAINS: &str = "wlanif-ap";
-
-        let DeviceInfoRef { device_class, mac: _, topological_path } = self;
+        let DeviceInfoRef { device_class, mac: _, topological_path: _ } = self;
         match device_class {
             fidl_fuchsia_hardware_network::DeviceClass::WlanAp => true,
-            // TODO: Remove string matching once integration tests don't
-            // need it to detect a WLAN AP interface.
-            fidl_fuchsia_hardware_network::DeviceClass::Virtual => {
-                topological_path.contains(WLAN_AP_TOPO_PATH_CONTAINS)
-            }
             fidl_fuchsia_hardware_network::DeviceClass::Wlan
+            | fidl_fuchsia_hardware_network::DeviceClass::Virtual
             | fidl_fuchsia_hardware_network::DeviceClass::Ethernet
             | fidl_fuchsia_hardware_network::DeviceClass::Ppp
             | fidl_fuchsia_hardware_network::DeviceClass::Bridge => false,

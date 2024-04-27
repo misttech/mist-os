@@ -538,7 +538,7 @@ TEST_F(DebugAgentTests, WeakFilterMatchDoesNotSendModules) {
 
   EXPECT_TRUE(reply.matched_processes_for_filter.empty());
 
-  harness.debug_agent()->OnProcessStart(
+  harness.debug_agent()->OnProcessStarting(
       std::make_unique<MockProcessHandle>(kProcessKoid, kProcessName));
 
   // We should have sent a process starting notification, but no modules.

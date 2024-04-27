@@ -39,7 +39,9 @@ int main(int argc, const char** argv) {
     }
   };
 
+  printf("Async loop starting\n");
   loop.Run();
+  printf("Async loop finished\n");
   return num_responses == 2 ? 0 : 1;
 }
 // [END main]

@@ -20,6 +20,7 @@ open protocol RealmFactory {
     /// Returns OperationError.INVALID if called more than once.
     flexible CreateRealm(resource struct {
         options RealmOptions;
-        dictionary server_end:fuchsia.component.sandbox.Dictionary;
-    }) -> () error fuchsia.testing.harness.OperationError;
+    }) -> (resource struct {
+        dictionary client_end:fuchsia.component.sandbox.Dictionary;
+    }) error fuchsia.testing.harness.OperationError;
 };

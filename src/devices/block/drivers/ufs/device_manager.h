@@ -12,6 +12,7 @@
 
 #include <map>
 
+#include "src/devices/block/drivers/ufs/transfer_request_processor.h"
 #include "src/devices/block/drivers/ufs/upiu/attributes.h"
 #include "src/devices/block/drivers/ufs/upiu/descriptors.h"
 #include "src/devices/block/drivers/ufs/upiu/flags.h"
@@ -55,8 +56,10 @@ using PowerModeMap = std::map<UfsPowerMode, std::pair<scsi::PowerCondition, Link
 class Ufs;
 class DeviceManager {
  public:
-  static zx::result<std::unique_ptr<DeviceManager>> Create(Ufs &controller);
-  explicit DeviceManager(Ufs &controller) : controller_(controller) {}
+  static zx::result<std::unique_ptr<DeviceManager>> Create(
+      Ufs &controller, TransferRequestProcessor &transfer_request_processor);
+  explicit DeviceManager(Ufs &controller, TransferRequestProcessor &transfer_request_processor)
+      : controller_(controller), req_processor_(transfer_request_processor) {}
 
   // Device initialization.
   zx::result<> SendLinkStartUp();
@@ -76,10 +79,17 @@ class DeviceManager {
 
   bool IsSuspended() const { return current_power_mode_ != UfsPowerMode::kActive; }
 
-  // for test
-  DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
 
+  // This function is only used for the QEMU quirk case.
+  void SetCurrentPowerMode(UfsPowerMode power_mode) {
+    current_power_mode_ = power_mode;
+    current_power_condition_ = power_mode_map_[power_mode].first;
+    current_link_state_ = power_mode_map_[power_mode].second;
+  }
+
+  // for test
+  DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   PowerModeMap &GetPowerModeMap() { return power_mode_map_; }
   UfsPowerMode GetCurrentPowerMode() const { return current_power_mode_; }
   scsi::PowerCondition GetCurrentPowerCondition() const { return current_power_condition_; }
@@ -97,6 +107,7 @@ class DeviceManager {
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition);
 
   Ufs &controller_;
+  TransferRequestProcessor &req_processor_;
 
   DeviceDescriptor device_descriptor_;
   GeometryDescriptor geometry_descriptor_;

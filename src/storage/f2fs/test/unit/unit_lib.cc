@@ -191,6 +191,7 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
 
   VnodeF2fs::Allocate(fs, inode_nid, static_cast<umode_t>(mode), &vnode);
   ASSERT_EQ(vnode->Open(nullptr), ZX_OK);
+  vnode->InitTime();
   vnode->InitFileCache();
   vnode->InitExtentTree();
   vnode->UnlockNewInode();

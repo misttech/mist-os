@@ -28,7 +28,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::Status,
-    futures::{FutureExt, TryStreamExt},
+    futures::TryStreamExt,
     fxfs::{
         errors::FxfsError,
         object_handle::ReadObjectHandle,
@@ -467,27 +467,20 @@ impl VfsDirectory for BlobDirectory {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            async move {
-                if path.is_empty() {
-                    object_request.create_connection(
-                        scope,
-                        OpenedNode::new(self.clone())
-                            .downcast::<BlobDirectory>()
-                            .unwrap_or_else(|_| unreachable!())
-                            .take(),
-                        flags,
-                        MutableConnection::create,
-                    )
-                } else {
-                    tracing::error!(
-                        "Tried to open a blob via open(). Use the BlobCreator or BlobReader
-                            instead."
-                    );
-                    Err(Status::NOT_SUPPORTED)
-                }
+        flags.to_object_request(server_end).handle(move |object_request| {
+            if path.is_empty() {
+                object_request.spawn_connection(
+                    scope,
+                    OpenedNode::new(self).take(),
+                    flags,
+                    MutableConnection::create,
+                )
+            } else {
+                tracing::error!(
+                    "Tried to open a blob via open(). Use the BlobCreator or BlobReader instead."
+                );
+                Err(Status::NOT_SUPPORTED)
             }
-            .boxed()
         });
     }
 

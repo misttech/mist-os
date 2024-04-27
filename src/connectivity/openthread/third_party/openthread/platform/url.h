@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_URL_H_
 #define SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_URL_H_
 
-#ifdef OPENTHREAD_240214
 #include <stdint.h>
 
 #include <openthread/error.h>
@@ -195,5 +194,4 @@ class Url : public otUrl {
 }  // namespace Url
 }  // namespace ot
 
-#endif  // OPENTHREAD_240214
 #endif  // SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_URL_H_

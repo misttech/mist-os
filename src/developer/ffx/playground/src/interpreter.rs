@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use crate::compiler::Visitor;
 use crate::error::{Error, Result};
 use crate::frame::GlobalVariables;
-use crate::parser::{Mutability, Node, ParseResult};
+use crate::parser::{Mutability, ParseResult, TabHint};
 use crate::value::{InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, Value, ValueExt};
 
 macro_rules! error {
@@ -556,40 +556,117 @@ impl Interpreter {
     }
 
     /// Performs tab completion. Takes in a command string and the cursor
-    /// position (as a *character* offset) and returns a list of tuples of
-    /// strings to be inserted and where in the string they begin (as a
-    /// character offset again). The characters between the cursor position and
-    /// the beginning position given with the completion should be deleted
-    /// before the completion text is inserted in their place, and the cursor
-    /// should end up at the end of the completion text.
+    /// position and returns a list of tuples of strings to be inserted and
+    /// where in the string they begin. The characters between the cursor
+    /// position and the beginning position given with the completion should be
+    /// deleted before the completion text is inserted in their place, and the
+    /// cursor should end up at the end of the completion text.
     pub async fn complete(&self, cmd: String, cursor_pos: usize) -> Vec<(String, usize)> {
         let cmd: ParseResult<'_> = cmd.as_str().into();
-        let cmd = cmd.tree;
+        let whitespace = cmd.whitespace;
+        let hints = cmd.tab_completions;
         let mut ret = Vec::new();
 
-        let mut cmd_node_and_parents = cmd.find_node_containing_cursor(cursor_pos);
-        match cmd_node_and_parents.pop() {
-            Some(Node::Invocation(identifier, _)) => {
-                let start = identifier.get_utf8_column() - 1;
-                let end = start + identifier.fragment().chars().count();
+        let mut whitespace_range_start = cursor_pos;
+        let mut whitespace_range_end = cursor_pos;
 
-                if end >= cursor_pos {
-                    let char_offset = cursor_pos - start;
-                    let byte_offset = identifier
-                        .fragment()
-                        .char_indices()
-                        .skip(char_offset)
-                        .next()
-                        .map(|x| x.0)
-                        .unwrap_or(identifier.fragment().len());
+        for whitespace in whitespace.iter() {
+            let whitespace_start = whitespace.location_offset();
+            let whitespace_end = whitespace_start + whitespace.fragment().len();
+            if whitespace_start <= cursor_pos && whitespace_end >= cursor_pos {
+                whitespace_range_start = std::cmp::min(whitespace_range_start, whitespace_start);
+                whitespace_range_end = std::cmp::max(whitespace_range_end, whitespace_end);
+            }
+        }
+
+        for hint in hints.values().flat_map(|x| x.iter()) {
+            let start = hint.span().location_offset();
+            let end = start + hint.span().fragment().len();
+            if start > whitespace_range_end {
+                continue;
+            }
+
+            if end < whitespace_range_start {
+                continue;
+            }
+
+            let fragment = if hint.span().fragment().is_empty() {
+                ""
+            } else {
+                if start > cursor_pos || end < cursor_pos {
+                    continue;
+                }
+
+                &hint.span().fragment()[..cursor_pos - start]
+            };
+
+            match hint {
+                TabHint::Invocable(_) => {
                     for name in self.global_variables.lock().unwrap().names(|x| x.is_invocable()) {
-                        if name.starts_with(&identifier.fragment()[..byte_offset]) {
+                        if name.starts_with(fragment) {
                             ret.push((format!("{name} "), start))
                         }
                     }
                 }
+                TabHint::CommandArgument(_) => {
+                    if fragment.is_empty() {
+                        continue;
+                    }
+
+                    let file = self.open(fragment.to_owned()).await;
+
+                    let (file, prefix, filter) = if let Ok(file) = file {
+                        (file, fragment, "")
+                    } else if fragment.ends_with("/") {
+                        continue;
+                    } else {
+                        let (prefix, filter) = fragment.rsplit_once("/").unwrap_or((".", fragment));
+                        let Ok(file) = self.open(prefix.to_owned()).await else {
+                            continue;
+                        };
+                        (file, prefix, filter)
+                    };
+
+                    let dir =
+                        file.try_client_channel(self.inner.lib_namespace(), "fuchsia.io/Directory");
+
+                    if let Ok(dir) = dir {
+                        let dir = fio::DirectoryProxy::from_channel(
+                            fuchsia_async::Channel::from_channel(dir),
+                        );
+                        let Ok(entries) = fuchsia_fs::directory::readdir(&dir).await else {
+                            continue;
+                        };
+
+                        for entry in entries.into_iter().filter(|x| x.name.starts_with(filter)) {
+                            let (node, server) = fidl::endpoints::create_proxy().unwrap();
+                            let is_dir = if let Ok(_) = dir.open(
+                                fio::OpenFlags::NODE_REFERENCE,
+                                fio::ModeType::empty(),
+                                &entry.name,
+                                server,
+                            ) {
+                                node.get_attr()
+                                    .await
+                                    .map(|attr| {
+                                        attr.1.mode & fio::MODE_TYPE_MASK
+                                            == fio::MODE_TYPE_DIRECTORY
+                                    })
+                                    .unwrap_or(false)
+                            } else {
+                                false
+                            };
+
+                            let postfix = if is_dir { "/" } else { " " };
+                            let sep = if prefix.ends_with("/") { "" } else { "/" };
+                            let name = entry.name;
+                            ret.push((format!("{prefix}{sep}{name}{postfix}"), start));
+                        }
+                    } else if prefix == fragment && !fragment.ends_with("/") {
+                        ret.push((format!("{fragment} "), start));
+                    }
+                }
             }
-            _ => (),
         }
 
         ret

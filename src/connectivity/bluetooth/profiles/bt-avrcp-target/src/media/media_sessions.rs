@@ -521,7 +521,7 @@ pub(crate) mod tests {
             let mut inner = create_session(disc_clone.clone(), id, true);
 
             let current =
-                fidl_avrcp::Notification { track_id: Some(std::u64::MAX), ..Default::default() };
+                fidl_avrcp::Notification { track_id: Some(u64::MAX), ..Default::default() };
             let res = inner.register_notification(supported_id, current.into(), 0, responder);
             assert_matches!(res, Ok(None));
             assert!(inner.notifications.contains_key(&supported_id));
@@ -540,7 +540,7 @@ pub(crate) mod tests {
         let result = result_fut.await.expect("notification response");
         assert_eq!(
             result,
-            Ok(fidl_avrcp::Notification { track_id: Some(std::u64::MAX), ..Default::default() })
+            Ok(fidl_avrcp::Notification { track_id: Some(u64::MAX), ..Default::default() })
         );
     }
 
@@ -743,7 +743,7 @@ pub(crate) mod tests {
         {
             let supported_id = NotificationEvent::TrackChanged;
             let current =
-                fidl_avrcp::Notification { track_id: Some(std::u64::MAX), ..Default::default() };
+                fidl_avrcp::Notification { track_id: Some(u64::MAX), ..Default::default() };
             let res = sessions.register_notification(supported_id, current.into(), 0, responder);
             assert_matches!(res, Ok(None));
             assert_eq!(
@@ -815,10 +815,9 @@ pub(crate) mod tests {
             let ids = requested_event_ids.clone();
             for (event_id, responder) in ids.into_iter().zip(responders.into_iter()) {
                 let current_val = match event_id {
-                    NotificationEvent::TrackChanged => fidl_avrcp::Notification {
-                        track_id: Some(std::u64::MAX),
-                        ..Default::default()
-                    },
+                    NotificationEvent::TrackChanged => {
+                        fidl_avrcp::Notification { track_id: Some(u64::MAX), ..Default::default() }
+                    }
                     NotificationEvent::PlaybackStatusChanged => fidl_avrcp::Notification {
                         status: Some(fidl_avrcp::PlaybackStatus::Stopped),
                         ..Default::default()
@@ -1048,10 +1047,9 @@ pub(crate) mod tests {
                 .zip(responders.into_iter().zip(expected_notification_queue_sizes.into_iter()))
             {
                 let current_val = match event_id {
-                    NotificationEvent::TrackChanged => fidl_avrcp::Notification {
-                        track_id: Some(std::u64::MAX),
-                        ..Default::default()
-                    },
+                    NotificationEvent::TrackChanged => {
+                        fidl_avrcp::Notification { track_id: Some(u64::MAX), ..Default::default() }
+                    }
                     NotificationEvent::PlayerApplicationSettingChanged => {
                         fidl_avrcp::Notification {
                             application_settings: Some(fidl_avrcp::PlayerApplicationSettings {

@@ -20,7 +20,7 @@ use {
 /// If this fails, attempts to parse as JSON5.
 /// Parsing with serde_json5 is known to be much slower, so we try the faster
 /// parser first.
-pub fn json_or_json5_from_file(file: &PathBuf) -> Result<Value, Error> {
+pub(crate) fn json_or_json5_from_file(file: &PathBuf) -> Result<Value, Error> {
     let mut buffer = String::new();
     fs::File::open(&file)
         .map_err(|e| {
@@ -43,7 +43,7 @@ pub fn json_or_json5_from_file(file: &PathBuf) -> Result<Value, Error> {
 /// Write a depfile.
 /// Given an output and its includes, writes a depfile in Make format.
 /// If there is no output, deletes the potentially stale depfile.
-pub fn write_depfile(
+pub(crate) fn write_depfile(
     depfile: &PathBuf,
     output: Option<&PathBuf>,
     inputs: &Vec<PathBuf>,
@@ -71,7 +71,7 @@ pub fn write_depfile(
 }
 
 /// Read .cml file and parse into a cml::Document.
-pub fn read_cml(file: &Path) -> Result<cml::Document, Error> {
+pub(crate) fn read_cml(file: &Path) -> Result<cml::Document, Error> {
     let buffer = read_file_to_string(file)?;
     cml::parse_one_document(&buffer, file)
 }
@@ -80,7 +80,7 @@ pub fn read_cml(file: &Path) -> Result<cml::Document, Error> {
 /// collect .cml files to merge using "GN metadata", which can only output its merged
 /// representation as a JSON array. In the case of component GN rules, this is an
 /// array of many .cml JSON objects.
-pub fn read_cml_tolerate_gn_metadata(file: &Path) -> Result<Vec<cml::Document>, Error> {
+pub(crate) fn read_cml_tolerate_gn_metadata(file: &Path) -> Result<Vec<cml::Document>, Error> {
     let buffer = read_file_to_string(file)?;
     cml::parse_many_documents(&buffer, file)
 }
@@ -99,7 +99,7 @@ fn read_file_to_string(file: &Path) -> Result<String, Error> {
 }
 
 /// Read .cm file and parse into a cm_rust::ComponentDecl.
-pub fn read_cm(file: &Path) -> Result<ComponentDecl, Error> {
+pub(crate) fn read_cm(file: &Path) -> Result<ComponentDecl, Error> {
     let mut buffer = vec![];
     fs::File::open(&file)
         .map_err(|e| Error::parse(format!("Couldn't open file: {}", e), None, Some(file)))?
@@ -113,7 +113,7 @@ pub fn read_cm(file: &Path) -> Result<ComponentDecl, Error> {
     })
 }
 
-pub fn ensure_directory_exists(output: &PathBuf) -> Result<(), Error> {
+pub(crate) fn ensure_directory_exists(output: &PathBuf) -> Result<(), Error> {
     if let Some(parent) = output.parent() {
         if !parent.exists() {
             std::fs::create_dir_all(parent)?;

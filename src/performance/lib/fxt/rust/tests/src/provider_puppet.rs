@@ -14,7 +14,7 @@ fn main() {
     instant!(c"test_puppet", c"puppet_instant", Scope::Thread);
 
     counter!(c"test_puppet", c"puppet_counter", 0, "somedataseries" => 1);
-    counter!(c"test_puppet", c"puppet_counter2", 1, "someotherdataseries" => std::u64::MAX - 1);
+    counter!(c"test_puppet", c"puppet_counter2", 1, "someotherdataseries" => u64::MAX - 1);
 
     duration_begin!(c"test_puppet", c"puppet_duration");
     duration_end!(c"test_puppet", c"puppet_duration");

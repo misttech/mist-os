@@ -98,9 +98,6 @@ FUNCTION_LABEL(_start)
     // This is in .bss, so now it's safe to set it.
     mov %r15, PHYS(kernel_entry_ticks)
 
-    /* give the boot allocator a chance to compute the physical address of the kernel */
-    call boot_alloc_init
-
 .Lpaging_setup64:
     /* initialize the default page tables */
     /* Setting the First PML4E with a PDP table reference*/

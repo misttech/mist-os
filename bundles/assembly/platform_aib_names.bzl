@@ -14,6 +14,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "bootstrap",
     "console_user",
     "driver_framework",
+    "embeddable",
     "emulator_support",
     "fshost_common",
     "fshost_fxfs",
@@ -33,6 +34,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "legacy_power_framework",
     "live_usb",
     "paver_legacy",
+    "sysmem_no_allocate",
     "resources",
     "virtcon",
     "virtcon_disable",
@@ -43,12 +45,15 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "bootstrap_userdebug",
+    "bootstrap_realm_vsock_development_access",
     "clock_development_tools",
     "console_userdebug",
+    "embeddable_userdebug",
     "kernel_args_eng",
     "kernel_args_userdebug",
     "kernel_debug_broker_userdebug",
     "netsvc",
+    "paravirtualization_support_bootstrap",
     "ptysvc",
 ]
 
@@ -56,6 +61,7 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
+    "embeddable_eng",
     "bootstrap_eng",
     "kernel_pmm_checker_enabled",
 ]

@@ -97,7 +97,12 @@ zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(const TestFilesyst
 zx::result<zx::channel> GetCryptService();
 
 // A file system instance is a specific instance created for test purposes.
-class FilesystemInstance {
+//
+// These abstract base classes are derived in the shared libraries that filesystem test suites
+// implement. The definitions here must have public LTO visibility to be compatible with the
+// definitions in the shared libraries. (See
+// https://clang.llvm.org/docs/LTOVisibility.html).
+class [[clang::lto_visibility_public]] FilesystemInstance {
  public:
   FilesystemInstance() = default;
   FilesystemInstance(const FilesystemInstance&) = delete;
@@ -125,7 +130,7 @@ class FilesystemInstance {
 
 // Base class for all supported file systems. It is a factory class that generates
 // instances of FilesystemInstance subclasses.
-class Filesystem {
+class [[clang::lto_visibility_public]] Filesystem {
  public:
   struct Traits {
     bool has_directory_size_limit = false;

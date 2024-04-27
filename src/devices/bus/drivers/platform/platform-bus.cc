@@ -218,53 +218,6 @@ zx_status_t PlatformBus::IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::
   return bti->second.duplicate(ZX_RIGHT_SAME_RIGHTS, out_bti);
 }
 
-void PlatformBus::RegisterProtocol(RegisterProtocolRequestView request, fdf::Arena& arena,
-                                   RegisterProtocolCompleter::Sync& completer) {
-  if (request->protocol.count() < sizeof(ddk::AnyProtocol)) {
-    completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-
-  const uint8_t* protocol = request->protocol.data();
-  switch (request->proto_id) {
-      // DO NOT ADD ANY MORE PROTOCOLS HERE.
-      // GPIO_IMPL is needed for board driver pinmuxing. IOMMU is for potential future use.
-      // CLOCK_IMPL are needed by the amlogic board drivers. Use of this mechanism for all other
-      // protocols has been deprecated.
-    case ZX_PROTOCOL_CLOCK_IMPL: {
-      clock_ =
-          ddk::ClockImplProtocolClient(reinterpret_cast<const clock_impl_protocol_t*>(protocol));
-      break;
-    }
-    case ZX_PROTOCOL_IOMMU: {
-      iommu_ = ddk::IommuProtocolClient(reinterpret_cast<const iommu_protocol_t*>(protocol));
-      break;
-    }
-    default:
-      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-      return;
-  }
-
-  fbl::AutoLock lock(&proto_completion_mutex_);
-  auto entry = proto_ready_responders_.find(request->proto_id);
-  if (entry != proto_ready_responders_.end()) {
-    auto& responder = entry->second;
-    zx_status_t status = responder.timeout_task->Cancel();
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to cancel task: %s. Trying to respond anyway.",
-             zx_status_get_string(status));
-    }
-    if (responder.completer.is_reply_needed()) {
-      responder.completer.buffer(responder.arena).ReplySuccess();
-    } else {
-      zxlogf(ERROR, "Failed to register proto id 0x%x. It probably took too long.",
-             request->proto_id);
-    }
-    proto_ready_responders_.erase(entry);
-  }
-  completer.buffer(arena).ReplySuccess();
-}
-
 void PlatformBus::NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
                           NodeAddCompleter::Sync& completer) {
   if (!request->node.has_name()) {
@@ -296,63 +249,6 @@ zx::result<> PlatformBus::NodeAddInternal(fuchsia_hardware_platform_bus::Node& n
   // devmgr is now in charge of the device.
   [[maybe_unused]] auto* dummy = dev.release();
   return zx::ok();
-}
-
-void PlatformBus::ProtocolNodeAdd(ProtocolNodeAddRequestView request, fdf::Arena& arena,
-                                  ProtocolNodeAddCompleter::Sync& completer) {
-  if (!request->node.has_name()) {
-    completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-
-  auto natural = fidl::ToNatural(request->node);
-  auto result = ValidateResources(natural);
-  if (result.is_error()) {
-    completer.buffer(arena).ReplyError(result.status_value());
-    return;
-  }
-
-  std::unique_ptr<platform_bus::PlatformDevice> dev;
-  auto status =
-      PlatformDevice::Create(std::move(natural), zxdev(), this, PlatformDevice::Protocol, &dev);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-
-  status = dev->Start();
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-
-  // devmgr is now in charge of the device.
-  [[maybe_unused]] auto* dummy = dev.release();
-
-  // Wait for protocol implementation driver to register its protocol.
-  fbl::AutoLock<fbl::Mutex> lock(&proto_completion_mutex_);
-  auto new_value = proto_ready_responders_.emplace(
-      request->proto_id,
-      ProtoReadyResponse{
-          .arena = std::move(arena),
-          .completer = completer.ToAsync(),
-          .timeout_task = std::make_unique<async::Task>(
-              [this, proto_id = request->proto_id](async_dispatcher_t*, async::Task*, zx_status_t) {
-                fbl::AutoLock lock(&proto_completion_mutex_);
-                auto entry = proto_ready_responders_.find(proto_id);
-                // Either the protocol was registered, and we won't find this entry, or it won't
-                // have been and we'll have to report failure.
-                if (entry != proto_ready_responders_.end()) {
-                  auto& response = entry->second;
-                  response.completer.buffer(response.arena).ReplyError(ZX_ERR_TIMED_OUT);
-                  proto_ready_responders_.erase(entry);
-                }
-              }),
-      });
-
-  // Post the task.
-  new_value.first->second.timeout_task->PostDelayed(
-      fdf::Dispatcher::GetCurrent()->async_dispatcher(), zx::sec(100));
 }
 
 void PlatformBus::GetBoardName(GetBoardNameCompleter::Sync& completer) {
@@ -535,35 +431,6 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   [[maybe_unused]] auto* dev_ptr = dev.release();
 
   completer.buffer(arena).ReplySuccess();
-}
-
-zx_status_t PlatformBus::DdkGetProtocol(uint32_t proto_id, void* out) {
-  switch (proto_id) {
-    // DO NOT ADD ANY MORE PROTOCOLS HERE.
-    // GPIO_IMPL is needed for board driver pinmuxing. IOMMU is for potential future use.
-    // CLOCK_IMPL are needed by the amlogic board drivers. Use of this mechanism for all other
-    // protocols has been deprecated.
-    case ZX_PROTOCOL_CLOCK_IMPL:
-      if (clock_) {
-        clock_->GetProto(static_cast<clock_impl_protocol_t*>(out));
-        return ZX_OK;
-      }
-      break;
-    case ZX_PROTOCOL_IOMMU:
-      if (iommu_) {
-        iommu_->GetProto(static_cast<iommu_protocol_t*>(out));
-        return ZX_OK;
-      } else {
-        // return default implementation
-        auto proto = static_cast<iommu_protocol_t*>(out);
-        proto->ctx = this;
-        proto->ops = &iommu_protocol_ops_;
-        return ZX_OK;
-      }
-      break;
-  }
-
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx::result<PlatformBus::BootItemResult> PlatformBus::GetBootItem(uint32_t type, uint32_t extra) {

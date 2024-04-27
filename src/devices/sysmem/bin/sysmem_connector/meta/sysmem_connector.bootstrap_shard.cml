@@ -35,6 +35,10 @@
             as: "dev-sysmem",
             to: "#sysmem",
             subdir: "sysmem",
+
+            // This must be weak because sysmem's exposed protocols are routed back to drivers which creates
+            // a cycle. We need the sysmem_connector to outlive drivers which depend on it.
+            dependency: "weak",
         },
         {
             protocol: "fuchsia.logger.LogSink",

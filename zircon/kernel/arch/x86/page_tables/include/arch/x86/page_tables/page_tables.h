@@ -657,7 +657,7 @@ class X86PageTableImpl : public X86PageTableBase {
   // to the hardware interpreting them.  Finish MUST be called on this
   // class, even if the page table change failed.
   // The aspace lock *must* be held over the full operation of the ConsistencyManager, from
-  // queue_free to Flush. The lock must be held continuously, due to strategy employed here of only
+  // queue_free to Finish. The lock must be held continuously, due to strategy employed here of only
   // invalidating actual vaddrs with changing entries, and not all vaddrs an operation applies to.
   // Otherwise the following scenario is possible
   //  1. Thread 1 performs an Unmap and removes PTE entries, but drops the lock prior to
@@ -703,7 +703,7 @@ class X86PageTableImpl : public X86PageTableBase {
     PendingTlbInvalidation* pending_tlb() { return &tlb_; }
 
     // This function must be called while holding pt_->lock_.
-    void Finish() {
+    void ForceFlush() {
       AssertHeld(pt_->lock_);
 
       clf_.ForceFlush();
@@ -723,6 +723,15 @@ class X86PageTableImpl : public X86PageTableBase {
       }
       // Clear out the pending TLB invalidations.
       tlb_.clear();
+    }
+
+    // After this call completes the |ConsistencyManager| is in an invalid state and cannot
+    // be used further.
+    //
+    // This function must be called while holding pt_->lock_.
+    void Finish() {
+      AssertHeld(pt_->lock_);
+      ForceFlush();
       pt_ = nullptr;
     }
 
@@ -955,36 +964,59 @@ class X86PageTableImpl : public X86PageTableBase {
                            ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
+    const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
     const PtFlags term_flags =
         static_cast<T*>(this)->terminal_flags(PageTableLevel::PT_L, mmu_flags);
-    uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
 
+    uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
       volatile pt_entry_t* existing_entry = table + index;
+      const bool valid = IS_PAGE_PRESENT(*existing_entry);
 
-      if (IS_PAGE_PRESENT(*existing_entry)) {
-        if (existing_action == ExistingEntryAction::Upgrade) {
-          const paddr_t existing_paddr = (*existing_entry) & X86_PG_FRAME;
-          const bool remapping_same_address = existing_paddr == cursor.paddr();
-          const bool mmu_flags_ro =
-              (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
+      // Early out in case of an error.
+      // Do not consume addresses yet - the caller's error handling logic expects
+      // them to be unconsumed in this case.
+      if (valid && existing_action == ExistingEntryAction::Error) {
+        return ZX_ERR_ALREADY_EXISTS;
+      }
 
-          // If the physical page we are trying to map is already present, and
-          // we would be marking it read only, then don't.
-          // Either:
-          //   1. it is already read-only - we can skip the work.
-          //   2. it is already writable - we shouldn't downgrade permissions.
-          if (!remapping_same_address || !mmu_flags_ro) {
-            UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
-                        term_flags, /*was_terminal=*/true);
-          }
-        } else if (existing_action == ExistingEntryAction::Error) {
-          return ZX_ERR_ALREADY_EXISTS;
+      const bool paddr_changing = (*existing_entry & X86_PG_FRAME) != cursor.paddr();
+      if (valid && existing_action == ExistingEntryAction::Skip) {
+        // Empty case to simplify the other branches.
+        // Cannot use `continue` here because `ConsumePAddr` must be called at the end
+        // of the loop.
+      } else if (valid && existing_action == ExistingEntryAction::Upgrade && !paddr_changing) {
+        // Doing an upgrade of an existing entry where the physical address is not changing.
+        // This is a protect. Skip changing the entry if the new permissions are RO:
+        // Either
+        //   1. the entry is already read-only - can skip the work.
+        //   2. the entry is already writable - shouldn't downgrade permissions.
+        if (!ro) {
+          UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
+                      term_flags, /*was_terminal=*/true);
         }
       } else {
+        // Either
+        //  1. no existing entry.
+        //  2. upgrading an existing entry where the physical address is changing.
+
+        // Upgrading an existing entry where the physical address *is* changing.
+        // If the address weren't changing, would have hit the `Upgrade` case above.
+        //
+        // This requires a break-before-make if the new permissions are writable,
+        // otherwise writes could be lost.
+        if (valid && !ro) {
+          UnmapEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry,
+                     /*was_terminal=*/true);
+          // Must force the TLB flush to happen now.
+          // This ensures the invalidated entry is visible before installing a new entry.
+          cm->ForceFlush();
+        }
+
         UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
                     term_flags, /*was_terminal=*/true);
       }
+
       cursor.ConsumePAddr(PAGE_SIZE);
     }
 

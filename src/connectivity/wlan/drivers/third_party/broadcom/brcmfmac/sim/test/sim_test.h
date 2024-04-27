@@ -253,7 +253,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   zx_status_t InterfaceDestroyed(SimInterface* sim_ifc);
 
   uint32_t DeviceCount();
-  uint32_t DeviceCountByProtocolId(uint32_t proto_id);
+  uint32_t DeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property);
 
   // We don't have a good mechanism to synchronize the Remove call from
   // brcmfmac::Device with node_server_, so these functions repeatedly check the device count and
@@ -261,7 +261,8 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   // The result is a timeout if it doesn't work instead of immediately failing, but the upside is
   // that we're no longer relying on the timing of the Remove call.
   void WaitForDeviceCount(uint32_t expected);
-  void WaitForDeviceCountByProtocolId(uint32_t proto_id, uint32_t expected);
+  void WaitForDeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property,
+                                      uint32_t expected);
 
   // Provides synchronous access to the brcmfmac::SimDevice instance via a callback. The callback
   // is posted to the SimDevice's dispatcher (i.e., driver_dispatcher_).

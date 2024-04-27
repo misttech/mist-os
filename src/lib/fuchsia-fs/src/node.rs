@@ -38,6 +38,17 @@ pub enum OpenError {
     UnexpectedNodeKind { expected: Kind, actual: Kind },
 }
 
+impl OpenError {
+    /// Returns true if the open failed because the node was not found.
+    pub fn is_not_found_error(&self) -> bool {
+        matches!(
+            self,
+            OpenError::OpenError(zx_status::Status::NOT_FOUND)
+                | OpenError::Namespace(zx_status::Status::NOT_FOUND)
+        )
+    }
+}
+
 /// An error encountered while cloning a node
 #[derive(Debug, Clone, Error)]
 #[allow(missing_docs)]

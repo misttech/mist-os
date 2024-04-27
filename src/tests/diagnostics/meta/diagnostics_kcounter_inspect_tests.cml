@@ -7,8 +7,8 @@
         accessor: "ALL",
         timeout_seconds: "60",
         cases: [
-            // diagnostics-kcounter produces valid Inspect containing at least handles.
-            "core/diagnostics/kcounter:root/handles*",
+            // kernel_debug_broker produces valid Inspect containing at least handles.
+            "bootstrap/kernel_debug_broker:root/handles*",
         ],
     },
 }

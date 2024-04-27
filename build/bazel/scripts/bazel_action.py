@@ -16,7 +16,13 @@ import stat
 import subprocess
 import sys
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, TypeAlias
+
+# A type for the JSON-decoded content describing the @legacy_ninja_build_outputs repository.
+LegacyInputsManifest: TypeAlias = List[Dict[str, Any]]
+
+# A type for the JSON-decoded content describing the @gn_targets repository.
+GnTargetsManifest: TypeAlias = List[Dict[str, Any]]
 
 # A list of built-in Bazel workspaces like @bazel_tools// which are actually
 # stored in the prebuilt Bazel install_base directory with a timestamp *far* in
@@ -52,6 +58,7 @@ _IGNORED_FILE_SUFFIXES = (
 _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
     "@fuchsia_build_config//",
     "@fuchsia_build_info//",
+    "@gn_targets//",
 )
 
 # Technical notes on input (source and build files) located in Bazel external
@@ -214,7 +221,7 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
 #
 
 # Set this to True to debug operations locally in this script.
-# IMPORTANT: Settings this to True will result in Ninja timeouts in CQ
+# IMPORTANT: Setting this to True will result in Ninja timeouts in CQ
 # due to the stdout/stderr logs being too large.
 _DEBUG = False
 
@@ -223,13 +230,13 @@ _DEBUG = False
 _ASSERT_ON_IGNORED_FILES = True
 
 
-def debug(msg: str):
+def debug(msg: str) -> None:
     # Print debug message to stderr if _DEBUG is True.
     if _DEBUG:
         print("BAZEL_ACTION_DEBUG: " + msg, file=sys.stderr)
 
 
-def copy_file_if_changed(src_path: str, dst_path: str):
+def copy_file_if_changed(src_path: str, dst_path: str) -> None:
     """Copy |src_path| to |dst_path| if they are different."""
     # NOTE: For some reason, filecmp.cmp() will return True if
     # dst_path does not exist, even if src_path is not empty!?
@@ -270,13 +277,13 @@ def copy_file_if_changed(src_path: str, dst_path: str):
                 if e.errno != errno.EXDEV:
                     raise
 
-    def make_writable(p):
+    def make_writable(p: str) -> None:
         file_mode = os.stat(p).st_mode
         is_readonly = file_mode & stat.S_IWUSR == 0
         if is_readonly:
             os.chmod(p, file_mode | stat.S_IWUSR)
 
-    def copy_writable(src, dst):
+    def copy_writable(src: str, dst: str) -> None:
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(src, dst)
         make_writable(dst)
@@ -292,6 +299,22 @@ def copy_file_if_changed(src_path: str, dst_path: str):
                     make_writable(os.path.join(root, d))
         else:
             copy_writable(src_path, dst_path)
+
+
+def force_symlink(target_path: str, link_path: str) -> None:
+    if os.path.islink(link_path) or os.path.exists(link_path):
+        os.remove(link_path)
+
+    link_parent = os.path.dirname(link_path)
+    os.makedirs(link_parent, exist_ok=True)
+    rel_target_path = os.path.relpath(target_path, link_parent)
+    os.symlink(rel_target_path, link_path)
+
+    real_dst_path = os.path.realpath(link_path)
+    real_src_path = os.path.realpath(target_path)
+    assert (
+        real_dst_path == real_src_path
+    ), f"Symlink creation failed {link_path} points to {real_dst_path}, not {real_src_path}"
 
 
 def depfile_quote(path: str) -> str:
@@ -381,7 +404,7 @@ class BazelLabelMapper(object):
          a query.
     """
 
-    def __init__(self, bazel_workspace, output_dir):
+    def __init__(self, bazel_workspace: str, output_dir: str):
         # Get the $OUTPUT_BASE/external directory from the $WORKSPACE_DIR,
         # the following only works in the context of the Fuchsia platform build
         # because the workspace/ and output_base/ directories are always
@@ -405,7 +428,7 @@ class BazelLabelMapper(object):
         # string otherwise.
         self._repository_hash_map: Dict[str, str] = {}
 
-    def _get_repository_content_hash(self, repository_name):
+    def _get_repository_content_hash(self, repository_name: str) -> str:
         """Check whether a repository name has an associated content hash file.
 
         Args:
@@ -447,7 +470,9 @@ class BazelLabelMapper(object):
 
         return hash_file
 
-    def source_label_to_path(self, label, relative_to=None):
+    def source_label_to_path(
+        self, label: str, relative_to: str | None = None
+    ) -> str:
         """Convert a Bazel label to a source file into the corresponding file path.
 
         Args:
@@ -539,7 +564,7 @@ class BazelLabelMapper(object):
 
 def print_bazel_action_error_header(
     abstract: str, gn_target: str, bazel_targets: List[str]
-):
+) -> None:
     """Print the common header of multiple bazel_action() related errors.
 
     Args:
@@ -550,11 +575,10 @@ def print_bazel_action_error_header(
     _ERROR = """
 BAZEL_ACTION_ERROR: {abstract}
 
-A GN target builds one or more Bazel targets that need to access Ninja
-outputs as Bazel inputs through the @legacy_ninja_build_outputs repository.
+The following GN target:               {gn_target}
+Builds the following Bazel target(s):  {bazel_targets}
 
-  GN target:       {gn_target}
-  Bazel target(s): {bazel_targets}
+Which references Ninja outputs through the @legacy_ninja_build_outputs external repository.
 
 """
     print(
@@ -569,11 +593,11 @@ outputs as Bazel inputs through the @legacy_ninja_build_outputs repository.
 
 
 def verify_unlisted_legacy_input_dependencies(
-    legacy_inputs_manifest,
-    ninja_inputs_manifest,
-    gn_target_label,
-    bazel_targets,
-):
+    legacy_inputs_manifest: LegacyInputsManifest,
+    ninja_inputs_manifest: GnTargetsManifest,
+    gn_target_label: str,
+    bazel_targets: List[str],
+) -> int:
     """Check for unlisted bazel_inputs_xxx() dependencies.
 
     This verifies that all transitive bazel input dependencies of a given
@@ -597,13 +621,13 @@ def verify_unlisted_legacy_input_dependencies(
         error message explaining the situation to stderr, then return 1.
     """
 
-    def extract_gn_labels(inputs_manifest):
+    def extract_gn_labels(inputs_manifest: List[Dict[str, Any]]) -> Set[str]:
         return set(e["gn_label"].partition("(")[0] for e in inputs_manifest)
 
     legacy_input_labels = extract_gn_labels(legacy_inputs_manifest)
     ninja_input_labels = extract_gn_labels(ninja_inputs_manifest)
 
-    _UNLISTED_BAZEL_INPUTS_DEPENDENCIES = r"""These GN bazel_input_xxx() target dependencies are missing from global lists:
+    _UNLISTED_BAZEL_INPUTS_DEPENDENCIES = r"""These GN bazel_input_resource() target dependencies are missing from global lists:
 
 {missing_labels}
 
@@ -614,7 +638,7 @@ Fix: update `gn_labels_for_bazel_inputs` or `extra_gn_labels_for_bazel_inputs`.
     ]
     if unknown_legacy_labels:
         print_bazel_action_error_header(
-            "Unlisted bazel_input_xxx() dependencies",
+            "Unlisted bazel_input_resource() dependencies",
             gn_target_label,
             bazel_targets,
         )
@@ -631,19 +655,19 @@ Fix: update `gn_labels_for_bazel_inputs` or `extra_gn_labels_for_bazel_inputs`.
 
 
 def verify_missing_legacy_input_dependencies(
-    source_files,
-    legacy_inputs_manifest,
-    legacy_inputs_repository_dir,
-    gn_action_target,
-    bazel_targets,
-):
+    source_files: List[str],
+    legacy_inputs_manifest: LegacyInputsManifest,
+    legacy_inputs_repository_dir: str,
+    gn_action_target: str,
+    bazel_targets: List[str],
+) -> int:
     """Check for missing bazel_inputs_xxx() dependencies.
 
     This verifies that a GN bazel_action() target is not missing
     a listed bazel_input_xxx() dependencies in its `bazel_inputs` list.
 
     For example, bazel_action("foo") invokes Bazel target //src:foo which
-    access @legacy_ninja_build_outputs//:bar which is defined by a GN
+    accesses @legacy_ninja_build_outputs//:bar which is defined by a GN
     bazel_input_xxx() target that is not a dependency of "foo".
 
     IMPORTANT: This must be called after the function
@@ -730,12 +754,12 @@ def verify_missing_legacy_input_dependencies(
         return 0
 
     print_bazel_action_error_header(
-        "Missing bazel_input_xxx() dependencies.",
+        "Missing bazel_input_resource() dependencies.",
         gn_action_target,
         bazel_targets,
     )
 
-    _MISSING_DEPS = r"""The following are missing from the GN target's bazel_inputs dependencies:
+    _MISSING_DEPS = r"""The following GN dependencies are missing from the GN target's 'bazel_inputs' argument:
 
 {missing_deps}
 """
@@ -753,8 +777,21 @@ def verify_missing_legacy_input_dependencies(
 
 
 def verify_unknown_legacy_inputs(
-    build_files_error, gn_action_target, bazel_targets
-):
+    build_files_error: List[str],
+    gn_action_target: str,
+    bazel_targets: List[str],
+) -> int:
+    """Check for unknown @legacy_ninja_build_outputs// dependencies.
+
+    Args:
+        build_files_error: list of error lines from bazel build or query.
+        gn_action_target: Label of the GN bazel_action() target for this invocation.
+        bazel_targets: List of Bazel targets invoked by the GN bazel_action() target.
+
+    Returns:
+        On success, simply return 0. On failure, print a human friendly
+        error message explaining the situation to stderr, then return 1.
+    """
     first_error_line = build_files_error[0]
     missing_target = None
     if (
@@ -786,15 +823,148 @@ def verify_unknown_legacy_inputs(
 
 To fix this, add the GN bazel_input_xxx() target that defines it to the global
 lists defined in //build/bazel/legacy_ninja_build_outputs.gni, and also add it
-as a bazel_inputs dependency to the GN target.
+as a 'bazel_inputs' dependency to the GN target.
 """
-
     print(
         UNKNOWN_LEGACY_INPUT_ERROR.format(
             gn_target=gn_action_target,
             bazel_targets=" ".join(bazel_targets),
             missing_target=missing_target,
         ),
+        file=sys.stderr,
+    )
+    return 1
+
+
+def verify_unknown_gn_targets(
+    build_files_error: List[str],
+    gn_action_target: str,
+    bazel_targets: List[str],
+) -> int:
+    """Check for unknown @gn_targets// dependencies.
+
+    Args:
+        build_files_error: list of error lines from bazel build or query.
+        gn_action_target: Label of the GN bazel_action() target for this invocation.
+        bazel_targets: List of Bazel targets invoked by the GN bazel_action() target.
+
+    Returns:
+        On success, simply return 0. On failure, print a human friendly
+        error message explaining the situation to stderr, then return 1.
+    """
+    missing_ninja_outputs = set()
+    missing_ninja_packages = set()
+    build_dirs: Set[str] = set()
+    for error_line in build_files_error:
+        if not (
+            error_line.startswith("ERROR:") and "@gn_targets//" in error_line
+        ):
+            continue
+
+        pos = error_line.find("@@gn_targets//")
+        if pos < 0:
+            # Should not happen, do not assert and let the caller print the full error
+            # after this.
+            print(f"UNSUPPORTED ERROR LINE: {error_line}", file=sys.stderr)
+            return 0
+
+        ending_pos = error_line.find("'", pos)
+        if ending_pos < 0:
+            print(f"UNSUPPORTED ERROR LINE: {error_line}", file=sys.stderr)
+            return 0
+
+        label = error_line[pos + 1 : ending_pos]  # skip first @.
+        if error_line[:pos].endswith(": no such package '"):
+            # The line looks like the following when the BUILD.bazel references a label
+            # that does not belong to a @gn_targets package.
+            #
+            # ERROR: <abspath>/BUILD.bazel:<line>:<column>: no such package '@@gn_targets//<dir>': ...
+            #
+            # This happens when the GN bazel_action() targets fails to dependon the corresponding
+            # bazel_input_file() or bazel_input_directory() target, and that none of its other
+            # dependencies expose other targets from the same package / directory. The error message
+            # does not give any information about the target name being evaluated by the query though.
+            missing_ninja_packages.add(label)
+
+        elif error_line[:pos].endswith(": no such target '"):
+            # The line looks like this when the BUILD.bazel files references the wrong
+            # label from a package exposed in @gn_targets//:
+            # ERROR: <abspath>/BUILD.bazel:<line>:<column>: no such target '@@gn_targets//<dir>:<name>' ...
+            missing_ninja_outputs.add(label)
+
+    if not missing_ninja_outputs and not missing_ninja_packages:
+        return 0
+
+    missing_outputs = sorted(missing_ninja_outputs)
+    missing_packages = sorted(missing_ninja_packages)
+
+    _ERROR = """
+BAZEL_ACTION_ERROR: Unknown @gn_targets targets.
+
+The following GN target:               {gn_target}
+Builds the following Bazel target(s):  {bazel_targets}
+""".format(
+        gn_target=gn_action_target,
+        bazel_targets=" ".join(bazel_targets),
+    )
+
+    if not missing_packages:
+        _ERROR += """Which references the following unknown @gn_targets labels:
+
+  {missing_bazel_labels}
+
+To fix this, ensure that bazel_input_file() or bazel_input_directory()
+targets are defined in the GN graph for:
+
+  {missing_gn_labels}
+
+Then ensure that the GN target depends on them transitively.
+""".format(
+            missing_bazel_labels="\n  ".join(missing_outputs),
+            missing_gn_labels="\n  ".join(
+                f"//{o.removeprefix('@gn_targets//')}" for o in missing_outputs
+            ),
+        )
+
+    else:
+        missing_labels = missing_outputs + missing_packages
+        missing_build_files = set()
+        for label in missing_labels:
+            label = label.removeprefix("@gn_targets//")
+            gn_dir, sep, gn_name = label.partition(":")
+            if sep != ":":
+                gn_dir = label
+            missing_build_files.add(f"//{gn_dir}/BUILD.gn")
+
+        _ERROR += """Which references the following unknown @gn_targets labels or packages:
+
+  {missing_bazel_labels}
+
+To fix this, ensure that bazel_input_file() or bazel_input_directory()
+targets are defined in the following build files:
+
+  {missing_build_files}
+
+Then ensure that the GN target depends on them transitively.
+""".format(
+            missing_bazel_labels="\n  ".join(
+                missing_outputs + missing_packages
+            ),
+            missing_build_files="\n  ".join(sorted(missing_build_files)),
+        )
+
+    print(_ERROR, file=sys.stderr)
+    print(
+        "=================== ORIGINAL BAZEL ERROR MESSAGE ================",
+        file=sys.stderr,
+    )
+    max_error_lines = 10
+    for line in build_files_error[:max_error_lines]:
+        print(line, file=sys.stderr)
+    if len(build_files_error) > max_error_lines:
+        print("...", file=sys.stderr)
+    print(
+        "--------------------- END OF BAZEL ERROR MESSAGE ----------------\n",
         file=sys.stderr,
     )
     return 1
@@ -813,7 +983,7 @@ def label_requires_content_hash(label: str) -> bool:
     return not label.startswith(_BAZEL_NO_CONTENT_HASH_REPOSITORIES)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--bazel-launcher", required=True, help="Path to Bazel launcher script."
@@ -840,6 +1010,14 @@ def main():
         "--ninja-inputs-manifest",
         required=True,
         help="Path to the manifest file describing bazel_input_xxx() dependencies.",
+    )
+    parser.add_argument(
+        "--gn-targets-repository-manifest",
+        help="Path to the manifest file describing the content of the @gn_targets repository.",
+    )
+    parser.add_argument(
+        "--gn-targets-all-licenses-spdx",
+        help="Path to the SPDX file describing licenses for all files in @gn_targets repository.",
     )
     parser.add_argument(
         "--bazel-targets",
@@ -930,21 +1108,45 @@ def main():
 
     current_dir = os.getcwd()
 
+    # Location of the @legacy_ninja_build_outputs repository directory.
     legacy_inputs_repository_dir = os.path.relpath(
         os.path.realpath(
             os.path.join(
                 args.workspace_dir,
-                "..",
-                "output_base",
-                "external",
-                "legacy_ninja_build_outputs",
+                "../output_base/external/legacy_ninja_build_outputs",
             )
         )
     )
 
+    def relative_workspace_dir(path: str) -> str:
+        """Convert path relative to the workspace root to the path relative to current directory."""
+        return os.path.relpath(
+            os.path.abspath(realpath(os.path.join(args.workspace_dir, path)))
+        )
+
+    # LINT.IfChange
+    if args.gn_targets_repository_manifest:
+        force_symlink(
+            target_path=args.gn_targets_repository_manifest,
+            link_path=os.path.join(
+                args.workspace_dir,
+                "fuchsia_build_generated/gn_targets_repository_manifest.json",
+            ),
+        )
+
+    if args.gn_targets_all_licenses_spdx:
+        force_symlink(
+            target_path=args.gn_targets_all_licenses_spdx,
+            link_path=os.path.join(
+                args.workspace_dir,
+                "fuchsia_build_generated/gn_targets_all_licenses_spdx.json",
+            ),
+        )
+    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+
     def run_bazel_query(
         query_type: str, query_args: List[str], ignore_errors: bool
-    ) -> subprocess.CompletedProcess:
+    ) -> "subprocess.CompletedProcess[str]":
         """Run a Bazel query, and return stdout, stderr pair.
 
         Args:
@@ -1058,6 +1260,20 @@ def main():
             ):
                 return 1
 
+            # Detect the error message corresponding to a Bazel target
+            # referencing a @gn_targets//<dir>:<name> label
+            # that does not exist. This happens when the GN bazel_action()
+            # fails to depend on the proper bazel_input_file() or
+            # bazel_input_directory() dependency.
+            #
+            # (There is no need to add these to the global list though).
+            if verify_unknown_gn_targets(
+                ret.stderr.splitlines(),
+                args.gn_target_label,
+                args.bazel_targets,
+            ):
+                return 1
+
             # This is a different error, just print it as is.
             print(
                 "BAZEL_ACTION_ERROR: Error when calling build files Bazel query:\n%s\n"
@@ -1099,17 +1315,23 @@ def main():
         # first bazel build command being performed in a clean build, that
         # directory might not be generated yet. To enforce this, run
         # `bazel query @legacy_ninja_build_outputs//:BUILD.bazel`
-        if not os.path.exists(legacy_inputs_repository_dir):
+        def ensure_repository_exists(repo_dir: str, repo_name: str) -> None:
+            if os.path.exists(repo_dir):
+                return
             ret = subprocess.run(
                 [
                     args.bazel_launcher,
                     "query",
                     "--config=quiet",
-                    "@legacy_ninja_build_outputs//:BUILD.bazel",
+                    f"@{repo_name}//:BUILD.bazel",
                 ]
             )
             ret.check_returncode()
-            assert os.path.exists(legacy_inputs_repository_dir)
+            assert os.path.exists(repo_dir)
+
+        ensure_repository_exists(
+            legacy_inputs_repository_dir, "legacy_ninja_build_outputs"
+        )
 
         if verify_missing_legacy_input_dependencies(
             source_files,
@@ -1138,8 +1360,8 @@ def main():
     # CQ/CI bots usable.
     cmd += configured_args + args.bazel_targets + ["--verbose_failures"]
 
-    ret = subprocess.run(cmd)
-    if ret.returncode != 0:
+    ret2 = subprocess.run(cmd)
+    if ret2.returncode != 0:
         print(
             "ERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
             % " ".join(shlex.quote(c) for c in cmd),

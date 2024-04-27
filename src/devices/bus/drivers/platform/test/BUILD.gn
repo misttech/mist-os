@@ -322,7 +322,7 @@ foreach(driver, simple_drivers) {
     component_name = "test-$driver"
     deps = [ ":test-$driver-driver" ]
     info = "test-driver-info.json"
-    colocate = true
+    manifest = "meta/test-$driver.cml"
   }
 }
 

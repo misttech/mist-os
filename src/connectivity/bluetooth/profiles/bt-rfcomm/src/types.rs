@@ -4,6 +4,7 @@
 
 use anyhow::Error;
 use bt_rfcomm::ServerChannel;
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_bluetooth::PeerId;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::{
@@ -20,7 +21,11 @@ use crate::profile::{psms_from_service_definitions, server_channels_from_service
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ServiceGroupHandle(usize);
 
-/// A collection of `ServiceGroups` which are indexed by a unique `ServiceGroupHandle`.
+/// Toplevel object for managing a single group of services advertised via the `bredr.Profile` API.
+///
+/// Each `ServiceGroup` typically represents a single `bredr.Advertise` request made by a FIDL
+/// client of the `bt-rfcomm` component.
+/// Each `ServiceGroup` is uniquely identified by a `ServiceGroupHandle`.
 pub struct Services(Slab<ServiceGroup>);
 
 impl Services {
@@ -83,34 +88,50 @@ impl Services {
 }
 
 /// Parameters needed to advertise a service.
-/// This type is used to reduce verbosity of passing around service advertisements.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AdvertiseParams {
     pub services: Vec<ServiceDefinition>,
     pub parameters: ChannelParameters,
 }
 
-/// Relevant information associated with a group of registered services.
+impl AdvertiseParams {
+    pub fn into_advertise_request(
+        self,
+        receiver: ClientEnd<bredr::ConnectionReceiverMarker>,
+    ) -> bredr::ProfileAdvertiseRequest {
+        let fidl_services = self
+            .services
+            .iter()
+            .map(bredr::ServiceDefinition::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        bredr::ProfileAdvertiseRequest {
+            services: Some(fidl_services),
+            parameters: Some((&self.parameters).try_into().unwrap()),
+            receiver: Some(receiver),
+            ..Default::default()
+        }
+    }
+}
+
+/// Information associated with BR/EDR service advertisement made by a `bredr.Profile` client.
 #[derive(Debug)]
 pub struct ServiceGroup {
-    /// Client associated with this group.
+    /// Connection to the FIDL client that made the `bredr.Advertise` request.
+    /// Incoming L2CAP connections from a remote peer are relayed to this connection `receiver`.
     receiver: bredr::ConnectionReceiverProxy,
 
-    /// The ChannelParameters for this group.
+    /// The ChannelParameters for this service advertisement.
     channel_parameters: ChannelParameters,
 
-    /// The client's Responder for this group. When the services are
-    /// unregistered with the `ProfileRegistrar`, the hanging-get responder
-    /// will be notified.
-    responder: Option<bredr::ProfileAdvertiseResponder>,
-
-    /// The services definitions for this group.
+    /// The service definitions that are advertised.
     service_defs: Vec<ServiceDefinition>,
 
-    /// The allocated PSMs for this group.
+    /// The allocated PSMs associated with the `service_defs`.
     allocated_psms: HashSet<Psm>,
 
-    /// The allocated server channels for this group.
+    /// The allocated RFCOMM server channels for the `service_defs`.
     allocated_server_channels: HashSet<ServerChannel>,
 }
 
@@ -122,7 +143,6 @@ impl ServiceGroup {
         Self {
             receiver,
             channel_parameters,
-            responder: None,
             service_defs: vec![],
             allocated_psms: HashSet::new(),
             allocated_server_channels: HashSet::new(),
@@ -161,23 +181,11 @@ impl ServiceGroup {
         self.receiver.connected(&peer_id, channel, &protocol).map_err(|e| e.into())
     }
 
-    pub fn set_responder(&mut self, responder: bredr::ProfileAdvertiseResponder) {
-        self.responder = Some(responder);
-    }
-
     /// Sets the ServiceDefinitions for this group.
     pub fn set_service_defs(&mut self, defs: Vec<ServiceDefinition>) {
         self.allocated_psms = psms_from_service_definitions(&defs);
         self.allocated_server_channels = server_channels_from_service_definitions(&defs);
         self.service_defs = defs;
-    }
-}
-
-impl Drop for ServiceGroup {
-    fn drop(&mut self) {
-        if let Some(responder) = self.responder.take() {
-            let _ = responder.send(Ok(()));
-        }
     }
 }
 

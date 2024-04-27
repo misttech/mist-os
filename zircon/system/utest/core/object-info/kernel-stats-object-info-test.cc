@@ -21,7 +21,7 @@ namespace {
 class KernelStatsGetInfoTest : public zxtest::Test {
  public:
   void SetUp() override {
-    root_resource_ = maybe_standalone::GetRootResource();
+    system_resource_ = maybe_standalone::GetSystemResource();
     num_cpus_ = zx_system_get_num_cpus();
   }
 
@@ -31,7 +31,13 @@ class KernelStatsGetInfoTest : public zxtest::Test {
   template <zx_object_info_topic_t Topic, typename ElementType>
   void TestArraySize() {
     size_t probe_actual_records = -1, probe_avail_records = 0;
-    ASSERT_OK(zx_object_get_info(root_resource_->get(), Topic, nullptr, 0, &probe_actual_records,
+
+    zx::result<zx::resource> result =
+        maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+    ASSERT_OK(result.status_value());
+    zx::resource info_resource = std::move(result.value());
+
+    ASSERT_OK(zx_object_get_info(info_resource.get(), Topic, nullptr, 0, &probe_actual_records,
                                  &probe_avail_records));
     EXPECT_EQ(probe_actual_records, 0u);
     EXPECT_GT(probe_avail_records, 0u);
@@ -40,7 +46,7 @@ class KernelStatsGetInfoTest : public zxtest::Test {
     ASSERT_EQ(records.size(), probe_avail_records);
     cpp20::span buffer = records;
     size_t actual_records, avail_records;
-    ASSERT_OK(zx_object_get_info(root_resource_->get(), Topic, buffer.data(), buffer.size_bytes(),
+    ASSERT_OK(zx_object_get_info(info_resource.get(), Topic, buffer.data(), buffer.size_bytes(),
                                  &actual_records, &avail_records));
     EXPECT_EQ(avail_records, probe_avail_records);
     EXPECT_EQ(actual_records, probe_avail_records);
@@ -48,12 +54,12 @@ class KernelStatsGetInfoTest : public zxtest::Test {
 
  protected:
   uint32_t num_cpus_ = 0;
-  zx::unowned_resource root_resource_;
+  zx::unowned_resource system_resource_;
 };
 
 TEST_F(KernelStatsGetInfoTest, KmemStats) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -81,7 +87,13 @@ TEST_F(KernelStatsGetInfoTest, KmemStats) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource_->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -90,7 +102,11 @@ TEST_F(KernelStatsGetInfoTest, KmemStats) {
   zx_info_kmem_stats_t buffer;
   size_t actual, avail;
 
-  ASSERT_OK(zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS, &buffer, sizeof(buffer),
+  result = maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
+  ASSERT_OK(zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS, &buffer, sizeof(buffer),
                                &actual, &avail));
 
   EXPECT_EQ(actual, 1);
@@ -131,35 +147,45 @@ TEST_F(KernelStatsGetInfoTest, KmemStatsBadHandleType) {
 }
 
 TEST_F(KernelStatsGetInfoTest, KmemStatsNullBuffer) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
   size_t actual, avail;
-  ASSERT_EQ(zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS, nullptr,
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
+  ASSERT_EQ(zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS, nullptr,
                                sizeof(zx_info_kmem_stats_t), &actual, &avail),
             ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(KernelStatsGetInfoTest, KmemStatsSmallBuffer) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
   size_t actual, avail;
   zx_info_kmem_stats_t buffer;
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
   ASSERT_EQ(
-      zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS, &buffer, 0, &actual, &avail),
+      zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS, &buffer, 0, &actual, &avail),
       ZX_ERR_BUFFER_TOO_SMALL);
   EXPECT_EQ(actual, 0);
   EXPECT_EQ(avail, 1);
 }
 
 TEST_F(KernelStatsGetInfoTest, KmemStatsExtended) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -187,7 +213,13 @@ TEST_F(KernelStatsGetInfoTest, KmemStatsExtended) {
   zx::bti bti;
   zx::pmt pmt;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx_iommu_create(root_resource_->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  ASSERT_OK(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
                             iommu.reset_and_get_address()));
   ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
   zx_paddr_t addr;
@@ -209,7 +241,11 @@ TEST_F(KernelStatsGetInfoTest, KmemStatsExtended) {
   zx_info_kmem_stats_extended_t buffer;
   size_t actual, avail;
 
-  ASSERT_OK(zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS_EXTENDED, &buffer,
+  result = maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
+  ASSERT_OK(zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS_EXTENDED, &buffer,
                                sizeof(buffer), &actual, &avail));
 
   EXPECT_EQ(actual, 1);
@@ -262,26 +298,37 @@ TEST_F(KernelStatsGetInfoTest, KmemStatsExtendedBadHandleType) {
 }
 
 TEST_F(KernelStatsGetInfoTest, KmemStatsExtendedNullBuffer) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
   size_t actual, avail;
-  ASSERT_EQ(zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS_EXTENDED, nullptr,
+  ASSERT_EQ(zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS_EXTENDED, nullptr,
                                sizeof(zx_info_kmem_stats_extended_t), &actual, &avail),
             ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(KernelStatsGetInfoTest, KmemStatsExtendedSmallBuffer) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
   size_t actual, avail;
   zx_info_kmem_stats_extended_t buffer;
-  ASSERT_EQ(zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS_EXTENDED, &buffer, 0,
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
+  ASSERT_EQ(zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS_EXTENDED, &buffer, 0,
                                &actual, &avail),
             ZX_ERR_BUFFER_TOO_SMALL);
   EXPECT_EQ(actual, 0);
@@ -289,15 +336,21 @@ TEST_F(KernelStatsGetInfoTest, KmemStatsExtendedSmallBuffer) {
 }
 
 TEST_F(KernelStatsGetInfoTest, CpuStats) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
   zx_info_cpu_stats_t buffer;
   size_t actual, avail;
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
   // Read a single record.
-  ASSERT_OK(zx_object_get_info(root_resource_->get(), ZX_INFO_CPU_STATS, &buffer, sizeof(buffer),
+  ASSERT_OK(zx_object_get_info(info_resource.get(), ZX_INFO_CPU_STATS, &buffer, sizeof(buffer),
                                &actual, &avail));
 
   EXPECT_EQ(actual, 1);
@@ -305,7 +358,7 @@ TEST_F(KernelStatsGetInfoTest, CpuStats) {
 
   std::vector<zx_info_cpu_stats_t> buf(num_cpus_);
   // Read all records.
-  ASSERT_OK(zx_object_get_info(root_resource_->get(), ZX_INFO_CPU_STATS, buf.data(),
+  ASSERT_OK(zx_object_get_info(info_resource.get(), ZX_INFO_CPU_STATS, buf.data(),
                                buf.size() * sizeof(zx_info_cpu_stats_t), &actual, &avail));
 
   EXPECT_EQ(actual, num_cpus_);
@@ -333,21 +386,27 @@ TEST_F(KernelStatsGetInfoTest, CpuStatsBadHandleType) {
 }
 
 TEST_F(KernelStatsGetInfoTest, CpuStatsNullBuffer) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
   size_t actual, avail;
-  ASSERT_OK(zx_object_get_info(root_resource_->get(), ZX_INFO_CPU_STATS, nullptr,
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource_, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
+  ASSERT_OK(zx_object_get_info(info_resource.get(), ZX_INFO_CPU_STATS, nullptr,
                                sizeof(zx_info_kmem_stats_t), &actual, &avail));
   EXPECT_EQ(actual, 0);
   EXPECT_EQ(avail, num_cpus_);
 }
 
 TEST_F(KernelStatsGetInfoTest, CpuStatsArraySize) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -355,8 +414,8 @@ TEST_F(KernelStatsGetInfoTest, CpuStatsArraySize) {
 }
 
 TEST_F(KernelStatsGetInfoTest, GuestStatsArraySize) {
-  if (!root_resource_->is_valid()) {
-    printf("Root resource not available, skipping\n");
+  if (!system_resource_->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 

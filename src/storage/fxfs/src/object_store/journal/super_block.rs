@@ -28,10 +28,7 @@ use {
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject},
         log::*,
-        lsm_tree::{
-            types::{LayerIterator, MutableLayer},
-            LSMTree, LayerSet,
-        },
+        lsm_tree::{types::LayerIterator, LSMTree, LayerSet},
         metrics,
         object_handle::ObjectHandle as _,
         object_store::{
@@ -57,6 +54,7 @@ use {
     anyhow::{bail, ensure, Context, Error},
     fprint::TypeFingerprint,
     fuchsia_inspect::{Property as _, UintProperty},
+    futures::FutureExt,
     rustc_hash::FxHashMap as HashMap,
     serde::{Deserialize, Serialize},
     std::{
@@ -303,16 +301,14 @@ async fn read(
             }
             SuperBlockRecord::End => break,
         };
-        root_parent
-            .apply_mutation(
-                mutation,
-                &ApplyContext {
-                    mode: ApplyMode::Replay,
-                    checkpoint: JournalCheckpoint { file_offset: sequence, ..Default::default() },
-                },
-                AssocObj::None,
-            )
-            .await?;
+        root_parent.apply_mutation(
+            mutation,
+            &ApplyContext {
+                mode: ApplyMode::Replay,
+                checkpoint: JournalCheckpoint { file_offset: sequence, ..Default::default() },
+            },
+            AssocObj::None,
+        )?;
     }
     Ok((super_block_header, instance, root_parent))
 }
@@ -364,18 +360,22 @@ async fn write<S: HandleOwner>(
 
 // Compacts and returns the *old* snapshot of the root_parent store.
 // Must be performed whilst holding a writer lock.
-pub async fn compact_root_parent(
+pub fn compact_root_parent(
     root_parent_store: &ObjectStore,
 ) -> Result<LayerSet<ObjectKey, ObjectValue>, Error> {
+    // The root parent always uses in-memory layers which shouldn't be async, so we can use
+    // `now_or_never`.
     let tree = root_parent_store.tree();
     let layer_set = tree.layer_set();
     {
         let mut merger = layer_set.merger();
-        let mut iter = LSMTree::major_iter(merger.seek(Bound::Unbounded).await?).await?;
+        let mut iter = LSMTree::major_iter(merger.seek(Bound::Unbounded).now_or_never().unwrap()?)
+            .now_or_never()
+            .unwrap()?;
         let new_layer = LSMTree::new_mutable_layer();
         while let Some(item_ref) = iter.get() {
-            new_layer.insert(item_ref.cloned()).await?;
-            iter.advance().await?;
+            new_layer.insert(item_ref.cloned())?;
+            iter.advance().now_or_never().unwrap()?;
         }
         tree.set_mutable_layer(new_layer);
     }
@@ -884,7 +884,6 @@ mod tests {
         write(
             &super_block_header_a,
             compact_root_parent(fs.object_manager().root_parent_store().as_ref())
-                .await
                 .expect("scan failed"),
             handle_a,
         )

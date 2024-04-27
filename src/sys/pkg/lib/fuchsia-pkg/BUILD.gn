@@ -15,7 +15,6 @@ lib_deps = [
   "//src/lib/utf8_path",
   "//src/lib/versioning/version-history/rust:version-history",
   "//src/lib/zircon/rust:fuchsia-zircon-status",
-  "//src/storage/lib/delivery_blob",
   "//src/sys/pkg/lib/far/rust:fuchsia-archive",
   "//src/sys/pkg/lib/fuchsia-hash",
   "//src/sys/pkg/lib/fuchsia-merkle",

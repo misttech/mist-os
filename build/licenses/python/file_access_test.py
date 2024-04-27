@@ -35,6 +35,9 @@ class FileAccessTest(unittest.TestCase):
         file_path3 = self.temp_dir_path / "child" / "baz"
         file_path3.write_text("BAZ")
 
+        json_path = self.temp_dir_path / "json"
+        json_path.write_text('{"key": "value"}')
+
         return super().setUp()
 
     def tearDown(self) -> None:
@@ -67,6 +70,7 @@ class FileAccessTest(unittest.TestCase):
                 GnLabel.from_str("//bar"),
                 GnLabel.from_str("//child/baz"),
                 GnLabel.from_str("//foo"),
+                GnLabel.from_str("//json"),
             ],
         )
 
@@ -86,6 +90,12 @@ class FileAccessTest(unittest.TestCase):
             self.file_access.read_text(GnLabel.from_str("//bar")), "BAR"
         )
 
+    def test_read_json(self):
+        self.assertEqual(
+            self.file_access.read_json(GnLabel.from_str("//json")),
+            {"key": "value"},
+        )
+
     def _assert_depfile(self, expected_content):
         depfile_path = self.temp_dir_path / "depfile"
         self.file_access.write_depfile(
@@ -97,6 +107,10 @@ class FileAccessTest(unittest.TestCase):
     def test_write_depfile_after_read_text(self):
         self.file_access.read_text(GnLabel.from_str("//foo"))
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/foo""")
+
+    def test_write_depfile_after_read_json(self):
+        self.file_access.read_text(GnLabel.from_str("//json"))
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/json""")
 
     def test_write_depfile_after_file_exists(self):
         self.file_access.file_exists(GnLabel.from_str("//bar"))

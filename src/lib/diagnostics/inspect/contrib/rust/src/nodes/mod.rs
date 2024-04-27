@@ -46,6 +46,7 @@ impl NodeExt for Node {
 }
 
 /// Wrapper around an int property that stores a monotonic timestamp.
+#[derive(Debug)]
 pub struct TimeProperty {
     pub(crate) inner: IntProperty,
 }

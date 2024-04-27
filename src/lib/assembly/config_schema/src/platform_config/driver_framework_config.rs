@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Configuration options for how to act when a driver host crashes.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum DriverHostCrashPolicy {
     RestartDriverHost,
@@ -14,7 +15,7 @@ pub enum DriverHostCrashPolicy {
 }
 
 /// Platform configuration options for driver load testing.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TestFuzzingConfig {
     #[serde(default)]
@@ -38,7 +39,7 @@ impl std::fmt::Display for DriverHostCrashPolicy {
 }
 
 /// Platform configuration options for driver framework support.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DriverFrameworkConfig {
     #[serde(default)]

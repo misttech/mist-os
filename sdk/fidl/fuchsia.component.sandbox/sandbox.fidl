@@ -36,10 +36,10 @@ type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
     2: handle client_end:HandleCapability;
     3: data DataCapability;
-    4: cloneable client_end:fuchsia.unknown.Cloneable;
-    5: dictionary client_end:Dictionary;
-    6: sender client_end:Sender;
-    7: directory client_end:fuchsia.io.Directory;
+    4: dictionary client_end:Dictionary;
+    5: sender client_end:Sender;
+    6: directory client_end:fuchsia.io.Directory;
+    7: router client_end:Router;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -83,11 +83,6 @@ type DictionaryError = flexible enum {
 @discoverable
 @available(added=20)
 open protocol Dictionary {
-    /// Creates a new connection to the same underlying dictionary.
-    ///
-    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
-    compose fuchsia.unknown.Cloneable;
-
     /// Inserts a key-value pair into the dictionary.
     ///
     /// * error `DictionaryError.ALREADY_EXISTS` if the dictionary already contains an
@@ -124,6 +119,14 @@ open protocol Dictionary {
         items vector<DictionaryItem>:MAX;
     });
 
+    /// Creates a new connection to the same underlying dictionary.
+    ///
+    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
+    @available(added=HEAD)
+    flexible Clone() -> (resource struct {
+        dictionary client_end:Dictionary;
+    });
+
     /// Create a new dictionary that contains a clone of all the entries in
     /// this dictionary.
     ///
@@ -131,8 +134,8 @@ open protocol Dictionary {
     /// created dictionary will contain references to those same nested
     /// dictionaries because the entries are cloned rather than copied.
     @available(added=HEAD)
-    flexible Copy(resource struct {
-        request server_end:Dictionary;
+    flexible Copy() -> (resource struct {
+        dictionary client_end:Dictionary;
     });
 
     /// Enumerates the entries in this dictionary.
@@ -169,6 +172,46 @@ open protocol Sender {
 
     /// Sends a channel over this sender.
     flexible Send(ProtocolPayload);
+};
+
+/// This represents a component within the framework.
+/// There are currently no methods here as this is used as a token.
+@available(added=HEAD)
+type ComponentToken = resource struct {
+    token zx.Handle:EVENTPAIR;
+};
+
+/// A request for a route.
+@available(added=HEAD)
+type RouteRequest = resource table {
+    /// The requested availability for this capability.
+    1: availability Availability;
+    /// The component that is requesting the capability.
+    2: requesting ComponentToken;
+};
+
+@available(added=HEAD)
+type BedrockError = flexible enum : uint32 {
+    /// Routing the capability failed.
+    ROUTING = 1;
+
+    /// A lifecycle transition failed for some capability in the
+    /// routing chain.
+    LIFECYCLE = 2;
+
+    /// Could not open the capability in the provider component.
+    OPEN = 3;
+
+    /// The arguments provided to the function are invalid.
+    INVALID_ARGS = 4;
+};
+
+/// A router allows a client to request a capability.
+@available(added=HEAD)
+open protocol Router {
+    flexible Route(RouteRequest) -> (resource struct {
+        capability Capability;
+    }) error BedrockError;
 };
 
 /// A receiver is served by clients and allows them to receive channels

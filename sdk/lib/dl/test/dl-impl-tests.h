@@ -12,11 +12,13 @@
 
 #include "../diagnostics.h"
 #include "../runtime-dynamic-linker.h"
-#include "dl-tests-base.h"
+#include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
 #include <lib/elfldltl/vmar-loader.h>
 #include <lib/elfldltl/vmo.h>
+
+#include "dl-load-zircon-tests-base.h"
 #endif
 
 namespace dl::testing {
@@ -39,8 +41,14 @@ class TestPosix {
   static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };
 
+#ifdef __Fuchsia__
+using DlImplLoadTestsBase = DlLoadZirconTestsBase;
+#else
+using DlImplLoadTestsBase = DlLoadTestsBase;
+#endif
+
 template <class TestOS>
-class DlImplTests : public DlTestsBase {
+class DlImplTests : public DlImplLoadTestsBase {
  public:
   // Error messages in tests can be matched exactly with this test fixture,
   // since the error message returned from the libdl implementation will be the
@@ -48,7 +56,11 @@ class DlImplTests : public DlTestsBase {
   static constexpr bool kCanMatchExactError = true;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
-    return dynamic_linker_.Open<TestOS>(file, mode);
+    // fit::result<...> must be initialized to something, but this will get
+    // overwritten by the return value from dynamic_linker_.Open.
+    fit::result<Error, void*> result = fit::error{Error{"dlopen result is not set"}};
+    CallWithLdsvcInstalled([&]() { result = dynamic_linker_.Open<TestOS>(file, mode); });
+    return result;
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {

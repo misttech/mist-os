@@ -272,7 +272,7 @@ class FFX(ffx_interface.FFX):
 
     def add_target(
         self,
-        timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"],
+        timeout: float = ffx_interface.TIMEOUTS["TARGET_ADD"],
     ) -> None:
         """Adds a target to the ffx collection
 
@@ -579,7 +579,7 @@ class FFX(ffx_interface.FFX):
         self,
         cmd: list[str],
         **kwargs,
-    ) -> subprocess.Popen:  # type: ignore[type-arg]
+    ) -> subprocess.Popen[Any]:
         """Executes the command `ffx -t {target} ... {cmd}` via `subprocess.Popen`.
 
         Intended for executing daemons or processing streamed output. Given

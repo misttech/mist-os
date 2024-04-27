@@ -4,15 +4,22 @@
 # found in the LICENSE file.
 """Input Latency Benchmark."""
 
+import os
+from pathlib import Path
+
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.typing import ui as ui_custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
+from perf_publish import publish
+from trace_processing import trace_importing, trace_metrics, trace_model
+from trace_processing.metrics import input_latency
 
 TOUCH_APP = (
     "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
     "simplest-app-flatland-session.cm"
 )
+TEST_NAME: str = "fuchsia.input_latency.simplest_app"
 
 
 class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
@@ -41,6 +48,8 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         # Add simplest-input-flatland-session-app to session.
         self.dut.session.add_component(TOUCH_APP)
 
+        touch_device = self.dut.user_input.create_touch_device()
+
         with self.dut.tracing.trace_session(
             categories=[
                 "input",
@@ -55,13 +64,43 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             # Each tap will be 33.5ms apart, drifting 0.166ms against regular 60
             # fps vsync interval. 100 taps span the entire vsync interval 1 time at
             # 100 equidistant points.
-            self.dut.user_input.tap(
+            touch_device.tap(
                 location=ui_custom_types.Coordinate(x=500, y=500),
                 tap_event_count=100,
-                duration=3350,
+                duration_ms=3350,
             )
 
-        # TODO(b/271467734): Process fxt tracing file.
+        expected_trace_filename: str = os.path.join(self.log_path, "trace.fxt")
+
+        json_trace_file: str = trace_importing.convert_trace_file_to_json(
+            expected_trace_filename
+        )
+
+        model: trace_model.Model = trace_importing.create_model_from_file_path(
+            json_trace_file
+        )
+
+        input_latency_results: list[
+            trace_metrics.TestCaseResult
+        ] = input_latency.metrics_processor(
+            model, {"aggregateMetricsOnly": False}
+        )
+
+        fuchsiaperf_json_path = Path(
+            os.path.join(self.log_path, f"{TEST_NAME}.fuchsiaperf.json")
+        )
+
+        trace_metrics.TestCaseResult.write_fuchsiaperf_json(
+            results=input_latency_results,
+            test_suite=f"{TEST_NAME}",
+            output_path=fuchsiaperf_json_path,
+        )
+
+        expected_metrics_file = f"{TEST_NAME}.txt"
+        publish.publish_fuchsiaperf(
+            fuchsia_perf_file_paths=[fuchsiaperf_json_path],
+            expected_metric_names_filename=expected_metrics_file,
+        )
 
 
 if __name__ == "__main__":

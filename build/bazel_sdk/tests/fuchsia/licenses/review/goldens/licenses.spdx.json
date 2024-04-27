@@ -19,10 +19,6 @@
     ],
     "packages": [
         {
-            "SPDXID": "SPDXRef-Package-0",
-            "name": "Root"
-        },
-        {
             "SPDXID": "SPDXRef-Package-1",
             "name": "Package A",
             "homepage": "http://foo.bar",
@@ -51,6 +47,10 @@
             "SPDXID": "SPDXRef-Package-6",
             "name": "Package F",
             "licenseConcluded": "LicenseRef-X AND (LicenseRef-Y+ OR LicenseRef-Z WITH LicenseRef-X)"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-0",
+            "name": "Root"
         }
     ],
     "relationships": [
@@ -65,16 +65,6 @@
             "relationshipType": "CONTAINS"
         },
         {
-            "spdxElementId": "SPDXRef-Package-2",
-            "relatedSpdxElement": "SPDXRef-Package-3",
-            "relationshipType": "CONTAINS"
-        },
-        {
-            "spdxElementId": "SPDXRef-Package-3",
-            "relatedSpdxElement": "SPDXRef-Package-4",
-            "relationshipType": "CONTAINS"
-        },
-        {
             "spdxElementId": "SPDXRef-Package-0",
             "relatedSpdxElement": "SPDXRef-Package-5",
             "relationshipType": "CONTAINS"
@@ -82,6 +72,16 @@
         {
             "spdxElementId": "SPDXRef-Package-0",
             "relatedSpdxElement": "SPDXRef-Package-6",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-2",
+            "relatedSpdxElement": "SPDXRef-Package-3",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-3",
+            "relatedSpdxElement": "SPDXRef-Package-4",
             "relationshipType": "CONTAINS"
         }
     ],

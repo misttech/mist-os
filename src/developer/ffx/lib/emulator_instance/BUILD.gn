@@ -18,7 +18,6 @@ rustc_library("lib") {
   deps = [
     "//build/sdk/meta:rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -31,7 +30,6 @@ rustc_library("lib") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:tempfile",
   ]
 }

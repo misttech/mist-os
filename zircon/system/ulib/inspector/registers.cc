@@ -39,8 +39,10 @@ __EXPORT void inspector_print_general_regs(FILE* f, const zx_thread_state_genera
           regs->r12, regs->r13, regs->r14, regs->r15);
   fprintf(f, " fs.base: %#18" PRIx64 " gs.base: %#18" PRIx64 "\n", regs->fs_base, regs->gs_base);
   if (excp_data) {
-    // errc value is 17 on purpose, errc is 4 characters
-    fprintf(f, " errc: %#17" PRIx64 "\n", excp_data->err_code);
+    // These are padded differently to line up with the labels above given the
+    // specific lengths of the "vector:" and "errc:" labels.
+    fprintf(f, " vector: %#15" PRIx64 " errc: %#17" PRIx64 "\n", excp_data->vector,
+            excp_data->err_code);
   }
 }
 

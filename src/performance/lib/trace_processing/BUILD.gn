@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_library.gni")
 
@@ -32,9 +33,24 @@ group("tests") {
   public_deps = [ "tests" ]
 }
 
-python_binary("run_cpu_breakdown") {
+python_binary("run_cpu_breakdown_bin") {
   testonly = true
   main_source = "run_cpu_breakdown.py"
   deps = [ ":trace_processing" ]
   enable_mypy = true
+  output_name = "run_cpu_breakdown.pyz"
+}
+
+# Rename the resulting .pyz for the host tool
+copy("copy") {
+  testonly = true
+  deps = [ ":run_cpu_breakdown_bin" ]
+  sources = [ "${target_out_dir}/run_cpu_breakdown.pyz" ]
+  outputs = [ "${root_out_dir}/run_cpu_breakdown" ]
+}
+
+install_host_tools("run_cpu_breakdown") {
+  testonly = true
+  deps = [ ":copy" ]
+  outputs = [ "run_cpu_breakdown" ]
 }

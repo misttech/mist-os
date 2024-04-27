@@ -804,7 +804,7 @@ block *
             os.path.join(logs_dir, "workspace-events.log"), workspace_dir
         ),
         execution_log_file=os.path.relpath(
-            os.path.join(logs_dir, "exec_log.json"), workspace_dir
+            os.path.join(logs_dir, "exec_log.pb.zstd"), workspace_dir
         ),
         config_file=os.path.relpath(
             os.path.join(topdir, "download_config_file"), workspace_dir
@@ -814,7 +814,6 @@ block *
         remote_instance_name=build_config["rbe_instance_name"],
         rbe_project=build_config["rbe_project"],
     )
-    # TODO(b/327500655): figure out where build_config["rbe_gce_machine_type"] goes
     if args.use_bzlmod:
         bazelrc_content += """
 # Enable BlzMod, i.e. support for MODULE.bazel files.

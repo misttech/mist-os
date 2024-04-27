@@ -62,7 +62,7 @@ impl Joined {
     /// The returned state is unchanged in an error case. Otherwise, the state transitions into
     /// "Authenticating".
     /// Returns Ok(AkmAlgorithm) if authentication request was sent successfully, Err(()) otherwise.
-    fn start_authenticating<D: DeviceOps>(
+    async fn start_authenticating<D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
     ) -> Result<akm::AkmAlgorithm, ()> {
@@ -87,15 +87,22 @@ impl Joined {
             },
         };
 
-        result.map_err(|status_code| {
-            sta.send_connect_conf_failure(status_code);
-            let _ =
-                sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
-        })
+        match result {
+            Ok(algorithm) => Ok(algorithm),
+            Err(status_code) => {
+                sta.send_connect_conf_failure(status_code);
+                let _ = sta
+                    .clear_association()
+                    .await
+                    .map_err(|e| error!("Failed to clear association: {}", e));
+                Err(())
+            }
+        }
     }
 
-    fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
-        let _ = sta.clear_association().map_err(|e| warn!("Failed to clear association: {}", e));
+    async fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
+        let _ =
+            sta.clear_association().await.map_err(|e| warn!("Failed to clear association: {}", e));
     }
 }
 
@@ -119,7 +126,7 @@ impl Authenticating {
         Self { algorithm }
     }
 
-    fn akm_state_update_notify_sme<D: DeviceOps>(
+    async fn akm_state_update_notify_sme<D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
         state: Result<akm::AkmState, anyhow::Error>,
@@ -136,6 +143,7 @@ impl Authenticating {
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
                 let _ = sta
                     .clear_association()
+                    .await
                     .map_err(|e| error!("Failed to clear association: {}", e));
                 AuthProgress::Failed
             }
@@ -145,6 +153,7 @@ impl Authenticating {
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
                 let _ = sta
                     .clear_association()
+                    .await
                     .map_err(|e| error!("Failed to clear association: {}", e));
                 AuthProgress::Failed
             }
@@ -167,7 +176,7 @@ impl Authenticating {
     //  association has started.
     /// Returns AuthProgress::InProgress if authentication is still ongoing.
     /// Returns AuthProgress::Failed if failed to authenticate or start association request.
-    fn on_auth_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_auth_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         auth_frame: mac::AuthFrame<B>,
@@ -175,36 +184,36 @@ impl Authenticating {
         wtrace::duration!(c"Authenticating::on_auth_frame");
 
         let state = self.algorithm.handle_auth_frame(sta, auth_frame);
-        self.akm_state_update_notify_sme(sta, state)
+        self.akm_state_update_notify_sme(sta, state).await
     }
 
     /// Processes an SAE response from SME.
     /// This indicates that an SAE handshake has completed, successful or otherwise.
     /// On success, authentication is complete and association has started.
-    fn on_sme_sae_resp<D: DeviceOps>(
+    async fn on_sme_sae_resp<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         resp: fidl_mlme::SaeHandshakeResponse,
     ) -> AuthProgress {
         let state = self.algorithm.handle_sae_resp(sta, resp.status_code);
-        self.akm_state_update_notify_sme(sta, state)
+        self.akm_state_update_notify_sme(sta, state).await
     }
 
     /// Processes a request from SME to transmit an SAE authentication frame to a peer.
-    fn on_sme_sae_tx<D: DeviceOps>(
+    async fn on_sme_sae_tx<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         tx: fidl_mlme::SaeFrame,
     ) -> AuthProgress {
         let state =
             self.algorithm.handle_sme_sae_tx(sta, tx.seq_num, tx.status_code, &tx.sae_fields[..]);
-        self.akm_state_update_notify_sme(sta, state)
+        self.akm_state_update_notify_sme(sta, state).await
     }
 
     /// Processes an inbound deauthentication frame.
     /// This always results in an MLME-AUTHENTICATE.confirm message to MLME's SME peer.
     /// The pending authentication timeout will be canceled in this process.
-    fn on_deauth_frame<D: DeviceOps>(
+    async fn on_deauth_frame<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
@@ -219,12 +228,14 @@ impl Authenticating {
 
         sta.sta.connect_timeout.take();
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
-        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
+        let _ =
+            sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
     }
 
-    fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
+    async fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         sta.sta.connect_timeout.take();
-        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
+        let _ =
+            sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
     }
 }
 
@@ -281,7 +292,7 @@ impl Associating {
     /// with the BSS was successful.
     /// Returns Ok(()) if the association was successful, otherwise Err(()).
     /// Note: The pending authentication timeout will be canceled in any case.
-    fn on_assoc_resp_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_assoc_resp_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         assoc_resp_frame: mac::AssocRespFrame<B>,
@@ -366,7 +377,7 @@ impl Associating {
             ..Default::default()
         };
 
-        if let Err(status) = sta.ctx.device.notify_association_complete(assoc_cfg) {
+        if let Err(status) = sta.ctx.device.notify_association_complete(assoc_cfg).await {
             // Device cannot handle this association. Something is seriously wrong.
             error!("device failed to configure association: {}", status);
             sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
@@ -422,7 +433,7 @@ impl Associating {
     /// Processes an inbound deauthentication frame.
     /// This always results in an MLME-ASSOCIATE.confirm message to MLME's SME peer.
     /// The pending association timeout will be canceled in this process.
-    fn on_deauth_frame<D: DeviceOps>(
+    async fn on_deauth_frame<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
@@ -434,12 +445,14 @@ impl Associating {
             { deauth_hdr.reason_code }
         );
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
-        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
+        let _ =
+            sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
     }
 
-    fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
+    async fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         sta.sta.connect_timeout.take();
-        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
+        let _ =
+            sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
     }
 }
 
@@ -568,7 +581,7 @@ impl Associated {
     }
 
     /// Sends an MLME-DEAUTHENTICATE.indication message to MLME's SME peer.
-    fn on_deauth_frame<D: DeviceOps>(
+    async fn on_deauth_frame<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
@@ -578,7 +591,8 @@ impl Associated {
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
         sta.send_deauthenticate_ind(reason_code, LocallyInitiated(false));
-        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
+        let _ =
+            sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
     }
 
     /// Process every inbound management frame before its being handed off to a more specific
@@ -615,7 +629,7 @@ impl Associated {
 
     /// Process and inbound beacon frame.
     /// Resets LostBssCounter, check buffered frame if available.
-    fn on_beacon_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_beacon_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         header: &BeaconHdr,
@@ -625,7 +639,7 @@ impl Associated {
         self.0.lost_bss_counter.reset();
         // TODO(b/253637931): Add metrics to track channel switch counts and success rates.
         if let Err(e) =
-            sta.channel_state.bind(sta.ctx, sta.scanner).handle_beacon(header, &elements[..])
+            sta.channel_state.bind(sta.ctx, sta.scanner).handle_beacon(header, &elements[..]).await
         {
             warn!("Failed to handle channel switch announcement: {}", e);
         }
@@ -774,7 +788,7 @@ impl Associated {
         //self.0.block_ack_state.replace_state(|state| state.on_block_ack_frame(sta, action, body));
     }
 
-    fn on_spectrum_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_spectrum_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         action: mac::SpectrumMgmtAction,
@@ -786,6 +800,7 @@ impl Associated {
                     .channel_state
                     .bind(sta.ctx, sta.scanner)
                     .handle_announcement_frame(&body[..])
+                    .await
                 {
                     warn!("Failed to handle channel switch announcement: {}", e);
                 }
@@ -810,7 +825,7 @@ impl Associated {
         sta.send_eapol_frame(req.src_addr.into(), req.dst_addr.into(), protected, &req.data);
     }
 
-    fn on_sme_set_keys<D: DeviceOps>(
+    async fn on_sme_set_keys<D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::SetKeysRequest,
@@ -819,25 +834,24 @@ impl Associated {
             error!("Unexpected MLME-SetKeys.request message: BSS not protected");
             return;
         }
-        let results = req
-            .keylist
-            .into_iter()
-            .map(|key_descriptor| {
-                let key_id = key_descriptor.key_id;
+        let mut results = Vec::with_capacity(req.keylist.len());
+        for key_descriptor in req.keylist {
+            let key_id = key_descriptor.key_id;
 
-                match sta
-                    .ctx
-                    .device
-                    .install_key(&softmac_key_configuration_from_mlme(key_descriptor))
-                {
-                    Ok(()) => fidl_mlme::SetKeyResult { key_id, status: zx::Status::OK.into_raw() },
-                    Err(e) => {
-                        error!("failed to set key: {}", e);
-                        fidl_mlme::SetKeyResult { key_id, status: e.into_raw() }
-                    }
+            match sta
+                .ctx
+                .device
+                .install_key(&softmac_key_configuration_from_mlme(key_descriptor))
+                .await
+            {
+                Ok(()) => results
+                    .push(fidl_mlme::SetKeyResult { key_id, status: zx::Status::OK.into_raw() }),
+                Err(e) => {
+                    error!("failed to set key: {}", e);
+                    results.push(fidl_mlme::SetKeyResult { key_id, status: e.into_raw() })
                 }
-            })
-            .collect();
+            }
+        }
         if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::SetKeysConf {
             conf: fidl_mlme::SetKeysConfirm { results },
         }) {
@@ -868,7 +882,7 @@ impl Associated {
         }
     }
 
-    fn on_sme_deauthenticate<D: DeviceOps>(
+    async fn on_sme_deauthenticate<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::DeauthenticateRequest,
@@ -878,7 +892,8 @@ impl Associated {
         }
 
         self.pre_leaving_associated_state(sta);
-        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
+        let _ =
+            sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
 
         if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
             resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: sta.sta.bssid().to_array() },
@@ -991,7 +1006,7 @@ impl States {
     /// Begin the 802.11 connect operation, starting with authentication.
     /// This method only has an effect if the initial state is Joined.
     /// Otherwise it is no-op.
-    pub fn start_connecting<D: DeviceOps>(self, sta: &mut BoundClient<'_, D>) -> States {
+    pub async fn start_connecting<D: DeviceOps>(self, sta: &mut BoundClient<'_, D>) -> States {
         match self {
             States::Joined(state) => {
                 // Setting timeout in term of beacon period allows us to adjust the realtime
@@ -1000,7 +1015,7 @@ impl States {
                     sta.sta.beacon_period() * sta.sta.connect_req.connect_failure_timeout;
                 let timeout = sta.ctx.timer.schedule_after(duration, TimedEvent::Connecting);
                 sta.sta.connect_timeout.replace(timeout);
-                match state.start_authenticating(sta) {
+                match state.start_authenticating(sta).await {
                     Ok(algorithm) => state.transition_to(Authenticating::new(algorithm)).into(),
                     Err(()) => state.transition_to(Joined).into(),
                 }
@@ -1019,7 +1034,7 @@ impl States {
     /// - frames are from a foreign BSS
     /// - frames are unicast but destined for a MAC address that is different from this STA.
     // TODO(https://fxbug.dev/42119762): Implement a packet counter and add tests to verify frames are dropped correctly.
-    pub fn on_mac_frame<B: ByteSlice, D: DeviceOps>(
+    pub async fn on_mac_frame<B: ByteSlice, D: DeviceOps>(
         mut self,
         sta: &mut BoundClient<'_, D>,
         bytes: B,
@@ -1058,7 +1073,7 @@ impl States {
 
         match mac_frame {
             mac::MacFrame::Mgmt(mgmt_frame) => {
-                let states = self.on_mgmt_frame(sta, mgmt_frame, rx_info);
+                let states = self.on_mgmt_frame(sta, mgmt_frame, rx_info).await;
                 wtrace::async_end_wlansoftmac_rx(
                     async_id,
                     "management frame successfully received",
@@ -1087,7 +1102,7 @@ impl States {
 
     /// Processes inbound management frames.
     /// Only frames from the joined BSS are processed. Frames from other STAs are dropped.
-    fn on_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         self,
         sta: &mut BoundClient<'_, D>,
         mgmt_frame: mac::MgmtFrame<B>,
@@ -1105,26 +1120,27 @@ impl States {
             States::Authenticating(mut state) => match mgmt_body {
                 mac::MgmtBody::Authentication(auth_frame) => match state
                     .on_auth_frame(sta, auth_frame)
+                    .await
                 {
                     AuthProgress::Complete => state.transition_to(Associating::default()).into(),
                     AuthProgress::InProgress => state.into(),
                     AuthProgress::Failed => state.transition_to(Joined).into(),
                 },
                 mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
-                    state.on_deauth_frame(sta, &deauth_hdr);
+                    state.on_deauth_frame(sta, &deauth_hdr).await;
                     state.transition_to(Joined).into()
                 }
                 _ => state.into(),
             },
             States::Associating(mut state) => match mgmt_body {
                 mac::MgmtBody::AssociationResp(assoc_resp_frame) => {
-                    match state.on_assoc_resp_frame(sta, assoc_resp_frame) {
+                    match state.on_assoc_resp_frame(sta, assoc_resp_frame).await {
                         Ok(association) => state.transition_to(Associated(association)).into(),
                         Err(()) => state.transition_to(Joined).into(),
                     }
                 }
                 mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
-                    state.on_deauth_frame(sta, &deauth_hdr);
+                    state.on_deauth_frame(sta, &deauth_hdr).await;
                     state.transition_to(Joined).into()
                 }
                 // This case is highly unlikely and only added to improve interoperability with
@@ -1140,11 +1156,11 @@ impl States {
                 state.on_any_mgmt_frame(sta, &mgmt_hdr);
                 match mgmt_body {
                     mac::MgmtBody::Beacon { bcn_hdr, elements } => {
-                        state.on_beacon_frame(sta, &bcn_hdr, elements);
+                        state.on_beacon_frame(sta, &bcn_hdr, elements).await;
                         state.into()
                     }
                     mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
-                        state.on_deauth_frame(sta, &deauth_hdr);
+                        state.on_deauth_frame(sta, &deauth_hdr).await;
                         state.transition_to(Joined).into()
                     }
                     mac::MgmtBody::Disassociation { disassoc_hdr, .. } => {
@@ -1171,11 +1187,13 @@ impl States {
                                 if let Some(action) =
                                     reader.peek_unaligned::<mac::SpectrumMgmtAction>()
                                 {
-                                    state.on_spectrum_mgmt_frame(
-                                        sta,
-                                        action.get(),
-                                        reader.into_remaining(),
-                                    );
+                                    state
+                                        .on_spectrum_mgmt_frame(
+                                            sta,
+                                            action.get(),
+                                            reader.into_remaining(),
+                                        )
+                                        .await;
                                 }
                                 state.into()
                             }
@@ -1206,7 +1224,7 @@ impl States {
     }
 
     /// Callback when a previously scheduled event fired.
-    pub fn on_timed_event<D: DeviceOps>(
+    pub async fn on_timed_event<D: DeviceOps>(
         self,
         sta: &mut BoundClient<'_, D>,
         event: TimedEvent,
@@ -1221,6 +1239,7 @@ impl States {
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RejectedSequenceTimeout);
                 let _ = sta
                     .clear_association()
+                    .await
                     .map_err(|e| error!("Failed to clear association: {}", e));
                 match self {
                     States::Authenticating(state) => state.transition_to(Joined).into(),
@@ -1257,6 +1276,7 @@ impl States {
                     .channel_state
                     .bind(sta.ctx, sta.scanner)
                     .handle_channel_switch_timeout(event_id)
+                    .await
                 {
                     error!("ChannelSwitch timeout handler failed: {}", e);
                 }
@@ -1265,7 +1285,7 @@ impl States {
         }
     }
 
-    pub fn handle_mlme_req<D: DeviceOps>(
+    pub async fn handle_mlme_req<D: DeviceOps>(
         self,
         sta: &mut BoundClient<'_, D>,
         req: wlan_sme::MlmeRequest,
@@ -1275,7 +1295,7 @@ impl States {
         match self {
             States::Joined(mut state) => match req {
                 MlmeReq::Deauthenticate(_) => {
-                    state.on_sme_deauthenticate(sta);
+                    state.on_sme_deauthenticate(sta).await;
                     state.into()
                 }
                 MlmeReq::Reconnect(req) => {
@@ -1288,18 +1308,18 @@ impl States {
                 _ => state.into(),
             },
             States::Authenticating(mut state) => match req {
-                MlmeReq::SaeHandshakeResp(resp) => match state.on_sme_sae_resp(sta, resp) {
+                MlmeReq::SaeHandshakeResp(resp) => match state.on_sme_sae_resp(sta, resp).await {
                     AuthProgress::Complete => state.transition_to(Associating::default()).into(),
                     AuthProgress::InProgress => state.into(),
                     AuthProgress::Failed => state.transition_to(Joined).into(),
                 },
-                MlmeReq::SaeFrameTx(frame) => match state.on_sme_sae_tx(sta, frame) {
+                MlmeReq::SaeFrameTx(frame) => match state.on_sme_sae_tx(sta, frame).await {
                     AuthProgress::Complete => state.transition_to(Associating::default()).into(),
                     AuthProgress::InProgress => state.into(),
                     AuthProgress::Failed => state.transition_to(Joined).into(),
                 },
                 MlmeReq::Deauthenticate(_) => {
-                    state.on_sme_deauthenticate(sta);
+                    state.on_sme_deauthenticate(sta).await;
                     state.transition_to(Joined).into()
                 }
                 MlmeReq::Reconnect(req) => {
@@ -1322,7 +1342,7 @@ impl States {
             },
             States::Associating(mut state) => match req {
                 MlmeReq::Deauthenticate(_) => {
-                    state.on_sme_deauthenticate(sta);
+                    state.on_sme_deauthenticate(sta).await;
                     state.transition_to(Joined).into()
                 }
                 MlmeReq::Reconnect(req) => {
@@ -1343,7 +1363,7 @@ impl States {
                     state.into()
                 }
                 MlmeReq::SetKeys(req) => {
-                    state.on_sme_set_keys(sta, req);
+                    state.on_sme_set_keys(sta, req).await;
                     state.into()
                 }
                 MlmeReq::SetCtrlPort(req) => {
@@ -1351,7 +1371,7 @@ impl States {
                     state.into()
                 }
                 MlmeReq::Deauthenticate(req) => {
-                    state.on_sme_deauthenticate(sta, req);
+                    state.on_sme_deauthenticate(sta, req).await;
                     state.transition_to(Joined).into()
                 }
                 MlmeReq::Reconnect(req) => {
@@ -1526,16 +1546,18 @@ mod tests {
             }
         }
 
-        fn make_ctx(&mut self) -> Context<FakeDevice> {
+        async fn make_ctx(&mut self) -> Context<FakeDevice> {
             self.fake_device
                 .set_channel(fake_wlan_channel().into())
+                .await
                 .expect("fake device is obedient");
             self.make_base_ctx()
         }
 
-        fn make_ctx_with_bss(&mut self) -> Context<FakeDevice> {
+        async fn make_ctx_with_bss(&mut self) -> Context<FakeDevice> {
             self.fake_device
                 .set_channel(fake_wlan_channel().into())
+                .await
                 .expect("fake device is obedient");
             self.fake_device
                 .join_bss(&fidl_common::JoinBssRequest {
@@ -1545,6 +1567,7 @@ mod tests {
                     beacon_period: Some(100),
                     ..Default::default()
                 })
+                .await
                 .expect("error configuring bss");
             self.make_base_ctx()
         }
@@ -1654,12 +1677,13 @@ mod tests {
     async fn connect_authenticate_tx_failure() {
         let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.send_wlan_frame_fails = true;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = Joined;
-        let _state = state.start_authenticating(&mut sta).expect_err("should fail authenticating");
+        let _state =
+            state.start_authenticating(&mut sta).await.expect_err("should fail authenticating");
 
         // Verify no event was queued up in the timer.
         assert!(m.time_stream.try_next().is_err());
@@ -1684,7 +1708,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn joined_no_authentication_algorithm() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let connect_req = ParsedConnectRequest {
             selected_bss: fake_bss_description!(Open, bssid: BSSID.to_array()),
             connect_failure_timeout: 10,
@@ -1699,7 +1723,8 @@ mod tests {
         let state = Joined;
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        let _state = state.start_authenticating(&mut sta).expect_err("should fail authenticating");
+        let _state =
+            state.start_authenticating(&mut sta).await.expect_err("should fail authenticating");
 
         // Verify MLME-CONNECT.confirm message was sent.
         let msg = m
@@ -1723,7 +1748,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn authenticating_state_auth_rejected() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = open_authenticating(&mut sta);
@@ -1731,18 +1756,20 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
         // Verify authentication failed.
         assert_variant!(
-            state.on_auth_frame(
-                &mut sta,
-                mac::AuthFrame {
-                    auth_hdr: mac::AuthHdr {
-                        auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
-                        auth_txn_seq_num: 2,
-                        status_code: fidl_ieee80211::StatusCode::NotInSameBss.into(),
-                    }
-                    .as_bytes_ref(),
-                    elements: &[],
-                },
-            ),
+            state
+                .on_auth_frame(
+                    &mut sta,
+                    mac::AuthFrame {
+                        auth_hdr: mac::AuthHdr {
+                            auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
+                            auth_txn_seq_num: 2,
+                            status_code: fidl_ieee80211::StatusCode::NotInSameBss.into(),
+                        }
+                        .as_bytes_ref(),
+                        elements: &[],
+                    },
+                )
+                .await,
             AuthProgress::Failed
         );
 
@@ -1767,16 +1794,18 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn authenticating_state_deauth_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = open_authenticating(&mut sta);
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        state.on_deauth_frame(
-            &mut sta,
-            &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::NoMoreStas.into() },
-        );
+        state
+            .on_deauth_frame(
+                &mut sta,
+                &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::NoMoreStas.into() },
+            )
+            .await;
 
         // Verify MLME-CONNECT.confirm message was sent.
         let msg = m
@@ -1799,7 +1828,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_success_unprotected() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -1824,6 +1853,7 @@ mod tests {
                     elements: &assoc_resp_ies[..],
                 },
             )
+            .await
             .expect("failed processing association response frame");
         assert_eq!(aid, 42);
         assert_eq!(true, controlled_port_open);
@@ -1849,7 +1879,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_success_protected() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_protected_client_station();
         sta.client_capabilities.0.capability_info =
             mac::CapabilityInfo(0).with_ess(true).with_ibss(true);
@@ -1877,6 +1907,7 @@ mod tests {
                     elements: &assoc_resp_ies[..],
                 },
             )
+            .await
             .expect("failed processing association response frame");
         assert_eq!(aid, 42);
         assert_eq!(false, controlled_port_open);
@@ -1924,7 +1955,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_failure_due_to_failed_status_code() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -1945,6 +1976,7 @@ mod tests {
                     elements: &[][..],
                 },
             )
+            .await
             .expect_err("expected failure processing association response frame");
 
         // Verify MLME-CONNECT.confirm message was sent.
@@ -1960,7 +1992,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_failure_due_to_incompatibility() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -1980,6 +2012,7 @@ mod tests {
                     elements: fake_bss_description!(Wpa2, rates: vec![0x81]).ies(),
                 },
             )
+            .await
             .expect_err("expected failure processing association response frame");
 
         // Verify MLME-CONNECT.confirm message was sent.
@@ -1998,17 +2031,19 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_deauth_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let mut state = Associating::default();
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        state.on_deauth_frame(
-            &mut sta,
-            &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
-        );
+        state
+            .on_deauth_frame(
+                &mut sta,
+                &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
+            )
+            .await;
 
         // Verify MLME-CONNECT.confirm message was sent.
         let msg = m
@@ -2023,7 +2058,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_disassociation() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -2053,7 +2088,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_block_ack_frame() {
         let mut mock = MockObjects::new().await;
-        let mut ctx = mock.make_ctx();
+        let mut ctx = mock.make_ctx().await;
         let mut station = make_client_station();
         let mut client = station.bind(&mut ctx, &mut mock.scanner, &mut mock.channel_state);
 
@@ -2085,7 +2120,7 @@ mod tests {
             &mut client,
         ))));
         let rx_info = mock_rx_info(&client);
-        match state.on_mac_frame(&mut client, &frame[..], rx_info, 0.into()) {
+        match state.on_mac_frame(&mut client, &frame[..], rx_info, 0.into()).await {
             States::Associated(state) => {
                 let (_, associated) = state.release_data();
                 // TODO(https://fxbug.dev/42104687): Handle BlockAck frames. The following code has been
@@ -2106,7 +2141,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_deauth_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = Associated(empty_association(&mut sta));
@@ -2117,16 +2152,19 @@ mod tests {
         sta.ctx
             .device
             .notify_association_complete(fake_assoc_cfg())
+            .await
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device_state.lock().assocs.len());
 
         sta.ctx.device.set_ethernet_up().expect("should succeed");
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::UP);
 
-        let _joined = state.on_deauth_frame(
-            &mut sta,
-            &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
-        );
+        let _joined = state
+            .on_deauth_frame(
+                &mut sta,
+                &mac::DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
+            )
+            .await;
 
         // Verify MLME-ASSOCIATE.confirm message was sent.
         let msg = m
@@ -2150,7 +2188,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_disassociation() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = Associated(empty_association(&mut sta));
@@ -2161,6 +2199,7 @@ mod tests {
         sta.ctx
             .device
             .notify_association_complete(fake_assoc_cfg())
+            .await
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device_state.lock().assocs.len());
 
@@ -2195,7 +2234,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_move_data_closed_controlled_port() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(empty_association(&mut sta));
@@ -2211,7 +2250,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_move_data_opened_controlled_port() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state =
@@ -2235,7 +2274,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_skip_empty_data() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state =
@@ -2259,7 +2298,7 @@ mod tests {
         protected: bool,
     ) {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta =
             if protected { make_protected_client_station() } else { make_client_station() };
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2283,7 +2322,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_handle_eapol_closed_controlled_port() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(empty_association(&mut sta));
@@ -2314,7 +2353,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_handle_eapol_open_controlled_port() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(empty_association(&mut sta));
@@ -2345,7 +2384,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_handle_amsdus_open_controlled_port() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state =
@@ -2378,7 +2417,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_request_bu_data_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(Association {
@@ -2408,7 +2447,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_request_bu_mgmt_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = Associated(Association {
@@ -2447,7 +2486,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_no_bu_request() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -2477,14 +2516,14 @@ mod tests {
             // Omit IEs
         ];
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
+        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into()).await;
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_drop_foreign_data_frames() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -2516,14 +2555,14 @@ mod tests {
             11, 11, 11,
         ];
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &bytes[..], rx_info, 0.into());
+        state.on_mac_frame(&mut sta, &bytes[..], rx_info, 0.into()).await;
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_joined_state_reconnect_denied() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Joined));
@@ -2532,7 +2571,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: [1, 2, 3, 4, 5, 6],
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
 
         assert_variant!(state, States::Joined(_), "not in joined state");
 
@@ -2556,7 +2595,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_authing_success() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2578,14 +2617,14 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Associating(_), "not in associating state");
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_authing_failure() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2608,7 +2647,7 @@ mod tests {
             42, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_failure[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &auth_resp_failure[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2616,7 +2655,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_authing_deauth() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2637,7 +2676,7 @@ mod tests {
             5, 0, // Algorithm Number (Open)
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2645,7 +2684,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_foreign_auth_resp() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2667,7 +2706,7 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Authenticating(_), "not in authenticating state");
 
         // Verify that an authentication response from the joined BSS still moves the Client
@@ -2687,14 +2726,14 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Associating(_), "not in associating state");
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_authing_state_reconnect_denied() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2704,7 +2743,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: [1, 2, 3, 4, 5, 6],
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
 
         assert_variant!(state, States::Authenticating(_), "not in authenticating state");
 
@@ -2728,7 +2767,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_authing_state_wrong_algorithm() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2749,7 +2788,7 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_wrong[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &auth_resp_wrong[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2757,7 +2796,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_associng_success() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
@@ -2788,14 +2827,14 @@ mod tests {
             0xea, 0xff, 0x00, 0x00, 0xea, 0xff, 0x00, 0x00, // VHT supported MCS set
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Associated(_), "not in associated state");
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_associng_failure() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
@@ -2817,7 +2856,7 @@ mod tests {
             0, 0, // AID
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &assoc_resp_failure[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &assoc_resp_failure[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
@@ -2825,7 +2864,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_associng_deauthing() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
@@ -2845,7 +2884,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2853,7 +2892,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_associng_reconnect_no_op() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
@@ -2863,7 +2902,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: BSSID.to_array(),
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
         assert_variant!(state, States::Associating(_), "not in associating state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -2877,7 +2916,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_associng_reconnect_denied() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state = States::from(statemachine::testing::new_state(Associating::default()));
@@ -2888,7 +2927,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: sus_bssid,
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
         assert_variant!(state, States::Associating(_), "not in associating state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -2912,7 +2951,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_assoced_disassoc_connect_success() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -2933,7 +2972,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -2956,7 +2995,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: BSSID.to_array(),
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
         assert_variant!(state, States::Associating(_), "not in associating state");
 
         // Verify associate request frame was sent
@@ -2999,7 +3038,7 @@ mod tests {
             0xea, 0xff, 0x00, 0x00, 0xea, 0xff, 0x00, 0x00, // VHT supported MCS set
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Associated(_), "not in associated state");
 
         // Verify a successful connect conf is sent
@@ -3016,7 +3055,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_assoced_disassoc_reconnect_timeout() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -3037,7 +3076,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3052,7 +3091,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: BSSID.to_array(),
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
         assert_variant!(state, States::Associating(_), "not in associating state");
 
         // Verify an event was queued up in the timer.
@@ -3062,7 +3101,7 @@ mod tests {
         });
 
         // Notify reconnecting timeout
-        let state = state.on_timed_event(&mut sta, event, id);
+        let state = state.on_timed_event(&mut sta, event, id).await;
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3086,7 +3125,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_assoced_disassoc_reconnect_denied() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -3107,7 +3146,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3123,7 +3162,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: sus_bssid,
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
 
         // Verify a connect conf was sent
@@ -3146,7 +3185,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_assoced_reconnect_no_op() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let association = Association {
@@ -3165,7 +3204,7 @@ mod tests {
         let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
             peer_sta_address: BSSID.to_array(),
         });
-        state = state.handle_mlme_req(&mut sta, reconnect_req);
+        state = state.handle_mlme_req(&mut sta, reconnect_req).await;
         assert_variant!(state, States::Associated(_), "not in associated state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3183,7 +3222,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn state_transitions_assoced_deauthing() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let mut state =
@@ -3204,7 +3243,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
+        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into()).await;
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -3216,7 +3255,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn assoc_send_eth_frame_becomes_data_frame(protected: bool, scanning: bool) {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta =
             if protected { make_protected_client_station() } else { make_client_station() };
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3237,6 +3276,7 @@ mod tests {
                     min_channel_time: 100,
                     max_channel_time: 300,
                 })
+                .await
                 .expect("Failed to start scan");
             assert!(sta.scanner.is_scanning());
         }
@@ -3280,7 +3320,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn eth_frame_dropped_when_off_channel() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state =
@@ -3293,6 +3333,7 @@ mod tests {
                 cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
+            .await
             .expect("fake device is obedient");
         let eth_frame = &[100; 14]; // An ethernet frame must be at least 14 bytes long.
 
@@ -3308,7 +3349,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn assoc_eth_frame_too_short_dropped() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state =
@@ -3328,7 +3369,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn assoc_controlled_port_closed_eth_frame_dropped() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state =
@@ -3348,7 +3389,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn not_assoc_eth_frame_dropped() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Joined));
@@ -3368,13 +3409,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn joined_sme_deauth() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Joined));
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req()).await;
         assert_variant!(state, States::Joined(_), "Joined should stay in Joined");
         // No MLME message was sent because MLME already deauthenticated.
         m.fake_device_state
@@ -3387,13 +3428,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn authenticating_sme_deauth() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req()).await;
 
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
@@ -3408,13 +3449,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associating_sme_deauth() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associating::default()));
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req()).await;
 
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
@@ -3429,7 +3470,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_sme_deauth() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx_with_bss();
+        let mut ctx = m.make_ctx_with_bss().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associated(Association {
@@ -3440,6 +3481,7 @@ mod tests {
         sta.ctx
             .device
             .notify_association_complete(fake_assoc_cfg())
+            .await
             .expect("valid assoc ctx should not fail");
         assert_eq!(1, m.fake_device_state.lock().assocs.len());
 
@@ -3447,7 +3489,7 @@ mod tests {
         sta.ctx.device.set_ethernet_up().expect("should succeed");
         assert_eq!(crate::device::LinkStatus::UP, m.fake_device_state.lock().link_status);
 
-        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req()).await;
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
         // Should accept the deauthentication request and send back confirm.
@@ -3483,21 +3525,21 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_eapol_not_associated() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = States::from(statemachine::testing::new_state(Joined));
-        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req()).await;
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
         m.fake_device_state.lock().wlan_queue.clear();
-        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req()).await;
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
-        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req()).await;
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
@@ -3505,13 +3547,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_eapol_associated_not_protected() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req()).await;
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
@@ -3519,13 +3561,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_eapol_associated() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req()).await;
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
             &m.fake_device_state.lock().wlan_queue[0].0[..],
@@ -3550,20 +3592,20 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_keys_not_associated() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = States::from(statemachine::testing::new_state(Joined));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into()));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into())).await;
         assert_eq!(m.fake_device_state.lock().keys.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into()));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into())).await;
         assert_eq!(m.fake_device_state.lock().keys.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into()));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into())).await;
         assert_eq!(m.fake_device_state.lock().keys.len(), 0);
     }
 
@@ -3571,13 +3613,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_keys_associated_not_protected() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into()));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into())).await;
         assert_eq!(m.fake_device_state.lock().keys.len(), 0);
     }
 
@@ -3585,13 +3627,13 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_keys_associated() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into()));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req((*BSSID).into())).await;
         assert_eq!(m.fake_device_state.lock().keys.len(), 1);
         let conf = assert_variant!(m.fake_device_state.lock().next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
         assert_eq!(conf.results.len(), 1);
@@ -3620,7 +3662,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_keys_failure() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -3637,7 +3679,7 @@ mod tests {
             }
             _ => panic!(),
         }
-        let _state = state.handle_mlme_req(&mut sta, set_keys_req);
+        let _state = state.handle_mlme_req(&mut sta, set_keys_req).await;
         let conf = assert_variant!(m.fake_device_state.lock().next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
         assert_eq!(conf.results.len(), 2);
         assert_eq!(
@@ -3663,49 +3705,49 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_controlled_port_not_associated() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = States::from(statemachine::testing::new_state(Joined));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true)).await;
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true)).await;
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true)).await;
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_controlled_port_associated_not_protected() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true)).await;
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn mlme_set_controlled_port_associated() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
-        let state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
+        let state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true)).await;
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::UP);
-        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(false));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(false)).await;
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
     }
 
@@ -3714,7 +3756,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_rx_succeeds(scanning: bool) {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associated(Association {
@@ -3735,6 +3777,7 @@ mod tests {
                     min_channel_time: 100,
                     max_channel_time: 300,
                 })
+                .await
                 .expect("Failed to start scan");
             assert!(sta.scanner.is_scanning());
         }
@@ -3761,14 +3804,14 @@ mod tests {
         ];
 
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into());
+        state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into()).await;
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_rx_with_wrong_cbw_succeeds() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associated(Association {
@@ -3802,14 +3845,14 @@ mod tests {
         // We deliberately ignore the cbw, since it isn't important and not all
         // drivers report it consistently.
         rx_info.channel.cbw = fidl_common::ChannelBandwidth::Cbw80;
-        state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into());
+        state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into()).await;
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_request_bu_if_tim_indicates_buffered_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associated(Association {
@@ -3833,7 +3876,7 @@ mod tests {
         ];
 
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
+        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into()).await;
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -3850,7 +3893,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn associated_does_not_request_bu_if_tim_indicates_no_buffered_frame() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
         let state = States::from(statemachine::testing::new_state(Associated(Association {
@@ -3873,7 +3916,7 @@ mod tests {
             5, 4, 0, 0, 0, 0, // Tim IE: No buffered frame for any client.
         ];
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
+        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into()).await;
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
@@ -3890,7 +3933,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn signal_report() {
         let mut m = MockObjects::new().await;
-        let mut ctx = m.make_ctx();
+        let mut ctx = m.make_ctx().await;
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
@@ -3900,7 +3943,7 @@ mod tests {
 
         let (_, timed_event) =
             m.time_stream.try_next().unwrap().expect("Should have scheduled signal report timeout");
-        let state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id);
+        let state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id).await;
 
         let signal_ind = m
             .fake_device_state
@@ -3927,11 +3970,11 @@ mod tests {
 
         const EXPECTED_DBM: i8 = -32;
         let rx_info = rx_info_with_dbm(&sta, EXPECTED_DBM);
-        let state = state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
+        let state = state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into()).await;
 
         let (_, timed_event) =
             m.time_stream.try_next().unwrap().expect("Should have scheduled signal report timeout");
-        let _state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id);
+        let _state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id).await;
 
         let signal_ind = m
             .fake_device_state

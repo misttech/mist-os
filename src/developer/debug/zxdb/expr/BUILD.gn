@@ -84,6 +84,8 @@ static_library("expr") {
     "pretty_type.h",
     "pretty_type_manager.cc",
     "pretty_type_manager.h",
+    "register_utils.cc",
+    "register_utils.h",
     "resolve_array.cc",
     "resolve_array.h",
     "resolve_base.cc",

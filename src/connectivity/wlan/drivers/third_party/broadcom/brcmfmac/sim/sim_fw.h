@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <zircon/types.h>
 
+#include <condition_variable>
 #include <list>
 #include <memory>
 #include <optional>
@@ -259,8 +260,9 @@ class SimFirmware {
   zx_status_t BusRxCtl(unsigned char* msg, uint len, int* rxlen_out);
   zx_status_t BusFlushTxQueue(int ifidx);
   zx_status_t BusGetBootloaderMacAddr(uint8_t* mac_addr);
-  zx_status_t BusQueueRxSpace(const rx_space_buffer_t* buffer_list, size_t buffer_count,
-                              uint8_t* vmo_addrs[]);
+  zx_status_t BusQueueRxSpace(
+      cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+      uint8_t* vmo_addrs[]);
   drivers::components::FrameContainer BusAcquireTxSpace(size_t count);
   // This function returns the wsec_key_list for an iface to outside.
   std::vector<brcmf_wsec_key_le> GetKeyList(uint16_t ifidx);
@@ -521,6 +523,9 @@ class SimFirmware {
   void SendAPStartLinkEvent(uint16_t ifidx);
   zx_status_t StopInterface(const int32_t bsscfgidx);
 
+  // Block until there is at least one frame available in rx_frame_storage_.
+  void WaitForRxSpaceAvailable();
+
   // Schedule an event to release and re-create itself.
   void ResetSimFirmware();
 
@@ -570,6 +575,7 @@ class SimFirmware {
 
   // This stores frames given to SimFw through calls to BusQueueRxSpace
   drivers::components::FrameStorage rx_frame_storage_;
+  std::condition_variable_any rx_space_queued_;
 
   // Internal firmware state variables
   std::array<uint8_t, ETH_ALEN> mac_addr_;

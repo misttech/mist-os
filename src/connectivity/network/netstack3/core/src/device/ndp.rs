@@ -101,7 +101,11 @@ pub(crate) mod testutil {
 mod tests {
     use super::*;
 
-    use alloc::{collections::HashSet, vec, vec::Vec};
+    use alloc::{
+        collections::{HashMap, HashSet},
+        vec,
+        vec::Vec,
+    };
     use core::{
         convert::TryInto as _,
         fmt::Debug,
@@ -142,7 +146,7 @@ mod tests {
         },
         context::{
             testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
-            InstantContext as _, RngContext as _, TimerContext,
+            InstantContext as _, RngContext as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -158,13 +162,17 @@ mod tests {
                 },
                 get_ipv6_hop_limit,
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
-                slaac::{SlaacConfiguration, SlaacTimerId, TemporarySlaacAddressConfiguration},
+                slaac::{
+                    self, InnerSlaacTimerId, SlaacBindingsContext, SlaacConfiguration,
+                    SlaacContext, SlaacTimerId, TemporarySlaacAddressConfiguration,
+                },
                 state::{
                     Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Lifetime, SlaacConfig,
                     TemporarySlaacConfig,
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
-                IpAddressId as _, Ipv6DeviceAddr, Ipv6DeviceHandler, Ipv6DeviceTimerId,
+                IpAddressId as _, IpDeviceBindingsContext, Ipv6DeviceAddr,
+                Ipv6DeviceConfigurationContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             SendIpPacketMeta,
@@ -175,7 +183,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        Instant, TimerId,
+        BindingsTypes, Instant, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]
@@ -1781,16 +1789,6 @@ mod tests {
         assert_eq!(ctx.trigger_next_timer(), None);
     }
 
-    impl From<SlaacTimerId<DeviceId<crate::testutil::FakeBindingsCtx>>>
-        for TimerId<crate::testutil::FakeBindingsCtx>
-    {
-        fn from(
-            id: SlaacTimerId<DeviceId<crate::testutil::FakeBindingsCtx>>,
-        ) -> TimerId<crate::testutil::FakeBindingsCtx> {
-            TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Slaac(id).into()))
-        }
-    }
-
     #[derive(Copy, Clone, Debug)]
     struct TestSlaacPrefix {
         prefix: Subnet<Ipv6Addr>,
@@ -2231,6 +2229,47 @@ mod tests {
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
     }
 
+    // Assert internal timers in integration tests by going through the contexts
+    // to get the state.
+    #[track_caller]
+    fn assert_slaac_timers_integration<CC, BC, I>(
+        core_ctx: &mut CC,
+        device_id: &CC::DeviceId,
+        timers: I,
+    ) where
+        CC: Ipv6DeviceConfigurationContext<BC>,
+        for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
+        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+        I: IntoIterator<Item = (InnerSlaacTimerId, BC::Instant)>,
+    {
+        let want = timers.into_iter().collect::<HashMap<_, _>>();
+        let got = slaac::testutil::collect_slaac_timers_integration(core_ctx, device_id);
+        assert_eq!(got, want);
+    }
+
+    #[track_caller]
+    fn assert_next_slaac_timer_integration<CC, BC>(
+        core_ctx: &mut CC,
+        device_id: &CC::DeviceId,
+        want: &InnerSlaacTimerId,
+    ) where
+        CC: Ipv6DeviceConfigurationContext<BC>,
+        for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
+        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+    {
+        let got = slaac::testutil::collect_slaac_timers_integration(core_ctx, device_id)
+            .into_iter()
+            .min_by_key(|(_, v)| *v)
+            .map(|(k, _)| k);
+        assert_eq!(got.as_ref(), Some(want));
+    }
+
+    fn new_slaac_timer_id<BT: BindingsTypes>(device_id: &DeviceId<BT>) -> TimerId<BT> {
+        TimerId(TimerIdInner::Ipv6Device(
+            Ipv6DeviceTimerId::Slaac(SlaacTimerId::new(device_id.downgrade())).into(),
+        ))
+    }
+
     #[test]
     fn test_host_slaac_address_deprecate_while_tentative() {
         let config = Ipv6::FAKE_CONFIG;
@@ -2320,22 +2359,20 @@ mod tests {
         assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
 
         // Make sure deprecate and invalidation timers are set.
-        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
-            (
-                SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into(),
-                now + Duration::from_secs(preferred_lifetime.into()),
-            ),
-            (
-                SlaacTimerId::new_invalidate_slaac_address(device.clone(), expected_addr).into(),
-                valid_until,
-            ),
-        ]);
+        assert_slaac_timers_integration(
+            &mut ctx.core_ctx(),
+            &device,
+            [
+                (
+                    InnerSlaacTimerId::DeprecateSlaacAddress { addr: expected_addr },
+                    now + Duration::from_secs(preferred_lifetime.into()),
+                ),
+                (InnerSlaacTimerId::InvalidateSlaacAddress { addr: expected_addr }, valid_until),
+            ],
+        );
 
         // Trigger the deprecation timer.
-        assert_eq!(
-            ctx.trigger_next_timer().unwrap(),
-            SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into()
-        );
+        assert_eq!(ctx.trigger_next_timer().unwrap(), new_slaac_timer_id(&device));
         assert_eq!(
             get_global_ipv6_addrs(&ctx, &device),
             [GlobalIpv6Addr {
@@ -2409,7 +2446,7 @@ mod tests {
     }
 
     fn assert_slaac_lifetimes_enforced(
-        bindings_ctx: &crate::testutil::FakeBindingsCtx,
+        ctx: &mut crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         entry: GlobalIpv6Addr<FakeInstant>,
         valid_until: FakeInstant,
@@ -2428,18 +2465,16 @@ mod tests {
             Ipv6AddrConfig::Manual(_manual_config) => unreachable!(),
         };
         assert_eq!(entry_valid_until, Lifetime::Finite(valid_until));
-        bindings_ctx.timer_ctx().assert_some_timers_installed([
-            (
-                SlaacTimerId::new_deprecate_slaac_address(device.clone(), entry.addr_sub().addr())
-                    .into(),
-                preferred_until,
-            ),
-            (
-                SlaacTimerId::new_invalidate_slaac_address(device.clone(), entry.addr_sub().addr())
-                    .into(),
-                valid_until,
-            ),
-        ]);
+        let timers = slaac::testutil::collect_slaac_timers_integration(&mut ctx.core_ctx(), device);
+        assert_eq!(
+            timers.get(&InnerSlaacTimerId::DeprecateSlaacAddress { addr: entry.addr_sub().addr() }),
+            Some(&preferred_until)
+        );
+        assert_eq!(
+            timers
+                .get(&InnerSlaacTimerId::InvalidateSlaacAddress { addr: entry.addr_sub().addr() }),
+            Some(&valid_until)
+        );
     }
 
     #[test]
@@ -2467,13 +2502,7 @@ mod tests {
             let preferred_until =
                 now.checked_add(Duration::from_secs(preferred_lifetime.into())).unwrap();
 
-            assert_slaac_lifetimes_enforced(
-                &ctx.bindings_ctx,
-                &device,
-                entry,
-                valid_until,
-                preferred_until,
-            );
+            assert_slaac_lifetimes_enforced(ctx, &device, entry, valid_until, preferred_until);
         }
 
         let config = Ipv6::FAKE_CONFIG;
@@ -2919,13 +2948,12 @@ mod tests {
                 }
         })
         .unwrap();
-        let regen_timer_id: TimerId<_> = SlaacTimerId::new_regenerate_temporary_slaac_address(
-            device.clone(),
-            *first_addr_entry.addr_sub(),
-        )
-        .into();
+        let regen_timer_id = InnerSlaacTimerId::RegenerateTemporaryAddress {
+            addr_subnet: *first_addr_entry.addr_sub(),
+        };
         trace!("advancing to regen for first address");
-        assert_eq!(ctx.trigger_next_timer(), Some(regen_timer_id.clone()));
+        assert_next_slaac_timer_integration(&mut ctx.core_ctx(), &device, &regen_timer_id);
+        assert_eq!(ctx.trigger_next_timer(), Some(new_slaac_timer_id(&device)));
 
         // The regeneration timer should cause a new address to be created in
         // the same subnet.
@@ -2963,12 +2991,13 @@ mod tests {
         .map(|entry| entry.addr_sub().addr())
         .collect::<Vec<_>>();
 
+        let slaac_timers =
+            slaac::testutil::collect_slaac_timers_integration(&mut ctx.core_ctx(), &device);
         for address in &addresses {
             assert_matches!(
-                ctx.bindings_ctx.scheduled_instant(SlaacTimerId::new_deprecate_slaac_address(
-                    device.clone(),
-                    *address,
-                )),
+                slaac_timers.get(&InnerSlaacTimerId::DeprecateSlaacAddress{
+                    addr: *address,
+                }).copied(),
                 Some(deprecate_at) => {
                     let preferred_for = deprecate_at - ctx.bindings_ctx.now();
                     assert!(preferred_for <= prefix_preferred_for, "{:?} <= {:?}", preferred_for, prefix_preferred_for);
@@ -2979,7 +3008,8 @@ mod tests {
         trace!("advancing to new regen for first address");
         // Running the context forward until the first address is again eligible
         // for regeneration doesn't result in a new address being created.
-        assert_eq!(ctx.trigger_next_timer(), Some(regen_timer_id));
+        assert_next_slaac_timer_integration(&mut ctx.core_ctx(), &device, &regen_timer_id);
+        assert_eq!(ctx.trigger_next_timer(), Some(new_slaac_timer_id(&device)));
         assert_eq!(
             get_matching_slaac_address_entries(&ctx, &device, |entry| entry.addr_sub().subnet()
                 == subnet
@@ -2996,16 +3026,12 @@ mod tests {
         trace!("advancing to deprecation for first address");
         // If we continue on until the first address is deprecated, we still
         // shouldn't regenerate since the second address is active.
-        assert_eq!(
-            ctx.trigger_next_timer(),
-            Some(
-                SlaacTimerId::new_deprecate_slaac_address(
-                    device.clone(),
-                    first_addr_entry.addr_sub().addr()
-                )
-                .into()
-            )
+        assert_next_slaac_timer_integration(
+            &mut ctx.core_ctx(),
+            &device,
+            &InnerSlaacTimerId::DeprecateSlaacAddress { addr: first_addr_entry.addr_sub().addr() },
         );
+        assert_eq!(ctx.trigger_next_timer(), Some(new_slaac_timer_id(&device)));
 
         let remaining_addresses = addresses
             .into_iter()
@@ -3123,13 +3149,13 @@ mod tests {
                 }
         })
         .unwrap();
-        let regen_at = ctx
-            .bindings_ctx
-            .scheduled_instant(SlaacTimerId::new_regenerate_temporary_slaac_address(
-                device.clone(),
-                *first_addr_entry.addr_sub(),
-            ))
-            .unwrap();
+        let regen_at =
+            slaac::testutil::collect_slaac_timers_integration(&mut ctx.core_ctx(), &device)
+                .get(&InnerSlaacTimerId::RegenerateTemporaryAddress {
+                    addr_subnet: *first_addr_entry.addr_sub(),
+                })
+                .copied()
+                .unwrap();
 
         let before_regen = regen_at - Duration::from_secs(10);
         // The only events that run before regen should be the DAD timers for
@@ -3141,13 +3167,13 @@ mod tests {
         .collect::<Vec<_>>();
         ctx.trigger_timers_until_and_expect_unordered(before_regen, dad_timer_ids);
 
-        let preferred_until = ctx
-            .bindings_ctx
-            .scheduled_instant(SlaacTimerId::new_deprecate_slaac_address(
-                device.clone(),
-                first_addr_entry.addr_sub().addr(),
-            ))
-            .unwrap();
+        let preferred_until =
+            slaac::testutil::collect_slaac_timers_integration(&mut ctx.core_ctx(), &device)
+                .get(&InnerSlaacTimerId::DeprecateSlaacAddress {
+                    addr: first_addr_entry.addr_sub().addr(),
+                })
+                .copied()
+                .unwrap();
 
         let max_preferred_lifetime = max_preferred_lifetime * 4 / 5;
         let mut slaac_config = SlaacConfiguration::default();
@@ -3186,14 +3212,14 @@ mod tests {
 
         // The regeneration is still handled by timer, so handle any pending
         // events.
-        assert_eq!(
-            ctx.trigger_timers_for(Duration::ZERO),
-            vec![SlaacTimerId::new_regenerate_temporary_slaac_address(
-                device.clone(),
-                *first_addr_entry.addr_sub()
-            )
-            .into()]
+        assert_next_slaac_timer_integration(
+            &mut ctx.core_ctx(),
+            &device,
+            &InnerSlaacTimerId::RegenerateTemporaryAddress {
+                addr_subnet: *first_addr_entry.addr_sub(),
+            },
         );
+        assert_eq!(ctx.trigger_timers_for(Duration::ZERO), vec![new_slaac_timer_id(&device)]);
 
         let addresses = get_matching_slaac_address_entries(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
@@ -3275,7 +3301,7 @@ mod tests {
         assert!(expected_preferred_until < max_preferred_until);
 
         assert_slaac_lifetimes_enforced(
-            &ctx.bindings_ctx,
+            &mut ctx,
             &device,
             entry,
             expected_valid_until,
@@ -3328,7 +3354,7 @@ mod tests {
             Ipv6AddrConfig::Manual(_manual_config) => unreachable!("temporary slaac address"),
         };
         assert_slaac_lifetimes_enforced(
-            &ctx.bindings_ctx,
+            &mut ctx,
             &device,
             entry,
             expected_valid_until,
@@ -3384,7 +3410,7 @@ mod tests {
         })
         .unwrap();
         assert_slaac_lifetimes_enforced(
-            &ctx.bindings_ctx,
+            &mut ctx,
             &device,
             entry,
             max_valid_until,
@@ -3472,16 +3498,17 @@ mod tests {
         };
         assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
         // Make sure deprecate and invalidation timers are set.
-        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
-            (
-                SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into(),
-                now + Duration::from_secs(PREFERRED_LIFETIME_SECS.into()),
-            ),
-            (
-                SlaacTimerId::new_invalidate_slaac_address(device.clone(), expected_addr).into(),
-                valid_until,
-            ),
-        ]);
+        assert_slaac_timers_integration(
+            &mut ctx.core_ctx(),
+            &device,
+            [
+                (
+                    InnerSlaacTimerId::DeprecateSlaacAddress { addr: expected_addr },
+                    now + Duration::from_secs(PREFERRED_LIFETIME_SECS.into()),
+                ),
+                (InnerSlaacTimerId::InvalidateSlaacAddress { addr: expected_addr }, valid_until),
+            ],
+        );
 
         // Deleting the address should cancel its SLAAC timers.
         ctx.core_api()

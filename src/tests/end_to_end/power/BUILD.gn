@@ -51,11 +51,6 @@ source_set("power_utils") {
   ]
 }
 
-group("power") {
-  testonly = true
-  deps = [ "//src/tests/end_to_end/squareload" ]
-}
-
 group("tests") {
   testonly = true
   deps = [ "tests" ]

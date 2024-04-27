@@ -190,8 +190,10 @@ impl Resolver for QueuedResolver {
 }
 
 impl QueuedResolver {
-    /// Creates an unbounded queue that will resolve up to `max_concurrency`
-    /// packages at once.
+    /// Creates an unbounded queue that will resolve up to `max_concurrency` packages at once.
+    /// Returns:
+    ///   1. a Future to be awaited that processes the queue
+    ///   2. a Self that enables pushing work onto the queue
     pub fn new(
         cache_client: pkg::cache::Client,
         base_package_index: Arc<BasePackageIndex>,
@@ -223,6 +225,7 @@ impl QueuedResolver {
                 }
             },
         );
+        let () = inspect.record_raw_queue(package_fetch_queue.record_lazy_inspect());
         let fetcher =
             Self { queue, inspect, base_package_index, cache, rewriter, system_cache_list };
         (package_fetch_queue.into_future(), fetcher)

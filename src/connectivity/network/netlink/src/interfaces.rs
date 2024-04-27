@@ -9,6 +9,7 @@
 use std::{
     collections::BTreeMap,
     fmt::Debug,
+    net::IpAddr,
     num::{NonZeroU32, NonZeroU64},
 };
 
@@ -29,13 +30,18 @@ use fidl_fuchsia_net_root as fnet_root;
 use derivative::Derivative;
 use either::Either;
 use futures::{channel::oneshot, StreamExt as _};
+use linux_uapi::{
+    net_device_flags_IFF_LOOPBACK, net_device_flags_IFF_LOWER_UP, net_device_flags_IFF_RUNNING,
+    net_device_flags_IFF_UP, rtnetlink_groups_RTNLGRP_IPV4_IFADDR,
+    rtnetlink_groups_RTNLGRP_IPV6_IFADDR, rtnetlink_groups_RTNLGRP_LINK, ARPHRD_ETHER,
+    ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID,
+};
 use net_types::ip::{AddrSubnetEither, IpVersion};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
-    link::nlas::Nla as LinkNla, AddressHeader, AddressMessage, LinkHeader, LinkMessage,
-    RtnlMessage, AF_INET, AF_INET6, AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP,
-    ARPHRD_VOID, IFA_F_PERMANENT, IFA_F_TENTATIVE, IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP,
-    RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR, RTNLGRP_LINK,
+    address::{AddressAttribute, AddressFlags, AddressHeader, AddressHeaderFlags, AddressMessage},
+    link::{LinkAttribute, LinkFlags, LinkHeader, LinkLayerType, LinkMessage, State},
+    AddressFamily, RouteNetlinkMessage,
 };
 
 use crate::{
@@ -440,7 +446,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 {
                     self.route_clients.send_message_to_group(
                         message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
-                        ModernGroup(RTNLGRP_LINK),
+                        ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
                     )
                 }
 
@@ -487,7 +493,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     {
                         self.route_clients.send_message_to_group(
                             message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
-                            ModernGroup(RTNLGRP_LINK),
+                            ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
                         )
                     }
 
@@ -529,7 +535,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 {
                     self.route_clients.send_message_to_group(
                         message.into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
-                        ModernGroup(RTNLGRP_LINK),
+                        ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
                     )
                 }
 
@@ -914,11 +920,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                             .flatten()
                             .filter(|NetlinkAddressMessage(message)| {
                                 ip_version_filter.map_or(true, |ip_version| {
-                                    ip_version.eq(&match message.header.family.into() {
-                                        AF_INET => IpVersion::V4,
-                                        AF_INET6 => IpVersion::V6,
+                                    ip_version.eq(&match message.header.family {
+                                        AddressFamily::Inet => IpVersion::V4,
+                                        AddressFamily::Inet6 => IpVersion::V6,
                                         family => unreachable!(
-                                            "unexpected address family ({}); addr = {:?}",
+                                            "unexpected address family ({:?}); addr = {:?}",
                                             family, message,
                                         ),
                                     })
@@ -984,11 +990,11 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 
     let send_update = |addr: &NetlinkAddressMessage, kind| {
         let NetlinkAddressMessage(inner) = addr;
-        let group = match inner.header.family.into() {
-            AF_INET => RTNLGRP_IPV4_IFADDR,
-            AF_INET6 => RTNLGRP_IPV6_IFADDR,
+        let group = match inner.header.family {
+            AddressFamily::Inet => rtnetlink_groups_RTNLGRP_IPV4_IFADDR,
+            AddressFamily::Inet6 => rtnetlink_groups_RTNLGRP_IPV6_IFADDR,
             family => {
-                unreachable!("unrecognized interface address family ({family}); addr = {addr:?}")
+                unreachable!("unrecognized interface address family ({family:?}); addr = {addr:?}")
             }
         };
 
@@ -1051,9 +1057,10 @@ impl NetlinkLinkMessage {
         self,
         sequence_number: u32,
         is_dump: bool,
-    ) -> NetlinkMessage<RtnlMessage> {
+    ) -> NetlinkMessage<RouteNetlinkMessage> {
         let Self(message) = self;
-        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewLink(message).into();
+        let mut msg: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::NewLink(message).into();
         msg.header.sequence_number = sequence_number;
         if is_dump {
             msg.header.flags |= NLM_F_MULTIPART;
@@ -1062,9 +1069,10 @@ impl NetlinkLinkMessage {
         msg
     }
 
-    fn into_rtnl_del_link(self, sequence_number: u32) -> NetlinkMessage<RtnlMessage> {
+    fn into_rtnl_del_link(self, sequence_number: u32) -> NetlinkMessage<RouteNetlinkMessage> {
         let Self(message) = self;
-        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::DelLink(message).into();
+        let mut msg: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::DelLink(message).into();
         msg.header.sequence_number = sequence_number;
         msg.finalize();
         msg
@@ -1093,6 +1101,8 @@ fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 
             fhwnet::DeviceClass::Virtual => ARPHRD_VOID,
         },
     }
+    .try_into()
+    .expect("potential values will fit into the u16 range")
 }
 
 // Netstack only reports 'online' when the 'admin status' is 'enabled' and the 'link
@@ -1121,7 +1131,8 @@ fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 
 //       Driver has signaled netif_carrier_on()
 //
 //   ...
-const ONLINE_IF_FLAGS: u32 = IFF_UP | IFF_RUNNING | IFF_LOWER_UP;
+const ONLINE_IF_FLAGS: u32 =
+    net_device_flags_IFF_UP | net_device_flags_IFF_RUNNING | net_device_flags_IFF_LOWER_UP;
 
 // Implement conversions from `Properties` to `NetlinkLinkMessage`
 // which is fallible iff, the interface has an id greater than u32.
@@ -1140,8 +1151,7 @@ fn interface_properties_to_link_message(
     let online = *online;
     let mut link_header = LinkHeader::default();
 
-    // This constant is in the range of u8-accepted values, so it can be safely casted to a u8.
-    link_header.interface_family = AF_UNSPEC.try_into().expect("should fit into u8");
+    link_header.interface_family = AddressFamily::Unspec;
 
     // We expect interface ids to safely fit in the range of u32 values.
     let id: u32 = match id.get().try_into() {
@@ -1153,20 +1163,23 @@ fn interface_properties_to_link_message(
     link_header.index = id;
 
     let link_layer_type = device_class_to_link_type(*device_class);
-    link_header.link_layer_type = link_layer_type;
+    link_header.link_layer_type = LinkLayerType::from(link_layer_type);
 
     let mut flags = 0;
     if online {
         flags |= ONLINE_IF_FLAGS;
     };
-    if link_header.link_layer_type == ARPHRD_LOOPBACK {
-        flags |= IFF_LOOPBACK;
+    if link_header.link_layer_type == LinkLayerType::Loopback {
+        flags |= net_device_flags_IFF_LOOPBACK;
     };
-    link_header.flags = flags;
+
+    // SAFETY: This and the following .unwrap() are safe as LinkFlags
+    // can hold any valid u32.
+    link_header.flags = LinkFlags::from_bits(flags).unwrap();
 
     // As per netlink_package_route and rtnetlink documentation, this should be set to
     // `0xffff_ffff` and reserved for future use.
-    link_header.change_mask = u32::MAX;
+    link_header.change_mask = LinkFlags::from_bits(u32::MAX).unwrap();
 
     // The NLA order follows the list that attributes are listed on the
     // rtnetlink man page.
@@ -1183,24 +1196,20 @@ fn interface_properties_to_link_message(
     // not have corresponding values in `fnet_interfaces_ext::Properties`.
     // This list is documented within issuetracker.google.com/283137644.
     let nlas = [
-        LinkNla::IfName(name.clone()),
-        LinkNla::Link(link_layer_type.into()),
+        LinkAttribute::IfName(name.clone()),
+        LinkAttribute::Link(link_layer_type.into()),
         // Netstack only exposes enough state to determine between `Up` and `Down`
         // operating state.
-        LinkNla::OperState(if online {
-            netlink_packet_route::nlas::link::State::Up
-        } else {
-            netlink_packet_route::nlas::link::State::Down
-        }),
+        LinkAttribute::OperState(if online { State::Up } else { State::Down }),
     ]
     .into_iter()
     // If the interface has a link-address, include it in the NLAs.
-    .chain(link_address.clone().map(LinkNla::Address))
+    .chain(link_address.clone().map(LinkAttribute::Address))
     .collect();
 
     let mut link_message = LinkMessage::default();
     link_message.header = link_header;
-    link_message.nlas = nlas;
+    link_message.attributes = nlas;
 
     return Ok(NetlinkLinkMessage(link_message));
 }
@@ -1215,10 +1224,10 @@ impl NetlinkAddressMessage {
         &self,
         sequence_number: u32,
         is_dump: bool,
-    ) -> NetlinkMessage<RtnlMessage> {
+    ) -> NetlinkMessage<RouteNetlinkMessage> {
         let Self(message) = self;
-        let mut message: NetlinkMessage<RtnlMessage> =
-            RtnlMessage::NewAddress(message.clone()).into();
+        let mut message: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::NewAddress(message.clone()).into();
         message.header.sequence_number = sequence_number;
         if is_dump {
             message.header.flags |= NLM_F_MULTIPART;
@@ -1227,10 +1236,13 @@ impl NetlinkAddressMessage {
         message
     }
 
-    pub(crate) fn to_rtnl_del_addr(&self, sequence_number: u32) -> NetlinkMessage<RtnlMessage> {
+    pub(crate) fn to_rtnl_del_addr(
+        &self,
+        sequence_number: u32,
+    ) -> NetlinkMessage<RouteNetlinkMessage> {
         let Self(message) = self;
-        let mut message: NetlinkMessage<RtnlMessage> =
-            RtnlMessage::DelAddress(message.clone()).into();
+        let mut message: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::DelAddress(message.clone()).into();
         message.header.sequence_number = sequence_number;
         message.finalize();
         message
@@ -1289,8 +1301,12 @@ fn interface_properties_to_address_messages(
                 let mut addr_header = AddressHeader::default();
 
                 let (family, addr_bytes) = match addr {
-                    fnet::IpAddress::Ipv4(ip_addr) => (AF_INET, ip_addr.addr.to_vec()),
-                    fnet::IpAddress::Ipv6(ip_addr) => (AF_INET6, ip_addr.addr.to_vec()),
+                    fnet::IpAddress::Ipv4(ip_addr) => {
+                        (AddressFamily::Inet, IpAddr::V4(ip_addr.addr.into()))
+                    }
+                    fnet::IpAddress::Ipv6(ip_addr) => {
+                        (AddressFamily::Inet6, IpAddr::V6(ip_addr.addr.into()))
+                    }
                 };
 
                 // The possible constants below are in the range of u8-accepted values, so they can
@@ -1300,24 +1316,21 @@ fn interface_properties_to_address_messages(
 
                 // TODO(https://issues.fuchsia.dev/284980862): Determine proper
                 // mapping from Netstack properties to address flags.
-                let flags = IFA_F_PERMANENT
+                let flags = AddressHeaderFlags::Permanent
                     | match assignment_state {
-                        fnet_interfaces::AddressAssignmentState::Assigned => 0,
+                        fnet_interfaces::AddressAssignmentState::Assigned => {
+                            AddressHeaderFlags::empty()
+                        }
                         fnet_interfaces::AddressAssignmentState::Tentative
                         | fnet_interfaces::AddressAssignmentState::Unavailable => {
                             // There is no equivalent `IFA_F_` flag for
                             // `Unavailable` so we treat it as tentative to
                             // signal that the address is installed but not
                             // considered assigned.
-                            IFA_F_TENTATIVE
+                            AddressHeaderFlags::Tentative
                         }
                     };
-                // In the header, flags are stored as u8, and in the NLAs, flags are stored as u32,
-                // requiring casting. There are several possible flags, such as
-                // IFA_F_NOPREFIXROUTE that do not fit into a u8, and are expected to be lost in
-                // the header. This NLA is present in netlink_packet_route but is not shown on the
-                // rtnetlink man page.
-                addr_header.flags = flags as u8;
+                addr_header.flags = flags;
                 addr_header.index = id;
 
                 // The NLA order follows the list that attributes are listed on the
@@ -1334,14 +1347,16 @@ fn interface_properties_to_address_messages(
                 // IFA_MULTICAST is documented via the netlink_packet_route crate but is not
                 // present on the rtnetlink page.
                 let nlas = vec![
-                    netlink_packet_route::address::nlas::Nla::Address(addr_bytes),
-                    netlink_packet_route::address::nlas::Nla::Label(name.clone()),
-                    netlink_packet_route::address::nlas::Nla::Flags(flags.into()),
+                    AddressAttribute::Address(addr_bytes),
+                    AddressAttribute::Label(name.clone()),
+                    // SAFETY: This unwrap is safe because AddressFlags overlaps with
+                    // AddressHeaderFlags.
+                    AddressAttribute::Flags(AddressFlags::from_bits(flags.bits().into()).unwrap()),
                 ];
 
                 let mut addr_message = AddressMessage::default();
                 addr_message.header = addr_header;
-                addr_message.nlas = nlas;
+                addr_message.attributes = nlas;
                 (addr.clone(), NetlinkAddressMessage(addr_message))
             },
         )
@@ -1459,13 +1474,14 @@ pub(crate) mod testutil {
     pub(crate) struct Setup<E, W> {
         pub event_loop_fut: E,
         pub watcher_stream: W,
-        pub request_sink: mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RtnlMessage>>>,
+        pub request_sink:
+            mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RouteNetlinkMessage>>>,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
         pub interfaces_handler_sink: FakeInterfacesHandlerSink,
     }
 
     pub(crate) fn setup_with_route_clients(
-        route_clients: ClientTable<NetlinkRoute, FakeSender<RtnlMessage>>,
+        route_clients: ClientTable<NetlinkRoute, FakeSender<RouteNetlinkMessage>>,
     ) -> Setup<
         impl Future<Output = Result<std::convert::Infallible, anyhow::Error>>,
         impl Stream<Item = fnet_interfaces::WatcherRequest>,
@@ -1484,7 +1500,7 @@ pub(crate) mod testutil {
             },
         ) = crate::eventloop::testutil::event_loop_fixture::<
             FakeInterfacesHandler,
-            FakeSender<RtnlMessage>,
+            FakeSender<RouteNetlinkMessage>,
         >(interfaces_handler, route_clients, request_stream);
 
         let interfaces_request_stream = interfaces.into_stream().unwrap();
@@ -1567,17 +1583,17 @@ pub(crate) mod testutil {
         id: u64,
         link_type: u16,
         flags: u32,
-        nlas: Vec<LinkNla>,
+        nlas: Vec<LinkAttribute>,
     ) -> NetlinkLinkMessage {
         let mut link_header = LinkHeader::default();
         link_header.index = id.try_into().expect("should fit into u32");
-        link_header.link_layer_type = link_type;
-        link_header.flags = flags;
-        link_header.change_mask = u32::MAX;
+        link_header.link_layer_type = LinkLayerType::from(link_type);
+        link_header.flags = LinkFlags::from_bits(flags).unwrap();
+        link_header.change_mask = LinkFlags::from_bits(u32::MAX).unwrap();
 
         let mut link_message = LinkMessage::default();
         link_message.header = link_header;
-        link_message.nlas = nlas;
+        link_message.attributes = nlas;
 
         NetlinkLinkMessage(link_message)
     }
@@ -1587,18 +1603,14 @@ pub(crate) mod testutil {
         link_type: u16,
         online: bool,
         mac: &Option<fnet::MacAddress>,
-    ) -> Vec<LinkNla> {
+    ) -> Vec<LinkAttribute> {
         [
-            LinkNla::IfName(name),
-            LinkNla::Link(link_type.into()),
-            LinkNla::OperState(if online {
-                netlink_packet_route::nlas::link::State::Up
-            } else {
-                netlink_packet_route::nlas::link::State::Down
-            }),
+            LinkAttribute::IfName(name),
+            LinkAttribute::Link(link_type.into()),
+            LinkAttribute::OperState(if online { State::Up } else { State::Down }),
         ]
         .into_iter()
-        .chain(mac.map(|fnet::MacAddress { octets }| LinkNla::Address(octets.to_vec())))
+        .chain(mac.map(|fnet::MacAddress { octets }| LinkAttribute::Address(octets.to_vec())))
         .collect()
     }
 
@@ -1610,23 +1622,27 @@ pub(crate) mod testutil {
     ) -> NetlinkAddressMessage {
         let mut addr_header = AddressHeader::default();
         let (family, addr) = match subnet.addr {
-            fnet::IpAddress::Ipv4(ip_addr) => (AF_INET, ip_addr.addr.to_vec()),
-            fnet::IpAddress::Ipv6(ip_addr) => (AF_INET6, ip_addr.addr.to_vec()),
+            fnet::IpAddress::Ipv4(ip_addr) => {
+                (AddressFamily::Inet, IpAddr::V4(ip_addr.addr.into()))
+            }
+            fnet::IpAddress::Ipv6(ip_addr) => {
+                (AddressFamily::Inet6, IpAddr::V6(ip_addr.addr.into()))
+            }
         };
-        addr_header.family = family as u8;
+        addr_header.family = family;
         addr_header.prefix_len = subnet.prefix_len;
-        addr_header.flags = flags.try_into().expect("should fit into u8");
+        addr_header.flags = AddressHeaderFlags::from_bits(flags as u8).unwrap();
         addr_header.index = interface_id;
 
         let nlas = vec![
-            netlink_packet_route::address::nlas::Nla::Address(addr),
-            netlink_packet_route::address::nlas::Nla::Label(interface_name),
-            netlink_packet_route::address::nlas::Nla::Flags(flags.into()),
+            AddressAttribute::Address(addr),
+            AddressAttribute::Label(interface_name),
+            AddressAttribute::Flags(AddressFlags::from_bits(flags).unwrap()),
         ];
 
         let mut addr_message = AddressMessage::default();
         addr_message.header = addr_header;
-        addr_message.nlas = nlas;
+        addr_message.attributes = nlas;
         NetlinkAddressMessage(addr_message)
     }
 
@@ -1660,7 +1676,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use futures::{sink::SinkExt as _, stream::Stream, FutureExt as _};
-    use netlink_packet_route::RTNLGRP_IPV4_ROUTE;
+    use linux_uapi::{rtnetlink_groups_RTNLGRP_IPV4_ROUTE, IFA_F_PERMANENT, IFA_F_TENTATIVE};
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 
@@ -1925,16 +1941,19 @@ mod tests {
     #[test_case(WLAN_AP, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
     #[test_case(PPP, false, 0, ARPHRD_PPP)]
     #[test_case(PPP, true, ONLINE_IF_FLAGS, ARPHRD_PPP)]
-    #[test_case(LOOPBACK, false, IFF_LOOPBACK, ARPHRD_LOOPBACK)]
-    #[test_case(LOOPBACK, true, ONLINE_IF_FLAGS | IFF_LOOPBACK, ARPHRD_LOOPBACK)]
+    #[test_case(LOOPBACK, false, net_device_flags_IFF_LOOPBACK, ARPHRD_LOOPBACK)]
+    #[test_case(LOOPBACK, true, ONLINE_IF_FLAGS | net_device_flags_IFF_LOOPBACK, ARPHRD_LOOPBACK)]
     #[test_case(BRIDGE, false, 0, ARPHRD_ETHER)]
     #[test_case(BRIDGE, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
     fn test_interface_conversion(
         device_class: fnet_interfaces::DeviceClass,
         online: bool,
         flags: u32,
-        expected_link_type: u16,
+        expected_link_type: u32,
     ) {
+        // This conversion is safe as the link type is actually a u16,
+        // but our bindings generator declared it as a u32.
+        let expected_link_type = expected_link_type as u16;
         let interface_name = LO_NAME.to_string();
         let interface =
             create_interface(LO_INTERFACE_ID, interface_name.clone(), device_class, online, vec![]);
@@ -2002,26 +2021,26 @@ mod tests {
     async fn test_deliver_updates() {
         let (mut link_sink, link_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
-            &[ModernGroup(RTNLGRP_LINK)],
+            &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
         );
         let (mut addr4_sink, addr4_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_2,
-            &[ModernGroup(RTNLGRP_IPV4_IFADDR)],
+            &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR)],
         );
         let (mut addr6_sink, addr6_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_3,
-            &[ModernGroup(RTNLGRP_IPV6_IFADDR)],
+            &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR)],
         );
         let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_4,
-            &[ModernGroup(RTNLGRP_IPV4_ROUTE)],
+            &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE)],
         );
         let (mut all_sink, all_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_5,
             &[
-                ModernGroup(RTNLGRP_LINK),
-                ModernGroup(RTNLGRP_IPV6_IFADDR),
-                ModernGroup(RTNLGRP_IPV4_IFADDR),
+                ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
             ],
         );
         let Setup {
@@ -2182,36 +2201,39 @@ mod tests {
                 HandledLink { name: ETH_NAME.to_string(), kind: HandledLinkKind::Del },
             ],
         );
-
+        // Conversion to u16 is safe because 1 < 65535
+        let arphrd_ether_u16: u16 = ARPHRD_ETHER as u16;
+        // Conversion to u16 is safe because 772 < 65535
+        let arphrd_loopback_u16: u16 = ARPHRD_LOOPBACK as u16;
         let wlan_link = SentMessage::multicast(
             create_netlink_link_message(
                 WLAN_INTERFACE_ID,
-                ARPHRD_ETHER,
+                arphrd_ether_u16,
                 0,
-                create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false, &WLAN_MAC),
+                create_nlas(WLAN_NAME.to_string(), arphrd_ether_u16, false, &WLAN_MAC),
             )
             .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
-            ModernGroup(RTNLGRP_LINK),
+            ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
         );
         let lo_link = SentMessage::multicast(
             create_netlink_link_message(
                 LO_INTERFACE_ID,
-                ARPHRD_LOOPBACK,
-                ONLINE_IF_FLAGS | IFF_LOOPBACK,
-                create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true, &LO_MAC),
+                arphrd_loopback_u16,
+                ONLINE_IF_FLAGS | net_device_flags_IFF_LOOPBACK,
+                create_nlas(LO_NAME.to_string(), arphrd_loopback_u16, true, &LO_MAC),
             )
             .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
-            ModernGroup(RTNLGRP_LINK),
+            ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
         );
         let eth_link = SentMessage::multicast(
             create_netlink_link_message(
                 ETH_INTERFACE_ID,
-                ARPHRD_ETHER,
+                arphrd_ether_u16,
                 0,
-                create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false, &ETH_MAC),
+                create_nlas(ETH_NAME.to_string(), arphrd_ether_u16, false, &ETH_MAC),
             )
             .into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
-            ModernGroup(RTNLGRP_LINK),
+            ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
         );
         assert_eq!(
             &link_sink.take_messages()[..],
@@ -2226,7 +2248,7 @@ mod tests {
                 IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
-            ModernGroup(RTNLGRP_IPV4_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
         );
         let eth_v4_addr = SentMessage::multicast(
             create_address_message(
@@ -2236,7 +2258,7 @@ mod tests {
                 IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
-            ModernGroup(RTNLGRP_IPV4_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
         );
         let ppp_v4_addr = SentMessage::multicast(
             create_address_message(
@@ -2246,7 +2268,7 @@ mod tests {
                 IFA_F_PERMANENT,
             )
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
-            ModernGroup(RTNLGRP_IPV4_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
         );
         assert_eq!(
             &addr4_sink.take_messages()[..],
@@ -2261,7 +2283,7 @@ mod tests {
                 IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
-            ModernGroup(RTNLGRP_IPV6_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
         );
         let lo_v6_addr = SentMessage::multicast(
             create_address_message(
@@ -2271,7 +2293,7 @@ mod tests {
                 IFA_F_PERMANENT,
             )
             .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
-            ModernGroup(RTNLGRP_IPV6_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
         );
         let eth_v6_addr = SentMessage::multicast(
             create_address_message(
@@ -2281,7 +2303,7 @@ mod tests {
                 IFA_F_PERMANENT | IFA_F_TENTATIVE,
             )
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
-            ModernGroup(RTNLGRP_IPV6_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
         );
         let ppp_v6_addr = SentMessage::multicast(
             create_address_message(
@@ -2291,7 +2313,7 @@ mod tests {
                 IFA_F_PERMANENT,
             )
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
-            ModernGroup(RTNLGRP_IPV6_IFADDR),
+            ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
         );
         assert_eq!(
             &addr6_sink.take_messages()[..],
@@ -2363,7 +2385,7 @@ mod tests {
 
     #[derive(Debug, PartialEq)]
     struct TestRequestResult {
-        messages: Vec<SentMessage<RtnlMessage>>,
+        messages: Vec<SentMessage<RouteNetlinkMessage>>,
         waiter_results: Vec<Result<(), RequestError>>,
     }
 
@@ -2504,21 +2526,25 @@ mod tests {
             GetLinkArgs::Dump => true,
             GetLinkArgs::Get(_) => false,
         };
+        // Conversion to u16 is safe because 1 < 65535
+        let arphrd_ether_u16: u16 = ARPHRD_ETHER as u16;
+        // Conversion to u16 is safe because 772 < 65535
+        let arphrd_loopback_u16: u16 = ARPHRD_LOOPBACK as u16;
         let expected_messages = expected_new_links
             .iter()
             .map(|link_id| {
                 let msg = match *link_id {
                     LO_INTERFACE_ID => create_netlink_link_message(
                         LO_INTERFACE_ID,
-                        ARPHRD_LOOPBACK,
-                        ONLINE_IF_FLAGS | IFF_LOOPBACK,
-                        create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true, &LO_MAC),
+                        arphrd_loopback_u16,
+                        ONLINE_IF_FLAGS | net_device_flags_IFF_LOOPBACK,
+                        create_nlas(LO_NAME.to_string(), arphrd_loopback_u16, true, &LO_MAC),
                     ),
                     ETH_INTERFACE_ID => create_netlink_link_message(
                         ETH_INTERFACE_ID,
-                        ARPHRD_ETHER,
+                        arphrd_ether_u16,
                         0,
-                        create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false, &ETH_MAC),
+                        create_nlas(ETH_NAME.to_string(), arphrd_ether_u16, false, &ETH_MAC),
                     ),
                     _ => unreachable!("GetLink should only be tested with loopback and ethernet"),
                 };

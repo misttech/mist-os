@@ -2771,7 +2771,7 @@ void brcmf_cfg80211_rx(struct brcmf_if* ifp, wlan::drivers::components::Frame&& 
     return;
   }
 
-  ifp->drvr->device->NetDev()->CompleteRx(std::move(frame));
+  ifp->drvr->device->NetDev().CompleteRx(std::move(frame));
 }
 
 void brcmf_cfg80211_rx(struct brcmf_pub* drvr, wlan::drivers::components::FrameContainer&& frames) {
@@ -2787,7 +2787,7 @@ void brcmf_cfg80211_rx(struct brcmf_pub* drvr, wlan::drivers::components::FrameC
     }
   }
 
-  drvr->device->NetDev()->CompleteRx(std::move(frames));
+  drvr->device->NetDev().CompleteRx(std::move(frames));
 }
 
 static void brcmf_iedump(uint8_t* ies, size_t total_len) {
@@ -7025,8 +7025,12 @@ zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wir
       brcmf_abort_scanning_immediately(cfg);
     }
 
-    struct brcmf_if* client_ifp = cfg_to_if(cfg);
-    brcmf_enable_mpc(client_ifp, 1);
+    // Check if there is a client interface by calling cfg_to_ndev first. In case of shutdown this
+    // may be called to destroy the AP interface after the client interface has been destroyed.
+    if (cfg_to_ndev(cfg)) {
+      struct brcmf_if* client_ifp = cfg_to_if(cfg);
+      brcmf_enable_mpc(client_ifp, 1);
+    }
   }
 
   zx_status_t err = brcmf_bus_flush_txq(ifp->drvr->bus_if, ifp->ifidx);

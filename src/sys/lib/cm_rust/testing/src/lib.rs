@@ -6,7 +6,7 @@ use {
     anyhow::{Context, Error},
     assert_matches::assert_matches,
     cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative},
-    cm_types::{Name, Path, RelativePath},
+    cm_types::{LongName, Name, Path, RelativePath},
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     std::collections::BTreeMap,
@@ -41,7 +41,7 @@ impl ComponentDeclBuilder {
     /// A ComponentDeclBuilder prefilled with a program and using a runner named "test_runner",
     /// which we assume is offered to us.
     pub fn new() -> Self {
-        Self::new_empty_component().add_program(TEST_RUNNER_NAME)
+        Self::new_empty_component().program_runner(TEST_RUNNER_NAME)
     }
 
     /// Add a child element.
@@ -67,12 +67,16 @@ impl ComponentDeclBuilder {
     }
 
     /// Add a "program" clause, using the given runner.
-    pub fn add_program(mut self, runner: &str) -> Self {
+    pub fn program_runner(self, runner: &str) -> Self {
         assert!(self.result.program.is_none(), "tried to add program twice");
-        self.result.program = Some(cm_rust::ProgramDecl {
+        self.program(cm_rust::ProgramDecl {
             runner: Some(runner.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
-        });
+        })
+    }
+
+    pub fn program(mut self, program: cm_rust::ProgramDecl) -> Self {
+        self.result.program = Some(program);
         self
     }
 
@@ -95,17 +99,12 @@ impl ComponentDeclBuilder {
     }
 
     // Add a use decl for fuchsia.component.Realm.
-    pub fn use_realm(mut self) -> Self {
-        let use_ = cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-            dependency_type: cm_rust::DependencyType::Strong,
-            source: cm_rust::UseSource::Framework,
-            source_name: "fuchsia.component.Realm".parse().unwrap(),
-            source_dictionary: Default::default(),
-            target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-        self.result.uses.push(use_);
-        self
+    pub fn use_realm(self) -> Self {
+        self.use_(
+            UseBuilder::protocol()
+                .name("fuchsia.component.Realm")
+                .source(cm_rust::UseSource::Framework),
+        )
     }
 
     /// Add a capability declaration.
@@ -161,12 +160,12 @@ impl ComponentDeclBuilder {
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
 pub struct ChildBuilder {
-    name: Option<String>,
+    name: Option<LongName>,
     url: Option<String>,
     #[derivative(Default(value = "fdecl::StartupMode::Lazy"))]
     startup: fdecl::StartupMode,
     on_terminate: Option<fdecl::OnTerminate>,
-    environment: Option<String>,
+    environment: Option<Name>,
 }
 
 impl ChildBuilder {
@@ -176,7 +175,7 @@ impl ChildBuilder {
 
     /// Defaults url to `"test:///{name}"`.
     pub fn name(mut self, name: &str) -> Self {
-        self.name = Some(name.into());
+        self.name = Some(name.parse().unwrap());
         if self.url.is_none() {
             self.url = Some(format!("test:///{name}"));
         }
@@ -203,7 +202,7 @@ impl ChildBuilder {
     }
 
     pub fn environment(mut self, environment: &str) -> Self {
-        self.environment = Some(environment.into());
+        self.environment = Some(environment.parse().unwrap());
         self
     }
 
@@ -232,7 +231,7 @@ pub struct CollectionBuilder {
     name: Option<Name>,
     #[derivative(Default(value = "fdecl::Durability::Transient"))]
     durability: fdecl::Durability,
-    environment: Option<String>,
+    environment: Option<Name>,
     #[derivative(Default(value = "cm_types::AllowedOffers::StaticOnly"))]
     allowed_offers: cm_types::AllowedOffers,
     allow_long_names: bool,
@@ -255,7 +254,7 @@ impl CollectionBuilder {
     }
 
     pub fn environment(mut self, environment: &str) -> Self {
-        self.environment = Some(environment.into());
+        self.environment = Some(environment.parse().unwrap());
         self
     }
 
@@ -296,7 +295,7 @@ impl From<CollectionBuilder> for cm_rust::CollectionDecl {
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
 pub struct EnvironmentBuilder {
-    name: Option<String>,
+    name: Option<Name>,
     #[derivative(Default(value = "fdecl::EnvironmentExtends::Realm"))]
     extends: fdecl::EnvironmentExtends,
     runners: Vec<cm_rust::RunnerRegistration>,
@@ -311,7 +310,7 @@ impl EnvironmentBuilder {
     }
 
     pub fn name(mut self, name: &str) -> Self {
-        self.name = Some(name.into());
+        self.name = Some(name.parse().unwrap());
         self
     }
 
@@ -715,6 +714,10 @@ impl UseBuilder {
         self
     }
 
+    pub fn source_static_child(self, source: &str) -> Self {
+        self.source(cm_rust::UseSource::Child(source.parse().unwrap()))
+    }
+
     pub fn availability(mut self, availability: cm_rust::Availability) -> Self {
         assert_matches!(
             self.type_,
@@ -926,6 +929,10 @@ impl ExposeBuilder {
         self
     }
 
+    pub fn source_static_child(self, source: &str) -> Self {
+        self.source(cm_rust::ExposeSource::Child(source.parse().unwrap()))
+    }
+
     pub fn target(mut self, target: cm_rust::ExposeTarget) -> Self {
         self.target = target;
         self
@@ -1037,11 +1044,11 @@ impl From<ExposeBuilder> for cm_rust::ExposeDecl {
 }
 
 pub fn offer_source_static_child(name: &str) -> cm_rust::OfferSource {
-    cm_rust::OfferSource::Child(cm_rust::ChildRef { name: name.into(), collection: None })
+    cm_rust::OfferSource::Child(cm_rust::ChildRef { name: name.parse().unwrap(), collection: None })
 }
 
 pub fn offer_target_static_child(name: &str) -> cm_rust::OfferTarget {
-    cm_rust::OfferTarget::Child(cm_rust::ChildRef { name: name.into(), collection: None })
+    cm_rust::OfferTarget::Child(cm_rust::ChildRef { name: name.parse().unwrap(), collection: None })
 }
 
 /// A convenience builder for constructing [OfferDecl]s.

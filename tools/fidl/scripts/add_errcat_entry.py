@@ -4,13 +4,14 @@
 # found in the LICENSE file.
 
 import argparse
+import datetime
 import glob
 import os
 import re
 import sys
 import textwrap
-from pathlib import Path
 from dataclasses import dataclass, asdict
+from pathlib import Path
 from string import Template
 
 FUCHSIA_DIR = Path(os.environ["FUCHSIA_DIR"])
@@ -143,6 +144,7 @@ def remove_entry(path, entry_matcher, num, after_regex=None):
 
 
 def substitute(template_path, subs):
+    subs["year"] = datetime.date.today().year
     subs["dns"] = DNS
     with open(template_path) as f:
         template = Template(f.read())

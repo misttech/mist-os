@@ -31,9 +31,9 @@ fuchsia_driver("parent_driver") {
 
 fuchsia_driver_component("parent_component") {
   component_name = "banjo_transport_parent"
-  colocate = true
   deps = [ ":parent_driver" ]
   info = "component-info.json"
+  manifest = "meta/parent_component.cml"
 }
 
 driver_bind_rules("child_bind") {
@@ -55,7 +55,7 @@ fuchsia_driver("child_driver") {
 
 fuchsia_driver_component("child_component") {
   component_name = "banjo_transport_child"
-  colocate = true
   deps = [ ":child_driver" ]
   info = "component-info.json"
+  manifest = "meta/child_component.cml"
 }

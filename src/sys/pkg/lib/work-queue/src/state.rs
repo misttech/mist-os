@@ -96,6 +96,18 @@ where
 }
 
 impl<C, O> TaskVariants<C, O> {
+    /// Returns true iff an instance of the task is running.
+    pub(crate) fn running(&self) -> bool {
+        self.running.is_some()
+    }
+
+    /// Returns the number of pending instances of the task.
+    pub(crate) fn pending(&self) -> usize {
+        self.pending.len()
+    }
+}
+
+impl<C, O> TaskVariants<C, O> {
     /// Starts the first instance of this task, claiming its context.
     ///
     /// # Panics

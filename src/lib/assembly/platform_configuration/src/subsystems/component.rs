@@ -55,7 +55,12 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
         let input = input.into_iter().map(PathBuf::from).collect();
 
         // Collect the product policies.
-        let product = config.policy.product_policies.iter().map(PathBuf::from).collect();
+        let product = config
+            .policy
+            .product_policies
+            .iter()
+            .map(|p| PathBuf::from(p.as_utf8_pathbuf()))
+            .collect();
 
         // Compile the final policy config file.
         let config = gendir.join("config.json5");

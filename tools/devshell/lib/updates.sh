@@ -190,44 +190,70 @@ function check-for-package-server {
       fi
     fi
   else
-    local ffx_addr=$(ffx-configured-repository-server-address)
-    local err=$?
-    if [[ "${err}" -ne 0 ]]; then
-      return $err
-    fi
-
-    if [[ -z "${ffx_addr}" ]]; then
-      fx-error "repository server is currently disabled. to re-enable, run:"
-      fx-error ""
-      fx-error "$ ffx config set repository.server.mode ffx"
-      fx-error "$ ffx config remove repository.server.listen"
-      fx-error ""
-      fx-error "Then re-run this command."
-      return 1
-    fi
-
-    # Regex: zero or more characters, a colon, then at least one digit, matching
-    # the digits.
-    if [[ ${ffx_addr} =~ .*:([0-9]+) ]]; then
-      local ffx_port="${BASH_REMATCH[1]}"
-    else
-      fx-error "could not parse ip and port from ffx server address: '$ffx_addr'"
-      return 1
-    fi
-
-    if [[ "${ffx_port}" -eq 0 ]]; then
-      fx-warn "The server is configured to listen on a random port."
-      fx-warn "We can't determine which port this is, so assuming it's running."
-    else
-      if ! is-listening-on-port "${ffx_port}"; then
-        fx-error "It looks like the ffx package server is not running."
-        fx-error "You probably need to run \"fx add-update-source\""
-        return 1
+    # Check for the foreground server.
+    if [[ "$(pgrep -f 'ffx.* repository serve')" ]]; then
+      if [[ "$(pgrep -f "ffx.* repository serve .* --repo-path .*/amber-files")" ]] && [[ -z "$(pgrep -f "ffx.* repository serve .* --repo-path .*${FUCHSIA_BUILD_DIR}/amber-files")" ]]; then
+        fx-warn "It looks like 'fx serve' is running in a different workspace."
+        fx-warn "You probably need to stop that one and start a new one here with \"fx serve\""
       fi
-    fi
+    else
+      # check for the background server.
+      local server_state=$(ffx-repository-server-state)
+      local err=$?
+      if [[ "${err}" -ne 0 ]]; then
+        return "${err}"
+      fi
 
-    # FIXME(https://fxbug.dev/42160775): Check if the current `devhost` points at
-    # '${FUCHSIA_BUILD_DIR}/amber-files'.
+      case "${server_state}" in
+        "stopped")
+          fx-error "It looks like the package repository server is not running."
+          fx-error "You probably need to run \"fx serve\""
+          return 1
+          ;;
+
+        "running")
+          local ffx_addr=$(ffx-configured-repository-server-address)
+          local err=$?
+            if [[ "${err}" -ne 0 ]]; then
+              return "${err}"
+          fi
+
+          # Regex: zero or more characters, a colon, then at least one digit, matching
+          # the digits.
+          if [[ ${ffx_addr} =~ .*:([0-9]+) ]]; then
+            local ffx_port="${BASH_REMATCH[1]}"
+          else
+            fx-error "could not parse ip and port from ffx server address: '$ffx_addr'"
+            return 1
+          fi
+
+          if [[ "${ffx_port}" -eq 0 ]]; then
+            fx-warn "The server is configured to listen on a random port."
+            fx-warn "We can't determine which port this is, so assuming it's running."
+          else
+            if ! is-listening-on-port "${ffx_port}"; then
+              fx-error "It looks like the ffx package server is not running."
+              fx-error "You probably need to run \"fx add-update-source\""
+              return 1
+            fi
+          fi
+
+          # FIXME(https://fxbug.dev/42160775): Check if the current `devhost` points at
+          # '${FUCHSIA_BUILD_DIR}/amber-files'.
+          #
+          ;;
+
+        "disabled")
+          fx-error "repository server is currently disabled. to re-enable, run:"
+          fx-error ""
+          fx-error "$ ffx config set repository.server.mode ffx"
+          fx-error "$ ffx config remove repository.server.listen"
+          fx-error ""
+          fx-error "Then re-run this command."
+          return 1
+          ;;
+      esac
+    fi
   fi
 
   return 0

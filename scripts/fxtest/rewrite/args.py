@@ -69,6 +69,7 @@ class Flags:
     status_delay: float
     ffx_output_directory: str | None
     slow: float
+    quiet: bool
 
     def validate(self) -> None:
         """Validate incoming flags, raising an exception on failure.
@@ -205,7 +206,13 @@ def parse_args(
         default=False,
         help="If set, pretty print the contents of the log file. If no --logpath is set, the default log output location is checked and the most recent log is used.",
     )
-
+    utility.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Silence INFO and INSTRUCTION messages from the tool",
+    )
     build = parser.add_argument_group("Build Options")
     build.add_argument(
         "--build",

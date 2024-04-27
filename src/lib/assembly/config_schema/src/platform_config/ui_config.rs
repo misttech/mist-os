@@ -4,10 +4,11 @@
 
 use camino::Utf8PathBuf;
 use input_device_constants::InputDeviceType as PlatformInputDeviceType;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the UI area.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformUiConfig {
     /// Whether UI should be enabled on the product.
@@ -16,6 +17,7 @@ pub struct PlatformUiConfig {
 
     /// The sensor config to provide to the input pipeline.
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub sensor_config: Option<Utf8PathBuf>,
 
     /// The minimum frame duration for frame scheduler.
@@ -99,7 +101,7 @@ impl Default for PlatformUiConfig {
 
 // LINT.IfChange
 /// Options for input devices that may be supported.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub enum InputDeviceType {
     Button,
@@ -123,7 +125,7 @@ impl From<InputDeviceType> for PlatformInputDeviceType {
 }
 // LINT.ThenChange(/src/ui/lib/input-device-constants/src/lib.rs)
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub enum ViewingDistance {
     Handheld,
@@ -148,7 +150,7 @@ impl AsRef<str> for ViewingDistance {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub struct BrightnessManager {
     pub with_display_power: bool,
@@ -156,7 +158,7 @@ pub struct BrightnessManager {
 
 // LINT.IfChange
 /// Options for Scenic renderers that may be supported.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub enum RendererType {
     Cpu,
@@ -166,7 +168,7 @@ pub enum RendererType {
 }
 // LINT.ThenChange(/src/ui/scenic/bin/app.h)
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct UnsignedIntegerRangeInclusive {
     /// The inclusive lower bound of the range. If None, the range is unbounded.
     pub start: Option<u32>,

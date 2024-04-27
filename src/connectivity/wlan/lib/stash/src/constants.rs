@@ -9,7 +9,7 @@ pub const POLICY_STASH_PREFIX: &str = "config";
 /// The StashNode abstraction requires that writing to a StashNode is done as a named field,
 /// so we will store the network config's data under the POLICY_DATA_KEY.
 pub const POLICY_DATA_KEY: &str = "data";
-pub const POLICY_STASH_ID: &str = "saved_networks";
+pub const POLICY_STORAGE_ID: &str = "saved_networks";
 
 pub type StashedSsid = Vec<u8>;
 
@@ -45,4 +45,60 @@ pub enum Credential {
     None,
     Password(Vec<u8>),
     Psk(Vec<u8>),
+}
+
+/// To deserialize file data into a JSON with a file version and data, a wrapper is needed since
+/// the values of the hashmap must be consistent.
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FileContent {
+    Version(u8),
+    Networks(Vec<PersistentStorageData>),
+}
+
+/// The data that will be stored between reboots of a device. Used to convert the data between JSON
+/// and network config.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct PersistentStorageData {
+    pub ssid: StashedSsid,
+    pub security_type: SecurityType,
+    pub credential: Credential,
+    #[serde(default = "has_ever_connected_default")]
+    pub has_ever_connected: bool,
+}
+
+/// Defines the default value of has_ever_connected in persisted data. This is used so that the
+/// config could be loaded even if this field is missing.
+fn has_ever_connected_default() -> bool {
+    false
+}
+
+impl PersistentStorageData {
+    /// Used when migrating persisted networks from deprecated stash to the new local storage format.
+    pub fn new_from_legacy_data(
+        id: NetworkIdentifier,
+        data: PersistentData,
+    ) -> PersistentStorageData {
+        PersistentStorageData {
+            ssid: id.ssid.clone(),
+            security_type: id.security_type,
+            credential: data.credential,
+            has_ever_connected: data.has_ever_connected,
+        }
+    }
+}
+
+/// Used when migrating persisted networks from deprecated stash to the new local storage format.
+pub fn new_persisted_data_from_old(
+    id: NetworkIdentifier,
+    data: Vec<PersistentData>,
+) -> Vec<PersistentStorageData> {
+    data.into_iter()
+        .map(|c| PersistentStorageData {
+            ssid: id.ssid.clone(),
+            security_type: id.security_type,
+            credential: c.credential,
+            has_ever_connected: c.has_ever_connected,
+        })
+        .collect()
 }

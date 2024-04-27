@@ -1,5 +1,6 @@
 blobfs.cache-eviction-policy=NEVER_EVICT
 ?console.shell=false
+?driver.sysmem.contiguous_memory_size=0
 ?kernel.compression.at_memory_pressure=true
 ?kernel.compression.reclaim_anonymous=true
 ?kernel.compression.reclaim_zero_forks=true

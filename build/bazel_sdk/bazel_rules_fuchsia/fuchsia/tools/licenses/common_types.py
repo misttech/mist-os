@@ -155,7 +155,7 @@ def _verify_string_list(value):
         return "Expected list value"
     for v in value:
         if not isinstance(v, str):
-            return f"Expected str value but got {type(v)}"
+            return f"Expected str elements but got {type(v)}"
     return None
 
 

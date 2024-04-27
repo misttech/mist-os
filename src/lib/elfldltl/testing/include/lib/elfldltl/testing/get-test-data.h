@@ -19,6 +19,9 @@ namespace elfldltl::testing {
 // Get the full path to an arbitrary test data file.
 std::filesystem::path GetTestDataPath(std::string_view filename);
 
+// Get an open fd specifically on a test DSO file, if it exists.
+fbl::unique_fd TryGetTestLib(std::string_view libname);
+
 // Get an open fd specifically on a test DSO file.
 fbl::unique_fd GetTestLib(std::string_view libname);
 

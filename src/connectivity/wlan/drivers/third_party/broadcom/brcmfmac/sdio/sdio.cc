@@ -334,7 +334,7 @@ constexpr size_t kInternalVmoBufferSize = BRCMF_DCMD_MAXLEN + 1024;
 
 // The VMO ID used for the internal DMA buffer. The network device implementation seems to start at
 // 0 so if we pick a number from the other end of the spectrum we should be OK.
-constexpr uint32_t kInternalVmoId = MAX_VMOS - 1;
+constexpr uint32_t kInternalVmoId = fuchsia_hardware_network_driver::kMaxVmos - 1;
 
 #if !defined(NDEBUG)
 struct brcmf_trap_info {
@@ -2302,17 +2302,6 @@ zx::result<uint8_t*> brcmf_map_vmo(brcmf_sdio* bus, uint8_t vmo_id, zx_handle_t 
     BRCMF_ERR("Unable to map VMO: %s", zx_status_get_string(err));
     return zx::error(err);
   }
-  {
-    std::lock_guard<std::mutex> lock(bus->rx_tx_data.vmos_mutex);
-    if (vmo_id >= std::size(bus->rx_tx_data.vmos)) {
-      BRCMF_ERR("vmo_id %u out of range, max value is %lu", vmo_id,
-                std::size(bus->rx_tx_data.vmos));
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    bus->rx_tx_data.vmos[vmo_id].id = vmo_id;
-    bus->rx_tx_data.vmos[vmo_id].handle = vmo;
-    bus->rx_tx_data.vmos[vmo_id].size = vmo_size;
-  }
 
   return zx::success(reinterpret_cast<uint8_t*>(addr));
 }
@@ -2320,11 +2309,24 @@ zx::result<uint8_t*> brcmf_map_vmo(brcmf_sdio* bus, uint8_t vmo_id, zx_handle_t 
 static zx_status_t brcmf_sdio_prepare_vmo(brcmf_bus* bus_if, uint8_t vmo_id, zx_handle_t vmo,
                                           uint8_t* mapped_addr, size_t mapped_size) {
   struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
+  struct brcmf_sdio* bus = sdiodev->bus;
 
   zx_handle_t fn1_vmo = ZX_HANDLE_INVALID;
   zx_handle_t fn2_vmo = ZX_HANDLE_INVALID;
 
-  sdiodev->bus->rx_tx_data.vmo_addrs[vmo_id] = mapped_addr;
+  {
+    std::lock_guard<std::mutex> lock(bus->rx_tx_data.vmos_mutex);
+    if (vmo_id >= std::size(bus->rx_tx_data.vmos)) {
+      BRCMF_ERR("vmo_id %u out of range, max value is %lu", vmo_id,
+                std::size(bus->rx_tx_data.vmos));
+      return ZX_ERR_INVALID_ARGS;
+    }
+    bus->rx_tx_data.vmos[vmo_id].id = vmo_id;
+    bus->rx_tx_data.vmos[vmo_id].handle = vmo;
+    bus->rx_tx_data.vmos[vmo_id].size = mapped_size;
+  }
+
+  bus->rx_tx_data.vmo_addrs[vmo_id] = mapped_addr;
 
   zx_status_t err = zx_handle_duplicate(vmo, ZX_RIGHT_SAME_RIGHTS, &fn1_vmo);
   if (err != ZX_OK) {
@@ -2402,12 +2404,13 @@ static zx_status_t brcmf_sdio_release_vmo(brcmf_bus* bus_if, uint8_t vmo_id) {
   return err;
 }
 
-static zx_status_t brcmf_sdio_queue_rx_space(struct brcmf_bus* bus_if,
-                                             const rx_space_buffer_t* buffers_list,
-                                             size_t buffers_count, uint8_t* vmo_addrs[]) {
+static zx_status_t brcmf_sdio_queue_rx_space(
+    struct brcmf_bus* bus_if,
+    cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+    uint8_t* vmo_addrs[]) {
   struct brcmf_sdio* bus = bus_if->bus_priv.sdio->bus;
   std::lock_guard lock(bus->rx_tx_data.rx_space);
-  bus->rx_tx_data.rx_space.Store(buffers_list, buffers_count, vmo_addrs);
+  bus->rx_tx_data.rx_space.Store(buffers, vmo_addrs);
   bus->rx_tx_data.rx_space_valid = true;
   return ZX_OK;
 }
@@ -3941,7 +3944,8 @@ static void create_internal_frame_space(struct brcmf_sdio* bus,
                                         wlan::drivers::components::FrameStorage& storage,
                                         size_t vmo_offset) __TA_REQUIRES(storage) {
   // Half the space is used for RX or TX and each buffer inside the space has a fixed size
-  rx_space_buffer_t buffers[kDmaInternalBufferSize / 2 / kInternalVmoBufferSize];
+  constexpr size_t kNumBuffers = kDmaInternalBufferSize / 2 / kInternalVmoBufferSize;
+  fuchsia_hardware_network_driver::wire::RxSpaceBuffer buffers[kNumBuffers];
 
   for (size_t i = 0; i < std::size(buffers); ++i) {
     buffers[i].id = kInternalBufferId;
@@ -3950,7 +3954,7 @@ static void create_internal_frame_space(struct brcmf_sdio* bus,
     buffers[i].region.offset = vmo_offset + i * kInternalVmoBufferSize;
   }
 
-  storage.Store(buffers, std::size(buffers), bus->rx_tx_data.vmo_addrs.data());
+  storage.Store(buffers, bus->rx_tx_data.vmo_addrs.data());
 }
 
 static zx_status_t brcmf_create_internal_rx_tx_space(struct brcmf_sdio* bus) {
@@ -3971,6 +3975,11 @@ static zx_status_t brcmf_create_internal_rx_tx_space(struct brcmf_sdio* bus) {
       brcmf_sdio_prepare_vmo(bus->sdiodev->bus_if, kInternalVmoId,
                              bus->rx_tx_data.internal_vmo.get(), *address, kDmaInternalBufferSize);
   if (ret != ZX_OK) {
+    zx_status_t unmap_status = zx_vmar_unmap(
+        zx_vmar_root_self(), reinterpret_cast<zx_vaddr_t>(*address), kDmaInternalBufferSize);
+    if (unmap_status != ZX_OK) {
+      BRCMF_ERR("Failed to unmap internal VMO: %s", zx_status_get_string(unmap_status));
+    }
     BRCMF_ERR("Failed to prepare internal VMO: %s", zx_status_get_string(ret));
     return ret;
   }
@@ -4187,6 +4196,16 @@ void brcmf_sdio_remove(struct brcmf_sdio* bus) {
         free(bus->sdiodev->settings->bus.sdio);
       }
       free(bus->sdiodev->settings);
+    }
+
+    // Can't call brcmf_sdio_release_vmo while holding the lock so we need this workaround.
+    zx_handle_t internal_vmo_handle = ZX_HANDLE_INVALID;
+    {
+      std::lock_guard<std::mutex> vmos_lock(bus->rx_tx_data.vmos_mutex);
+      internal_vmo_handle = bus->rx_tx_data.vmos[kInternalVmoId].handle;
+    }
+    if (internal_vmo_handle != ZX_HANDLE_INVALID) {
+      brcmf_sdio_release_vmo(bus->sdiodev->bus_if, kInternalVmoId);
     }
 
     delete bus->timer;

@@ -9,10 +9,7 @@ use crate::{
 };
 
 use {
-    selinux::{
-        security_server::{SecurityServer, SecurityServerStatus},
-        InitialSid, SecurityId,
-    },
+    selinux::{security_server::SecurityServer, InitialSid, SecurityId},
     starnix_uapi::{error, errors::Errno, signals::Signal},
     std::sync::Arc,
 };

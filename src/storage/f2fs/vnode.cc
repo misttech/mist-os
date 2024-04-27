@@ -331,8 +331,10 @@ zx_status_t VnodeF2fs::GetAttributes(fs::VnodeAttributes *a) {
   a->content_size = GetSize();
   a->storage_size = GetBlockCount() * kBlockSize;
   a->link_count = nlink_;
-  a->creation_time = zx_time_add_duration(ZX_SEC(ctime_.tv_sec), ctime_.tv_nsec);
-  a->modification_time = zx_time_add_duration(ZX_SEC(mtime_.tv_sec), mtime_.tv_nsec);
+  const auto &btime = GetTime<Timestamps::BirthTime>();
+  const auto &mtime = GetTime<Timestamps::ModificationTime>();
+  a->creation_time = zx_time_add_duration(ZX_SEC(btime.tv_sec), btime.tv_nsec);
+  a->modification_time = zx_time_add_duration(ZX_SEC(mtime.tv_sec), mtime.tv_nsec);
 
   return ZX_OK;
 }
@@ -341,12 +343,12 @@ zx_status_t VnodeF2fs::SetAttributes(fs::VnodeAttributesUpdate attr) {
   bool need_inode_sync = false;
 
   if (attr.has_creation_time()) {
-    SetCTime(zx_timespec_from_duration(
+    SetTime<Timestamps::BirthTime>(zx_timespec_from_duration(
         safemath::checked_cast<zx_duration_t>(attr.take_creation_time())));
     need_inode_sync = true;
   }
   if (attr.has_modification_time()) {
-    SetMTime(zx_timespec_from_duration(
+    SetTime<Timestamps::ModificationTime>(zx_timespec_from_duration(
         safemath::checked_cast<zx_duration_t>(attr.take_modification_time())));
     need_inode_sync = true;
   }
@@ -472,12 +474,18 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
     std::memset(&inode.i_ext, 0, sizeof(inode.i_ext));
   }
 
-  inode.i_atime = CpuToLe(static_cast<uint64_t>(atime_.tv_sec));
-  inode.i_ctime = CpuToLe(static_cast<uint64_t>(ctime_.tv_sec));
-  inode.i_mtime = CpuToLe(static_cast<uint64_t>(mtime_.tv_sec));
-  inode.i_atime_nsec = CpuToLe(static_cast<uint32_t>(atime_.tv_nsec));
-  inode.i_ctime_nsec = CpuToLe(static_cast<uint32_t>(ctime_.tv_nsec));
-  inode.i_mtime_nsec = CpuToLe(static_cast<uint32_t>(mtime_.tv_nsec));
+  // TODO(b/297201368): As there is no space for creation time, it temporarily considers ctime as
+  // creation time.
+  const timespec &atime = time_->Get<Timestamps::AccessTime>();
+  const timespec &ctime = time_->Get<Timestamps::BirthTime>();
+  const timespec &mtime = time_->Get<Timestamps::ModificationTime>();
+
+  inode.i_atime = CpuToLe(static_cast<uint64_t>(atime.tv_sec));
+  inode.i_ctime = CpuToLe(static_cast<uint64_t>(ctime.tv_sec));
+  inode.i_mtime = CpuToLe(static_cast<uint64_t>(mtime.tv_sec));
+  inode.i_atime_nsec = CpuToLe(static_cast<uint32_t>(atime.tv_nsec));
+  inode.i_ctime_nsec = CpuToLe(static_cast<uint32_t>(ctime.tv_nsec));
+  inode.i_mtime_nsec = CpuToLe(static_cast<uint32_t>(mtime.tv_nsec));
   inode.i_current_depth = CpuToLe(static_cast<uint32_t>(current_depth_));
   inode.i_xattr_nid = CpuToLe(xattr_nid_);
   inode.i_flags = CpuToLe(inode_flags_);
@@ -538,10 +546,7 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
     ClearFlag(InodeInfoFlag::kDataExist);
   }
 
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  SetCTime(cur_time);
-  SetMTime(cur_time);
+  SetTime<Timestamps::ModificationTime>();
   SetDirty();
   return ZX_OK;
 }
@@ -623,10 +628,7 @@ void VnodeF2fs::TruncateToSize() {
     return;
 
   if (zx_status_t ret = TruncateBlocks(GetSize()); ret == ZX_OK) {
-    timespec cur_time;
-    clock_gettime(CLOCK_REALTIME, &cur_time);
-    SetMTime(cur_time);
-    SetCTime(cur_time);
+    SetTime<Timestamps::ModificationTime>();
   }
 }
 
@@ -689,6 +691,13 @@ void VnodeF2fs::InitFileCacheUnsafe(uint64_t nbytes) {
   file_cache_ = std::make_unique<FileCache>(this, vmo_manager_.get());
 }
 
+void VnodeF2fs::InitTime() {
+  std::lock_guard lock(mutex_);
+  timespec cur;
+  clock_gettime(CLOCK_REALTIME, &cur);
+  time_ = Timestamps(UpdateMode::kRelative, cur, cur, cur, cur);
+}
+
 void VnodeF2fs::Init(LockedPage &node_page) {
   std::lock_guard lock(mutex_);
   Inode &inode = node_page->GetAddress<Node>()->i;
@@ -702,12 +711,15 @@ void VnodeF2fs::Init(LockedPage &node_page) {
   // Don't count the in-memory inode.i_blocks for compatibility with the generic
   // filesystem including linux f2fs.
   SetBlocks(safemath::CheckSub<uint64_t>(LeToCpu(inode.i_blocks), 1).ValueOrDie());
-  atime_.tv_sec = LeToCpu(inode.i_atime);
-  atime_.tv_nsec = LeToCpu(inode.i_atime_nsec);
-  ctime_.tv_sec = LeToCpu(inode.i_ctime);
-  ctime_.tv_nsec = LeToCpu(inode.i_ctime_nsec);
-  mtime_.tv_sec = LeToCpu(inode.i_mtime);
-  mtime_.tv_nsec = LeToCpu(inode.i_mtime_nsec);
+  const timespec atime = {static_cast<time_t>(LeToCpu(inode.i_atime)),
+                          static_cast<time_t>(LeToCpu(inode.i_atime_nsec))};
+  // TODO(b/297201368): As there is no space for creation time, it temporarily considers ctime as
+  // creation time.
+  const timespec btime = {static_cast<time_t>(LeToCpu(inode.i_ctime)),
+                          static_cast<time_t>(LeToCpu(inode.i_ctime_nsec))};
+  const timespec mtime = {static_cast<time_t>(LeToCpu(inode.i_mtime)),
+                          static_cast<time_t>(LeToCpu(inode.i_mtime_nsec))};
+  time_ = Timestamps(UpdateMode::kRelative, atime, btime, mtime, mtime);
   generation_ = LeToCpu(inode.i_generation);
   SetParentNid(LeToCpu(inode.i_pino));
   current_depth_ = LeToCpu(inode.i_current_depth);

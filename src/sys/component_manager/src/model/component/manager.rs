@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{component::ComponentInstance, error::RebootError},
+    crate::model::component::ComponentInstance,
     ::routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_instance::TopInstanceInterface,
     },
     cm_util::TaskGroup,
+    errors::RebootError,
     fidl::endpoints::{self},
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fuchsia_async as fasync,

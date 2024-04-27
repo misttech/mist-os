@@ -23,7 +23,6 @@ if (is_host) {
       "commands/stop:ffx_emulator_stop",
     ]
     test_deps = [
-      "commands:tests",
       "common:tests",
       "configuration:tests",
       "engines:tests",

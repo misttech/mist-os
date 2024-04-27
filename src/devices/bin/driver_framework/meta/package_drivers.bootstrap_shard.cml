@@ -44,7 +44,10 @@
             to: "#pkg-drivers",
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "#sysmem",
             to: "#pkg-drivers",
 

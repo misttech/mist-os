@@ -157,7 +157,7 @@ int64_t LdStartupSpawnProcessTests::Run() {
   spawn.Name(process_name());
 
   // Pass in the mock loader service channel.
-  spawn.AddLdsvc(GetLdsvc());
+  spawn.AddLdsvc(TakeLdsvc());
 
   // Put the log pipe on stderr to collect any diagnostics.
   fbl::unique_fd log_fd;

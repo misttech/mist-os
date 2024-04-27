@@ -96,6 +96,8 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   zx_status_t ConnectFragmentRuntime(const char* fragment_name, const char* service_name,
                                      const char* protocol_name, fdf::Channel request);
 
+  zx_status_t ConnectNsProtocol(const char* protocol_name, zx::channel request);
+
   fpromise::promise<void, zx_status_t> WaitForInitToComplete();
 
   zx_status_t CreateNode();

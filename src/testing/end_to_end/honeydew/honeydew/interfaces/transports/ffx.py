@@ -15,6 +15,7 @@ from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {
     "FFX_CLI": 10,
+    "TARGET_ADD": 15,
     "TARGET_RCS_CONNECTION_WAIT": 15,
     "TARGET_RCS_DISCONNECTION_WAIT": 15,
 }
@@ -36,7 +37,7 @@ class FFX(abc.ABC):
     @abc.abstractmethod
     def add_target(
         self,
-        timeout: float = TIMEOUTS["FFX_CLI"],
+        timeout: float = TIMEOUTS["TARGET_ADD"],
     ) -> None:
         """Adds a target to the ffx collection
 

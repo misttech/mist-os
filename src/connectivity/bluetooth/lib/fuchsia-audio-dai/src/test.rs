@@ -9,7 +9,7 @@ use fuchsia_async as fasync;
 use futures::{Future, StreamExt};
 use std::sync::{Arc, Mutex};
 use tracing::warn;
-use vfs::{directory::entry_container::Directory, mut_pseudo_directory, service};
+use vfs::{directory::entry_container::Directory, pseudo_directory, service};
 
 use crate::driver::{ensure_dai_format_is_supported, ensure_pcm_format_is_supported};
 use crate::DigitalAudioInterface;
@@ -249,9 +249,9 @@ async fn handle_dai_connect_requests(as_input: bool, mut stream: DaiConnectorReq
 
 /// Builds and returns a VFS with a mock input and output DAI device.
 pub fn mock_dai_dev_with_io_devices(input: String, output: String) -> Arc<dyn Directory> {
-    mut_pseudo_directory! {
-        "class" => mut_pseudo_directory! {
-            "dai" => mut_pseudo_directory! {
+    pseudo_directory! {
+        "class" => pseudo_directory! {
+            "dai" => pseudo_directory! {
                 &input => service::host(
                     move |stream: DaiConnectorRequestStream| handle_dai_connect_requests(true,
                                                                                          stream)

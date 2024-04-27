@@ -8,14 +8,12 @@
 use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability},
-        model::{
-            component::WeakComponentInstance,
-            error::{CapabilityProviderError, PkgDirError},
-        },
+        model::component::WeakComponentInstance,
     },
     ::routing::{capability_source::InternalCapability, error::ComponentInstanceError},
     async_trait::async_trait,
     cm_util::TaskGroup,
+    errors::{CapabilityProviderError, PkgDirError},
     vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };
 

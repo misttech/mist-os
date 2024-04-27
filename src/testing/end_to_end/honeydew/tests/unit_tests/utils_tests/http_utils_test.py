@@ -5,12 +5,15 @@
 """Unit tests for honeydew.utils.http_utils.py."""
 
 import json
+import time
 import unittest
+import urllib.request
+from collections.abc import Callable
 from http.client import RemoteDisconnected
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.utils import http_utils
@@ -38,11 +41,13 @@ _MOCK_ARGS: dict[str, Any] = {
 }
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -100,9 +105,9 @@ class HttpUtilsTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(http_utils.urllib.request, "urlopen", autospec=True)
+    @mock.patch.object(urllib.request, "urlopen", autospec=True)
     def test_send_http_request_success(
-        self, parameterized_dict, mock_urlopen
+        self, parameterized_dict: dict[str, Any], mock_urlopen: mock.Mock
     ) -> None:
         """Test case for http_utils.send_http_request() success case."""
 
@@ -127,13 +132,13 @@ class HttpUtilsTests(unittest.TestCase):
         mock_urlopen.assert_called_once()
 
     @mock.patch.object(
-        http_utils.urllib.request,
+        urllib.request,
         "urlopen",
         side_effect=RemoteDisconnected,
         autospec=True,
     )
     def test_send_http_request_with_exceptions_to_skip(
-        self, mock_urlopen
+        self, mock_urlopen: mock.Mock
     ) -> None:
         """Testcase to make sure http_utils.send_http_request() do not
         fail when it receives an exception that is part of exceptions_to_skip
@@ -144,15 +149,15 @@ class HttpUtilsTests(unittest.TestCase):
         self.assertEqual(response, {})
         mock_urlopen.assert_called_once()
 
-    @mock.patch.object(http_utils.time, "sleep", autospec=True)
+    @mock.patch.object(time, "sleep", autospec=True)
     @mock.patch.object(
-        http_utils.urllib.request,
+        urllib.request,
         "urlopen",
         side_effect=RuntimeError("some run time error"),
         autospec=True,
     )
     def test_send_http_request_fail_because_of_exception(
-        self, mock_urlopen, mock_sleep
+        self, mock_urlopen: mock.Mock, mock_sleep: mock.Mock
     ) -> None:
         """Testcase for http_utils.send_http_request() failure case because of
         an exception."""

@@ -11,24 +11,32 @@ group("tools") {
 group("core-tools") {
   testonly = true
   public_deps = [
-    "//bundles/packages/prod:cmdutils",
-    "//bundles/packages/prod:debug_agent",
-    "//bundles/packages/prod:far",
-    "//bundles/packages/prod:tiles",
-    "//bundles/packages/prod:tracing",
     "//src/connectivity:tools",
+    "//src/developer/debug/debug_agent",
     "//src/fonts",
     "//src/graphics/lib/magma:magma-tools",
     "//src/media/audio/consumer/bundles:services",
     "//src/media/bundles:tools",
+    "//src/performance/trace",
     "//src/recovery/factory_reset:tools",
-    "//src/sys/pkg/bin/pm:host",
+    "//src/sys/pkg/bin/far",
     "//src/ui/tools:scenic",
+    "//src/ui/tools/tiles",
     "//third_party/curl:curl_pkg",
     "//third_party/iperf:iperf3_pkg",
     "//third_party/openssh-portable:scp-shell-pkg",
     "//third_party/openssh-portable:ssh-keygen-shell-pkg",
     "//third_party/openssh-portable:ssh-shell-pkg",
+  ]
+}
+
+group("host_tools") {
+  testonly = true
+  public_deps = [
+    "//src/performance/trace2json($host_toolchain)",
+    "//src/performance/traceutil($host_toolchain)",
+    "//src/sys/pkg/bin/far:host($host_toolchain)",
+    "//src/sys/pkg/bin/pm:host",
     "//tools/check-licenses:host($host_toolchain)",
     "//tools/fidl/fidlmerge:host",
     "//tools/fidl/gidl:host",

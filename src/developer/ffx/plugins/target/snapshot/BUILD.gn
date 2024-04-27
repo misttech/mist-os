@@ -13,12 +13,16 @@ ffx_plugin("ffx_snapshot") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+  ]
 
   args_sources = [ "src/args.rs" ]
 

@@ -113,7 +113,7 @@ if (target_cpu == "arm64") {
     component_name = "amlogic_video_decoder_test"
     deps = [ ":amlogic_decoder_test-driver" ]
     info = "amlogic_video_decoder_test-info.json"
-    colocate = true
+    manifest = "meta/amlogic_video_decoder_test.cml"
   }
 
   config("sources_include_config") {

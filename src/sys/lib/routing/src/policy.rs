@@ -200,13 +200,13 @@ impl GlobalPolicyChecker {
         capability_type: CapabilityTypeName,
         name: &'a cm_types::Name,
         env_moniker: &'a Moniker,
-        env_name: &'a str,
+        env_name: &'a cm_types::Name,
     ) -> Result<(), PolicyError> {
         let debug_key = DebugCapabilityKey {
             name: name.clone(),
             source: CapabilityAllowlistSource::Self_,
             capability: capability_type,
-            env_name: env_name.to_string(),
+            env_name: env_name.clone(),
         };
         let route_allowed = match self.policy.debug_capability_policy.get(&debug_key) {
             None => false,
@@ -223,7 +223,7 @@ impl GlobalPolicyChecker {
         Err(PolicyError::DebugCapabilityUseDisallowed {
             cap: debug_key.name.to_string(),
             env_moniker: env_moniker.to_owned(),
-            env_name: env_name.to_owned(),
+            env_name: env_name.to_string(),
         })
     }
 

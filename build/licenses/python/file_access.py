@@ -3,7 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from typing import Callable, List, Set
+import json
+from typing import Any, Callable, List, Set
 from gn_label import GnLabel
 import dataclasses
 import os
@@ -23,6 +24,13 @@ class FileAccess:
         self.visited_files.add(path)
         with open(path) as f:
             return f.read()
+
+    def read_json(self, label: GnLabel) -> Any:
+        GnLabel.check_type(label)
+        path = os.path.join(self.fuchsia_source_path_str, label.path_str)
+        self.visited_files.add(path)
+        with open(path) as f:
+            return json.load(f)
 
     def file_exists(self, label: GnLabel) -> bool:
         """Whether the file exists and is not a directory"""

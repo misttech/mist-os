@@ -177,14 +177,12 @@ fn get_suitable_dhcpv6_prefix(
                 dhcpv6_pd_config: _,
                 interface_admin_auth: _,
             }) => {
-                let ClientState { prefixes, sockaddr: _ } =
-                    dhcpv6_client_state.as_ref().unwrap_or_else(|| {
-                        panic!(
-                            "interface {} doesn't have DHCPv6 client \
-                            but provides prefix returned to PrefixControl",
-                            interface_id
-                        )
-                    });
+                let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state.as_ref()
+                else {
+                    // It's surprising that the interface doesn't have an active DHCPv6 client
+                    // but has a DHCPv6 prefix, but this can happen during interface teardown.
+                    return None;
+                };
                 if let Some(lifetimes) = prefixes.get(&prefix) {
                     return Some(PrefixOnInterface { interface_id, prefix, lifetimes: *lifetimes });
                 }

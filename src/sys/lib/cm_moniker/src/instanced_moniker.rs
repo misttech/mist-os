@@ -50,8 +50,12 @@ impl InstancedMoniker {
             .path()
             .iter()
             .map(|c| {
-                InstancedChildName::try_new(c.name(), c.collection().map(|c| c.as_str()), 0)
-                    .expect("down path moniker is guaranteed to be valid")
+                InstancedChildName::try_new(
+                    c.name().as_str(),
+                    c.collection().map(|c| c.as_str()),
+                    0,
+                )
+                .expect("down path moniker is guaranteed to be valid")
             })
             .collect();
         InstancedMoniker::new(path)
@@ -141,7 +145,7 @@ mod tests {
         assert_eq!("a:1/coll:b:2", format!("{}", m));
         assert_eq!(m, InstancedMoniker::try_from(vec!["a:1", "coll:b:2"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
-        assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
+        assert_eq!(m.leaf().map(|m| m.name().as_str()), Some("b"));
         assert_eq!(m.leaf().map(|m| m.instance()), Some(2));
         assert_eq!(m.leaf(), Some(&InstancedChildName::try_from("coll:b:2").unwrap()));
     }

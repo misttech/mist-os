@@ -8,4 +8,5 @@ bind_library("fuchsia.amlogic.platform.a311d") {
   source = "fuchsia.amlogic.platform.a311d.bind"
   sdk_category = "partner"
   sdk_area = "Driver SDK"
+  public_deps = [ "//src/devices/bind/fuchsia.regulator" ]
 }

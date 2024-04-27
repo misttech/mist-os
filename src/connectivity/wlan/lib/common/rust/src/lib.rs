@@ -23,7 +23,6 @@ pub mod ie;
 pub mod mac;
 pub mod mgmt_writer;
 pub mod organization;
-pub mod pointers;
 pub mod scan;
 pub mod security;
 pub mod sequence;

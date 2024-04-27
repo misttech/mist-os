@@ -4,6 +4,7 @@
 
 #include "src/performance/trace/app.h"
 
+#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/performance/trace/commands/list_categories.h"
@@ -12,13 +13,11 @@
 
 namespace tracing {
 
-App::App(sys::ComponentContext* context) : Command(context) {
+App::App() {
   RegisterCommand(ListCategoriesCommand::Describe());
   RegisterCommand(RecordCommand::Describe());
   RegisterCommand(TimeCommand::Describe());
 }
-
-App::~App() {}
 
 void App::Start(const fxl::CommandLine& command_line) {
   if (command_line.HasOption("help")) {
@@ -44,7 +43,7 @@ void App::Start(const fxl::CommandLine& command_line) {
     return;
   }
 
-  command_ = it->second.factory(context());
+  command_ = it->second.factory();
   command_->Run(fxl::CommandLineFromIteratorsWithArgv0(
                     positional_args.front(), positional_args.begin() + 1, positional_args.end()),
                 [this](int32_t return_code) { Done(return_code); });
@@ -53,12 +52,12 @@ void App::Start(const fxl::CommandLine& command_line) {
 void App::RegisterCommand(Command::Info info) { known_commands_[info.name] = std::move(info); }
 
 void App::PrintHelp() {
-  out() << "trace [options] command [command-specific options]" << std::endl;
-  out() << "  --help: Produce this help message" << std::endl << std::endl;
+  out() << "trace [options] command [command-specific options]\n";
+  out() << "  --help: Produce this help message\n\n";
   for (const auto& pair : known_commands_) {
-    out() << "  " << pair.second.name << " - " << pair.second.usage << std::endl;
+    out() << "  " << pair.second.name << " - " << pair.second.usage << '\n';
     for (const auto& option : pair.second.options)
-      out() << "    --" << option.first << ": " << option.second << std::endl;
+      out() << "    --" << option.first << ": " << option.second << '\n';
   }
 }
 

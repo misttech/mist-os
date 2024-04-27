@@ -22,16 +22,10 @@
 #include <string>
 #include <vector>
 
-#include "src/lib/files/file.h"
-#include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/performance/lib/test_utils/run_program.h"
-#include "src/performance/trace/options.h"
-#include "src/performance/trace/tests/component_context.h"
-#include "src/performance/trace/tests/integration_test_utils.h"
 
-namespace tracing {
-namespace test {
+namespace tracing::test {
 
 // The path of the trace program as a shell command.
 const char kTraceProgramPath[] = "/pkg/bin/trace";
@@ -223,5 +217,4 @@ bool VerifyIntegrationTest(const std::string& app_path, const std::string& test_
   return true;
 }
 
-}  // namespace test
-}  // namespace tracing
+}  // namespace tracing::test

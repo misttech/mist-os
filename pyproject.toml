@@ -39,20 +39,13 @@ warn_return_any = false
 # More info @ https://github.com/python/mypy/issues/9318
 disallow_subclassing_any = false
 
+# Allow decorators, calls without type annotations since some of our packages
+# don't have type annotations.
+allow_untyped_decorators = true
+allow_untyped_calls = true
+
 # 'yaml' module imports aren't working with the global
 # 'ignore_missing_imports' flag. Overriding using overridesr entry.
 [[tool.mypy.overrides]]
 module = "yaml"
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-# TODO(b/326472322):  Investigate Honeydew module import failure with full path
-module = "tests.unit_tests.*"
-# TODO(b/322232685) - unit tests are not mypy compatible with `strict=true`.
-# Unable to override `strict` config in per-module config. More info @ https://github.com/python/mypy/issues/11401.
-# As a result, disable specific config options for unit tests that were enabled
-# by `strict=true` until unit test code addresses these warnings.
-allow_untyped_defs = true
-allow_untyped_decorators = true
-allow_incomplete_defs = true
-disable_error_code = ["attr-defined"]

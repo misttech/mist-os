@@ -4,6 +4,8 @@
 
 library fuchsia.amlogic.platform.a311d;
 
+using fuchsia.regulator;
+
 // Values taken from <soc/aml-a311d/a311d-gpio.h>
 
 extend uint fuchsia.BIND_PWM_ID {
@@ -143,7 +145,7 @@ uint GPIOE_PIN_ID {
     PIN_2 = 99,
 };
 
-uint POWER_DOMAIN {
-  ARM_CORE_BIG = 0,
-  ARM_CORE_LITTLE = 1,
+extend string fuchsia.regulator.NAME {
+  PWM_VREG_LITTLE = "pwm_vreg_little",
+  PWM_VREG_BIG = "pwm_vreg_big",
 };

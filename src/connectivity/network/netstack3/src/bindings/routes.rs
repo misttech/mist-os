@@ -37,6 +37,8 @@ pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
 
 pub(crate) mod state;
+mod witness;
+use witness::TableId;
 
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsCtx>;
 type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsCtx>;

@@ -6,9 +6,10 @@
 
 use anyhow::{bail, Context, Result};
 use emulator_instance::{
-    get_instance_dir, AccelerationMode, ConsoleType, EmulatorConfiguration, GpuType, LogLevel,
+    AccelerationMode, ConsoleType, EmulatorConfiguration, EmulatorInstances, GpuType, LogLevel,
     NetworkingMode, OperatingSystem,
 };
+use ffx_config::EnvironmentContext;
 use ffx_emulator_common::{
     config::{EMU_UPSCRIPT_FILE, KVM_PATH},
     split_once,
@@ -26,8 +27,10 @@ use std::{
 
 /// Create a RuntimeConfiguration based on the command line args.
 pub(crate) async fn make_configs(
+    ctx: &EnvironmentContext,
     cmd: &StartCommand,
     product_bundle: Option<ProductBundle>,
+    emu_instances: &EmulatorInstances,
 ) -> Result<EmulatorConfiguration> {
     // Start with a default structure, than fill it in as we go.
     let mut emu_config = EmulatorConfiguration::default();
@@ -55,7 +58,9 @@ pub(crate) async fn make_configs(
 
     // Integrate the values from command line flags into the emulation configuration, and
     // return the result to the caller.
-    apply_command_line_options(emu_config, cmd).await.context("problem with apply command lines")
+    apply_command_line_options(emu_config, cmd, emu_instances, ctx)
+        .await
+        .context("problem with apply command lines")
 }
 
 /// Given an EmulatorConfiguration and a StartCommand, write the values from the
@@ -63,6 +68,8 @@ pub(crate) async fn make_configs(
 async fn apply_command_line_options(
     mut emu_config: EmulatorConfiguration,
     cmd: &StartCommand,
+    emu_instances: &EmulatorInstances,
+    ctx: &EnvironmentContext,
 ) -> Result<EmulatorConfiguration> {
     // Clone any fields that can simply copy over.
     emu_config.host.acceleration = cmd.accel.clone();
@@ -78,7 +85,7 @@ async fn apply_command_line_options(
         emu_config.host.log = PathBuf::from(env::current_dir()?).join(log);
     } else {
         // TODO(https://fxbug.dev/42067481): Move logs to ffx log dir so `ffx doctor` collects them.
-        let instance = get_instance_dir(&cmd.name().await?, false).await?;
+        let instance = emu_instances.get_instance_dir(&cmd.name().await?, false)?;
         emu_config.host.log = instance.join("emulator.log");
     }
 
@@ -89,9 +96,8 @@ async fn apply_command_line_options(
             OperatingSystem::Linux => {
                 emu_config.host.acceleration = AccelerationMode::None;
                 if check_kvm {
-                    let path: String = ffx_config::get(KVM_PATH)
-                        .await
-                        .context("getting KVM path from ffx config")?;
+                    let path: String =
+                        ctx.get(KVM_PATH).await.context("getting KVM path from ffx config")?;
                     match std::fs::OpenOptions::new().write(true).open(&path) {
                         Err(e) => match e.kind() {
                             std::io::ErrorKind::PermissionDenied => {
@@ -170,7 +176,7 @@ async fn apply_command_line_options(
     emu_config.runtime.addl_kernel_args = cmd.kernel_args.clone();
     emu_config.runtime.name = cmd.name().await?;
     emu_config.runtime.instance_directory =
-        get_instance_dir(&emu_config.runtime.name, true).await?;
+        emu_instances.get_instance_dir(&emu_config.runtime.name, true)?;
     emu_config.runtime.reuse = cmd.reuse;
 
     // Collapsing multiple binary options into related fields.
@@ -199,9 +205,8 @@ async fn apply_command_line_options(
 
     // Any generated values or values from ffx_config.
     emu_config.runtime.mac_address = generate_mac_address(&cmd.name().await?);
-    let upscript: String = ffx_config::get(EMU_UPSCRIPT_FILE)
-        .await
-        .context("Getting upscript path from ffx config")?;
+    let upscript: String =
+        ctx.get(EMU_UPSCRIPT_FILE).await.context("Getting upscript path from ffx config")?;
     if !upscript.is_empty() {
         emu_config.runtime.upscript = Some(PathBuf::from(upscript));
     }
@@ -284,8 +289,7 @@ mod tests {
     use emulator_instance::{CpuArchitecture, PortMapping};
     use ffx_config::ConfigLevel;
     use ffx_emulator_common::config::{
-        EMU_DEFAULT_DEVICE, EMU_DEFAULT_ENGINE, EMU_DEFAULT_GPU, EMU_INSTANCE_ROOT_DIR,
-        EMU_START_TIMEOUT,
+        EMU_DEFAULT_DEVICE, EMU_DEFAULT_ENGINE, EMU_DEFAULT_GPU, EMU_START_TIMEOUT,
     };
     use regex::Regex;
     use serde_json::json;
@@ -298,6 +302,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_apply_command_line_options() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
+        let emulator_instances = EmulatorInstances::new(PathBuf::new());
 
         // Set up some test data to be applied.
         let mut cmd = StartCommand {
@@ -331,7 +336,9 @@ mod tests {
         assert_eq!(emu_config.runtime.upscript, None);
 
         // Apply the test data, which should change everything in the config.
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emulator_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::Hyper);
         assert_eq!(opts.host.gpu, GpuType::HostExperimental);
         assert_eq!(opts.host.log, PathBuf::from("/path/to/log"));
@@ -350,13 +357,15 @@ mod tests {
             .set(json!("/path/to/upscript".to_string()))
             .await?;
 
-        let opts = apply_command_line_options(opts, &cmd).await?;
+        let opts =
+            apply_command_line_options(opts, &cmd, &emulator_instances, &env.context).await?;
         assert_eq!(opts.runtime.upscript, Some(PathBuf::from("/path/to/upscript")));
 
         // "console" and "monitor" are exclusive, so swap them and reapply.
         cmd.console = false;
         cmd.monitor = true;
-        let opts = apply_command_line_options(opts, &cmd).await?;
+        let opts =
+            apply_command_line_options(opts, &cmd, &emulator_instances, &env.context).await?;
         assert_eq!(opts.runtime.console, ConsoleType::Monitor);
 
         // Test relative file paths
@@ -368,13 +377,17 @@ mod tests {
         env::set_current_dir(&temp_path).context("Error setting cwd in test")?;
 
         cmd.log = Some(PathBuf::from("tmp.log"));
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emulator_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         assert_eq!(opts.host.log, temp_path.join("tmp.log"));
 
         cmd.log = Some(PathBuf::from("relative/path/to/emulator.file"));
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emulator_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         assert_eq!(opts.host.log, temp_path.join("relative/path/to/emulator.file"));
@@ -382,7 +395,9 @@ mod tests {
         // Set the CWD to the longer directory, so we can test ".."
         env::set_current_dir(&long_path).context("Error setting cwd in test")?;
         cmd.log = Some(PathBuf::from("../other/file.log"));
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emulator_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         // As mentioned in the code, it'd be nice to canonicalize this, but since the file doesn't
@@ -391,7 +406,9 @@ mod tests {
 
         // Test absolute path
         cmd.log = Some(long_path.join("absolute.file"));
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emulator_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         assert_eq!(opts.host.log, long_path.join("absolute.file"));
@@ -407,12 +424,16 @@ mod tests {
         let mut cmd = StartCommand::default();
         let emu_config = EmulatorConfiguration::default();
 
+        let emu_instances = EmulatorInstances::new(PathBuf::new());
+
         assert_eq!(cmd.device().await.unwrap(), Some(String::from("")));
         assert_eq!(cmd.engine().await.unwrap(), "femu");
         assert_eq!(cmd.gpu().await.unwrap(), "swiftshader_indirect");
         assert_eq!(cmd.startup_timeout().await.unwrap(), 60);
 
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         assert_eq!(opts.host.gpu, GpuType::SwiftshaderIndirect);
@@ -439,7 +460,9 @@ mod tests {
         assert_eq!(cmd.gpu().await.unwrap(), "host");
         assert_eq!(cmd.startup_timeout().await.unwrap(), 120);
 
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         assert_eq!(opts.host.gpu, GpuType::HostExperimental);
@@ -447,7 +470,9 @@ mod tests {
         cmd.gpu = Some(String::from("swiftshader_indirect"));
 
         assert_eq!(cmd.gpu().await.unwrap(), "swiftshader_indirect");
-        let result = apply_command_line_options(emu_config.clone(), &cmd).await;
+        let result =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
         assert_eq!(opts.host.gpu, GpuType::SwiftshaderIndirect);
@@ -474,15 +499,7 @@ mod tests {
                 .expect("Couldn't convert file_path to str")
                 .to_string()))
             .await?;
-        env.context
-            .query(EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ConfigLevel::User))
-            .set(json!(temp_path
-                .as_path()
-                .to_str()
-                .expect("Couldn't convert temp_path to str")
-                .to_string()))
-            .await?;
+        let emu_instances = EmulatorInstances::new(temp_path.clone());
 
         // Set up some test data to be applied.
         let cmd = StartCommand { accel: AccelerationMode::Auto, ..Default::default() };
@@ -494,22 +511,30 @@ mod tests {
 
         emu_config.device.cpu.architecture = CpuArchitecture::X64;
         emu_config.host.architecture = CpuArchitecture::X64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::Hyper);
 
         emu_config.device.cpu.architecture = CpuArchitecture::X64;
         emu_config.host.architecture = CpuArchitecture::Arm64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         emu_config.device.cpu.architecture = CpuArchitecture::Arm64;
         emu_config.host.architecture = CpuArchitecture::Arm64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::Hyper);
 
         emu_config.device.cpu.architecture = CpuArchitecture::Arm64;
         emu_config.host.architecture = CpuArchitecture::X64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         perms.set_readonly(true);
@@ -517,44 +542,60 @@ mod tests {
 
         emu_config.device.cpu.architecture = CpuArchitecture::X64;
         emu_config.host.architecture = CpuArchitecture::X64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         emu_config.device.cpu.architecture = CpuArchitecture::X64;
         emu_config.host.architecture = CpuArchitecture::Arm64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         emu_config.device.cpu.architecture = CpuArchitecture::Arm64;
         emu_config.host.architecture = CpuArchitecture::Arm64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         emu_config.device.cpu.architecture = CpuArchitecture::Arm64;
         emu_config.host.architecture = CpuArchitecture::X64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         emu_config.host.os = OperatingSystem::MacOS;
 
         emu_config.device.cpu.architecture = CpuArchitecture::X64;
         emu_config.host.architecture = CpuArchitecture::X64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::Hyper);
 
         emu_config.device.cpu.architecture = CpuArchitecture::X64;
         emu_config.host.architecture = CpuArchitecture::Arm64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         emu_config.device.cpu.architecture = CpuArchitecture::Arm64;
         emu_config.host.architecture = CpuArchitecture::Arm64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::Hyper);
 
         emu_config.device.cpu.architecture = CpuArchitecture::Arm64;
         emu_config.host.architecture = CpuArchitecture::X64;
-        let opts = apply_command_line_options(emu_config.clone(), &cmd).await?;
+        let opts =
+            apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
+                .await?;
         assert_eq!(opts.host.acceleration, AccelerationMode::None);
 
         Ok(())

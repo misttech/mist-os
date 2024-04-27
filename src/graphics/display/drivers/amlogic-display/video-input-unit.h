@@ -64,7 +64,7 @@ class VideoInputUnit {
 
   // Schedules the given |config| to be applied by the RDMA engine when the next VSYNC interrupt
   // occurs.
-  void FlipOnVsync(const display_config_t* config, display::ConfigStamp config_stamp);
+  void FlipOnVsync(const display_config_t& config, display::ConfigStamp config_stamp);
 
   // Returns the image handle that was most recently processed by the RDMA engine. If RDMA is
   // determined to be in progress and incomplete, then the previously applied image is returned. If
@@ -127,7 +127,7 @@ class VideoInputUnit {
   bool ConfigNeededForSingleNonscaledLayer(PixelGridSize2D layer_image_size,
                                            PixelGridSize2D display_contents_size) const;
 
-  void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* config);
+  void SetColorCorrection(uint32_t rdma_table_idx, const display_config_t& config);
 
   void DumpNonRdmaRegisters();
 

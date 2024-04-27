@@ -6,11 +6,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::{
-    component::{ComponentInstance, IncomingCapabilities, StartReason, WeakComponentInstance},
-    error::{ActionError, StartActionError},
+use super::component::{
+    ComponentInstance, IncomingCapabilities, StartReason, WeakComponentInstance,
 };
 use crate::framework::controller;
+use errors::{ActionError, StartActionError};
 
 /// The interface to start a component.
 ///

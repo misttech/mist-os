@@ -137,6 +137,7 @@ template("devicetree_visitor_collection") {
       ":*",
       "//sdk:*",
     ]
+    category = "internal"  # For the "internal IDK" used for Bazel rules.
 
     deps = []
     foreach(dep, invoker.deps) {

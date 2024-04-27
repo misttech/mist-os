@@ -30,16 +30,34 @@ class SyntheticDevicetreeTest {
     loaded_dtb = LoadDtb("arm_gic2_no_msi.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     arm_gic2_no_msi_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("arm_gic3_stride.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    arm_gic3_stride_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("arm_gic3_four_stride.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    arm_gic3_four_stride_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("arm_gic3_subsumed_stride.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    arm_gic3_subsumed_stride_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() { empty_dtb_ = std::nullopt; }
 
   auto empty_fdt() { return empty_dtb_->fdt(); }
   auto arm_gic2_no_msi() { return arm_gic2_no_msi_->fdt(); }
+  auto arm_gic3_stride() { return arm_gic3_stride_->fdt(); }
+  auto arm_gic3_four_stride() { return arm_gic3_four_stride_->fdt(); }
+  auto arm_gic3_subsumed_stride() { return arm_gic3_subsumed_stride_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> empty_dtb_;
   static std::optional<LoadedDtb> arm_gic2_no_msi_;
+  static std::optional<LoadedDtb> arm_gic3_stride_;
+  static std::optional<LoadedDtb> arm_gic3_four_stride_;
+  static std::optional<LoadedDtb> arm_gic3_subsumed_stride_;
 };
 
 // Devicetree Test fixture that provides members to existing ARM dtbs.

@@ -134,10 +134,6 @@ pub struct PureIpSockaddr {
 impl From<PureIpSockaddr> for libc::sockaddr_ll {
     fn from(value: PureIpSockaddr) -> Self {
         let PureIpSockaddr { interface_id, protocol } = value;
-        let protocol = match protocol {
-            net_types::ip::IpVersion::V4 => libc::ETH_P_IP,
-            net_types::ip::IpVersion::V6 => libc::ETH_P_IPV6,
-        };
         libc::sockaddr_ll {
             sll_family: libc::AF_PACKET
                 .try_into()
@@ -146,10 +142,7 @@ impl From<PureIpSockaddr> for libc::sockaddr_ll {
                 .map_or(0, NonZeroU64::get)
                 .try_into()
                 .expect("interface_id should fit in sll_ifindex field"),
-            // Network order is big endian.
-            sll_protocol: u16::try_from(protocol)
-                .expect("protocol should fit in sll_protocol field")
-                .to_be(),
+            sll_protocol: sockaddr_ll_ip_protocol(protocol),
             // Pure IP devices don't have a hardware address.
             sll_halen: 0,
             sll_addr: [0, 0, 0, 0, 0, 0, 0, 0],
@@ -157,6 +150,16 @@ impl From<PureIpSockaddr> for libc::sockaddr_ll {
             sll_pkttype: 0, // unused by sendto() or bind()
         }
     }
+}
+
+/// Returns the protocol, in network byte order, for the given `IpVersion`.
+pub fn sockaddr_ll_ip_protocol(ip_version: net_types::ip::IpVersion) -> u16 {
+    let protocol = match ip_version {
+        net_types::ip::IpVersion::V4 => libc::ETH_P_IP,
+        net_types::ip::IpVersion::V6 => libc::ETH_P_IPV6,
+    };
+    // Network order is big endian.
+    u16::try_from(protocol).expect("protocol should fit in a u16 field").to_be()
 }
 
 #[cfg(test)]

@@ -10,32 +10,13 @@
 #ifndef SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_RADIO_H_
 #define SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_RADIO_H_
 
-#ifdef OPENTHREAD_231010
-#include "openthread-system.h"
-#include "spinel_fidl_interface.h"
-
-#define NEW_HPP_  // TODO(jiamingw) remove after OpenThread updated to May 17, 2023 version
-#define OT_CORE_COMMON_NEW_HPP_  // Use the new operator defined in fuchsia instead
-#include <spinel/radio_spinel.hpp>
-#undef OT_CORE_COMMON_NEW_HPP_
-#undef NEW_HPP_
-
-extern "C" void platformRadioInit(const otPlatformConfig *a_platform_config);
-extern "C" otError otPlatRadioEnable(otInstance *a_instance);
-extern "C" otInstance *otPlatRadioCheckOtInstanceEnabled();
-extern "C" void platformRadioProcess(otInstance *a_instance);
-#endif  //  OPENTHREAD_231010
-
-#ifdef OPENTHREAD_240214
 #include "openthread-system.h"
 #include "radio_url.h"
 #include "spinel_fidl_interface.h"
 
-#define NEW_HPP_  // TODO(jiamingw) remove after OpenThread updated to May 17, 2023 version
 #define OT_CORE_COMMON_NEW_HPP_  // Use the new operator defined in fuchsia instead
 #include <spinel/radio_spinel.hpp>
 #undef OT_CORE_COMMON_NEW_HPP_
-#undef NEW_HPP_
 
 #define OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE 1
 
@@ -125,7 +106,5 @@ class Radio {
 
 }  // namespace Posix
 }  // namespace ot
-
-#endif  // OPENTHREAD_240214
 
 #endif  // SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_RADIO_H_

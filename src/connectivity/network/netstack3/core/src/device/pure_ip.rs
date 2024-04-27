@@ -63,6 +63,13 @@ pub struct PureIpDeviceTxQueueFrameMetadata {
     ip_version: IpVersion,
 }
 
+/// Metadata for sending IP packets from a device socket.
+#[derive(Debug, PartialEq)]
+pub struct PureIpHeaderParams {
+    /// The IP version of the packet to send.
+    pub ip_version: IpVersion,
+}
+
 /// State for a pure IP device.
 pub struct PureIpDeviceState {
     /// The device's dynamic state.

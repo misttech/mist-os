@@ -714,7 +714,7 @@ mod tests {
             vec![
                 Property::UintArray(
                     "array".to_string(),
-                    ArrayContent::Values(vec![0, 2, std::u64::MAX]),
+                    ArrayContent::Values(vec![0, 2, u64::MAX]),
                 ),
                 Property::Bool("bool_true".to_string(), true),
                 Property::Bool("bool_false".to_string(), false),

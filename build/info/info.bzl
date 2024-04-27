@@ -42,17 +42,16 @@ def _gen_latest_date_and_timestamp_impl(ctx):
     # Build command line arguments.
     cmd_args = [
         ctx.file._py_script.path,
-        "--use-jiri-values",
-        "--git",
-        ctx.file._git.path,
+        "--input-hash-file",
+        ctx.file._commit_hash_file.path,
+        "--input-stamp-file",
+        ctx.file._commit_stamp_file.path,
         "--timestamp-file",
         stamp_file.path,
         "--date-file",
         commit_date.path,
         "--commit-hash-file",
         commit_hash.path,
-        "--repo",
-        "integration",
     ]
 
     if truncate_build_info_commit_date:
@@ -60,9 +59,8 @@ def _gen_latest_date_and_timestamp_impl(ctx):
 
     runfiles = ctx.runfiles(
         files = [
-            ctx.file._integration_git_head,
-            ctx.file._integration_commit_hash,
-            ctx.file._integration_commit_stamp,
+            ctx.file._commit_hash_file,
+            ctx.file._commit_stamp_file,
         ],
         transitive_files = python3_runfiles.files,
     )
@@ -82,28 +80,15 @@ def _gen_latest_date_and_timestamp_impl(ctx):
 gen_latest_date_and_timestamp = rule(
     implementation = _gen_latest_date_and_timestamp_impl,
     attrs = {
-        "_integration_git_head": attr.label(
-            allow_single_file = True,
-            default = "//:integration/.git/HEAD",
-        ),
         "_py_script": attr.label(
             allow_single_file = True,
             default = "//build/info:gen_latest_commit_date.py",
         ),
-        # https://fxbug.dev/335391299: Remove this once the Jiri hook
-        # has been enabled.
-        "_git": attr.label(
-            allow_single_file = True,
-            doc = "Git binary to use.",
-            # LINT.IfChange
-            default = "//:fuchsia_build_generated/git",
-            # LINT.ThenChange(//build/bazel/scripts/update_workspace.py)
-        ),
-        "_integration_commit_hash": attr.label(
+        "_commit_hash_file": attr.label(
             allow_single_file = True,
             default = "//build/info:jiri_generated/integration_commit_hash.txt",
         ),
-        "_integration_commit_stamp": attr.label(
+        "_commit_stamp_file": attr.label(
             allow_single_file = True,
             default = "//build/info:jiri_generated/integration_commit_stamp.txt",
         ),

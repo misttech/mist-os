@@ -432,7 +432,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cm_rust::{Availability, ChildRef, OfferSource, OfferTarget};
+    use cm_rust::{Availability, OfferSource};
+    use cm_rust_testing::*;
 
     #[test]
     fn test_get_instance_filter() {
@@ -444,7 +445,7 @@ mod tests {
                 source: OfferSource::Parent,
                 source_name: "foo".parse().unwrap(),
                 source_dictionary: Default::default(),
-                target: OfferTarget::Child(ChildRef { name: "a".into(), collection: None }),
+                target: offer_target_static_child("a"),
                 target_name: "bar".parse().unwrap(),
                 source_instance_filter,
                 renamed_instances,

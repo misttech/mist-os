@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
     hash::Hash,
@@ -49,15 +50,22 @@ macro_rules! impl_path_type_marker {
 }
 
 /// A path, in valid utf-8, which carries a marker for what kind of path it is.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct TypedPathBuf<P: PathTypeMarker> {
     #[serde(flatten)]
+    #[schemars(schema_with = "path_schema")]
     inner: Utf8PathBuf,
 
     #[serde(skip)]
     _marker: PhantomData<P>,
+}
+
+fn path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <String>::json_schema(gen).into();
+    schema.format = Some("Utf8PathBuf".to_owned());
+    schema.into()
 }
 
 /// This derefs into the typed version of utf8 path, not utf8 path itself, so

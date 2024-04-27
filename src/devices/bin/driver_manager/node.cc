@@ -1441,7 +1441,7 @@ void Node::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
   completer.ReplySuccess();
 }
 void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  completer.ReplySuccess(fidl::StringView::FromExternal(MakeTopologicalPath()));
+  completer.ReplySuccess(fidl::StringView::FromExternal("/" + MakeTopologicalPath()));
 }
 
 zx_status_t Node::ConnectControllerInterface(

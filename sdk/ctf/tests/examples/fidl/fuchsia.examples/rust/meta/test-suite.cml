@@ -6,7 +6,7 @@
 {
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
-        "//src/testing/realm_proxy/client/meta/realm_proxy.shard.cml",
+        "//src/testing/realm_client/meta/realm_client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

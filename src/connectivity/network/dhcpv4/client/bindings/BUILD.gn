@@ -36,6 +36,7 @@ network_unified_binary("dhcp_client") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/packet-formats",

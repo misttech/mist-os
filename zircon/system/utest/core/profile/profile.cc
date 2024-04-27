@@ -64,8 +64,13 @@ zx_profile_info_t MakeMemoryPriorityProfile(int32_t priority) {
 
 size_t GetCpuCount() {
   size_t actual, available;
-  zx_status_t status =
-      standalone::GetRootResource()->get_info(ZX_INFO_CPU_STATS, nullptr, 0, &actual, &available);
+  auto system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_INFO_BASE);
+  ZX_ASSERT(result.status_value() == ZX_OK);
+  zx::resource info_resource = std::move(result.value());
+
+  zx_status_t status = info_resource.get_info(ZX_INFO_CPU_STATS, nullptr, 0, &actual, &available);
   ZX_ASSERT(status == ZX_OK);
   return available;
 }
@@ -440,8 +445,14 @@ TEST(MemoryPriorityProfile, ApplyProfile) {
   supply();
 
   zx_info_kmem_stats_extended_t stats;
-  EXPECT_OK(standalone::GetRootResource()->get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats,
-                                                    sizeof(stats), nullptr, nullptr));
+  auto system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource info_resource = std::move(result.value());
+
+  EXPECT_OK(
+      info_resource.get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats, sizeof(stats), nullptr, nullptr));
 
   const uint64_t prev = stats.vmo_reclaim_disabled_bytes;
 
@@ -452,15 +463,15 @@ TEST(MemoryPriorityProfile, ApplyProfile) {
   // In between the previous supply and setting the profile, the pages could have been evicted, so
   // re-supply them.
   supply();
-  EXPECT_OK(standalone::GetRootResource()->get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats,
-                                                    sizeof(stats), nullptr, nullptr));
+  EXPECT_OK(
+      info_resource.get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats, sizeof(stats), nullptr, nullptr));
   EXPECT_GT(stats.vmo_reclaim_disabled_bytes, prev);
 
   // Applying the default priority should undo the reclamation change.
   EXPECT_OK(zx::vmar::root_self()->set_profile(profile_default, 0));
 
-  EXPECT_OK(standalone::GetRootResource()->get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats,
-                                                    sizeof(stats), nullptr, nullptr));
+  EXPECT_OK(
+      info_resource.get_info(ZX_INFO_KMEM_STATS_EXTENDED, &stats, sizeof(stats), nullptr, nullptr));
   EXPECT_EQ(stats.vmo_reclaim_disabled_bytes, prev);
 }
 

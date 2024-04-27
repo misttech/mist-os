@@ -25,7 +25,7 @@ fuchsia_component("vkproto_driver_test_child_component") {
 fuchsia_structured_config_values("default_config") {
   cm_label = ":vkproto_driver_tests_manifest"
   values = {
-    gpu_vendor_id = ""
+    gpu_vendor_id = 0
   }
 }
 
@@ -69,7 +69,6 @@ fuchsia_package("vkproto_driver_tests_child_package") {
   testonly = true
   deps = [ ":vkproto_driver_test_child_component" ]
   deps += [ ":default_config" ]
-  validate_structured_config = false
 }
 
 fuchsia_test_component("vkproto_driver_tests_component") {

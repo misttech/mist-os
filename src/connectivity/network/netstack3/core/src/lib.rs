@@ -81,7 +81,7 @@ pub mod device {
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
     pub use pure_ip::{
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
-        PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId,
+        PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
     pub use queue::tx::TransmitQueueConfiguration;
 }
@@ -91,8 +91,8 @@ pub mod device_socket {
     pub use crate::device::{
         base::FrameDestination,
         socket::{
-            DeviceSocketBindingsContext, DeviceSocketTypes, EthernetFrame, Frame, Protocol,
-            ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams,
+            DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
+            EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SendFrameError,
             SentFrame, SocketId, SocketInfo, TargetDevice,
         },
     };
@@ -113,13 +113,13 @@ pub mod filter {
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
         FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines,
-        PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule,
+        PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule, TransparentProxy,
         TransportProtocolMatcher, UninstalledRoutine, ValidationError,
     };
     pub(crate) use netstack3_filter::{
         ConntrackConnection, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
-        FilterIpMetadata, ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
-        RxPacket, State, TransportPacketSerializer, TxPacket, Verdict,
+        FilterIpMetadata, ForwardedPacket, IngressVerdict, IpPacket, MaybeTransportPacket,
+        NestedWithInnerIpPacket, RxPacket, State, TransportPacketSerializer, TxPacket, Verdict,
     };
 }
 

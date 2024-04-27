@@ -56,6 +56,7 @@ Symbols:
   - { Name: _zx_interrupt_destroy, Type: Func }
   - { Name: _zx_interrupt_trigger, Type: Func }
   - { Name: _zx_interrupt_wait, Type: Func }
+  - { Name: _zx_iob_allocate_id, Type: Func }
   - { Name: _zx_iob_create, Type: Func }
   - { Name: _zx_iommu_create, Type: Func }
   - { Name: _zx_ioports_release, Type: Func }
@@ -170,6 +171,7 @@ Symbols:
   - { Name: _zx_thread_create, Type: Func }
   - { Name: _zx_thread_exit, Type: Func }
   - { Name: _zx_thread_legacy_yield, Type: Func }
+  - { Name: _zx_thread_raise_exception, Type: Func }
   - { Name: _zx_thread_read_state, Type: Func }
   - { Name: _zx_thread_start, Type: Func }
   - { Name: _zx_thread_write_state, Type: Func }
@@ -258,6 +260,7 @@ Symbols:
   - { Name: zx_interrupt_destroy, Type: Func, Weak: true }
   - { Name: zx_interrupt_trigger, Type: Func, Weak: true }
   - { Name: zx_interrupt_wait, Type: Func, Weak: true }
+  - { Name: zx_iob_allocate_id, Type: Func, Weak: true }
   - { Name: zx_iob_create, Type: Func, Weak: true }
   - { Name: zx_iommu_create, Type: Func, Weak: true }
   - { Name: zx_ioports_release, Type: Func, Weak: true }
@@ -372,6 +375,7 @@ Symbols:
   - { Name: zx_thread_create, Type: Func, Weak: true }
   - { Name: zx_thread_exit, Type: Func, Weak: true }
   - { Name: zx_thread_legacy_yield, Type: Func, Weak: true }
+  - { Name: zx_thread_raise_exception, Type: Func, Weak: true }
   - { Name: zx_thread_read_state, Type: Func, Weak: true }
   - { Name: zx_thread_start, Type: Func, Weak: true }
   - { Name: zx_thread_write_state, Type: Func, Weak: true }

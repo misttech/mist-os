@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Error, Result},
+    anyhow::{bail, Error, Result},
     blobfs_ramdisk::BlobfsRamdisk,
-    fidl::endpoints,
+    fidl::endpoints::{self, ServerEnd},
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_test::*,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream},
@@ -87,23 +87,25 @@ async fn serve_factory(
     let factory = connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            RealmFactoryRequest::CreateRealm { options: _, dictionary, responder } => {
-                let (client_end, server_end) = endpoints::create_endpoints();
-                if let Err(e) = directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end) {
-                    error!("{:?}", e);
-                    let _ = responder.send(Err(OperationError::Failed));
+            RealmFactoryRequest::CreateRealm { options, responder } => {
+                let pkg_directory_server_end = match options.pkg_directory_server {
+                    Some(v) => ServerEnd::<fio::NodeMarker>::from(v.into_channel()),
+                    None => {
+                        responder.send(Err(OperationError::Failed)).ok();
+                        bail!("pkg directory required");
+                    }
+                };
+                if let Err(e) =
+                    directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, pkg_directory_server_end)
+                {
+                    error!("failed to clone: {:?}", e);
+                    responder.send(Err(OperationError::Failed)).ok();
                     continue;
                 }
-                // TODO(https://fxbug.dev/329496030): We have to use this factory method instead
-                // of creating a Capability::Directory directly - see the bug for details.
-                let my_dictionary_proxy = factory.create_dictionary().await?;
-                let my_dictionary_proxy = my_dictionary_proxy.into_proxy().unwrap();
-                let value =
-                    factory.create_directory(client_end.into_channel().into()).await.unwrap();
-                my_dictionary_proxy.insert("pkg", value).await?.unwrap();
-                my_dictionary_proxy.clone2(dictionary.into_channel().into())?;
 
-                responder.send(Ok(()))?;
+                let my_dictionary = factory.create_dictionary().await?;
+
+                responder.send(Ok(my_dictionary))?;
             }
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
         }

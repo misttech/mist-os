@@ -15,7 +15,6 @@ from honeydew.interfaces.device_classes import fuchsia_device
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-# TODO(b/328778702): Run this test in infra once test groups are updated per <PRODUCT>.<BOARD>
 class SystemPowerStateControllerAffordanceTests(
     fuchsia_base_test.FuchsiaBaseTest
 ):
@@ -26,7 +25,7 @@ class SystemPowerStateControllerAffordanceTests(
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-    def test_idle_idle_suspend_auto_resume(self) -> None:
+    def test_idle_suspend_auto_resume(self) -> None:
         """Test case for SystemPowerStateController.idle_suspend_auto_resume()"""
         if self.user_params["is_starnix_supported"]:
             self.device.system_power_state_controller.idle_suspend_auto_resume()
@@ -34,9 +33,17 @@ class SystemPowerStateControllerAffordanceTests(
             with asserts.assert_raises(errors.NotSupportedError):
                 self.device.system_power_state_controller.idle_suspend_auto_resume()
 
-        # TODO (b/330594505): Add checks either here or in affordance
-        # implementation to make sure device is indeed suspend-resumed by doing
-        # `ffx log` parsing
+    def test_idle_suspend_timer_based_resume(self) -> None:
+        """Test case for SystemPowerStateController.idle_suspend_timer_based_resume()"""
+        if self.user_params["is_starnix_supported"]:
+            self.device.system_power_state_controller.idle_suspend_timer_based_resume(
+                duration=3
+            )
+        else:
+            with asserts.assert_raises(errors.NotSupportedError):
+                self.device.system_power_state_controller.idle_suspend_timer_based_resume(
+                    duration=3
+                )
 
 
 if __name__ == "__main__":

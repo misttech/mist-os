@@ -19,7 +19,7 @@ use {
 /// JSON objects are merged recursively, and if two blobs set the same key an error is returned.
 /// JSON arrays are appended together, with duplicate items being removed.
 /// If a depfile is provided, also writes the files encountered to the depfile.
-pub fn merge(
+pub(crate) fn merge(
     mut files: Vec<PathBuf>,
     output: Option<PathBuf>,
     // If specified, this is a path to newline-delimited `files`

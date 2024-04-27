@@ -4,6 +4,7 @@
 """Tests for spdx_types.py"""
 
 import unittest
+from fuchsia.tools.licenses.common_types import LicenseException
 from fuchsia.tools.licenses.spdx_types import *
 
 

@@ -12,6 +12,7 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
@@ -22,7 +23,6 @@
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <soc/aml-meson/g12a-clk.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
-#include <soc/aml-s905d2/s905d2-power.h>
 
 #include "astro-gpios.h"
 #include "astro.h"
@@ -80,15 +80,15 @@ static const std::vector<fpbus::Metadata> cpu_metadata{
 const std::vector<fdf::BindRule> kPowerRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
                             bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia::POWER_DOMAIN,
-                            static_cast<uint32_t>(S905d2PowerDomains::kArmCore)),
+    fdf::MakeAcceptBindRule(bind_fuchsia_power::POWER_DOMAIN,
+                            bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE),
 };
 
 const std::vector<fdf::NodeProperty> kPowerProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
                       bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN,
-                      bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_BIG),
+                      bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE),
 };
 
 const std::vector<fdf::BindRule> kGpioInitRules = std::vector{

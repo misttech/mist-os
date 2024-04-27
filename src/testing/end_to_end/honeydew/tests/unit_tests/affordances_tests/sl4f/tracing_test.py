@@ -8,10 +8,11 @@ import base64
 import os
 import tempfile
 import unittest
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest import mock
 
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.affordances.sl4f import tracing as sl4f_tracing
@@ -20,12 +21,12 @@ from honeydew.transports import sl4f as sl4f_transport
 
 
 def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
+    testcase_func: Callable[..., None], _: str, param_arg: param
 ) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_{test_label}"

@@ -14,8 +14,7 @@ namespace debug {
 // Callbacks for exceptions from a process exception port.
 class ZirconExceptionWatcher {
  public:
-  virtual void OnProcessStarting(zx::exception exception_token,
-                                 zx_exception_info_t exception_info) {}
+  virtual void OnJobException(zx::exception exception_token, zx_exception_info_t exception_info) {}
 
   // Process terminated is different as it is communicated through a signal instead as from an
   // exception.

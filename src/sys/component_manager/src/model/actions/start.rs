@@ -9,19 +9,19 @@ use {
         actions::{Action, ActionKey},
         component::instance::{InstanceState, StartedInstanceState},
         component::{ComponentInstance, IncomingCapabilities, StartReason},
-        error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::create_namespace,
         routing::{open_capability, RouteRequest},
     },
     crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
-    ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
+    ::routing::component_instance::ComponentInstanceInterface,
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
     cm_rust::ComponentDecl,
     cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope},
     config_encoder::ConfigFields,
+    errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
     fidl::{endpoints::DiscoverableProtocolMarker, Vmo},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
@@ -114,6 +114,9 @@ struct StartContext {
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
     program_input_dict_additions: Option<Dict>,
+    start_reason: StartReason,
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
+    logger: Option<ScopedLogger>,
 }
 
 async fn do_start(
@@ -188,16 +191,33 @@ async fn do_start(
         })?;
     }
 
-    // Generate the Runtime which will be set in the Execution.
+    // Check policy.
+    // TODO(https://fxbug.dev/42071809): Consider moving this check to ComponentInstance::add_child
+    match component.on_terminate {
+        fdecl::OnTerminate::Reboot => {
+            component.policy_checker().reboot_on_terminate_allowed(&component.moniker).map_err(
+                |err| StartActionError::RebootOnTerminateForbidden {
+                    moniker: component.moniker.clone(),
+                    err,
+                },
+            )?;
+        }
+        fdecl::OnTerminate::None => {}
+    }
+
+    // Create a component-scoped logger if the component uses LogSink.
     let decl = &resolved_component.decl;
-    let pending_runtime = make_execution_runtime(
-        &component,
-        component.policy_checker(),
-        decl,
-        start_reason.clone(),
-        execution_controller_task,
-    )
-    .await?;
+    let logger = if let Some(logsink_decl) = get_logsink_decl(&decl) {
+        match create_scoped_logger(component, logsink_decl.clone()).await {
+            Ok(logger) => Some(logger),
+            Err(err) => {
+                warn!(moniker = %component.moniker, %err, "Could not create logger for component. Logs will be attributed to component_manager");
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     let encoded_config = match decl.config {
         None => None,
@@ -241,9 +261,12 @@ async fn do_start(
         numbered_handles,
         encoded_config,
         program_input_dict_additions,
+        start_reason: start_reason.clone(),
+        execution_controller_task,
+        logger,
     };
 
-    start_component(&component, resolved_component.decl, pending_runtime, start_context).await
+    start_component(&component, resolved_component.decl, start_context).await
 }
 
 /// Set the Runtime in the Execution and start the exit watcher. From component manager's
@@ -254,7 +277,6 @@ async fn do_start(
 async fn start_component(
     component: &Arc<ComponentInstance>,
     decl: ComponentDecl,
-    mut pending_runtime: StartedInstanceState,
     start_context: StartContext,
 ) -> Result<(), StartActionError> {
     let runtime_info;
@@ -281,9 +303,12 @@ async fn start_component(
             namespace_scope,
             encoded_config,
             program_input_dict_additions,
+            start_reason,
+            execution_controller_task,
+            logger,
         } = start_context;
 
-        if let Some(runner) = runner {
+        let program = if let Some(runner) = runner {
             let moniker = &component.moniker;
             let component_instance = state
                 .instance_token(moniker, &component.context)
@@ -307,7 +332,7 @@ async fn start_component(
                 component_instance,
             };
 
-            pending_runtime.set_program(
+            Some(
                 Program::start(
                     &runner,
                     start_info,
@@ -319,16 +344,23 @@ async fn start_component(
                     moniker: moniker.clone(),
                     err,
                 })?,
-                component.as_weak(),
-            );
-        }
+            )
+        } else {
+            None
+        };
 
-        timestamp = pending_runtime.timestamp;
+        let started = StartedInstanceState::new(
+            program,
+            component.as_weak(),
+            start_reason,
+            execution_controller_task,
+            logger,
+        );
+        timestamp = started.timestamp;
         runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
-        runtime_dir = pending_runtime.runtime_dir().cloned();
-
+        runtime_dir = started.runtime_dir().cloned();
         state.replace(|instance_state| match instance_state {
-            InstanceState::Resolved(resolved) => InstanceState::Started(resolved, pending_runtime),
+            InstanceState::Resolved(resolved) => InstanceState::Started(resolved, started),
             other_state => panic!("starting an unresolved component: {:?}", other_state),
         });
 
@@ -516,43 +548,6 @@ async fn encode_config(
     Ok(fmem::Data::Buffer(fmem::Buffer { vmo, size }))
 }
 
-/// Returns a configured Runtime for a component and the start info (without actually starting
-/// the component).
-async fn make_execution_runtime(
-    component: &Arc<ComponentInstance>,
-    checker: &GlobalPolicyChecker,
-    decl: &cm_rust::ComponentDecl,
-    start_reason: StartReason,
-    execution_controller_task: Option<controller::ExecutionControllerTask>,
-) -> Result<StartedInstanceState, StartActionError> {
-    // TODO(https://fxbug.dev/42071809): Consider moving this check to ComponentInstance::add_child
-    match component.on_terminate {
-        fdecl::OnTerminate::Reboot => {
-            checker.reboot_on_terminate_allowed(&component.moniker).map_err(|err| {
-                StartActionError::RebootOnTerminateForbidden {
-                    moniker: component.moniker.clone(),
-                    err,
-                }
-            })?;
-        }
-        fdecl::OnTerminate::None => {}
-    }
-
-    let logger = if let Some(logsink_decl) = get_logsink_decl(&decl) {
-        match create_scoped_logger(component, logsink_decl.clone()).await {
-            Ok(logger) => Some(logger),
-            Err(err) => {
-                warn!(moniker = %component.moniker, %err, "Could not create logger for component. Logs will be attributed to component_manager");
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    Ok(StartedInstanceState::new(start_reason, execution_controller_task, logger))
-}
-
 /// Returns the UseProtocolDecl for the LogSink protocol, if any.
 fn get_logsink_decl<'a>(decl: &'a cm_rust::ComponentDecl) -> Option<&'a cm_rust::UseProtocolDecl> {
     decl.uses.iter().find_map(|use_| match use_ {
@@ -580,8 +575,7 @@ mod tests {
         crate::model::{
             actions::{ActionSet, ShutdownAction, ShutdownType, StopAction},
             component::instance::{ResolvedInstanceState, UnresolvedInstanceState},
-            component::Component,
-            error::ModelError,
+            component::{Component, WeakComponentInstance},
             hooks::{EventType, Hook, HooksRegistration},
             structured_dict::ComponentInput,
             testing::{
@@ -593,6 +587,7 @@ mod tests {
         assert_matches::assert_matches,
         async_trait::async_trait,
         cm_rust_testing::{ChildBuilder, ComponentDeclBuilder},
+        errors::ModelError,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, stream::FuturesUnordered, FutureExt, StreamExt},
         rand::seq::SliceRandom,
@@ -963,7 +958,13 @@ mod tests {
             )
             .await
             .unwrap();
-            let started_state = StartedInstanceState::new(StartReason::Debug, None, None);
+            let started_state = StartedInstanceState::new(
+                None,
+                WeakComponentInstance::invalid(),
+                StartReason::Debug,
+                None,
+                None,
+            );
             assert_matches!(
                 should_return_early(&InstanceState::Started(ris, started_state), &m),
                 Some(Ok(()))

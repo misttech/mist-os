@@ -30,7 +30,7 @@ class TestArgs(unittest.TestCase):
         flags = args.parse_args([])
         flags.validate()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "cannot show status with --simple",
@@ -153,7 +153,7 @@ class TestArgs(unittest.TestCase):
             ],
         )
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("default is None", [], [], None),
             ("config file overrides output", [], ["--output"], True),

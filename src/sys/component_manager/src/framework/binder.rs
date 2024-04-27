@@ -7,7 +7,6 @@ use {
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{StartReason, WeakComponentInstance},
-            error::ModelError,
             routing::report_routing_failure,
             start::Start,
         },
@@ -15,6 +14,7 @@ use {
     ::routing::RouteRequest,
     async_trait::async_trait,
     cm_types::Name,
+    errors::ModelError,
     fuchsia_zircon as zx,
     lazy_static::lazy_static,
     routing::capability_source::InternalCapability,

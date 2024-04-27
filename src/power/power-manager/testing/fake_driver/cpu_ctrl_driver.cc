@@ -23,6 +23,16 @@ zx::result<> CpuCtrlDriver::Start() {
     return result.take_error();
   }
 
+  fuchsia_hardware_cpu_ctrl::Service::InstanceHandler handler({
+      .device = fit::bind_member<&CpuCtrlDriver::ServeCpuCtrl>(this),
+  });
+
+  result = outgoing()->AddService<fuchsia_hardware_cpu_ctrl::Service>(std::move(handler));
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
+    return result.take_error();
+  }
+
   return zx::ok();
 }
 

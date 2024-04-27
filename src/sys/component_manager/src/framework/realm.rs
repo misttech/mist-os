@@ -7,7 +7,6 @@ use {
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::OpenExposedDirError,
             model::Model,
         },
     },
@@ -17,6 +16,7 @@ use {
     cm_config::RuntimeConfig,
     cm_rust::FidlIntoNative,
     cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
+    errors::OpenExposedDirError,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -1111,7 +1111,7 @@ mod tests {
         let child = {
             let state = test.component().lock_resolved_state().await.unwrap();
             let child = state.children().next().unwrap();
-            assert_eq!("a", child.0.name());
+            assert_eq!("a", child.0.name().as_str());
             child.1.clone()
         };
 

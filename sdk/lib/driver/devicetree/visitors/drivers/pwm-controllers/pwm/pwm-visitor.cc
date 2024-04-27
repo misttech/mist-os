@@ -11,9 +11,15 @@
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
+#include <vector>
+
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
+
+namespace {
+using fuchsia_hardware_pwm::PwmChannelInfo;
+}
 
 namespace pwm_visitor_dt {
 
@@ -100,15 +106,18 @@ zx::result<> PwmVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   }
 
   auto cells = fdf_devicetree::Uint32Array(specifiers);
-  pwm_id_t pwm_id = {};
-  pwm_id.id = cells[0];
+  PwmChannelInfo pwm_channel = {};
+  pwm_channel.id() = cells[0];
 
-  FDF_LOG(DEBUG, "PWM ID added - ID 0x%x name '%s' to controller '%s'", cells[0],
+  FDF_LOG(DEBUG, "PWM channel added - ID 0x%x with name '%s' to controller '%s'", cells[0],
           pwm_name ? std::string(*pwm_name).c_str() : "<anonymous>", parent.name().c_str());
 
-  controller.pwm_ids.emplace_back(pwm_id);
+  if (!controller.pwm_channels.channels()) {
+    controller.pwm_channels.channels() = std::vector<PwmChannelInfo>();
+  }
+  controller.pwm_channels.channels()->emplace_back(pwm_channel);
 
-  return AddChildNodeSpec(child, pwm_id.id, pwm_name);
+  return AddChildNodeSpec(child, cells[0], pwm_name);
 }
 
 zx::result<> PwmVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
@@ -151,16 +160,21 @@ zx::result<> PwmVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       return zx::ok();
     }
 
-    if (!controller->second.pwm_ids.empty()) {
-      fuchsia_hardware_platform_bus::Metadata id_metadata = {{
-          .type = DEVICE_METADATA_PWM_IDS,
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(controller->second.pwm_ids.data()),
-              reinterpret_cast<const uint8_t*>(controller->second.pwm_ids.data()) +
-                  (controller->second.pwm_ids.size() * sizeof(pwm_id_t))),
+    if (controller->second.pwm_channels.channels()) {
+      fit::result encoded_metadata = fidl::Persist(controller->second.pwm_channels);
+      if (encoded_metadata.is_error()) {
+        FDF_LOG(ERROR, "Failed to encode pwm channels metadata: %s",
+                encoded_metadata.error_value().FormatDescription().c_str());
+        return zx::error(encoded_metadata.error_value().status());
+      }
+
+      fuchsia_hardware_platform_bus::Metadata channels_metadata = {{
+          .type = DEVICE_METADATA_PWM_CHANNELS,
+          .data = encoded_metadata.value(),
       }};
-      node.AddMetadata(std::move(id_metadata));
-      FDF_LOG(DEBUG, "PWM IDs metadata added to node '%s'", node.name().c_str());
+
+      node.AddMetadata(std::move(channels_metadata));
+      FDF_LOG(DEBUG, "PWM Channels metadata added to node '%s'", node.name().c_str());
     }
   }
   return zx::ok();

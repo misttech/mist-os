@@ -1,5 +1,7 @@
 # Audio Codec Interface
 
+Caution: This page contains information for the deprecated Codec API.
+
 Caution: This page may contain information that is specific to the legacy
 version of the driver framework (DFv1).
 

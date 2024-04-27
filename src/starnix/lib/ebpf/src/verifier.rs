@@ -312,7 +312,7 @@ impl Type {
                 Self::NullOr { id, .. },
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
             ) => {
-                context.null_states.insert(id.clone(), true);
+                context.set_null(id, true);
                 let zero = Type::from(0);
                 (zero.clone(), zero)
             }
@@ -322,7 +322,7 @@ impl Type {
                 Self::NullOr { id, inner },
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
             ) if jump_type.is_strict() => {
-                context.null_states.insert(id.clone(), false);
+                context.set_null(id, false);
                 (*inner.clone(), type2)
             }
             (
@@ -331,7 +331,7 @@ impl Type {
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
                 Self::NullOr { id, inner },
             ) if jump_type.is_strict() => {
-                context.null_states.insert(id.clone(), false);
+                context.set_null(id, false);
                 (type1, *inner.clone())
             }
 
@@ -373,6 +373,21 @@ impl Type {
             }
             (JumpWidth::W64, JumpType::Eq, _, _) => (type1.clone(), type1),
             _ => (type1, type2),
+        }
+    }
+
+    /// If this `Type` is an instance of NullOr with the given `null_id`, replace it wither either
+    /// 0 or the subtype depending on `is_null`
+    fn set_null(&mut self, null_id: &MemoryId, is_null: bool) {
+        match self {
+            Type::NullOr { id, inner } if id == null_id => {
+                if is_null {
+                    *self = Type::from(0);
+                } else {
+                    *self = *inner.clone();
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -588,6 +603,14 @@ impl Default for Stack {
 }
 
 impl Stack {
+    /// Replace all instances of the NullOr type with the given `null_id` to either 0 or the
+    /// subtype depending on `is_null`
+    fn set_null(&mut self, null_id: &MemoryId, is_null: bool) {
+        for i in 0..self.data.len() {
+            self.data[i].set_null(null_id, is_null);
+        }
+    }
+
     fn extract_sub_value(value: u64, offset: usize, byte_count: usize) -> u64 {
         NativeEndian::read_uint(&value.as_bytes()[offset..], byte_count)
     }
@@ -740,7 +763,7 @@ impl Stack {
         }
 
         let index = offset.array_index();
-        let loaded_type = context.resolve(self.data[index].clone());
+        let loaded_type = self.data[index].clone();
         if width == DataWidth::U64 {
             Ok(loaded_type)
         } else {
@@ -779,27 +802,24 @@ struct ComputationContext {
     pc: ProgramCounter,
     /// The dynamically known bounds of buffers indexed by their ids.
     array_bounds: HashMap<MemoryId, u64>,
-    /// The dynamically known null state of nullable entities indexed by their ids.
-    null_states: HashMap<MemoryId, bool>,
 }
 
 impl ComputationContext {
-    fn resolve(&self, t: Type) -> Type {
-        match t {
-            Type::NullOr { id, inner } => match self.null_states.get(&id) {
-                None => Type::NullOr { id, inner },
-                Some(true) => Type::from(0),
-                Some(false) => *inner,
-            },
-            t => t,
+    /// Replace all instances of the NullOr type with the given `null_id` to either 0 or the
+    /// subtype depending on `is_null`
+    fn set_null(&mut self, null_id: &MemoryId, is_null: bool) {
+        for i in 0..self.registers.len() {
+            self.registers[i].set_null(null_id, is_null);
         }
+        self.stack.set_null(null_id, is_null);
     }
+
     fn reg(&self, index: Register) -> Result<Type, String> {
         if index >= REGISTER_COUNT {
             return Err(format!("R{index} is invalid at pc {}", self.pc));
         }
         if index < GENERAL_REGISTER_COUNT {
-            Ok(self.resolve(self.registers[index as usize].clone()))
+            Ok(self.registers[index as usize].clone())
         } else {
             Ok(Type::PtrToStack { offset: StackOffset::default() })
         }

@@ -242,6 +242,9 @@ filegroup(
             # hwasan runtime libraries
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.hwasan.so" % cpu,
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.hwasan-preinit.a" % cpu,
+
+            # coverage and profiling runtime libraries
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.profile.a" % cpu,
         ],
     )
     for cpu in TARGET_CPUS

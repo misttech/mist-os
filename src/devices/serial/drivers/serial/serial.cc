@@ -7,29 +7,38 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/fit/function.h>
-#include <lib/zx/handle.h>
-#include <lib/zx/time.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
 #include <memory>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 namespace serial {
 
-zx_status_t SerialDevice::SerialGetInfo(serial_port_info_t* info) { return serial_.GetInfo(info); }
-
-zx_status_t SerialDevice::SerialConfig(uint32_t baud_rate, uint32_t flags) {
-  return serial_.Config(baud_rate, flags);
-}
-
 void SerialDevice::Read(ReadCompleter::Sync& completer) {
+  if (std::holds_alternative<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)) {
+    fdf::Arena arena('SERI');
+    std::get<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)
+        .buffer(arena)
+        ->Read()
+        .Then([completer = completer.ToAsync()](auto& result) mutable {
+          if (!result.ok()) {
+            completer.ReplyError(result.status());
+          } else if (result->is_error()) {
+            completer.ReplyError(result->error_value());
+          } else {
+            completer.ReplySuccess(result->value()->data);
+          }
+        });
+    return;
+  }
+
   uint8_t data[fuchsia_io::wire::kMaxBuf];
   size_t actual;
-  if (zx_status_t status = serial_.Read(data, sizeof(data), &actual); status != ZX_OK) {
+  zx_status_t status =
+      std::get<ddk::SerialImplProtocolClient>(serial_).Read(data, sizeof(data), &actual);
+  if (status != ZX_OK) {
     completer.ReplyError(status);
     return;
   }
@@ -38,11 +47,29 @@ void SerialDevice::Read(ReadCompleter::Sync& completer) {
 }
 
 void SerialDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
+  if (std::holds_alternative<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)) {
+    fdf::Arena arena('SERI');
+    std::get<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)
+        .buffer(arena)
+        ->Write(request->data)
+        .Then([completer = completer.ToAsync()](auto& result) mutable {
+          if (!result.ok()) {
+            completer.ReplyError(result.status());
+          } else if (result->is_error()) {
+            completer.ReplyError(result->error_value());
+          } else {
+            completer.ReplySuccess();
+          }
+        });
+    return;
+  }
+
   cpp20::span data = request->data.get();
   while (!data.empty()) {
     size_t actual;
-    if (zx_status_t status = serial_.Write(data.data(), data.size_bytes(), &actual);
-        status != ZX_OK) {
+    zx_status_t status = std::get<ddk::SerialImplProtocolClient>(serial_).Write(
+        data.data(), data.size_bytes(), &actual);
+    if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
     }
@@ -58,7 +85,7 @@ void SerialDevice::GetChannel(GetChannelRequestView request, GetChannelCompleter
     return;
   }
 
-  if (zx_status_t status = serial_.Enable(true); status != ZX_OK) {
+  if (zx_status_t status = Enable(true); status != ZX_OK) {
     request->req.Close(status);
     return;
   }
@@ -68,7 +95,7 @@ void SerialDevice::GetChannel(GetChannelRequestView request, GetChannelCompleter
                                   std::move(request->req), this,
                                   [](SerialDevice* self, fidl::UnbindInfo,
                                      fidl::ServerEnd<fuchsia_hardware_serial::Device>) {
-                                    self->serial_.Enable(false);
+                                    self->Enable(false);
                                     std::optional opt = std::exchange(self->binding_, {});
                                     ZX_ASSERT(opt.has_value());
                                     Binding& binding = opt.value();
@@ -134,8 +161,42 @@ void SerialDevice::SetConfig(SetConfigRequestView request, SetConfigCompleter::S
       break;
   }
 
-  zx_status_t status = SerialConfig(request->config.baud_rate, flags);
-  completer.Reply(status);
+  if (std::holds_alternative<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)) {
+    fdf::Arena arena('SERI');
+    std::get<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)
+        .buffer(arena)
+        ->Config(request->config.baud_rate, flags)
+        .Then([completer = completer.ToAsync()](auto& result) mutable {
+          if (result.ok()) {
+            completer.Reply(result->is_error() ? result->error_value() : ZX_OK);
+          } else {
+            completer.Reply(result.status());
+          }
+        });
+    return;
+  }
+
+  completer.Reply(
+      std::get<ddk::SerialImplProtocolClient>(serial_).Config(request->config.baud_rate, flags));
+}
+
+zx_status_t SerialDevice::Enable(bool enable) {
+  if (std::holds_alternative<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)) {
+    fdf::Arena arena('SERI');
+    auto result = std::get<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)
+                      .sync()
+                      .buffer(arena)
+                      ->Enable(enable);
+    if (!result.ok()) {
+      return result.status();
+    }
+    if (result->is_error()) {
+      return result->error_value();
+    }
+    return ZX_OK;
+  }
+
+  return std::get<ddk::SerialImplProtocolClient>(serial_).Enable(enable);
 }
 
 void SerialDevice::DdkUnbind(ddk::UnbindTxn txn) {
@@ -150,13 +211,26 @@ void SerialDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void SerialDevice::DdkRelease() {
-  serial_.Enable(false);
+  Enable(false);
   delete this;
 }
 
 zx_status_t SerialDevice::Create(void* ctx, zx_device_t* dev) {
+  SerialType serial(ddk::SerialImplProtocolClient{dev});
+  if (!std::get<ddk::SerialImplProtocolClient>(serial).is_valid()) {
+    zx::result serial_client =
+        DdkConnectRuntimeProtocol<fuchsia_hardware_serialimpl::Service::Device>(dev);
+    if (serial_client.is_error()) {
+      zxlogf(ERROR, "Failed to get Banjo or FIDL serial client: %s", serial_client.status_string());
+      return serial_client.error_value();
+    }
+
+    serial.emplace<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(
+        *std::move(serial_client), fdf::Dispatcher::GetCurrent()->get());
+  }
+
   fbl::AllocChecker ac;
-  std::unique_ptr<SerialDevice> sdev(new (&ac) SerialDevice(dev));
+  std::unique_ptr<SerialDevice> sdev(new (&ac) SerialDevice(dev, std::move(serial)));
 
   if (!ac.check()) {
     zxlogf(ERROR, "SerialDevice::Create: no memory to allocate serial device!");
@@ -180,18 +254,37 @@ zx_status_t SerialDevice::Create(void* ctx, zx_device_t* dev) {
 }
 
 zx_status_t SerialDevice::Init() {
-  if (!serial_.is_valid()) {
-    zxlogf(ERROR, "SerialDevice::Init: ZX_PROTOCOL_SERIAL_IMPL not available");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx_status_t status = ZX_OK;
+  if (std::holds_alternative<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)) {
+    fdf::Arena arena('SERI');
+    auto result = std::get<fdf::WireClient<fuchsia_hardware_serialimpl::Device>>(serial_)
+                      .sync()
+                      .buffer(arena)
+                      ->GetInfo();
+    if (!result.ok()) {
+      status = result.status();
+    } else if (result->is_error()) {
+      status = result->error_value();
+    } else {
+      serial_class_ = static_cast<uint8_t>(result->value()->info.serial_class);
+    }
+  } else if (std::holds_alternative<ddk::SerialImplProtocolClient>(serial_)) {
+    if (!std::get<ddk::SerialImplProtocolClient>(serial_).is_valid()) {
+      zxlogf(ERROR, "SerialDevice::Init: ZX_PROTOCOL_SERIAL_IMPL not available");
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
+    serial_port_info_t info;
+    status = std::get<ddk::SerialImplProtocolClient>(serial_).GetInfo(&info);
+    if (status == ZX_OK) {
+      serial_class_ = info.serial_class;
+    }
   }
 
-  serial_port_info_t info;
-  zx_status_t status = serial_.GetInfo(&info);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SerialDevice::Init: SerialImpl::GetInfo failed %d", status);
     return status;
   }
-  serial_class_ = info.serial_class;
 
   return ZX_OK;
 }
@@ -202,7 +295,8 @@ zx_status_t SerialDevice::Bind() {
       {BIND_SERIAL_CLASS, 0, serial_class_},
   };
 
-  return DdkAdd(ddk::DeviceAddArgs("serial").set_props(props));
+  // Set proto_id so that a devfs entry is created for us.
+  return DdkAdd(ddk::DeviceAddArgs("serial").set_props(props).set_proto_id(ZX_PROTOCOL_SERIAL));
 }
 
 static constexpr zx_driver_ops_t serial_driver_ops = []() {

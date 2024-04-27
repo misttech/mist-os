@@ -11,28 +11,28 @@ use super::get_host_tool;
 use crate::qemu_based::QemuBasedEngine;
 use async_trait::async_trait;
 use emulator_instance::{
-    get_instance_dir, write_to_disk, CpuArchitecture, EmulatorConfiguration, EmulatorInstanceData,
-    EmulatorInstanceInfo, EngineState, EngineType, PointingDevice,
+    write_to_disk, CpuArchitecture, EmulatorConfiguration, EmulatorInstanceData,
+    EmulatorInstanceInfo, EmulatorInstances, EngineState, EngineType, PointingDevice,
 };
 use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config::QEMU_TOOL;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
-use serde::{Deserialize, Serialize};
 use std::{
     env,
     path::{Path, PathBuf},
     process::Command,
 };
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug)]
 pub struct QemuEngine {
     data: EmulatorInstanceData,
+    emu_instances: EmulatorInstances,
 }
 
 impl QemuEngine {
-    pub(crate) fn new(data: EmulatorInstanceData) -> Self {
-        Self { data }
+    pub(crate) fn new(data: EmulatorInstanceData, emu_instances: EmulatorInstances) -> Self {
+        Self { data, emu_instances }
     }
 
     fn validate_configuration(&self) -> Result<()> {
@@ -202,8 +202,9 @@ impl EmulatorEngine for QemuEngine {
     async fn save_to_disk(&self) -> Result<()> {
         write_to_disk(
             &self.data,
-            &get_instance_dir(self.data.get_name(), true)
-                .await
+            &self
+                .emu_instances
+                .get_instance_dir(self.data.get_name(), true)
                 .unwrap_or_else(|_| panic!("instance directory for {}", self.data.get_name())),
         )
         .map_err(|e| bug!("Error saving instance to disk: {e}"))
@@ -243,7 +244,7 @@ mod tests {
 
         let mut emu_data = EmulatorInstanceData::new(cfg, EngineType::Qemu, EngineState::New);
         emu_data.set_emulator_binary(program_name.into());
-        let test_engine = QemuEngine::new(emu_data);
+        let test_engine = QemuEngine::new(emu_data, EmulatorInstances::new(PathBuf::new()));
         let cmd = test_engine.build_emulator_cmd();
         assert_eq!(cmd.get_program(), program_name);
         assert_eq!(
@@ -262,7 +263,8 @@ mod tests {
 
         let mut emu_data = EmulatorInstanceData::new(cfg, EngineType::Qemu, EngineState::New);
         emu_data.set_emulator_binary(program_name.into());
-        let test_engine: QemuEngine = QemuEngine::new(emu_data);
+        let test_engine: QemuEngine =
+            QemuEngine::new(emu_data, EmulatorInstances::new(PathBuf::new()));
         let cmd = test_engine.build_emulator_cmd();
         assert_eq!(cmd.get_program(), program_name);
         assert_eq!(cmd.get_envs().collect::<Vec<_>>(), []);

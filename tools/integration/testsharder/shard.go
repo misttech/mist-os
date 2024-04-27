@@ -153,7 +153,11 @@ func prepareBlobsForPackage(
 	blobsDirRel string,
 	blobsDir string,
 ) error {
-	manifest, err := pm_build.LoadPackageManifest(filepath.Join(buildDir, manifestPath))
+	manifestAbsPath := manifestPath
+	if !filepath.IsAbs(manifestAbsPath) {
+		manifestAbsPath = filepath.Join(buildDir, manifestPath)
+	}
+	manifest, err := pm_build.LoadPackageManifest(manifestAbsPath)
 	if err != nil {
 		return err
 	}

@@ -124,7 +124,7 @@ pub async fn exec_playground(
     let query = rcs::root_realm_query(&remote_proxy, std::time::Duration::from_secs(5)).await?;
     let toolbox = toolbox_directory(&*remote_proxy, &query).await?;
     let cf_root = cf_fs::CFDirectory::new_root(query);
-    let fs_root_simple = vfs::directory::mutable::simple();
+    let fs_root_simple = vfs::directory::immutable::simple();
     let root_dir_client = vfs::directory::spawn_directory(Arc::clone(&fs_root_simple));
     fs_root_simple.add_entry("host", host_fs::HostDirectory::new("/"))?;
     fs_root_simple.add_entry("toolbox", toolbox)?;
@@ -137,16 +137,30 @@ pub async fn exec_playground(
     fasync::Task::spawn(runner).detach();
 
     let (quit_sender, mut quit_receiver) = oneshot();
-    let quit_sender = Mutex::new(Some(quit_sender));
-    interpreter
-        .add_command("quit", move |_, _| {
-            if let Some(quit_sender) = quit_sender.lock().unwrap().take() {
-                quit_sender.send(()).unwrap();
-            }
+    let quit_sender = Arc::new(Mutex::new(Some(quit_sender)));
+    {
+        let quit_sender = Arc::clone(&quit_sender);
+        interpreter
+            .add_command("quit", move |_, _| {
+                if let Some(quit_sender) = quit_sender.lock().unwrap().take() {
+                    let _ = quit_sender.send(());
+                }
 
-            async move { Ok(Value::Null) }
+                async move { Ok(Value::Null) }
+            })
+            .await;
+    }
+    {
+        let remote_proxy = Arc::clone(&remote_proxy);
+        fasync::Task::spawn(async move {
+            let _ = remote_proxy.on_closed().await;
+            if let Some(quit_sender) = quit_sender.lock().unwrap().take() {
+                eprintln!("Connection lost");
+                let _ = quit_sender.send(());
+            }
         })
-        .await;
+        .detach();
+    }
 
     let mut text = String::new();
     if let Some(cmd) = command.command {

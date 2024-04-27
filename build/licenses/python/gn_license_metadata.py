@@ -22,7 +22,7 @@ class GnLicenseMetadata:
 
     target_label: GnLabel
     public_package_name: str
-    license_files: Tuple[GnLabel]
+    license_files: Tuple[GnLabel, ...]
 
     @staticmethod
     def is_license_metadata_dict(dict: AnyDict) -> bool:
@@ -62,8 +62,8 @@ class GnApplicableLicensesMetadata:
 
     target_label: GnLabel
     target_type: str
-    license_labels: Tuple[GnLabel]
-    third_party_resources: Tuple[GnLabel]
+    license_labels: Tuple[GnLabel, ...]
+    third_party_resources: Tuple[GnLabel, ...]
 
     @staticmethod
     def is_applicable_licenses_metadata_dict(dict: AnyDict) -> bool:

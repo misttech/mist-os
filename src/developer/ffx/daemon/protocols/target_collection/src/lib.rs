@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use emulator_instance::targets as emulator_targets;
 use emulator_targets::EmulatorTargetAction;
+use ffx_config::EnvironmentContext;
 use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::{
     target::{
@@ -27,6 +28,7 @@ use futures::TryStreamExt;
 use protocols::prelude::*;
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    path::PathBuf,
     rc::Rc,
     sync::Arc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -51,6 +53,8 @@ pub struct TargetCollectionProtocol {
     // If is Some, will send signal after manual targets have been successfully loaded
     #[cfg(test)]
     manual_targets_loaded_signal: Option<Sender<()>>,
+
+    context: EnvironmentContext,
 }
 
 impl Default for TargetCollectionProtocol {
@@ -65,6 +69,7 @@ impl Default for TargetCollectionProtocol {
             manual_targets: Rc::new(manual_targets),
             #[cfg(test)]
             manual_targets_loaded_signal: None,
+            context: ffx_config::global_env_context().unwrap(),
         }
     }
 }
@@ -544,8 +549,20 @@ impl FidlProtocol for TargetCollectionProtocol {
         });
 
         let tc2 = cx.get_target_collection().await?;
+        let context = self.context.clone();
         self.tasks.spawn(async move {
-            let mut watcher = match emulator_targets::start_emulator_watching().await {
+            let instance_root: PathBuf = match context
+                .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+                .await
+            {
+                Ok(dir) => dir,
+                Err(e) => {
+                    tracing::error!("Could not read emulator instance root configuration: {e:?}");
+                    return;
+                }
+            };
+
+            let mut watcher = match emulator_targets::start_emulator_watching(instance_root).await {
                 Ok(w) => w,
                 Err(e) => {
                     tracing::error!("Could not create emulator watcher: {e:?}");

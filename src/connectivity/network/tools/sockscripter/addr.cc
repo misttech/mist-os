@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
+#include <iomanip>
 #include <ostream>
 
 #include "lib/fit/defer.h"
@@ -36,6 +37,22 @@ std::ostream& operator<<(std::ostream& out, const PrintInterface& interface) {
     return out << interface.iface_index;
   }
   return out << name;
+}
+
+std::ostream& operator<<(std::ostream& out, const PrintHardwareAddress ha) {
+  // Store the original out format flags, so that they can be restored later.
+  auto out_flags = out.flags();
+  out << "[";
+  for (int i = 0; i < ha.len; i++) {
+    if (i != 0) {
+      out << ":";
+    }
+    out << std::setw(2) << std::setfill('0') << std::hex << (int)ha.addr_bytes[i];
+  }
+  out << "]";
+
+  out.flags(out_flags);
+  return out;
 }
 
 std::string Format(const sockaddr_storage& addr) {
@@ -72,12 +89,21 @@ std::string Format(const sockaddr_storage& addr) {
       const sockaddr_ll& addr_ll = *reinterpret_cast<const sockaddr_ll*>(&addr);
       std::stringstream o;
 
-      o << ntohs(addr_ll.sll_protocol) << ":";
+      o << "(";
+
+      o << "protocol:" << ntohs(addr_ll.sll_protocol);
+
       if (addr_ll.sll_ifindex != 0) {
-        o << PrintInterface(addr_ll.sll_ifindex);
+        o << ", interface:" << PrintInterface(addr_ll.sll_ifindex);
       } else {
-        o << "{no interface}";
+        o << ", interface:<None>";
       }
+
+      o << ", packet_type:" << (int)addr_ll.sll_pkttype;
+
+      o << ", address:" << PrintHardwareAddress{addr_ll.sll_halen, addr_ll.sll_addr};
+
+      o << ")";
       return o.str();
     }
 #endif

@@ -240,13 +240,13 @@ void CodecAdapterFfmpegDecoder::DecodeFrames() {
   }
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
   std::lock_guard<std::mutex> lock(lock_);
 
-  fuchsia::sysmem::BufferCollectionConstraints result;
+  fuchsia_sysmem2::BufferCollectionConstraints result;
 
   // The CodecImpl won't hand us the sysmem token, so we shouldn't expect to
   // have the token here.
@@ -265,18 +265,18 @@ CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints(
   // the client wants more buffers the client can demand buffers in its own
   // fuchsia::sysmem::BufferCollection::SetConstraints().
   if (port == kOutputPort) {
-    result.min_buffer_count_for_camping = kMinOutputBufferCountForCamping;
+    result.min_buffer_count_for_camping() = kMinOutputBufferCountForCamping;
   } else {
-    result.min_buffer_count_for_camping = kMinInputBufferCountForCamping;
+    result.min_buffer_count_for_camping() = kMinInputBufferCountForCamping;
   }
 
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
 
   if (port == kOutputPort) {
-    result.max_buffer_count = kMaxOutputBufferCount;
+    result.max_buffer_count() = kMaxOutputBufferCount;
   } else {
-    result.max_buffer_count = kMaxInputBufferCount;
+    result.max_buffer_count() = kMaxInputBufferCount;
   }
 
   uint32_t per_packet_buffer_bytes_min;
@@ -300,59 +300,57 @@ CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints(
     per_packet_buffer_bytes_max = 0xFFFFFFFF;
   }
 
-  result.has_buffer_memory_constraints = true;
-  result.buffer_memory_constraints.min_size_bytes = per_packet_buffer_bytes_min;
-  result.buffer_memory_constraints.max_size_bytes = per_packet_buffer_bytes_max;
+  auto& bmc = result.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = per_packet_buffer_bytes_min;
+  bmc.max_size_bytes() = per_packet_buffer_bytes_max;
 
   // These are all false because SW decode.
-  result.buffer_memory_constraints.physically_contiguous_required = false;
-  result.buffer_memory_constraints.secure_required = false;
+  bmc.physically_contiguous_required() = false;
+  bmc.secure_required() = false;
 
   if (port == kOutputPort) {
     ZX_ASSERT(decoded_output_info_.has_value());
     auto& [uncompressed_format, per_packet_buffer_bytes] = decoded_output_info_.value();
 
-    result.image_format_constraints_count = 1;
-    fuchsia::sysmem::ImageFormatConstraints& image_constraints = result.image_format_constraints[0];
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::YV12;
+    auto& image_constraints = result.image_format_constraints().emplace().emplace_back();
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kYv12;
+
     // TODO(https://fxbug.dev/42084950): confirm that REC709 is always what we want here, or plumb
     // actual YUV color space if it can ever be REC601_*.  Since 2020 and 2100
     // are minimum 10 bits per Y sample and we're outputting NV12, 601 is the
     // only other potential possibility here.
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
+    image_constraints.color_spaces() = {fuchsia_images2::ColorSpace::kRec709};
 
     // The non-"required_" fields indicate the decoder's ability to potentially
     // output frames at various dimensions as coded in the stream.  Aside from
     // the current stream being somewhere in these bounds, these have nothing to
     // do with the current stream in particular.
-    image_constraints.min_coded_width = 16;
-    image_constraints.max_coded_width = 3840;
-    image_constraints.min_coded_height = 16;
+    image_constraints.min_size() = {16, 16};
+
     // This intentionally isn't the height of a 4k frame.  See
     // max_coded_width_times_coded_height.  We intentionally constrain the max
     // dimension in width or height to the width of a 4k frame.  While the HW
     // might be able to go bigger than that as long as the other dimension is
     // smaller to compensate, we don't really need to enable any larger than
     // 4k's width in either dimension, so we don't.
-    image_constraints.max_coded_height = 3840;
-    image_constraints.min_bytes_per_row = 16;
+    image_constraints.max_size() = {3840, 3840};
+    image_constraints.min_bytes_per_row() = 16;
+
     // no hard-coded max stride, at least for now
-    image_constraints.max_bytes_per_row = 0xFFFFFFFF;
-    image_constraints.max_coded_width_times_coded_height = 3840 * 2160;
-    image_constraints.layers = 1;
-    image_constraints.coded_width_divisor = 16;
-    image_constraints.coded_height_divisor = 16;
-    image_constraints.bytes_per_row_divisor = 16;
+    ZX_DEBUG_ASSERT(!image_constraints.max_bytes_per_row().has_value());
+    image_constraints.max_width_times_height() = 3840 * 2160;
+    image_constraints.size_alignment() = {16, 16};
+    image_constraints.bytes_per_row_divisor() = 16;
+
     // TODO(dustingreen): Since this is a producer that will always produce at
     // offset 0 of a physical page, we don't really care if this field is
     // consistent with any constraints re. what the HW can do.
-    image_constraints.start_offset_divisor = 1;
+    image_constraints.start_offset_divisor() = 1;
+
     // Odd display dimensions are permitted, but these don't imply odd YV12
     // dimensions - those are constrainted by coded_width_divisor and
     // coded_height_divisor which are both 16.
-    image_constraints.display_width_divisor = 1;
-    image_constraints.display_height_divisor = 1;
+    image_constraints.display_rect_alignment() = {1, 1};
 
     // The decoder is producing frames and the decoder has no choice but to
     // produce frames at their coded size.  The decoder wants to potentially be
@@ -365,31 +363,67 @@ CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints(
     // larger range of dimensions that includes the required range indicated
     // here (via a-priori knowledge of the potential stream dimensions), an
     // initiator is free to do so.
-    image_constraints.required_min_coded_width = uncompressed_format.primary_width_pixels;
-    image_constraints.required_max_coded_width = uncompressed_format.primary_width_pixels;
-    image_constraints.required_min_coded_height = uncompressed_format.primary_height_pixels;
-    image_constraints.required_max_coded_height = uncompressed_format.primary_height_pixels;
-    // As needed we might want to plumb more flexibility for the stride.
-    image_constraints.required_min_bytes_per_row = uncompressed_format.primary_line_stride_bytes;
-    image_constraints.required_max_bytes_per_row = uncompressed_format.primary_line_stride_bytes;
+    image_constraints.required_min_size() = {uncompressed_format.primary_width_pixels,
+                                             uncompressed_format.primary_height_pixels};
+    image_constraints.required_max_size() = {uncompressed_format.primary_width_pixels,
+                                             uncompressed_format.primary_height_pixels};
+
+    // Sysmem2 doesn't have required_min_bytes_per_row or
+    // required_max_bytes_per_row (at least for now). If those later prove to be
+    // worth adding to sysmem2, we'd set those to
+    // uncompressed_format.primary_line_stride_bytes here.
+    //
+    // The way we'd know is CoreCodecSetBufferCollectionInfo would fail the
+    // codec when primary_line_stride_bytes isn't within
+    // [min_bytes_per_row..max_bytes_per_row].
+    //
+    // The decoder is the producer. We're implicitly relying on the consumer(s)
+    // to not overly constrain the bytes_per_row using min_bytes_per_row and
+    // max_bytes_per_row, in order for decode of the current stream dimensions
+    // to be possible.
   } else {
-    ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+    ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
   }
 
   // We don't have to fill out usage - CodecImpl takes care of that.
-  ZX_DEBUG_ASSERT(!result.usage.cpu);
-  ZX_DEBUG_ASSERT(!result.usage.display);
-  ZX_DEBUG_ASSERT(!result.usage.vulkan);
-  ZX_DEBUG_ASSERT(!result.usage.video);
+  ZX_DEBUG_ASSERT(!result.usage().has_value());
 
   return result;
 }
 
 void CodecAdapterFfmpegDecoder::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
-  if (port == kInputPort) {
-    ZX_DEBUG_ASSERT(buffer_collection_info.buffer_count >= kMinInputBufferCountForCamping);
-  } else {
-    ZX_DEBUG_ASSERT(buffer_collection_info.buffer_count >= kMinOutputBufferCountForCamping);
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
+  std::optional<uint32_t> bytes_per_row;
+  uint32_t min_bytes_per_row;
+  uint32_t max_bytes_per_row;
+
+  {  // scope lock
+    std::lock_guard<std::mutex> lock(lock_);
+
+    if (port == kInputPort) {
+      ZX_DEBUG_ASSERT(buffer_collection_info.buffers()->size() >= kMinInputBufferCountForCamping);
+    } else {
+      ZX_DEBUG_ASSERT(buffer_collection_info.buffers()->size() >= kMinOutputBufferCountForCamping);
+    }
+
+    if (decoded_output_info_.has_value()) {
+      auto& [uncompressed_format, per_packet_buffer_bytes] = decoded_output_info_.value();
+      bytes_per_row = uncompressed_format.primary_line_stride_bytes;
+    }
+  }
+
+  if (bytes_per_row.has_value()) {
+    auto& ifc = *buffer_collection_info.settings()->image_format_constraints();
+    min_bytes_per_row = *ifc.min_bytes_per_row();
+    max_bytes_per_row = *ifc.max_bytes_per_row();
+
+    if (bytes_per_row < min_bytes_per_row) {
+      events_->onCoreCodecFailCodec("bytes_per_row < *ifc.min_bytes_per_row()");
+      return;
+    }
+    if (bytes_per_row > max_bytes_per_row) {
+      events_->onCoreCodecFailCodec("bytes_per_row > *ifc.max_bytes_per_row()");
+      return;
+    }
   }
 }

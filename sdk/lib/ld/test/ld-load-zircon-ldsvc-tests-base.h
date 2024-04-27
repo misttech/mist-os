@@ -50,7 +50,7 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
     mock_.Needed(name_found_pairs);
   }
 
-  zx::channel GetLdsvc() { return mock_.GetLdsvc(); }
+  zx::channel TakeLdsvc() { return mock_.TakeLdsvc(); }
 
  private:
   MockLoaderServiceForTest mock_;

@@ -1,0 +1,23 @@
+Name: netlink-packet-generic-0.3.3
+License File: LICENSE-MIT
+Description:
+
+# What is this crate used for?
+
+Netlink protocol in Starnix.
+
+# Are there any use restrictions? i.e. only for development hosts
+
+No.
+
+# What differs from upstream?
+
+Imported pull request https://github.com/rust-netlink/netlink-packet-generic/pull/15.
+
+# Are there any restrictions to how it should be rolled?
+
+No.
+
+# Is there anything else which makes this dependency "special"?
+
+No.

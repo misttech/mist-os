@@ -4,40 +4,32 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_INTERNAL_ASYNC_TXN_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_INTERNAL_ASYNC_TXN_H_
 
+#include <lib/fdf/arena.h>
 #include <zircon/assert.h>
 
 #include <utility>
 
-template <class... Args>
+template <class Completer, class... Args>
 class AsyncTxn {
  public:
-  using ReplyFunc = void (*)(void*, Args...);
-  AsyncTxn(ReplyFunc reply, void* cookie) : reply_(reply), cookie_(cookie) {}
+  explicit AsyncTxn(Completer& completer) : completer_(completer.ToAsync()) {}
   ~AsyncTxn() {
-    if (cookie_) {
-      ZX_ASSERT_MSG(replied_, "Reply must be called on NetDevTxn");
+    if (completer_.is_reply_needed() && !replied_) {
+      ZX_ASSERT_MSG(replied_, "Reply must be called on AsyncTxn");
     }
   }
-  AsyncTxn(AsyncTxn&& other) noexcept { Move(std::move(other)); }
-  AsyncTxn& operator=(AsyncTxn&& other) noexcept {
-    Move(std::move(other));
-    return *this;
-  }
+  AsyncTxn(AsyncTxn&& other) noexcept = default;
+  AsyncTxn& operator=(AsyncTxn&& other) = default;
 
   void Reply(Args&&... args) {
     replied_ = true;
-    reply_(cookie_, args...);
+    fdf::Arena arena('ASNC');
+    completer_.buffer(arena).Reply(args...);
   }
 
  private:
-  void Move(AsyncTxn&& other) {
-    reply_ = other.reply_;
-    cookie_ = nullptr;
-    std::swap(cookie_, other.cookie_);
-    replied_ = other.replied_;
-  }
-  ReplyFunc reply_ = nullptr;
-  void* cookie_ = nullptr;
+  using AsyncCompleter = decltype(std::declval<Completer>().ToAsync());
+  AsyncCompleter completer_;
   bool replied_ = false;
 };
 

@@ -52,8 +52,6 @@ __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_handle_t get_root_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
-
 __EXPORT zx_handle_t get_ioport_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
 
 __EXPORT zx_handle_t get_mmio_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
@@ -136,6 +134,11 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* service_name,
                                                            const char* protocol_name,
                                                            zx_handle_t request) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+__EXPORT zx_status_t device_connect_ns_protocol(zx_device_t* device, const char* protocol_name,
+                                                zx_handle_t request) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 }

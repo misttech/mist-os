@@ -23,7 +23,6 @@ board_configuration("x64") {
 
   input_bundles = [
     ":main_bundle",
-    ":prebuilt_codec_runner",
     ":x64_common",
     ":paver",
     "//boards/emulation/virtio",
@@ -247,10 +246,6 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/e1000.cm" ]
     },
   ]
-}
-
-board_input_bundle("prebuilt_codec_runner") {
-  base_packages = [ "//src/media/codec/codecs/vaapi:codec_runner_intel_gen" ]
 }
 
 board_input_bundle("paver") {

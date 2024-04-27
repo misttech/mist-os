@@ -15,7 +15,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/util.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 #include <pw_bluetooth/hci_data.emb.h>
@@ -971,11 +970,14 @@ void FakeController::OnLECreateConnectionCommandReceived(
     return;
   }
 
-  DeviceAddress::Type addr_type =
+  std::optional<DeviceAddress::Type> addr_type =
       DeviceAddress::LeAddrToDeviceAddr(params.peer_address_type().Read());
-  const DeviceAddress peer_address(addr_type,
+  BT_DEBUG_ASSERT(addr_type && *addr_type != DeviceAddress::Type::kBREDR);
+
+  const DeviceAddress peer_address(*addr_type,
                                    DeviceAddressBytes(params.peer_address()));
-  pwemb::StatusCode status = pwemb::StatusCode::SUCCESS;
+  pw::bluetooth::emboss::StatusCode status =
+      pw::bluetooth::emboss::StatusCode::SUCCESS;
 
   // Find the peer that matches the requested address.
   FakePeer* peer = FindPeer(peer_address);

@@ -1,0 +1,72 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.net.routes;
+
+using fuchsia.net;
+
+/// The priority of the rule set, all rule sets are linearized based on this.
+///
+/// Rules of a `RuleSet` with a smaller [`RuleSetPriority`] are executed before
+/// rules of a `RuleSet` with a larger [`RuleSetPriority`]. That is, `RuleSet`
+/// with priority 0 has the top priority.
+@available(added=HEAD)
+alias RuleSetPriority = uint32;
+
+/// The index of a rule within a provided rule set.
+///
+/// Rules within the same `RuleSet` are oredered based on the index. Rule at
+/// index 0 is evaluated first among the entire set.
+@available(added=HEAD)
+alias RuleIndex = uint32;
+
+/// Actions of a rule if the selector matches.
+@available(added=HEAD)
+type RuleAction = flexible union {
+    /// Look for a route in the indicated route table. If there is no matching
+    /// route in the target table, the lookup will continue to consider the
+    /// next rule.
+    1: lookup TableId;
+    /// Return network is unreachable. This is contrary to if a `lookup` table
+    /// is empty or no matching routes, this decision is terminal and stops
+    /// the lookup process from continuing.
+    2: unreachable struct {};
+};
+
+/// A selector to be used against the mark value.
+@available(added=HEAD)
+type MarkSelector = flexible union {
+    /// This mark domain does not have a mark.
+    1: unmarked struct {};
+    2: marked struct {
+        /// Mask to apply before comparing to the range in `between`.
+        mask uint32;
+        /// The mark is between the given range.
+        between struct {
+            /// start of the range, inclusive.
+            start uint32;
+            /// end of the range, inclusive.
+            end uint32;
+        };
+    };
+};
+
+/// The common selector that can be applied to both IPv4 and IPv6 packets.
+///
+/// A selector matches a packet if all of the present fields match the
+/// corresponding properties.
+@available(added=HEAD)
+type BaseSelector = table {
+    /// Matches the packet iff the packet was locally generated.
+    1: locally_generated bool;
+
+    /// Matches the packet iff the socket that was bound to the device using
+    /// `SO_BINDTODEVICE`.
+    2: bound_device fuchsia.net.InterfaceId;
+
+    /// The selector for the MARK_1 domain.
+    3: mark_1_selector MarkSelector;
+
+    /// The selector for the MARK_2 domain.
+    4: mark_2_selector MarkSelector;
+};

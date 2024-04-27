@@ -5,10 +5,11 @@
 """Unit tests for honeydew.affordances.sl4f.wlan_policy.py."""
 
 import unittest
+from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew.affordances.sl4f.wlan import wlan_policy as sl4f_wlan_policy
 from honeydew.transports import sl4f as sl4f_transport
@@ -24,11 +25,13 @@ from honeydew.typing.wlan import (
 )
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"

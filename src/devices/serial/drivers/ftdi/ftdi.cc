@@ -51,11 +51,24 @@ static zx_status_t FtdiBindFail(zx_status_t status) {
 namespace ftdi_serial {
 
 void FtdiDevice::NotifyCallback() {
-  if (need_to_notify_cb_ == true) {
-    need_to_notify_cb_ = false;
-    if (notify_cb_.callback) {
-      notify_cb_.callback(notify_cb_.ctx, state_);
-    }
+  if (!need_to_notify_cb_) {
+    return;
+  }
+
+  need_to_notify_cb_ = false;
+  if (notify_cb_.callback) {
+    notify_cb_.callback(notify_cb_.ctx, state_);
+  }
+
+  if (state_ & SERIAL_STATE_READABLE) {
+    sync_completion_signal(&serial_readable_);
+  } else {
+    sync_completion_reset(&serial_readable_);
+  }
+  if (state_ & SERIAL_STATE_WRITABLE) {
+    sync_completion_signal(&serial_writable_);
+  } else {
+    sync_completion_reset(&serial_writable_);
   }
 }
 
@@ -311,6 +324,56 @@ zx_status_t FtdiDevice::SerialImplSetNotifyCallback(const serial_notify_t* cb) {
   return ZX_OK;
 }
 
+zx_status_t FtdiDevice::Read(uint8_t* buf, size_t len) {
+  size_t read_len = 0;
+  zx_status_t status;
+  uint8_t* buf_index = buf;
+
+  while (read_len < len) {
+    size_t actual;
+    status = SerialImplRead(buf_index, len - read_len, &actual);
+    if (status == ZX_ERR_SHOULD_WAIT || (actual == 0)) {
+      status = sync_completion_wait_deadline(&serial_readable_,
+                                             zx::deadline_after(kSerialReadWriteTimeout).get());
+      if (status != ZX_OK) {
+        return status;
+      }
+      continue;
+    }
+    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
+      return status;
+    }
+    read_len += actual;
+    buf_index += actual;
+  }
+  return ZX_OK;
+}
+
+zx_status_t FtdiDevice::Write(uint8_t* buf, size_t len) {
+  const uint8_t* buf_index = buf;
+  size_t write_len = 0;
+
+  while (write_len < len) {
+    size_t actual;
+    zx_status_t status = SerialImplWrite(buf_index, len - write_len, &actual);
+    if (status == ZX_ERR_SHOULD_WAIT || (actual == 0)) {
+      status = sync_completion_wait_deadline(&serial_writable_,
+                                             zx::deadline_after(kSerialReadWriteTimeout).get());
+      if (status != ZX_OK) {
+        return status;
+      }
+      continue;
+    }
+    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
+      return status;
+    }
+    write_len += actual;
+    buf_index += actual;
+  }
+
+  return ZX_OK;
+}
+
 FtdiDevice::~FtdiDevice() {}
 
 void FtdiDevice::DdkUnbind(ddk::UnbindTxn txn) {
@@ -339,7 +402,7 @@ void FtdiDevice::CreateI2C(CreateI2CRequestView request, CreateI2CCompleter::Syn
     return;
   }
 
-  ftdi_mpsse::FtdiI2c::Create(this->zxdev(), &request->layout, &request->device);
+  ftdi_mpsse::FtdiI2c::Create(this->zxdev(), this, &request->layout, &request->device);
 }
 
 zx_status_t ftdi_bind_fail(zx_status_t status) {

@@ -126,6 +126,11 @@ func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnet
 	}(), nil
 }
 
+// GetRouteTableName implements fuchsia.net.routes/State.GetRouteTableName.
+func (r *resolveImpl) GetRouteTableName(ctx_ fidl.Context, tableId uint32) (fnetRoutes.StateGetRouteTableNameResult, error) {
+	panic("TODO(https://fxbug.dev/336205291): Implement for main table")
+}
+
 // GetWatcherV4 implements fuchsia.net.routes/StateV4.GetWatcherV4.
 func (r *getWatcherImpl) GetWatcherV4(
 	_ fidl.Context,
@@ -139,6 +144,15 @@ func (r *getWatcherImpl) GetWatcherV4(
 	return nil
 }
 
+// GetRuleWatcherV4 implements fuchsia.net.routes/StateV4.GetRuleWatcherV4.
+func (r *getWatcherImpl) GetRuleWatcherV4(
+	_ fidl.Context,
+	watcher fnetRoutes.RuleWatcherV4WithCtxInterfaceRequest,
+	options fnetRoutes.RuleWatcherOptionsV4,
+) error {
+	panic("TODO(https://fxbug.dev/336204757): Implement rules watcher")
+}
+
 // GetWatcherV6 implements fuchsia.net.routes/StateV6.GetWatcherV6.
 func (r *getWatcherImpl) GetWatcherV6(
 	_ fidl.Context,
@@ -150,6 +164,15 @@ func (r *getWatcherImpl) GetWatcherV6(
 		options: options,
 	}
 	return nil
+}
+
+// GetRuleWatcherV6 implements fuchsia.net.routes/StateV6.GetRuleWatcherV6.
+func (r *getWatcherImpl) GetRuleWatcherV6(
+	_ fidl.Context,
+	watcher fnetRoutes.RuleWatcherV6WithCtxInterfaceRequest,
+	options fnetRoutes.RuleWatcherOptionsV6,
+) error {
+	panic("TODO(https://fxbug.dev/336204757): Implement rules watcher")
 }
 
 // routesGetWatcherRequest is an interface for GetWatcher requests, abstracting

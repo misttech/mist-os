@@ -9,12 +9,14 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/fit/result.h>
 #include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
+#include <lib/ld/memory.h>
 #include <lib/ld/module.h>
 
 #include <fbl/alloc_checker.h>
@@ -38,6 +40,9 @@ inline constexpr size_t kMaxSegments = 8;
 // segment, so allow a fair few more.
 inline constexpr size_t kMaxPhdrs = 32;
 static_assert(kMaxPhdrs > kMaxSegments);
+
+template <class ModuleType>
+using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
 
 // TODO(https://fxbug.dev/324136831): comment on how ModuleHandle relates to
 // startup modules when the latter is supported.
@@ -68,6 +73,8 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   ModuleHandle(const ModuleHandle&) = delete;
   ModuleHandle(ModuleHandle&&) = default;
 
+  // See unmap-[posix|zircon|.cc for the dtor. On destruction, the module's load
+  // image is unmapped per the semantics of the OS implementation.
   ~ModuleHandle();
 
   // The name of the module handle is set to the filename passed to dlopen() to
@@ -96,6 +103,8 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
 
   const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
+
+  size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
 
  private:
   // A ModuleHandle can only be created with Module::Create...).
@@ -126,6 +135,21 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   using Dyn = Elf::Dyn;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxSegments>::Container>;
 
+  // TODO(https://fxbug.dev/331421403): Implement TLS.
+  struct NoTlsDesc {
+    using TlsDescGot = typename Elf::TlsDescGot;
+    constexpr TlsDescGot operator()() const {
+      assert(false && "TLS is not supported");
+      return {};
+    }
+    template <class Diagnostics, class Definition>
+    constexpr fit::result<bool, TlsDescGot> operator()(Diagnostics& diag,
+                                                       const Definition& defn) const {
+      assert(false && "TLS is not supported");
+      return fit::error{false};
+    }
+  };
+
   // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
   static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};
   using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
@@ -154,6 +178,7 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
       caller_ac.arm(sizeof(LoadModule), false);
       return nullptr;
     }
+    // TODO(https://fxbug.dev/335921712): Have ModuleHandle own the name string.
     load_module->set_name(name);
     // Have the underlying DecodedModule (see <lib/ld/decoded-module.h>) point to
     // the ABIModule embedded in the ModuleHandle, so that its information will
@@ -226,6 +251,17 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
     }
 
     return std::nullopt;
+  }
+
+  // Perform relative and symbolic relocations, resolving symbols from the
+  // list of modules as needed.
+  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<OSImpl>>& modules) {
+    constexpr NoTlsDesc kNoTlsDesc{};
+    auto memory = ld::ModuleMemory{module()};
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kNoTlsDesc);
+    return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
+           elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
+                                      resolver);
   }
 
  private:

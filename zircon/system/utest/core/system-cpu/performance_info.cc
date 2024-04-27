@@ -55,8 +55,16 @@ zx::result<zx_info_thread_stats_t> GetThreadStats(const zx::thread& thread) {
 
 zx::result<size_t> GetCpuCount() {
   size_t actual, available;
+  auto system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_INFO_BASE);
+  if (result.is_error()) {
+    return zx::error(result.error_value());
+  }
+  zx::resource info_resource = std::move(result.value());
+
   const zx_status_t status =
-      standalone::GetRootResource()->get_info(ZX_INFO_CPU_STATS, nullptr, 0, &actual, &available);
+      info_resource.get_info(ZX_INFO_CPU_STATS, nullptr, 0, &actual, &available);
   if (status != ZX_OK) {
     return zx::error(status);
   }

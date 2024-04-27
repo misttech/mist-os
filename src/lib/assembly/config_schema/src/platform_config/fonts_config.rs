@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Assembly platform configuratio schema for the Fonts subsystem.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FontsConfig {
     /// If true, use assembly to configure fonts.

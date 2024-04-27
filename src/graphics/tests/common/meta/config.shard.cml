@@ -2,11 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    config: {
-        gpu_vendor_id: {
-            type: "string",
-            max_size: 128,
-            mutability: [ "parent" ],
+    use: [
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.GpuVendorId",
+            key: "gpu_vendor_id",
+            availability: "transitional",
+            type: "uint32",
         },
+    ],
+    config: {
+        gpu_vendor_id: { type: "uint32" },
     },
 }

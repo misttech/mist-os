@@ -5,10 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/crashlog.h>
+#include <lib/ubsan-custom/handlers.h>
 #include <platform.h>
 #include <stdio.h>
-
-#include "ubsan-handlers.h"
 
 ubsan::Report::Report(const char* check, const ubsan::SourceLocation& loc,  //
                       void* caller, void* frame) {

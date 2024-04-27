@@ -7,11 +7,8 @@ use {
         constants::PKG_PATH,
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
-            error::CreateNamespaceError,
-            routing::{
-                self, route_and_open_capability,
-                router::{Request, Router},
-            },
+            routing::router_ext::{RouterExt, WeakComponentTokenExt},
+            routing::{self, route_and_open_capability},
         },
         sandbox_util::DictExt,
     },
@@ -21,13 +18,14 @@ use {
     },
     bedrock_error::{BedrockError, Explain},
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
+    errors::CreateNamespaceError,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         FutureExt, StreamExt,
     },
-    sandbox::{Capability, Dict, Directory, Open},
+    sandbox::{Capability, Dict, Directory, Open, Request, WeakComponentToken},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -305,7 +303,7 @@ fn service_or_protocol_use(
         UseDecl::Protocol(use_protocol_decl) => {
             let request = Request {
                 availability: use_protocol_decl.availability.clone(),
-                target: component.as_weak(),
+                target: WeakComponentToken::new(component.as_weak()),
             };
             let Some(capability) =
                 program_input_dict.get_capability(&use_protocol_decl.target_path)
@@ -323,7 +321,7 @@ fn service_or_protocol_use(
                     component.moniker, capability
                 );
             };
-            let router = Router::from_any(router.clone());
+            let router = router.clone();
             let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
 
             // When there are router errors, they are sent to the error handler, which reports
@@ -333,6 +331,7 @@ fn service_or_protocol_use(
             Open::new(router.into_directory_entry(
                 request,
                 fio::DirentType::Service,
+                component.execution_scope.clone(),
                 move |error: &BedrockError| {
                     let Ok(target) = weak_component.upgrade() else {
                         return None;

@@ -367,6 +367,20 @@ void ThreadDispatcher::ExitingCurrent() {
   {
     Guard<CriticalMutex> guard{get_lock()};
 
+    // Mark the thread as dead in the thread stats.  The thread is technically
+    // still running, but from a perspective of user-mode observable thread
+    // stats, it is now dead.  It is important to do this now, before we remove
+    // ourselves from our process's collection.  If we are the last thread to
+    // leave the collection, user-mode will be signaled and will expect the
+    // process to be dead (implying that its thread stats should no longer be
+    // increasing).  If we have not declared this thread to be dead yet, users
+    // could continue to see the thread stats change even though they now
+    // consider the process to be dead.
+    {
+      InterruptDisableGuard interrupt_disable;
+      UpdateRuntimeStats(thread_state::THREAD_DEATH);
+    }
+
     // put ourselves into the dead state
     SetStateLocked(ThreadState::Lifecycle::DEAD);
     core_thread_ = nullptr;
@@ -594,32 +608,25 @@ zx_status_t ThreadDispatcher::GetStatsForUserspace(zx_info_thread_stats_t* info)
   return ZX_OK;
 }
 
-zx_status_t ThreadDispatcher::GetRuntimeStats(TaskRuntimeStats* out) const {
+TaskRuntimeStats ThreadDispatcher::GetCompensatedTaskRuntimeStats() const {
   canary_.Assert();
+  return runtime_stats_.GetCompensatedTaskRuntimeStats();
+}
 
-  *out = {};
+void ThreadDispatcher::UpdateRuntimeStats(thread_state new_state) {
+  canary_.Assert();
+  DEBUG_ASSERT(arch_ints_disabled());
+  runtime_stats_.Update(new_state, ThreadRuntimeStats::NoIrqSave);
+}
 
-  // Repeatedly try to get a consistent snapshot out of runtime stats using the generation count.
-  //
-  // We attempt to get a snapshot forever, so it is theoretically possible for us to loop forever.
-  // In practice, our context switching overhead is significantly higher than the runtime of this
-  // loop, so it is unlikely to happen.
-  //
-  // If our context switch overhead drops very significantly, we may need to revisit this
-  // algorithm and return an error after some number of loops.
-  while (true) {
-    uint64_t start_count;
-    while ((start_count = stats_generation_count_.load(ktl::memory_order_acquire)) % 2) {
-      // Loop until no write is happening concurrently.
-    }
+void ThreadDispatcher::AddPageFaultTicks(zx_ticks_t ticks) {
+  canary_.Assert();
+  runtime_stats_.AddPageFaultTicks(ticks);
+}
 
-    *out = runtime_stats_.TotalRuntime();
-
-    uint64_t end_count = stats_generation_count_.load(ktl::memory_order_acquire);
-    if (start_count == end_count) {
-      return ZX_OK;
-    }
-  }
+void ThreadDispatcher::AddLockContentionTicks(zx_ticks_t ticks) {
+  canary_.Assert();
+  runtime_stats_.AddLockContentionTicks(ticks);
 }
 
 zx_status_t ThreadDispatcher::GetExceptionReport(zx_exception_report_t* report) {

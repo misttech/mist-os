@@ -28,6 +28,7 @@
         {
             protocol: [
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",

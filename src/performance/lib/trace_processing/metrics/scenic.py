@@ -57,6 +57,12 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
     def process_metrics(
         self, model: trace_model.Model
     ) -> List[trace_metrics.TestCaseResult]:
+        # This method looks for a possible race between trace event start in Scenic and magma.
+        # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
+        model = trace_utils.adjust_to_common_process_start(
+            model, [("scenic.cm", ""), ("driver_host.cm", "DeviceThread")]
+        )
+
         all_events: Iterator[trace_model.Event] = model.all_events()
         scenic_start_events: List[trace_model.Event] = list(
             trace_utils.filter_events(
@@ -81,13 +87,6 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
             )
             if following is not None:
                 vsync_ready_events.append(following)
-
-        valid_vsync_start_index = trace_utils.find_valid_vsync_start_index(
-            vsync_ready_events
-        )
-        scenic_start_events = scenic_start_events[valid_vsync_start_index:]
-        scenic_render_events = scenic_render_events[valid_vsync_start_index:]
-        vsync_ready_events = vsync_ready_events[valid_vsync_start_index:]
 
         if len(scenic_render_events) < 1 or len(vsync_ready_events) < 1:
             _LOGGER.info(

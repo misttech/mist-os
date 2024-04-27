@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod dispatcher;
-pub mod error;
 pub mod event;
 pub mod registry;
 pub(crate) mod serve;

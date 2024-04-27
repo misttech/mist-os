@@ -1,13 +1,13 @@
-// Copyright 2016 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #![allow(non_camel_case_types)]
 
-use static_assertions::const_assert_eq;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicI32;
+#[cfg(feature = "zerocopy")]
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub type zx_addr_t = usize;
@@ -25,6 +25,7 @@ pub type zx_koid_t = u64;
 pub type zx_obj_type_t = u32;
 pub type zx_object_info_topic_t = u32;
 pub type zx_info_maps_type_t = u32;
+pub type zx_iob_allocate_id_options_t = u32;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
 pub type zx_rights_t = u32;
@@ -43,6 +44,17 @@ pub type zx_vcpu_state_topic_t = u32;
 pub type zx_restricted_reason_t = u64;
 pub type zx_processor_power_level_options_t = u64;
 pub type zx_processor_power_control_t = u64;
+
+macro_rules! const_assert {
+    ($e:expr $(,)?) => {
+        const _: [(); 1 - { const ASSERT: bool = $e; ASSERT as usize }] = [];
+    };
+}
+macro_rules! const_assert_eq {
+    ($lhs:expr, $rhs:expr $(,)?) => {
+        const_assert!($lhs == $rhs);
+    };
+}
 
 // TODO: magically coerce this to &`static str somehow?
 #[repr(C)]
@@ -86,7 +98,7 @@ multiconst!(zx_koid_t, [
 ]);
 
 multiconst!(zx_time_t, [
-    ZX_TIME_INFINITE = ::std::i64::MAX;
+    ZX_TIME_INFINITE = i64::MAX;
     ZX_TIME_INFINITE_PAST = ::std::i64::MIN;
 ]);
 
@@ -491,6 +503,7 @@ multiconst!(u64, [
 // from //zircon/system/public/zircon/syscalls/exception.h
 multiconst!(u32, [
     ZX_EXCEPTION_CHANNEL_DEBUGGER = 1 << 0;
+    ZX_EXCEPTION_TARGET_JOB_DEBUGGER = 1 << 0;
 ]);
 
 /// A byte used only to control memory alignment. All padding bytes are considered equal
@@ -501,7 +514,8 @@ multiconst!(u32, [
 /// safely initialized. These explicit padding fields are mirrored in the Rust struct definitions
 /// to minimize the opportunities for mistakes and inconsistencies.
 #[repr(C)]
-#[derive(Copy, Clone, Eq, Default, FromZeros, FromBytes, NoCell, AsBytes)]
+#[derive(Copy, Clone, Eq, Default)]
+#[cfg_attr(feature = "zerocopy", derive(FromZeros, FromBytes, NoCell, AsBytes))]
 pub struct PadByte(u8);
 
 impl PartialEq for PadByte {
@@ -963,7 +977,7 @@ multiconst!(u32, [
 
 pub type zx_excp_type_t = u32;
 
-multiconst!(zx_obj_type_t, [
+multiconst!(zx_excp_type_t, [
     ZX_EXCP_GENERAL               = 0x008;
     ZX_EXCP_FATAL_PAGE_FAULT      = 0x108;
     ZX_EXCP_UNDEFINED_INSTRUCTION = 0x208;
@@ -976,10 +990,20 @@ multiconst!(zx_obj_type_t, [
     ZX_EXCP_THREAD_STARTING       = 0x008 | ZX_EXCP_SYNTH;
     ZX_EXCP_THREAD_EXITING        = 0x108 | ZX_EXCP_SYNTH;
     ZX_EXCP_POLICY_ERROR          = 0x208 | ZX_EXCP_SYNTH;
+    ZX_EXCP_USER                  = 0x309 | ZX_EXCP_SYNTH;
+]);
+
+multiconst!(u32, [
+    ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED = 0x0001;
+
+    ZX_EXCP_USER_CODE_USER0                = 0xF000;
+    ZX_EXCP_USER_CODE_USER1                = 0xF001;
+    ZX_EXCP_USER_CODE_USER2                = 0xF002;
 ]);
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, FromZeros, FromBytes, NoCell, AsBytes)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "zerocopy", derive(FromZeros, FromBytes, NoCell, AsBytes))]
 pub struct zx_exception_info_t {
     pub pid: zx_koid_t,
     pub tid: zx_koid_t,
@@ -988,7 +1012,7 @@ pub struct zx_exception_info_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_x86_64_exc_data_t {
     pub vector: u64,
     pub err_code: u64,
@@ -996,7 +1020,7 @@ pub struct zx_x86_64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_arm64_exc_data_t {
     pub esr: u32,
     pub padding1: [PadByte; 4],
@@ -1005,7 +1029,7 @@ pub struct zx_arm64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_riscv64_exc_data_t {
     pub cause: u64,
     pub tval: u64,

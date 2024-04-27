@@ -1200,6 +1200,11 @@ impl Task {
         // If this is the thread group leader, use this name for the process too.
         if self.is_leader() {
             set_zx_name(&self.thread_group.process, name.as_bytes());
+            let _ = zx::Thread::raise_user_exception(
+                zx::RaiseExceptionOptions::TARGET_JOB_DEBUGGER,
+                zx::sys::ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED,
+                0,
+            );
         }
 
         let debug_info = starnix_logging::TaskDebugInfo {

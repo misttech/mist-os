@@ -5,29 +5,35 @@
 #ifndef LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 #define LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 
-#include "dl-tests-base.h"
+#ifdef __Fuchsia__
+#include "dl-load-zircon-tests-base.h"
+#endif
+
+#include "dl-load-tests-base.h"
 
 namespace dl::testing {
 
-class DlSystemTests : public DlTestsBase {
+#ifdef __Fuchsia__
+using DlSystemLoadTestsBase = DlLoadZirconTestsBase;
+#else
+using DlSystemLoadTestsBase = DlLoadTestsBase;
+#endif
+
+class DlSystemTests : public DlSystemLoadTestsBase {
  public:
   // This test fixture does not need to match on exact error text, since the
   // error message can vary between different system implementations.
   static constexpr bool kCanMatchExactError = false;
 
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/324650368): Disable dep tests until Fuchsia's
-  // loader service can load from test paths.
-  static constexpr bool kCanLookUpDeps = false;
-
   // Fuchsia's musl implementation of dlopen does not validate flag values for
   // the mode argument.
   static constexpr bool kCanValidateMode = false;
 #endif
 
-  fit::result<Error, void*> DlOpen(const char* name, int mode);
+  fit::result<Error, void*> DlOpen(const char* file, int mode);
 
-  fit::result<Error, void*> DlSym(void* module, const char* ref);
+  static fit::result<Error, void*> DlSym(void* module, const char* ref);
 };
 
 }  // namespace dl::testing

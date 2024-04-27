@@ -17,9 +17,8 @@ There are some constructs in this directory:
 - Test binaries: These are actual binaries that get breakpoint tests run as a sub-process so that
   they can load breakpoints on them.
   See src/developer/debug/debug_agent/integration_tests/breakpoint_test.cc for an example.
-- Test utilities: These are various one-off programs that are meant to be run manually, either as a
-  shell program ($ /pkgfs/packages/debug_agent_helpers/0/bin/program) or as a component
-  ($ run this_component.cm... See limbo caller as an example).
+- Test utilities: These are various one-off programs that are meant to be run manually as a
+  component ($ run this_component.cm... See limbo caller as an example).
 
 ## Deploying
 

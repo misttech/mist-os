@@ -21,17 +21,7 @@
 namespace ftdi_mpsse {
 
 zx_status_t FtdiI2c::Enable() {
-  zx_status_t status;
-  status = mpsse_.Init();
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (!mpsse_.IsValid()) {
-    zxlogf(ERROR, "ftdi_i2c: mpsse is invalid!");
-    return ZX_ERR_INTERNAL;
-  }
-
-  status = mpsse_.Sync();
+  zx_status_t status = mpsse_.Sync();
   if (status != ZX_OK) {
     zxlogf(ERROR, "ftdi_i2c: mpsse failed to sync %d", status);
     return status;
@@ -436,7 +426,7 @@ void FtdiI2c::handle_unknown_method(
   zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
 }
 
-zx_status_t FtdiI2c::Create(zx_device_t* device,
+zx_status_t FtdiI2c::Create(zx_device_t* device, ftdi_serial::FtdiSerial* const serial,
                             const fuchsia_hardware_ftdi::wire::I2cBusLayout* layout,
                             const fuchsia_hardware_ftdi::wire::I2cDevice* i2c_dev) {
   // Note: This driver has only been tested on one set of pins.
@@ -455,7 +445,7 @@ zx_status_t FtdiI2c::Create(zx_device_t* device,
   i2c_devices[0].pid = i2c_dev->pid;
   i2c_devices[0].did = i2c_dev->did;
 
-  auto dev = std::make_unique<ftdi_mpsse::FtdiI2c>(device, i2c_layout, i2c_devices);
+  auto dev = std::make_unique<ftdi_mpsse::FtdiI2c>(device, serial, i2c_layout, i2c_devices);
   zx_status_t status = dev->Bind();
   if (status == ZX_OK) {
     // devmgr is now in charge of the memory for dev

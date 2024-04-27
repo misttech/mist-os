@@ -4,7 +4,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_FRAME_STORAGE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_FRAME_STORAGE_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
 #include <string.h>
 #include <zircon/compiler.h>
 
@@ -59,10 +59,9 @@ class __TA_CAPABILITY("mutex") FrameStorage {
   void lock() __TA_ACQUIRE() { mutex_.lock(); }
   void unlock() __TA_RELEASE() { mutex_.unlock(); }
 
-  void Store(const rx_space_buffer_t* buffers_list, size_t buffers_count, uint8_t* vmo_addrs[])
-      __TA_REQUIRES(*this) {
-    for (size_t i = 0; i < buffers_count; ++i) {
-      const rx_space_buffer_t& buffer = buffers_list[i];
+  void Store(cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+             uint8_t* vmo_addrs[]) __TA_REQUIRES(*this) {
+    for (const auto& buffer : buffers) {
       const size_t offset = buffer.region.offset;
       uint8_t* const addr = vmo_addrs[buffer.region.vmo] + offset;
       const uint32_t length = static_cast<uint32_t>(buffer.region.length);

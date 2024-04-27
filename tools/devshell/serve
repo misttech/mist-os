@@ -289,37 +289,13 @@ elif is_feature_enabled "incremental_legacy"; then
   exit 1
 fi
 
-if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
-  fx-error "Both the foreground and background server are enabled. This is mutually incompatible."
-  pm_bg_resolutions
-elif is_feature_enabled "foreground_repo_server"; then
-  fx-info "The 'foreground_repo_server' feature is now enabled by default."
-  fx-info "Background serving with both ffx and pm is going away soon."
-  fx-info "Until the end of 2024Q2, you can opt out of foreground serving by"
-  fx-info "running the following commands, but note that starting a background"
-  fx-info "repo server using \"fx serve\" is no longer supported; instead,"
-  fx-info "starting the background repo server will be handled by the ffx daemon."
-  fx-info ""
-  fx-info "Ensure your shell *does* export the following environment variable"
-  fx-info "wherever you use fx and ffx:"
-  fx-info ""
-  fx-info "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
-  fx-info ""
-  fx-info "Enable the background server:"
-  fx-info ""
-  fx-info "$ ffx config set repository.server.enabled true"
-  fx-info "$ ffx doctor --restart-daemon"
-  fx-info ""
-  fx-info "Please note that an already running foreground server"
-  fx-info "may not always be detected correctly. Please consider"
-  fx-info "running the following commands in case of problems:"
-  fx-info ""
-  fx-info "$ ffx config remove repository.server.listen"
-  fx-info "$ ffx doctor --restart-daemon"
-  fx-info ""
-else
-  fx-error "Starting a background server from \"fx serve\" is no longer supported,"
-  fx-error "preceding the upcoming deprecation of background serving at the end of 2024Q2."
+if [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
+  if is_feature_enabled "foreground_repo_server"; then
+    fx-error "Both ffx foreground and background serving are enabled. This is mutually incompatible."
+  else
+    fx-error "Starting an ffx background server from \"fx serve\" is no longer supported,"
+    fx-error "preceding the upcoming removal of background serving at the end of 2024Q2."
+  fi
   pm_bg_resolutions
 fi
 

@@ -51,19 +51,18 @@ class WlanInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
                       public wlan::drivers::components::NetworkPort,
                       public wlan::drivers::components::NetworkPort::Callbacks {
  public:
-  // Static factory function.
-  static zx::result<std::unique_ptr<WlanInterface>> Create(
-      wlan::brcmfmac::Device* device, const char* name, wireless_dev* wdev,
-      fuchsia_wlan_common_wire::WlanMacRole role);
-  zx_status_t DestroyIface();
+  // Static factory function. The result is provided through the |on_complete| callback. The
+  // callback may be called inline from this call in case of an error (but not on success).
+  // Make sure this does not attempt to recursively acquire any locks.
+  static void Create(wlan::brcmfmac::Device* device, const char* name, wireless_dev* wdev,
+                     fuchsia_wlan_common_wire::WlanMacRole role, uint16_t iface_id,
+                     fit::callback<void(zx::result<std::unique_ptr<WlanInterface>>)>&& on_complete);
+  void DestroyIface(fit::callback<void(zx_status_t)>&& on_complete);
 
   // Accessors.
   void set_wdev(wireless_dev* wdev);
   wireless_dev* take_wdev();
   std::string GetName() { return name_; }
-
-  // Called by WlanPhyImpl device when destroying the iface.
-  void Remove(fit::callback<void()>&& on_remove);
 
   // Serves the WlanFullmacImpl protocol on `server_end`.
   void ServiceConnectHandler(fdf_dispatcher_t* dispatcher,
@@ -141,22 +140,28 @@ class WlanInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
  protected:
   // NetworkPort::Callbacks implementation
   uint32_t PortGetMtu() override;
-  void MacGetAddress(mac_address_t* out_mac) override;
-  void MacGetFeatures(features_t* out_features) override;
-  void MacSetMode(mac_filter_mode_t mode, cpp20::span<const mac_address_t> multicast_macs) override;
+  void MacGetAddress(fuchsia_net::MacAddress* out_mac) override;
+  void MacGetFeatures(fuchsia_hardware_network_driver::Features* out_features) override;
+  void MacSetMode(fuchsia_hardware_network::wire::MacFilterMode mode,
+                  cpp20::span<const ::fuchsia_net::wire::MacAddress> multicast_macs) override;
+  void PortRemoved() override;
 
  private:
-  WlanInterface(wlan::brcmfmac::Device* device, const network_device_ifc_protocol_t& proto,
-                uint8_t port_id, const char* name);
+  WlanInterface(
+      wlan::brcmfmac::Device* device,
+      fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc>&& netdev_ifc,
+      uint8_t port_id, const char* name, uint16_t iface_id);
   zx_status_t AddWlanFullmacDevice();
   zx_status_t RemoveWlanFullmacDevice();
 
   std::shared_mutex lock_;
-  wireless_dev* wdev_;               // lock_ is used as a RW lock on wdev_
-  fit::callback<void()> on_remove_;  // lock_ is also used as a RW lock on on_remove_
-  wlan::brcmfmac::Device* device_;
+  wireless_dev* wdev_ = nullptr;  // lock_ is used as a RW lock on wdev_
+  bool destroying_ __TA_GUARDED(lock_) = false;
+  wlan::brcmfmac::Device* device_ = nullptr;
   fuchsia_wlan_common_wire::WlanMacRole role_;
   std::string name_;
+  // This is the interface ID used by the Device object, not the port ID or firmware ID.
+  uint16_t iface_id_;
   fdf::ServerBindingGroup<fuchsia_wlan_fullmac::WlanFullmacImpl> bindings_;
   fidl::WireClient<fdf::NodeController> wlanfullmac_controller_;
 };

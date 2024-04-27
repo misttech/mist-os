@@ -21,7 +21,6 @@
 #include "src/performance/trace/cmd_utils.h"
 #include "src/performance/trace/command.h"
 #include "src/performance/trace/tracer.h"
-#include "src/performance/trace/utils.h"
 
 namespace tracing {
 
@@ -33,7 +32,7 @@ class RecordCommand : public CommandWithController {
     std::string test_name;
     std::string app;
     std::vector<std::string> args;
-    std::vector<std::string> categories = {};
+    std::vector<std::string> categories;
     zx::duration duration = zx::sec(kDefaultDurationSeconds);
     bool detach = false;
     bool decouple = false;
@@ -42,7 +41,7 @@ class RecordCommand : public CommandWithController {
     std::optional<std::string> environment_name;
     uint32_t buffer_size_megabytes = kDefaultBufferSizeMegabytes;
     std::vector<ProviderSpec> provider_specs;
-    fuchsia::tracing::BufferingMode buffering_mode = kDefaultBufferingMode;
+    fuchsia_tracing::BufferingMode buffering_mode = kDefaultBufferingMode;
     bool binary = false;
     bool compress = false;
     std::string output_file_name = kDefaultOutputFileName;
@@ -53,7 +52,7 @@ class RecordCommand : public CommandWithController {
 
   static Info Describe();
 
-  explicit RecordCommand(sys::ComponentContext* context);
+  explicit RecordCommand();
 
  protected:
   void Start(const fxl::CommandLine& command_line) override;

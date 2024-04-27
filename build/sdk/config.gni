@@ -39,6 +39,9 @@ declare_args() {
   # on the system goes beyond this value, ninja will throttle itself. If left
   # blank, the subbuild script will make a guess.
   sdk_sub_build_max_load_average = ""
+
+  # Set to `true` to enable verbose logging during IDK subbuilds.
+  sdk_sub_build_verbose = false
 }
 
 # The list of all cpu architectures for the prebuild fuchsia binaries that go

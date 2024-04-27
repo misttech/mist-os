@@ -14,85 +14,91 @@ pub const EMU_INSTANCE_ROOT_DIR: &'static str = "emu.instance_dir";
 
 pub(crate) const SERIALIZE_FILE_NAME: &str = "engine.json";
 
-/// Return a PathBuf with the path to the instance directory for this engine. If the "create" flag
-/// is set, the directory and its ancestors will be created if it doesn't already exist.
-pub async fn get_instance_dir(instance_name: &str, create: bool) -> Result<PathBuf> {
-    let root_dir: String = ffx_config::get(EMU_INSTANCE_ROOT_DIR)
-        .await
-        .context("Error encountered accessing FFX config for the emulator instance root.")?;
-    let path = PathBuf::from(root_dir).join(&instance_name);
-    if !path.exists() {
-        if create {
-            tracing::debug!("Creating {:?} for {}", path, instance_name);
-            create_dir_all(&path.as_path())?;
+#[derive(Debug, Clone)]
+pub struct EmulatorInstances {
+    instance_root: PathBuf,
+}
+
+impl EmulatorInstances {
+    pub fn new(instance_root: PathBuf) -> Self {
+        EmulatorInstances { instance_root }
+    }
+    /// Return a PathBuf with the path to the instance directory for this engine. If the "create" flag
+    /// is set, the directory and its ancestors will be created if it doesn't already exist.
+    pub fn get_instance_dir(&self, instance_name: &str, create: bool) -> Result<PathBuf> {
+        let path = self.instance_root.join(&instance_name);
+        if !path.exists() {
+            if create {
+                tracing::debug!("Creating {:?} for {}", path, instance_name);
+                create_dir_all(&path.as_path())?;
+            } else {
+                tracing::debug!(
+                    "Path {} doesn't exist. Check the spelling of the instance name.",
+                    instance_name
+                );
+            }
+        }
+        Ok(path)
+    }
+
+    /// Given an instance name, empty and remove the instance directory associated with that name.
+    /// Fails if the directory can't be removed; returns Ok(()) if the directory doesn't exist.
+    pub fn clean_up_instance_dir(&self, instance_name: &str) -> Result<()> {
+        let path = self.get_instance_dir(instance_name, false)?;
+        if path.exists() {
+            tracing::debug!("Removing {:?} for {:?}", path, path.as_path().file_name().unwrap());
+            std::fs::remove_dir_all(&path.as_path()).context("Request to remove directory failed")
         } else {
-            tracing::debug!(
-                "Path {} doesn't exist. Check the spelling of the instance name.",
-                instance_name
-            );
+            // It's already gone, so just return Ok(()).
+            Ok(())
         }
     }
-    Ok(path)
-}
 
-/// Given an instance name, empty and remove the instance directory associated with that name.
-/// Fails if the directory can't be removed; returns Ok(()) if the directory doesn't exist.
-pub async fn clean_up_instance_dir(instance_name: &str) -> Result<()> {
-    let path = get_instance_dir(instance_name, false).await?;
-    if path.exists() {
-        tracing::debug!("Removing {:?} for {:?}", path, path.as_path().file_name().unwrap());
-        std::fs::remove_dir_all(&path.as_path()).context("Request to remove directory failed")
-    } else {
-        // It's already gone, so just return Ok(()).
-        Ok(())
-    }
-}
-
-/// Retrieve a list of all of the names of instances currently present on the local system.
-pub async fn get_all_instances() -> Result<Vec<EmulatorInstanceData>> {
-    let mut result = Vec::new();
-    let root_dir: String = ffx_config::get(EMU_INSTANCE_ROOT_DIR)
-        .await
-        .context("Error encountered accessing FFX config for the emulator instance root.")?;
-    let buf = PathBuf::from(root_dir);
-    let root = buf.as_path();
-    if root.is_dir() {
-        for entry in root.read_dir()? {
-            if let Ok(entry) = entry {
-                if !entry.path().is_dir() {
-                    continue;
-                }
-                if entry.path().join(SERIALIZE_FILE_NAME).exists() {
-                    if let Some(name_as_os_str) = entry.path().file_name() {
-                        if let Some(name) = name_as_os_str.to_str() {
-                            match read_from_disk(name).await {
-                                Ok(EngineOption::DoesExist(data)) => result.push(data),
-                                Ok(EngineOption::DoesNotExist(name)) => result.push(
-                                    EmulatorInstanceData::new_with_state(&name, EngineState::Error),
-                                ),
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Cannot read emulator instance data for {}: {:?}",
-                                        name,
-                                        e
-                                    );
-                                    result.push(EmulatorInstanceData::new_with_state(
-                                        name,
-                                        EngineState::Error,
-                                    ));
-                                }
-                            };
+    /// Retrieve a list of all of the names of instances currently present on the local system.
+    pub fn get_all_instances(&self) -> Result<Vec<EmulatorInstanceData>> {
+        let mut result = Vec::new();
+        let root = self.instance_root.as_path();
+        if root.is_dir() {
+            for entry in root.read_dir()? {
+                if let Ok(entry) = entry {
+                    if !entry.path().is_dir() {
+                        continue;
+                    }
+                    if entry.path().join(SERIALIZE_FILE_NAME).exists() {
+                        if let Some(name_as_os_str) = entry.path().file_name() {
+                            if let Some(name) = name_as_os_str.to_str() {
+                                match read_from_disk(&entry.path()) {
+                                    Ok(EngineOption::DoesExist(data)) => result.push(data),
+                                    Ok(EngineOption::DoesNotExist(name)) => {
+                                        result.push(EmulatorInstanceData::new_with_state(
+                                            &name,
+                                            EngineState::Error,
+                                        ))
+                                    }
+                                    Err(e) => {
+                                        tracing::error!(
+                                            "Cannot read emulator instance data for {}: {:?}",
+                                            name,
+                                            e
+                                        );
+                                        result.push(EmulatorInstanceData::new_with_state(
+                                            name,
+                                            EngineState::Error,
+                                        ));
+                                    }
+                                };
+                            }
                         }
                     }
                 }
             }
         }
+        return Ok(result);
     }
-    return Ok(result);
 }
 
-pub async fn read_from_disk(instance_name: &str) -> Result<EngineOption> {
-    let filepath = get_instance_dir(instance_name, false).await?.join(SERIALIZE_FILE_NAME);
+pub fn read_from_disk(instance_directory: &PathBuf) -> Result<EngineOption> {
+    let filepath = instance_directory.join(SERIALIZE_FILE_NAME);
 
     // Read the engine.json file and deserialize it from disk into a new TypedEngine instance
     if filepath.exists() {
@@ -106,7 +112,7 @@ pub async fn read_from_disk(instance_name: &str) -> Result<EngineOption> {
         let value = res?;
         Ok(EngineOption::DoesExist(value))
     } else {
-        Ok(EngineOption::DoesNotExist(instance_name.to_string()))
+        Ok(EngineOption::DoesNotExist(filepath.to_string_lossy().into()))
     }
 }
 
@@ -145,47 +151,37 @@ pub fn write_to_disk(data: &EmulatorInstanceData, instance_directory: &PathBuf) 
 mod tests {
     use super::*;
     use crate::{EmulatorInstanceInfo, EngineType};
-    use ffx_config::ConfigLevel;
-    use serde_json::json;
     use std::{fs::remove_file, io::Write};
     use tempfile::tempdir;
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_get_instance_dir() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp_dir = tempdir()
-            .expect("Couldn't get a temporary directory for testing.")
-            .path()
-            .to_str()
-            .expect("Couldn't convert Path to str")
-            .to_string();
-        env.context
-            .query(EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ConfigLevel::User))
-            .set(json!(temp_dir))
-            .await?;
+    #[test]
+    fn test_get_instance_dir() -> Result<()> {
+        let temp_dir = tempdir().expect("Couldn't get a temporary directory for testing.");
+
+        let instance_root = PathBuf::from(temp_dir.path());
+        let emu_instances = EmulatorInstances::new(instance_root.clone());
 
         // Create a new directory.
-        let path1 = get_instance_dir("create_me", true).await?;
-        assert_eq!(path1, PathBuf::from(&temp_dir).join("create_me"));
+        let path1 = emu_instances.get_instance_dir("create_me", true)?;
+        assert_eq!(path1, instance_root.join("create_me"));
         assert!(path1.exists());
 
         // Look for a dir that doesn't exist, but don't create it.
-        let path2 = get_instance_dir("dont_create", false).await?;
+        let path2 = emu_instances.get_instance_dir("dont_create", false)?;
         assert!(!path2.exists());
 
         // Look for a dir that already exists, but don't allow creation.
-        let mut path3 = get_instance_dir("create_me", false).await?;
-        assert_eq!(path3, PathBuf::from(&temp_dir).join("create_me"));
+        let mut path3 = emu_instances.get_instance_dir("create_me", false)?;
+        assert_eq!(path3, instance_root.join("create_me"));
         assert!(path3.exists());
 
         // Get an existing directory, but set the create flag too. Make sure it didn't get replaced.
         path3 = path3.join("foo.txt");
         let _ = File::create(&path3)?;
-        let path4 = get_instance_dir("create_me", true).await?;
+        let path4 = emu_instances.get_instance_dir("create_me", true)?;
         assert!(path4.exists());
         assert!(path3.exists());
-        assert_eq!(path4, PathBuf::from(&temp_dir).join("create_me"));
+        assert_eq!(path4, instance_root.join("create_me"));
         for entry in path4.as_path().read_dir()? {
             assert_eq!(entry?.path(), path3);
         }
@@ -193,38 +189,30 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_get_all_instances() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp_dir = tempdir()
-            .expect("Couldn't get a temporary directory for testing.")
-            .path()
-            .to_str()
-            .expect("Couldn't convert Path to str")
-            .to_string();
-        env.context
-            .query(EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ConfigLevel::User))
-            .set(json!(temp_dir))
-            .await?;
+    #[test]
+    fn test_get_all_instances() -> Result<()> {
+        let temp_dir = tempdir().expect("Couldn't get a temporary directory for testing.");
+
+        let instance_root = PathBuf::from(temp_dir.path());
+        let emu_instances = EmulatorInstances::new(instance_root.clone());
 
         // Create three mock instance directories, and make sure they're all included.
-        let path1 = PathBuf::from(&temp_dir).join("path1");
+        let path1 = instance_root.join("path1");
         create_dir_all(path1.as_path())?;
         let file1_path = path1.join(SERIALIZE_FILE_NAME);
         let _file1 = File::create(&file1_path)?;
 
-        let path2 = PathBuf::from(&temp_dir).join("path2");
+        let path2 = instance_root.join("path2");
         create_dir_all(path2.as_path())?;
         let file2_path = path2.join(SERIALIZE_FILE_NAME);
         let _file2 = File::create(&file2_path)?;
 
-        let path3 = PathBuf::from(&temp_dir).join("path3");
+        let path3 = instance_root.join("path3");
         create_dir_all(path3.as_path())?;
         let file3_path = path3.join(SERIALIZE_FILE_NAME);
         let _file3 = File::create(&file3_path)?;
 
-        let instances = get_all_instances().await?;
+        let instances = emu_instances.get_all_instances()?;
         assert!(instances.iter().any(|e| e.get_name() == "path1"));
         assert!(instances.iter().any(|e| e.get_name() == "path2"));
         assert!(instances.iter().any(|e| e.get_name() == "path3"));
@@ -233,17 +221,17 @@ mod tests {
         // Remove the file for path2, and make sure it's excluded from the results.
         assert!(remove_file(&file2_path).is_ok());
 
-        let instances = get_all_instances().await?;
+        let instances = emu_instances.get_all_instances()?;
         assert!(instances.iter().any(|e| e.get_name() == "path1"));
         assert!(!instances.iter().any(|e| e.get_name() == "path2"));
         assert!(instances.iter().any(|e| e.get_name() == "path3"));
 
         // Other files in the root shouldn't be included either. Create an empty file in the root
         // and make sure it's excluded too.
-        let file_path = PathBuf::from(&temp_dir).join("empty_file");
+        let file_path = instance_root.join("empty_file");
         let _empty_file = File::create(&file_path)?;
 
-        let instances = get_all_instances().await?;
+        let instances = emu_instances.get_all_instances()?;
         assert!(instances.iter().any(|e| e.get_name() == "path1"));
         assert!(!instances.iter().any(|e| e.get_name() == "path2"));
         assert!(instances.iter().any(|e| e.get_name() == "path3"));
@@ -251,26 +239,18 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_clean_up_instance_dir() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp_dir = tempdir()
-            .expect("Couldn't get a temporary directory for testing.")
-            .path()
-            .to_str()
-            .expect("Couldn't convert Path to str")
-            .to_string();
-        env.context
-            .query(EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ConfigLevel::User))
-            .set(json!(temp_dir))
-            .await?;
+    #[test]
+    fn test_clean_up_instance_dir() -> Result<()> {
+        let temp_dir = tempdir().expect("Couldn't get a temporary directory for testing.");
 
-        let path1 = PathBuf::from(&temp_dir).join("path1");
+        let instance_root = PathBuf::from(temp_dir.path());
+        let emu_instances = EmulatorInstances::new(instance_root.clone());
+
+        let path1 = instance_root.join("path1");
         create_dir_all(path1.as_path())?;
         assert!(path1.exists());
 
-        let path2 = PathBuf::from(&temp_dir).join("path2");
+        let path2 = instance_root.join("path2");
         create_dir_all(path2.as_path())?;
         assert!(path2.exists());
 
@@ -279,39 +259,30 @@ mod tests {
         assert!(file_path.exists());
 
         // Clean up an existing, empty directory
-        assert!(clean_up_instance_dir("path1").await.is_ok());
+        emu_instances.clean_up_instance_dir("path1").expect("cleanup path1");
         assert!(!path1.exists());
         assert!(path2.exists());
 
         // Clean up an existing, populated directory
-        assert!(clean_up_instance_dir("path2").await.is_ok());
+        emu_instances.clean_up_instance_dir("path2").expect("cleanup path2");
         assert!(!path2.exists());
         assert!(!file_path.exists());
 
         // Clean up an non-existing directory
-        assert!(clean_up_instance_dir("path3").await.is_ok());
+        emu_instances.clean_up_instance_dir("path3").expect("cleanup path3");
         assert!(!path1.exists());
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_broken_reads() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp_dir = tempdir()
-            .expect("Couldn't get a temporary directory for testing.")
-            .path()
-            .to_str()
-            .expect("Couldn't convert Path to str")
-            .to_string();
-        env.context
-            .query(EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ConfigLevel::User))
-            .set(json!(temp_dir))
-            .await?;
+    #[test]
+    fn test_broken_reads() -> Result<()> {
+        let temp_dir = tempdir().expect("Couldn't get a temporary directory for testing.");
 
+        let instance_root = PathBuf::from(temp_dir.path());
+        let emu_instances = EmulatorInstances::new(instance_root.clone());
         // Create a test directory in TempFile::tempdir.
         let name = "test_write_then_read";
-        let temp_path = PathBuf::from(temp_dir).join(name);
+        let temp_path = instance_root.join(name);
         let file_path = temp_path.join(SERIALIZE_FILE_NAME);
         create_dir_all(&temp_path)?;
 
@@ -343,7 +314,7 @@ mod tests {
 
         let mut file = File::create(&file_path)?;
         write!(file, "{}", &bad_json)?;
-        let box_engine = read_from_disk(name).await;
+        let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);
         assert!(box_engine.is_err());
         let value = read_from_disk_untyped(&temp_path);
         assert!(value.is_err());
@@ -351,7 +322,7 @@ mod tests {
         remove_file(&file_path).expect("Problem removing serialized file during test.");
         let mut file = File::create(&file_path)?;
         write!(file, "{}", &no_pid)?;
-        let box_engine = read_from_disk(name).await;
+        let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);
         assert!(box_engine.is_err());
         let value = read_from_disk_untyped(&temp_path);
         assert!(value.is_ok(), "{:?}", value);
@@ -360,7 +331,7 @@ mod tests {
         remove_file(&file_path).expect("Problem removing serialized file during test.");
         let mut file = File::create(&file_path)?;
         write!(file, "{}", &bad_pid)?;
-        let box_engine = read_from_disk(name).await;
+        let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);
         assert!(box_engine.is_err());
         let value = read_from_disk_untyped(&temp_path);
         assert!(value.is_ok(), "{:?}", value);
@@ -370,7 +341,7 @@ mod tests {
         remove_file(&file_path).expect("Problem removing serialized file during test.");
         let mut file = File::create(&file_path)?;
         write!(file, "{}", &has_pid)?;
-        let box_engine = read_from_disk(name).await;
+        let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);
         assert!(box_engine.is_err());
         let value = read_from_disk_untyped(&temp_path);
         assert!(value.is_ok(), "{:?}", value);
@@ -381,7 +352,7 @@ mod tests {
         remove_file(&file_path).expect("Problem removing serialized file during test.");
         let mut file = File::create(&file_path)?;
         write!(file, "{}", &valid_femu)?;
-        let box_engine = read_from_disk(name).await;
+        let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);
         assert!(box_engine.is_ok(), "{:?}", box_engine.err());
         match box_engine? {
             EngineOption::DoesExist(data) => assert_eq!(data.get_engine_type(), EngineType::Femu),

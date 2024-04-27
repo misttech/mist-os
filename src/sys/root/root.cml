@@ -74,6 +74,7 @@
                 "fuchsia.session.SessionUrl",
                 "fuchsia.wlan.RecoveryEnabled",
                 "fuchsia.wlan.RecoveryProfile",
+                "fuchsia.wlan.RoamingProfile",
             ],
             availability: "same_as_target",
         },
@@ -299,7 +300,6 @@
         // Non-zircon services for archivist, pwrbtn-monitor, and console.
         {
             protocol: [
-                "fuchsia.component.KcounterBinder",
                 "fuchsia.component.PersistenceBinder",
                 "fuchsia.component.SamplerBinder",
                 "fuchsia.exception.Handler",

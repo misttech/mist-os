@@ -107,15 +107,14 @@ impl<T> Node<T> {
         }
     }
 
-    fn get_mut<I, V>(&mut self, mut path: I) -> Option<&mut T>
+    fn get_mut<'a, 'b, I>(&'a mut self, mut path: I) -> Option<&'a mut T>
     where
-        I: Iterator<Item = V>,
-        V: AsRef<str> + std::hash::Hash + std::cmp::Eq,
+        I: Iterator<Item = &'b Name>,
     {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => None,
-                Node::Internal(children) => match children.get_mut(name.as_ref()) {
+                Node::Internal(children) => match children.get_mut(name) {
                     Some(node) => node.get_mut(path),
                     None => None,
                 },
@@ -127,15 +126,14 @@ impl<T> Node<T> {
         }
     }
 
-    fn get<I, V>(&self, mut path: I) -> Option<&T>
+    fn get<'a, 'b, I>(&'a self, mut path: I) -> Option<&'a T>
     where
-        I: Iterator<Item = V>,
-        V: AsRef<str> + std::hash::Hash + std::cmp::Eq,
+        I: Iterator<Item = &'b Name>,
     {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => None,
-                Node::Internal(children) => match children.get(name.as_ref()) {
+                Node::Internal(children) => match children.get(name) {
                     Some(node) => node.get(path),
                     None => None,
                 },
@@ -165,7 +163,7 @@ impl<T> Node<T> {
                             None => None,
                         }
                     } else {
-                        match children.get_mut(name.as_str()) {
+                        match children.get_mut(name) {
                             Some(node) => node.remove(path),
                             None => None,
                         }

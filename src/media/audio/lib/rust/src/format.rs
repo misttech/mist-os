@@ -17,10 +17,10 @@ use std::{str::FromStr, time::Duration};
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 
 // Common sample sizes.
-const BITS_8: NonZeroU32 = const_unwrap_option(NonZeroU32::new(8));
-const BITS_16: NonZeroU32 = const_unwrap_option(NonZeroU32::new(16));
-const BITS_24: NonZeroU32 = const_unwrap_option(NonZeroU32::new(24));
-const BITS_32: NonZeroU32 = const_unwrap_option(NonZeroU32::new(32));
+pub const BITS_8: NonZeroU32 = const_unwrap_option(NonZeroU32::new(8));
+pub const BITS_16: NonZeroU32 = const_unwrap_option(NonZeroU32::new(16));
+pub const BITS_24: NonZeroU32 = const_unwrap_option(NonZeroU32::new(24));
+pub const BITS_32: NonZeroU32 = const_unwrap_option(NonZeroU32::new(32));
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Format {
@@ -423,6 +423,35 @@ impl SampleSize {
     }
 }
 
+impl Display for SampleSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}in{}", self.valid_bits, self.total_bits)
+    }
+}
+
+impl FromStr for SampleSize {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((valid_bits_str, total_bits_str)) = s.split_once("in") else {
+            return Err(format!("Invalid sample size: {}. Expected: <ValidBits>in<TotalBits>", s));
+        };
+        let valid_bits = valid_bits_str
+            .parse::<NonZeroU32>()
+            .map_err(|err| format!("Invalid valid bits: {}", err))?;
+        let total_bits = total_bits_str
+            .parse::<NonZeroU32>()
+            .map_err(|err| format!("Invalid total bits: {}", err))?;
+        let sample_size = Self::from_partial_bits(valid_bits, total_bits).ok_or_else(|| {
+            format!(
+                "Invalid sample size: {}. Valid bits must be less than or equal to total bits.",
+                s
+            )
+        })?;
+        Ok(sample_size)
+    }
+}
+
 /// Parses a Duration from string.
 pub fn parse_duration(value: &str) -> Result<Duration, String> {
     let re = Regex::new(DURATION_REGEX).map_err(|e| format!("Could not create regex: {}", e))?;
@@ -476,43 +505,44 @@ pub fn str_to_clock(src: &str) -> Result<fac::ClockType, String> {
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use test_case::test_case;
 
-    #[test]
-    fn test_format_parse() {
-        assert_eq!(
-            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 },
-            Format::from_str("48000,uint8,2ch").unwrap()
-        );
-
-        assert_eq!(
-            Format { frames_per_second: 44100, sample_type: SampleType::Float32, channels: 1 },
-            Format::from_str("44100,float32,1ch").unwrap()
-        );
-
-        // malformed inputs
-        assert!(Format::from_str("44100,float,1ch").is_err());
-
-        assert!(Format::from_str("44100").is_err());
-
-        assert!(Format::from_str("44100,float32,1").is_err());
-
-        assert!(Format::from_str("44100,float32").is_err());
-
-        assert!(Format::from_str(",,").is_err());
+    #[test_case(
+        "48000,uint8,2ch",
+        Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 };
+        "48000,uint8,2ch"
+    )]
+    #[test_case(
+        "44100,float32,1ch",
+        Format { frames_per_second: 44100, sample_type: SampleType::Float32, channels: 1 };
+        "44100,float32,1ch"
+    )]
+    fn test_format_display_parse(s: &str, format: Format) {
+        assert_eq!(s.parse::<Format>().unwrap(), format);
+        assert_eq!(format.to_string(), s);
     }
 
-    #[test]
-    fn test_display() {
-        assert_eq!(
-            Format { frames_per_second: 48000, sample_type: SampleType::Uint8, channels: 2 }
-                .to_string(),
-            "48000,uint8,2ch",
-        );
+    #[test_case("44100,float,1ch"; "bad sample type")]
+    #[test_case("44100"; "missing sample type and channels")]
+    #[test_case("44100,float32,1"; "invalid channels")]
+    #[test_case("44100,float32"; "missing channels")]
+    #[test_case(",,"; "empty components")]
+    fn test_format_parse_invalid(s: &str) {
+        assert!(s.parse::<Format>().is_err());
+    }
 
-        assert_eq!(
-            Format { frames_per_second: 44100, sample_type: SampleType::Float32, channels: 1 }
-                .to_string(),
-            "44100,float32,1ch"
-        );
+    #[test_case(
+        "16in32",
+        SampleSize::from_partial_bits(BITS_16, BITS_32).unwrap();
+        "16 valid 32 total"
+    )]
+    #[test_case(
+        "32in32",
+        SampleSize::from_full_bits(BITS_32);
+        "32 valid 32 total"
+    )]
+    fn test_samplesize_display_parse(s: &str, sample_size: SampleSize) {
+        assert_eq!(s.parse::<SampleSize>().unwrap(), sample_size);
+        assert_eq!(sample_size.to_string(), s);
     }
 }

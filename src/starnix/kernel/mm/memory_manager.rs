@@ -2707,10 +2707,8 @@ impl MemoryManager {
 
         let (range, mapping) = state.mappings.get(&brk.current).ok_or_else(|| errno!(EFAULT))?;
 
-        brk.current = addr;
-
         let old_end = range.end;
-        let new_end = (brk.current + 1u64).round_up(*PAGE_SIZE).unwrap();
+        let new_end = (addr + 1u64).round_up(*PAGE_SIZE).unwrap();
 
         match new_end.cmp(&old_end) {
             std::cmp::Ordering::Less => {
@@ -2757,17 +2755,19 @@ impl MemoryManager {
                     Ok(_) => {
                         state.mappings.insert(brk.base..new_end, mapping);
                     }
-                    Err(e) => {
+                    Err(_) => {
                         // We failed to extend the mapping, which means we need to add
                         // back the old mapping.
+                        // Return the old program break.
                         state.mappings.insert(brk.base..old_end, mapping);
-                        return Err(Self::get_errno_for_map_err(e));
+                        return Ok(brk.current);
                     }
                 }
             }
             _ => {}
         };
 
+        brk.current = addr;
         state.brk = Some(brk);
         Ok(brk.current)
     }

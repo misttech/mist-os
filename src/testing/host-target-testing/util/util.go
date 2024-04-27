@@ -387,6 +387,12 @@ func (i *ImagesManifest) GetPartition(slot string, typ string) (*url.URL, build.
 }
 
 func (i *ImagesManifest) SetPartition(slot string, typ string, url string, path string) error {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	size := fi.Size()
+
 	hash, err := Sha256File(path)
 	if err != nil {
 		return err
@@ -397,6 +403,7 @@ func (i *ImagesManifest) SetPartition(slot string, typ string, url string, path 
 
 		if p.Slot == slot && p.Type == typ {
 			p.Url = url
+			p.Size = size
 			p.Hash = hash
 			return nil
 		}

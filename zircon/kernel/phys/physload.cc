@@ -38,6 +38,11 @@ namespace {
 // physload, physboot, EL2, kernel
 constexpr size_t kMaxPhysloadModules = 4;
 
+void LogSerial(FILE* out = stdout) {
+  fprintf(out, "%s: Console configured as ", ProgramName());
+  gBootOptions->Show("kernel.serial"sv, false, out);
+}
+
 }  // namespace
 
 [[noreturn]] void ZbiMain(void* zbi_ptr, arch::EarlyTicks ticks) {
@@ -47,6 +52,7 @@ constexpr size_t kMaxPhysloadModules = 4;
   MainSymbolize symbolize("physload");
   if (gBootOptions->phys_verbose) {
     symbolize.Context();
+    LogSerial();
   }
 
   AddressSpace aspace;
@@ -65,6 +71,7 @@ constexpr size_t kMaxPhysloadModules = 4;
     // to the console.
     FILE log_file{&log};
     symbolize.ContextAlways(&log_file);
+    LogSerial(&log_file);
     Allocation::GetPool().PrintMemoryRanges(symbolize.name(), &log_file);
   }
 

@@ -33,8 +33,8 @@ source_set("pwm-visitor-impl") {
     "//src/lib/ddk:ddk_metadata",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/lib/driver/devicetree/visitors:property-parser",
-    "//src/lib/ddk:ddk-metadata-headers",
   ]
 }
 

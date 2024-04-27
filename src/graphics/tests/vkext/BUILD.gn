@@ -91,7 +91,7 @@ fuchsia_component("vkext_cmp") {
 fuchsia_structured_config_values("default_config") {
   cm_label = ":child-manifest"
   values = {
-    gpu_vendor_id = ""
+    gpu_vendor_id = 0
     support_sysmem_yuv = true
     support_sysmem_linear_nonrgba = true
     support_sysmem_renderable_linear = true

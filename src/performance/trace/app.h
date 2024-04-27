@@ -15,8 +15,7 @@ namespace tracing {
 
 class App : public Command {
  public:
-  App(sys::ComponentContext* context);
-  ~App();
+  App();
 
  protected:
   void Start(const fxl::CommandLine& command_line) override;

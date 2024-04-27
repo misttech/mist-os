@@ -16,6 +16,7 @@ use {
     cm_config::RuntimeConfig,
     cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
+    cm_types::Name,
     config_encoder::ConfigFields,
     fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
@@ -51,7 +52,7 @@ pub const REALM_BUILDER_RUNNER_NAME: &str = "realm_builder";
 #[derive(Deserialize, Serialize)]
 pub struct DynamicComponent {
     pub url: AbsoluteComponentUrl,
-    pub environment: Option<String>,
+    pub environment: Option<Name>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -202,7 +203,7 @@ impl V2ComponentModelDataCollector {
 
     fn load_dynamic_components(
         component_tree_config_path: &Option<PathBuf>,
-    ) -> Result<HashMap<Moniker, (AbsoluteComponentUrl, Option<String>)>> {
+    ) -> Result<HashMap<Moniker, (AbsoluteComponentUrl, Option<Name>)>> {
         if component_tree_config_path.is_none() {
             return Ok(HashMap::new());
         }

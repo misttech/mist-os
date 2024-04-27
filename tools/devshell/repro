@@ -131,9 +131,18 @@ function repro {
     print_cmd "fx sync-to ${build_id}"
   fi
 
+  local rust_toolchain_cas_args="$(get_rust_toolchain_cas_args)"
+  if [[ ! -z "$rust_toolchain_cas_args" ]]; then
+    print_spacer
+    print_comment "Download the Rust toolchain:"
+    print_cmd rm -rf "${FUCHSIA_DIR}/rust_toolchain"
+    print_cmd "${FUCHSIA_DIR}/prebuilt/tools/cas/cas download -dir "${FUCHSIA_DIR}/rust_toolchain" $rust_toolchain_cas_args"
+    rust_toolchain_set_args="--args rustc_prefix=\\\"${FUCHSIA_DIR}/rust_toolchain\\\""
+  fi
+
   print_spacer
   print_comment "Set the build configuration:"
-  print_cmd "fx --dir=${build_dir_name} set --fint-params-path '$fint_params_file_relative' --skip-local-args"
+  print_cmd "fx --dir=${build_dir_name} set --fint-params-path '$fint_params_file_relative' --skip-local-args ${rust_toolchain_set_args}"
   print_spacer
 
   print_comment "Build:"
@@ -218,6 +227,15 @@ function get_builder_field {
   jq ".builder.$1" "$build"
 }
 
+function get_rust_toolchain_cas_args {
+  digest=$(jq ".input.properties.\"\$fuchsia/checkout\".rust_toolchain.cas_digest" "$build")
+  instance=$(jq ".input.properties.\"\$fuchsia/checkout\".rust_toolchain.cas_instance" "$build")
+  if [[ "$digest" == "null" || "$instance" == "null" ]]; then
+    return
+  fi
+  echo -cas-instance $instance -digest $digest
+}
+
 # Returns a space-separated list of all the tests that failed for the build.
 function get_failed_tests {
   jq '.output.properties.failed_test_names? // [] | unique | join(" ")' "$build"
@@ -271,7 +289,7 @@ function check_bb_auth {
 
 function get_build {
   local build_id="$1"
-  "${FUCHSIA_DIR}/prebuilt/tools/buildbucket/bb" get "$build_id" -json -fields "status,builder,output.properties"
+  "${FUCHSIA_DIR}/prebuilt/tools/buildbucket/bb" get "$build_id" -json -fields "status,builder,input.properties,output.properties"
 }
 
 function main {

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Specifies the configuration for the Bluetooth Snoop component (`bt-snoop`).
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Snoop {
     /// Don't include `bt-snoop`.
@@ -19,7 +20,7 @@ pub enum Snoop {
 
 /// Configuration options for Bluetooth audio streaming (bt-a2dp).
 // TODO(b/324894109): Add profile-specific arguments
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct A2dpConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -27,7 +28,7 @@ pub struct A2dpConfig {
 
 /// Configuration options for Bluetooth media controls (bt-avrcp).
 // TODO(b/324894109): Add profile-specific arguments
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct AvrcpConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -35,7 +36,7 @@ pub struct AvrcpConfig {
 
 /// Configuration options for Bluetooth hands free calling (bt-hfp).
 // TODO(b/324894109): Add profile-specific arguments
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct HfpConfig {
     /// Enable hands free calling audio gateway (`bt-hfp-audio-gateway`).
     #[serde(default)]
@@ -43,7 +44,7 @@ pub struct HfpConfig {
 }
 
 /// Platform configuration to enable Bluetooth profiles.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct BluetoothProfilesConfig {
     /// Specifies the configuration for `bt-a2dp`.
     #[serde(default)]
@@ -60,7 +61,7 @@ pub struct BluetoothProfilesConfig {
 
 /// Platform configuration options for Bluetooth.
 /// The default platform configuration does not include any Bluetooth packages.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
 pub enum BluetoothConfig {
     /// The standard Bluetooth configuration includes the "core" set of components that provide

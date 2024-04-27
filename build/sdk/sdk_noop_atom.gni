@@ -11,16 +11,15 @@ import("//build/python/python_action.gni")
 # templates to handle such a target as any other SDK target.
 #
 # Parameters
+#   category (required)
+#     Describes the availability of the element.
+#     See //build/sdk/sdk_atom.gni for information regarding category.
+#     Type: string
+#
 #   id (optional)
 #     Identifier of this element within SDKs. Used for API verification.
 #     See //build/sdk/sdk_atom.gni for information regarding id.
-#     If this attribute is set, "category" and "type" must be set as well.
-#     Type: string
-#
-#   category (optional)
-#     Describes the availability of the element.
-#     See //build/sdk/sdk_atom.gni for information regarding category.
-#     If this attribute is set, "id" and "type" must be set as well.
+#     If this attribute is set, `type` must be set as well.
 #     Type: string
 #
 #   sdk_area (optional)
@@ -32,10 +31,12 @@ import("//build/python/python_action.gni")
 #
 #   type (optional)
 #     Describes the type of the element.
-#     If this attribute is set, "id" and "category" must be set as well.
+#     If this attribute is set, `id` must be set as well.
 #     Type: string
 #
 template("sdk_noop_atom") {
+  assert(defined(invoker.category), "Must define an SDK category")
+
   meta_target_name = "${target_name}_meta"
   meta_file = "${target_gen_dir}/${target_name}.meta.json"
   generated_file(meta_target_name) {
@@ -47,13 +48,10 @@ template("sdk_noop_atom") {
 
   manifest_file = "${target_gen_dir}/${target_name}.sdk"
 
-  # If id, category and type are set, the SDK contents will be API verified by
-  # checking that all elements are still in the SDK.
-  if (defined(invoker.id) || defined(invoker.category) ||
-      defined(invoker.type)) {
+  # If `id` or `type` are set, both must be set and the SDK contents will be API
+  # verified by checking that all elements are still in the SDK.
+  if (defined(invoker.id) || defined(invoker.type)) {
     assert(defined(invoker.id), "Must define id for API verification.")
-    assert(defined(invoker.category),
-           "Must define category for API verification.")
     assert(defined(invoker.type), "Must define type for API verification.")
 
     python_action(target_name) {
@@ -94,6 +92,12 @@ template("sdk_noop_atom") {
       }
     }
   } else {
+    # NOTE: The compatibility of the `category` with targets that depend on it
+    # is not verified as it is for other `sdk_` elements.
+
+    assert(target_name == "zircon_sdk",
+           "Carefully consider whether adding another instance is appropriate.")
+
     generated_file(target_name) {
       contents = {
         atoms = []

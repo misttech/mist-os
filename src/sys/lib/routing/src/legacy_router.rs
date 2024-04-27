@@ -710,7 +710,7 @@ impl Use {
             UseSource::Child(name) => {
                 let moniker = target.moniker();
                 let child_component = {
-                    let child_moniker = ChildName::try_new(name, None)?;
+                    let child_moniker = ChildName::new(name.clone().into(), None);
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || {
                             RoutingError::use_from_child_instance_not_found(
@@ -958,6 +958,15 @@ impl Offer {
                     }
                 }
                 false
+            }
+
+            // Make sure this isn't coming from a dictionary
+            for o in offer_bundle.iter() {
+                if !o.source_path().dirname.is_dot() {
+                    return Err(RoutingError::DictionariesNotSupported {
+                        cap_type: CapabilityTypeName::from(o),
+                    });
+                }
             }
 
             match offer_bundle {
@@ -1370,6 +1379,15 @@ impl Expose {
                 ExposeVisitor::visit(visitor, &visit_expose)?;
             }
 
+            // Make sure this isn't coming from a dictionary
+            for e in expose_bundle.iter() {
+                if !e.source_path().dirname.is_dot() {
+                    return Err(RoutingError::DictionariesNotSupported {
+                        cap_type: CapabilityTypeName::from(e),
+                    });
+                }
+            }
+
             match expose_bundle {
                 RouteBundle::Single(expose) => {
                     match Self::route_segment(expose, target, sources, visitor, mapper).await? {
@@ -1437,7 +1455,7 @@ impl Expose {
             }
             ExposeSource::Child(child) => {
                 let child_component = {
-                    let child_moniker = ChildName::try_new(child, None)?;
+                    let child_moniker = ChildName::new(child.clone().into(), None);
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::ExposeFromChildInstanceNotFound {
                             child_moniker,
@@ -1477,7 +1495,7 @@ impl Expose {
 fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bool {
     match target {
         OfferTarget::Child(target_ref) => {
-            target_ref.name == child_moniker.name()
+            &target_ref.name == child_moniker.name()
                 && target_ref.collection.as_ref() == child_moniker.collection()
         }
         OfferTarget::Collection(target_collection) => {
@@ -1597,9 +1615,7 @@ impl CapabilityVisitor for NoopVisitor {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        cm_rust::{ChildRef, ExposeServiceDecl},
+        super::*, assert_matches::assert_matches, cm_rust::ExposeServiceDecl, cm_rust_testing::*,
     };
 
     #[test]
@@ -1639,7 +1655,7 @@ mod tests {
             source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
             source_dictionary: Default::default(),
-            target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
+            target: offer_target_static_child("target"),
             target_name: "foo_target".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,
@@ -1668,7 +1684,7 @@ mod tests {
         let child_exposes: Vec<_> = [1, 2, 3]
             .into_iter()
             .map(|i| ExposeServiceDecl {
-                source: ExposeSource::Child("source".into()),
+                source: ExposeSource::Child("source".parse().unwrap()),
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: ExposeTarget::Parent,

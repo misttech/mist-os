@@ -17,7 +17,7 @@ use std::str::from_utf8;
 /// If `output` is not given, prints the result to stdout.
 ///
 /// See [format_cml] for current style conventions.
-pub fn format(file: &PathBuf, output: Option<PathBuf>) -> Result<(), Error> {
+pub(crate) fn format(file: &PathBuf, output: Option<PathBuf>) -> Result<(), Error> {
     let mut buffer = String::new();
     fs::File::open(&file)?.read_to_string(&mut buffer)?;
 

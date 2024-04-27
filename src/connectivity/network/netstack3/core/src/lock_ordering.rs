@@ -163,6 +163,7 @@ pub enum Ipv4DeviceAddressState {}
 pub enum Ipv6DeviceRouterSolicitations {}
 pub enum Ipv6DeviceRouteDiscovery {}
 pub enum Ipv6DeviceLearnedParams {}
+pub enum Ipv6DeviceSlaac {}
 pub enum Ipv6DeviceAddressDad {}
 pub enum Ipv6DeviceAddressState {}
 pub struct NudConfig<I>(PhantomData<I>, Never);
@@ -246,7 +247,8 @@ impl_lock_after!(UdpBoundMap<Ipv4> => UdpBoundMap<Ipv6>);
 impl_lock_after!(UdpBoundMap<Ipv6> => IpDeviceConfiguration<Ipv4>);
 impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
 impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
-impl_lock_after!(Ipv6DeviceRouteDiscovery => IpStateRoutingTable<Ipv4>);
+impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
+impl_lock_after!(Ipv6DeviceSlaac => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
 impl_lock_after!(IpStateRoutingTable<Ipv6> => Ipv6DeviceAddressDad);
 impl_lock_after!(Ipv6DeviceAddressDad => FilterState<Ipv4>);

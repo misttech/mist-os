@@ -20,6 +20,9 @@ import fuchsia_controller_py as fcp
 from honeydew import errors
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
+from honeydew.affordances.fuchsia_controller.ui import (
+    user_input as user_input_fc,
+)
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import rtc, tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
@@ -174,7 +177,11 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
         Returns:
             user_input.UserInput object
         """
-        raise NotImplementedError
+        return user_input_fc.UserInput(
+            device_name=self.device_name,
+            fuchsia_controller=self.fuchsia_controller,
+            ffx_transport=self.ffx,
+        )
 
     @properties.Affordance
     def wlan_policy(self) -> wlan_policy.WlanPolicy:

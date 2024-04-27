@@ -88,9 +88,9 @@ static_assert(sizeof(UpiuHeader) == 12, "UpiuHeader struct must be 12 bytes");
 
 class AbstractUpiu {
  public:
-  // TODO(https://fxbug.dev/42075643): Make |AbstractUpiu| to template class for removing the |Data| struct
-  // within |AbstractUpiu|. Currently each derived class must have a |UpiuHeader| as the first
-  // member in its |Data| struct.
+  // TODO(https://fxbug.dev/42075643): Make |AbstractUpiu| to template class for removing the |Data|
+  // struct within |AbstractUpiu|. Currently each derived class must have a |UpiuHeader| as the
+  // first member in its |Data| struct.
   struct Data {
     UpiuHeader header;
   } __PACKED;
@@ -305,6 +305,31 @@ enum class QueryOpcode {
   kClearFlag,
   kToggleFlag,
 };
+
+inline const char* QueryOpcodeToString(QueryOpcode opcode) {
+  switch (opcode) {
+    case QueryOpcode::kNop:
+      return "Nop";
+    case QueryOpcode::kReadDescriptor:
+      return "Read Descriptor";
+    case QueryOpcode::kWriteDescriptor:
+      return "Write Descriptor";
+    case QueryOpcode::kReadAttribute:
+      return "Read Attribute";
+    case QueryOpcode::kWriteAttribute:
+      return "Write Attribute";
+    case QueryOpcode::kReadFlag:
+      return "Read Flag";
+    case QueryOpcode::kSetFlag:
+      return "Set Flag";
+    case QueryOpcode::kClearFlag:
+      return "Clear Flag";
+    case QueryOpcode::kToggleFlag:
+      return "Toggle Flag";
+    default:
+      return "(UNKNOWN)";
+  }
+}
 
 struct QueryResponseUpiuData {
   // dword 0 ~ 2

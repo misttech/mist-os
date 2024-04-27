@@ -36,7 +36,7 @@ impl SafeOp for u64 {
         self.checked_sub(other).unwrap_or(0)
     }
     fn safe_add(&self, other: u64) -> u64 {
-        self.checked_add(other).unwrap_or(std::u64::MAX)
+        self.checked_add(other).unwrap_or(u64::MAX)
     }
 }
 
@@ -45,7 +45,7 @@ impl SafeOp for i64 {
         self.checked_sub(other).unwrap_or(std::i64::MIN)
     }
     fn safe_add(&self, other: i64) -> i64 {
-        self.checked_add(other).unwrap_or(std::i64::MAX)
+        self.checked_add(other).unwrap_or(i64::MAX)
     }
 }
 
@@ -1386,12 +1386,12 @@ mod tests {
             assert!(state.set_int_metric(block_index, -6).is_ok());
             assert_eq!(state.get_block(block_index).int_value().unwrap(), -6);
 
-            assert!(state.subtract_int_metric(block_index, std::i64::MAX).is_ok());
+            assert!(state.subtract_int_metric(block_index, i64::MAX).is_ok());
             assert_eq!(state.get_block(block_index).int_value().unwrap(), std::i64::MIN);
-            assert!(state.set_int_metric(block_index, std::i64::MAX).is_ok());
+            assert!(state.set_int_metric(block_index, i64::MAX).is_ok());
 
             assert!(state.add_int_metric(block_index, 2).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), std::i64::MAX);
+            assert_eq!(state.get_block(block_index).int_value().unwrap(), i64::MAX);
 
             // Free metric.
             assert!(state.free_value(block_index).is_ok());
@@ -1443,12 +1443,12 @@ mod tests {
             assert!(state.set_uint_metric(block_index, 0).is_ok());
             assert_eq!(state.get_block(block_index).uint_value().unwrap(), 0);
 
-            assert!(state.subtract_uint_metric(block_index, std::u64::MAX).is_ok());
+            assert!(state.subtract_uint_metric(block_index, u64::MAX).is_ok());
             assert_eq!(state.get_block(block_index).uint_value().unwrap(), 0);
 
             assert!(state.set_uint_metric(block_index, 3).is_ok());
-            assert!(state.add_uint_metric(block_index, std::u64::MAX).is_ok());
-            assert_eq!(state.get_block(block_index).uint_value().unwrap(), std::u64::MAX);
+            assert!(state.add_uint_metric(block_index, u64::MAX).is_ok());
+            assert_eq!(state.get_block(block_index).uint_value().unwrap(), u64::MAX);
 
             // Free metric.
             assert!(state.free_value(block_index).is_ok());

@@ -142,7 +142,7 @@ void EnsureResolveReference(const fxl::RefPtr<EvalContext>& eval_context, ExprVa
 }
 
 Err GetPointedToType(const fxl::RefPtr<EvalContext>& eval_context, const Type* input,
-                     fxl::RefPtr<Type>* pointed_to) {
+                     fxl::RefPtr<Type>* pointed_to, PointedToOptions option) {
   if (!input)
     return Err("No type information.");
 
@@ -155,9 +155,14 @@ Err GetPointedToType(const fxl::RefPtr<EvalContext>& eval_context, const Type* i
                                  input->GetFullName().c_str()));
   }
 
-  *pointed_to = RefPtrTo(mod_type->modified().Get()->As<Type>());
-  if (!*pointed_to)
+  if (mod_type->ModifiesVoid() && option == PointedToOptions::kNoVoid) {
     return Err("Can not dereference a pointer to 'void'.");
+  }
+
+  // If the caller requested kIncludeVoid, then this may be null. It is the caller's responsibility
+  // to check if this is the case.
+  *pointed_to = RefPtrTo(mod_type->modified().Get()->As<Type>());
+
   return Err();
 }
 

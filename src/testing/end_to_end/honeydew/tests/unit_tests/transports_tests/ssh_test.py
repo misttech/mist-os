@@ -7,10 +7,11 @@
 import ipaddress
 import subprocess
 import unittest
+from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.transports import ffx, ssh
@@ -43,11 +44,13 @@ _MOCK_ARGS: dict[str, Any] = {
 }
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -82,7 +85,7 @@ class SshTests(unittest.TestCase):
         autospec=True,
     )
     def test_ssh_check_connection_success(
-        self, mock_ssh_run, mock_sleep
+        self, mock_ssh_run: mock.Mock, mock_sleep: mock.Mock
     ) -> None:
         """Testcase for SSH.check_connection() success case"""
         self.ssh_obj_wo_ip.check_connection(timeout=5)
@@ -96,7 +99,10 @@ class SshTests(unittest.TestCase):
         ssh.SSH, "run", side_effect=subprocess.CalledProcessError, autospec=True
     )
     def test_ssh_check_connection_fail(
-        self, mock_ssh_run, mock_time, mock_sleep
+        self,
+        mock_ssh_run: mock.Mock,
+        mock_time: mock.Mock,
+        mock_sleep: mock.Mock,
     ) -> None:
         """Testcase for SSH.check_connection() failure case"""
         with self.assertRaises(errors.SshConnectionError):
@@ -106,8 +112,8 @@ class SshTests(unittest.TestCase):
         mock_time.assert_called()
         mock_sleep.assert_called()
 
-    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
-    def test_ssh_run_wo_device_ip(self, mock_popen) -> None:
+    @mock.patch.object(subprocess, "Popen", autospec=True)
+    def test_ssh_run_wo_device_ip(self, mock_popen: mock.Mock) -> None:
         """Testcase for SSH.run() when called using SSH object created without
         device_ip argument."""
         process_mock = mock.Mock()
@@ -145,8 +151,8 @@ class SshTests(unittest.TestCase):
         )
         self.ffx_obj.get_target_ssh_address.assert_called_with(timeout=3)
 
-    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
-    def test_ssh_run_with_device_ip(self, mock_popen) -> None:
+    @mock.patch.object(subprocess, "Popen", autospec=True)
+    def test_ssh_run_with_device_ip(self, mock_popen: mock.Mock) -> None:
         """Testcase for SSH.run() when called using SSH object created with
         device_ip argument."""
         process_mock = mock.Mock()
@@ -193,8 +199,10 @@ class SshTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
-    def test_ssh_run_exception(self, parameterized_dict, mock_popen) -> None:
+    @mock.patch.object(subprocess, "Popen", autospec=True)
+    def test_ssh_run_exception(
+        self, parameterized_dict: dict[str, Any], mock_popen: mock.Mock
+    ) -> None:
         """Testcase for SSH.run() raising errors.SSHCommandError exception"""
         self.ffx_obj.get_target_ssh_address.return_value = _MOCK_ARGS[
             "target_ssh_address"
@@ -214,8 +222,8 @@ class SshTests(unittest.TestCase):
 
         mock_popen.assert_called()
 
-    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
-    def test_ssh_popen(self, mock_popen) -> None:
+    @mock.patch.object(subprocess, "Popen", autospec=True)
+    def test_ssh_popen(self, mock_popen: mock.Mock) -> None:
         """Testcase for SSH.popen()"""
         self.assertEqual(
             self.ssh_obj_with_ip.popen("some_command"), mock_popen.return_value

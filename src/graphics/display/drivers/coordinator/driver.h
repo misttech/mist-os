@@ -45,10 +45,10 @@ class Driver : public ddk::Device<Driver> {
   zx::result<> ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
 
   config_check_result_t CheckConfiguration(
-      const display_config_t** display_config_list, size_t display_config_count,
+      const display_config_t* display_config_list, size_t display_config_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void ApplyConfiguration(const display_config_t** display_config_list, size_t display_config_count,
+  void ApplyConfiguration(const display_config_t* display_config_list, size_t display_config_count,
                           const config_stamp_t* config_stamp);
 
   void SetEld(DisplayId display_id, cpp20::span<const uint8_t> raw_eld);

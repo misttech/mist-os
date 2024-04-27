@@ -338,6 +338,19 @@ ignored_path_parts = {
 }
 ```
 
+### Errors reported in CQ which cannot be reproduced locally
+First, ensure that you are using the build arg `build_should_trace_actions=true`, as
+described above.
+
+If CQ reports that a Python file is unexpectedly read by `action_tracer.py` but you cannot
+reproduce this issue locally, the cause is probably compiled Python files cached in
+`__pycache__` directories throughout the tree (e.g. `find third_party -type d -name __pycache__`).
+The quick solution is to delete all `*.pyc` files in these directories.  The reason this
+false negative occurs is that the file system never opens the original `.py` file, so it is
+not reported as being touched and therefore does not trigger a failed hermeticity check.
+
+File types other than Python may fail to reproduce for similar reasons.
+
 See also: [hermetic actions in open projects][hermetic-actions-bb]
 
 [action]: https://gn.googlesource.com/gn/+/master/docs/reference.md#func_action

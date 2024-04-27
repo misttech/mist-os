@@ -19,14 +19,21 @@
 
 #include <string>
 
+#include <wlan/drivers/testing/test_helpers.h>
 #include <zxtest/zxtest.h>
 
 namespace wlan {
 namespace brcmfmac {
 namespace {
 
+// A fixture that simply creates a log context to prevent crashes in the test.
+class FirmwareTest : public zxtest::Test {
+ private:
+  wlan::drivers::log::testing::UnitTestLogContext log_context{"test-logger"};
+};
+
 // This is a simple test to verify the NVRAM parsing functionality.
-TEST(FirmwareTest, ParseNvram) {
+TEST_F(FirmwareTest, ParseNvram) {
   struct InputAndResult {
     std::string input;
     std::string expected_result;

@@ -6,11 +6,9 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <algorithm>
 #include <iostream>
 
 #include "src/lib/fxl/strings/string_number_conversions.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace tracing {
 
@@ -24,7 +22,8 @@ bool ParseBufferingMode(const std::string& value, BufferingMode* out_mode) {
   return true;
 }
 
-static bool CheckBufferSize(uint32_t megabytes) {
+namespace {
+bool CheckBufferSize(uint32_t megabytes) {
   if (megabytes < kMinBufferSizeMegabytes || megabytes > kMaxBufferSizeMegabytes) {
     FX_LOGS(ERROR) << "Buffer size not between " << kMinBufferSizeMegabytes << ","
                    << kMaxBufferSizeMegabytes << ": " << megabytes;
@@ -32,6 +31,7 @@ static bool CheckBufferSize(uint32_t megabytes) {
   }
   return true;
 }
+}  // namespace
 
 bool ParseBufferSize(const std::string& value, uint32_t* out_buffer_size) {
   uint32_t megabytes;
@@ -50,7 +50,7 @@ bool ParseProviderBufferSize(const std::vector<std::string_view>& values,
                              std::vector<ProviderSpec>* out_specs) {
   for (const auto& value : values) {
     size_t colon = value.rfind(':');
-    if (colon == value.npos) {
+    if (colon == std::string::npos) {
       FX_LOGS(ERROR) << "Syntax error in provider buffer size"
                      << ": should be provider-name:buffer_size_in_mb";
       return false;
@@ -76,7 +76,7 @@ bool ParseTriggers(const std::vector<std::string_view>& values,
 
   for (const auto& value : values) {
     size_t colon = value.rfind(':');
-    if (colon == value.npos || colon < 1 || colon > value.size() - 2) {
+    if (colon == std::string::npos || colon < 1 || colon > value.size() - 2) {
       FX_LOGS(ERROR) << "Syntax error in trigger specification: "
                      << "should be alert-name:action, got " << value;
       return false;
@@ -106,17 +106,17 @@ bool ParseAction(std::string_view value, Action* out_action) {
   return false;
 }
 
-fuchsia::tracing::BufferingMode TranslateBufferingMode(BufferingMode mode) {
+fuchsia_tracing::BufferingMode TranslateBufferingMode(BufferingMode mode) {
   switch (mode) {
     case BufferingMode::kOneshot:
-      return fuchsia::tracing::BufferingMode::ONESHOT;
+      return fuchsia_tracing::BufferingMode::kOneshot;
     case BufferingMode::kCircular:
-      return fuchsia::tracing::BufferingMode::CIRCULAR;
+      return fuchsia_tracing::BufferingMode::kCircular;
     case BufferingMode::kStreaming:
-      return fuchsia::tracing::BufferingMode::STREAMING;
+      return fuchsia_tracing::BufferingMode::kStreaming;
     default:
       FX_NOTREACHED();
-      return fuchsia::tracing::BufferingMode::ONESHOT;
+      return fuchsia_tracing::BufferingMode::kOneshot;
   }
 }
 
@@ -129,9 +129,10 @@ std::vector<controller::ProviderSpec> TranslateProviderSpecs(
   }
   std::vector<controller::ProviderSpec> uniquified_specs;
   for (const auto& it : spec_map) {
-    controller::ProviderSpec spec;
-    spec.set_name(it.first);
-    spec.set_buffer_size_megabytes_hint(it.second);
+    controller::ProviderSpec spec{{
+        .name = it.first,
+        .buffer_size_megabytes_hint = it.second,
+    }};
     uniquified_specs.push_back(std::move(spec));
   }
   return uniquified_specs;
@@ -139,13 +140,13 @@ std::vector<controller::ProviderSpec> TranslateProviderSpecs(
 
 const char* StartErrorCodeToString(controller::StartErrorCode code) {
   switch (code) {
-    case controller::StartErrorCode::NOT_INITIALIZED:
+    case controller::StartErrorCode::kNotInitialized:
       return "not initialized";
-    case controller::StartErrorCode::ALREADY_STARTED:
+    case controller::StartErrorCode::kAlreadyStarted:
       return "already started";
-    case controller::StartErrorCode::STOPPING:
+    case controller::StartErrorCode::kStopping:
       return "stopping";
-    case controller::StartErrorCode::TERMINATING:
+    case controller::StartErrorCode::kTerminating:
       return "terminating";
     default:
       return "<unknown>";

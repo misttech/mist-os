@@ -7,7 +7,14 @@
 mod ip_hooks;
 mod matchers;
 
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZeroU16,
+    pin::pin,
+};
+
 use assert_matches::assert_matches;
+use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
@@ -17,7 +24,7 @@ use fidl_fuchsia_net_filter_ext::{
     ChangeCommitError, CommitError, Controller, ControllerId, DeviceClass, Domain, Event,
     InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
     NamespaceId, NatHook, PortMatcher, PushChangesError, Resource, ResourceId, Routine, RoutineId,
-    RoutineType, Rule, RuleId, Subnet, TransportProtocolMatcher,
+    RoutineType, Rule, RuleId, Subnet, TransparentProxy, TransportProtocolMatcher,
 };
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
@@ -29,10 +36,6 @@ use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use std::{
-    collections::{HashMap, HashSet},
-    pin::pin,
-};
 use test_case::test_case;
 
 trait TestValue {
@@ -711,6 +714,52 @@ async fn push_change_invalid_port_matcher(name: &str) {
             .expect("call push changes"),
         fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
             fnet_filter::ChangeValidationError::InvalidPortMatcher
+        ])
+    );
+}
+
+#[netstack_test]
+#[test_case(fnet_filter::TransparentProxy_::LocalPort(0); "zero local port")]
+#[test_case(
+    fnet_filter::TransparentProxy_::LocalAddrAndPort(fnet_filter::SocketAddr {
+        addr: fidl_ip!("192.0.2.1"),
+        port: 0,
+    });
+    "addr with zero local port"
+)]
+async fn push_change_invalid_transparent_proxy_action(
+    name: &str,
+    action: fnet_filter::TransparentProxy_,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    // Use the FIDL bindings directly rather than going through the extension
+    // library, because it intentionally does not allow us to express the
+    // invalid types that we are testing.
+    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    control.open_controller("test", server_end).expect("open controller");
+    assert_eq!(
+        controller
+            .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
+                fnet_filter::Rule {
+                    id: fnet_filter::RuleId {
+                        routine: fnet_filter::RoutineId {
+                            namespace: String::from("namespace"),
+                            name: String::from("routine"),
+                        },
+                        index: 0,
+                    },
+                    matchers: fnet_filter::Matchers::default(),
+                    action: fnet_filter::Action::TransparentProxy(action),
+                }
+            ))])
+            .await
+            .expect("call push changes"),
+        fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
+            fnet_filter::ChangeValidationError::InvalidTransparentProxyAction
         ])
     );
 }
@@ -1763,4 +1812,179 @@ async fn invalid_matcher_for_hook(
         Err(CommitError::RuleWithInvalidMatcher(rule_id)) => rule_id
     );
     assert_eq!(invalid_rule, rule_id);
+}
+
+const TPROXY_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+
+#[netstack_test]
+#[test_case(
+    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::Ingress, priority: 0})), Ok(());
+    "TPROXY valid in IP INGRESS"
+)]
+#[test_case(
+    RoutineType::Nat(Some(InstalledNatRoutine { hook: NatHook::Ingress, priority: 0})), Ok(());
+    "TPROXY valid in NAT INGRESS"
+)]
+#[test_case(
+    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::LocalIngress, priority: 0})), Err(());
+    "TPROXY invalid in IP LOCAL_INGRESS"
+)]
+#[test_case(
+    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::Forwarding, priority: 0})), Err(());
+    "TPROXY invalid in IP FORWARDING"
+)]
+#[test_case(
+    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::LocalEgress, priority: 0})), Err(());
+    "TPROXY invalid in IP LOCAL_EGRESS"
+)]
+#[test_case(
+    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::Egress, priority: 0})), Err(());
+    "TPROXY invalid in IP EGRESS"
+)]
+#[test_case(
+    RoutineType::Nat(Some(InstalledNatRoutine { hook: NatHook::LocalIngress, priority: 0})), Err(());
+    "TPROXY invalid in NAT LOCAL_INGRESS"
+)]
+#[test_case(
+    RoutineType::Nat(Some(InstalledNatRoutine { hook: NatHook::LocalEgress, priority: 0})), Err(());
+    "TPROXY invalid in NAT LOCAL_EGRESS"
+)]
+#[test_case(
+    RoutineType::Nat(Some(InstalledNatRoutine { hook: NatHook::Egress, priority: 0})), Err(());
+    "TPROXY invalid in NAT EGRESS"
+)]
+async fn invalid_action_for_hook(
+    name: &str,
+    routine_type: RoutineType,
+    expected_result: Result<(), ()>,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        Controller::new(&control, &ControllerId(name.to_owned())).await.expect("create controller");
+    let namespace_id = NamespaceId(String::from("namespace"));
+    let routine_id = RoutineId { namespace: namespace_id.clone(), name: String::from("routine") };
+    let rule_id = RuleId { routine: routine_id.clone(), index: 0 };
+    let resources = [
+        Resource::Namespace(Namespace { id: namespace_id.clone(), domain: Domain::AllIp }),
+        Resource::Routine(Routine { id: routine_id, routine_type }),
+        Resource::Rule(Rule {
+            id: rule_id.clone(),
+            matchers: Matchers {
+                transport_protocol: Some(TransportProtocolMatcher::Udp {
+                    src_port: None,
+                    dst_port: None,
+                }),
+                ..Default::default()
+            },
+            action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
+    let result = controller.commit().await;
+    match expected_result {
+        Ok(()) => result.expect("commit should succeed"),
+        Err(()) => {
+            let invalid_rule = assert_matches!(
+                result,
+                Err(CommitError::RuleWithInvalidAction(rule_id)) => rule_id
+            );
+            assert_eq!(invalid_rule, rule_id);
+        }
+    }
+}
+
+#[netstack_test]
+#[test_case(
+    Matchers {
+        transport_protocol: Some(TransportProtocolMatcher::Tcp {
+            src_port: None,
+            dst_port: None,
+        }),
+        ..Default::default()
+    },
+    Ok(());
+    "TCP"
+)]
+#[test_case(
+    Matchers {
+        transport_protocol: Some(TransportProtocolMatcher::Udp {
+            src_port: None,
+            dst_port: None,
+        }),
+        ..Default::default()
+    },
+    Ok(());
+    "UDP"
+)]
+#[test_case(
+    Matchers {
+        transport_protocol: Some(TransportProtocolMatcher::Icmp),
+        ..Default::default()
+    },
+    Err(());
+    "ICMP"
+)]
+#[test_case(
+    Matchers {
+        transport_protocol: Some(TransportProtocolMatcher::Icmpv6),
+        ..Default::default()
+    },
+    Err(());
+    "ICMPv6"
+)]
+#[test_case(
+    Matchers::default(),
+    Err(());
+    "no transport protocol matcher"
+)]
+async fn invalid_matcher_for_transparent_proxy(
+    name: &str,
+    matchers: Matchers,
+    expected_result: Result<(), ()>,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        Controller::new(&control, &ControllerId(name.to_owned())).await.expect("create controller");
+    let namespace_id = NamespaceId(String::from("namespace"));
+    let routine_id = RoutineId { namespace: namespace_id.clone(), name: String::from("routine") };
+    let rule_id = RuleId { routine: routine_id.clone(), index: 0 };
+    let resources = [
+        Resource::Namespace(Namespace { id: namespace_id.clone(), domain: Domain::AllIp }),
+        Resource::Routine(Routine {
+            id: routine_id,
+            routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                hook: IpHook::Ingress,
+                priority: 0,
+            })),
+        }),
+        Resource::Rule(Rule {
+            id: rule_id.clone(),
+            matchers,
+            action: Action::TransparentProxy(TransparentProxy::LocalPort(TPROXY_PORT)),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
+    let result = controller.commit().await;
+    match expected_result {
+        Ok(()) => result.expect("commit should succeed"),
+        Err(()) => {
+            let invalid_rule = assert_matches!(
+                result,
+                Err(CommitError::TransparentProxyWithInvalidMatcher(rule_id)) => rule_id
+            );
+            assert_eq!(invalid_rule, rule_id);
+        }
+    }
 }

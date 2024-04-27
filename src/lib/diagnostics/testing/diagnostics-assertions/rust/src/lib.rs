@@ -734,6 +734,7 @@ impl<K> PropertyAssertion<K> for Vec<&str> {
 }
 
 /// An assertion for a histogram property.
+#[derive(Clone)]
 pub struct HistogramAssertion<T> {
     format: ArrayFormat,
     values: Vec<T>,

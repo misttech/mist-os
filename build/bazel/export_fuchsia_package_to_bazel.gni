@@ -25,17 +25,23 @@ import("//build/packages/prebuilt_package.gni")
 #    ```
 #    fuchsia_prebuilt_package(
 #      name = "foo",
-#      archive = "@legacy_ninja_build_outputs//path/to:foo.far"
+#      archive = "@gn_targets//{gn_dir}:foo.archive"
 #    )
 #    ```
+#    Where {gn_dir} matches the target's definition's directory.
 #
 # Parameters
 #
 #   package (required)
-#     A 'fuchsia_package' target.
+#     A 'fuchsia_package' target label.
 #
 #   package_name (optional)
 #     The name to overwrite the underlying fuchsia_package target name.
+#     Default is the name of the 'package' label.
+#
+#   gn_targets_name (optional)
+#      Which target name to use in the @gn_targets repository for
+#      this package. Default is package_name.
 #
 #   deps (optional)
 #   testonly (optional)
@@ -45,16 +51,19 @@ import("//build/packages/prebuilt_package.gni")
 template("export_fuchsia_package_to_bazel") {
   assert(defined(invoker.package), "Must specify package.")
 
-  labels = {
+  targets = {
     package_name = get_label_info(invoker.package, "name")
     if (defined(invoker.package_name)) {
       package_name = invoker.package_name
     }
     archive_label = "${target_name}.archive"
-    bazel_output = "${package_name}.far"
   }
 
-  fuchsia_package_archive(labels.archive_label) {
+  files = {
+    bazel_output = "${targets.package_name}.far"
+  }
+
+  fuchsia_package_archive(targets.archive_label) {
     forward_variables_from(invoker,
                            [
                              "deps",
@@ -68,13 +77,18 @@ template("export_fuchsia_package_to_bazel") {
   bazel_input_resource(target_name) {
     forward_variables_from(invoker,
                            [
+                             "gn_target_names",
                              "deps",
                              "testonly",
                              "visibility",
                              "applicable_licenses",
                            ])
-    deps = [ ":${labels.archive_label}" ]
-    sources = get_target_outputs(":${labels.archive_label}")
-    outputs = [ labels.bazel_output ]
+    deps = [ ":${targets.archive_label}" ]
+    sources = get_target_outputs(":${targets.archive_label}")
+    outputs = [ files.bazel_output ]
+
+    if (!defined(gn_targets_name)) {
+      gn_targets_name = targets.package_name
+    }
   }
 }

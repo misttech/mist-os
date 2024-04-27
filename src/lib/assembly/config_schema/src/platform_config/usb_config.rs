@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for usb.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UsbConfig {
     #[serde(default)]
@@ -14,7 +15,7 @@ pub struct UsbConfig {
 }
 
 /// Configure how the USB peripheral subsystem should work.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UsbPeripheralConfig {
     #[serde(default)]
@@ -24,7 +25,7 @@ pub struct UsbPeripheralConfig {
     pub functions: Option<Vec<UsbPeripheralFunction>>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum UsbPeripheralFunction {
     Adb,

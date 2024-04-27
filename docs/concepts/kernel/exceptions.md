@@ -158,15 +158,24 @@ will succeed.
 The `ZX_EXCP_PROCESS_STARTING` behaves differently than other exceptions. It is
 only sent to job debugger exception channels, and is always sent to all found
 handlers, essentially assuming `ZX_EXCEPTION_STATE_TRY_NEXT` regardless of the
-actual handler behavior. This is also the only exception that job debugger
-channels receive, making them a special-case handler for just detecting new
-processes.
+actual handler behavior. This is also the only kernel-defined exception that
+job debugger channels receive, making them a special-case handler for detecting
+new processes. Job debuggers can also receive `ZX_EXCP_USER` exceptions, which
+can be raised using the [`zx_thread_raise_exception()`] syscall.
 
 Since job debugger channels are considered as "read-only", multiple job debugger
 channels (up to `ZX_EXCEPTION_CHANNEL_JOB_DEBUGGER_MAX_COUNT`) may be created on
 a single job. When multiple debug channels are created on one job, a
 `ZX_EXCP_PROCESS_STARTING` event will be sent to all channels sequentially, with
 the earlier created channels being notified before the later created channels.
+
+### User-defined Exceptions
+
+The [`zx_thread_raise_exception()`] syscall can be used to raise a user-defined
+exception. These exceptions have the type `ZX_EXCP_USER`, with user-defined
+values delivered in the `synth_code` and `synth_data` fields of
+`zx_exception_context_t`. Currently, user-defined exceptions can be delivered
+only to a job debugger exception channel.
 
 ### Process Debugger First... and Possibly Again Later
 
@@ -296,6 +305,7 @@ zx_task_suspend()                  | kill(SIGSTOP),ptrace(KILL(SIGSTOP))
 zx_handle_close(suspend_token)     | kill(SIGCONT),ptrace(CONT)
 zx_handle_close(exception)         | kill(SIGCONT),ptrace(CONT)
 zx_task_kill()                     | kill(SIGKILL)
+zx_thread_raise_exception()        | kill(SIGUSR1)
 N/A                                | kill(everything_else)
 TBD                                | signal()/sigaction()
 zx_port_wait()                     | wait*()
@@ -307,7 +317,7 @@ zx_thread_write_state()            | ptrace(SETREGS,SETREGSET)
 zx_process_read_memory()           | ptrace(PEEKTEXT)
 zx_process_write_memory()          | ptrace(POKETEXT)
 
-Zircon does not have asynchronous signals like `SIGINT`, `SIGQUIT`, `SIGTERM`,
+Zircon does not have non-fatal asynchronous signals like `SIGINT`, `SIGQUIT`, `SIGTERM`,
 `SIGUSR1`, `SIGUSR2`, and so on.
 
 Another significant difference from Posix is that in Zircon a thread cannot
@@ -339,3 +349,4 @@ Zircon code that uses exceptions can be viewed for further examples, including:
 [`zx_port_wait()`]: /reference/syscalls/port_wait.md
 [`zx_task_create_exception_channel()`]: /reference/syscalls/task_create_exception_channel.md
 [`zx_task_kill()`]: /reference/syscalls/task_kill.md
+[`zx_thread_raise_exception()`]: /reference/syscalls/thread_raise_exception.md

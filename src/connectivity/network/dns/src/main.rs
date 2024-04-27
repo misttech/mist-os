@@ -2744,8 +2744,13 @@ mod tests {
         let (routes_proxy, routes_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
                 .expect("failed to create routes.StateProxy");
-        let routes_fut = routes_stream.map(|r| r.context("stream FIDL error")).try_for_each(
-            |fnet_routes::StateRequest::Resolve { destination, responder }| {
+        let routes_fut =
+            routes_stream.map(|r| r.context("stream FIDL error")).try_for_each(|req| {
+                let (destination, responder) = assert_matches!(
+                    req,
+                    fnet_routes::StateRequest::Resolve { destination, responder }
+                        => (destination, responder)
+                );
                 let result = TEST_IPS
                     .iter()
                     .enumerate()
@@ -2773,8 +2778,7 @@ mod tests {
                         .send(result.as_ref().map_err(|e| *e))
                         .context("failed to send Resolve response"),
                 )
-            },
-        );
+            });
 
         let ((), ()) = futures::future::try_join(routes_fut, async move {
             let addrs = TEST_IPS.iter().map(|(dst, _src)| *dst).collect();
@@ -2798,7 +2802,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_lookupip() {
         // Routes handler will say that only IPV6_HOST is reachable.
-        let routes_handler = |fnet_routes::StateRequest::Resolve { destination, responder }| {
+        let routes_handler = |req| {
+            let (destination, responder) = assert_matches!(
+                req,
+                fnet_routes::StateRequest::Resolve { destination, responder }
+                    => (destination, responder)
+            );
             let resolved;
             let response = if destination == map_ip(IPV6_HOST) {
                 resolved = fnet_routes::Resolved::Direct(fnet_routes::Destination {

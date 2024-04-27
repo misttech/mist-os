@@ -41,13 +41,12 @@ class CodecAdapterSbcDecoder : public CodecAdapterSW<fit::deferred_action<fit::c
   CodecAdapterSbcDecoder(std::mutex& lock, CodecAdapterEvents* codec_adapter_events);
   ~CodecAdapterSbcDecoder();
 
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
 
   void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
 
   void CoreCodecStopStream() override;
 

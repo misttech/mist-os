@@ -127,6 +127,7 @@ class NetworkDeviceImpl : public EndpointImpl,
         .type = Endpoint::kFrameType,
         .features = fuchsia::hardware::network::FRAME_FEATURES_RAW,
         .supported_flags = fuchsia::hardware::network::TxFlags()}});
+    port_config.mutable_base()->set_port_class(config().port_class);
     if (config().mac) {
       status = config().mac->Clone(port_config.mutable_mac());
       if (status != ZX_OK) {

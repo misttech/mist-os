@@ -30,8 +30,8 @@ SdmmcVisitor::SdmmcVisitor() {
 }
 
 bool SdmmcVisitor::is_match(std::string_view name) {
-  // Check that the name begins with mmc-.
-  return name.find("mmc-") == 0;
+  // Check that the name begins with mmc@.
+  return name.find("mmc@") == 0;
 }
 
 zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,

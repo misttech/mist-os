@@ -166,15 +166,13 @@ type NodeOptions = table {
         ALWAYS = 3;
     };
 
-    /// Requested rights on the new connection.
+    /// Requested rights on the new connection. If any [`rights`] exceed those of the current
+    /// connection, [`object_request`] will be closed with `ZX_ERR_ACCESS_DENIED`.
     ///
-    /// If [`rights`] exceed the rights of the requesting connection then [`object_request`] will be
-    /// closed with a `ZX_ERR_ACCESS_DENIED` epitaph.
-    ///
-    /// This applies in addition to [`DirectoryProtocolOptions.optional_rights`].
-    ///
-    /// If absent, inherits appropriate rights from the requesting connection. For example, if using
-    /// the node protocol, only the GET_ATTRIBUTES right is inherited.
+    /// The rights granted to the connection will be downscoped to those operations the target
+    /// node type supports. For example, if the target node is a file and both
+    /// [`Rights.WRITE_BYTES`] and [`Rights.MODIFY_DIRECTORY`] are requested, the resulting
+    /// connection will only be granted [`Rights.WRITE_BYTES`].
     4: rights Rights;
 
     /// If the [`NodeFlags.GET_REPRESENTATION`] flag is set, attributes to be returned in

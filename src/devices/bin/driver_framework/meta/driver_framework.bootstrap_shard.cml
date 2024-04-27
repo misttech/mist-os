@@ -177,6 +177,7 @@
             protocol: [ "power-manager-outlives-driver-manager" ],
             from: "#power_manager",
             to: "#driver_manager",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
@@ -216,6 +217,7 @@
                 "#boot-drivers",
                 "#driver-hosts",
             ],
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
@@ -280,13 +282,12 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "#sysmem",
             to: "#boot-drivers",
-
-            // This must be weak because sysmem needs sysmem from devfs, which creates
-            // a cycle. sysmem can be made into a non-driver to fix this.
-            dependency: "weak",
             source_availability: "unknown",
         },
         {
@@ -340,11 +341,13 @@
             // drivers depend on system-activity-governor.
             // Weak to resolve dependency cycles.
             dependency: "weak",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: "#boot-drivers",
+            source_availability: "unknown",
         },
     ],
     expose: [

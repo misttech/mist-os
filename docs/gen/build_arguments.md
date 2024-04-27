@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2100
+From //build/config/BUILDCONFIG.gn:2099
 
 ### allowed_test_device_types
 
@@ -331,18 +331,6 @@ to save about 3 minutes of build time when they are not needed.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_fuchsia_sdk.gni:17
-
-### bazel_fuchsia_sdk_content
-
-Determines which set of SDK atoms are used to populage the @fuchsia_sdk
-Bazel external repository in the current build configuration. Possible
-values are "core" or "driver", see below for a description of each set.
-Note: this value will be changed to "core" once CI builders for the
-Fuchsia Bazel DDK are in place.
-
-**Current value (from the default):** `"driver"`
-
 From //build/bazel/bazel_fuchsia_sdk.gni:11
 
 ### bazel_product_bundle_board
@@ -405,7 +393,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:18
+From //build/bazel/bazel_action.gni:19
 
 ### bazel_upload_build_events
 
@@ -878,6 +866,12 @@ An action that accesses undeclared inputs or outputs will fail the build.
 
 From //build/tracer/tracer.gni:12
 
+### build_time_supported_api_levels
+
+**Current value (from the default):** `[15, 16, 17, 18, 19, 20]`
+
+From //build/bazel/bazel_fuchsia_sdk.gni:18
+
 ### build_uefi_disk
 
 Generate a UEFI disk image
@@ -1107,7 +1101,7 @@ Makes clippy targets fail to build when any "deny" lints are found
 
 **Current value (from the default):** `true`
 
-From //build/rust/config.gni:67
+From //build/rust/config.gni:64
 
 ### clippy_force_warn_all
 
@@ -1117,7 +1111,7 @@ should only be used to collect stats about clippy lints in our source tree.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:64
+From //build/rust/config.gni:61
 
 ### clippy_warn_all
 
@@ -1126,7 +1120,7 @@ Note: setting lint levels in source takes precedence over this.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:59
+From //build/rust/config.gni:56
 
 ### cobalt_environment
 
@@ -3253,7 +3247,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1835
+From //build/config/BUILDCONFIG.gn:1834
 
 ### extra_vbmeta_descriptors
 
@@ -3951,7 +3945,7 @@ causes clippy targets to get included in the build. This gets enabled by default
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:72
+From //build/rust/config.gni:69
 
 ### include_internal_fonts
 
@@ -4384,7 +4378,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1636
+From //build/config/BUILDCONFIG.gn:1635
 
 ### legacy_base_package_labels
 
@@ -4676,6 +4670,16 @@ submitted commands.
 **Current value (from the default):** `true`
 
 From //src/graphics/drivers/msd-vsi-vip/BUILD.gn:14
+
+### netstack3_profile_rustc
+
+Adds compilation flags to emit rustc self-profiling when building netstack3
+targets. That helps us track down where time is spent and memory
+consumption to play nice with RBE.
+
+**Current value (from the default):** `false`
+
+From //src/connectivity/network/netstack3/BUILD.gn:9
 
 ### netsvc_extra_defines
 
@@ -7066,7 +7070,7 @@ ignore warnings.
 
 **Current value (from the default):** `"deny"`
 
-From //build/rust/config.gni:55
+From //build/rust/config.gni:52
 
 ### rust_debug_assertions
 
@@ -7107,15 +7111,13 @@ From //build/rust/config.gni:47
 ### rust_one_rlib_per_dir
 
 To avoid build nondeterminism due to extern search paths resolving
-to more than one path during a build, enable this option to place
-every rlib into its own exclusive directory.
-This requires `rustc_use_response_file = true` due to the command-line
-bloat this causes.
-See http://g-issues.fuchsia.dev/issues/319148874 for more details.
+to more than one path during a build, this option places every rlib
+into its own exclusive directory. This requires
+`rustc_use_response_file = true` due to the command-line bloat this causes.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/rust/build.gni:19
+From //build/rust/build.gni:16
 
 ### rust_parallel_frontend_threads
 
@@ -7220,14 +7222,6 @@ One of:
 
 From //build/toolchain/rbe.gni:93
 
-### rust_toolchain_triple_suffix
-
-Sets the fuchsia toolchain target triple suffix (after arch)
-
-**Current value (from the default):** `"fuchsia"`
-
-From //build/rust/config.gni:50
-
 ### rust_v0_symbol_mangling
 
 Controls whether the rust compiler uses v0 symbol mangling scheme
@@ -7260,11 +7254,10 @@ Place lengthy rustdeps and externs (GN) into ninja response files.
 Response files are needed to get around command line length limitations.
 rustc support for response files (as needed in our GN build) was
 added with revision 'git_revision:dfe53afaebd817f334d8ef9dc75a5cd2562cf6e6'.
-This optional will eventually become permanently true.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/rust/build.gni:11
+From //build/rust/build.gni:10
 
 ### rustc_version_description
 
@@ -7465,6 +7458,14 @@ a guess.
 
 From //build/sdk/config.gni:36
 
+### sdk_sub_build_verbose
+
+Set to `true` to enable verbose logging during IDK subbuilds.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:44
+
 ### select_variant
 
 List of "selectors" to request variant builds of certain targets.
@@ -7535,7 +7536,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2090
+From //build/config/BUILDCONFIG.gn:2089
 
 ### select_variant_canonical
 
@@ -7545,7 +7546,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2095
+From //build/config/BUILDCONFIG.gn:2094
 
 ### select_variant_shortcuts
 
@@ -7603,7 +7604,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1881
+From //build/config/BUILDCONFIG.gn:1880
 
 ### size_checker_input
 
@@ -8078,7 +8079,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1865
+From //build/config/BUILDCONFIG.gn:1864
 
 ### universe_package_labels
 
@@ -8299,15 +8300,6 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 **Current value (from the default):** `false`
 
 From //build/config/compiler.gni:43
-
-### use_prebuilt_codec_runner_intel_gen
-
-True if a prebuilt codec_runner_intel_gen package is used. If false, the codec_runner will be
-built from scratch (requires a checkout of the intel media-driver repo).
-
-**Current value (from the default):** `true`
-
-From //src/media/codec/codecs/vaapi/BUILD.gn:11
 
 ### use_prebuilt_ffmpeg
 

@@ -15,6 +15,7 @@
 #include "src/developer/debug/zxdb/expr/eval_dwarf_expr.h"
 #include "src/developer/debug/zxdb/expr/expr_value.h"
 #include "src/developer/debug/zxdb/expr/find_name.h"
+#include "src/developer/debug/zxdb/expr/register_utils.h"
 #include "src/developer/debug/zxdb/expr/resolve_collection.h"
 #include "src/developer/debug/zxdb/expr/resolve_const_value.h"
 #include "src/developer/debug/zxdb/expr/resolve_ptr_ref.h"
@@ -36,69 +37,6 @@
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
-namespace {
-
-using debug::RegisterID;
-
-RegisterID GetRegisterID(debug::Arch arch, const ParsedIdentifier& ident) {
-  // Check for explicit register identifier annotation.
-  if (ident.components().size() == 1 &&
-      ident.components()[0].special() == SpecialIdentifier::kRegister) {
-    return debug::StringToRegisterID(arch, ident.components()[0].name());
-  }
-
-  // Try to convert the identifier string to a register name.
-  auto str = GetSingleComponentIdentifierName(ident);
-  if (!str)
-    return debug::RegisterID::kUnknown;
-  return debug::StringToRegisterID(arch, *str);
-}
-
-Err GetUnavailableRegisterErr(RegisterID id) {
-  return Err("Register %s unavailable in this context.", debug::RegisterIDToString(id));
-}
-
-ErrOrValue RegisterDataToValue(ExprLanguage lang, RegisterID id, VectorRegisterFormat vector_fmt,
-                               cpp20::span<const uint8_t> data) {
-  const debug::RegisterInfo* info = debug::InfoForRegister(id);
-  if (!info)
-    return Err("Unknown register");
-
-  ExprValueSource source(id);
-
-  switch (info->format) {
-    case debug::RegisterFormat::kGeneral:
-    case debug::RegisterFormat::kSpecial: {
-      return ExprValue(GetBuiltinUnsignedType(lang, data.size()),
-                       std::vector<uint8_t>(data.begin(), data.end()), source);
-    }
-
-    case debug::RegisterFormat::kFloat: {
-      return ExprValue(GetBuiltinFloatType(lang, data.size()),
-                       std::vector<uint8_t>(data.begin(), data.end()), source);
-    }
-
-    case debug::RegisterFormat::kVector: {
-      return VectorRegisterToValue(id, vector_fmt, std::vector<uint8_t>(data.begin(), data.end()));
-    }
-
-    case debug::RegisterFormat::kVoidAddress: {
-      // A void* is a pointer to no type.
-      return ExprValue(fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType, LazySymbol()),
-                       std::vector<uint8_t>(data.begin(), data.end()), source);
-    }
-
-    case debug::RegisterFormat::kWordAddress: {
-      auto word_ptr_type = fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType,
-                                                             GetBuiltinUnsignedType(lang, 8));
-      return ExprValue(word_ptr_type, std::vector<uint8_t>(data.begin(), data.end()), source);
-    }
-  }
-
-  return Err("Unknown register type");
-}
-
-}  // namespace
 
 EvalContextImpl::EvalContextImpl(std::shared_ptr<Abi> abi,
                                  fxl::WeakPtr<const ProcessSymbols> process_symbols,
@@ -181,7 +119,8 @@ void EvalContextImpl::GetNamedValue(const ParsedIdentifier& identifier, EvalCall
   }
 
   auto reg = GetRegisterID(data_provider_->GetArch(), identifier);
-  if (reg == RegisterID::kUnknown || debug::GetArchForRegisterID(reg) != data_provider_->GetArch())
+  if (reg == debug::RegisterID::kUnknown ||
+      debug::GetArchForRegisterID(reg) != data_provider_->GetArch())
     return cb(Err("No variable '%s' found.", identifier.GetFullName().c_str()));
 
   // Fall back to matching registers when no symbol is found. The data_provider is in charge

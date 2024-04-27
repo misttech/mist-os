@@ -4,12 +4,6 @@
 
 """file-making utilities."""
 
-load(
-    "@fuchsia_sdk//fuchsia/private:providers.bzl",
-    "FuchsiaPackageResourcesInfo",
-)
-load("@fuchsia_sdk//fuchsia/private:utils.bzl", "make_resource_struct")
-
 def _make_file_impl(ctx):
     f = ctx.actions.declare_file(ctx.attr.filename)
     ctx.actions.write(f, ctx.attr.content)
@@ -23,23 +17,6 @@ make_file = rule(
     a simpler interface.""",
     attrs = {
         "filename": attr.string(),
-        "content": attr.string(),
-    },
-)
-
-def _make_resource_file_impl(ctx):
-    f = ctx.actions.declare_file(ctx.label.name + "_" + ctx.attr.dest.replace("/", "_"))
-    ctx.actions.write(f, ctx.attr.content)
-    return [
-        DefaultInfo(files = depset([f])),
-        FuchsiaPackageResourcesInfo(resources = [make_resource_struct(src = f, dest = ctx.attr.dest)]),
-    ]
-
-make_resource_file = rule(
-    implementation = _make_resource_file_impl,
-    doc = "Creates a file which will provide a FuchsiaPackageResourcesInfo.",
-    attrs = {
-        "dest": attr.string(doc = "Where the file will be installed in a fuchsia package"),
         "content": attr.string(),
     },
 )

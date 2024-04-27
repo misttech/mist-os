@@ -5,6 +5,8 @@
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/wire.h>
+#include <fidl/fuchsia.power.system/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <fidl/fuchsia.sys2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -17,6 +19,7 @@
 #include <zircon/status.h>
 
 #include <chrono>
+#include <optional>
 #include <thread>
 
 #include <fbl/auto_lock.h>
@@ -32,6 +35,8 @@ namespace fio = fuchsia_io;
 
 namespace statecontrol_fidl = fuchsia_hardware_power_statecontrol;
 namespace sys2_fidl = fuchsia_sys2;
+namespace broker_fidl = fuchsia_power_broker;
+namespace system_fidl = fuchsia_power_system;
 
 // The amount of time that the shim will spend trying to connect to
 // power_manager before giving up.
@@ -41,6 +46,16 @@ const zx::duration SERVICE_CONNECTION_TIMEOUT = zx::sec(2);
 // The amount of time that the shim will spend waiting for a manually trigger
 // system shutdown to finish before forcefully restarting the system.
 const std::chrono::duration MANUAL_SYSTEM_SHUTDOWN_TIMEOUT = std::chrono::minutes(60);
+
+// The valid power levels for the shutdown_control power element.
+enum class ShutdownControlLevel : uint8_t {
+  // The shutdown_control power element is not active.
+  // System suspension is allowed.
+  kInactive = 0u,
+  // The shutdown_control power element is active.
+  // System suspension is not allowed.
+  kActive = 1u
+};
 
 class SystemStateTransitionServer final
     : public fidl::WireServer<fuchsia_device_manager::SystemStateTransition> {
@@ -78,6 +93,99 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
  public:
   StateControlAdminServer() : loop_((&kAsyncLoopConfigNoAttachToCurrentThread)) {
     loop_.StartThread("SystemStateTransitionLoop");
+
+    // Set up a power element that keeps the system awake during reboots and shutdowns.
+    // The new power element, shutdown_control, has an active dependency on
+    // SAG's WakeHandling power element when its power level is
+    // ShutdownControlLevel::kActive.
+
+    // Start by getting a dependency token to system activity governor's WakeHandling power element.
+    zx::result activity_governor = component::Connect<system_fidl::ActivityGovernor>();
+    if (activity_governor.is_error()) {
+      fprintf(stderr, "[shutdown-shim]: error connecting to system_activity_governor: %s\n",
+              activity_governor.status_string());
+      return;
+    }
+
+    fidl::WireSyncClient activity_governor_client{std::move(activity_governor.value())};
+    auto get_resp = activity_governor_client->GetPowerElements();
+    if (get_resp.status() != ZX_OK) {
+      fprintf(stderr, "[shutdown-shim]: error getting activity governor power elements: %s\n",
+              get_resp.status_string());
+      return;
+    }
+
+    if (!get_resp.value().has_wake_handling()) {
+      fprintf(stderr, "[shutdown-shim]: wake_handling power element not available\n");
+      return;
+    }
+
+    auto wake_handling = std::move(get_resp.value().wake_handling());
+    if (!wake_handling.has_active_dependency_token()) {
+      fprintf(stderr, "[shutdown-shim]: wake_handling dependency token not available\n");
+      return;
+    }
+
+    // Next, create the new power element with power-broker.
+    zx::result topology = component::Connect<broker_fidl::Topology>();
+    if (topology.is_error()) {
+      fprintf(stderr, "[shutdown-shim]: error connecting to power_broker: %s\n",
+              topology.status_string());
+      return;
+    }
+
+    fidl::WireSyncClient topology_client{std::move(topology.value())};
+
+    // Use the WakeHandling dependency token to set up an active dependency
+    // between shutdown-shim's new power element and system-activity-governor's
+    // WakeHandling power element.
+    auto requires_token = std::move(wake_handling.active_dependency_token());
+    auto wake_handling_dep = broker_fidl::wire::LevelDependency{
+        .dependency_type = broker_fidl::wire::DependencyType::kActive,
+        .dependent_level = static_cast<uint8_t>(ShutdownControlLevel::kActive),
+        .requires_token = std::move(requires_token),
+        .requires_level = static_cast<uint8_t>(system_fidl::wire::WakeHandlingLevel::kActive),
+    };
+    std::vector<broker_fidl::wire::LevelDependency> dependencies;
+    dependencies.push_back(std::move(wake_handling_dep));
+
+    auto lessor_endpoints = fidl::CreateEndpoints<broker_fidl::Lessor>();
+    if (!lessor_endpoints.is_ok()) {
+      fprintf(stderr, "[shutdown-shim]: error creating Lessor endpoints: %s\n",
+              lessor_endpoints.status_string());
+      return;
+    }
+
+    std::vector<uint8_t> valid_levels{
+        static_cast<uint8_t>(ShutdownControlLevel::kInactive),
+        static_cast<uint8_t>(ShutdownControlLevel::kActive),
+    };
+
+    fidl::Arena arena;
+    auto shutdown_control_schema =
+        broker_fidl::wire::ElementSchema::Builder(arena)
+            .element_name(fidl::StringView::FromExternal("shutdown_control"))
+            .valid_levels(fidl::VectorView<uint8_t>::FromExternal(valid_levels))
+            .initial_current_level(static_cast<uint8_t>(ShutdownControlLevel::kInactive))
+            .dependencies(
+                fidl::VectorView<broker_fidl::wire::LevelDependency>::FromExternal(dependencies))
+            .lessor_channel(std::move(lessor_endpoints->server))
+            .Build();
+
+    auto resp = topology_client->AddElement(std::move(shutdown_control_schema));
+    if (resp.status() != ZX_OK) {
+      fprintf(stderr, "[shutdown-shim]: error requesting shutdown_control power element: %s\n",
+              resp.status_string());
+      return;
+    }
+    if (resp.value().is_error()) {
+      fprintf(stderr, "[shutdown-shim]: error creating shutdown_control power element: %u\n",
+              static_cast<uint32_t>(resp.value().error_value()));
+      return;
+    }
+
+    element_control_channel_client_end_ = std::move(resp.value().value()->element_control_channel);
+    lessor_client_ = fidl::WireSyncClient{std::move(lessor_endpoints->client)};
   }
 
   zx_status_t ExportServices(fbl::RefPtr<fs::PseudoDir>& svc_dir, async_dispatcher* dispatcher);
@@ -92,8 +200,13 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
   void SuspendToRam(SuspendToRamCompleter::Sync& completer) override;
 
  private:
+  std::optional<fidl::WireSyncClient<broker_fidl::LeaseControl>> AcquireShutdownControlLease()
+      const;
+
   SystemStateTransitionServer system_state_transition_server_;
   async::Loop loop_;
+  fidl::ClientEnd<broker_fidl::ElementControl> element_control_channel_client_end_;
+  fidl::WireSyncClient<broker_fidl::Lessor> lessor_client_;
 };
 
 // Opens a service node, failing if the provider of the service does not respond
@@ -344,6 +457,7 @@ void StateControlAdminServer::PowerFullyOn(PowerFullyOnCompleter::Sync& complete
 }
 
 void StateControlAdminServer::Reboot(RebootRequestView request, RebootCompleter::Sync& completer) {
+  auto reboot_control_lease = AcquireShutdownControlLease();
   fuchsia_device_manager::SystemPowerState target_state =
       fuchsia_device_manager::SystemPowerState::kReboot;
   if (request->reason == statecontrol_fidl::wire::RebootReason::kOutOfMemory) {
@@ -359,6 +473,7 @@ void StateControlAdminServer::Reboot(RebootRequestView request, RebootCompleter:
 }
 
 void StateControlAdminServer::RebootToBootloader(RebootToBootloaderCompleter::Sync& completer) {
+  auto reboot_control_lease = AcquireShutdownControlLease();
   system_state_transition_server_.set_system_power_state(
       fuchsia_device_manager::SystemPowerState::kRebootBootloader);
   zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kRebootBootloader);
@@ -370,6 +485,7 @@ void StateControlAdminServer::RebootToBootloader(RebootToBootloaderCompleter::Sy
 }
 
 void StateControlAdminServer::RebootToRecovery(RebootToRecoveryCompleter::Sync& completer) {
+  auto reboot_control_lease = AcquireShutdownControlLease();
   system_state_transition_server_.set_system_power_state(
       fuchsia_device_manager::SystemPowerState::kRebootRecovery);
   zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kRebootRecovery);
@@ -381,6 +497,7 @@ void StateControlAdminServer::RebootToRecovery(RebootToRecoveryCompleter::Sync& 
 }
 
 void StateControlAdminServer::Poweroff(PoweroffCompleter::Sync& completer) {
+  auto reboot_control_lease = AcquireShutdownControlLease();
   system_state_transition_server_.set_system_power_state(
       fuchsia_device_manager::SystemPowerState::kPoweroff);
   zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kPoweroff);
@@ -392,6 +509,7 @@ void StateControlAdminServer::Poweroff(PoweroffCompleter::Sync& completer) {
 }
 
 void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sync& completer) {
+  auto reboot_control_lease = AcquireShutdownControlLease();
   // Duplicate the VMOs now, as forwarding the mexec request to power-manager
   // will consume them.
   zx::vmo kernel_zbi, data_zbi;
@@ -448,6 +566,55 @@ void StateControlAdminServer::SuspendToRam(SuspendToRamCompleter::Sync& complete
   } else {
     completer.ReplyError(status);
   }
+}
+
+std::optional<fidl::WireSyncClient<broker_fidl::LeaseControl>>
+StateControlAdminServer::AcquireShutdownControlLease() const {
+  if (!lessor_client_) {
+    fprintf(
+        stderr,
+        "[shutdown-shim]: no lessor client available, skipping acquiring shutdown_control lease.\n");
+    return std::nullopt;
+  }
+
+  auto resp = lessor_client_->Lease(static_cast<uint8_t>(ShutdownControlLevel::kActive));
+  if (resp.status() != ZX_OK) {
+    fprintf(stderr, "[shutdown-shim]: failed to request lease: %s\n", resp.status_string());
+
+    // At this point, shutdown-shim has communicated with system-activity-governor and power-broker,
+    // but the state of the system is inconsistent with that. Force reboot to recover.
+    fprintf(stderr, "[shutdown-shim]: system is in an unexpected state, rebooting to recover\n");
+    exit(1);
+  }
+  if (resp.value().is_error()) {
+    fprintf(stderr, "[shutdown-shim]: failed to acquire lease: %d\n",
+            static_cast<uint32_t>(resp.value().error_value()));
+
+    // At this point, shutdown-shim has communicated with system-activity-governor and power-broker,
+    // but the state of the system is inconsistent with that. Force reboot to recover.
+    fprintf(stderr, "[shutdown-shim]: system is in an unexpected state, rebooting to recover\n");
+    exit(1);
+  }
+
+  auto lease_control_client = fidl::WireSyncClient{std::move(resp.value().value()->lease_control)};
+
+  auto status = broker_fidl::wire::LeaseStatus::kUnknown;
+  while (status != broker_fidl::wire::LeaseStatus::kSatisfied) {
+    auto status_resp = lease_control_client->WatchStatus(status);
+    if (status_resp.status() != ZX_OK) {
+      fprintf(stderr, "[shutdown-shim]: failed to watch lease: %s\n", resp.status_string());
+
+      // At this point, shutdown-shim has communicated with system-activity-governor and
+      // power-broker, but the state of the system is inconsistent with that.
+      // Force reboot to recover.
+      fprintf(stderr, "[shutdown-shim]: system is in an unexpected state, rebooting to recover\n");
+      exit(1);
+    }
+    status = status_resp.value().status;
+  }
+
+  fprintf(stderr, "[shutdown-shim]: acquired shutdown_control lease\n");
+  return std::optional(std::move(lease_control_client));
 }
 
 void SystemStateTransitionServer::GetTerminationSystemState(

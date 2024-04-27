@@ -190,6 +190,13 @@ class OutputsDatabase(object):
 
 def get_build_dir(fuchsia_dir: Path) -> Path:
     """Get current Ninja build directory."""
+    # Use $FUCHSIA_DIR/.fx-build-dir if present. This is only useful
+    # when invoking the script directly from the command-line, i.e.
+    # during build system development.
+    #
+    # `fx` scripts should use the `fx-build-api-client` function which
+    # always sets --build-dir to the appropriate value instead
+    # (https://fxbug.dev/336720162).
     file = fuchsia_dir / ".fx-build-dir"
     if not file.exists():
         return Path()

@@ -46,6 +46,8 @@ type InstalledRouteV6 = table {
     1: route RouteV6;
     /// The route's effective properties.
     2: effective_properties EffectiveRouteProperties;
+    /// The ID of the table to which this route belongs.
+    3: table_id TableId;
 };
 
 /// Provides observability to the system's IPv6 routing state.
@@ -58,7 +60,19 @@ closed protocol StateV6 {
     /// + request `watch_options` specifies the behavior of the `WatcherV6`.
     strict GetWatcherV6(resource struct {
         watcher server_end:WatcherV6;
-        options @generated_name("WatcherOptionsV6") table {};
+        options @generated_name("WatcherOptionsV6") table {
+            /// Only watch for events on the specified table.
+            1: table_id TableId;
+        };
+    });
+
+    /// Initialize a watcher for IPv6 rules state.
+    ///
+    /// + request 'watcher' grants access to the `RuleWatcherV6` Protocol.
+    /// + request `watch_options` specifies the behavior of the `RuleWatcherV6`.
+    strict GetRuleWatcherV6(resource struct {
+        watcher server_end:RuleWatcherV6;
+        options @generated_name("RuleWatcherOptionsV6") table {};
     });
 };
 
@@ -100,4 +114,64 @@ closed protocol WatcherV6 {
     });
 };
 
+/// An installed IPv6 routing rule.
+@available(added=HEAD)
+type InstalledRuleV6 = struct {
+    /// Rule sets are ordered by the rule set priority, rule sets are disjoint
+    /// and don’t have interleaving rules among them.
+    rule_set_priority RuleSetPriority;
+    /// Rules within a rule set are locally ordered, together with the rule set
+    /// priority, this defines a global order for all installed rules.
+    rule_index RuleIndex;
+    /// The selector part of the rule, the rule is a no-op if the selector does
+    /// not match the packet.
+    selector RuleSelectorV6;
+    /// The action part of the rule that describes what to do if the selector
+    /// matches the packet.
+    action RuleAction;
+};
+
+
+/// An observer protocol for changes in the system's IPv6 rules table.
+@available(added=HEAD)
+closed protocol RuleWatcherV6 {
+    /// Hanging-Get style API for observing routing rule changes.
+    ///
+    /// Clients must only have one pending `Watch` call at a time. Calling
+    /// `Watch` while a request is already pending will cause the protocol to
+    /// close.
+    ///
+    /// The first N events will always be `existing` where N is the number of
+    /// IPv6 rules that already existed when the server-end of the protocol was
+    /// initialized. The following event will be `idle` signaling the end of the
+    /// `existing` events. At this point the client has watched all existing
+    /// state and will never again observe an `existing` event.
+    ///
+    /// - response `events` A vector of at most `MAX_EVENTS` events.
+    strict Watch() -> (struct {
+        events vector<@generated_name("RuleEventV6") flexible union {
+            /// A rule that already existed when watching started.
+            1: existing InstalledRuleV6;
+            /// Sentinel value indicating no more `existing` events will be
+            /// received.
+            2: idle Empty;
+            /// A rule that was added while watching.
+            3: added InstalledRuleV6;
+            /// A rule that was removed while watching.
+            6: removed InstalledRuleV6;
+        }>:MAX_EVENTS;
+    });
+};
+
+/// The selector part of the rule that is used to match packets.
+///
+/// A selector matches a packet if all of the present fields match the
+/// corresponding properties.
+@available(added=HEAD)
+type RuleSelectorV6 = table {
+    /// Matches whether the source address of the packet is from the subnet.
+    1: from fuchsia.net.Ipv6AddressWithPrefix;
+    /// The rest of the selectors that is common between IP versions.
+    2: base BaseSelector;
+};
 // LINT.ThenChange(ipv4.fidl)

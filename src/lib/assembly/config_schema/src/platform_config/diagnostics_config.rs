@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Diagnostics configuration options for the diagnostics area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiagnosticsConfig {
     #[serde(default)]
@@ -23,7 +24,7 @@ pub struct DiagnosticsConfig {
 }
 
 /// Diagnostics configuration options for the archivist configuration area.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ArchivistConfig {
     Default,
@@ -31,17 +32,18 @@ pub enum ArchivistConfig {
 }
 
 /// A single archivist pipeline config.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ArchivistPipeline {
     /// The name of the pipeline.
     pub name: PipelineType,
     /// The files to add to the pipeline.
     /// Zero files is not valid.
+    #[schemars(schema_with = "crate::vec_path_schema")]
     pub files: Vec<Utf8PathBuf>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(into = "String")]
 pub enum PipelineType {
@@ -77,7 +79,7 @@ impl From<PipelineType> for String {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename = "snake_case")]
 pub enum ArchivistPipelineName {
     Feedback,
@@ -86,23 +88,26 @@ pub enum ArchivistPipelineName {
 }
 
 /// Diagnostics configuration options for the sampler configuration area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
     #[serde(default)]
+    #[schemars(schema_with = "crate::vec_path_schema")]
     pub metrics_configs: Vec<Utf8PathBuf>,
     /// The fire configs to pass to sampler.
     #[serde(default)]
+    #[schemars(schema_with = "crate::vec_path_schema")]
     pub fire_configs: Vec<Utf8PathBuf>,
 }
 
 /// Diagnostics configuration options for the memory monitor configuration area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryMonitorConfig {
     /// The memory buckets config file to provide to memory monitor.
     #[serde(default)]
+    #[schemars(schema_with = "crate::option_path_schema")]
     pub buckets: Option<Utf8PathBuf>,
     /// Control whether a pressure change should trigger a capture.
     #[serde(default)]

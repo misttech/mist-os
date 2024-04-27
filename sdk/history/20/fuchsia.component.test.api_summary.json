@@ -573,6 +573,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.component.test/RealmBuilderError.INVALID_CHILD_DECL",
+        "value": "22"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.component.test/RealmBuilderError.INVALID_CHILD_REALM_HANDLE",
         "value": "14"
     },

@@ -101,8 +101,6 @@ fuchsia_driver_package("intel") {
   if (internal_access) {
     deps += [ ":btintel-firmware($shlib_toolchain)" ]
   }
-
-  # This package is reachable from //bundles/packages/prod:all
 }
 
 executable("tests_executable") {

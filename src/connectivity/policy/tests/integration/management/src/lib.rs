@@ -13,6 +13,7 @@ use std::{
     pin::pin,
 };
 
+use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
@@ -176,35 +177,91 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
     );
 }
 
-// Create two realms with one netstack each, managed by netcfg. Each realm
-// has an endpoint, which are both on the same network. Send a UDP packet
-// between Realm1 and Realm2, where Realm1 and Realm2 can be initialized
-// with a predefined ManagerConfig.
+// Create two realms with predefined port classes and one netstack each, managed
+// by netcfg. Each realm has an endpoint, which are both on the same network.
+// Send a UDP packet between Realm1 and Realm2, where Realm1 and Realm2 can be
+// initialized with a predefined ManagerConfig.
 #[netstack_test]
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::PacketFilterEthernet,
-    false; "receiver_eth_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    false; "receiver_eth_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::PacketFilterEthernet,
     ManagerConfig::Empty,
-    false; "sender_eth_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    false; "sender_eth_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::PacketFilterEthernet,
     ManagerConfig::PacketFilterEthernet,
-    false; "both_eth_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    false; "both_eth_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::PacketFilterWlan,
     ManagerConfig::PacketFilterWlan,
-    true; "both_wlan_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    true; "both_wlan_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::Empty,
-    true; "both_no_filter")]
+    fhardware_network::PortClass::Ethernet,
+    true; "both_no_filter__both_ports_eth")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::Wlan,
+    false; "receiver_wlan_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::Wlan,
+    false; "sender_wlan_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::Wlan,
+    false; "both_wlan_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::PacketFilterEthernet,
+    ManagerConfig::PacketFilterEthernet,
+    fhardware_network::PortClass::Wlan,
+    true; "both_eth_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::Wlan,
+    true; "both_no_filter__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::WlanAp,
+    false; "receiver_wlan_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::WlanAp,
+    false; "sender_wlan_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::WlanAp,
+    false; "both_wlan_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::PacketFilterEthernet,
+    ManagerConfig::PacketFilterEthernet,
+    fhardware_network::PortClass::WlanAp,
+    true; "both_eth_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::WlanAp,
+    true; "both_no_filter__both_ports_wlan_ap")]
 async fn test_filtering_udp<M: Manager, N: Netstack>(
     name: &str,
     realm1_manager: ManagerConfig,
     realm2_manager: ManagerConfig,
+    port_class: fhardware_network::PortClass,
     message_expected: bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -220,18 +277,24 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         realm: &'a netemul::TestRealm<'a>,
         port: u16,
         name: String,
+        port_class: fhardware_network::PortClass,
     ) -> (netemul::TestEndpoint<'a>, SocketAddr) {
         // Install a new device via devfs so netcfg can pick it up and install filtering rules.
-        let ep = network.create_endpoint(format!("{name}-eth-ep")).await.expect("create endpoint");
+        let ep = network
+            .create_endpoint_with(
+                format!("{name}-eth-ep"),
+                fnetemul_network::EndpointConfig {
+                    mtu: netemul::DEFAULT_MTU,
+                    mac: None,
+                    port_class,
+                },
+            )
+            .await
+            .expect("create endpoint");
         ep.set_link_up(true).await.expect("set link up");
         let endpoint_mount_path = netemul::devfs_device_path(format!("{name}-eth-ep").as_str());
         let endpoint_mount_path = endpoint_mount_path.as_path();
 
-        // TODO(https://fxbug.dev/42177261): The Virtual device type is treated as
-        // Ethernet for the purposes of netcfg's `filter_enabled_interface_types`
-        // config parameter. When implemented, insert this as a device with the
-        // Ethernet device class instead of Virtual. Additionally, add another
-        // device to exercise packet filtering with the Wlan device class.
         realm.add_virtual_device(&ep, endpoint_mount_path).await.unwrap_or_else(|e| {
             panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
         });
@@ -286,10 +349,13 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
+                    use_dhcp_server: true,
                     use_out_of_stack_dhcp_client: false,
                     config: realm1_manager,
                 },
+                // Include the DHCP server because we bring up a WLAN_AP device
+                // in some test cases.
+                KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
             ],
@@ -300,6 +366,7 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         &sender_realm,
         SENDER_PORT,
         format!("sender-eth-ep"),
+        port_class,
     )
     .await;
 
@@ -309,10 +376,13 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
+                    use_dhcp_server: true,
                     use_out_of_stack_dhcp_client: false,
                     config: realm2_manager,
                 },
+                // Include the DHCP server because we bring up a WLAN_AP device
+                // in some test cases.
+                KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
             ],
@@ -323,6 +393,7 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         &receiver_realm,
         RECEIVER_PORT,
         format!("receiver-eth-ep"),
+        port_class,
     )
     .await;
 
@@ -829,15 +900,20 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         };
 
         // Add a device to the realm that looks like a WLAN AP from the
-        // perspective of NetCfg. The topological path for the interface must
-        // include "wlanif-ap" as that is how NetCfg identifies a WLAN AP
-        // interface.
+        // perspective of NetCfg.
         let network = sandbox
             .create_network(format!("dhcp-server-{}", offset))
             .await
             .expect("create network");
         let wlan_ap = network
-            .create_endpoint(format!("wlanif-ap-dhcp-server-{}", offset))
+            .create_endpoint_with(
+                format!("wlanif-ap-dhcp-server-{}", offset),
+                fnetemul_network::EndpointConfig {
+                    mtu: netemul::DEFAULT_MTU,
+                    mac: None,
+                    port_class: fhardware_network::PortClass::WlanAp,
+                },
+            )
             .await
             .expect("create wlan ap");
         let path = netemul::devfs_device_path(&format!("dhcp-server-ep-{}", offset));
@@ -1423,25 +1499,28 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
     assert!(prefix_control.is_closed());
 }
 
-#[netstack_test]
-async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &str) {
-    const SERVER_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("fe80::5122");
-    const SERVER_ID: [u8; 3] = [2, 5, 1];
-    const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("a::/64");
-    const RENEWED_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("b::/64");
-    const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(546));
-    const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(547));
-    const INFINITE_TIME_VALUE: u32 = u32::MAX;
-    const ONE_SECOND_TIME_VALUE: u32 = 1;
-    // The DHCPv6 Client always sends IAs with the first IAID starting at 0.
-    const EXPECTED_IAID: dhcpv6::IAID = dhcpv6::IAID::new(0);
+mod dhcpv6_helper {
+    use super::*;
 
-    struct Dhcpv6ClientMessage {
-        tx_id: [u8; 3],
-        client_id: Vec<u8>,
+    pub(crate) const SERVER_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("fe80::5122");
+    pub(crate) const SERVER_ID: [u8; 3] = [2, 5, 1];
+    pub(crate) const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> =
+        net_subnet_v6!("a::/64");
+    pub(crate) const RENEWED_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> =
+        net_subnet_v6!("b::/64");
+    pub(crate) const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(546));
+    pub(crate) const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(547));
+    pub(crate) const INFINITE_TIME_VALUE: u32 = u32::MAX;
+    pub(crate) const ONE_SECOND_TIME_VALUE: u32 = 1;
+    // The DHCPv6 Client always sends IAs with the first IAID starting at 0.
+    pub(crate) const EXPECTED_IAID: dhcpv6::IAID = dhcpv6::IAID::new(0);
+
+    pub(crate) struct Dhcpv6ClientMessage {
+        pub(crate) tx_id: [u8; 3],
+        pub(crate) client_id: Vec<u8>,
     }
 
-    async fn send_dhcpv6_message(
+    pub(crate) async fn send_dhcpv6_message(
         fake_ep: &netemul::TestFakeEndpoint<'_>,
         client_addr: net_types_ip::Ipv6Addr,
         prefix: Option<net_types_ip::Subnet<net_types_ip::Ipv6Addr>>,
@@ -1513,7 +1592,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
             fake_ep.write(buf.unwrap_b().as_ref()).await.expect("error sending dhcpv6 message");
     }
 
-    async fn wait_for_message(
+    pub(crate) async fn wait_for_message(
         fake_ep: &netemul::TestFakeEndpoint<'_>,
         expected_src_ip: net_types_ip::Ipv6Addr,
         want_msg_type: dhcpv6::MessageType,
@@ -1592,7 +1671,10 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
         let mut stream = pin!(stream);
         stream.next().await.expect("expected DHCPv6 message")
     }
+}
 
+#[netstack_test]
+async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Dhcpv6,
@@ -1630,12 +1712,12 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     (dhcpv6::MessageType::Solicit, dhcpv6::MessageType::Advertise),
                     (dhcpv6::MessageType::Request, dhcpv6::MessageType::Reply),
                 ] {
-                    let Dhcpv6ClientMessage { tx_id, client_id } =
-                        wait_for_message(&fake_ep, if_ll_addr, expected).await;
-                    send_dhcpv6_message(
+                    let dhcpv6_helper::Dhcpv6ClientMessage { tx_id, client_id } =
+                        dhcpv6_helper::wait_for_message(&fake_ep, if_ll_addr, expected).await;
+                    dhcpv6_helper::send_dhcpv6_message(
                         &fake_ep,
                         if_ll_addr,
-                        Some(PREFIX),
+                        Some(dhcpv6_helper::PREFIX),
                         None,
                         tx_id,
                         send,
@@ -1647,8 +1729,10 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     prefix_control.watch_prefix().await.expect("error watching prefix"),
                     fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
                         prefix: fnet::Ipv6AddressWithPrefix {
-                            addr: fnet::Ipv6Address { addr: PREFIX.network().ipv6_bytes() },
-                            prefix_len: PREFIX.prefix(),
+                            addr: fnet::Ipv6Address {
+                                addr: dhcpv6_helper::PREFIX.network().ipv6_bytes()
+                            },
+                            prefix_len: dhcpv6_helper::PREFIX.prefix(),
                         },
                         lifetimes: fnet_dhcpv6::Lifetimes {
                             valid_until: zx::Time::INFINITE.into_nanos(),
@@ -1660,14 +1744,14 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                 for (new_prefix, old_prefix, res) in [
                     // Renew the IA with a new prefix and invalidate the old prefix.
                     (
-                        Some(RENEWED_PREFIX),
-                        Some(PREFIX),
+                        Some(dhcpv6_helper::RENEWED_PREFIX),
+                        Some(dhcpv6_helper::PREFIX),
                         fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
                             prefix: fnet::Ipv6AddressWithPrefix {
                                 addr: fnet::Ipv6Address {
-                                    addr: RENEWED_PREFIX.network().ipv6_bytes(),
+                                    addr: dhcpv6_helper::RENEWED_PREFIX.network().ipv6_bytes(),
                                 },
-                                prefix_len: RENEWED_PREFIX.prefix(),
+                                prefix_len: dhcpv6_helper::RENEWED_PREFIX.prefix(),
                             },
                             lifetimes: fnet_dhcpv6::Lifetimes {
                                 valid_until: zx::Time::INFINITE.into_nanos(),
@@ -1678,13 +1762,18 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     // Invalidate the prefix.
                     (
                         None,
-                        Some(RENEWED_PREFIX),
+                        Some(dhcpv6_helper::RENEWED_PREFIX),
                         fnet_dhcpv6::PrefixEvent::Unassigned(fnet_dhcpv6::Empty {}),
                     ),
                 ] {
-                    let Dhcpv6ClientMessage { tx_id, client_id } =
-                        wait_for_message(&fake_ep, if_ll_addr, dhcpv6::MessageType::Renew).await;
-                    send_dhcpv6_message(
+                    let dhcpv6_helper::Dhcpv6ClientMessage { tx_id, client_id } =
+                        dhcpv6_helper::wait_for_message(
+                            &fake_ep,
+                            if_ll_addr,
+                            dhcpv6::MessageType::Renew,
+                        )
+                        .await;
+                    dhcpv6_helper::send_dhcpv6_message(
                         &fake_ep,
                         if_ll_addr,
                         new_prefix,
@@ -1699,6 +1788,129 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                         res,
                     );
                 }
+            }
+            .boxed_local()
+        },
+    )
+    .await;
+}
+
+// Regression test for https://fxbug.dev/335892036, in which netcfg panicked if an interface was
+// disabled while it was holding a DHCPv6 prefix for it.
+#[netstack_test]
+async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(name: &str) {
+    let _if_name: String = with_netcfg_owned_device::<M, N, _>(
+        name,
+        ManagerConfig::Dhcpv6,
+        true, /* use_out_of_stack_dhcp_client */
+        [KnownServiceProvider::Dhcpv6Client, KnownServiceProvider::DhcpClient],
+        |if_id, network, interface_state, realm, _sandbox| {
+            async move {
+                // Fake endpoint to inject server packets and intercept client packets.
+                let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+
+                // Request Prefixes to be acquired.
+                let prefix_provider = realm
+                    .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
+                    .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
+                let (prefix_control, server_end) =
+                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
+                        .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+                prefix_provider
+                    .acquire_prefix(
+                        &fnet_dhcpv6::AcquirePrefixConfig {
+                            interface_id: Some(if_id),
+                            ..Default::default()
+                        },
+                        server_end,
+                    )
+                    .expect("acquire prefix");
+
+                let if_ll_addr = interfaces::wait_for_v6_ll(interface_state, if_id)
+                    .await
+                    .expect("error waiting for link-local address");
+                let fake_ep = &fake_ep;
+
+                // Perform the prefix negotiation.
+                for (expected, send) in [
+                    (dhcpv6::MessageType::Solicit, dhcpv6::MessageType::Advertise),
+                    (dhcpv6::MessageType::Request, dhcpv6::MessageType::Reply),
+                ] {
+                    let dhcpv6_helper::Dhcpv6ClientMessage { tx_id, client_id } =
+                        dhcpv6_helper::wait_for_message(&fake_ep, if_ll_addr, expected).await;
+                    dhcpv6_helper::send_dhcpv6_message(
+                        &fake_ep,
+                        if_ll_addr,
+                        Some(dhcpv6_helper::PREFIX),
+                        None,
+                        tx_id,
+                        send,
+                        client_id,
+                    )
+                    .await;
+                }
+                assert_eq!(
+                    prefix_control.watch_prefix().await.expect("error watching prefix"),
+                    fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
+                        prefix: fnet::Ipv6AddressWithPrefix {
+                            addr: fnet::Ipv6Address {
+                                addr: dhcpv6_helper::PREFIX.network().ipv6_bytes()
+                            },
+                            prefix_len: dhcpv6_helper::PREFIX.prefix(),
+                        },
+                        lifetimes: fnet_dhcpv6::Lifetimes {
+                            valid_until: zx::Time::INFINITE.into_nanos(),
+                            preferred_until: zx::Time::INFINITE.into_nanos(),
+                        },
+                    }),
+                );
+
+                let root_interfaces = realm
+                    .connect_to_protocol::<fnet_root::InterfacesMarker>()
+                    .expect("connect to fuchsia.net.root.Interfaces");
+                let (control, server_end) =
+                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+                        .expect("create proxy");
+                root_interfaces.get_admin(if_id, server_end).expect("get admin");
+
+                let mut interface_event_stream = Box::pin(
+                    realm.get_interface_event_stream().expect("get interface event stream"),
+                );
+
+                let mut if_state = fnet_interfaces_ext::existing(
+                    interface_event_stream.by_ref(),
+                    fnet_interfaces_ext::InterfaceState::Unknown::<()>(if_id),
+                )
+                .await
+                .expect("collect initial state of interface");
+
+                let fnet_interfaces_ext::PropertiesAndState {
+                    properties: fnet_interfaces_ext::Properties { online, .. },
+                    state: (),
+                } = assert_matches!(
+                    &if_state,
+                    fnet_interfaces_ext::InterfaceState::Known(properties) => properties
+                );
+                assert!(online, "interface should start out online before disabling");
+
+                // When netcfg had the issue that this regression test covers,
+                // it would panic while handling the interface-disabled event.
+                // This manifests as a test failure due to error log severity.
+                assert!(control
+                    .disable()
+                    .await
+                    .expect("disable should not have FIDL error")
+                    .expect("disable should succeed"));
+
+                fnet_interfaces_ext::wait_interface_with_id(
+                    interface_event_stream,
+                    &mut if_state,
+                    |fnet_interfaces_ext::PropertiesAndState { properties, state: () }| {
+                        (!properties.online).then_some(())
+                    },
+                )
+                .await
+                .expect("wait for interface to go offline");
             }
             .boxed_local()
         },
@@ -1959,6 +2171,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                             mac: Some(Box::new(
                                 fnet_ext::MacAddress { octets: SERVER_MAC.bytes() }.into(),
                             )),
+                            port_class: fhardware_network::PortClass::Virtual,
                         },
                         netemul::InterfaceConfig {
                             name: Some("serveriface".into()),

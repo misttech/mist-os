@@ -20,9 +20,9 @@ use {
                 ActionSet, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            error::{ActionError, ModelError, ResolveActionError, StartActionError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-            routing::{router::Routable, Route, RouteRequest, RouteSource, RoutingError},
+            routing::router_ext::WeakComponentTokenExt,
+            routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{
                 echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
                 routing_test_helpers::*, test_helpers::*,
@@ -44,6 +44,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::RelativePath,
+    errors::{ActionError, ModelError, ResolveActionError, StartActionError},
     fasync::TestExecutor,
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
@@ -63,6 +64,7 @@ use {
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
+    sandbox::{Routable, WeakComponentToken},
     std::{
         collections::HashSet,
         pin::pin,
@@ -96,9 +98,7 @@ fn namespace_teardown_processes_final_request() {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .use_(
-                        UseBuilder::protocol().name("foo").source(UseSource::Child("leaf".into())),
-                    )
+                    .use_(UseBuilder::protocol().name("foo").source_static_child("leaf"))
                     .child(ChildBuilder::new().name("leaf"))
                     .build(),
             ),
@@ -162,7 +162,7 @@ async fn namespace_teardown_rejects_late_request() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseBuilder::protocol().name("foo").source(UseSource::Child("leaf".into())))
+                .use_(UseBuilder::protocol().name("foo").source_static_child("leaf"))
                 .child(ChildBuilder::new().name("leaf"))
                 .build(),
         ),
@@ -360,7 +360,7 @@ async fn use_in_collection() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -373,7 +373,7 @@ async fn use_in_collection() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "d".to_string(),
+            name: "d".parse().unwrap(),
             url: "test:///d".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -452,7 +452,7 @@ async fn use_in_collection_not_offered() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -525,7 +525,7 @@ async fn dynamic_offer_from_parent() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -548,7 +548,7 @@ async fn dynamic_offer_from_parent() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "d".to_string(),
+            name: "d".parse().unwrap(),
             url: "test:///d".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -611,7 +611,7 @@ async fn dynamic_offer_siblings_same_collection() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -624,7 +624,7 @@ async fn dynamic_offer_siblings_same_collection() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -635,7 +635,7 @@ async fn dynamic_offer_siblings_same_collection() {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("coll".to_string()),
                 })),
                 target_name: Some("hippo".to_string()),
@@ -693,7 +693,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         &Moniker::root(),
         "source_coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -706,7 +706,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         &Moniker::root(),
         "target_coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -716,7 +716,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("source_coll".to_string()),
                 })),
                 source_name: Some("hippo".to_string()),
@@ -774,7 +774,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -787,7 +787,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -798,7 +798,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("coll".to_string()),
                 })),
                 target_name: Some("hippo".to_string()),
@@ -820,7 +820,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -889,7 +889,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -902,7 +902,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -913,7 +913,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
             dynamic_offers: Some(vec![fdecl::Offer::Directory(fdecl::OfferDirectory {
                 source_name: Some("hippo_data".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("coll".to_string()),
                 })),
                 target_name: Some("hippo_data".to_string()),
@@ -935,7 +935,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -1013,7 +1013,7 @@ async fn dynamic_offer_to_static_offer() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -1024,7 +1024,7 @@ async fn dynamic_offer_to_static_offer() {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: None,
                 })),
                 target_name: Some("hippo".to_string()),
@@ -1100,7 +1100,7 @@ async fn create_child_with_dict() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -1281,7 +1281,7 @@ async fn use_runner_from_parent_environment() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1339,7 +1339,7 @@ async fn use_runner_from_environment_in_collection() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1359,7 +1359,7 @@ async fn use_runner_from_environment_in_collection() {
             &Moniker::root(),
             "coll",
             ChildDecl {
-                name: "b".to_string(),
+                name: "b".parse().unwrap(),
                 url: "test:///b".to_string(),
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
@@ -1422,7 +1422,7 @@ async fn use_runner_from_grandparent_environment() {
                 }))
                 .build(),
         ),
-        ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1487,7 +1487,7 @@ async fn use_runner_from_sibling_environment() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1550,7 +1550,7 @@ async fn use_runner_from_inherited_environment() {
                 .environment(EnvironmentBuilder::new().name("env"))
                 .build(),
         ),
-        ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1606,7 +1606,7 @@ async fn use_runner_from_environment_failed() {
                 .use_(UseBuilder::event_stream().name("stopped").path("/events/stopped"))
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("runner").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("runner").build()),
     ];
 
     let runner_service = service::endpoint(|_scope, _channel| {});
@@ -1682,7 +1682,7 @@ async fn use_runner_from_environment_not_found() {
                 .runner_default("elf")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+        ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
     ];
 
     // Set up the system.
@@ -1782,7 +1782,7 @@ async fn use_with_destroyed_parent() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -2355,8 +2355,12 @@ async fn verify_service_route(
     for child_moniker in &child_monikers {
         let coll = child_moniker.collection().unwrap();
         let name = child_moniker.name();
-        test.create_dynamic_child(&agg_moniker, coll.as_str(), ChildBuilder::new().name(name))
-            .await;
+        test.create_dynamic_child(
+            &agg_moniker,
+            coll.as_str(),
+            ChildBuilder::new().name(name.as_str()),
+        )
+        .await;
         test.start_instance_and_wait_start(&agg_moniker.child(child_moniker.clone()))
             .await
             .unwrap();
@@ -2576,7 +2580,7 @@ async fn offer_service_from_collections_multilevel() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collection() {
-    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("b".into())).build();
+    let use_decl = UseBuilder::service().name("foo").source_static_child("b").build();
     let mut components = vec![
         ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
         (
@@ -2624,7 +2628,7 @@ async fn expose_service_from_collection() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collections() {
-    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("b".into())).build();
+    let use_decl = UseBuilder::service().name("foo").source_static_child("b").build();
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2683,7 +2687,7 @@ async fn expose_service_from_collections() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collections_multilevel() {
-    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("m".into())).build();
+    let use_decl = UseBuilder::service().name("foo").source_static_child("m").build();
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2697,9 +2701,7 @@ async fn expose_service_from_collections_multilevel() {
         (
             "m",
             ComponentDeclBuilder::new()
-                .expose(
-                    ExposeBuilder::service().name("foo").source(ExposeSource::Child("b".into())),
-                )
+                .expose(ExposeBuilder::service().name("foo").source_static_child("b"))
                 .child_default("b")
                 .build(),
         ),
@@ -3423,9 +3425,9 @@ async fn source_component_stopping_when_routing() {
         let entry = output
             .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
-            .route(crate::model::routing::router::Request {
+            .route(sandbox::Request {
                 availability: Availability::Required,
-                target: root.as_weak().into(),
+                target: WeakComponentToken::new(root.as_weak()),
             })
             .await
             .unwrap();
@@ -3487,9 +3489,9 @@ async fn source_component_stopped_after_routing_before_open() {
     let cap = output
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
-        .route(crate::model::routing::router::Request {
+        .route(sandbox::Request {
             availability: Availability::Required,
-            target: root.as_weak().into(),
+            target: WeakComponentToken::new(root.as_weak()),
         })
         .await
         .unwrap();
@@ -3556,9 +3558,9 @@ async fn source_component_shutdown_after_routing_before_open() {
     let cap = output
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
-        .route(crate::model::routing::router::Request {
+        .route(sandbox::Request {
             availability: Availability::Required,
-            target: root.as_weak().into(),
+            target: WeakComponentToken::new(root.as_weak()),
         })
         .await
         .unwrap();
@@ -3648,7 +3650,7 @@ async fn build_realm_for_capability_requested_tests(delivery: DeliveryType) -> R
                         .name("capability_requested")
                         .target_name("capability_requested")
                         .scope(vec![EventScope::Child(ChildRef {
-                            name: "consumer".into(),
+                            name: "consumer".parse().unwrap(),
                             collection: None,
                         })])
                         .source(OfferSource::Parent)
@@ -3798,7 +3800,7 @@ async fn build_realm_for_on_readable_tests() -> RoutingTest {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseBuilder::protocol().name("echo").source(UseSource::Child("b".into())))
+                .use_(UseBuilder::protocol().name("echo").source_static_child("b"))
                 .child(ChildBuilder::new().name("b"))
                 .build(),
         ),

@@ -224,7 +224,7 @@ mod tests {
 
     fn new_child_decl(name: String, url: String) -> ChildDecl {
         ChildDecl {
-            name,
+            name: name.parse().unwrap(),
             url,
             startup: fdecl::StartupMode::Lazy,
             environment: None,

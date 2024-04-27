@@ -33,8 +33,7 @@ TEST(EldTest, eld1) {
   edid::Edid edid;
   const char* err_msg = nullptr;
   ASSERT_TRUE(edid.Init(edid1, sizeof(edid1), &err_msg));
-  fbl::Array<uint8_t> eld;
-  ComputeEld(edid, eld);
+  fbl::Array<uint8_t> eld = ComputeEld(edid);
   ASSERT_EQ(eld.size(), 36u);
   EXPECT_EQ(eld[3], 0x10);  // Version 2.
 
@@ -80,8 +79,7 @@ TEST(EldTest, VsyncWithEld2) {
   edid::Edid edid;
   const char* err_msg = nullptr;
   ASSERT_TRUE(edid.Init(edid2, sizeof(edid2), &err_msg));
-  fbl::Array<uint8_t> eld;
-  ComputeEld(edid, eld);
+  fbl::Array<uint8_t> eld = ComputeEld(edid);
   ASSERT_EQ(eld.size(), 36u);
   EXPECT_EQ(eld[3], 0x10);  // Version 2.
 
@@ -127,8 +125,7 @@ TEST(EldTest, VsyncWithEld3) {
   edid::Edid edid;
   const char* err_msg = nullptr;
   ASSERT_TRUE(edid.Init(edid3, sizeof(edid3), &err_msg));
-  fbl::Array<uint8_t> eld;
-  ComputeEld(edid, eld);
+  fbl::Array<uint8_t> eld = ComputeEld(edid);
   ASSERT_EQ(eld.size(), 36u);
   EXPECT_EQ(eld[3], 0x10);  // Version 2.
 

@@ -173,20 +173,9 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // Fetch per thread stats for userspace.
   zx_status_t GetStatsForUserspace(zx_info_thread_stats_t* info) TA_EXCL(get_lock());
 
-  // Fetch a consistent snapshot of the runtime stats.
-  zx_status_t GetRuntimeStats(TaskRuntimeStats* out) const;
-
-  // Aggregate the runtime stats for this thread into the given struct.
-  zx_status_t AccumulateRuntimeTo(zx_info_task_runtime_t* info) const {
-    TaskRuntimeStats out;
-    zx_status_t err = GetRuntimeStats(&out);
-    if (err != ZX_OK) {
-      return err;
-    }
-
-    out.AccumulateRuntimeTo(info);
-    return ZX_OK;
-  }
+  // Fetch a consistent snapshot of the runtime stats, compensated for unaccumulated runtime in the
+  // ready or running state.
+  TaskRuntimeStats GetCompensatedTaskRuntimeStats() const;
 
   // For debugger usage.
   zx_status_t ReadState(zx_thread_state_topic_t state_kind, user_out_ptr<void> buffer,
@@ -238,28 +227,18 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // callback from kernel when thread is resuming
   void Resuming();
 
-  // Provide an update to this thread's scheduler-related runtime stats.
+  // Update the runtime stats for this thread/process. This is called by
+  // Scheduler to update the runtime stats of the thread as it changes thread
+  // state.
   //
-  // WARNING: This method must not be called concurrently by two separate threads.
-  // For now, this method is protected by the thread_lock, but in the future this may change.
-  void UpdateSchedulerStats(const Thread::RuntimeStats::SchedulerStats& update)
-      TA_REQ(thread_lock) {
-    uint64_t before = stats_generation_count_.fetch_add(1, ktl::memory_order_acq_rel);
-    runtime_stats_.UpdateSchedulerStats(update);
-    uint64_t after = stats_generation_count_.fetch_add(1, ktl::memory_order_acq_rel);
-    // Ensure no concurrent write was happening at the start and that no concurrent writes happened
-    // during this operation.
-    DEBUG_ASSERT((before % 2) == 0);
-    DEBUG_ASSERT(after == before + 1);
-  }
+  // Must be called with interrupts disabled.
+  void UpdateRuntimeStats(thread_state new_state);
 
-  // Update time spent handling page faults.
-  // Safe for concurrent use.
-  void AddPageFaultTicks(zx_ticks_t ticks) { runtime_stats_.AddPageFaultTicks(ticks); }
+  // Update time spent handling page faults. This is called by the VM during page fault handling.
+  void AddPageFaultTicks(zx_ticks_t ticks);
 
-  // Update time spent contended on locks.
-  // Safe for concurrent use.
-  void AddLockContentionTicks(zx_ticks_t ticks) { runtime_stats_.AddLockContentionTicks(ticks); }
+  // Update time spent contended on locks. This is called by lock implementations.
+  void AddLockContentionTicks(zx_ticks_t ticks);
 
  private:
   ThreadDispatcher(fbl::RefPtr<ProcessDispatcher> process, uint32_t flags);
@@ -300,6 +279,10 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
 
   // a ref pointer back to the parent process.
   const fbl::RefPtr<ProcessDispatcher> process_;
+
+  // The runtime stats for this thread. Placed near the front of ThreadDispatcher due to frequent
+  // updates by the scheduler.
+  ThreadRuntimeStats runtime_stats_;
 
   // The thread as understood by the lower kernel. This is set to nullptr when
   // `state_` transitions to DEAD.
@@ -359,23 +342,6 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // and therefor the thread's futex-context lock can be used to guard this
   // futex ID.
   FutexId blocking_futex_id_{FutexId::Null()};
-
-  // Generation counter protecting runtime stats.
-  //
-  // This count provides single-writer, multi-reader consistency on reads from the runtime_stats_
-  // variable.
-  //
-  // Locking strategy:
-  // - All writes are preceded by and followed by acq-rel atomic fetch-adds.
-  // - All reads consist of:
-  //   1) atomic read with acquire ordering of the generation count,
-  //   2) copy stats out,
-  //   3) atomic read with acquire ordering of the generation count,
-  //   4) comparison of the two generation counts (must be even and match)
-  // - Reads retry until a consistent snapshot can be taken.
-  ktl::atomic<uint64_t> stats_generation_count_ = 0;
-  // The runtime stats for this thread.
-  Thread::RuntimeStats runtime_stats_ = {};
 
   // Marker to denote that thread sampling has been requested for this thread and that we should
   // take a sample when we handle THREAD_SIGNAL_SAMPLE_STACK.

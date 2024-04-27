@@ -23,29 +23,6 @@
 
 namespace ahci {
 
-struct ThreadWrapper {
-  thrd_t thread;
-  bool created = false;
-
-  ~ThreadWrapper() { ZX_DEBUG_ASSERT(created == false); }
-
-  zx_status_t CreateWithName(thrd_start_t entry, void* arg, const char* name) {
-    ZX_DEBUG_ASSERT(created == false);
-    if (thrd_create_with_name(&thread, entry, arg, name) == thrd_success) {
-      created = true;
-      return ZX_OK;
-    }
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  void Join() {
-    if (!created)
-      return;
-    thrd_join(thread, nullptr);
-    created = false;
-  }
-};
-
 class Controller : public fdf::DriverBase {
  public:
   static constexpr char kDriverName[] = "ahci";
@@ -67,8 +44,8 @@ class Controller : public fdf::DriverBase {
   uint32_t RegRead(size_t offset);
   zx_status_t RegWrite(size_t offset, uint32_t val);
 
-  // Create irq and worker threads.
-  zx_status_t LaunchIrqAndWorkerThreads();
+  // Create irq and worker dispatchers.
+  zx_status_t LaunchIrqAndWorkerDispatchers();
 
   // Release all resources.
   void Shutdown() __TA_EXCLUDES(lock_);
@@ -97,9 +74,8 @@ class Controller : public fdf::DriverBase {
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
 
  private:
-  static int IrqThread(void* arg) { return static_cast<Controller*>(arg)->IrqLoop(); }
   void WorkerLoop();
-  int IrqLoop();
+  void IrqLoop();
 
   // Initialize controller and detect devices.
   zx_status_t Init();
@@ -112,14 +88,17 @@ class Controller : public fdf::DriverBase {
   std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   fbl::Mutex lock_;
-  bool threads_should_exit_ __TA_GUARDED(lock_) = false;
+  bool shutdown_ __TA_GUARDED(lock_) = false;
 
-  ThreadWrapper irq_thread_;
+  // Dispatcher for handling interrupt requests.
+  fdf::Dispatcher irq_dispatcher_;
+  // Signaled when irq_dispatcher_ is shut down.
+  libsync::Completion irq_shutdown_completion_;
 
   // Dispatcher for processing queued block requests.
   fdf::Dispatcher worker_dispatcher_;
-  // Signaled when worker_dispatcher_ is shut down.
-  libsync::Completion worker_shutdown_completion_;
+  // True when worker_dispatcher_ is shut down.
+  std::atomic_bool worker_shutdown_;
   // Signaled when there is work to be done in the worker loop.
   libsync::Completion worker_event_completion_;
 

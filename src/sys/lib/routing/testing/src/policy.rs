@@ -290,7 +290,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "foo_env".to_string(),
+                env_name: "foo_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new().exact("foo").build(),
         );
@@ -299,7 +299,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "bootstrap_env".to_string(),
+                env_name: "bootstrap_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap").build(),
         );
@@ -307,15 +307,15 @@ where
         let protocol_name: Name = "debug_service1".parse().unwrap();
 
         let valid_cases = vec![
-            (Moniker::try_from(vec!["root", "bootstrap"]).unwrap(), "bootstrap_env".to_string()),
-            (Moniker::try_from(vec!["foo"]).unwrap(), "foo_env".to_string()),
+            (Moniker::try_from(vec!["root", "bootstrap"]).unwrap(), "bootstrap_env"),
+            (Moniker::try_from(vec!["foo"]).unwrap(), "foo_env"),
         ];
 
         let invalid_cases = vec![
-            (Moniker::try_from(vec!["foobar"]).unwrap(), "foobar_env".to_string()),
-            (Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap(), "foobar_env".to_string()),
-            (Moniker::try_from(vec!["root", "bootstrap"]).unwrap(), "foo_env".to_string()),
-            (Moniker::try_from(vec!["root", "baz"]).unwrap(), "foo_env".to_string()),
+            (Moniker::try_from(vec!["foobar"]).unwrap(), "foobar_env"),
+            (Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap(), "foobar_env"),
+            (Moniker::try_from(vec!["root", "bootstrap"]).unwrap(), "foo_env"),
+            (Moniker::try_from(vec!["root", "baz"]).unwrap(), "foo_env"),
         ];
 
         for valid_case in valid_cases {
@@ -324,7 +324,7 @@ where
                     CapabilityTypeName::Protocol,
                     &protocol_name,
                     &valid_case.0,
-                    &valid_case.1,
+                    &valid_case.1.parse().unwrap(),
                 ),
                 Ok(()),
                 "{:?}",
@@ -338,7 +338,7 @@ where
                     CapabilityTypeName::Protocol,
                     &protocol_name,
                     &invalid_case.0,
-                    &invalid_case.1,
+                    &invalid_case.1.parse().unwrap(),
                 ),
                 Err(_),
                 "{:?}",
@@ -360,7 +360,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "bar_env".to_string(),
+                env_name: "bar_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap1").any_descendant(),
         );
@@ -369,7 +369,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "foo_env".to_string(),
+                env_name: "foo_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap2").build(),
         );
@@ -378,7 +378,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "baz_env".to_string(),
+                env_name: "baz_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap3").any_descendant(),
         );
@@ -401,6 +401,7 @@ where
 
         for (dest, env) in valid_cases {
             let protocol_name: Name = "debug_service1".parse().unwrap();
+            let env: Name = env.parse().unwrap();
             assert_matches!(
                 global_policy_checker.can_register_debug_capability(
                     CapabilityTypeName::Protocol,
@@ -416,6 +417,7 @@ where
 
         for (dest, env) in invalid_cases {
             let protocol_name: Name = "debug_service1".parse().unwrap();
+            let env: Name = env.parse().unwrap();
             assert_matches!(
                 global_policy_checker.can_register_debug_capability(
                     CapabilityTypeName::Protocol,
@@ -443,7 +445,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "bar_env".to_string(),
+                env_name: "bar_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new()
                 .exact("root")
@@ -455,7 +457,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "foo_env".to_string(),
+                env_name: "foo_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap2").build(),
         );
@@ -464,7 +466,7 @@ where
                 name: "debug_service1".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
-                env_name: "baz_env".to_string(),
+                env_name: "baz_env".parse().unwrap(),
             },
             AllowlistEntryBuilder::new()
                 .exact("root")
@@ -492,6 +494,7 @@ where
 
         for (dest, env) in valid_cases {
             let protocol_name: Name = "debug_service1".parse().unwrap();
+            let env: Name = env.parse().unwrap();
             assert_matches!(
                 global_policy_checker.can_register_debug_capability(
                     CapabilityTypeName::Protocol,
@@ -507,6 +510,7 @@ where
 
         for (dest, env) in invalid_cases {
             let protocol_name: Name = "debug_service1".parse().unwrap();
+            let env: Name = env.parse().unwrap();
             assert_matches!(
                 global_policy_checker.can_register_debug_capability(
                     CapabilityTypeName::Protocol,

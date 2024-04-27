@@ -162,9 +162,5 @@ group("tests") {
 
 group("hwstress") {
   testonly = true
-  public_deps = [
-    ":hwstress_cli",
-    ":hwstress_v2_pkg",
-    ":hwstress_v2_shard",
-  ]
+  public_deps = [ ":hwstress_v2_pkg" ]
 }

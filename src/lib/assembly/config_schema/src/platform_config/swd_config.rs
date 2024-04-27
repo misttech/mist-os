@@ -2,26 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use camino::Utf8PathBuf;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A representative struct of all the configurable details of the software delivery system made
 /// available to a product owner
-#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(
+    Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(default, deny_unknown_fields)]
 #[serde(rename(serialize = "software_delivery"))]
 #[serde(rename(deserialize = "software_delivery"))]
 pub struct SwdConfig {
     pub policy: Option<PolicyLabels>,
+    #[file_relative_paths]
     pub update_checker: Option<UpdateChecker>,
     pub on_verification_failure: VerificationFailureAction,
-    pub tuf_config_paths: Vec<Utf8PathBuf>,
+    #[file_relative_paths]
+    #[schemars(schema_with = "crate::vec_path_schema")]
+    pub tuf_config_paths: Vec<FileRelativePathBuf>,
     pub include_configurator: bool,
 }
 
 /// The SWD Policies are laid out in
 /// [RFC-0118](https://https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0118_swd_policy_at_image_assembly_rfc)
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyLabels {
     BaseComponentsOnly,
@@ -31,18 +37,20 @@ pub enum PolicyLabels {
 
 /// The UpdateChecker enum represents the particular implementation of the
 /// update-checker tool on the target that the `update` package depends on
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(
+    Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateChecker {
     /// Omaha-client is the default update checker on userdebug and user builds.
-    OmahaClient(OtaConfigs),
+    OmahaClient(#[file_relative_paths] OtaConfigs),
     /// “platform” version of an updater
     SystemUpdateChecker,
 }
 
 /// Defines the behavior of the system-update-committer package when update
 /// verification fails
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum VerificationFailureAction {
@@ -52,12 +60,17 @@ pub enum VerificationFailureAction {
 }
 
 /// Configuration for the Omaha Client
-#[derive(Default, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(
+    Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub struct OtaConfigs {
     /// Deserializes to the ChannelConfig struct defined by SWD in
     /// //src/sys/pkg/lib/channel-config
-    pub channels_path: Option<Utf8PathBuf>,
+    #[file_relative_paths]
+    #[schemars(schema_with = "crate::option_path_schema")]
+    pub channels_path: Option<FileRelativePathBuf>,
+
     /// If not specified, the hard-coded value in omaha-client-bin will be
     /// used
     pub server_url: Option<ServerUrl>,
@@ -73,7 +86,7 @@ type ServerUrl = String;
 
 /// Allows the product owner to define the values that the Omaha Client's
 /// FuchsiaPolicy implementation is configured with.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PolicyConfig {
     pub allow_reboot_when_idle: bool,
@@ -102,7 +115,6 @@ mod tests {
 
     use anyhow::Result;
     use assembly_util as util;
-    use std::str::FromStr;
 
     #[test]
     fn test_empty_deserialization() {
@@ -145,9 +157,9 @@ mod tests {
             SwdConfig {
                 policy: Some(PolicyLabels::Unrestricted),
                 update_checker: Some(UpdateChecker::OmahaClient(OtaConfigs {
-                    channels_path: Some(
-                        Utf8PathBuf::from_str("/path/to/channel_config.json").unwrap()
-                    ),
+                    channels_path: Some(FileRelativePathBuf::FileRelative(
+                        "/path/to/channel_config.json".into()
+                    )),
                     server_url: Some("http://localhost:5000".to_string()),
                     policy_config: PolicyConfig {
                         allow_reboot_when_idle: false,
@@ -158,7 +170,9 @@ mod tests {
                     include_empty_eager_config: false,
                 })),
                 on_verification_failure: VerificationFailureAction::Reboot,
-                tuf_config_paths: vec![Utf8PathBuf::from_str("/path/to/tuf_config.json").unwrap()],
+                tuf_config_paths: vec![FileRelativePathBuf::FileRelative(
+                    "/path/to/tuf_config.json".into()
+                )],
                 ..Default::default()
             }
         );
@@ -287,7 +301,9 @@ mod tests {
         assert_eq!(
             config.update_checker,
             Some(UpdateChecker::OmahaClient(OtaConfigs {
-                channels_path: Some(Utf8PathBuf::from_str("/path/to/channel_config.json").unwrap()),
+                channels_path: Some(FileRelativePathBuf::FileRelative(
+                    "/path/to/channel_config.json".into()
+                )),
                 server_url: Some("http://localhost:5000".to_string()),
                 policy_config: PolicyConfig {
                     allow_reboot_when_idle: false,
@@ -317,7 +333,9 @@ mod tests {
         assert_eq!(
             config.update_checker,
             Some(UpdateChecker::OmahaClient(OtaConfigs {
-                channels_path: Some(Utf8PathBuf::from_str("/path/to/channel_config.json").unwrap()),
+                channels_path: Some(FileRelativePathBuf::FileRelative(
+                    "/path/to/channel_config.json".into()
+                )),
                 server_url: Some("http://localhost:5000".to_string()),
                 policy_config: PolicyConfig::default(),
                 include_empty_eager_config: false,

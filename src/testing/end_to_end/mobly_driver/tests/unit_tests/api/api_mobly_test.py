@@ -22,7 +22,7 @@ class ApiMoblyTest(unittest.TestCase):
         """Test case to ensure test output symlink is returned"""
         api_mobly.get_latest_test_output_dir_symlink_path("output_path", "tb")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("Output path is empty", "", "tb"),
             ("Testbed name is empty", "ouput_path", ""),
@@ -41,7 +41,7 @@ class ApiMoblyTest(unittest.TestCase):
         """Test case to ensure test result symlink is returned"""
         api_mobly.get_result_path("output_path", "tb")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("Output path is empty", "", "tb"),
             ("Testbed name is empty", "ouput_path", ""),
@@ -54,7 +54,7 @@ class ApiMoblyTest(unittest.TestCase):
         with self.assertRaises(api_mobly.ApiException):
             api_mobly.get_result_path(output_path, tb_name)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             param(
                 "success_empty_controllers_empty_params",
@@ -301,7 +301,7 @@ class ApiMoblyTest(unittest.TestCase):
             # Assert that no exceptions are raised.
             config_parser.load_test_config_file(config_fh.name)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("success_empty_config", {}, {}),
             (
@@ -464,7 +464,7 @@ class ApiMoblyTest(unittest.TestCase):
         api_mobly.set_transport(new_config_obj, "fuchsia-controller")
         self.assertDictEqual(new_config_obj, transformed_config_obj)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("success_empty_config", {}, {}),
             (
@@ -625,7 +625,7 @@ class ApiMoblyTest(unittest.TestCase):
         api_mobly.set_ffx_path(new_config_obj, "ffx/path")
         self.assertDictEqual(new_config_obj, transformed_config_obj)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("success_empty_config", {}, {}),
             (
@@ -788,7 +788,7 @@ class ApiMoblyTest(unittest.TestCase):
         )
         self.assertDictEqual(new_config_obj, transformed_config_obj)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             # (name, config_dict, params_dict, expected_config_dict)
             (
@@ -837,7 +837,7 @@ class ApiMoblyTest(unittest.TestCase):
         ret = api_mobly.get_config_with_test_params(config_dict, params_dict)
         self.assertDictEqual(ret, expected_config_dict)
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ("Config is None", None),
             ("Config is empty", {}),

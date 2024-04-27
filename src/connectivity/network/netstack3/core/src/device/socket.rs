@@ -14,7 +14,7 @@ use lock_order::{
     relation::LockBefore,
     wrap::prelude::*,
 };
-use net_types::ethernet::Mac;
+use net_types::{ethernet::Mac, ip::IpVersion};
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::{
     error::ParseError,
@@ -24,8 +24,8 @@ use packet_formats::{
 use crate::{
     context::{ContextPair, SendFrameContext},
     device::{
-        self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, StrongId as _,
-        WeakDeviceId, WeakId as _,
+        self, AnyDevice, Device, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination,
+        StrongId as _, WeakDeviceId, WeakId as _,
     },
     for_any_device_id,
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
@@ -297,38 +297,8 @@ pub trait DeviceSocketAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
 /// An error encountered when sending a frame.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SendFrameError {
-    /// The socket is not bound to a device and no egress device was specified.
-    NoDevice,
     /// The device failed to send the frame.
     SendFailed,
-}
-
-/// An error encountered when sending a datagram.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum SendDatagramError {
-    /// There was a problem sending the constructed frame.
-    Frame(SendFrameError),
-    /// No protocol number was provided.
-    NoProtocol,
-}
-
-/// The destination to use when sending a datagram.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SendDatagramParams<D> {
-    /// The frame-level sending parameters.
-    pub frame: SendFrameParams<D>,
-    /// The protocol to use, or `None` to use the socket's bound protocol.
-    pub protocol: Option<NonZeroU16>,
-    /// The destination address.
-    pub dest_addr: Mac,
-}
-
-/// The destination to use when sending a frame.
-#[derive(Debug, Clone, Derivative, Eq, PartialEq)]
-#[derivative(Default(bound = ""))]
-pub struct SendFrameParams<D> {
-    /// The egress device, or `None` to use the socket's bound device.
-    pub device: Option<D>,
 }
 
 enum MaybeUpdate<T> {
@@ -416,11 +386,7 @@ impl<C> DeviceSocketApi<C> {
 impl<C> DeviceSocketApi<C>
 where
     C: ContextPair,
-    C::CoreContext: DeviceSocketContext<C::BindingsContext>
-        + SendFrameContext<
-            C::BindingsContext,
-            DeviceSocketMetadata<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
-        >,
+    C::CoreContext: DeviceSocketContext<C::BindingsContext>,
     C::BindingsContext:
         DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
@@ -514,101 +480,53 @@ where
         core_ctx.remove_socket(id)
     }
 
-    /// Sends a frame for the specified socket without any additional framing.
-    pub fn send_frame<S>(
+    /// Sends a frame for the specified socket.
+    pub fn send_frame<S, D>(
         &mut self,
-        id: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
-        params: SendFrameParams<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        _id: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
+        metadata: DeviceSocketMetadata<D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendFrameError)>
     where
         S: Serializer,
         S::Buffer: BufferMut,
+        D: DeviceSocketSendTypes,
+        C::CoreContext: DeviceIdContext<D>
+            + SendFrameContext<
+                C::BindingsContext,
+                DeviceSocketMetadata<D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
+            >,
+        C::BindingsContext: DeviceLayerTypes,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        let metadata = match core_ctx.with_socket_state(id, |_external_state, target| {
-            make_send_metadata::<C::CoreContext>(target, params, None)
-        }) {
-            Ok(metadata) => metadata,
-            Err(e) => return Err((body, e)),
-        };
         core_ctx
             .send_frame(bindings_ctx, metadata, body)
             .map_err(|s| (s, SendFrameError::SendFailed))
     }
-
-    /// Sends a datagram with system-determined framing.
-    pub fn send_datagram<S>(
-        &mut self,
-        id: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
-        params: SendDatagramParams<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
-        body: S,
-    ) -> Result<(), (S, SendDatagramError)>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        let metadata = match core_ctx.with_socket_state(
-            id,
-            |_external_state, target @ Target { device: _, protocol }| {
-                let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
-                let protocol = match target_protocol.or_else(|| {
-                    protocol.and_then(|p| match p {
-                        Protocol::Specific(p) => Some(p),
-                        Protocol::All => None,
-                    })
-                }) {
-                    None => return Err(SendDatagramError::NoProtocol),
-                    Some(p) => p,
-                };
-
-                make_send_metadata::<C::CoreContext>(
-                    target,
-                    frame,
-                    Some(DatagramHeader { dest_addr, protocol: EtherType::from(protocol.get()) }),
-                )
-                .map_err(SendDatagramError::Frame)
-            },
-        ) {
-            Ok(metadata) => metadata,
-            Err(e) => return Err((body, e)),
-        };
-        core_ctx
-            .send_frame(bindings_ctx, metadata, body)
-            .map_err(|s| (s, SendDatagramError::Frame(SendFrameError::SendFailed)))
-    }
 }
 
+/// A provider of the types required to send on a device socket.
+pub trait DeviceSocketSendTypes: Device {
+    /// The metadata required to send a frame on the device.
+    type Metadata;
+}
+
+/// Metadata required to send a frame on a device socket.
 #[derive(Debug, PartialEq)]
-pub struct DeviceSocketMetadata<D> {
-    pub(super) device_id: D,
-    pub(super) header: Option<DatagramHeader>,
+pub struct DeviceSocketMetadata<D: DeviceSocketSendTypes, DeviceId> {
+    /// The device ID to send via.
+    pub device_id: DeviceId,
+    /// The metadata required to send that's specific to the device type.
+    pub metadata: D::Metadata,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) struct DatagramHeader {
-    pub(super) dest_addr: Mac,
-    pub(super) protocol: EtherType,
-}
-
-fn make_send_metadata<CC: DeviceIdContext<AnyDevice>>(
-    bound: &Target<CC::WeakDeviceId>,
-    params: SendFrameParams<<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    header: Option<DatagramHeader>,
-) -> Result<DeviceSocketMetadata<CC::DeviceId>, SendFrameError> {
-    let Target { protocol: _, device } = bound;
-    let SendFrameParams { device: target_device } = params;
-
-    let device_id = match target_device.or_else(|| match device {
-        TargetDevice::AnyDevice => None,
-        TargetDevice::SpecificDevice(d) => d.upgrade(),
-    }) {
-        Some(d) => d,
-        None => return Err(SendFrameError::NoDevice),
-    };
-
-    Ok(DeviceSocketMetadata { device_id, header })
+/// Parameters needed to apply system-framing of an Ethernet frame.
+#[derive(Debug, PartialEq)]
+pub struct EthernetHeaderParams {
+    /// The destination MAC address to send to.
+    pub dest_addr: Mac,
+    /// The upperlayer protocol of the data contained in this Ethernet frame.
+    pub protocol: EtherType,
 }
 
 /// Public identifier for a socket.
@@ -645,13 +563,18 @@ pub trait DeviceSocketHandler<D: Device, BC>: DeviceIdContext<D> {
 /// A frame received on a device.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReceivedFrame<B> {
-    /// An ethernet frame received on a socket.
+    /// An ethernet frame received on a device.
     Ethernet {
         /// Where the frame was destined.
         destination: FrameDestination,
         /// The parsed ethernet frame.
         frame: EthernetFrame<B>,
     },
+    /// An IP frame received on a device.
+    ///
+    /// Note that this is not an IP packet within an Ethernet Frame. This is an
+    /// IP packet received directly from the device (e.g. a pure IP device).
+    Ip(IpFrame<B>),
 }
 
 /// A frame sent on a device.
@@ -659,6 +582,11 @@ pub enum ReceivedFrame<B> {
 pub enum SentFrame<B> {
     /// An ethernet frame sent on a device.
     Ethernet(EthernetFrame<B>),
+    /// An IP frame sent on a device.
+    ///
+    /// Note that this is not an IP packet within an Ethernet Frame. This is an
+    /// IP Packet send directly on the device (e.g. a pure IP device).
+    Ip(IpFrame<B>),
 }
 
 /// A frame couldn't be parsed as a [`SentFrame`].
@@ -683,10 +611,26 @@ pub struct EthernetFrame<B> {
     pub src_mac: Mac,
     /// The destination address of the frame.
     pub dst_mac: Mac,
-    /// The protocol of the frame, or `None` if there was none.
-    pub protocol: Option<u16>,
+    /// The EtherType of the frame, or `None` if there was none.
+    pub ethertype: Option<EtherType>,
     /// The body of the frame.
     pub body: B,
+}
+
+/// Data from an IP frame.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IpFrame<B> {
+    /// The IP version of the frame.
+    pub ip_version: IpVersion,
+    /// The body of the frame.
+    pub body: B,
+}
+
+impl<B> IpFrame<B> {
+    fn ethertype(&self) -> EtherType {
+        let IpFrame { ip_version, body: _ } = self;
+        EtherType::from_ip_version(*ip_version)
+    }
 }
 
 /// A frame sent or received on a device
@@ -715,7 +659,7 @@ impl<'a> From<packet_formats::ethernet::EthernetFrame<&'a [u8]>> for EthernetFra
         Self {
             src_mac: frame.src_mac(),
             dst_mac: frame.dst_mac(),
-            protocol: frame.ethertype().map(Into::into),
+            ethertype: frame.ethertype(),
             body: frame.into_body(),
         }
     }
@@ -732,19 +676,23 @@ impl<'a> ReceivedFrame<&'a [u8]> {
 
 impl<B> Frame<B> {
     fn protocol(&self) -> Option<u16> {
-        match self {
+        let ethertype = match self {
             Self::Sent(SentFrame::Ethernet(frame))
-            | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.protocol,
-        }
+            | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.ethertype,
+            Self::Sent(SentFrame::Ip(frame)) | Self::Received(ReceivedFrame::Ip(frame)) => {
+                Some(frame.ethertype())
+            }
+        };
+        ethertype.map(Into::into)
     }
 
     /// Convenience method for consuming the `Frame` and producing the body.
     pub fn into_body(self) -> B {
         match self {
             Self::Received(ReceivedFrame::Ethernet { destination: _, frame })
-            | Self::Sent(SentFrame::Ethernet(frame)) => {
-                let EthernetFrame { src_mac: _, dst_mac: _, protocol: _, body } = frame;
-                body
+            | Self::Sent(SentFrame::Ethernet(frame)) => frame.body,
+            Self::Received(ReceivedFrame::Ip(frame)) | Self::Sent(SentFrame::Ip(frame)) => {
+                frame.body
             }
         }
     }
@@ -1032,7 +980,7 @@ mod tests {
 
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
-    use packet::{Buf, FragmentedBuffer as _, ParsablePacket};
+    use packet::ParsablePacket;
     use test_case::test_case;
 
     use crate::{
@@ -1059,14 +1007,25 @@ mod tests {
                         frame: frame.cloned(),
                     })
                 }
+                Self::Sent(SentFrame::Ip(frame)) => Frame::Sent(SentFrame::Ip(frame.cloned())),
+                Self::Received(super::ReceivedFrame::Ip(frame)) => {
+                    Frame::Received(super::ReceivedFrame::Ip(frame.cloned()))
+                }
             }
         }
     }
 
     impl EthernetFrame<&[u8]> {
         fn cloned(self) -> EthernetFrame<Vec<u8>> {
-            let Self { src_mac, dst_mac, protocol, body } = self;
-            EthernetFrame { src_mac, dst_mac, protocol, body: Vec::from(body) }
+            let Self { src_mac, dst_mac, ethertype, body } = self;
+            EthernetFrame { src_mac, dst_mac, ethertype, body: Vec::from(body) }
+        }
+    }
+
+    impl IpFrame<&[u8]> {
+        fn cloned(self) -> IpFrame<Vec<u8>> {
+            let Self { ip_version, body } = self;
+            IpFrame { ip_version, body: Vec::from(body) }
         }
     }
 
@@ -1081,9 +1040,7 @@ mod tests {
     type FakeCtx<D> = crate::testutil::ContextPair<FakeCoreCtx<D>, FakeBindingsCtx<D>>;
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]
-    struct FakeBindingsCtx<D> {
-        sent: Vec<(DeviceSocketMetadata<D>, Vec<u8>)>,
-    }
+    struct FakeBindingsCtx<D>(core::marker::PhantomData<D>);
 
     impl<D> ContextProvider for FakeBindingsCtx<D> {
         type Context = Self;
@@ -1110,30 +1067,6 @@ mod tests {
                 frame: frame.cloned(),
                 raw: raw_frame.into(),
             })
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> SendFrameContext<FakeBindingsCtx<D>, DeviceSocketMetadata<D>>
-        for FakeCoreCtx<D>
-    {
-        fn send_frame<S>(
-            &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<D>,
-            metadata: DeviceSocketMetadata<D>,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            let DeviceSocketMetadata { device_id: _, header: _ } = &metadata;
-            match frame.serialize_vec_outer() {
-                Ok(frame) => Ok(bindings_ctx.sent.push((
-                    metadata,
-                    frame.map_b(Buf::into_inner).map_a(|b| b.to_flattened_vec()).into_inner(),
-                ))),
-                Err((_, s)) => Err(s),
-            }
         }
     }
 
@@ -1417,26 +1350,6 @@ mod tests {
         type DeviceId = D;
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
             self.contains_key(device_id)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> SendFrameContext<FakeBindingsCtx<D>, DeviceSocketMetadata<D>>
-        for HashMap<D, DeviceSockets<FakeStrongId>>
-    {
-        fn send_frame<S>(
-            &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<D>,
-            metadata: DeviceSocketMetadata<D>,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            let body = frame.serialize_vec_outer().map_err(|(_, s)| s)?;
-            let body = body.map_a(|b| b.to_flattened_vec()).map_b(Buf::into_inner).into_inner();
-            bindings_ctx.sent.push((metadata, body));
-            Ok(())
         }
     }
 
@@ -1827,7 +1740,7 @@ mod tests {
                         frame: EthernetFrame {
                             src_mac: TestData::SRC_MAC,
                             dst_mac: TestData::DST_MAC,
-                            protocol: Some(TestData::PROTO.into()),
+                            ethertype: Some(TestData::PROTO.get().into()),
                             body: Vec::from(TestData::BODY),
                         }
                     }),
@@ -1837,144 +1750,6 @@ mod tests {
             ]
         );
         assert!(all_sockets.is_empty());
-    }
-
-    #[test_case(None, None, Err(SendFrameError::NoDevice); "no bound or override device")]
-    #[test_case(Some(MultipleDevicesId::A), None, Ok(MultipleDevicesId::A); "bound device set")]
-    #[test_case(None, Some(MultipleDevicesId::A), Ok(MultipleDevicesId::A); "send device set")]
-    #[test_case(Some(MultipleDevicesId::A), Some(MultipleDevicesId::A), Ok(MultipleDevicesId::A);
-        "both set same")]
-    #[test_case(Some(MultipleDevicesId::A), Some(MultipleDevicesId::B), Ok(MultipleDevicesId::B);
-        "send overides")]
-    fn send_frame_on_socket(
-        bind_device: Option<MultipleDevicesId>,
-        send_device: Option<MultipleDevicesId>,
-        expected_device: Result<MultipleDevicesId, SendFrameError>,
-    ) {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
-            MultipleDevicesId::all(),
-        )));
-        let mut api = ctx.device_socket_api();
-        let id = api.create(Default::default());
-        if let Some(bind_device) = bind_device {
-            api.set_device(&id, TargetDevice::SpecificDevice(&bind_device));
-        }
-
-        let destination = SendFrameParams { device: send_device };
-        let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
-        assert_eq!(
-            api.send_frame(&id, destination, Buf::new(Vec::from(TestData::BODY), ..),)
-                .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
-            expected_status
-        );
-
-        if let Ok(expected_device) = expected_device {
-            let FakeBindingsCtx { sent } = ctx.bindings_ctx;
-            assert_eq!(
-                sent,
-                [(
-                    DeviceSocketMetadata { device_id: expected_device, header: None },
-                    Vec::from(TestData::BODY)
-                )]
-            )
-        }
-    }
-
-    #[test_case(
-        None, None,
-        SendDatagramParams {
-            frame: SendFrameParams {device: None},
-            dest_addr: TestData::DST_MAC,
-            protocol: None
-        },
-        Err(SendDatagramError::NoProtocol); "no protocol or device")]
-    #[test_case(
-        None, Some(MultipleDevicesId::A),
-        SendDatagramParams {
-            frame: SendFrameParams {device: None},
-            dest_addr: TestData::DST_MAC,
-            protocol: None
-        },
-        Err(SendDatagramError::NoProtocol); "bound no protocol")]
-    #[test_case(
-        Some(Protocol::All), Some(MultipleDevicesId::A),
-        SendDatagramParams {
-            frame: SendFrameParams {device: None},
-            dest_addr: TestData::DST_MAC,
-            protocol: None
-        },
-        Err(SendDatagramError::NoProtocol); "bound all protocols")]
-    #[test_case(
-        Some(Protocol::Specific(TestData::PROTO)), None,
-        SendDatagramParams {
-            frame: SendFrameParams {device: None},
-            dest_addr: TestData::DST_MAC,
-            protocol: None,
-        },
-        Err(SendDatagramError::Frame(SendFrameError::NoDevice)); "no device")]
-    #[test_case(
-        Some(Protocol::Specific(TestData::PROTO)), Some(MultipleDevicesId::A),
-        SendDatagramParams {
-            frame: SendFrameParams {device: None},
-            dest_addr: TestData::DST_MAC,
-            protocol: None,
-        },
-        Ok(MultipleDevicesId::A); "device and proto from bound")]
-    #[test_case(
-        None, None,
-        SendDatagramParams {
-            frame: SendFrameParams { device: Some(MultipleDevicesId::C), },
-            dest_addr: TestData::DST_MAC,
-            protocol: Some(TestData::PROTO),
-        },
-        Ok(MultipleDevicesId::C); "device and proto from destination")]
-    #[test_case(
-        Some(Protocol::Specific(WRONG_PROTO)), Some(MultipleDevicesId::A),
-        SendDatagramParams {
-            frame: SendFrameParams {device: Some(MultipleDevicesId::C),},
-            dest_addr: TestData::DST_MAC,
-            protocol: Some(TestData::PROTO),
-        },
-        Ok(MultipleDevicesId::C); "destination overrides")]
-    fn send_datagram_on_socket(
-        bind_protocol: Option<Protocol>,
-        bind_device: Option<MultipleDevicesId>,
-        destination: SendDatagramParams<MultipleDevicesId>,
-        expected_device: Result<MultipleDevicesId, SendDatagramError>,
-    ) {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
-            MultipleDevicesId::all(),
-        )));
-
-        let id = make_bound(
-            &mut ctx,
-            bind_device.map_or(TargetDevice::AnyDevice, TargetDevice::SpecificDevice),
-            bind_protocol,
-            Default::default(),
-        );
-
-        let mut api = ctx.device_socket_api();
-        let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
-        assert_eq!(
-            api.send_datagram(&id, destination, Buf::new(Vec::from(TestData::BODY), ..),)
-                .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
-            expected_status
-        );
-
-        if let Ok(expected_device) = expected_device {
-            let FakeBindingsCtx { sent } = ctx.bindings_ctx;
-            let expected_sent = (
-                DeviceSocketMetadata {
-                    device_id: expected_device,
-                    header: Some(DatagramHeader {
-                        dest_addr: TestData::DST_MAC,
-                        protocol: TestData::PROTO.get().into(),
-                    }),
-                },
-                Vec::from(TestData::BODY),
-            );
-            assert_eq!(sent, [expected_sent])
-        }
     }
 
     #[test]

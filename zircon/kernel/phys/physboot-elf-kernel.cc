@@ -101,13 +101,7 @@ PhysBootTimes gBootTimes;
   // Use the putative eventual virtual address to relocate the kernel.
   const uint64_t kernel_vaddr = kArchHandoffVirtualAddress;
 
-  // Though we're loading an ELF kernel now, currently we are still loading an
-  // old-style kernel entered in physical memory that may still use the bad old
-  // boot_alloc ways, so make sure there's some excess memory free off the end
-  // of the proper kernel load image.
-  // TODO(mcgrathr): When boot_alloc is gone, just Load() here will do.
-  Allocation loaded_elf_kernel =
-      elf_kernel.Load(kernel_vaddr, true, BootZbi::kKernelBootAllocReserve);
+  Allocation loaded_elf_kernel = elf_kernel.Load(kernel_vaddr);
 
   const ArchPatchInfo patch_info = ArchPreparePatchInfo();
   PatchElfKernel(elf_kernel, patch_info);

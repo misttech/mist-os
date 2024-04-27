@@ -59,7 +59,6 @@
 #include <platform/pc/bootloader.h>
 #include <platform/pc/smbios.h>
 #include <platform/ram_mappable_crashlog.h>
-#include <vm/bootalloc.h>
 #include <vm/bootreserve.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -99,12 +98,6 @@ static void platform_save_bootloader_data(void) {
     crashlog_impls::ram_mappable.Initialize(nvram.base, nvram.length);
     PlatformCrashlog::Bind(crashlog_impls::ram_mappable.Get());
   }
-
-  // Prevent the early boot allocator from handing out the memory the ZBI data
-  // is located in.
-  ktl::span<ktl::byte> zbi = ZbiInPhysmap();
-  auto phys = reinterpret_cast<uintptr_t>(zbi.data());
-  boot_alloc_reserve(phys, zbi.size_bytes());
 }
 
 static void boot_reserve_zbi() {

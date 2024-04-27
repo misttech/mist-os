@@ -17,6 +17,7 @@
             config: [
                 "fuchsia.wlan.RecoveryEnabled",
                 "fuchsia.wlan.RecoveryProfile",
+                "fuchsia.wlan.RoamingProfile",
             ],
         },
         {

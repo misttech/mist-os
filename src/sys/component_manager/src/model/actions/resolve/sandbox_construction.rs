@@ -8,8 +8,8 @@ use {
         model::{
             component::instance::ResolvedInstanceState,
             component::{ComponentInstance, WeakComponentInstance},
-            routing::router::{Request, Router},
             routing::router_ext::RouterExt,
+            routing::router_ext::WeakComponentTokenExt,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
@@ -27,7 +27,8 @@ use {
     futures::FutureExt,
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Capability, Dict, Unit},
+    sandbox::WeakComponentToken,
+    sandbox::{Capability, Dict, Request, Router, Unit},
     std::{collections::HashMap, fmt::Debug, sync::Arc},
     tracing::warn,
 };
@@ -51,7 +52,7 @@ pub fn build_component_sandbox(
     for environment_decl in &decl.environments {
         environments
             .insert(
-                Name::new(&environment_decl.name).unwrap(),
+                environment_decl.name.clone(),
                 build_environment(component, children, component_input, environment_decl),
             )
             .ok();
@@ -60,7 +61,7 @@ pub fn build_component_sandbox(
     for child in &decl.children {
         let environment;
         if let Some(environment_name) = child.environment.as_ref() {
-            environment = environments.get(&Name::new(environment_name).unwrap()).expect(
+            environment = environments.get(environment_name).expect(
                 "child references nonexistent environment, \
                     this should be prevented in manifest validation",
             )
@@ -68,13 +69,14 @@ pub fn build_component_sandbox(
             environment = component_input.environment();
         }
         let input = ComponentInput::new(environment);
-        child_inputs.insert(Name::new(&child.name).unwrap(), input).ok();
+        let name = Name::new(child.name.as_str()).expect("child is static so name is not long");
+        child_inputs.insert(name, input).ok();
     }
 
     for collection in &decl.collections {
         let environment;
         if let Some(environment_name) = collection.environment.as_ref() {
-            environment = environments.get(&Name::new(environment_name).unwrap()).expect(
+            environment = environments.get(environment_name).expect(
                 "collection references nonexistent environment, \
                     this should be prevented in manifest validation",
             )
@@ -109,7 +111,8 @@ pub fn build_component_sandbox(
         let mut target_dict = match offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
-                let child_name = Name::new(&child_ref.name).unwrap();
+                let child_name = Name::new(child_ref.name.as_str())
+                    .expect("child is static so name is not long");
                 if child_inputs.get(&child_name).is_none() {
                     child_inputs.insert(child_name.clone(), Default::default()).ok();
                 }
@@ -334,8 +337,10 @@ fn make_dict_extending_router(
             }
 
             // Otherwise combine the two.
-            let source_request =
-                Request { availability: cm_types::Availability::Required, target: component };
+            let source_request = Request {
+                availability: cm_types::Availability::Required,
+                target: WeakComponentToken::new(component),
+            };
             let source_dict = match source_dict_router.route(source_request).await? {
                 Capability::Dictionary(d) => d,
                 _ => panic!("source_dict_router must return a Dict"),

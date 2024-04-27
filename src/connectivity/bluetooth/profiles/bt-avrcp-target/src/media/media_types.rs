@@ -377,7 +377,7 @@ impl MediaInfo {
         {
             0
         } else {
-            std::u64::MAX
+            u64::MAX
         }
     }
 
@@ -618,14 +618,14 @@ mod tests {
     /// Tests correctness of updating the `playing_time` field in MediaInfo.
     fn test_media_info_update_playing_time() {
         let mut info: MediaInfo = Default::default();
-        assert_eq!(info.get_track_id(), std::u64::MAX);
+        assert_eq!(info.get_track_id(), u64::MAX);
 
         // Duration (in nanos), roughly 12 milliseconds.
         let duration = Some(12345678);
         let expected_duration = 12;
         info.update_playing_time(duration);
         assert_eq!(Some(expected_duration.to_string()), info.playing_time);
-        assert_eq!(std::u64::MAX, info.get_track_id());
+        assert_eq!(u64::MAX, info.get_track_id());
     }
 
     #[fuchsia::test]

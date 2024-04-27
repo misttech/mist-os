@@ -10,14 +10,13 @@ use {
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
         component::{Component, WeakComponentInstance},
-        error::{ActionError, ResolveActionError},
         hooks::{Event, EventPayload},
         resolver::Resolver,
     },
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
-    cm_util::io::clone_dir,
     cm_util::{AbortError, AbortHandle, AbortableScope},
+    errors::{ActionError, ResolveActionError},
     std::{ops::DerefMut, sync::Arc},
 };
 
@@ -173,10 +172,6 @@ async fn do_resolve(
         EventPayload::Resolved {
             component: WeakComponentInstance::from(component),
             decl: component_info.decl.clone(),
-            package_dir: component_info
-                .package
-                .as_ref()
-                .and_then(|pkg| clone_dir(Some(&pkg.package_dir))),
         },
     );
     component.hooks.dispatch(&event).await;
@@ -193,11 +188,11 @@ pub mod tests {
                 StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            error::{ActionError, ResolveActionError},
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
         cm_rust_testing::ComponentDeclBuilder,
+        errors::{ActionError, ResolveActionError},
         futures::{channel::oneshot, FutureExt},
         moniker::{Moniker, MonikerBase},
     };

@@ -40,8 +40,8 @@ inline constexpr bool kLogMain = true;
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
-inline constexpr bool kLogSummaryFinalDeviceInfo = true;
-inline constexpr bool kLogDetailedFinalDeviceInfo = false;
+inline constexpr bool kLogDeviceAddErrorRemove = true;
+inline constexpr bool kLogDeviceInfo = true;
 
 inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogObjectLifetimes = false;
@@ -102,6 +102,9 @@ void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> f
 
 void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& composite_props);
 
+void LogDeviceAddition(const fuchsia_audio_device::Info& device_info);
+void LogDeviceRemoval(const std::optional<fuchsia_audio_device::Info>& device_info);
+void LogDeviceError(const std::optional<fuchsia_audio_device::Info>& device_info);
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
 void LogElementMap(const std::unordered_map<ElementId, ElementRecord>& element_map);

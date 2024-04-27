@@ -175,6 +175,7 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   // Initialize the UFS controller and bind the logical units.
   zx_status_t Init();
+  zx::result<> InitQuirk();
   zx::result<> InitController();
   zx::result<> InitDeviceInterface(inspect::Node &controller_node);
   zx::result<> GetControllerDescriptor();
@@ -225,6 +226,8 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
   // maximum transfer size to 1MiB for performance reason.
   uint32_t max_transfer_bytes_ = kMaxTransferSize1MiB;
+
+  bool qemu_quirk_ = false;
 };
 
 }  // namespace ufs

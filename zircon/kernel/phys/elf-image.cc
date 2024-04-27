@@ -146,8 +146,7 @@ ktl::span<ktl::byte> ElfImage::GetBytesToPatch(const code_patching::Directive& p
   return file.subspan(static_cast<size_t>(patch.range_start - image_.base()), patch.range_size);
 }
 
-Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_place_ok,
-                          size_t extra_vaddr_size) {
+Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_place_ok) {
   auto endof = [](const auto& last) { return last.offset() + last.filesz(); };
   const uint64_t load_size = ktl::visit(endof, load_info_.segments().back());
 
@@ -158,7 +157,7 @@ Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_pl
     gSymbolize->OnLoad(*this);
   });
 
-  if (in_place_ok && CanLoadInPlace() && extra_vaddr_size == 0) {
+  if (in_place_ok && CanLoadInPlace()) {
     // TODO(https://fxbug.dev/42065186): Could have a memalloc::Pool feature to
     // reclassify the memory range to the new type.
 
@@ -172,8 +171,8 @@ Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_pl
   }
 
   fbl::AllocChecker ac;
-  Allocation image = Allocation::New(ac, memalloc::Type::kPhysElf,
-                                     load_info_.vaddr_size() + extra_vaddr_size, ZX_PAGE_SIZE);
+  Allocation image =
+      Allocation::New(ac, memalloc::Type::kPhysElf, load_info_.vaddr_size(), ZX_PAGE_SIZE);
   if (!ac.check()) {
     ZX_PANIC("cannot allocate phys ELF load image of %#zx bytes",
              static_cast<size_t>(load_info_.vaddr_size()));

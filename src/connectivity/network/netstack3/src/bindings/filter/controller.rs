@@ -393,7 +393,8 @@ impl Validator {
                     }
                     fnet_filter_ext::Action::Accept
                     | fnet_filter_ext::Action::Drop
-                    | fnet_filter_ext::Action::Return => {}
+                    | fnet_filter_ext::Action::Return
+                    | fnet_filter_ext::Action::TransparentProxy(_) => {}
                 }
 
                 let to_insert = Rule { matchers, action };

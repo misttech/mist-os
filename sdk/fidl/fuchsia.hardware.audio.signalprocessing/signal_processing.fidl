@@ -109,12 +109,31 @@ type Element = table {
     /// If not included or false, the processing element is always enabled.
     ///
     /// Optional.
+    ///
+    /// # Deprecation
+    ///
+    /// Use `can_bypass` instead.
+    @available(deprecated=20)
     4: can_disable bool;
 
     /// If included, a textual description of the processing element.
     ///
     /// Optional.
     5: description string:MAX_STRING_SIZE;
+
+    /// If included and true, the processing element can be stopped via `ElementSetState`.
+    /// If not included or false, the processing element is always started.
+    ///
+    /// Optional.
+    @available(added=20)
+    6: can_stop bool;
+
+    /// If included and true, the processing element can be bypassed via `ElementSetState`.
+    /// If not included or false, the processing element cannot be bypassed.
+    ///
+    /// Optional.
+    @available(added=20)
+    7: can_bypass bool;
 };
 
 /// Type-specific processing element state.
@@ -157,6 +176,11 @@ type ElementState = table {
     /// element is currently enabled.
     ///
     /// Optional.
+    ///
+    /// # Deprecation
+    ///
+    /// Use `bypassed` instead.
+    @available(deprecated=20)
     2: enabled bool;
 
     /// If included, how much latency is added to the pipeline if this processing element is
@@ -172,6 +196,65 @@ type ElementState = table {
     /// Optional.
     @available(added=HEAD)
     4: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
+
+    /// The started/stopped state for this processing element.
+    /// If true, the hardware associated with the element is started. If false, stopped.
+    ///
+    /// By default processing elements are started.
+    /// If the corresponding `Element` returned `can_stop` equals to `false`, then
+    /// this field can't be set to `false`.
+    ///
+    /// A stopped processing element does not provide its abstracted functionality.
+    /// Specifically, no audio data flows through a stopped element.
+    ///
+    /// Required.
+    @available(added=20)
+    5: started bool;
+
+    /// The bypassed state for this processing element.
+    /// If true, the hardware associated with the element is bypassed. If false, not bypassed.
+    ///
+    /// By default processing elements are not bypassed.
+    /// If the corresponding `Element` returned `can_bypass` equals to `false`, then
+    /// this field can't be set to `true`.
+    ///
+    /// A bypassed element does not affect the flow of audio through the topology.
+    ///
+    /// Optional.
+    @available(added=20)
+    6: bypassed bool;
+
+    /// If included, the driver's best estimate of the amount of time (in nanoseconds) it takes
+    /// the element hardware to get into fully operational mode after `started` has changed from
+    /// false to true.
+    ///
+    /// This field should not be present in a `SetElementState` `state` since the `turn_on_delay`
+    /// can't be set by a client. It may be provided by the server in a `WatchElementState` reply.
+    ///
+    /// It may take some time for the hardware to get into fully operational mode, for example due
+    /// a power state change. This delay must be taken into account if not getting the initial audio
+    /// samples played or captured is not acceptable.
+    /// If not included `turn_on_delay` is unknown.
+    ///
+    /// Optional.
+    @available(added=20)
+    7: turn_on_delay zx.Duration;
+
+    /// If included, the driver's best estimate of the amount of time (in nanoseconds) it takes
+    /// the element hardware to get into fully disabled mode after the `ElementState` has
+    /// changed `started` from true to false.
+    ///
+    /// This field should not be present in a `SetElementState` `state` since the `turn_off_delay`
+    /// can't be set by a client. It may be provided by the server in a `WatchElementState` reply.
+    ///
+    /// It may take some time for the hardware to get into fully disabled mode, for example due to
+    /// a power state change. This delay must be taken into account if audio processing of audio
+    /// samples after disabling a processing element is not acceptable.
+    /// If not included, the turn off delay is unknown.
+    ///
+    /// Optional.
+    @available(added=20)
+    8: turn_off_delay zx.Duration;
 };
 
 /// Edge pairs between processing elements used to define ordering in processing elements

@@ -37,16 +37,16 @@ void CodecAdapterMpeg2::CoreCodecInit(
   ZX_DEBUG_ASSERT_MSG(false, "not yet implemented");
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterMpeg2::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterMpeg2::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
   ZX_DEBUG_ASSERT_MSG(false, "not yet implemented");
-  return fuchsia::sysmem::BufferCollectionConstraints();
+  return fuchsia_sysmem2::BufferCollectionConstraints();
 }
 
 void CodecAdapterMpeg2::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   ZX_DEBUG_ASSERT_MSG(false, "not yet implemented");
 }
 

@@ -4,7 +4,7 @@
 
 """Rule that creates a product bundle for flashing, emulating, or updating a Fuchsia product to a target device."""
 
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs", "get_ffx_scrutiny_inputs")
 load(
     "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
     "fuchsia_product_bundle_tasks",
@@ -122,6 +122,7 @@ _build_zipped_product_bundle = rule(
 def _scrutiny_validation(
         ctx,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         scrutiny_config,
         platform_scrutiny_config,
@@ -141,6 +142,7 @@ def _scrutiny_validation(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         scrutiny_config.bootfs_files + platform_scrutiny_config.bootfs_files,
         scrutiny_config.bootfs_packages + platform_scrutiny_config.bootfs_packages,
@@ -150,6 +152,7 @@ def _scrutiny_validation(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         scrutiny_config.kernel_cmdline + platform_scrutiny_config.kernel_cmdline,
     ))
@@ -158,6 +161,7 @@ def _scrutiny_validation(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         scrutiny_config.static_packages + platform_scrutiny_config.static_packages,
     )
@@ -166,6 +170,7 @@ def _scrutiny_validation(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         platform_scrutiny_config.pre_signing_policy,
         platform_scrutiny_config.pre_signing_goldens_dir,
@@ -176,6 +181,7 @@ def _scrutiny_validation(
             ctx,
             ffx_invocation,
             ffx_tool,
+            ffx_scrutiny_inputs,
             pb_out_dir,
             platform_scrutiny_config.routes_config_golden,
         )
@@ -183,6 +189,7 @@ def _scrutiny_validation(
             ctx,
             ffx_invocation,
             ffx_tool,
+            ffx_scrutiny_inputs,
             pb_out_dir,
             platform_scrutiny_config.component_resolver_allowlist,
         )
@@ -190,6 +197,7 @@ def _scrutiny_validation(
             ctx,
             ffx_invocation,
             ffx_tool,
+            ffx_scrutiny_inputs,
             pb_out_dir,
             platform_scrutiny_config.component_route_exceptions,
             scrutiny_config.component_tree_config,
@@ -198,12 +206,14 @@ def _scrutiny_validation(
             ctx,
             ffx_invocation,
             ffx_tool,
+            ffx_scrutiny_inputs,
             pb_out_dir,
             platform_scrutiny_config.structured_config_policy,
         )
         deps += _extract_structured_config(
             ctx,
             ffx_tool,
+            ffx_scrutiny_inputs,
             pb_out_dir,
             is_recovery,
         )
@@ -214,6 +224,7 @@ def _verify_bootfs_filelist(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         zbi_bootfs_filelist_goldens,
         zbi_bootfs_packages_goldens):
@@ -242,7 +253,7 @@ def _verify_bootfs_filelist(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir] + zbi_bootfs_filelist_goldens + zbi_bootfs_packages_goldens
+    inputs = [ffx_tool, pb_out_dir] + zbi_bootfs_filelist_goldens + zbi_bootfs_packages_goldens + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, ffx_isolate_dir],
@@ -257,6 +268,7 @@ def _verify_kernel_cmdline(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         zbi_kernel_cmdline_goldens):
     stamp_file = ctx.actions.declare_file(label_name + "_kernel.stamp")
@@ -279,7 +291,7 @@ def _verify_kernel_cmdline(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir] + zbi_kernel_cmdline_goldens
+    inputs = [ffx_tool, pb_out_dir] + zbi_kernel_cmdline_goldens + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, ffx_isolate_dir],
@@ -293,6 +305,7 @@ def _verify_route_sources(
         ctx,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         routes_config_golden):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_route.stamp")
@@ -315,7 +328,7 @@ def _verify_route_sources(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir, routes_config_golden]
+    inputs = [ffx_tool, pb_out_dir, routes_config_golden] + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
@@ -329,6 +342,7 @@ def _verify_component_resolver_allowlist(
         ctx,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         component_resolver_allowlist):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_component_resolver.stamp")
@@ -351,7 +365,7 @@ def _verify_component_resolver_allowlist(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir, component_resolver_allowlist]
+    inputs = [ffx_tool, pb_out_dir, component_resolver_allowlist] + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
@@ -365,6 +379,7 @@ def _verify_routes(
         ctx,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         allow_lists,
         component_tree_config):
@@ -396,7 +411,7 @@ def _verify_routes(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir, component_tree_config] + allow_lists
+    inputs = [ffx_tool, pb_out_dir, component_tree_config] + allow_lists + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
@@ -411,6 +426,7 @@ def _verify_base_packages(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         base_packages):
     stamp_file = ctx.actions.declare_file(label_name + "_static_pkgs.stamp")
@@ -436,7 +452,7 @@ def _verify_base_packages(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir] + base_packages
+    inputs = [ffx_tool, pb_out_dir] + base_packages + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
@@ -451,6 +467,7 @@ def _verify_pre_signing(
         label_name,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         pre_signing_policy_file,
         pre_signing_goldens_dir,
@@ -478,7 +495,7 @@ def _verify_pre_signing(
     # The pre_signing_goldens file list is only specified to avoid providing a dir build input
     # to bazel. This avoids the "dependency checking of directories is unsound" warning.
     # The scrutiny invocation itself expects a dir path to be provided.
-    inputs = [ffx_tool, pb_out_dir, pre_signing_policy_file] + pre_signing_goldens
+    inputs = [ffx_tool, pb_out_dir, pre_signing_policy_file] + pre_signing_goldens + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, ffx_isolate_dir],
@@ -492,6 +509,7 @@ def _verify_structured_config(
         ctx,
         ffx_invocation,
         ffx_tool,
+        ffx_scrutiny_inputs,
         pb_out_dir,
         structured_config_policy):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_structured_config.stamp")
@@ -514,7 +532,7 @@ def _verify_structured_config(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir, structured_config_policy]
+    inputs = [ffx_tool, pb_out_dir, structured_config_policy] + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
@@ -524,7 +542,7 @@ def _verify_structured_config(
     )
     return [stamp_file, tmp_dir]
 
-def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
+def _extract_structured_config(ctx, ffx_tool, ffx_scrutiny_inputs, pb_out_dir, is_recovery):
     structured_config = ctx.actions.declare_file(ctx.label.name + "_structured_config")
     depfile = ctx.actions.declare_file(ctx.label.name + "_depfile")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_extract_structured_config.ffx")
@@ -550,7 +568,7 @@ def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
         "set -e",
         " ".join(ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir]
+    inputs = [ffx_tool, pb_out_dir] + ffx_scrutiny_inputs
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [structured_config, depfile, ffx_isolate_dir],
@@ -660,6 +678,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     deps = [pb_out_dir, size_report] + ctx.files.partitions_config + ctx.files.main
 
     # Scrutiny Validation
+    ffx_scrutiny_inputs = get_ffx_scrutiny_inputs(fuchsia_toolchain)
     if ctx.attr.main_scrutiny_config:
         build_type = ctx.attr.main[FuchsiaProductImageInfo].build_type
         if build_type == "user":
@@ -670,7 +689,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
             fail("scrutiny cannot run on 'product' because it is an eng build type")
 
         main_scrutiny_config = ctx.attr.main_scrutiny_config[FuchsiaScrutinyConfigInfo]
-        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, main_scrutiny_config, platform_scrutiny_config)
+        deps += _scrutiny_validation(ctx, ffx_tool, ffx_scrutiny_inputs, pb_out_dir, main_scrutiny_config, platform_scrutiny_config)
     if ctx.attr.recovery_scrutiny_config:
         build_type = ctx.attr.recovery[FuchsiaProductImageInfo].build_type
         if build_type == "user":
@@ -681,7 +700,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
             fail("scrutiny cannot run on 'recovery' because it is an eng build type")
 
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
-        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
+        deps += _scrutiny_validation(ctx, ffx_tool, ffx_scrutiny_inputs, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
 
     return [
         DefaultInfo(

@@ -1,8 +1,8 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <gtest/gtest.h>
 #include <wlan/drivers/components/frame_storage.h>
-#include <zxtest/zxtest.h>
 
 namespace {
 
@@ -61,11 +61,11 @@ TEST(FrameStorageTest, Store) {
 TEST(FrameStorageTest, StoreRxSpaceBuffers) {
   constexpr size_t num_buffers = 4;
   constexpr size_t buffer_size = 64;
-  rx_space_buffer_t buffers[num_buffers];
+  fuchsia_hardware_network_driver::wire::RxSpaceBuffer buffers[num_buffers];
   uint8_t vmo_data[num_buffers];
   uint8_t* vmo_addrs[] = {vmo_data};
 
-  auto fill_rx_space_buffer = [&](rx_space_buffer_t& buffer) {
+  auto fill_rx_space_buffer = [&](fuchsia_hardware_network_driver::wire::RxSpaceBuffer& buffer) {
     static uint32_t buffer_id = 0;
     buffer.region.offset = static_cast<uint64_t>(buffer_id) * buffer_size;
     buffer.region.length = buffer_size;
@@ -82,15 +82,17 @@ TEST(FrameStorageTest, StoreRxSpaceBuffers) {
   FrameContainer frames;
   {
     std::lock_guard lock(storage);
-    storage.Store(buffers, std::size(buffers), vmo_addrs);
+    storage.Store(buffers, vmo_addrs);
     frames = storage.Acquire(num_buffers);
   }
 
-  auto frame_and_buffer_equal = [&](const Frame& frame, const rx_space_buffer_t& buffer) {
-    return frame.BufferId() == buffer.id && frame.VmoOffset() == buffer.region.offset &&
-           frame.Size() == buffer.region.length && frame.VmoId() == buffer.region.vmo &&
-           frame.Data() == vmo_addrs[frame.VmoId()] + frame.VmoOffset() && frame.Headroom() == 0;
-  };
+  auto frame_and_buffer_equal =
+      [&](const Frame& frame, const fuchsia_hardware_network_driver::wire::RxSpaceBuffer& buffer) {
+        return frame.BufferId() == buffer.id && frame.VmoOffset() == buffer.region.offset &&
+               frame.Size() == buffer.region.length && frame.VmoId() == buffer.region.vmo &&
+               frame.Data() == vmo_addrs[frame.VmoId()] + frame.VmoOffset() &&
+               frame.Headroom() == 0;
+      };
 
   auto frame = frames.begin();
   ASSERT_TRUE(frame_and_buffer_equal(*frame, buffers[0]));
@@ -113,7 +115,7 @@ TEST(FrameStorageTest, Clear) {
   EXPECT_TRUE(storage.empty());
 }
 
-struct FrameStorageFilledTest : public ::zxtest::Test {
+struct FrameStorageFilledTest : public ::testing::Test {
   void SetUp() override {
     frame1_ = CreateTestFrame(storage_);
     frame2_ = CreateTestFrame(storage_);

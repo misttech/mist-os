@@ -9,40 +9,7 @@ use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant};
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
-use super::IpVersionStrictness;
-
-impl IpVersionStrictness {
-    fn mismatch_result<T>(&self) -> Result<ConversionResult<T>, IpVersionMismatchError> {
-        match self {
-            IpVersionStrictness::IpVersionMustMatchState => Err(IpVersionMismatchError),
-            IpVersionStrictness::IpVersionCanDifferFromState => Ok(ConversionResult::Omit),
-        }
-    }
-}
-
-pub(super) enum ConversionResult<CoreState> {
-    State(CoreState),
-    Omit,
-}
-
-pub(super) struct IpVersionMismatchError;
-
-pub(super) trait TryConvertToCoreState {
-    type CoreState<I: IpExt>;
-
-    /// Attempts to convert `self` to the associated `netstack3_core::filter::state` type.
-    ///
-    /// If the IP version with which the method is invoked does not match
-    /// `self` (for example, if `self` contains an IPv4-specific address matcher
-    /// and this method is called with `Ipv6`), returns either:
-    ///
-    ///   * Err(IpVersionMismatchError) if `ip_version_strictness` is `true`
-    ///   * Ok(ConversionResult::Omit) otherwise
-    fn try_convert<I: IpExt>(
-        self,
-        ip_version_strictness: IpVersionStrictness,
-    ) -> Result<ConversionResult<Self::CoreState<I>>, IpVersionMismatchError>;
-}
+use super::{ConversionResult, IpVersionMismatchError, IpVersionStrictness, TryConvertToCoreState};
 
 impl TryConvertToCoreState for fnet_filter_ext::Matchers {
     type CoreState<I: IpExt> = netstack3_core::filter::PacketMatcher<I, fnet_filter::DeviceClass>;

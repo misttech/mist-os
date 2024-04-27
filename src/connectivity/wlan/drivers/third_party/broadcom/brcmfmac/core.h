@@ -25,7 +25,6 @@
 #include <fidl/fuchsia.wlan.fullmac/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/fidl.h>
-#include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/channel.h>
@@ -382,8 +381,10 @@ zx_status_t brcmf_iovar_data_set(brcmf_pub* drvr, const char* name, void* data, 
 void brcmf_bus_add_txhdrlen(brcmf_pub* drvr, uint len);
 zx_status_t brcmf_netdev_set_mac_address(struct net_device* ndev, uint8_t* addr);
 
-void brcmf_queue_rx_space(brcmf_pub* drvr, const rx_space_buffer_t* buffers_list,
-                          size_t buffers_count, uint8_t* vmo_addrs[]);
+void brcmf_queue_rx_space(
+    brcmf_pub* drvr,
+    cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+    uint8_t* vmo_addrs[]);
 zx_status_t brcmf_prepare_vmo(brcmf_pub* drvr, uint8_t vmo_id, zx_handle_t vmo,
                               uint8_t* mapped_addr, size_t mapped_size);
 void brcmf_release_vmo(brcmf_pub* drvr, uint8_t vmo_id);

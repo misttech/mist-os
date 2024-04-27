@@ -14,6 +14,7 @@
 #include <ddktl/device.h>
 
 #include "ftdi-mpsse.h"
+#include "ftdi.h"
 #include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 
 namespace ftdi_mpsse {
@@ -37,14 +38,15 @@ class FtdiI2c : public DeviceType, public fdf::WireServer<fuchsia_hardware_i2cim
     uint32_t pid;
     uint32_t did;
   };
-  FtdiI2c(zx_device_t* parent, I2cLayout layout, std::vector<I2cDevice> i2c_devices)
+  FtdiI2c(zx_device_t* parent, ftdi_serial::FtdiSerial* serial, I2cLayout layout,
+          std::vector<I2cDevice> i2c_devices)
       : DeviceType(parent),
         pin_layout_(layout),
-        mpsse_(parent),
+        mpsse_(serial),
         i2c_devices_(std::move(i2c_devices)),
         outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
-  static zx_status_t Create(zx_device_t* device,
+  static zx_status_t Create(zx_device_t* device, ftdi_serial::FtdiSerial* serial,
                             const fuchsia_hardware_ftdi::wire::I2cBusLayout* layout,
                             const fuchsia_hardware_ftdi::wire::I2cDevice* i2c_dev);
 

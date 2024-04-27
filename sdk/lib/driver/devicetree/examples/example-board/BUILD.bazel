@@ -73,7 +73,7 @@ fuchsia_package(
 
 fuchsia_package_resource(
     name = "test-dtb",
-    src = "@legacy_ninja_build_outputs//:test-dtb",
+    src = "@gn_targets//sdk/lib/driver/devicetree/examples/example-board:test-dtb",
     dest = "test-data/example-board.dtb",
 )
 
@@ -87,12 +87,12 @@ fuchsia_cc_test(
         "-Wno-vla-cxx-extension",
     ],
     deps = [
+        "//zircon/system/ulib/ddk-platform-defs",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//pkg/async-loop-cpp",
         "@fuchsia_sdk//pkg/async-loop-default",
         "@internal_sdk//pkg/board-test-helper",
-        "@internal_sdk//pkg/ddk-platform-defs",
     ],
 )
 
@@ -100,7 +100,7 @@ fuchsia_component_manifest(
     name = "test-manifest",
     src = "meta/example-board-test.cml",
     includes = [
-        "@internal_sdk//pkg/sys/component:realm_builder",
+        "@fuchsia_sdk//pkg/sys/component:realm_builder_absolute",
     ],
 )
 

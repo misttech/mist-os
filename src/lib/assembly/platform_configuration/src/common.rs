@@ -43,8 +43,14 @@ use assembly_util::{BootfsDestination, FileEntry, NamedMap, PackageSetDestinatio
 /// `Option::Some(value)`.
 #[derive(Debug, PartialEq)]
 pub(crate) enum FeatureSupportLevel {
+    /// This is a small build of fuchsia which is not meant to support
+    /// self-updates, but rather be updated externally. It is meant for truly
+    /// memory constrained environments. It includes a minimal subset of
+    /// bootstrap and doesn't bring in any of core.
+    Embeddable,
+
     /// Bootable, but serial-only.  This is only the `/bootstrap` realm.  No
-    /// netstack, no storage drivers, etc.  this is the smallest bootable system
+    /// netstack, no storage drivers, etc.  This is a smallest bootable system
     /// created by assembly, and is primarily used for board-level bringup.
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
@@ -70,6 +76,9 @@ impl FeatureSupportLevel {
     ) -> Option<Self> {
         match value {
             assembly_config_schema::FeatureSupportLevel::Empty => None,
+            assembly_config_schema::FeatureSupportLevel::Embeddable => {
+                Some(FeatureSupportLevel::Embeddable)
+            }
             assembly_config_schema::FeatureSupportLevel::Bootstrap => {
                 Some(FeatureSupportLevel::Bootstrap)
             }

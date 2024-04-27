@@ -429,7 +429,10 @@ Symbols:
   - { Name: fdopen, Type: Func, Weak: true }
   - { Name: fdopendir, Type: Func, Weak: true }
   - { Name: feclearexcept, Type: Func }
+  - { Name: fedisableexcept, Type: Func }
+  - { Name: feenableexcept, Type: Func }
   - { Name: fegetenv, Type: Func }
+  - { Name: fegetexcept, Type: Func }
   - { Name: fegetexceptflag, Type: Func }
   - { Name: fegetround, Type: Func }
   - { Name: feholdexcept, Type: Func }
@@ -439,9 +442,11 @@ Symbols:
   - { Name: ferror, Type: Func }
   - { Name: ferror_unlocked, Type: Func, Weak: true }
   - { Name: fesetenv, Type: Func }
+  - { Name: fesetexcept, Type: Func }
   - { Name: fesetexceptflag, Type: Func }
   - { Name: fesetround, Type: Func }
   - { Name: fetestexcept, Type: Func }
+  - { Name: fetestexceptflag, Type: Func }
   - { Name: feupdateenv, Type: Func }
   - { Name: fexecve, Type: Func }
   - { Name: fflush, Type: Func }

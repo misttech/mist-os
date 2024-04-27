@@ -951,7 +951,7 @@ class PopulateAllMethods {
   void Run() { Visit(original_protocol_); }
 
  private:
-  void Visit(const Protocol* protocol) {
+  void Visit(Protocol* protocol) {
     for (const auto& member : protocol->composed_protocols) {
       auto target = member.reference.resolved().element();
       if (target->kind != Element::Kind::kProtocol)

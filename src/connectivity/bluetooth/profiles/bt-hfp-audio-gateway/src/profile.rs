@@ -55,7 +55,6 @@ pub(crate) mod test_server {
     /// registration.
     pub(crate) struct LocalProfileTestServer {
         pub stream: bredr::ProfileRequestStream,
-        pub responder: Option<bredr::ProfileAdvertiseResponder>,
         pub receiver: Option<bredr::ConnectionReceiverProxy>,
         pub results: Option<bredr::SearchResultsProxy>,
         pub connections: Vec<fuchsia_zircon::Socket>,
@@ -63,14 +62,14 @@ pub(crate) mod test_server {
 
     impl From<bredr::ProfileRequestStream> for LocalProfileTestServer {
         fn from(stream: bredr::ProfileRequestStream) -> Self {
-            Self { stream, responder: None, receiver: None, results: None, connections: vec![] }
+            Self { stream, receiver: None, results: None, connections: vec![] }
         }
     }
 
     impl LocalProfileTestServer {
         /// Returns true if the `Profile` has registered an `Advertise` and `Search` request.
         fn is_registration_complete(&self) -> bool {
-            self.responder.is_some() && self.receiver.is_some() && self.results.is_some()
+            self.receiver.is_some() && self.results.is_some()
         }
 
         /// Run through the registration process of a new `Profile`.
@@ -81,8 +80,11 @@ pub(crate) mod test_server {
                         if self.is_registration_complete() {
                             panic!("unexpected second advertise request");
                         }
-                        self.responder = Some(responder);
                         self.receiver = Some(payload.receiver.unwrap().into_proxy().unwrap());
+                        let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse {
+                            services: payload.services.clone(),
+                            ..Default::default()
+                        }));
                         if self.is_registration_complete() {
                             break;
                         }

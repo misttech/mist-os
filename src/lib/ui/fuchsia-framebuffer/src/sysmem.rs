@@ -310,7 +310,7 @@ mod test {
                     }
                     BufferCollectionRequest::WaitForBuffersAllocated { responder } => {
                         let constraints =
-                            stored_constraints.expect("Expected a BufferCollectionRequest!");
+                            stored_constraints.take().expect("Expected a BufferCollectionRequest!");
                         let response = BufferCollectionInfo2 {
                             buffer_count: constraints.min_buffer_count,
                             // Everything below here is unused

@@ -61,38 +61,31 @@ pub enum PackageManifestError {
     #[error("package contains an invalid subpackage path '{path:?}'. {merkle}")]
     InvalidSubpackagePath { merkle: Hash, path: PathBuf },
 
-    #[error("io error")]
+    #[error("io error {}", _0)]
     IoError(#[from] io::Error),
 
     #[error("io error {cause}: '{path}'")]
     IoErrorWithPath { cause: io::Error, path: PathBuf },
 
-    #[error("meta contents")]
+    #[error("meta contents: {}", _0)]
     MetaContents(#[from] MetaContentsError),
 
-    #[error("meta package")]
+    #[error("meta package: {}", _0)]
     MetaPackage(#[from] MetaPackageError),
 
-    #[error("meta subpackages")]
+    #[error("meta subpackages: {}", _0)]
     MetaSubpackages(#[from] MetaSubpackagesError),
 
-    #[error("archive")]
+    #[error("archive: {}", _0)]
     Archive(#[from] fuchsia_archive::Error),
 
-    #[error("writing to relative path failed")]
-    RelativeWrite(#[source] anyhow::Error),
+    #[error("writing to relative path failed: {}", _0)]
+    RelativeWrite(#[from] anyhow::Error),
 
     #[error("persisting to file failed: '{path}'")]
     Persist {
         #[source]
         cause: PersistError,
-        path: PathBuf,
-    },
-
-    #[error("decompressing delivery blob failed: '{path}'")]
-    DecompressDeliveryBlob {
-        #[source]
-        cause: delivery_blob::DecompressError,
         path: PathBuf,
     },
 }

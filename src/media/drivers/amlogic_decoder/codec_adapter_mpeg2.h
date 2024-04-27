@@ -23,12 +23,11 @@ class CodecAdapterMpeg2 : public CodecAdapter {
   bool IsCoreCodecHwBased(CodecPort port) override;
 
   void CoreCodecInit(const fuchsia::media::FormatDetails& initial_input_format_details) override;
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
   void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
   void CoreCodecStartStream() override;
   void CoreCodecQueueInputFormatDetails(
       const fuchsia::media::FormatDetails& per_stream_override_format_details) override;

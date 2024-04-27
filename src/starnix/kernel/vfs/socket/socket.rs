@@ -25,8 +25,9 @@ use fuchsia_zircon as zx;
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
-    rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
-    AddressMessage, LinkMessage, RtnlMessage,
+    address::{AddressAttribute, AddressMessage},
+    link::{LinkAttribute, LinkFlags, LinkMessage},
+    AddressFamily, RouteNetlinkMessage,
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, WriteOps};
@@ -50,7 +51,7 @@ use starnix_uapi::{
     SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
-use std::{collections::VecDeque, ffi::CStr, mem::size_of, sync::Arc};
+use std::{collections::VecDeque, ffi::CStr, mem::size_of, net::IpAddr, sync::Arc};
 use zerocopy::{AsBytes, FromBytes as _};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
@@ -439,15 +440,15 @@ impl Socket {
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, address_msgs, _if_index) =
                     get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
-
+                let mut maybe_errno = None;
                 let ifru_addr = {
                     let mut addr = sockaddr::default();
                     let s_addr = address_msgs
                         .into_iter()
                         .next()
                         .and_then(|msg| {
-                            msg.nlas.into_iter().find_map(|nla| {
-                                if let AddressNla::Address(bytes) = nla {
+                            msg.attributes.into_iter().find_map(|nla| {
+                                if let AddressAttribute::Address(bytes) = nla {
                                     // The bytes are held in network-endian
                                     // order and `in_addr_t` is documented to
                                     // hold values in network order as well. Per
@@ -460,13 +461,23 @@ impl Socket {
                                     // Because of this, we read the bytes in
                                     // native endian which is effectively a
                                     // `core::mem::transmute` to `u32`.
-                                    Some(NativeEndian::read_u32(&bytes[..]))
+                                    Some(NativeEndian::read_u32(&match bytes {
+                                        std::net::IpAddr::V4(v4) => v4.octets(),
+                                        std::net::IpAddr::V6(_) => {
+                                            maybe_errno =
+                                                Some(error!(EINVAL, "expected an ipv4 address"));
+                                            return None;
+                                        }
+                                    }))
                                 } else {
                                     None
                                 }
                             })
                         })
                         .unwrap_or(0);
+                    if let Some(errno) = maybe_errno {
+                        return errno;
+                    }
                     sockaddr_in {
                         sin_family: AF_INET,
                         sin_port: 0,
@@ -501,7 +512,7 @@ impl Socket {
                 };
 
                 // Helper to verify the response of a Netlink request
-                let expect_ack = |msg: NetlinkMessage<RtnlMessage>| {
+                let expect_ack = |msg: NetlinkMessage<RouteNetlinkMessage>| {
                     match msg.payload {
                         NetlinkPayload::Error(ErrorMessage {
                             code: Some(code), header: _, ..
@@ -528,7 +539,7 @@ impl Socket {
                         &socket,
                         NetlinkMessage::new(
                             request_header,
-                            NetlinkPayload::InnerMessage(RtnlMessage::DelAddress(addr)),
+                            NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelAddress(addr)),
                         ),
                         &mut read_buf,
                     )?;
@@ -550,10 +561,9 @@ impl Socket {
                         &socket,
                         NetlinkMessage::new(
                             request_header,
-                            NetlinkPayload::InnerMessage(RtnlMessage::NewAddress({
+                            NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewAddress({
                                 let mut msg = AddressMessage::default();
-                                msg.header.family =
-                                    AF_INET.try_into().expect("AF_INET should fit in u8");
+                                msg.header.family = AddressFamily::Inet;
                                 msg.header.index = if_index;
                                 let addr = addr.to_be_bytes();
                                 // The request does not include the prefix
@@ -563,7 +573,8 @@ impl Socket {
                                     .class()
                                     .default_prefix_len()
                                     .unwrap_or(net_types::ip::Ipv4Addr::BYTES * 8);
-                                msg.nlas = vec![AddressNla::Address(addr.to_vec())];
+                                msg.attributes =
+                                    vec![AddressAttribute::Address(IpAddr::V4(addr.into()))];
                                 msg
                             })),
                         ),
@@ -583,8 +594,8 @@ impl Socket {
 
                 let hw_addr_and_type = {
                     let hw_type = link_msg.header.link_layer_type;
-                    link_msg.nlas.into_iter().find_map(|nla| {
-                        if let LinkNla::Address(addr) = nla {
+                    link_msg.attributes.into_iter().find_map(|nla| {
+                        if let LinkAttribute::Address(addr) = nla {
                             Some((addr, hw_type))
                         } else {
                             None
@@ -599,7 +610,7 @@ impl Socket {
                         ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
                         ifr_ifru.ifru_hwaddr: hw_addr_and_type.map(|(addr_bytes, sa_family)| {
                             let mut addr = sockaddr {
-                                sa_family,
+                                sa_family:sa_family.into(),
                                 sa_data: Default::default(),
                             };
                             // We need to manually assign from one to the other
@@ -662,7 +673,7 @@ impl Socket {
                         //   - SIOCGIFFLAGS returns a subset of the flags
                         //     returned by netlink; the flags lost by truncating
                         //     from 32 to 16 bits is expected.
-                        link_msg.header.flags as i16
+                        link_msg.header.flags.bits() as i16
                     },
                 });
                 current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
@@ -806,9 +817,9 @@ where
             header.flags = netlink_packet_core::NLM_F_REQUEST;
             header
         },
-        NetlinkPayload::InnerMessage(RtnlMessage::GetLink({
+        NetlinkPayload::InnerMessage(RouteNetlinkMessage::GetLink({
             let mut msg = LinkMessage::default();
-            msg.nlas = vec![LinkNla::IfName(iface_name.to_string())];
+            msg.attributes = vec![LinkAttribute::IfName(iface_name.to_string())];
             msg
         })),
     );
@@ -823,7 +834,7 @@ where
             let code = ErrnoCode::from_return_value(code.get() as u64);
             return Err(Errno::new(code, "error code from RTM_GETLINK", None));
         }
-        NetlinkPayload::InnerMessage(RtnlMessage::NewLink(msg)) => msg,
+        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewLink(msg)) => msg,
         // netlink is only expected to return an error or
         // RTM_NEWLINK response for our RTM_GETLINK request.
         payload => panic!("unexpected message = {:?}", payload),
@@ -862,9 +873,9 @@ where
                 header.flags = netlink_packet_core::NLM_F_DUMP | netlink_packet_core::NLM_F_REQUEST;
                 header
             },
-            NetlinkPayload::InnerMessage(RtnlMessage::GetAddress({
+            NetlinkPayload::InnerMessage(RouteNetlinkMessage::GetAddress({
                 let mut msg = AddressMessage::default();
-                msg.header.family = AF_INET.try_into().expect("AF_INET should fit in u8");
+                msg.header.family = AddressFamily::Inet;
                 msg
             })),
         );
@@ -883,11 +894,11 @@ where
         read_buf.reset();
         let n = socket.read(locked, current_task, read_buf)?;
 
-        let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
+        let msg = NetlinkMessage::<RouteNetlinkMessage>::deserialize(&read_buf.data()[..n])
             .expect("netlink should always send well-formed messages");
         match msg.payload {
             NetlinkPayload::Done(_) => break,
-            NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(msg)) => {
+            NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewAddress(msg)) => {
                 if msg.header.index == if_index {
                     addrs.push(msg);
                 }
@@ -933,13 +944,13 @@ where
             header.flags = netlink_packet_core::NLM_F_REQUEST | netlink_packet_core::NLM_F_ACK;
             header
         },
-        NetlinkPayload::InnerMessage(RtnlMessage::SetLink({
+        NetlinkPayload::InnerMessage(RouteNetlinkMessage::SetLink({
             let mut msg = LinkMessage::default();
-            msg.header.flags = flags;
+            msg.header.flags = LinkFlags::from_bits(flags).unwrap();
             // Only attempt to change flags in the first 16 bits, because
             // `ifreq` represents flags as a short (i16).
-            msg.header.change_mask = u16::MAX.into();
-            msg.nlas = vec![LinkNla::IfName(iface_name.to_string())];
+            msg.header.change_mask = LinkFlags::from_bits(u16::MAX as u32).unwrap();
+            msg.attributes = vec![LinkAttribute::IfName(iface_name.to_string())];
             msg
         })),
     );
@@ -968,9 +979,9 @@ fn send_netlink_msg_and_wait_response<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     socket: &FileHandle,
-    mut msg: NetlinkMessage<RtnlMessage>,
+    mut msg: NetlinkMessage<RouteNetlinkMessage>,
     read_buf: &mut VecOutputBuffer,
-) -> Result<NetlinkMessage<RtnlMessage>, Errno>
+) -> Result<NetlinkMessage<RouteNetlinkMessage>, Errno>
 where
     L: LockBefore<WriteOps>,
     L: LockBefore<FileOpsCore>,
@@ -985,7 +996,7 @@ where
 
     read_buf.reset();
     let n = socket.read(locked, current_task, read_buf)?;
-    let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
+    let msg = NetlinkMessage::<RouteNetlinkMessage>::deserialize(&read_buf.data()[..n])
         .expect("netlink should always send well-formed messages");
     Ok(msg)
 }

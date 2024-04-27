@@ -9,6 +9,7 @@
 #include <lib/zx/task.h>
 #include <zircon/availability.h>
 #include <zircon/process.h>
+#include <zircon/syscalls/exception.h>
 
 namespace zx {
 class process;
@@ -55,6 +56,12 @@ class thread final : public task<thread> {
   zx_status_t write_state(uint32_t kind, const void* buffer, size_t len) const
       ZX_AVAILABLE_SINCE(7) {
     return zx_thread_write_state(get(), kind, buffer, len);
+  }
+
+  static inline zx_status_t raise_exception(uint32_t options, zx_excp_type_t type,
+                                            const zx_exception_context_t* context)
+      ZX_AVAILABLE_SINCE(20) {
+    return zx_thread_raise_exception(options, type, context);
   }
 
   static inline unowned<thread> self() ZX_AVAILABLE_SINCE(7) {

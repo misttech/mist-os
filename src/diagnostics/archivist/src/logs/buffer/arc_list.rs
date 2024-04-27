@@ -99,7 +99,7 @@ impl<T> Default for InnerArcList<T> {
             items: VecDeque::new(),
             entries_seen: 0,
             entries_popped: 0,
-            final_entry: std::u64::MAX,
+            final_entry: u64::MAX,
             next_cursor_id: CursorId::default(),
             pending_cursors: Vec::new(),
         }
@@ -216,7 +216,7 @@ impl<T> Cursor<T> {
 
         let to = match mode {
             StreamMode::Snapshot => list.inner.lock().entries_seen,
-            StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => std::u64::MAX,
+            StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => u64::MAX,
         };
 
         Self { id, list, last_id_seen: from, until_id: to, mode }

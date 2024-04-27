@@ -271,6 +271,7 @@ async fn assert_resolve_package_with_failing_blobfs_fails(
     blobfs: BlobFsWithFileCreateOverride,
     pkg: Package,
     failing_file_call_count: Arc<AtomicU64>,
+    expected_failing_file_call_count: u64,
 ) {
     let system_image = blobfs.system_image;
     let env = TestEnvBuilder::new()
@@ -296,7 +297,10 @@ async fn assert_resolve_package_with_failing_blobfs_fails(
     let res = env.resolve_package(format!("fuchsia-pkg://test/{}", pkg.name()).as_str()).await;
 
     assert_matches!(res, Err(fidl_fuchsia_pkg::ResolveError::Io));
-    assert_eq!(failing_file_call_count.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(
+        failing_file_call_count.load(std::sync::atomic::Ordering::SeqCst),
+        expected_failing_file_call_count
+    );
 }
 
 #[fuchsia::test]
@@ -307,7 +311,10 @@ async fn fails_on_open_far_in_install_pkg() {
     )
     .await;
 
-    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count).await
+    // pkg-resolver tries to open the meta.far first outside of the fetch queue to see if it can
+    // skip fetching the blob to avoid blocking resolves of fully-cached packages, which results
+    // in two open attempts being made on the meta.far.
+    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count, 2).await
 }
 
 #[fuchsia::test]
@@ -318,7 +325,7 @@ async fn fails_truncate_far_in_install_pkg() {
     )
     .await;
 
-    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count).await
+    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count, 1).await
 }
 
 #[fuchsia::test]
@@ -329,7 +336,7 @@ async fn fails_write_far_in_install_pkg() {
     )
     .await;
 
-    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count).await
+    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count, 1).await
 }
 
 #[fuchsia::test]
@@ -340,7 +347,7 @@ async fn fails_on_open_blob_in_install_blob() {
     )
     .await;
 
-    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count).await
+    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count, 1).await
 }
 
 #[fuchsia::test]
@@ -351,7 +358,7 @@ async fn fails_truncate_blob_in_install_blob() {
     )
     .await;
 
-    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count).await
+    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count, 1).await
 }
 
 #[fuchsia::test]
@@ -362,5 +369,5 @@ async fn fails_write_blob_in_install_blob() {
     )
     .await;
 
-    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count).await
+    assert_resolve_package_with_failing_blobfs_fails(blobfs, pkg, failing_file_call_count, 1).await
 }

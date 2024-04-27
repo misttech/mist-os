@@ -36,7 +36,10 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             (_, _) => false,
         };
 
-        let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
+        let delay_fallback = matches!(
+            context.feature_set_level,
+            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+        );
 
         let test_fuzzing_config =
             driver_framework_config.test_fuzzing_config.as_ref().unwrap_or(&TestFuzzingConfig {

@@ -35,6 +35,12 @@
             type: "bool",
         },
         {
+            config: "fuchsia.wlan.RoamingProfile",
+            key: "roaming_profile",
+            type: "string",
+            max_size: 512,
+        },
+        {
             protocol: [
                 "fuchsia.diagnostics.persist.DataPersistence-wlan",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",

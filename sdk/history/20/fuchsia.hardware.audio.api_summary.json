@@ -56,6 +56,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.audio/Codec.GetProperties",
+        "strictness": "strict",
+        "ordinal": "8794707132531187088",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio/CodecGetPropertiesResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.audio/Codec.IsBridgeable",
         "strictness": "strict",
         "ordinal": "2787842859468818668",
@@ -174,6 +182,16 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.hardware.audio/CodecGetPropertiesResponse.properties",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio/CodecProperties"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio/CodecGetPropertiesResponse"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.hardware.audio/CodecIsBridgeableResponse.supports_bridged_mode",
         "ordinal": "1",
         "type": "bool"
@@ -181,6 +199,40 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.audio/CodecIsBridgeableResponse"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CodecProperties.is_input",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CodecProperties.manufacturer",
+        "ordinal": "2",
+        "type": "string:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CodecProperties.plug_detect_capabilities",
+        "ordinal": "5",
+        "type": "fuchsia.hardware.audio/PlugDetectCapabilities"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CodecProperties.product",
+        "ordinal": "3",
+        "type": "string:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/CodecProperties.unique_id",
+        "ordinal": "4",
+        "type": "array<uint8,16>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio/CodecProperties"
     },
     {
         "kind": "struct/member",
@@ -214,7 +266,7 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.hardware.audio/CodecStopResponse.start_time",
+        "name": "fuchsia.hardware.audio/CodecStopResponse.stop_time",
         "ordinal": "1",
         "type": "int64"
     },
@@ -728,6 +780,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.hardware.audio/DaiProperties.clock_domain",
+        "ordinal": "5",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.hardware.audio/DaiProperties.is_input",
         "ordinal": "1",
         "type": "bool"
@@ -743,6 +801,12 @@
         "name": "fuchsia.hardware.audio/DaiProperties.product_name",
         "ordinal": "3",
         "type": "string:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio/DaiProperties.unique_id",
+        "ordinal": "4",
+        "type": "array<uint8,16>"
     },
     {
         "kind": "table",

@@ -502,4 +502,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0242_configuration_capabilities.md
   - title: "RFC-0243: WLAN Roaming"
     path: /docs/contribute/governance/rfcs/0243_wlan_roaming.md
-
+  - title: "RFC-0244: Raise user-defined Zircon exception"
+    path: /docs/contribute/governance/rfcs/0244_raise_exception.md

@@ -31,7 +31,6 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
-#include <limits>
 #include <string>
 
 #include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
@@ -42,7 +41,6 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/core.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect/device_inspect.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio.h"
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/wlan_interface.h"
 
 constexpr auto kOpenFlags =
     fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kNotDirectory;
@@ -51,32 +49,25 @@ namespace brcmfmac {
 
 SdioDevice::SdioDevice(fdf::DriverStartArgs start_args,
                        fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : Device(),
-      DriverBase("brcmfmac", std::move(start_args), std::move(driver_dispatcher)),
+    : DriverBase("brcmfmac", std::move(start_args), std::move(driver_dispatcher)),
       parent_node_(fidl::WireClient(std::move(node()), dispatcher())) {}
 
 SdioDevice::~SdioDevice() = default;
 
 zx::result<> SdioDevice::Start() {
   wlan::drivers::log::Instance::Init(Debug::kBrcmfMsgFilter);
-  CreateNetDevice();
-  zx::result<> result =
-      compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                compat::ForwardMetadata::None(), NetDev()->GetBanjoConfig());
-  if (result.is_error()) {
-    BRCMF_ERR("Compat server init failed: %s", result.status_string());
-    return result.take_error();
-  }
 
-  zx_status_t status;
-  if ((status = InitDevice()) != ZX_OK) {
+  fidl::Arena arena;
+  zx_status_t status = InitDevice(*outgoing());
+  if (status != ZX_OK) {
     BRCMF_ERR("Init failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
   std::unique_ptr<DeviceInspect> inspect;
-  if ((status = DeviceInspect::Create(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
-                                      &inspect)) != ZX_OK) {
+  if (status = DeviceInspect::Create(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
+                                     &inspect);
+      status != ZX_OK) {
     BRCMF_ERR("Device Inspect create failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
@@ -91,8 +82,8 @@ void SdioDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
     brcmf_sdio_exit(brcmf_bus_.get());
     brcmf_bus_.reset();
   }
-  Shutdown();
-  completer(zx::ok());
+
+  Shutdown([completer = std::move(completer)]() mutable { completer(zx::ok()); });
 }
 
 zx_status_t SdioDevice::BusInit() {

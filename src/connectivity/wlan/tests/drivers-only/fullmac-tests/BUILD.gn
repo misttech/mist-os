@@ -8,9 +8,12 @@ rust_wlan_integration_test("fullmac-tests") {
   edition = "2021"
   binary_deps = [
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
+    "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_rust",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",
+    "//src/connectivity/wlan/lib/ieee80211",
     "//src/connectivity/wlan/tests/drivers-only/common",
     "//src/connectivity/wlan/tests/helpers/fullmac-helpers",
     "//src/lib/fidl/rust/fidl",
@@ -28,5 +31,9 @@ rust_wlan_integration_test("fullmac-tests") {
     log_settings = {
       max_severity = "ERROR"
     }
+
+    # When test cases run in parallel, the logs from their test realms are interleaved.
+    # This disables parallelism so that failing test cases are easier to debug.
+    parallel = 1
   }
 }

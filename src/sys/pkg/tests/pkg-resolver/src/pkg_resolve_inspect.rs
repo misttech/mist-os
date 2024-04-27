@@ -47,7 +47,8 @@ async fn initial_inspect_state() {
             },
             resolver_service: {
                 cache_fallbacks_due_to_not_found: 0u64,
-                active_package_resolves: {}
+                active_package_resolves: {},
+                raw_queue: {},
             },
             blob_fetcher: {
                 blob_header_timeout_seconds: 30u64,
@@ -55,6 +56,7 @@ async fn initial_inspect_state() {
                 blob_download_resumption_attempts_limit: 50u64,
                 blob_type: 1u64,
                 queue: {},
+                raw_queue: {},
             },
             structured_config: contains {},
         }

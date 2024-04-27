@@ -206,7 +206,7 @@ class ScreenshotImageTest(unittest.TestCase):
             param(x=0, y=-1),
         ]
     )
-    def test_get_pixel_out_of_bounds(self, x, y) -> None:
+    def test_get_pixel_out_of_bounds(self, x: int, y: int) -> None:
         image_bytes = rgba_data(RED, GREEN, BLUE, WHITE)
         image = ScreenshotImage(size=Size(2, 2), data=image_bytes)
 
@@ -215,7 +215,7 @@ class ScreenshotImageTest(unittest.TestCase):
         ):
             image.get_pixel(x, y)
 
-    def test_histogram(self):
+    def test_histogram(self) -> None:
         image_bytes = rgba_data(RED, RED, BLUE)
         image = ScreenshotImage(size=Size(3, 1), data=image_bytes)
 
@@ -256,7 +256,7 @@ class ScreenshotImageTest(unittest.TestCase):
         pixels1: list[Pixel],
         pixels2: list[Pixel],
         expected_similarity: float,
-    ):
+    ) -> None:
         image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels1))
         image2 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels2))
         self.assertEqual(
@@ -264,7 +264,7 @@ class ScreenshotImageTest(unittest.TestCase):
             expected_similarity,
         )
 
-    def test_pixel_similarity_different_sized_images(self):
+    def test_pixel_similarity_different_sized_images(self) -> None:
         image1 = ScreenshotImage(size=Size(1, 1), data=rgba_data(RED))
         image2 = ScreenshotImage(size=Size(2, 1), data=rgba_data(GREEN, RED))
 
@@ -300,7 +300,7 @@ class ScreenshotImageTest(unittest.TestCase):
         pixels1: list[Pixel],
         pixels2: list[Pixel],
         expected_similarity: float,
-    ):
+    ) -> None:
         image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels1))
         image2 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels2))
         self.assertEqual(
@@ -308,7 +308,7 @@ class ScreenshotImageTest(unittest.TestCase):
             expected_similarity,
         )
 
-    def test_histogram_similarity_different_sized_images(self):
+    def test_histogram_similarity_different_sized_images(self) -> None:
         image1 = ScreenshotImage(size=Size(1, 1), data=rgba_data(RED))
         image2 = ScreenshotImage(size=Size(2, 1), data=rgba_data(GREEN, RED))
 

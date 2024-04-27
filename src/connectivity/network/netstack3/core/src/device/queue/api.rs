@@ -76,7 +76,7 @@ where
                 let Some(ret) = ret else { return Ok(WorkQueueReport::AllDone) };
 
                 while let Some((meta, p)) = dequed_packets.pop_front() {
-                    tx::deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p);
+                    tx::deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p, &meta);
 
                     match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
                         Ok(()) => {}
@@ -141,7 +141,13 @@ where
                     let ret = prev_queue.dequeue_into(dequed_packets, MAX_BATCH_SIZE);
 
                     while let Some((meta, p)) = dequed_packets.pop_front() {
-                        tx::deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p);
+                        tx::deliver_to_device_sockets(
+                            tx_queue_ctx,
+                            bindings_ctx,
+                            device_id,
+                            &p,
+                            &meta,
+                        );
                         match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
                             Ok(()) => {}
                             Err(DeviceSendFrameError::DeviceNotReady(x)) => {

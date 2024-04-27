@@ -17,7 +17,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use vfs::directory::{entry_container::Directory, mutable::simple::Simple};
+use vfs::directory::{entry_container::Directory, immutable::simple::Simple};
 
 fn to_render2_error(err: fidl::Error) -> Error {
     anyhow::format_err!("Error encountered while calling render2: {:?}", err)
@@ -36,7 +36,7 @@ where
     Fut: Future<Output = Result<(), Error>> + 'static,
     Fut2: Future<Output = Result<fio::DirectoryProxy, Error>> + 'static,
 {
-    let outgoing_dir_vfs = vfs::mut_pseudo_directory! {};
+    let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
     let blobfs_proxy = wipe_storage_fn().await.context("failed to wipe storage")?;
 

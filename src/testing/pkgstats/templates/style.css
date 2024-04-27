@@ -1,0 +1,35 @@
+/* Copyright 2024 The Fuchsia Authors. All rights reserved.
+   Use of this source code is governed by a BSD-style license that can be
+   found in the LICENSE file.
+ */
+body {
+    font-family: Helvetica, sans-serif;
+    color: #333;
+    background-color: #eee;
+    margin: 0px 5% 0px 5%;
+}
+
+a {
+    text-decoration: none;
+    color: #922;
+}
+
+#header {
+    margin-bottom: 25px;
+}
+
+#header div {
+    display: inline-block;
+    padding: 25px;
+    font-size: 18pt;
+}
+
+#header div:first-child {
+    border: 1px solid black;
+    border-radius: 5px;
+}
+
+.contents-table td {
+    vertical-align: text-top;
+    font-size: 14pt;
+}

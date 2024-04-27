@@ -125,23 +125,29 @@ impl MockPeer {
 
     /// Attempts to register the services, as a group, specified by `services`.
     ///
-    /// Returns 1) The ServiceClassProfileIds of the registered services and 2) A future that should
-    /// be polled in order to remove the advertisement when `proxy` is closed.
+    /// Returns the registered service definitions Service Class identifiers for
+    /// the services. Returns a Future that should be polled to clean up the advertisement on
+    /// termination.
     /// Returns an Error if any service in the provided `services` are invalid, or if
     /// registration with the ServiceSet failed.
     pub fn new_advertisement(
         &mut self,
         services: Vec<bredr::ServiceDefinition>,
         proxy: bredr::ConnectionReceiverProxy,
-    ) -> Result<(HashSet<bredr::ServiceClassProfileIdentifier>, impl Future<Output = ()>), Error>
-    {
-        let service_records = parse_service_definitions(services)?;
+    ) -> Result<
+        (
+            Vec<bredr::ServiceDefinition>,
+            HashSet<bredr::ServiceClassProfileIdentifier>,
+            impl Future<Output = ()>,
+        ),
+        Error,
+    > {
+        let service_records = parse_service_definitions(services.clone())?;
         let registration_handle = self
             .service_mgr
             .write()
             .register_service(service_records)
             .ok_or(format_err!("Registration of services failed"))?;
-
         let service_event_stream = proxy.take_event_stream();
 
         if let Some(s) = self.services.insert(registration_handle, proxy) {
@@ -153,19 +159,26 @@ impl MockPeer {
             .get_service_ids_for_registration_handle(&registration_handle)
             .unwrap_or(&HashSet::new())
             .clone();
-
-        let peer_id = self.id.clone();
-        let reg_handle_clone = registration_handle.clone();
-        let detached_service = self.services.get(&registration_handle).expect("just added");
-        let service_mgr_clone = self.service_mgr.clone();
-        let closed_fut = async move {
-            let _ = service_event_stream.map(|_| ()).collect::<()>().await;
-            detached_service.detach();
-            let removed = service_mgr_clone.write().unregister_service(&reg_handle_clone);
-            info!("Peer {} unregistered service advertisement: {:?}", peer_id, removed);
+        let closed_fut = {
+            let peer_id = self.id.clone();
+            let reg_handle_clone = registration_handle.clone();
+            let mut service_event_stream = service_event_stream;
+            let detached_service = self.services.get(&registration_handle).expect("just added");
+            let service_mgr_clone = self.service_mgr.clone();
+            async move {
+                while let Some(event) = service_event_stream.next().await {
+                    match event {
+                        Ok(bredr::ConnectionReceiverEvent::OnRevoke {}) => break,
+                        _ => {}
+                    }
+                }
+                detached_service.detach();
+                let removed = service_mgr_clone.write().unregister_service(&reg_handle_clone);
+                info!(%peer_id, ?removed, "Unregistered service advertisement");
+            }
         };
-
-        Ok((ids, closed_fut))
+        // TODO(b/327758656): Return an updated `services` when the MPS supports dynamic PSMs.
+        Ok((services, ids, closed_fut))
     }
 
     /// Creates a new connection between this peer and the `other` peer.
@@ -219,7 +232,7 @@ impl MockPeer {
         let closed_fut = async move {
             let _ = search_stream.map(|_| ()).collect::<()>().await;
             if search_mgr_clone.write().remove(search_handle) {
-                info!("Peer {} unregistering service search {:?}", peer_id, uuid);
+                info!(%peer_id, ?uuid, "Unregistering service search");
             }
         };
 
@@ -230,18 +243,17 @@ impl MockPeer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        assert_matches::assert_matches,
-        bt_rfcomm::{
-            profile::{is_rfcomm_protocol, server_channel_from_protocol},
-            ServerChannel,
-        },
-        fidl::endpoints::create_proxy_and_stream,
-        fuchsia_async as fasync,
-        fuchsia_bluetooth::profile::ProtocolDescriptor,
-        futures::task::Poll,
-        std::pin::pin,
+
+    use assert_matches::assert_matches;
+    use bt_rfcomm::{
+        profile::{is_rfcomm_protocol, server_channel_from_protocol},
+        ServerChannel,
     };
+    use fidl::endpoints::{create_proxy_and_stream, RequestStream};
+    use fuchsia_async as fasync;
+    use fuchsia_bluetooth::profile::ProtocolDescriptor;
+    use futures::task::Poll;
+    use std::pin::pin;
 
     use crate::{
         profile::tests::{a2dp_service_definition, rfcomm_service_definition},
@@ -267,15 +279,15 @@ mod tests {
     }
 
     /// Builds and registers an A2DP Sink service advertisement.
-    /// Returns 1) ServerEnd of the ConnectionReceiver that will be used to receive l2cap
-    /// connections, 2) A future that signals the termination of the service advertisement
-    /// and 3) The ServiceClassProfileIds that were registered.
+    /// Returns a receiver for incoming L2CAP connections, the registered service definitions and
+    /// IDs, and Future to clean up the advertisement on termination.
     fn build_and_register_service(
         mock_peer: &mut MockPeer,
     ) -> (
         bredr::ConnectionReceiverRequestStream,
-        impl Future<Output = ()>,
+        Vec<bredr::ServiceDefinition>,
         HashSet<bredr::ServiceClassProfileIdentifier>,
+        impl Future<Output = ()>,
     ) {
         // Build the A2DP Sink Service Definition.
         let (a2dp_def, expected_record) = a2dp_service_definition(Psm::new(bredr::PSM_AVDTP));
@@ -283,11 +295,11 @@ mod tests {
         // Register the service.
         let (receiver, stream) =
             create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let (svc_ids, adv_fut) =
+        let (registered, svc_ids, closed_fut) =
             mock_peer.new_advertisement(vec![a2dp_def], receiver).expect("advertisement is ok");
         assert_eq!(expected_record.service_ids().clone(), svc_ids);
 
-        (stream, adv_fut, svc_ids)
+        (stream, registered, svc_ids, closed_fut)
     }
 
     /// Expects a ServiceFound call to the `stream` for the `other_peer`. Returns the primary
@@ -343,43 +355,43 @@ mod tests {
     /// Tests registration of a new service followed by unregistration when the
     /// client drops the ConnectionReceiver.
     #[test]
-    fn registered_service_is_unregistered_when_receiver_disconnects() -> Result<(), Error> {
+    fn registered_service_is_unregistered_when_receiver_disconnects() {
         let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(234);
-        let (mut mock_peer, _observer_stream) = create_mock_peer(id)?;
+        let (mut mock_peer, _observer_stream) = create_mock_peer(id).unwrap();
 
-        let (stream, adv_fut, svc_ids) = build_and_register_service(&mut mock_peer);
-        let mut adv_fut = pin!(adv_fut);
+        let (stream, _registered, svc_ids, closed_fut) = build_and_register_service(&mut mock_peer);
+        let mut closed_fut = pin!(closed_fut);
+        assert!(exec.run_until_stalled(&mut closed_fut).is_pending());
 
         // Services should be advertised.
         let advertised_service_records = mock_peer.get_advertised_services(&svc_ids);
         assert_eq!(svc_ids, advertised_service_records.keys().cloned().collect());
-        assert!(exec.run_until_stalled(&mut adv_fut).is_pending());
 
-        // Client decides to not advertise its service anymore by dropping ServerEnd.
-        // The advertisement future should resolve.
+        // Client decides to not advertise its service anymore by revoking the receiver stream.
+        stream.control_handle().send_on_revoke().expect("valid fidl event");
         drop(stream);
-        assert!(exec.run_until_stalled(&mut adv_fut).is_ready());
+        // This should signal termination to the `closed_fut`.
+        assert!(exec.run_until_stalled(&mut closed_fut).is_ready());
 
         // Advertised services for the previously registered ServiceClassProfileIds should be gone.
         let advertised_service_records = mock_peer.get_advertised_services(&svc_ids);
         assert_eq!(HashSet::new(), advertised_service_records.keys().cloned().collect());
-
-        Ok(())
     }
 
     /// Tests the registration of a new service and establishing a connection
     /// over potentially registered PSMs.
     #[test]
-    fn register_l2cap_service_with_connection_success() -> Result<(), Error> {
+    fn register_l2cap_service_with_connection_success() {
         let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(2392);
-        let (mut mock_peer, mut observer_stream) = create_mock_peer(id)?;
+        let (mut mock_peer, mut observer_stream) = create_mock_peer(id).unwrap();
 
         // Build the A2DP Sink Service Definition.
-        let (mut stream, _adv_fut, _svc_ids) = build_and_register_service(&mut mock_peer);
+        let (mut stream, _registered, _svc_ids, _closed_fut) =
+            build_and_register_service(&mut mock_peer);
 
         // There should be no connection updates yet.
         assert_matches!(exec.run_until_stalled(&mut stream.next()), Poll::Pending);
@@ -416,8 +428,6 @@ mod tests {
             }
             x => panic!("Expected Ready but got: {:?}", x),
         }
-
-        Ok(())
     }
 
     /// Tests the registration of new searches. There can be multiple searches for the
@@ -578,7 +588,7 @@ mod tests {
             rfcomm_service_definition(ServerChannel::try_from(4).expect("valid channel"));
         let (receiver, mut stream) =
             create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-        let (_, _adv_fut) =
+        let _adv_args =
             mock_peer.new_advertisement(vec![rfcomm_def], receiver).expect("valid advertisement");
 
         // Some other peer wants to connect to the RFCOMM service.

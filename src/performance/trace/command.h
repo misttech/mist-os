@@ -5,9 +5,8 @@
 #ifndef SRC_PERFORMANCE_TRACE_COMMAND_H_
 #define SRC_PERFORMANCE_TRACE_COMMAND_H_
 
-#include <fuchsia/tracing/controller/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.controller/cpp/fidl.h>
 #include <lib/fit/function.h>
-#include <lib/sys/cpp/component_context.h>
 
 #include <iosfwd>
 #include <map>
@@ -18,15 +17,15 @@
 
 namespace tracing {
 
-namespace controller = ::fuchsia::tracing::controller;
+namespace controller = fuchsia_tracing_controller;
 
-class Command {
+class Command : public fidl::AsyncEventHandler<controller::Controller> {
  public:
   // OnDoneCallback is the callback type invoked when a command finished
   // running. It takes as argument the return code to exit the process with.
   using OnDoneCallback = fit::function<void(int32_t)>;
   struct Info {
-    using CommandFactory = fit::function<std::unique_ptr<Command>(sys::ComponentContext*)>;
+    using CommandFactory = fit::function<std::unique_ptr<Command>()>;
 
     CommandFactory factory;
     std::string name;
@@ -34,7 +33,10 @@ class Command {
     std::map<std::string, std::string> options;
   };
 
-  virtual ~Command();
+  void on_fidl_error(fidl::UnbindInfo error) override;
+  void handle_unknown_event(fidl::UnknownEventMetadata<controller::Controller> metadata) override;
+
+  ~Command() override;
 
   void Run(const fxl::CommandLine& command_line, OnDoneCallback on_done);
 
@@ -42,10 +44,7 @@ class Command {
   static std::ostream& out();
   static std::istream& in();
 
-  explicit Command(sys::ComponentContext* context);
-
-  sys::ComponentContext* context();
-  sys::ComponentContext* context() const;
+  explicit Command();
 
   // Starts running the command.
   // The command must invoke Done() when finished.
@@ -53,7 +52,6 @@ class Command {
   void Done(int32_t return_code);
 
  private:
-  sys::ComponentContext* context_;
   OnDoneCallback on_done_;
   int32_t return_code_ = -1;
 
@@ -65,14 +63,12 @@ class Command {
 
 class CommandWithController : public Command {
  protected:
-  explicit CommandWithController(sys::ComponentContext* context);
+  explicit CommandWithController();
 
-  controller::ControllerPtr& controller() { return controller_; }
-  const controller::ControllerPtr& controller() const { return controller_; }
+  fidl::Client<controller::Controller>&& take_controller() { return std::move(controller_); }
 
  private:
-  std::unique_ptr<sys::ComponentContext> context_;
-  controller::ControllerPtr controller_;
+  fidl::Client<controller::Controller> controller_;
 
   CommandWithController(const CommandWithController&) = delete;
   CommandWithController(CommandWithController&&) = delete;

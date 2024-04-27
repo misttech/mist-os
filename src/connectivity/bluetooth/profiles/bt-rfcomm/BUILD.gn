@@ -34,10 +34,10 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:futures-test",
   ]
 
   sources = [

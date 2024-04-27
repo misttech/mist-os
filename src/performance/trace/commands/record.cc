@@ -4,7 +4,6 @@
 
 #include "src/performance/trace/commands/record.h"
 
-#include <errno.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fdio/spawn.h>
@@ -13,11 +12,13 @@
 #include <string.h>
 #include <zircon/status.h>
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
+#include "src/performance/trace/utils.h"
 
 namespace tracing {
 
@@ -112,7 +113,7 @@ bool RecordCommand::Options::Setup(const fxl::CommandLine& command_line) {
 
   // --duration=<seconds>
   if (command_line.HasOption(kDuration, &index)) {
-    uint64_t seconds;
+    int64_t seconds;
     if (!fxl::StringToNumberWithError(command_line.options()[index].value, &seconds)) {
       FX_LOGS(ERROR) << "Failed to parse command-line option " << kDuration << ": "
                      << command_line.options()[index].value;
@@ -202,7 +203,7 @@ bool RecordCommand::Options::Setup(const fxl::CommandLine& command_line) {
 
 Command::Info RecordCommand::Describe() {
   return Command::Info{
-      [](sys::ComponentContext* context) { return std::make_unique<RecordCommand>(context); },
+      []() { return std::make_unique<RecordCommand>(); },
       "record",
       "starts tracing and records data",
       {{"output-file=[/tmp/trace.json]",
@@ -247,9 +248,8 @@ Command::Info RecordCommand::Describe() {
         "tracing ends unless --detach is specified"}}};
 }
 
-RecordCommand::RecordCommand(sys::ComponentContext* context)
-    : CommandWithController(context),
-      dispatcher_(async_get_default_dispatcher()),
+RecordCommand::RecordCommand()
+    : dispatcher_(async_get_default_dispatcher()),
       wait_spawned_app_(this),
       weak_ptr_factory_(this) {
   wait_spawned_app_.set_trigger(ZX_PROCESS_TERMINATED);
@@ -282,33 +282,35 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
     record_consumer = [](trace::Record record) {};
     error_handler = [](fbl::String error) {};
   } else {
-    exporter_.reset(new ChromiumExporter(std::move(out_stream)));
+    exporter_ = std::make_unique<ChromiumExporter>(std::move(out_stream));
 
     bytes_consumer = [](const unsigned char* buffer, size_t n_bytes) {};
     record_consumer = [this](trace::Record record) { exporter_->ExportRecord(record); };
     error_handler = [](fbl::String error) { FX_LOGS(ERROR) << error.c_str(); };
   }
 
-  tracer_.reset(new Tracer(controller().get()));
+  tracer_ = std::make_unique<Tracer>(take_controller());
 
   tracing_ = true;
 
-  controller::TraceConfig trace_config;
-  trace_config.set_categories(options_.categories);
-  trace_config.set_buffer_size_megabytes_hint(options_.buffer_size_megabytes);
-  // TODO(dje): start_timeout_milliseconds
-  trace_config.set_buffering_mode(options_.buffering_mode);
-  trace_config.set_provider_specs(TranslateProviderSpecs(options_.provider_specs));
+  controller::TraceConfig trace_config{
+      {.categories = options_.categories,
+       .buffer_size_megabytes_hint = options_.buffer_size_megabytes,
+       // TODO(dje): start_timeout_milliseconds
+       .buffering_mode = options_.buffering_mode,
+       .provider_specs = TranslateProviderSpecs(options_.provider_specs)}};
 
   tracer_->Initialize(
       std::move(trace_config), options_.binary, std::move(bytes_consumer),
       std::move(record_consumer), std::move(error_handler),
-      [this] { DoneTrace(); },  // TODO(https://fxbug.dev/42113074): For now preserve existing behaviour.
+      [this] {
+        DoneTrace();
+      },  // TODO(https://fxbug.dev/42113074): For now preserve existing behaviour.
       [this] { DoneTrace(); }, fit::bind_member(this, &RecordCommand::OnAlert));
 
-  tracer_->Start([this](controller::Controller_StartTracing_Result result) {
-    if (result.is_err()) {
-      FX_LOGS(ERROR) << "Unable to start trace: " << StartErrorCodeToString(result.err());
+  tracer_->Start([this](fidl::Result<controller::Controller::StartTracing> result) {
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Unable to start trace: " << result.error_value();
       tracing_ = false;
       Done(EXIT_FAILURE);
       return;
@@ -328,7 +330,7 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
 
 void RecordCommand::TerminateTrace(int32_t return_code) {
   if (tracing_) {
-    out() << "Terminating trace..." << std::endl;
+    out() << "Terminating trace...\n";
     tracing_ = false;
     return_code_ = return_code;
     tracer_->Terminate();
@@ -344,7 +346,7 @@ void RecordCommand::DoneTrace() {
   tracer_.reset();
   exporter_.reset();
 
-  out() << "Trace file written to " << options_.output_file_name << std::endl;
+  out() << "Trace file written to " << options_.output_file_name << '\n';
 
   Done(return_code_);
 }
@@ -354,7 +356,8 @@ void RecordCommand::DoneTrace() {
 // This is just a log message so the result doesn't need to be executable,
 // this fact to avoid handling various complicated cases like one arg
 // containing a mix of spaces, single quotes, and double quotes.
-static std::string JoinArgsForLogging(const std::vector<std::string>& args) {
+namespace {
+std::string JoinArgsForLogging(const std::vector<std::string>& args) {
   std::string result;
 
   for (const auto& arg : args) {
@@ -363,7 +366,7 @@ static std::string JoinArgsForLogging(const std::vector<std::string>& args) {
     }
     if (arg.size() == 0) {
       result += "\"\"";
-    } else if (arg.find(' ') != arg.npos) {
+    } else if (arg.find(' ') != std::string::npos) {
       result += "{" + arg + "}";
     } else {
       result += arg;
@@ -372,6 +375,7 @@ static std::string JoinArgsForLogging(const std::vector<std::string>& args) {
 
   return result;
 }
+}  // namespace
 
 void RecordCommand::LaunchSpawnedApp() {
   std::vector<std::string> all_args = {options_.app};
@@ -411,7 +415,7 @@ void RecordCommand::OnSpawnedAppExit(async_dispatcher_t* dispatcher, async::Wait
         spawned_app_.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr);
     FX_DCHECK(info_status == ZX_OK);
 
-    out() << "Application exited with return code " << proc_info.return_code << std::endl;
+    out() << "Application exited with return code " << proc_info.return_code << '\n';
     if (!options_.decouple) {
       if (options_.return_child_result) {
         TerminateTrace(proc_info.return_code);
@@ -458,7 +462,7 @@ void RecordCommand::StartTimer() {
       },
       options_.duration);
   out() << "Starting trace; will stop in " << options_.duration.to_nsecs() / 1000000000.0
-        << " seconds..." << std::endl;
+        << " seconds...\n";
 }
 
 }  // namespace tracing

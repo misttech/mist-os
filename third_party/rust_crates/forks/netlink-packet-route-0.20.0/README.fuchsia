@@ -1,0 +1,29 @@
+Name: netlink-packet-route-0.20.0
+License File: LICENSE-MIT
+Description:
+
+# What is this crate used for?
+
+Netlink protocol in Starnix.
+
+# Are there any use restrictions? i.e. only for development hosts
+
+No.
+
+# What differs from upstream?
+
+Pull requests https://github.com/rust-netlink/netlink-packet-route/pull/116
+and https://github.com/rust-netlink/netlink-packet-route/pull/117 have been merged into this patch
+until these patches are merged upstream.
+These are minor changes to add Ord, PartialOrd, and Hash to various types in this library
+as well as to make a previously private parsing function public.
+
+This is tracked in b/336350529
+
+# Are there any restrictions to how it should be rolled?
+
+No.
+
+# Is there anything else which makes this dependency "special"?
+
+No.

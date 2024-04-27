@@ -14,6 +14,9 @@ namespace boot_shim::testing {
 
 std::optional<LoadedDtb> SyntheticDevicetreeTest::empty_dtb_ = std::nullopt;
 std::optional<LoadedDtb> SyntheticDevicetreeTest::arm_gic2_no_msi_ = std::nullopt;
+std::optional<LoadedDtb> SyntheticDevicetreeTest::arm_gic3_stride_ = std::nullopt;
+std::optional<LoadedDtb> SyntheticDevicetreeTest::arm_gic3_four_stride_ = std::nullopt;
+std::optional<LoadedDtb> SyntheticDevicetreeTest::arm_gic3_subsumed_stride_ = std::nullopt;
 
 std::optional<LoadedDtb> ArmDevicetreeTest::crosvm_arm_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic3_ = std::nullopt;

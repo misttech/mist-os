@@ -1730,7 +1730,6 @@ impl ObjectStore {
                     Mutation::deserialize_from_version(&mut cursor, context.checkpoint.version)
                         .context("failed to deserialize encrypted mutation")?;
                 self.apply_mutation(mutation, &context, AssocObj::None)
-                    .await
                     .context("failed to apply encrypted mutation")?;
             }
         }
@@ -2113,7 +2112,7 @@ impl ObjectStore {
 
 #[async_trait]
 impl JournalingObject for ObjectStore {
-    async fn apply_mutation(
+    fn apply_mutation(
         &self,
         mutation: Mutation,
         context: &ApplyContext<'_, '_>,
@@ -2146,23 +2145,23 @@ impl JournalingObject for ObjectStore {
                                 self.update_last_object_id(item.key.object_id);
                             }
                         }
-                        self.tree.insert(item).await?;
+                        self.tree.insert(item)?;
                     }
                     Operation::ReplaceOrInsert => {
-                        self.tree.replace_or_insert(item).await;
+                        self.tree.replace_or_insert(item);
                     }
                     Operation::Merge => {
                         if item.is_tombstone() {
                             self.store_info.lock().unwrap().adjust_object_count(-1);
                         }
                         let lower_bound = item.key.key_for_merge_into();
-                        self.tree.merge_into(item, &lower_bound).await;
+                        self.tree.merge_into(item, &lower_bound);
                     }
                 }
             }
             Mutation::BeginFlush => {
                 ensure!(self.parent_store.is_some(), FxfsError::Inconsistent);
-                self.tree.seal().await;
+                self.tree.seal();
                 self.store_info.lock().unwrap().begin_flush();
             }
             Mutation::EndFlush => {

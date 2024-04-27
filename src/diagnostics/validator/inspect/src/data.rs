@@ -1627,7 +1627,7 @@ mod tests {
         assert!(info.to_string().contains("value: IntArray([4, 2, 0, 2, 1, 0], LinearHistogram)"));
         assert!(info.apply(&insert!(id: 3, value: Value::IntT(8))).is_ok());
         assert!(info.to_string().contains("value: IntArray([4, 2, 0, 2, 1, 1], LinearHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::IntT(std::i64::MAX))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::IntT(i64::MAX))).is_ok());
         assert!(info.to_string().contains("value: IntArray([4, 2, 0, 2, 1, 2], LinearHistogram)"));
         assert!(info.apply(&insert!(id: 3, value: Value::IntT(0))).is_ok());
         assert!(info.to_string().contains("value: IntArray([4, 2, 1, 2, 1, 2], LinearHistogram)"));
@@ -1668,7 +1668,7 @@ mod tests {
         assert!(info
             .to_string()
             .contains("value: IntArray([5, 2, 4, 0, 2, 1, 1], ExponentialHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::IntT(std::i64::MAX))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::IntT(i64::MAX))).is_ok());
         assert!(info
             .to_string()
             .contains("value: IntArray([5, 2, 4, 0, 2, 1, 2], ExponentialHistogram)"));
@@ -1768,7 +1768,7 @@ mod tests {
         assert!(info.to_string().contains("value: UintArray([4, 2, 0, 2, 1, 0], LinearHistogram)"));
         assert!(info.apply(&insert!(id: 3, value: Value::UintT(8))).is_ok());
         assert!(info.to_string().contains("value: UintArray([4, 2, 0, 2, 1, 1], LinearHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::UintT(std::u64::MAX))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::UintT(u64::MAX))).is_ok());
         assert!(info.to_string().contains("value: UintArray([4, 2, 0, 2, 1, 2], LinearHistogram)"));
         assert!(info.apply(&insert!(id: 3, value: Value::UintT(0))).is_ok());
         assert!(info.to_string().contains("value: UintArray([4, 2, 1, 2, 1, 2], LinearHistogram)"));
@@ -1807,7 +1807,7 @@ mod tests {
         assert!(info
             .to_string()
             .contains("value: UintArray([5, 2, 4, 0, 2, 1, 1], ExponentialHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::UintT(std::u64::MAX))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::UintT(u64::MAX))).is_ok());
         assert!(info
             .to_string()
             .contains("value: UintArray([5, 2, 4, 0, 2, 1, 2], ExponentialHistogram)"));

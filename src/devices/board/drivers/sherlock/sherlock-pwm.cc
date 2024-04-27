@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -15,7 +16,6 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
-#include <ddk/metadata/pwm.h>
 #include <soc/aml-t931/t931-pwm.h>
 
 #include "sherlock-gpios.h"
@@ -47,37 +47,13 @@ static const std::vector<fpbus::Mmio> pwm_mmios{
     }},
 };
 
-static const pwm_id_t pwm_ids[] = {
-    {T931_PWM_A},
-    {T931_PWM_B},
-    {T931_PWM_C},
-    {T931_PWM_D},
-    {T931_PWM_E},
-    {T931_PWM_F},
-    {T931_PWM_AO_A},
-    // T931_PWM_AO_B controls VDDEE_800 which is configured by the bootloader.
-    // Marked as protect so we don't try to initialize it.
-    {T931_PWM_AO_B, /*init = */ false},
-    {T931_PWM_AO_C},
-    {T931_PWM_AO_D},
-};
-
-static const std::vector<fpbus::Metadata> pwm_metadata{
-    {{
-        .type = DEVICE_METADATA_PWM_IDS,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&pwm_ids),
-                                     reinterpret_cast<const uint8_t*>(&pwm_ids) + sizeof(pwm_ids)),
-    }},
-};
-
-static const fpbus::Node pwm_dev = []() {
+static fpbus::Node pwm_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "pwm";
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PWM;
   dev.mmio() = pwm_mmios;
-  dev.metadata() = pwm_metadata;
   return dev;
 }();
 
@@ -118,6 +94,36 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Sherlock::PwmInit() {
+  // T931_PWM_AO_B controls VDDEE_800 which is configured by the bootloader.
+  // Marked as protect so we don't try to initialize it.
+  fuchsia_hardware_pwm::PwmChannelsMetadata metadata = {{{{
+      {{.id = T931_PWM_A}},
+      {{.id = T931_PWM_B}},
+      {{.id = T931_PWM_C}},
+      {{.id = T931_PWM_D}},
+      {{.id = T931_PWM_E}},
+      {{.id = T931_PWM_F}},
+      {{.id = T931_PWM_AO_A}},
+      {{.id = T931_PWM_AO_B, .skip_init = true}},
+      {{.id = T931_PWM_AO_C}},
+      {{.id = T931_PWM_AO_D}},
+  }}}};
+
+  fit::result encoded_metadata = fidl::Persist(metadata);
+  if (encoded_metadata.is_error()) {
+    zxlogf(ERROR, "Failed to encode pwm channels metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> pwm_metadata{
+      {{
+          .type = DEVICE_METADATA_PWM_CHANNELS,
+          .data = encoded_metadata.value(),
+      }},
+  };
+  pwm_dev.metadata() = pwm_metadata;
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('PWM_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pwm_dev));

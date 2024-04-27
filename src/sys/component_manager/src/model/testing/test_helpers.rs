@@ -457,7 +457,7 @@ impl ActionsTest {
     ) -> Result<(), fcomponent::Error> {
         let collection_ref = fdecl::CollectionRef { name: coll.to_string() };
         let child_decl = ChildDecl {
-            name: name.to_string(),
+            name: name.parse().unwrap(),
             url: format!("test:///{}", name),
             startup: fdecl::StartupMode::Lazy,
             environment: None,

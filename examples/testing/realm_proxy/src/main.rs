@@ -3,23 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fidl::endpoints::create_endpoints;
 use fidl_fidl_examples_routing_echo as fecho;
 use fidl_test_echoserver as ftest;
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at, connect_to_protocol_at_path,
 };
-use realm_proxy_client::{extend_namespace, InstalledNamespace};
+use realm_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
 
 async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (dict_client, dict_server) = create_endpoints();
-
-    realm_factory
-        .create_realm(options, dict_server)
-        .await?
-        .map_err(realm_proxy_client::Error::OperationError)?;
+    let dict_client =
+        realm_factory.create_realm(options).await?.map_err(realm_client::Error::OperationError)?;
     let ns = extend_namespace(realm_factory, dict_client).await?;
 
     Ok(ns)
@@ -32,13 +27,13 @@ async fn test_example() {
 
     info!("connected to the test realm!");
 
-    let echo = connect_to_protocol_at::<fecho::EchoMarker>(test_ns.prefix()).unwrap();
+    let echo = connect_to_protocol_at::<fecho::EchoMarker>(&test_ns).unwrap();
     let response = echo.echo_string(Some("hello")).await.unwrap().unwrap();
     assert_eq!(response, "hello");
 
     let echo = connect_to_protocol_at_path::<fecho::EchoMarker>(&format!(
         "{}/reverse-echo",
-        test_ns.prefix()
+        test_ns.prefix(),
     ))
     .unwrap();
     let response = echo.echo_string(Some("hello")).await.unwrap().unwrap();

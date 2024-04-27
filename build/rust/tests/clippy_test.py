@@ -82,16 +82,16 @@ class TestClippy(unittest.TestCase):
         with open(FAKE_OUT / TEST_DIR / "a.clippy.deps") as f:
             self.assertEqual(
                 f.read().splitlines(),
-                ["--extern=b=obj/build/rust/tests/libb.rlib"],
+                ["--extern=b=obj/build/rust/tests/b.actual/libb.rlib"],
             )
         with open(FAKE_OUT / TEST_DIR / "b.clippy.deps") as f:
             self.assertEqual(
                 f.read().splitlines(),
-                ["--extern=c=obj/build/rust/tests/libc.rlib"],
+                ["--extern=c=obj/build/rust/tests/c.actual/libc.rlib"],
             )
         with open(FAKE_OUT / TEST_DIR / "a.clippy.transdeps") as f:
             self.assertIn(
-                "-Ldependency=obj/build/rust/tests",
+                "-Ldependency=obj/build/rust/tests/b.actual",
                 f.read().splitlines(),
             )
 

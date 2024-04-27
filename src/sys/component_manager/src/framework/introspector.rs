@@ -9,6 +9,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use cm_types::Name;
 use cm_util::TaskGroup;
+use errors::CapabilityProviderError;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
 use fuchsia_zircon as zx;
@@ -23,7 +24,6 @@ use crate::{
     capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
     model::{
         component::WeakComponentInstance,
-        error::CapabilityProviderError,
         routing::report_routing_failure,
         token::{InstanceRegistry, InstanceToken},
     },

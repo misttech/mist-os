@@ -24,6 +24,7 @@ group("tests") {
   deps = [
     ":ufs-tests",
     ":ufs_bind_test",
+    "test/e2e:tests",
   ]
 }
 

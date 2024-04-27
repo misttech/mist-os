@@ -286,10 +286,7 @@ void Dir::SetLink(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
     page_lock.SetDirty();
 
     fs()->GetDirEntryCache().UpdateDirEntry(Ino(), vnode->GetNameView(), *de, page->GetIndex());
-
-    timespec cur_time;
-    clock_gettime(CLOCK_REALTIME, &cur_time);
-    ctime_ = mtime_ = cur_time;
+    time_->Update<Timestamps::ModificationTime>();
   }
 
   SetDirty();
@@ -364,9 +361,7 @@ void Dir::UpdateParentMetadata(VnodeF2fs *vnode, unsigned int current_depth) {
   }
 
   vnode->SetParentNid(Ino());
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  ctime_ = mtime_ = cur_time;
+  time_->Update<Timestamps::ModificationTime>();
 
   if (current_depth_ != current_depth) {
     current_depth_ = current_depth;
@@ -504,9 +499,7 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
 
   fs()->GetDirEntryCache().RemoveDirEntry(Ino(), remove_name);
 
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  ctime_ = mtime_ = cur_time;
+  time_->Update<Timestamps::ModificationTime>();
 
   if (!vnode || !vnode->IsDir()) {
     SetDirty();
@@ -519,7 +512,7 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
     }
 
     vnode->SetDirty();
-    vnode->SetCTime(cur_time);
+    vnode->SetTime<Timestamps::ChangeTime>();
     vnode->DropNlink();
     if (vnode->IsDir()) {
       vnode->DropNlink();

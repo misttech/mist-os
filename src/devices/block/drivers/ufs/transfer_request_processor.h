@@ -49,6 +49,9 @@ class TransferRequestProcessor : public RequestProcessor {
       ScsiCommandUpiu &request, uint8_t lun, std::optional<zx::unowned_vmo> data = std::nullopt,
       IoCommand *io_cmd = nullptr);
 
+  // This function is a wrapper function that sends a query request UPIU.
+  zx::result<std::unique_ptr<QueryResponseUpiu>> SendQueryRequestUpiu(QueryRequestUpiu &request);
+
   // |SendRequestUpiu| allocates a slot for request UPIU and calls SendRequestUsingSlot.
   // This function is only ever used for admin commands.
   template <class RequestType, class ResponseType>

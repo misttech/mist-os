@@ -123,12 +123,18 @@ impl DatagramSocket {
 
     /// Create a new async datagram socket from an existing socket.
     pub fn new_from_socket(socket: socket2::Socket) -> io::Result<Self> {
-        if socket.r#type()? != socket2::Type::DGRAM {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "socket type is not datagram"));
+        match socket.r#type()? {
+            socket2::Type::DGRAM
+            // SOCK_RAW sockets operate on raw datagrams (e.g. datagrams that
+            // include the frame/packet header). For the purposes of
+            // `DatagramSocket`, their semantics are identical.
+            | socket2::Type::RAW => {
+                socket.set_nonblocking(true)?;
+                let evented_fd = unsafe { EventedFd::new(socket)? };
+                Ok(Self(evented_fd))
+            }
+            _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid socket type.")),
         }
-        socket.set_nonblocking(true)?;
-        let evented_fd = unsafe { EventedFd::new(socket)? };
-        Ok(Self(evented_fd))
     }
 
     /// Returns the socket address that this socket was created from.

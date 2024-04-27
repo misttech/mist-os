@@ -92,6 +92,25 @@ __BEGIN_CDECLS
 // handles the exception.
 #define ZX_EXCP_PROCESS_STARTING        ((uint32_t) 0x308u | ZX_EXCP_SYNTH)
 
+// A user-generated exception.
+// This exception is created by the zx_thread_raise_exception syscall.
+#define ZX_EXCP_USER                    ((uint32_t) 0x309u | ZX_EXCP_SYNTH)
+
+// Codes for user-generated exceptions.
+// These codes appear in the `synth_code` field of zx_exception_context_t.
+
+// A user-generated exception that indicates that the name of process
+// has changed.
+#define ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED  ((uint32_t) 0x0001u)
+
+// Codes greater than or equal to ZX_EXCP_USER_CODE_USER0 are available for
+// for application-defined purposes. Codes less than ZX_EXCP_USER_CODE_USER0
+// are reserved for system-defined purposes and should be listed above.
+// The constants below are defined for application convenience.
+#define ZX_EXCP_USER_CODE_USER0                 ((uint32_t) 0xF000u)
+#define ZX_EXCP_USER_CODE_USER1                 ((uint32_t) 0xF001u)
+#define ZX_EXCP_USER_CODE_USER2                 ((uint32_t) 0xF002u)
+
 typedef uint32_t zx_excp_type_t;
 
 // Assuming |excp| is an exception type, the following returns true if the
@@ -178,9 +197,12 @@ typedef struct zx_exception_info {
     uint8_t padding1[4];
 } zx_exception_info_t;
 
-// Options for zx_create_exception_channel.
+// Options for zx_task_create_exception_channel.
 // When creating an exception channel, use the task's debugger channel.
 #define ZX_EXCEPTION_CHANNEL_DEBUGGER ((uint32_t)1)
+
+// Options for zx_thread_raise_exception
+#define ZX_EXCEPTION_TARGET_JOB_DEBUGGER ((uint32_t)1)
 
 // The type of exception handler a thread may be waiting for a response from.
 // These values are reported in zx_info_thread_t.wait_exception_channel_type.

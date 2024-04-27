@@ -8,7 +8,6 @@ use {
         model::{
             actions::{ActionSet, StopAction},
             component::{IncomingCapabilities, StartReason, WeakComponentInstance},
-            error::ModelError,
             model::Model,
         },
     },
@@ -16,6 +15,7 @@ use {
     async_trait::async_trait,
     cm_rust::FidlIntoNative,
     cm_types::Name,
+    errors::ModelError,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
@@ -310,7 +310,7 @@ mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "a".to_string(),
+                        name: "a".parse().unwrap(),
                         url: "test:///a".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -318,7 +318,7 @@ mod tests {
                         config_overrides: None,
                     })
                     .child(cm_rust::ChildDecl {
-                        name: "cant-resolve".to_string(),
+                        name: "cant-resolve".parse().unwrap(),
                         url: "cant-resolve://cant-resolve".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -331,7 +331,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "b".to_string(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -386,7 +386,7 @@ mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "a".to_string(),
+                        name: "a".parse().unwrap(),
                         url: "test:///a".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -399,7 +399,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "b".to_string(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -508,7 +508,10 @@ mod tests {
             lifecycle_proxy
                 .destroy_instance(
                     "./",
-                    &ChildRef { name: "child".to_string(), collection: Some("coll".to_string()) }
+                    &ChildRef {
+                        name: "child".parse().unwrap(),
+                        collection: Some("coll".to_string())
+                    }
                 )
                 .await
                 .unwrap(),

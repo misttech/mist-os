@@ -161,29 +161,6 @@ closed protocol PlatformBus {
         node Node;
     }) -> () error zx.Status;
 
-    /// Adds a device for binding a protocol implementation driver.
-    /// These devices are added in the same devhost as the platform bus.
-    /// After the driver binds to the device it calls `pbus_register_protocol()`
-    /// to register its protocol with the platform bus.
-    /// `pbus_protocol_device_add()` blocks until the protocol implementation driver
-    /// registers its protocol (or times out).
-    /// Extremely deprecated, please do not use this.
-    strict ProtocolNodeAdd(struct {
-        proto_id uint32;
-        node Node;
-    }) -> () error zx.Status;
-
-    /// Called by protocol implementation drivers to register their protocol
-    /// with the platform bus.
-    /// Extremely deprecated, please do not use this.
-    strict RegisterProtocol(struct {
-        proto_id uint32;
-        /// This is the *_protocol_t buffer. In the future we will probably pass
-        /// a FIDL client end.
-        protocol vector<uint8>:MAX;
-    }) -> () error zx.Status;
-
-
     /// Board drivers may use this to get information about the board, and to
     /// differentiate between multiple boards that they support.
     strict GetBoardInfo() -> (struct {

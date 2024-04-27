@@ -390,6 +390,11 @@ where
         create_shared(&kernel.kthreads.starnix_process, zx::ProcessOptions::empty(), name)
             .map_err(|status| from_status_like_fdio!(status))?;
 
+    // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
+    fuchsia_runtime::job_default()
+        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &process)
+        .map_err(|status| from_status_like_fdio!(status))?;
+
     let memory_manager =
         Arc::new(MemoryManager::new(root_vmar).map_err(|status| from_status_like_fdio!(status))?);
 
@@ -560,7 +565,7 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
 /// Wraps the
 /// [zx_process_create_shared](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create_shared.md)
 /// syscall.
-pub fn create_shared(
+fn create_shared(
     process: &zx::Process,
     options: zx::ProcessOptions,
     name: &[u8],

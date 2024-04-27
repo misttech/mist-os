@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        component::{ComponentInstance, WeakComponentInstance},
-        error::CapabilityProviderError,
-    },
+    crate::model::component::{ComponentInstance, WeakComponentInstance},
     ::routing::capability_source::{ComponentCapability, InternalCapability},
     async_trait::async_trait,
     cm_util::TaskGroup,
+    errors::CapabilityProviderError,
     fuchsia_zircon as zx,
     std::sync,
     vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope},

@@ -10,7 +10,4 @@ extend uint fuchsia.BIND_PROTOCOL {
   SENSOR = 0x97,
 };
 
-enum POWER_DOMAIN {
-  ARM_CORE_BIG,
-  ARM_CORE_LITTLE,
-};
+uint POWER_DOMAIN;

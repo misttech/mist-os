@@ -7,6 +7,20 @@ library fuchsia.net.routes;
 using fuchsia.net;
 using zx;
 
+/// The ID of a route table.
+///
+/// `TableId`s are globally unique non-reusable identifiers for a route table.
+@available(added=HEAD)
+alias TableId = uint32;
+
+/// Maximum length of a table name.
+@available(added=HEAD)
+const MAX_TABLE_NAME_LEN uint64 = 255;
+
+/// The name of a route table.
+@available(added=HEAD)
+alias TableName = string:MAX_TABLE_NAME_LEN;
+
 /// A placeholder for empty values.
 @available(added=HEAD)
 type Empty = struct {};
@@ -96,4 +110,19 @@ closed protocol State {
             2: gateway Destination;
         };
     }) error zx.Status;
+
+    /// Gets the route table name by its ID.
+    ///
+    /// + request `table_id` the ID of the route table in question.
+    /// - response `table_name` the name of the route table, if the route table
+    /// does not have a name, an empty string is returned.
+    /// * error `NO_TABLE` if the route table does not exist.
+    @available(added=HEAD)
+    strict GetRouteTableName(struct {
+        table_id TableId;
+    }) -> (struct {
+        table_name TableName;
+    }) error strict enum {
+        NO_TABLE = 1;
+    };
 };

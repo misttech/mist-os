@@ -36,7 +36,6 @@ visibility = [ "./*" ]
 source_set("debug") {
   public = [ "debug.h" ]
   public_deps = [
-    "//sdk/lib/driver/compat/cpp:logging",
     "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
     "//zircon/system/public",
   ]
@@ -68,7 +67,7 @@ source_set("linuxisms") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//zircon/system/public",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
@@ -157,10 +156,10 @@ source_set("core") {
   public_deps = [
     ":debug",
     ":linuxisms",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib_cpp",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
-    "//sdk/lib/driver/compat/cpp:logging",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/stdcompat",

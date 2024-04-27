@@ -21,6 +21,7 @@ if (is_host) {
       "//src/developer/ffx/lib/addr:lib",
       "//src/developer/ffx/lib/compat_info:lib",
       "//src/developer/ffx/lib/discovery:lib",
+      "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/netext:lib",
       "//src/developer/ffx/lib/rcs:lib",

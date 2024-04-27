@@ -1228,7 +1228,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
 
             // Add the router as a default gateway.
             let set_provider = realm
-                .connect_to_protocol::<I::SetProviderMarker>()
+                .connect_to_protocol::<I::RouteTableMarker>()
                 .expect("connect to route set provider");
             let route_set =
                 fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");

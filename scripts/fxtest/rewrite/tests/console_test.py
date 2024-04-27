@@ -61,7 +61,7 @@ class TestConsole(unittest.IsolatedAsyncioTestCase):
                 sleep_length=1,
             ),
         ]
-    )  # type: ignore[misc]
+    )
     @mock.patch("console.termout.is_valid", return_value=True)
     @mock.patch(
         "console.statusinfo.os.get_terminal_size",

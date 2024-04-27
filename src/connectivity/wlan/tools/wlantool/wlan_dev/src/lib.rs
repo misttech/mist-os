@@ -5,7 +5,6 @@
 use {
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints,
-    fidl_fuchsia_wlan_common::PowerSaveType,
     fidl_fuchsia_wlan_common::{self as fidl_common, WlanMacRole},
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_device_service::{
@@ -242,39 +241,6 @@ async fn do_phy(cmd: opts::PhyCmd, monitor_proxy: DeviceMonitor) -> Result<(), E
             let response =
                 monitor_proxy.clear_country(&req).await.context("error clearing country")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
-        }
-        opts::PhyCmd::SetPowerSaveMode { phy_id, mode } => {
-            println!("SetPSMode: phy_id {:?} ps_mode {:?}", phy_id, mode);
-            let req = wlan_service::SetPowerSaveModeRequest { phy_id, ps_mode: mode.into() };
-            let response =
-                monitor_proxy.set_power_save_mode(&req).await.context("error setting ps mode")?;
-            println!("response: {:?}", zx_status::Status::from_raw(response));
-        }
-        opts::PhyCmd::GetPowerSaveMode { phy_id } => {
-            let result =
-                monitor_proxy.get_power_save_mode(phy_id).await.context("error getting ps mode")?;
-            match result {
-                Ok(resp) => match resp.ps_mode {
-                    PowerSaveType::PsModePerformance => {
-                        println!("PS Mode Off");
-                    }
-                    PowerSaveType::PsModeBalanced => {
-                        println!("Medium PS Mode");
-                    }
-                    PowerSaveType::PsModeLowPower => {
-                        println!("Low Ps Mode");
-                    }
-                    PowerSaveType::PsModeUltraLowPower => {
-                        println!("Ultra low Ps Mode");
-                    }
-                },
-                Err(status) => {
-                    println!(
-                        "response: Failed with status {:?}",
-                        zx_status::Status::from_raw(status)
-                    );
-                }
-            }
         }
     }
     Ok(())
@@ -967,58 +933,6 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
-    fn test_get_power_save_mode() {
-        let mut exec = fasync::TestExecutor::new();
-        let (monitor_svc_local, monitor_svc_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_svc_stream =
-            monitor_svc_remote.into_stream().expect("failed to create stream");
-        let fut = do_phy(PhyCmd::GetPowerSaveMode { phy_id: 45 }, monitor_svc_local);
-        let mut fut = pin!(fut);
-
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
-            exec.run_until_stalled(&mut monitor_svc_stream.next()),
-            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetPowerSaveMode {
-                phy_id, responder,
-            }))) => {
-                assert_eq!(phy_id, 45);
-                responder.send(
-                     Ok(&fidl_fuchsia_wlan_device_service::GetPowerSaveModeResponse {
-                        ps_mode: PowerSaveType::PsModePerformance,
-                    })).expect("failed to send response");
-            }
-        );
-
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
-    }
-
-    #[fuchsia::test]
-    fn test_set_power_save_mode() {
-        let mut exec = fasync::TestExecutor::new();
-        let (monitor_svc_local, monitor_svc_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_svc_stream =
-            monitor_svc_remote.into_stream().expect("failed to create stream");
-        let fut = do_phy(
-            PhyCmd::SetPowerSaveMode { phy_id: 45, mode: PsModeArg::PsModeBalanced },
-            monitor_svc_local,
-        );
-        let mut fut = pin!(fut);
-
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
-            exec.run_until_stalled(&mut monitor_svc_stream.next()),
-            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::SetPowerSaveMode {
-                req, responder,
-            }))) => {
-                assert_eq!(req.phy_id, 45);
-                assert_eq!(req.ps_mode, PowerSaveType::PsModeBalanced);
-                responder.send(zx_status::Status::OK.into_raw()).expect("failed to send response");
-            }
-        );
-    }
     #[fuchsia::test]
     fn test_generate_psk() {
         assert_eq!(

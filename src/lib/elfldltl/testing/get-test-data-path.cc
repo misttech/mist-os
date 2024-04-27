@@ -42,11 +42,22 @@ std::filesystem::path GetTestDataPath(std::string_view filename) {
 
 #ifndef __Fuchsia__
 // See get-test-lib.cc for the Fuchsia case; elsewhere this is a normal open.
-fbl::unique_fd GetTestLib(std::string_view libname) {
+fbl::unique_fd TryGetTestLib(std::string_view libname) {
   std::string path = GetTestDataPath(libname);
   fbl::unique_fd fd{open(path.c_str(), O_RDONLY)};
-  EXPECT_TRUE(fd) << "elfldltl::testing::GetTestLib(\"" << libname << "\"):" << path << ": "
-                  << strerror(errno);
+  // If the fd is not valid, expect that it is due to the file not found; any
+  // other kind of error is unexpected.
+  if (!fd) {
+    EXPECT_EQ(errno, ENOENT) << "elfldltl::testing::TryGetTestLib(\"" << libname << "\"): " << path
+                             << ": " << strerror(errno);
+  }
+  return fd;
+}
+
+fbl::unique_fd GetTestLib(std::string_view libname) {
+  auto fd = TryGetTestLib(libname);
+  EXPECT_TRUE(fd) << "elfldltl::testing::GetTestLib(\"" << libname
+                  << "\"): " << GetTestDataPath(libname) << " not found";
   return fd;
 }
 #endif

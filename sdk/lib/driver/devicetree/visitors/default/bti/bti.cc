@@ -53,8 +53,7 @@ bool BtiVisitor::IsIommu(std::string_view node_name) { return node_name == "iomm
 zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
   zx::result parser_output = reference_parser_->Parse(node);
   if (parser_output.is_error()) {
-    FDF_LOG(ERROR, "Failed to parse reference for node '%.*s'", (int)node.name().length(),
-            node.name().data());
+    FDF_LOG(ERROR, "Failed to parse reference for node '%s'", node.name().c_str());
     return parser_output.take_error();
   }
 
@@ -100,7 +99,7 @@ zx::result<> BtiVisitor::ReferenceChildVisit(Node& child, ReferenceNode& parent,
       .bti_id = iommu_cell.bti_id(),
   }};
   FDF_LOG(DEBUG, "BTI (0x%0x, 0x%0x) added to node '%s'.", *bti.iommu_index(), *bti.bti_id(),
-          child.name().data());
+          child.name().c_str());
   child.AddBti(bti);
 
   return zx::ok();

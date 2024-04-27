@@ -315,7 +315,7 @@ impl ObjectManager {
         self.inner.read().unwrap().allocator.clone().unwrap()
     }
 
-    async fn apply_mutation(
+    fn apply_mutation(
         &self,
         object_id: u64,
         mutation: Mutation,
@@ -382,13 +382,13 @@ impl ObjectManager {
             self.lazy_open_store(object_id)
         });
         associated_object.map(|o| o.will_apply_mutation(&mutation, object_id, self));
-        object.apply_mutation(mutation, context, associated_object).await
+        object.apply_mutation(mutation, context, associated_object)
     }
 
     /// Called by the journaling system to replay the given mutations.  `checkpoint` indicates the
     /// location in the journal file for this transaction and `end_offset` is the ending journal
     /// offset.
-    pub async fn replay_mutations(
+    pub fn replay_mutations(
         &self,
         mutations: Vec<(u64, Mutation)>,
         context: &ApplyContext<'_, '_>,
@@ -412,7 +412,7 @@ impl ObjectManager {
                 }
                 continue;
             }
-            self.apply_mutation(object_id, mutation, context, AssocObj::None).await?;
+            self.apply_mutation(object_id, mutation, context, AssocObj::None)?;
         }
         Ok(())
     }
@@ -420,7 +420,7 @@ impl ObjectManager {
     /// Called by the journaling system to apply a transaction.  `checkpoint` indicates the location
     /// in the journal file for this transaction.  Returns an optional mutation to be written to be
     /// included with the transaction.
-    pub async fn apply_transaction(
+    pub fn apply_transaction(
         &self,
         transaction: &mut Transaction<'_>,
         checkpoint: &JournalCheckpoint,
@@ -434,7 +434,7 @@ impl ObjectManager {
         let context =
             ApplyContext { mode: ApplyMode::Live(transaction), checkpoint: checkpoint.clone() };
         for TxnMutation { object_id, mutation, associated_object, .. } in mutations {
-            self.apply_mutation(object_id, mutation, &context, associated_object).await?;
+            self.apply_mutation(object_id, mutation, &context, associated_object)?;
         }
         debug!("END TXN");
 

@@ -6,7 +6,7 @@ use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
-use ffx_audio_device_args::{DeviceCommand, DeviceRecordCommand, SubCommand};
+use ffx_audio_device_args::{DeviceCommand, RecordCommand, SetCommand, SetSubCommand, SubCommand};
 use ffx_command::user_error;
 use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::{
@@ -23,12 +23,15 @@ use fuchsia_zircon_status::Status;
 use futures::{AsyncWrite, FutureExt};
 use prettytable::Table;
 use serde::Serialize;
-use std::io::Read;
+use std::io::{Read, Write};
 
+mod connect;
+mod control;
 mod info;
 pub mod list;
 mod serde_ext;
 
+use control::DeviceControl;
 use list::QueryExt;
 
 #[derive(Debug, Serialize)]
@@ -53,6 +56,8 @@ pub struct DeviceTool {
     dev_class: fio::DirectoryProxy,
     #[with(optional_moniker("/core/audio_device_registry"))]
     registry: Option<fadevice::RegistryProxy>,
+    #[with(optional_moniker("/core/audio_device_registry"))]
+    control_creator: Option<fadevice::ControlCreatorProxy>,
 }
 
 fho::embedded_plugin!(DeviceTool);
@@ -147,15 +152,47 @@ impl FfxMain for DeviceTool {
 
                 match self.cmd.subcommand {
                     SubCommand::Gain(gain_cmd) => gain_state.gain_db = Some(gain_cmd.gain),
-                    SubCommand::Mute(..) => gain_state.muted = Some(true),
-                    SubCommand::Unmute(..) => gain_state.muted = Some(false),
+                    SubCommand::Mute(_) => gain_state.muted = Some(true),
+                    SubCommand::Unmute(_) => gain_state.muted = Some(false),
                     SubCommand::Agc(agc_command) => {
                         gain_state.agc_enabled = Some(agc_command.enable)
                     }
-                    _ => {}
+                    _ => unreachable!(),
                 }
 
                 device_set_gain_state(self.device_controller, selector, gain_state).await
+            }
+            SubCommand::Set(_)
+            | SubCommand::Start(_)
+            | SubCommand::Stop(_)
+            | SubCommand::Reset(_) => {
+                let device_control = connect::connect_device_control(
+                    &self.dev_class,
+                    self.control_creator.as_ref(),
+                    selector,
+                )
+                .await?;
+
+                match self.cmd.subcommand {
+                    SubCommand::Set(set_command) => {
+                        device_set(device_control, set_command, writer).await
+                    }
+                    SubCommand::Start(_) => {
+                        let start_time = device_control.start().await?;
+                        writeln!(writer, "Started at {}.", start_time)
+                            .bug_context("Failed to write result")
+                    }
+                    SubCommand::Stop(_) => {
+                        let stop_time = device_control.stop().await?;
+                        writeln!(writer, "Stopped at {}.", stop_time)
+                            .bug_context("Failed to write result")
+                    }
+                    SubCommand::Reset(_) => {
+                        device_control.reset().await?;
+                        writeln!(writer, "Reset device.").bug_context("Failed to write result")
+                    }
+                    _ => unreachable!(),
+                }
             }
         }
     }
@@ -233,7 +270,7 @@ async fn device_play(
 async fn device_record<W, E>(
     recorder: fac::RecorderProxy,
     selector: Selector,
-    record_command: DeviceRecordCommand,
+    record_command: RecordCommand,
     cancel_server: ServerEnd<fac::RecordCancelerMarker>,
     mut output_writer: W,
     mut output_error_writer: E,
@@ -313,6 +350,21 @@ pub fn device_list_untagged(
         .bug_context("Failed to write result")
 }
 
+async fn device_set(
+    device_control: Box<dyn DeviceControl>,
+    set_command: SetCommand,
+    mut writer: MachineWriter<DeviceResult>,
+) -> fho::Result<()> {
+    match set_command.subcommand {
+        SetSubCommand::DaiFormat(dai_format_cmd) => {
+            device_control.set_dai_format(dai_format_cmd.format, dai_format_cmd.element_id).await?;
+            writeln!(writer, "Set DAI format.").bug_context("Failed to write result")?;
+        }
+    };
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,7 +375,6 @@ mod tests {
     use fidl_fuchsia_audio_device as fadevice;
     use fuchsia_audio::{device::DevfsSelector, format::SampleType, Format};
     use std::fs;
-    use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;
 
@@ -335,7 +386,7 @@ mod tests {
         let writer: MachineWriter<DeviceResult> = MachineWriter::new_test(None, &test_buffers);
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Output,
         });
 
@@ -393,7 +444,7 @@ mod tests {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Output,
         });
 
@@ -428,7 +479,7 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let mut result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let record_command = DeviceRecordCommand {
+        let record_command = RecordCommand {
             duration: Some(std::time::Duration::from_nanos(500)),
             format: Format {
                 sample_type: SampleType::Uint8,
@@ -439,7 +490,7 @@ mod tests {
         };
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Input,
         });
 
@@ -479,7 +530,7 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let mut result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let record_command = DeviceRecordCommand {
+        let record_command = RecordCommand {
             duration: None,
             format: Format {
                 sample_type: SampleType::Uint8,
@@ -490,7 +541,7 @@ mod tests {
         };
 
         let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
+            name: "abc123".to_string(),
             device_type: fadevice::DeviceType::Input,
         });
 
@@ -523,11 +574,11 @@ mod tests {
 
         let devices = list::Devices::Devfs(vec![
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Input,
             }),
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Output,
             }),
         ]);
@@ -536,8 +587,8 @@ mod tests {
 
         let stdout = test_buffers.into_stdout_str();
         let stdout_expected = format!(
-            "\"/dev/class/audio-input/abc123\" Device id: \"abc123\", Device type: StreamConfig, Input\n\
-            \"/dev/class/audio-output/abc123\" Device id: \"abc123\", Device type: StreamConfig, Output\n"
+            "\"/dev/class/audio-input/abc123\" Device name: \"abc123\", Device type: StreamConfig, Input\n\
+            \"/dev/class/audio-output/abc123\" Device name: \"abc123\", Device type: StreamConfig, Output\n"
         );
 
         assert_eq!(stdout, stdout_expected);
@@ -553,11 +604,11 @@ mod tests {
 
         let devices = list::Devices::Devfs(vec![
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Input,
             }),
             DevfsSelector(fac::Devfs {
-                id: "abc123".to_string(),
+                name: "abc123".to_string(),
                 device_type: fadevice::DeviceType::Output,
             }),
         ]);
@@ -568,13 +619,13 @@ mod tests {
         let stdout_expected = format!(
             "{{\"devices\":[\
                 {{\
-                    \"device_id\":\"abc123\",\
+                    \"device_name\":\"abc123\",\
                     \"is_input\":true,\
                     \"device_type\":\"STREAMCONFIG\",\
                     \"path\":\"/dev/class/audio-input/abc123\"\
                 }},\
                 {{\
-                    \"device_id\":\"abc123\",\
+                    \"device_name\":\"abc123\",\
                     \"is_input\":false,\
                     \"device_type\":\"STREAMCONFIG\",\
                     \"path\":\"/dev/class/audio-output/abc123\"\

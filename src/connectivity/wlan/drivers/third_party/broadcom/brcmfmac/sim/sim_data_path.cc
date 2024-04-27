@@ -13,20 +13,21 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_data_path.h"
 
+#include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
+#include <lib/fdf/cpp/env.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 
-#include "fuchsia/hardware/network/driver/cpp/banjo.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
-#include "zircon/syscalls.h"
 
 namespace wlan::brcmfmac {
 
 namespace {
 
 // NOTE: These can't conflict with the vmo id used internally by sim_fw.cc
-constexpr uint8_t kTxVmoId = MAX_VMOS - 1;
-constexpr uint8_t kRxVmoId = MAX_VMOS - 2;
+constexpr uint8_t kTxVmoId = fuchsia_hardware_network_driver::kMaxVmos - 1;
+constexpr uint8_t kRxVmoId = fuchsia_hardware_network_driver::kMaxVmos - 2;
 
 zx::result<cpp20::span<uint8_t>> CreateAndMapVmo(zx::vmo& vmo, uint64_t req_size) {
   zx_status_t status = zx::vmo::create(req_size, 0, &vmo);
@@ -51,88 +52,191 @@ zx::result<cpp20::span<uint8_t>> CreateAndMapVmo(zx::vmo& vmo, uint64_t req_size
 }
 }  // namespace
 
-void SimDataPath::Init(drivers::components::NetworkDevice* net_dev) {
-  ZX_ASSERT(net_dev);
-  net_dev_ = net_dev;
+SimDataPath::~SimDataPath() {
+  if (client_dispatcher_.get()) {
+    client_dispatcher_.ShutdownAsync();
+    client_dispatcher_shutdown_.Wait();
+  }
+  if (ifc_dispatcher_.get()) {
+    ifc_dispatcher_.ShutdownAsync();
+    ifc_dispatcher_shutdown_.Wait();
+  }
+  if (port_dispatcher_.get()) {
+    port_dispatcher_.ShutdownAsync();
+    port_dispatcher_shutdown_.Wait();
+  }
+}
 
-  net_dev_->NetworkDeviceImplInit(
-      &ifc_protocol_,
-      [](void* ctx, zx_status_t status) {
-        ZX_ASSERT(status == ZX_OK);
+void SimDataPath::Init(fidl::UnownedClientEnd<fuchsia_io::Directory> outgoing_dir_client,
+                       fit::callback<void(zx_status_t)>&& on_complete) {
+  auto client_dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      this, fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "datapath-client",
+      [this](fdf_dispatcher_t*) { client_dispatcher_shutdown_.Signal(); });
+  ZX_ASSERT(client_dispatcher.is_ok());
+  client_dispatcher_ = std::move(client_dispatcher.value());
 
-        SimDataPath* data_path = static_cast<SimDataPath*>(ctx);
-        data_path->net_dev_->NetworkDeviceImplGetInfo(&data_path->device_info_);
+  auto ifc_dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "datapath-ifc", [this](fdf_dispatcher_t*) { ifc_dispatcher_shutdown_.Signal(); });
+  ZX_ASSERT(ifc_dispatcher.is_ok());
+  ifc_dispatcher_ = std::move(ifc_dispatcher.value());
 
-        // setup tx vmo, which is just a single frame of size kMaxFrameSize
-        zx::vmo tx_vmo;
-        auto tx_result = CreateAndMapVmo(tx_vmo, kMaxFrameSize);
-        ZX_ASSERT(tx_result.is_ok());
-        data_path->tx_span_ = tx_result.value();
+  auto port_dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "datapath-port", [this](fdf_dispatcher_t*) { port_dispatcher_shutdown_.Signal(); });
+  ZX_ASSERT(port_dispatcher.is_ok());
+  port_dispatcher_ = std::move(port_dispatcher.value());
 
-        // setup rx vmo
-        zx::vmo rx_vmo;
-        auto rx_result = CreateAndMapVmo(rx_vmo, kMaxFrameSize);
-        ZX_ASSERT(rx_result.is_ok());
-        data_path->rx_span_ = rx_result.value();
+  auto netdev_client = drivers::components::test::NetworkDeviceClient::Create(
+      outgoing_dir_client, client_dispatcher_.get());
+  ZX_ASSERT(netdev_client.is_ok());
+  netdev_client_ = std::move(*netdev_client);
+  ZX_ASSERT(netdev_client_->is_valid());
 
-        auto assert_ok = [](void* ctx, zx_status_t result) { ZX_ASSERT(result == ZX_OK); };
+  async::PostTask(client_dispatcher_.async_dispatcher(), [this, on_complete = std::move(
+                                                                    on_complete)]() mutable {
+    sim_device_.NetDev().WaitUntilServerConnected();
 
-        // Give both vmos to net device
-        data_path->net_dev_->NetworkDeviceImplPrepareVmo(kTxVmoId, std::move(tx_vmo), assert_ok,
-                                                         nullptr);
-        data_path->net_dev_->NetworkDeviceImplPrepareVmo(kRxVmoId, std::move(rx_vmo), assert_ok,
-                                                         nullptr);
+    test_net_dev_ifc_.add_port_ =
+        [this](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcAddPortRequest* request,
+               fdf::Arena& arena, auto& completer) {
+          OnAddPort(request->id, std::move(request->port));
+          completer.buffer(arena).Reply(ZX_OK);
+        };
+    test_net_dev_ifc_.remove_port_ =
+        [this](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcRemovePortRequest* request,
+               fdf::Arena& arena, auto& completer) { OnRemovePort(request->id); };
+    test_net_dev_ifc_.complete_rx_ =
+        [this](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteRxRequest* request,
+               fdf::Arena& arena, auto& completer) {
+          OnRxComplete(cpp20::span(request->rx.begin(), request->rx.end()));
+        };
+    test_net_dev_ifc_.complete_tx_ =
+        [this](fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request,
+               fdf::Arena& arena, auto& completer) {
+          OnTxComplete(cpp20::span(request->tx.begin(), request->tx.end()));
+        };
 
-        data_path->net_dev_->NetworkDeviceImplStart(assert_ok, nullptr);
+    auto bind_result = test_net_dev_ifc_.Bind(ifc_dispatcher_.get());
+    if (bind_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to bind NetworkDeviceIfc: %s", bind_result.status_string());
+      on_complete(bind_result.status_value());
+      return;
+    }
 
-        // Give the rx buffer to the network device on init
-        data_path->QueueRxBuffer();
-      },
-      this);
+    fdf::Arena arena('SMDP');
+    auto result = netdev_client_->sync().buffer(arena)->Init(std::move(*bind_result));
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "NetDevice init failed: %s", result.FormatDescription().c_str());
+      on_complete(result.status());
+      return;
+    }
+    if (result->s != ZX_OK) {
+      FDF_LOG(ERROR, "NetDevice init failed: %s", zx_status_get_string(result->s));
+      on_complete(result->s);
+      return;
+    }
+
+    auto info = netdev_client_->sync().buffer(arena)->GetInfo();
+    if (!info.ok()) {
+      FDF_LOG(ERROR, "GetInfo failed: %s", info.FormatDescription().c_str());
+      on_complete(info.status());
+      return;
+    }
+    device_info_ = fidl::ToNatural(info->info);
+
+    // setup tx vmo, which is just a single frame of size kMaxFrameSize
+    zx::vmo tx_vmo;
+    auto tx_result = CreateAndMapVmo(tx_vmo, kMaxFrameSize);
+    if (tx_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to create and map TX VMO: %s", tx_result.status_string());
+      on_complete(tx_result.status_value());
+      return;
+    }
+    tx_span_ = tx_result.value();
+
+    // setup rx vmo
+    zx::vmo rx_vmo;
+    auto rx_result = CreateAndMapVmo(rx_vmo, kMaxFrameSize);
+    if (rx_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to create and map RX VMO: %s", rx_result.status_string());
+      on_complete(rx_result.status_value());
+      return;
+    }
+    rx_span_ = rx_result.value();
+
+    // Give both vmos to net device
+    auto prepare = netdev_client_->sync().buffer(arena)->PrepareVmo(kTxVmoId, std::move(tx_vmo));
+    if (!prepare.ok() || prepare->s != ZX_OK) {
+      FDF_LOG(
+          ERROR, "Failed to prepare TX VMO: %s",
+          prepare.ok() ? zx_status_get_string(prepare->s) : prepare.FormatDescription().c_str());
+      on_complete(prepare.ok() ? prepare->s : prepare.status());
+      return;
+    }
+    prepare = netdev_client_->sync().buffer(arena)->PrepareVmo(kRxVmoId, std::move(rx_vmo));
+    if (!prepare.ok() || prepare->s != ZX_OK) {
+      FDF_LOG(
+          ERROR, "Failed to prepare RX VMO: %s",
+          prepare.ok() ? zx_status_get_string(prepare->s) : prepare.FormatDescription().c_str());
+      on_complete(prepare.ok() ? prepare->s : prepare.status());
+      return;
+    }
+
+    auto start = netdev_client_->sync().buffer(arena)->Start();
+    if (!start.ok() || start->s != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to start network device: %s",
+              start.ok() ? zx_status_get_string(start->s) : start.FormatDescription().c_str());
+      on_complete(start.ok() ? start->s : start.status());
+      return;
+    }
+
+    // Give the rx buffer to the network device on init
+    QueueRxBuffer();
+
+    on_complete(ZX_OK);
+  });
 }
 
 void SimDataPath::TxEthernet(uint16_t id, common::MacAddr dst, common::MacAddr src, uint16_t type,
                              cpp20::span<const uint8_t> body) {
-  ZX_ASSERT(net_dev_);
-  ZX_ASSERT_MSG(body.size() + sim_utils::kEthernetHeaderSize + device_info_.tx_head_length +
-                        device_info_.tx_tail_length <=
-                    kMaxFrameSize,
-                "Ethernet frame size too large");
+  const size_t frame_size = body.size() + sim_utils::kEthernetHeaderSize +
+                            device_info_.tx_head_length().value() +
+                            device_info_.tx_tail_length().value();
+  ZX_ASSERT_MSG(frame_size <= kMaxFrameSize, "Ethernet frame size too large");
 
-  auto data_span =
-      tx_span_.subspan(device_info_.tx_head_length, body.size() + sim_utils::kEthernetHeaderSize);
+  auto data_span = tx_span_.subspan(*device_info_.tx_head_length(),
+                                    body.size() + sim_utils::kEthernetHeaderSize);
   ZX_ASSERT(sim_utils::WriteEthernetFrame(data_span, dst, src, type, body) == ZX_OK);
 
   TxRegion(id, 0, data_span.size());
 }
 
 void SimDataPath::TxRaw(uint16_t id, const std::vector<uint8_t>& body) {
-  ZX_ASSERT(net_dev_);
-  ZX_ASSERT_MSG(
-      body.size() + device_info_.tx_head_length + device_info_.tx_tail_length <= kMaxFrameSize,
-      "Frame size too large");
+  const size_t frame_size =
+      body.size() + device_info_.tx_head_length().value() + device_info_.tx_tail_length().value();
+  ZX_ASSERT_MSG(frame_size <= kMaxFrameSize, "Frame size too large");
 
-  auto data_span = tx_span_.subspan(device_info_.tx_head_length, body.size());
+  auto data_span = tx_span_.subspan(*device_info_.tx_head_length(), body.size());
   memcpy(data_span.data(), body.data(), body.size());
   TxRegion(id, 0, data_span.size());
 }
 
-void SimDataPath::OnTxComplete(const tx_result_t* tx_list, size_t tx_count) {
+void SimDataPath::OnTxComplete(cpp20::span<fuchsia_hardware_network_driver::wire::TxResult> tx) {
   // Currently only one frame is sent at a time by the sim driver.
   // It is possible for this to be called with tx_count == 0 if frames owned internally by the
   // driver (not the network device) were transmitted.
-  ZX_ASSERT(tx_count <= 1);
+  ZX_ASSERT(tx.size() <= 1);
 
-  if (tx_count) {
-    tx_results_.push_back(tx_list[0]);
+  if (!tx.empty()) {
+    tx_results_.push_back(tx[0]);
+    complete_tx_called_.Signal();
   }
 }
 
-void SimDataPath::OnRxComplete(const rx_buffer_t* rx_list, size_t rx_count) {
-  ZX_ASSERT(rx_count <= 1);
+void SimDataPath::OnRxComplete(cpp20::span<fuchsia_hardware_network_driver::wire::RxBuffer> rx) {
+  ZX_ASSERT(rx.size() == 1);
 
-  ZX_ASSERT(rx_list[0].data_count && rx_list[0].data_list);
-  auto& region = *rx_list[0].data_list;
+  ZX_ASSERT(!rx[0].data.empty());
+  auto& region = rx[0].data[0];
 
   ZX_ASSERT(region.offset + region.length <= rx_span_.size());
 
@@ -146,48 +250,60 @@ void SimDataPath::OnRxComplete(const rx_buffer_t* rx_list, size_t rx_count) {
   QueueRxBuffer();
 }
 
-zx_status_t SimDataPath::OnAddPort(uint8_t id, const network_port_protocol_t* port) {
-  ZX_ASSERT(port && port->ctx && port->ops);
+void SimDataPath::OnAddPort(uint8_t id,
+                            fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkPort>&& port) {
+  ZX_ASSERT(port.is_valid());
   ZX_ASSERT(port_clients_.find(id) == port_clients_.end());
-  port_clients_.insert({id, ddk::NetworkPortProtocolClient(port)});
-  return ZX_OK;
+  port_clients_[id].Bind(std::move(port), port_dispatcher_.get());
 }
 
 void SimDataPath::OnRemovePort(uint8_t id) {
   auto client = port_clients_.find(id);
   ZX_ASSERT(client != port_clients_.end());
-  client->second.Removed();
+  fdf::Arena arena('SMDP');
+  ZX_ASSERT(client->second.sync().buffer(arena)->Removed().ok());
   port_clients_.erase(client);
 }
 
 void SimDataPath::TxRegion(uint16_t id, uint64_t offset, uint64_t data_size) {
-  buffer_region_t region = {
+  fuchsia_hardware_network_driver::wire::BufferRegion regions[] = {{
       .vmo = kTxVmoId,
       .offset = offset,
-      .length = data_size + device_info_.tx_head_length + device_info_.tx_tail_length,
-  };
+      .length =
+          data_size + device_info_.tx_head_length().value() + device_info_.tx_tail_length().value(),
+  }};
 
-  tx_buffer_t buffer = {
+  fdf::Arena arena('SMDP');
+  fuchsia_hardware_network_driver::wire::TxBuffer buffers[] = {{
       .id = id,
-      .data_list = &region,
-      .data_count = 1,
-      .meta = {},
-      .head_length = device_info_.tx_head_length,
-      .tail_length = device_info_.tx_tail_length,
-  };
+      .data = {arena, regions},
+      .meta =
+          {
+              .info = fuchsia_hardware_network_driver::wire::FrameInfo::WithNoInfo({}),
+              .frame_type = fuchsia_hardware_network::wire::FrameType::kEthernet,
+          },
+      .head_length = *device_info_.tx_head_length(),
+      .tail_length = *device_info_.tx_tail_length(),
+  }};
 
-  net_dev_->NetworkDeviceImplQueueTx(&buffer, 1);
+  // Calling QueueTx should eventually result in a CompleteTx, reset the event to make sure we catch
+  // this one. Since the SimDataPath only has one frame ever in flight it has to be the correct one.
+  // If more frames are ever added this would need to trigger on the correct buffer ID only.
+  complete_tx_called_.Reset();
+
+  auto status = netdev_client_->sync().buffer(arena)->QueueTx({arena, buffers});
+  ZX_ASSERT(status.ok());
+
+  // Wait until TX has completed to make this call synchronous.
+  complete_tx_called_.Wait();
 }
 
 void SimDataPath::QueueRxBuffer() {
-  rx_space_buffer_t buffer = {.id = 0,
-                              .region = {
-                                  .vmo = kRxVmoId,
-                                  .offset = 0,
-                                  .length = kMaxFrameSize,
-                              }};
+  fuchsia_hardware_network_driver::wire::RxSpaceBuffer buffers[] = {
+      {.id = 0, .region = {.vmo = kRxVmoId, .offset = 0, .length = kMaxFrameSize}}};
 
-  net_dev_->NetworkDeviceImplQueueRxSpace(&buffer, 1);
+  fdf::Arena arena('SMDP');
+  ZX_ASSERT(netdev_client_->sync().buffer(arena)->QueueRxSpace({arena, buffers}).ok());
 }
 
 }  // namespace wlan::brcmfmac

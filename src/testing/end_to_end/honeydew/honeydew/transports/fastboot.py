@@ -21,7 +21,7 @@ _FASTBOOT_CMDS: dict[str, list[str]] = {
 }
 
 _FFX_CMDS: dict[str, list[str]] = {
-    "BOOT_TO_FASTBOOT_MODE": ["target", "ssh", "dm", "reboot-bootloader"],
+    "BOOT_TO_FASTBOOT_MODE": ["target", "reboot", "--bootloader"],
 }
 
 _TIMEOUTS: dict[str, float] = {
@@ -56,9 +56,9 @@ class Fastboot(fastboot_interface.Fastboot):
         fastboot_node_id: str | None = None,
     ) -> None:
         self._device_name: str = device_name
-        self._device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            device_ip
-        )
+        self._device_ip: (
+            ipaddress.IPv4Address | ipaddress.IPv6Address | None
+        ) = device_ip
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
             reboot_affordance
         )

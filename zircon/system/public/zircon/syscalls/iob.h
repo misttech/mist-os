@@ -31,8 +31,10 @@ typedef uint64_t zx_iob_discipline_type_t;
 // interfaces are also mirrored in discipline-specific syscalls that permit
 // indirect, kernel-mediated access to the region in this manner.
 typedef struct zx_iob_discipline {
-  uint64_t type;
-  uint64_t reserved[8];
+  zx_iob_discipline_type_t type;
+  union {
+    uint64_t reserved[8];
+  };
 } zx_iob_discipline_t;
 
 // The type of a region specifies the nature of its backing memory object and
@@ -52,14 +54,14 @@ typedef uint32_t zx_iob_region_type_t;
 // reading and writing of *entries*.
 typedef uint32_t zx_iob_access_t;
 
-#define ZX_IOB_EP0_CAN_MAP_READ ((zx_iob_access_t)(1u << 0))
-#define ZX_IOB_EP0_CAN_MAP_WRITE ((zx_iob_access_t)(1u << 1))
-#define ZX_IOB_EP0_CAN_MEDIATED_READ ((zx_iob_access_t)(1u << 2))
-#define ZX_IOB_EP0_CAN_MEDIATED_WRITE ((zx_iob_access_t)(1u << 3))
-#define ZX_IOB_EP1_CAN_MAP_READ ((zx_iob_access_t)(1u << 4))
-#define ZX_IOB_EP1_CAN_MAP_WRITE ((zx_iob_access_t)(1u << 5))
-#define ZX_IOB_EP1_CAN_MEDIATED_READ ((zx_iob_access_t)(1u << 6))
-#define ZX_IOB_EP1_CAN_MEDIATED_WRITE ((zx_iob_access_t)(1u << 7))
+#define ZX_IOB_ACCESS_EP0_CAN_MAP_READ ((zx_iob_access_t)(1u << 0))
+#define ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE ((zx_iob_access_t)(1u << 1))
+#define ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ ((zx_iob_access_t)(1u << 2))
+#define ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE ((zx_iob_access_t)(1u << 3))
+#define ZX_IOB_ACCESS_EP1_CAN_MAP_READ ((zx_iob_access_t)(1u << 4))
+#define ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE ((zx_iob_access_t)(1u << 5))
+#define ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ ((zx_iob_access_t)(1u << 6))
+#define ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE ((zx_iob_access_t)(1u << 7))
 
 typedef struct zx_iob_region_private {
   uint32_t options;

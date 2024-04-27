@@ -573,8 +573,8 @@ impl CurrentLevelHandler {
                             &current_level
                         );
                         let mut broker = self.broker.borrow_mut();
-                        let res = broker.update_current_level(&element_id, current_level);
-                        responder.send(res.map_err(Into::into)).context("send failed")
+                        broker.update_current_level(&element_id, current_level);
+                        responder.send(Ok(())).context("send failed")
                     }
                     CurrentLevelRequest::_UnknownMethod { ordinal, .. } => {
                         tracing::warn!("Received unknown CurrentLevelRequest: {ordinal}");

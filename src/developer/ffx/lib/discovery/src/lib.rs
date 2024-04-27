@@ -5,6 +5,7 @@
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use bitflags::bitflags;
+use emulator_instance::EmulatorInstances;
 use fuchsia_async::Task;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::Stream;
@@ -14,6 +15,7 @@ use manual_targets::watcher::{
 };
 use mdns_discovery::{recommended_watcher, MdnsWatcher};
 use std::fmt;
+use std::path::PathBuf;
 use std::task::{ready, Context, Poll};
 use std::{fmt::Display, pin::Pin};
 use usb_fastboot_discovery::{
@@ -27,7 +29,7 @@ use fidl_fuchsia_developer_ffx as ffx;
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum FastbootConnectionState {
-    Usb(String),
+    Usb,
     Tcp(Vec<TargetAddr>),
     Udp(Vec<TargetAddr>),
 }
@@ -35,7 +37,7 @@ pub enum FastbootConnectionState {
 impl Display for FastbootConnectionState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
-            Self::Usb(s) => format!("Usb({})", s),
+            Self::Usb => format!("Usb"),
             Self::Tcp(addr) => format!("Tcp({:?})", addr),
             Self::Udp(addr) => format!("Udp({:?})", addr),
         };
@@ -105,8 +107,12 @@ struct EmulatorWatcher {
 }
 
 impl EmulatorWatcher {
-    async fn new(sender: UnboundedSender<Result<TargetEvent>>) -> Result<Self> {
-        let existing = emulator_instance::get_all_targets().await?;
+    async fn new(
+        instance_root: PathBuf,
+        sender: UnboundedSender<Result<TargetEvent>>,
+    ) -> Result<Self> {
+        let emu_instances = EmulatorInstances::new(instance_root.clone());
+        let existing = emulator_instance::get_all_targets(&emu_instances)?;
         for i in existing {
             let handle = i.try_into();
             if let Ok(h) = handle {
@@ -117,7 +123,7 @@ impl EmulatorWatcher {
 
         // Emulator (and therefore notify thread) lifetime should last as long as the task,
         // because it is moved into the loop
-        let mut watcher = emulator_instance::start_emulator_watching().await?;
+        let mut watcher = emulator_instance::start_emulator_watching(instance_root.clone()).await?;
         let task = Task::local(async move {
             loop {
                 if let Some(act) = watcher.emulator_target_detected().await {
@@ -183,6 +189,7 @@ bitflags! {
 }
 pub async fn wait_for_devices<F>(
     filter: F,
+    emulator_instance_root: Option<PathBuf>,
     notify_added: bool,
     notify_removed: bool,
     sources: DiscoverySources,
@@ -249,7 +256,11 @@ where
 
     let emulator_watcher = if sources.contains(DiscoverySources::EMULATOR) {
         let emulator_sender = sender.clone();
-        Some(EmulatorWatcher::new(emulator_sender).await?)
+        if let Some(instance_root) = emulator_instance_root {
+            Some(EmulatorWatcher::new(instance_root, emulator_sender).await?)
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -341,9 +352,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or("".to_string());
                 let connection_state = match iface {
-                    ffx::FastbootInterface::Usb => {
-                        FastbootConnectionState::Usb(serial_number.clone())
-                    }
+                    ffx::FastbootInterface::Usb => FastbootConnectionState::Usb,
                     ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addrs),
                     ffx::FastbootInterface::Tcp => FastbootConnectionState::Tcp(addrs),
                 };
@@ -362,7 +371,7 @@ impl From<FastbootEvent> for TargetEvent {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: serial.clone(),
-                        connection_state: FastbootConnectionState::Usb(serial),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 };
                 TargetEvent::Added(handle)
@@ -372,7 +381,7 @@ impl From<FastbootEvent> for TargetEvent {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: serial.clone(),
-                        connection_state: FastbootConnectionState::Usb(serial),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 };
                 TargetEvent::Removed(handle)
@@ -465,7 +474,6 @@ mod test {
     use pretty_assertions::assert_eq;
     use std::fs::File;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
-    use std::path::PathBuf;
     use std::str::FromStr;
 
     #[test]
@@ -479,7 +487,7 @@ mod test {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "1234".to_string(),
-                        connection_state: FastbootConnectionState::Usb("1234".to_string()),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 })
             );
@@ -494,7 +502,7 @@ mod test {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "1234".to_string(),
-                        connection_state: FastbootConnectionState::Usb("1234".to_string()),
+                        connection_state: FastbootConnectionState::Usb,
                     }),
                 })
             );
@@ -595,7 +603,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Usb("".to_string())
+                        connection_state: FastbootConnectionState::Usb
                     })
                 }
             );
@@ -988,11 +996,7 @@ mod test {
         // Create the emulator instance dir
         let temp = tempdir().expect("cannot get tempdir");
         let instance_dir = temp.path().to_path_buf();
-        ffx_config::query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ffx_config::ConfigLevel::User))
-            .set(instance_dir.to_str().into())
-            .await
-            .unwrap();
+        let emu_instances = emulator_instance::EmulatorInstances::new(instance_dir.clone());
 
         // Add a new emulator
         let config_file = build_instance_file(&instance_dir, "emu-data-instance")?;
@@ -1000,12 +1004,18 @@ mod test {
         // Before waiting on devices, let's make sure we're actually getting the
         // emulator. (This shouldn't be necessary, but I've seen this test flake
         // by timing out, so this is a validity check.)
-        let existing = emulator_instance::get_all_targets().await?;
+        let existing = emulator_instance::get_all_targets(&emu_instances)?;
         assert_eq!(existing.len(), 1);
 
         // Start watching the directory
-        let mut stream =
-            wait_for_devices(true_target_filter, true, false, DiscoverySources::EMULATOR).await?;
+        let mut stream = wait_for_devices(
+            true_target_filter,
+            Some(instance_dir.clone()),
+            true,
+            false,
+            DiscoverySources::EMULATOR,
+        )
+        .await?;
 
         // Assert that the existing emulator is discovered
         let next =

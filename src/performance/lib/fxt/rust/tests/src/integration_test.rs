@@ -118,7 +118,7 @@ async fn main() {
         })
     );
 
-    // counter!(c"test_puppet", c"puppet_counter2", 1, "someotherdataseries" => std::u64::MAX - 1);
+    // counter!(c"test_puppet", c"puppet_counter2", 1, "someotherdataseries" => u64::MAX - 1);
     let second_counter = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&second_counter).unwrap();
@@ -134,7 +134,7 @@ async fn main() {
             name: "puppet_counter2".into(),
             args: vec![fxt::Arg {
                 name: "someotherdataseries".into(),
-                value: fxt::ArgValue::Unsigned64(std::u64::MAX - 1),
+                value: fxt::ArgValue::Unsigned64(u64::MAX - 1),
             }],
             payload: fxt::EventPayload::Counter { id: 1 },
         })

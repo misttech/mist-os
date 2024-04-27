@@ -1,10 +1,16 @@
-# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 [package]
-name = "fuchsia-zircon-sys"
-version = "0.3.3"
-license-file = "LICENSE"
-authors = ["rust-fuchsia@fuchsia.com"]
-description = "Rust crate for Fuchsia OS"
+name = "fuchsia-zircon-types"
+version = "0.4.0-alpha.1"
+license = "BSD-2-Clause"
+authors = ["David Koloski <dkoloski@google.com>"]
+description = "Types for low-level Rust bindings for the Zircon kernel"
 repository = "https://fuchsia.googlesource.com"
+edition = "2021"
+
+[dependencies.zerocopy]
+version = "0.8.0-alpha.5"
+optional = true

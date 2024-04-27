@@ -7,6 +7,7 @@
 
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/timestamp.h"
 #include "src/storage/f2fs/vmo_manager.h"
 
 namespace f2fs {
@@ -82,6 +83,7 @@ class VnodeF2fs : public fs::PagedVnode,
   static zx_status_t Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
 
   void Init(LockedPage &node_page) __TA_EXCLUDES(mutex_);
+  void InitTime() __TA_EXCLUDES(mutex_);
   void InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
 
   ino_t GetKey() const { return ino_; }
@@ -239,32 +241,16 @@ class VnodeF2fs : public fs::PagedVnode,
   void SetUid(const uid_t &uid) { uid_ = uid; }
   void SetGid(const gid_t &gid) { gid_ = gid; }
 
-  void SetATime(const timespec &time) __TA_EXCLUDES(mutex_) {
+  template <typename T>
+  void SetTime(const timespec &time) __TA_EXCLUDES(mutex_) {
     std::lock_guard lock(mutex_);
-    atime_ = time;
+    time_->Update<T>(time);
   }
-  void SetATime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(mutex_) {
+
+  template <typename U>
+  void SetTime() __TA_EXCLUDES(mutex_) {
     std::lock_guard lock(mutex_);
-    atime_.tv_sec = sec;
-    atime_.tv_nsec = nsec;
-  }
-  void SetMTime(const timespec &time) __TA_EXCLUDES(mutex_) {
-    std::lock_guard lock(mutex_);
-    mtime_ = time;
-  }
-  void SetMTime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(mutex_) {
-    std::lock_guard lock(mutex_);
-    mtime_.tv_sec = sec;
-    mtime_.tv_nsec = nsec;
-  }
-  void SetCTime(const timespec &time) __TA_EXCLUDES(mutex_) {
-    std::lock_guard lock(mutex_);
-    ctime_ = time;
-  }
-  void SetCTime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(mutex_) {
-    std::lock_guard lock(mutex_);
-    ctime_.tv_sec = sec;
-    ctime_.tv_nsec = nsec;
+    time_->Update<U>();
   }
 
   // Coldness identification:
@@ -360,14 +346,15 @@ class VnodeF2fs : public fs::PagedVnode,
   void ResetFileCache() { file_cache_->Reset(); }
   ExtentTree &GetExtentTree() { return *extent_tree_; }
   uint8_t GetDirLevel() TA_NO_THREAD_SAFETY_ANALYSIS { return dir_level_; }
-  timespec GetMTime() TA_NO_THREAD_SAFETY_ANALYSIS { return mtime_; }
   bool HasPagedVmo() TA_NO_THREAD_SAFETY_ANALYSIS { return paged_vmo().is_valid(); }
   void ClearAdvise(const FAdvise bit) TA_NO_THREAD_SAFETY_ANALYSIS {
     advise_ &= ~GetMask(1, static_cast<size_t>(bit));
   }
   void SetDirLevel(const uint8_t level) TA_NO_THREAD_SAFETY_ANALYSIS { dir_level_ = level; }
-  timespec GetATime() TA_NO_THREAD_SAFETY_ANALYSIS { return atime_; }
-  timespec GetCTime() TA_NO_THREAD_SAFETY_ANALYSIS { return ctime_; }
+  template <typename T>
+  const timespec &GetTime() TA_NO_THREAD_SAFETY_ANALYSIS {
+    return time_->Get<T>();
+  }
 
  protected:
   block_t GetBlockAddrOnDataSegment(LockedPage &page);
@@ -413,9 +400,7 @@ class VnodeF2fs : public fs::PagedVnode,
   uint8_t dir_level_ __TA_GUARDED(mutex_) = 0;       // use for dentry level for large dir
   // TODO: revisit thread annotation when xattr is available.
   nid_t xattr_nid_ = 0;  // node id that contains xattrs
-  timespec atime_ __TA_GUARDED(mutex_) = {0, 0};
-  timespec mtime_ __TA_GUARDED(mutex_) = {0, 0};
-  timespec ctime_ __TA_GUARDED(mutex_) = {0, 0};
+  std::optional<Timestamps> time_ __TA_GUARDED(mutex_) = std::nullopt;
 
   std::unique_ptr<ExtentTree> extent_tree_;
 

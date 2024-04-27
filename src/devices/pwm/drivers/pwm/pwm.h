@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_PWM_DRIVERS_PWM_PWM_H_
 #define SRC_DEVICES_PWM_DRIVERS_PWM_PWM_H_
 
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -12,7 +13,6 @@
 
 #include <mutex>
 
-#include <ddk/metadata/pwm.h>
 #include <ddktl/device.h>
 
 namespace pwm {
@@ -40,11 +40,12 @@ class PwmDevice : public PwmDeviceType {
   void Disable(DisableCompleter::Sync& completer) override;
 
  private:
-  explicit PwmDevice(zx_device_t* parent, pwm_impl_protocol_t* pwm, pwm_id_t id)
-      : PwmDeviceType(parent), pwm_(pwm), id_(id) {}
+  explicit PwmDevice(zx_device_t* parent, pwm_impl_protocol_t* pwm,
+                     fuchsia_hardware_pwm::PwmChannelInfo channel)
+      : PwmDeviceType(parent), pwm_(pwm), channel_(std::move(channel)) {}
 
   ddk::PwmImplProtocolClient pwm_ __TA_GUARDED(lock_);
-  pwm_id_t id_;
+  fuchsia_hardware_pwm::PwmChannelInfo channel_;
 
   // Protect against concurrent access from both the FIDL and Banjo interfaces.
   std::mutex lock_;

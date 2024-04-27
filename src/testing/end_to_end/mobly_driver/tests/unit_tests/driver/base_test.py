@@ -17,7 +17,7 @@ from mobly_driver.driver import base
 class BaseMoblyDriverTest(unittest.TestCase):
     """Base Mobly Driver tests"""
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "output_path specified",

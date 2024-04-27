@@ -134,14 +134,116 @@ class FuseTest : public ::testing::Test {
   std::optional<std::string> base_dir_;
 };
 
+class Node {
+ public:
+  virtual ~Node() {}
+
+  void PopulateAttr(fuse_attr& attr) {
+    attr = {
+        .ino = id_,
+        .mode = type_ | S_IRWXU | S_IRWXG | S_IRWXO,
+    };
+  }
+
+  void PopulateEntry(fuse_entry_out& entry_out) {
+    entry_out = {
+        .nodeid = id_,
+        .generation = 1,
+    };
+    PopulateAttr(entry_out.attr);
+  }
+
+ protected:
+  Node(uint64_t id, uint32_t type) : id_(id), type_(type) {}
+
+ private:
+  uint64_t id_;
+  uint32_t type_;
+};
+
+class Directory : public Node {
+ public:
+  Directory(uint64_t id) : Node(id, S_IFDIR) {}
+
+  void AddChild(const std::string& name, std::shared_ptr<Node> node) { children_[name] = node; }
+
+  std::shared_ptr<Node> Lookup(const std::string& name) {
+    auto it = children_.find(name);
+    if (it == children_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+ private:
+  std::unordered_map<std::string, std::shared_ptr<Node>> children_;
+};
+
+class File : public Node {
+ public:
+  File(uint64_t id) : Node(id, S_IFREG) {}
+};
+
+class FileSystem {
+ public:
+  FileSystem() {
+    root_ = std::shared_ptr<Directory>(new Directory(FUSE_ROOT_ID));
+    nodes_[FUSE_ROOT_ID] = root_;
+  }
+
+  const std::shared_ptr<Directory>& RootDir() const { return root_; }
+
+  template <class T, typename F>
+  std::shared_ptr<T> AddNodeAt(const std::shared_ptr<Directory>& at, const std::string& name,
+                               F builder) {
+    uint64_t nodeid = next_nodeid_++;
+    std::shared_ptr<T> node = builder(nodeid);
+    nodes_[nodeid] = node;
+    at->AddChild(name, node);
+    return node;
+  }
+
+  std::shared_ptr<Directory> AddDirAt(const std::shared_ptr<Directory>& at,
+                                      const std::string& name) {
+    return AddNodeAt<Directory>(
+        at, name, [](uint64_t nodeid) { return std::make_shared<Directory>(nodeid); });
+  }
+
+  std::shared_ptr<Directory> AddDirAtRoot(const std::string& name) {
+    return AddDirAt(RootDir(), name);
+  }
+
+  std::shared_ptr<File> AddFileAt(const std::shared_ptr<Directory>& at, const std::string& name) {
+    return AddNodeAt<File>(at, name,
+                           [](uint64_t nodeid) { return std::make_shared<File>(nodeid); });
+  }
+
+  std::shared_ptr<File> AddFileAtRoot(const std::string& name) {
+    return AddFileAt(RootDir(), name);
+  }
+
+  std::shared_ptr<Node> Lookup(uint64_t nodeid) {
+    auto it = nodes_.find(nodeid);
+    if (it == nodes_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+ private:
+  uint64_t next_nodeid_ = FUSE_ROOT_ID + 1;
+  std::shared_ptr<Directory> root_;
+  std::unordered_map<uint64_t, std::shared_ptr<Node>> nodes_;
+};
+
 class FuseServer {
  public:
-  FuseServer() : FuseServer(0, S_IFREG) {}
-  FuseServer(uint32_t want_init_flags, uint32_t file_type)
-      : want_init_flags_(want_init_flags), file_type_(file_type) {}
+  FuseServer() : FuseServer(0) {}
+  FuseServer(uint32_t want_init_flags) : want_init_flags_(want_init_flags) {}
 
   virtual ~FuseServer() {}
 
+  FileSystem& fs() { return fs_; }
   const test_helper::ScopedFD& fuse_fd() { return fuse_fd_; }
 
   testing::AssertionResult Mount(const std::string& path) {
@@ -182,7 +284,7 @@ class FuseServer {
     return R();
   }
 
-  testing::AssertionResult SendInitResponse(const fuse_in_header* in_header, uint32_t flags) {
+  testing::AssertionResult SendInitResponse(const fuse_in_header& in_header, uint32_t flags) {
     fuse_init_out init_out = {
         .major = FUSE_KERNEL_VERSION,
         .minor = FUSE_KERNEL_MINOR_VERSION,
@@ -192,52 +294,68 @@ class FuseServer {
   }
 
  protected:
-  virtual testing::AssertionResult HandleFuseMessage(const std::vector<std::byte>& message) {
-    const struct fuse_in_header* in_header =
-        reinterpret_cast<const struct fuse_in_header*>(message.data());
+  testing::AssertionResult HandleFuseMessage(const std::vector<std::byte>& message) {
+    if (message.size() < sizeof(fuse_in_header)) {
+      return testing::AssertionFailure() << "Message size too small; got " << message.size()
+                                         << ", want at least " << sizeof(fuse_in_header);
+    }
+
+    // Copy out of |message| to make sure we access an aligned |fuse_in_header|.
+    struct fuse_in_header in_header;
+    memcpy(&in_header, message.data(), sizeof(in_header));
+
     // The operation-specific payload for the fuse request begins after the header.
-    const void* in_payload = in_header + 1;
-    switch (in_header->opcode) {
+    const void* in_payload = message.data() + sizeof(in_header);
+
+    std::shared_ptr<Node> node;
+    if (in_header.opcode != FUSE_INIT) {
+      node = fs_.Lookup(in_header.nodeid);
+      if (!node) {
+        return WriteDataFreeResponse(in_header, -ENOENT);
+      }
+    }
+
+    switch (in_header.opcode) {
       case FUSE_INIT: {
         struct fuse_init_in init_in = {};
         memcpy(&init_in, in_payload, sizeof(init_in));
-        OK_OR_RETURN(HandleInit(in_header, &init_in, message));
+        OK_OR_RETURN(HandleInit(in_header, &init_in));
         break;
       }
       case FUSE_ACCESS: {
         struct fuse_access_in access_in = {};
         memcpy(&access_in, in_payload, sizeof(access_in));
-        OK_OR_RETURN(HandleAccess(in_header, &access_in, message));
+        OK_OR_RETURN(HandleAccess(node, in_header, &access_in));
         break;
       }
       case FUSE_GETATTR: {
         struct fuse_getattr_in getattr_in = {};
         memcpy(&getattr_in, in_payload, sizeof(getattr_in));
-        OK_OR_RETURN(HandleGetAttr(in_header, &getattr_in, message));
+        OK_OR_RETURN(HandleGetAttr(node, in_header, &getattr_in));
         break;
       }
       case FUSE_LOOKUP: {
-        OK_OR_RETURN(HandleLookup(in_header, message));
+        OK_OR_RETURN(HandleLookup(node, in_header, reinterpret_cast<const char*>(in_payload)));
         break;
       }
       case FUSE_OPENDIR:
       case FUSE_OPEN: {
         struct fuse_open_in open_in = {};
         memcpy(&open_in, in_payload, sizeof(open_in));
-        OK_OR_RETURN(HandleOpen(in_header, &open_in, message));
+        OK_OR_RETURN(HandleOpen(node, in_header, &open_in));
         break;
       }
       case FUSE_FLUSH: {
         struct fuse_flush_in flush_in = {};
         memcpy(&flush_in, in_payload, sizeof(flush_in));
-        OK_OR_RETURN(HandleFlush(in_header, &flush_in, message));
+        OK_OR_RETURN(HandleFlush(node, in_header, &flush_in));
         break;
       }
       case FUSE_RELEASEDIR:
       case FUSE_RELEASE: {
         struct fuse_release_in release_in = {};
         memcpy(&release_in, in_payload, sizeof(release_in));
-        OK_OR_RETURN(HandleRelease(in_header, &release_in, message));
+        OK_OR_RETURN(HandleRelease(node, in_header, &release_in));
         break;
       }
       case FUSE_GETXATTR: {
@@ -249,7 +367,7 @@ class FuseServer {
         // no-op; these don't expect a response.
         break;
       default:
-        return testing::AssertionFailure() << "Unknown FUSE opcode: " << in_header->opcode;
+        return testing::AssertionFailure() << "Unknown FUSE opcode: " << in_header.opcode;
     }
     return testing::AssertionSuccess();
   }
@@ -263,62 +381,64 @@ class FuseServer {
     init_cv_.notify_all();
   }
 
-  virtual testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
-                                              const struct fuse_init_in* init_in,
-                                              const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleInit(const struct fuse_in_header& in_header,
+                                              const struct fuse_init_in* init_in) {
     EXPECT_EQ(init_in->flags & want_init_flags_, want_init_flags_);
     OK_OR_RETURN(SendInitResponse(in_header, want_init_flags_));
     NotifyInitWaiters();
     return testing::AssertionSuccess();
   }
 
-  virtual testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
-                                                const struct fuse_access_in* access_in,
-                                                const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleAccess(const std::shared_ptr<Node>& node,
+                                                const struct fuse_in_header& in_header,
+                                                const struct fuse_access_in* access_in) {
     return WriteAckResponse(in_header);
   }
 
-  virtual testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
-                                                 const struct fuse_getattr_in* getattr_in,
-                                                 const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleGetAttr(const std::shared_ptr<Node>& node,
+                                                 const struct fuse_in_header& in_header,
+                                                 const struct fuse_getattr_in* getattr_in) {
     fuse_attr_out attr_out = {};
-    PopulateDefaultAttr(in_header->nodeid, attr_out.attr);
+    node->PopulateAttr(attr_out.attr);
     return WriteStructResponse(in_header, attr_out);
   }
 
-  virtual testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
-                                                const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleLookup(const std::shared_ptr<Node>& node,
+                                                const struct fuse_in_header& in_header,
+                                                const char* name) {
     fuse_entry_out entry_out;
-    PopulateDefaultEntry(entry_out);
-    return WriteStructResponse(in_header, entry_out);
+    if (HandleLookupInner(node, in_header, name, entry_out)) {
+      return WriteStructResponse(in_header, entry_out);
+    }
+    return testing::AssertionSuccess();
   }
 
-  virtual testing::AssertionResult HandleOpen(const struct fuse_in_header* in_header,
-                                              const struct fuse_open_in* open_in,
-                                              const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleOpen(const std::shared_ptr<Node>& node,
+                                              const struct fuse_in_header& in_header,
+                                              const struct fuse_open_in* open_in) {
     struct fuse_open_out open_out = {};
     open_out.fh = GetNextFileHandle();
     return WriteStructResponse(in_header, open_out);
   }
 
-  virtual testing::AssertionResult HandleFlush(const struct fuse_in_header* in_header,
-                                               const struct fuse_flush_in* flush_in,
-                                               const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleFlush(const std::shared_ptr<Node>& node,
+                                               const struct fuse_in_header& in_header,
+                                               const struct fuse_flush_in* flush_in) {
     return WriteAckResponse(in_header);
   }
 
-  virtual testing::AssertionResult HandleRelease(const struct fuse_in_header* in_header,
-                                                 const struct fuse_release_in* release_in,
-                                                 const std::vector<std::byte>& message) {
+  virtual testing::AssertionResult HandleRelease(const std::shared_ptr<Node>& node,
+                                                 const struct fuse_in_header& in_header,
+                                                 const struct fuse_release_in* release_in) {
     return WriteAckResponse(in_header);
   }
 
-  testing::AssertionResult WriteDataFreeResponse(const struct fuse_in_header* in_header,
+  testing::AssertionResult WriteDataFreeResponse(const struct fuse_in_header& in_header,
                                                  int32_t error) {
     fuse_out_header out_header = {
         .len = sizeof(fuse_out_header),
         .error = error,
-        .unique = in_header->unique,
+        .unique = in_header.unique,
     };
 
     auto data = reinterpret_cast<std::byte*>(&out_header);
@@ -326,17 +446,17 @@ class FuseServer {
     return WriteResponse(response);
   }
 
-  testing::AssertionResult WriteAckResponse(const struct fuse_in_header* in_header) {
+  testing::AssertionResult WriteAckResponse(const struct fuse_in_header& in_header) {
     return WriteDataFreeResponse(in_header, /* error= */ 0);
   }
 
   template <typename Data>
-  testing::AssertionResult WriteStructResponse(const struct fuse_in_header* in_header, Data data) {
+  testing::AssertionResult WriteStructResponse(const struct fuse_in_header& in_header, Data data) {
     struct fuse_out_header out_header = {};
     uint32_t payload_len = sizeof(Data);
     uint32_t response_len = payload_len + sizeof(out_header);
     out_header.len = response_len;
-    out_header.unique = in_header->unique;
+    out_header.unique = in_header.unique;
     std::vector<std::byte> response(response_len);
     memcpy(response.data(), &out_header, sizeof(out_header));
     memcpy(response.data() + sizeof(out_header), &data, sizeof(Data));
@@ -355,24 +475,24 @@ class FuseServer {
 
   uint64_t GetNextFileHandle() { return next_fh_++; }
 
-  void PopulateDefaultEntry(fuse_entry_out& entry_out) {
-    entry_out = {
-        .nodeid = next_nodeid_++,
-        .generation = 1,
-    };
-    PopulateDefaultAttr(entry_out.nodeid, entry_out.attr);
-  }
+ protected:
+  bool HandleLookupInner(const std::shared_ptr<Node>& dir_node,
+                         const struct fuse_in_header& in_header, const char* name,
+                         fuse_entry_out& entry_out) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      EXPECT_TRUE(WriteDataFreeResponse(in_header, -ENOENT));
+      return false;
+    }
 
-  void PopulateDefaultAttr(uint64_t ino, fuse_attr& attr) {
-    attr = {
-        .ino = ino,
-        // Consider the root node as a directory and everything else as the
-        // specified kind. The node will also have read/write/exec permissions
-        // for the owning user, group and world. For current testing needs,
-        // this is sufficient.
-        .mode = static_cast<uint32_t>(ino == FUSE_ROOT_ID ? S_IFDIR : file_type_) | S_IRWXU |
-                S_IRWXG | S_IRWXO,
-    };
+    std::shared_ptr<Node> node = dir->Lookup(name);
+    if (!node) {
+      EXPECT_TRUE(WriteDataFreeResponse(in_header, -ENOENT));
+      return false;
+    }
+
+    node->PopulateEntry(entry_out);
+    return true;
   }
 
  private:
@@ -406,14 +526,14 @@ class FuseServer {
 
   test_helper::ScopedFD fuse_fd_;
   uint64_t next_fh_ = 1;
-  uint64_t next_nodeid_ = 2;  // 1 is reserved for the root.
 
   std::mutex init_mtx_;
   std::condition_variable init_cv_;
   bool init_done_ = false;
 
   uint32_t want_init_flags_;
-  uint32_t file_type_;
+
+  FileSystem fs_;
 };
 
 class FuseServerTest : public ::testing::Test {
@@ -729,12 +849,11 @@ TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
     }
 
    protected:
-    testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
-                                        const struct fuse_init_in* init_in,
-                                        const std::vector<std::byte>& message) {
+    testing::AssertionResult HandleInit(const struct fuse_in_header& in_header,
+                                        const struct fuse_init_in* init_in) {
       // Don't actually complete the request, just store the init request's header so
       // that we can respond to it later.
-      NotifyInitWaiters([&]() { init_hdr_ = *in_header; });
+      NotifyInitWaiters([&]() { init_hdr_ = in_header; });
       return testing::AssertionSuccess();
     }
 
@@ -743,6 +862,7 @@ TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
   };
 
   std::shared_ptr<NoReqsUntilInitResponseServer> server(new NoReqsUntilInitResponseServer());
+  ASSERT_TRUE(server->fs().AddFileAtRoot("file"));
   ASSERT_TRUE(Mount(server));
   const fuse_in_header init_hdr = server->WaitForInitAndReturnRequestHeader();
 
@@ -759,37 +879,41 @@ TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
 
   // Send our (delayed) response to the FUSE_INIT request and make sure that the
   // access request is now completed.
-  server->SendInitResponse(&init_hdr, 0);
+  server->SendInitResponse(init_hdr, 0);
   thrd.join();
   EXPECT_TRUE(access_done);
 }
 
 TEST_F(FuseServerTest, OpenAndClose) {
-  ASSERT_TRUE(Mount(std::make_shared<FuseServer>()));
+  std::shared_ptr<FuseServer> server(new FuseServer());
+  ASSERT_TRUE(server->fs().AddFileAtRoot("file"));
+  ASSERT_TRUE(Mount(server));
 
   std::string filename = GetMountDir() + "/file";
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
-  ASSERT_TRUE(fd.is_valid());
+  ASSERT_TRUE(fd.is_valid()) << strerror(errno);
   fd.reset();
 }
 
 TEST_F(FuseServerTest, HeaderLengthUnderflow) {
   class HeaderLengthUnderflowServer : public FuseServer {
-    testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
-                                          const struct fuse_access_in* access_in,
-                                          const std::vector<std::byte>& message) override {
+    testing::AssertionResult HandleAccess(const std::shared_ptr<Node>& node,
+                                          const struct fuse_in_header& in_header,
+                                          const struct fuse_access_in* access_in) override {
       uint32_t response_len = sizeof(struct fuse_out_header);
       std::vector<std::byte> response;
       response.resize(response_len);
       struct fuse_out_header* out_header =
           reinterpret_cast<struct fuse_out_header*>(response.data());
       out_header->len = 0;
-      out_header->unique = in_header->unique;
+      out_header->unique = in_header.unique;
       return WriteResponse(response);
     }
   };
 
-  ASSERT_TRUE(Mount(std::make_shared<HeaderLengthUnderflowServer>()));
+  std::shared_ptr<HeaderLengthUnderflowServer> server(new HeaderLengthUnderflowServer());
+  server->fs().AddFileAtRoot("file");
+  ASSERT_TRUE(Mount(server));
 
   std::string filename = GetMountDir() + "/file";
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
@@ -799,9 +923,9 @@ TEST_F(FuseServerTest, HeaderLengthUnderflow) {
 
 TEST_F(FuseServerTest, OverlongHeaderLength) {
   class OverlongHeaderLengthServer : public FuseServer {
-    testing::AssertionResult HandleOpen(const struct fuse_in_header* in_header,
-                                        const struct fuse_open_in* open_in,
-                                        const std::vector<std::byte>& message) override {
+    testing::AssertionResult HandleOpen(const std::shared_ptr<Node>& node,
+                                        const struct fuse_in_header& in_header,
+                                        const struct fuse_open_in* open_in) override {
       const uint32_t kBogusHeaderLengthAddition = 1024;
 
       struct fuse_open_out open_out = {};
@@ -811,7 +935,7 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
       uint32_t payload_len = sizeof(open_out);
       uint32_t response_len = payload_len + sizeof(out_header);
       out_header.len = response_len + kBogusHeaderLengthAddition;
-      out_header.unique = in_header->unique;
+      out_header.unique = in_header.unique;
       std::vector<std::byte> response(response_len);
       memcpy(response.data(), &out_header, sizeof(out_header));
       memcpy(response.data() + sizeof(out_header), &open_out, sizeof(open_out));
@@ -819,7 +943,9 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
     }
   };
 
-  ASSERT_TRUE(Mount(std::make_shared<OverlongHeaderLengthServer>()));
+  std::shared_ptr<OverlongHeaderLengthServer> server(new OverlongHeaderLengthServer());
+  server->fs().AddFileAtRoot("file");
+  ASSERT_TRUE(Mount(server));
 
   std::string filename = GetMountDir() + "/file";
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
@@ -847,8 +973,8 @@ struct BypassAccessTestCase {
 
 class CountingFuseServer : public FuseServer {
  public:
-  CountingFuseServer(uint32_t want_init_flags, uint32_t file_type, int access_reply)
-      : FuseServer(want_init_flags, file_type), access_reply_(access_reply) {}
+  CountingFuseServer(uint32_t want_init_flags, int access_reply)
+      : FuseServer(want_init_flags), access_reply_(access_reply) {}
 
   uint64_t LookupCount() { return calls_to_lookup_.load(std::memory_order_relaxed); }
   uint64_t AccessCount() { return calls_to_access_.load(std::memory_order_relaxed); }
@@ -857,26 +983,27 @@ class CountingFuseServer : public FuseServer {
   }
 
  protected:
-  testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
-                                        const std::vector<std::byte>& message) override {
+  testing::AssertionResult HandleLookup(const std::shared_ptr<Node>& node,
+                                        const struct fuse_in_header& in_header,
+                                        const char* name) override {
     calls_to_lookup_.fetch_add(1, std::memory_order_relaxed);
-    return FuseServer::HandleLookup(in_header, message);
+    return FuseServer::HandleLookup(node, in_header, name);
   }
 
-  testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
-                                        const struct fuse_access_in* access_in,
-                                        const std::vector<std::byte>& message) override {
+  testing::AssertionResult HandleAccess(const std::shared_ptr<Node>& node,
+                                        const struct fuse_in_header& in_header,
+                                        const struct fuse_access_in* access_in) override {
     calls_to_access_.fetch_add(1, std::memory_order_relaxed);
     return WriteDataFreeResponse(in_header, access_reply_);
   }
 
-  testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
-                                         const struct fuse_getattr_in* getattr_in,
-                                         const std::vector<std::byte>& message) override {
-    if (in_header->nodeid != FUSE_ROOT_ID) {
+  testing::AssertionResult HandleGetAttr(const std::shared_ptr<Node>& node,
+                                         const struct fuse_in_header& in_header,
+                                         const struct fuse_getattr_in* getattr_in) override {
+    if (in_header.nodeid != FUSE_ROOT_ID) {
       calls_to_non_root_getattr_.fetch_add(1, std::memory_order_relaxed);
     }
-    return FuseServer::HandleGetAttr(in_header, getattr_in, message);
+    return FuseServer::HandleGetAttr(node, in_header, getattr_in);
   }
 
  private:
@@ -906,8 +1033,17 @@ TEST_P(FuseServerPermissionCheck, PermissionCheck) {
     GTEST_SKIP() << "Need extra capability " << test_case.need_cap.value();
   }
 
-  std::shared_ptr<CountingFuseServer> server(
-      new CountingFuseServer(test_case.want_init_flags, test_case.file_type, 0));
+  std::shared_ptr<CountingFuseServer> server(new CountingFuseServer(test_case.want_init_flags, 0));
+  switch (test_case.file_type) {
+    case S_IFREG:
+      ASSERT_TRUE(server->fs().AddFileAtRoot("node"));
+      break;
+    case S_IFDIR:
+      ASSERT_TRUE(server->fs().AddDirAtRoot("node"));
+      break;
+    default:
+      FAIL() << "Unexpected file type = " << test_case.file_type;
+  }
   ASSERT_TRUE(Mount(server));
   server->WaitForInit();
   EXPECT_EQ(server->LookupCount(), 0u);
@@ -1109,11 +1245,17 @@ class FuseServerBypassAccessTest : public FuseServerTest,
                                    public ::testing::WithParamInterface<BypassAccessTestCase> {};
 
 TEST_P(FuseServerBypassAccessTest, BypassAccess) {
+  constexpr char kSomeFile1Name[] = "somefile1";
+  constexpr char kSomeFile2Name[] = "somefile2";
   const BypassAccessTestCase& test_case = GetParam();
 
   std::shared_ptr<CountingFuseServer> server(
-      new CountingFuseServer(test_case.want_init_flags, S_IFREG, test_case.access_reply));
+      new CountingFuseServer(test_case.want_init_flags, test_case.access_reply));
+  FileSystem& fs = server->fs();
+  ASSERT_TRUE(fs.AddFileAtRoot(kSomeFile1Name));
+  ASSERT_TRUE(fs.AddFileAtRoot(kSomeFile2Name));
   ASSERT_TRUE(Mount(server));
+
   server->WaitForInit();
   EXPECT_EQ(server->AccessCount(), 0u);
 
@@ -1128,12 +1270,12 @@ TEST_P(FuseServerBypassAccessTest, BypassAccess) {
     // the |FUSE_ACCESS| request |params.max_access_count| times for the lifetime
     // of the connection/server.
     for (int i = 0; i < 3; ++i) {
-      ASSERT_NO_FATAL_FAILURE(check_access("somefile1"));
+      ASSERT_NO_FATAL_FAILURE(check_access(kSomeFile1Name));
     }
 
     // Accessing another file shouldn't change the access count since it is still
     // part of the same connection.
-    ASSERT_NO_FATAL_FAILURE(check_access("somefile2"));
+    ASSERT_NO_FATAL_FAILURE(check_access(kSomeFile2Name));
   });
 }
 
@@ -1176,12 +1318,14 @@ class FuseServerCacheAttributesTest
       public ::testing::WithParamInterface<CacheAttributesTestCase> {};
 
 TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
+  constexpr char kSomeFile1Name[] = "somefile1";
+  constexpr char kSomeFile2Name[] = "somefile2";
   const CacheAttributesTestCase& test_case = GetParam();
 
   class CacheAttributesServer : public FuseServer {
    public:
     CacheAttributesServer(uint64_t lookup_attr_valid, uint64_t getattr_attr_valid)
-        : FuseServer(FUSE_POSIX_ACL, S_IFREG),
+        : FuseServer(FUSE_POSIX_ACL),
           lookup_attr_valid_(lookup_attr_valid),
           getattr_attr_valid_(getattr_attr_valid) {}
 
@@ -1190,10 +1334,13 @@ TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
     }
 
    protected:
-    testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
-                                          const std::vector<std::byte>& message) override {
+    testing::AssertionResult HandleLookup(const std::shared_ptr<Node>& node,
+                                          const struct fuse_in_header& in_header,
+                                          const char* name) override {
       fuse_entry_out entry_out;
-      PopulateDefaultEntry(entry_out);
+      if (!HandleLookupInner(node, in_header, name, entry_out)) {
+        return testing::AssertionSuccess();
+      }
       // Instruct the kernel to not immediately evict the |dcache| entry (|dentry|)
       // for this node by setting a really high entry value. This value is used to
       // determine when a FUSE-based |dentry| has gone stale. This test isn't focused
@@ -1208,16 +1355,16 @@ TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
       return WriteStructResponse(in_header, entry_out);
     }
 
-    testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
-                                           const struct fuse_getattr_in* getattr_in,
-                                           const std::vector<std::byte>& message) override {
-      if (in_header->nodeid != FUSE_ROOT_ID) {
+    testing::AssertionResult HandleGetAttr(const std::shared_ptr<Node>& node,
+                                           const struct fuse_in_header& in_header,
+                                           const struct fuse_getattr_in* getattr_in) override {
+      if (in_header.nodeid != FUSE_ROOT_ID) {
         calls_to_non_root_getattr_.fetch_add(1, std::memory_order_relaxed);
       }
       fuse_attr_out attr_out = {
           .attr_valid = getattr_attr_valid_,
       };
-      PopulateDefaultAttr(in_header->nodeid, attr_out.attr);
+      node->PopulateAttr(attr_out.attr);
       return WriteStructResponse(in_header, attr_out);
     }
 
@@ -1229,6 +1376,9 @@ TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
 
   std::shared_ptr<CacheAttributesServer> server(
       new CacheAttributesServer(test_case.lookup_attr_timeout, test_case.getattr_attr_timeout));
+  FileSystem& fs = server->fs();
+  ASSERT_TRUE(fs.AddFileAtRoot(kSomeFile1Name));
+  ASSERT_TRUE(fs.AddFileAtRoot(kSomeFile2Name));
   ASSERT_TRUE(Mount(server));
   server->WaitForInit();
   EXPECT_EQ(server->NonRootGetAttrCount(), 0u);
@@ -1243,12 +1393,12 @@ TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
     uint64_t count_after_file1;
     for (uint64_t i = 1; i <= 3; ++i) {
       count_after_file1 = ExpectedGetAttrsValue(test_case.expected_getattr_behaviour, i);
-      ASSERT_NO_FATAL_FAILURE(check_getattr("somefile1", count_after_file1));
+      ASSERT_NO_FATAL_FAILURE(check_getattr(kSomeFile1Name, count_after_file1));
     }
 
     for (uint64_t i = 1; i <= 5; ++i) {
       ASSERT_NO_FATAL_FAILURE(check_getattr(
-          "somefile2",
+          kSomeFile2Name,
           count_after_file1 + ExpectedGetAttrsValue(test_case.expected_getattr_behaviour, i)));
     }
   });

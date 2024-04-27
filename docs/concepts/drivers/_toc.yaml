@@ -22,3 +22,5 @@ toc:
   path: /docs/concepts/drivers/mapping-a-devices-memory-in-a-driver.md
 - title: "Driver dispatcher and threads"
   path: /docs/concepts/drivers/driver-dispatcher-and-threads.md
+- title: "Driver dispatcher performance"
+  path: /docs/concepts/drivers/driver-dispatcher-performance.md

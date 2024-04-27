@@ -44,8 +44,8 @@ use crate::{
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
         socket::{
-            DatagramHeader, DeviceSocketHandler, DeviceSocketMetadata, HeldDeviceSockets,
-            ParseSentFrameError, ReceivedFrame, SentFrame,
+            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+            HeldDeviceSockets, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
@@ -206,22 +206,29 @@ impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     }
 }
 
+impl DeviceSocketSendTypes for LoopbackDevice {
+    /// When `None`, data will be sent as a raw Ethernet frame without any
+    /// system-applied headers.
+    type Metadata = Option<EthernetHeaderParams>;
+}
+
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    SendFrameContext<BC, DeviceSocketMetadata<LoopbackDeviceId<BC>>> for CoreCtx<'_, BC, L>
+    SendFrameContext<BC, DeviceSocketMetadata<LoopbackDevice, LoopbackDeviceId<BC>>>
+    for CoreCtx<'_, BC, L>
 {
     fn send_frame<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        metadata: DeviceSocketMetadata<LoopbackDeviceId<BC>>,
+        metadata: DeviceSocketMetadata<LoopbackDevice, LoopbackDeviceId<BC>>,
         body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let DeviceSocketMetadata { device_id, header } = metadata;
-        match header {
-            Some(DatagramHeader { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
+        let DeviceSocketMetadata { device_id, metadata } = metadata;
+        match metadata {
+            Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
                 self,
                 bindings_ctx,
                 &device_id,
@@ -503,7 +510,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 
-    fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+    fn parse_outgoing_frame<'a, 'b>(
+        buf: &'a [u8],
+        (): &'b Self::Meta,
+    ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
         SentFrame::try_parse_as_ethernet(buf)
     }
 }

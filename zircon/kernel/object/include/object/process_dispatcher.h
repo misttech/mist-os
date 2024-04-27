@@ -193,9 +193,8 @@ class ProcessDispatcher final
   void GetInfo(zx_info_process_t* info) const;
   zx_status_t GetStats(zx_info_task_stats_t* stats) const;
 
-  // Accumulate the runtime of all threads that previously ran or are currently running under this
-  // process.
-  zx_status_t AccumulateRuntimeTo(zx_info_task_runtime_t* info) const;
+  // Get the runtime of all threads that previously ran or are currently running under this process.
+  TaskRuntimeStats GetTaskRuntimeStats() const TA_EXCL(get_lock());
 
   zx_status_t GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t max, size_t* actual,
                             size_t* available) const;
@@ -262,9 +261,6 @@ class ProcessDispatcher final
     return vdso_code_address_;
   }
 
-  // Retrieve the aggregated runtime of exited threads under this process.
-  TaskRuntimeStats GetAggregatedRuntime() const TA_EXCL(get_lock());
-
   // Allocates a handle with the given rights to the given dispatcher. The handle is added to the
   // calling process' handle table, and its value is returned in out.
   zx_status_t MakeAndAddHandle(fbl::RefPtr<Dispatcher> dispatcher, zx_rights_t rights,
@@ -281,6 +277,9 @@ class ProcessDispatcher final
   // private to the process. Threads executing in restricted mode are restricted to this address
   // space.
   VmAspace* restricted_aspace() { return restricted_aspace_.get(); }
+
+  // Dispatch a user exception to job debugger exception channels.
+  void OnUserExceptionForJobDebugger(ThreadDispatcher* t, const arch_exception_context_t* context);
 
  private:
   // Returns the normal address space for this process.
@@ -418,12 +417,12 @@ class ProcessDispatcher final
   // The time at which the process was started.
   zx_time_t start_time_ = 0;
 
+  // Hold accumulated stats for threads who have exited.
+  TaskRuntimeStats accumulated_stats_ TA_GUARDED(get_lock());
+
   // The user-friendly process name. For debug purposes only. That
   // is, there is no mechanism to mint a handle to a process via this name.
   fbl::Name<ZX_MAX_NAME_LEN> name_;
-
-  // Aggregated runtime stats from exited threads.
-  TaskRuntimeStats aggregated_runtime_stats_ TA_GUARDED(get_lock());
 };
 
 const char* StateToString(ProcessDispatcher::State state);

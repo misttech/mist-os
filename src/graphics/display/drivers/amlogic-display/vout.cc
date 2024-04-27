@@ -254,6 +254,16 @@ zx::result<> Vout::PowerOn() {
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
+zx::result<> Vout::SetFrameVisibility(bool frame_visible) {
+  switch (type_) {
+    case VoutType::kDsi:
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    case VoutType::kHdmi:
+      hdmi_.hdmi_host->ReplaceEncoderPixelColorWithBlack(!frame_visible);
+      return zx::ok();
+  }
+}
+
 bool Vout::IsDisplayTimingSupported(const display::DisplayTiming& timing) {
   ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
                       "Vout display timing check is only supported for HDMI output.");

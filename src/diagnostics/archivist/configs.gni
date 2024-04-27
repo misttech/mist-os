@@ -10,7 +10,7 @@ declare_args() {
 default_config = {
   bind_services = [
     "fuchsia.component.DetectBinder",
-    "fuchsia.component.KcounterBinder",
+    "fuchsia.component.KernelDebugBrokerBinder",
     "fuchsia.component.PersistenceBinder",
     "fuchsia.component.SamplerBinder",
   ]

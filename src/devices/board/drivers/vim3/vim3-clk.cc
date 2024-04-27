@@ -9,6 +9,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <ddk/metadata/clock.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-meson/g12b-clk.h>
@@ -80,7 +81,7 @@ zx_status_t Vim3::ClkInit() {
     dev.name() = "vim3-clk";
     dev.vid() = PDEV_VID_AMLOGIC;
     dev.pid() = PDEV_PID_AMLOGIC_A311D;
-    dev.did() = PDEV_DID_AMLOGIC_G12B_CLK;
+    dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_G12B_CLK;
     dev.mmio() = clk_mmios;
     dev.metadata() = clock_metadata;
     return dev;

@@ -435,21 +435,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .use_(
                             UseBuilder::service()
-                                .source(UseSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/fuchsia.examples.EchoService_a")
                                 .availability(test_case.use_availability),
                         )
                         .use_(
                             UseBuilder::protocol()
-                                .source(UseSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .name("fuchsia.examples.Echo")
                                 .path("/svc/fuchsia.examples.Echo_a")
                                 .availability(test_case.use_availability),
                         )
                         .use_(
                             UseBuilder::directory()
-                                .source(UseSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .name("dir")
                                 .path("/dir_a")
                                 .availability(test_case.use_availability),
@@ -591,21 +591,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     ComponentDeclBuilder::new()
                         .use_(
                             UseBuilder::service()
-                                .source(UseSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/fuchsia.examples.EchoService_a")
                                 .availability(test_case.use_availability),
                         )
                         .use_(
                             UseBuilder::protocol()
-                                .source(UseSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .name("fuchsia.examples.Echo")
                                 .path("/svc/fuchsia.examples.Echo_a")
                                 .availability(test_case.use_availability),
                         )
                         .use_(
                             UseBuilder::directory()
-                                .source(UseSource::Child("b".to_owned()))
+                                .source_static_child("b")
                                 .name("dir")
                                 .path("/dir_a")
                                 .availability(test_case.use_availability),

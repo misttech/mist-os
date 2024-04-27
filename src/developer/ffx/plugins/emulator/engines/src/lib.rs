@@ -12,10 +12,11 @@ mod show_output;
 
 pub use arg_templates::process_flag_template;
 use emulator_instance::{
-    get_instance_dir, read_from_disk, DeviceConfig, EmulatorConfiguration, EmulatorInstanceData,
-    EmulatorInstanceInfo, EngineOption, EngineState, EngineType, FlagData, GuestConfig, HostConfig,
-    RuntimeConfig,
+    read_from_disk, DeviceConfig, EmulatorConfiguration, EmulatorInstanceData,
+    EmulatorInstanceInfo, EmulatorInstances, EngineOption, EngineState, EngineType, FlagData,
+    GuestConfig, HostConfig, RuntimeConfig,
 };
+use errors::ffx_bail;
 use ffx_emulator_config::EmulatorEngine;
 use fho::{bug, return_user_error, Result};
 use qemu_based::{femu::FemuEngine, qemu::QemuEngine};
@@ -52,14 +53,16 @@ use qemu_based::{femu::FemuEngine, qemu::QemuEngine};
 pub struct EngineBuilder {
     emulator_configuration: EmulatorConfiguration,
     engine_type: EngineType,
+    emu_instances: EmulatorInstances,
 }
 
 impl EngineBuilder {
     /// Create a new EngineBuilder, populated with default values for all configuration.
-    pub fn new() -> Self {
+    pub fn new(emu_instances: EmulatorInstances) -> Self {
         Self {
             emulator_configuration: EmulatorConfiguration::default(),
             engine_type: EngineType::default(),
+            emu_instances,
         }
     }
 
@@ -102,10 +105,10 @@ impl EngineBuilder {
     /// Create from an existing EmulatorInstanceData,
     /// Does not validate or perform any configuration steps. Call
     /// |build| for those steps to be performed.
-    pub fn from_data(data: EmulatorInstanceData) -> Box<dyn EmulatorEngine> {
+    pub fn from_data(&self, data: EmulatorInstanceData) -> Box<dyn EmulatorEngine> {
         match data.get_engine_type() {
-            EngineType::Femu => Box::new(FemuEngine::new(data)),
-            EngineType::Qemu => Box::new(QemuEngine::new(data)),
+            EngineType::Femu => Box::new(FemuEngine::new(data, self.emu_instances.clone())),
+            EngineType::Qemu => Box::new(QemuEngine::new(data, self.emu_instances.clone())),
         }
     }
 
@@ -116,10 +119,12 @@ impl EngineBuilder {
         let name = &self.emulator_configuration.runtime.name;
         self.emulator_configuration.runtime.engine_type = self.engine_type;
         self.emulator_configuration.runtime.instance_directory =
-            get_instance_dir(name, true).await?;
+            self.emu_instances.get_instance_dir(name, true)?;
 
         // Make sure we don't overwrite an existing instance.
-        if let Ok(EngineOption::DoesExist(instance_data)) = read_from_disk(name).await {
+        if let Ok(EngineOption::DoesExist(instance_data)) =
+            read_from_disk(&self.emulator_configuration.runtime.instance_directory)
+        {
             if instance_data.is_running() {
                 return_user_error!(
                     "An emulator named {} is already running. \
@@ -133,12 +138,12 @@ impl EngineBuilder {
 
         // Build and complete configuration on the engine, then pass it back to the caller.
         let instance_data = EmulatorInstanceData::new(
-            self.emulator_configuration,
+            self.emulator_configuration.clone(),
             self.engine_type,
             EngineState::Configured,
         );
 
-        let mut engine: Box<dyn EmulatorEngine> = Self::from_data(instance_data);
+        let mut engine: Box<dyn EmulatorEngine> = self.from_data(instance_data);
         engine.configure()?;
 
         engine.load_emulator_binary().await?;
@@ -148,6 +153,48 @@ impl EngineBuilder {
         engine.save_to_disk().await?;
 
         Ok(engine)
+    }
+
+    /// Returns the EmulatorEngine instance based on the name.
+    /// If name is none, and there is only 1 emulator instance found, that instance is returned, and the
+    ///    name parameter is updated to the name of the instance.
+    /// If the name is some, then return that instance, or an error.
+    /// If there is no name, and not exactly 1 instance running, it is an error.
+    pub fn get_engine_by_name(
+        &self,
+        name: &mut Option<String>,
+    ) -> Result<Option<Box<dyn EmulatorEngine>>> {
+        if name.is_none() {
+            let mut all_instances = match self.emu_instances.get_all_instances() {
+                Ok(list) => list,
+                Err(e) => {
+                    ffx_bail!("Error encountered looking up emulator instances: {e:?}");
+                }
+            };
+            if all_instances.len() == 1 {
+                *name = Some(all_instances.pop().unwrap().get_name().to_string());
+            } else if all_instances.len() == 0 {
+                tracing::debug!("No emulators are running.");
+                return Ok(None);
+            } else {
+                ffx_bail!(
+                    "Multiple emulators are running. Indicate which emulator to access\n\
+                by specifying the emulator name with your command.\n\
+                See all the emulators available using `ffx emu list`."
+                );
+            }
+        }
+
+        // If we got this far, name is set to either what the user asked for, or the only one running.
+        if let Some(local_name) = name {
+            let instance_dir = self.emu_instances.get_instance_dir(local_name, false)?;
+            match read_from_disk(&instance_dir)? {
+                EngineOption::DoesExist(data) => Ok(Some(self.from_data(data))),
+                EngineOption::DoesNotExist(_) => Ok(None),
+            }
+        } else {
+            ffx_bail!("No emulator instances found")
+        }
     }
 }
 

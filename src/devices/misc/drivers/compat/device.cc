@@ -771,7 +771,11 @@ void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodeProperty
   }
 }
 
-std::string Device::OutgoingName() { return name_ + "-" + std::to_string(device_id_); }
+std::string Device::OutgoingName() {
+  auto outgoing_name = name_ + "-" + std::to_string(device_id_);
+  std::replace(outgoing_name.begin(), outgoing_name.end(), ':', '_');
+  return outgoing_name;
+}
 
 bool Device::HasChildNamed(std::string_view name) const {
   return std::any_of(children_.begin(), children_.end(),
@@ -996,6 +1000,12 @@ zx_status_t Device::ConnectFragmentRuntime(const char* fragment_name, const char
   }
 
   return ConnectFragmentFidl(fragment_name, service_name, protocol_name, std::move(server_token));
+}
+
+zx_status_t Device::ConnectNsProtocol(const char* protocol_name, zx::channel request) {
+  return component::internal::ConnectAtRaw(driver()->driver_namespace().svc_dir(),
+                                           std::move(request), protocol_name)
+      .status_value();
 }
 
 zx_status_t Device::PublishInspect(zx::vmo inspect_vmo) {

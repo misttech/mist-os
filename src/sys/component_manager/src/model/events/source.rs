@@ -7,9 +7,7 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ExtendedInstance, WeakExtendedInstance},
-            error::{CapabilityProviderError, EventSourceError, ModelError},
             events::{
-                error::EventsError,
                 registry::{EventRegistry, EventSubscription},
                 serve::serve_event_stream,
                 stream::EventStream,
@@ -19,6 +17,7 @@ use {
     },
     async_trait::async_trait,
     cm_util::TaskGroup,
+    errors::{CapabilityProviderError, EventSourceError, EventsError, ModelError},
     fidl::endpoints::RequestStream,
     futures::{SinkExt, StreamExt},
     moniker::ExtendedMoniker,

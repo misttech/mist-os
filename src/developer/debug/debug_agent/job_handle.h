@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "src/developer/debug/debug_agent/job_exception_observer.h"
 #include "src/developer/debug/shared/status.h"
 
 namespace debug_agent {
@@ -34,8 +35,7 @@ class JobHandle {
 
   // Registers for job exceptions. On success, the given callback will be issued for all process
   // launches in this job. Can be called with an empty function to unregister.
-  virtual debug::Status WatchJobExceptions(
-      fit::function<void(std::unique_ptr<ProcessHandle>)> cb) = 0;
+  virtual debug::Status WatchJobExceptions(JobExceptionObserver* observer) = 0;
 
   // Recursively searches the job tree from this job/process and returns a handle to it. Returns a
   // null pointer if the job/process was not found. This can also happen if the debug_agent doesn't

@@ -13,7 +13,8 @@
 
 namespace display {
 
-void ComputeEld(const edid::Edid& edid, fbl::Array<uint8_t>& out_eld);
+// Returns an empty array if memory allocation failed.
+fbl::Array<uint8_t> ComputeEld(const edid::Edid& edid);
 
 }  // namespace display
 

@@ -4,7 +4,7 @@
 
 use super::{
     access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_SIZE},
-    security_server::{SecurityServer, SecurityServerStatus},
+    security_server::SecurityServer,
     SecurityId,
 };
 
@@ -129,16 +129,6 @@ impl<'a> PermissionCheckImpl<'a> {
         access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
     ) -> Self {
         Self { security_server, access_vector_cache }
-    }
-}
-
-impl<'a> SecurityServerStatus for PermissionCheckImpl<'a> {
-    fn is_enforcing(&self) -> bool {
-        self.security_server.is_enforcing()
-    }
-
-    fn is_fake(&self) -> bool {
-        self.security_server.is_fake()
     }
 }
 

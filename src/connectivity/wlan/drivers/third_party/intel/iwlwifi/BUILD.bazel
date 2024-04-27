@@ -8,6 +8,6 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_prebuilt_package(
     name = "iwlwifi",
-    archive = "@legacy_ninja_build_outputs//:iwlwifi.far",
+    archive = "@gn_targets//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
     drivers = ["meta/iwlwifi.cm"],
 )

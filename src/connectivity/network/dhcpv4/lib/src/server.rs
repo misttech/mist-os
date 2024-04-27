@@ -1242,7 +1242,7 @@ impl Default for LeaseRecord {
             current: None,
             previous: None,
             options: Vec::new(),
-            lease_start_epoch_seconds: std::u64::MIN,
+            lease_start_epoch_seconds: u64::MIN,
             lease_length_seconds: std::u32::MAX,
         }
     }

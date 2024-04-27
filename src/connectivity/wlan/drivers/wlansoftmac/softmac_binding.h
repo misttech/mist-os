@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_BINDING_H_
 
-#include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
@@ -133,13 +133,10 @@ class SoftmacBinding : public DeviceInterface {
   // `EthernetImplIfc.Start`.
   mutable std::optional<uint32_t> cached_ethernet_status_ __TA_GUARDED(ethernet_proxy_lock_);
 
-  fdf::Dispatcher softmac_bridge_server_dispatcher_;
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
 
   // The FIDL client to communicate with iwlwifi
-  fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
-
-  fdf::Dispatcher softmac_ifc_server_dispatcher_;
+  fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
   // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
   // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
@@ -153,9 +150,6 @@ class SoftmacBinding : public DeviceInterface {
   // unbind_called_ even if SoftmacBinding drops its reference to unbind_called_.
   std::shared_ptr<std::mutex> unbind_lock_;
   std::shared_ptr<bool> unbind_called_ __TA_GUARDED(unbind_lock_);
-
-  // Dispatcher for being a FIDL client firing requests on WlanSoftmac protocol.
-  fdf::Dispatcher client_dispatcher_;
 };
 
 }  // namespace wlan::drivers::wlansoftmac

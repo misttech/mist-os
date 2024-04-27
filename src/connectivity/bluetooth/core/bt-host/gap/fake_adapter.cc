@@ -149,6 +149,10 @@ FakeAdapter::FakeBrEdr::RegisterService(std::vector<sdp::ServiceRecord> records,
   return handle;
 }
 
+bool FakeAdapter::FakeBrEdr::UnregisterService(RegistrationHandle handle) {
+  return registered_services_.erase(handle);
+}
+
 void FakeAdapter::SetLocalName(std::string name,
                                hci::ResultFunction<> callback) {
   local_name_ = name;

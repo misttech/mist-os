@@ -110,7 +110,7 @@ mod fuchsia {
             match self.vmo.read(data, offset) {
                 Ok(_) => Ok(()),
                 Err(zx::Status::OUT_OF_RANGE) => {
-                    let size = self.vmo.get_size().map_err(|_| ReaderError::Read(std::u64::MAX))?;
+                    let size = self.vmo.get_size().map_err(|_| ReaderError::Read(u64::MAX))?;
                     Err(ReaderError::OutOfBounds(offset, size))
                 }
                 Err(_) => Err(ReaderError::Read(offset)),

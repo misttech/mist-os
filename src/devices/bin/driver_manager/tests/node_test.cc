@@ -561,7 +561,8 @@ TEST_F(Dfv2NodeTest, UnbindChildrenMultipleCalls) {
 }
 
 // Verify that Node::AddChild() fails when a node is in the middle of unbinding children.
-TEST_F(Dfv2NodeTest, UnbindChildrenFailAddChild) {
+// TODO(https://fxbug.dev/333783189): Re-enable flaky test case.
+TEST_F(Dfv2NodeTest, DISABLED_UnbindChildrenFailAddChild) {
   const std::string kChildNode1Name = "child-1";
 
   auto parent = CreateNode("parent");

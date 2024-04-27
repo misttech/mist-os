@@ -30,6 +30,10 @@ import (
 
 const usage = `Usage: %s [-k key] [-m manifest] [-o output dir] [-t tempdir] <command> [-help]
 
+IMPORTANT: Please note that pm is being sunset and will be removed.
+           Building packages and serving repositories is supported
+           through ffx. Please adapt workflows accordingly.
+
 Package Commands:
     init     - initialize a package meta directory in the standard form
     build    - perform update and seal in order

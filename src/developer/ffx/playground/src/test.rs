@@ -105,10 +105,10 @@ impl<T: AsRef<str>> Test<T> {
 
     /// Set `$fs_root` with a set of standard test directories.
     pub fn with_standard_test_dirs(mut self) -> Self {
-        let simple = vfs::directory::mutable::simple();
+        let simple = vfs::directory::immutable::simple();
         let proxy = vfs::directory::spawn_directory(Arc::clone(&simple));
-        let test_subdir = vfs::directory::mutable::simple();
-        let foo_subdir = vfs::directory::mutable::simple();
+        let test_subdir = vfs::directory::immutable::simple();
+        let foo_subdir = vfs::directory::immutable::simple();
         let test_file = vfs::file::read_only(NEILS_PHILOSOPHY);
         foo_subdir
             .add_entry("relative_symlink", Arc::new(TestSymlink("../neils_philosophy".to_owned())))

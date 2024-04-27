@@ -75,9 +75,12 @@ async fn handle_fidl_request(
     request: fidl_sme::ClientSmeRequest,
 ) -> Result<(), fidl::Error> {
     match request {
-        ClientSmeRequest::Scan { req, responder } => Ok(scan(sme, req, responder)
-            .await
-            .unwrap_or_else(|e| error!("Error handling a scan transaction: {:?}", e))),
+        ClientSmeRequest::Scan { req, responder } => Ok(scan(sme, req, |result| match result {
+            Ok(scan_results) => responder.send(Ok(write_vmo(scan_results)?)).map_err(|e| e.into()),
+            Err(e) => responder.send(Err(e)).map_err(|e| e.into()),
+        })
+        .await
+        .unwrap_or_else(|e| error!("Error handling a scan transaction: {:?}", e))),
         ClientSmeRequest::Connect { req, txn, .. } => Ok(connect(sme, txn, req)
             .await
             .unwrap_or_else(|e| error!("Error handling a connect transaction: {:?}", e))),
@@ -87,6 +90,14 @@ async fn handle_fidl_request(
         }
         ClientSmeRequest::Status { responder } => responder.send(&status(sme)),
         ClientSmeRequest::WmmStatus { responder } => wmm_status(sme, responder).await,
+        ClientSmeRequest::ScanForController { req, responder } => {
+            Ok(scan(sme, req, |result| match result {
+                Ok(results) => responder.send(Ok(&results[..])).map_err(|e| e.into()),
+                Err(e) => responder.send(Err(e)).map_err(|e| e.into()),
+            })
+            .await
+            .unwrap_or_else(|e| error!("Error handling a test scan transaction: {:?}", e)))
+        }
     }
 }
 
@@ -123,14 +134,16 @@ async fn handle_telemetry_fidl_request(
 async fn scan(
     sme: &Mutex<Sme>,
     request: fidl_sme::ScanRequest,
-    responder: fidl_sme::ClientSmeScanResponder,
+    responder: impl FnOnce(
+        Result<Vec<fidl_sme::ScanResult>, fidl_sme::ScanErrorCode>,
+    ) -> Result<(), anyhow::Error>,
 ) -> Result<(), anyhow::Error> {
     let receiver = sme.lock().unwrap().on_scan_command(request);
     let receive_result = match receiver.await {
         Ok(receive_result) => receive_result,
         Err(e) => {
             error!("Scan receiver error: {:?}", e);
-            responder.send(Err(fidl_sme::ScanErrorCode::InternalError))?;
+            responder(Err(fidl_sme::ScanErrorCode::InternalError))?;
             return Ok(());
         }
     };
@@ -138,7 +151,7 @@ async fn scan(
     match receive_result {
         Ok(scan_results) => {
             let results = scan_results.into_iter().map(Into::into).collect::<Vec<_>>();
-            responder.send(Ok(write_vmo(results)?))
+            responder(Ok(results))
         }
         Err(mlme_scan_result_code) => {
             let scan_error_code = match mlme_scan_result_code {
@@ -155,7 +168,7 @@ async fn scan(
                     fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware
                 }
             };
-            responder.send(Err(scan_error_code))
+            responder(Err(scan_error_code))
         }
     }?;
     Ok(())

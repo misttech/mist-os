@@ -24,6 +24,7 @@ in_process_executables = [
   ":indirect-deps",
   ":passive-abi-basic",
   ":passive-abi-rdebug",
+  ":passive-abi-many-deps",
   ":symbolic-namespace",
   ":many-deps",
   ":init-fini",
@@ -558,10 +559,10 @@ test_executable("symbolic-namespace") {
   shlib_deps = [ ":ld-dep-a" ]
 }
 
-# These show the dependency graph of the test and the expected return value of each dependency's
-# only symbol.
+# These show the dependency graph of the test and the expected return value of
+# each dependency's only symbol.
 #
-# many_deps -> (13 + -8 + 3 + 9 = 17)
+# many-deps -> (13 + -8 + 3 + 9 = 17)
 #   a -> 13
 #   b -> -2 (-2 + 2 + 13 + -21 = -8)
 #     c -> 2
@@ -570,7 +571,8 @@ test_executable("symbolic-namespace") {
 #       c -> 2
 #       e -> -18
 #   f -> 3
-#   _ld_abi -> 9 (number of total modules including vdso which may not be depended on)
+#   _ld_abi -> 9 (the number of total modules including vdso which may not be
+#                 depended on: this is only applicable for many-deps-passive-abi)
 
 test_dep("b") {
   value = -2
@@ -601,9 +603,23 @@ test_dep("f") {
   value = 3
 }
 
+# This version of many-deps uses a constant number (9) in its return value
+# instead of _ld_abi to represent the total number of loaded modules.
 test_executable("many-deps") {
   can_be_in_process = true
   sources = [ "many-deps.cc" ]
+
+  shlib_deps = [
+    ":ld-dep-a",
+    ":ld-dep-b",
+    ":ld-dep-f",
+  ]
+}
+
+# The version of many-deps depends on _ld_abi.
+test_executable("passive-abi-many-deps") {
+  can_be_in_process = true
+  sources = [ "passive-abi-many-deps.cc" ]
 
   deps = [ "../.." ]
   shlib_deps = [

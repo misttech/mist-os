@@ -19,6 +19,19 @@
 
 namespace {
 
+// This is a convenience function to specify that a specific dependency should
+// not be found in a Needed set.
+constexpr std::pair<std::string_view, bool> NotFound(std::string_view name) {
+  return {name, false};
+}
+
+// Cast `symbol` into a function returning type T and run it.
+template <typename T>
+T RunFunction(void* symbol __attribute__((nonnull))) {
+  auto func_ptr = reinterpret_cast<T (*)()>(reinterpret_cast<uintptr_t>(symbol));
+  return func_ptr();
+}
+
 using ::testing::MatchesRegex;
 
 template <class Fixture>
@@ -47,17 +60,24 @@ using TestTypes = ::testing::Types<
 TYPED_TEST_SUITE(DlTests, TestTypes);
 
 TYPED_TEST(DlTests, NotFound) {
-  auto result = this->DlOpen("does_not_exist.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr const char* kNotFoundFile = "does-not-exist.so";
+
+  this->ExpectMissing(kNotFoundFile);
+
+  auto result = this->DlOpen(kNotFoundFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open does_not_exist.so");
+    EXPECT_EQ(result.error_value().take_str(), "cannot open " + std::string{kNotFoundFile});
   } else {
     EXPECT_THAT(result.error_value().take_str(),
-                MatchesRegex(".*does_not_exist.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
+                MatchesRegex(".*" + std::string{kNotFoundFile} +
+                             ":.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
   }
 }
 
 TYPED_TEST(DlTests, InvalidMode) {
+  constexpr const char* kBasicFile = "ret17.module.so";
+
   if constexpr (!TestFixture::kCanValidateMode) {
     GTEST_SKIP() << "test requires dlopen to validate mode argment";
   }
@@ -71,65 +91,165 @@ TYPED_TEST(DlTests, InvalidMode) {
   bad_mode &= ~RTLD_DEEPBIND;
 #endif
 
-  auto result = this->DlOpen("libld-dep-a.so", bad_mode);
+  auto result = this->DlOpen(kBasicFile, bad_mode);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
 }
 
+// Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
-  auto result = this->DlOpen("libld-dep-c.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr int64_t kReturnValue = 17;
+  constexpr const char* kBasicFile = "ret17.module.so";
+
+  this->ExpectRootModule(kBasicFile);
+
+  auto result = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
-  // Look up the "c" function and call it, expecting its return value of 2.
-  auto sym_result = this->DlSym(result.value(), "c");
+
+  // Look up the "TestStart" function and call it, expecting it to return 17.
+  auto sym_result = this->DlSym(result.value(), "TestStart");
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
-  int64_t (*func_ptr)();
-  func_ptr = reinterpret_cast<int64_t (*)()>(reinterpret_cast<uintptr_t>(sym_result.value()));
-  EXPECT_EQ(func_ptr(), 2);
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
-// TODO(https://fxrev.dev/323419430): expect that libld-dep-a.so was needed.
+// Load a file that performs relative relocations against itself. The TestStart
+// function's return value is derived from the resolved symbols.
+TYPED_TEST(DlTests, Relative) {
+  constexpr int64_t kReturnValue = 17;
+
+  this->ExpectRootModule("relative-reloc.module.so");
+
+  auto result = this->DlOpen("relative-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+}
+
+// Load a file that performs symbolic relocations against itself. The TestStart
+// functions' return value is derived from the resolved symbols.
+TYPED_TEST(DlTests, Symbolic) {
+  constexpr int64_t kReturnValue = 17;
+
+  this->ExpectRootModule("symbolic-reloc.module.so");
+
+  auto result = this->DlOpen("symbolic-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+}
+
+// Load a module that depends on a symbol provided directly by a dependency.
 TYPED_TEST(DlTests, BasicDep) {
-  if constexpr (!TestFixture::kCanLookUpDeps) {
-    GTEST_SKIP()
-        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
-  }
-  auto result = this->DlOpen("basic-dep.module.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr int64_t kReturnValue = 17;
+
+  constexpr const char* kBasicDepFile = "basic-dep.module.so";
+
+  this->ExpectRootModule(kBasicDepFile);
+  this->Needed({"libld-dep-a.so"});
+
+  auto result = this->DlOpen(kBasicDepFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
-// TODO(https://fxrev.dev/323419430): expect that libld-dep-[a,b,c].so was needed.
+// Load a module that depends on a symbols provided directly and transitively by
+// several dependencies. Dependency ordering is serialized such that a module
+// depends on a symbol provided by a dependency only one hop away
+// (e.g. in its DT_NEEDED list):
 TYPED_TEST(DlTests, IndirectDeps) {
-  if constexpr (!TestFixture::kCanLookUpDeps) {
-    GTEST_SKIP()
-        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
-  }
+  constexpr int64_t kReturnValue = 17;
 
-  auto result = this->DlOpen("indirect-deps.module.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr const char* kIndirectDepsFile = "indirect-deps.module.so";
+
+  this->ExpectRootModule(kIndirectDepsFile);
+  this->Needed({"libindirect-deps-a.so", "libindirect-deps-b.so", "libindirect-deps-c.so"});
+
+  auto result = this->DlOpen(kIndirectDepsFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+}
+
+// Load a module that depends on symbols provided directly and transitively by
+// several dependencies. Dependency ordering is DAG-like where several modules
+// share a dependency.
+TYPED_TEST(DlTests, ManyDeps) {
+  constexpr int64_t kReturnValue = 17;
+
+  constexpr const char* kManyDepsFile = "many-deps.module.so";
+
+  this->ExpectRootModule(kManyDepsFile);
+  this->Needed({
+      "libld-dep-a.so",
+      "libld-dep-b.so",
+      "libld-dep-f.so",
+      "libld-dep-c.so",
+      "libld-dep-d.so",
+      "libld-dep-e.so",
+  });
+
+  auto result = this->DlOpen(kManyDepsFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  auto sym_result = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
+  ASSERT_TRUE(sym_result.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
 TYPED_TEST(DlTests, MissingDependency) {
-  // To clarify this condition, the test needs to be accurate in that its
-  // searching the correct path for the dependency, but can't find it.
-  if constexpr (!TestFixture::kCanLookUpDeps) {
-    GTEST_SKIP()
-        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
-  }
+  constexpr const char* kMissingDepFile = "missing-dep.module.so";
 
-  auto result = this->DlOpen("missing-dep.module.so", RTLD_NOW | RTLD_LOCAL);
+  this->ExpectRootModule(kMissingDepFile);
+  this->Needed({NotFound("libmissing-dep-dep.so")});
+
+  auto result = this->DlOpen(kMissingDepFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
+
+  // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
+  // between implementations.
   // Expect that the dependency lib to missing-dep.module.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
     EXPECT_EQ(result.error_value().take_str(), "cannot open libmissing-dep-dep.so");
   } else {
+    // Match on musl/glibc's error message for a missing dependency.
+    // Fuchsia's musl generates the following:
+    //   "Error loading shared library libmissing-dep-dep.so: ZX_ERR_NOT_FOUND (needed by
+    //   missing-dep.module.so)"
+    // Linux's glibc generates the following:
+    //   "libmissing-dep-dep.so: cannot open shared object file: No such file or directory"
     EXPECT_THAT(
         result.error_value().take_str(),
-        MatchesRegex(".*libmissing-dep-dep.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
+        MatchesRegex(
+            "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.module.so\\)"
+            "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
   }
 }
 

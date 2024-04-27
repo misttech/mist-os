@@ -13,7 +13,6 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_sl4f,
 )
-from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.fuchsia_device.fuchsia_controller import (
@@ -24,9 +23,6 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 )
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_interface,
-)
-from honeydew.interfaces.affordances.ui import (
-    user_input as user_input_interface,
 )
 from honeydew.interfaces.affordances.wlan import wlan as wlan_interface
 from honeydew.interfaces.affordances.wlan import (
@@ -118,15 +114,6 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         return bluetooth_gap_sl4f.BluetoothGap(
             device_name=self.device_name, sl4f=self.sl4f, reboot_affordance=self
         )
-
-    @properties.Affordance
-    def user_input(self) -> user_input_interface.UserInput:
-        """Returns an user input affordance object.
-
-        Returns:
-            user_input.UserInput object
-        """
-        return user_input_sl4f.UserInput(sl4f=self.sl4f)
 
     @properties.Affordance
     def wlan_policy(self) -> wlan_policy_interface.WlanPolicy:

@@ -18,15 +18,15 @@ use {
     anyhow::Error,
     cache::{ObjectCache, ObjectCacheResult},
     simple_persistent_layer::SimplePersistentLayerWriter,
+    skip_list_layer::SkipListLayer,
     std::{
         fmt,
-        future::Future,
         ops::Bound,
         sync::{Arc, RwLock},
     },
     types::{
         Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeableKey,
-        MutableLayer, OrdLowerBound, Value,
+        OrdLowerBound, Value,
     },
 };
 
@@ -58,9 +58,7 @@ pub enum Operation {
 pub type MutationCallback<K, V> = Option<Box<dyn Fn(Operation, &Item<K, V>) + Send + Sync>>;
 
 struct Inner<K, V> {
-    // The DropEvent allows us to wait for any impending mutations to complete.  See the seal method
-    // below.
-    mutable_layer: (Arc<DropEvent>, Arc<dyn MutableLayer<K, V>>),
+    mutable_layer: Arc<SkipListLayer<K, V>>,
     layers: Vec<Arc<dyn Layer<K, V>>>,
     mutation_callback: MutationCallback<K, V>,
 }
@@ -80,7 +78,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     pub fn new(merge_fn: merge::MergeFn<K, V>, cache: Box<dyn ObjectCache<K, V>>) -> Self {
         LSMTree {
             data: RwLock::new(Inner {
-                mutable_layer: (Arc::new(DropEvent::new()), Self::new_mutable_layer()),
+                mutable_layer: Self::new_mutable_layer(),
                 layers: Vec::new(),
                 mutation_callback: None,
             }),
@@ -97,7 +95,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     ) -> Result<Self, Error> {
         Ok(LSMTree {
             data: RwLock::new(Inner {
-                mutable_layer: (Arc::new(DropEvent::new()), Self::new_mutable_layer()),
+                mutable_layer: Self::new_mutable_layer(),
                 layers: layers_from_handles(handles).await?,
                 mutation_callback: None,
             }),
@@ -127,26 +125,20 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         self.data.write().unwrap().layers = Vec::new();
     }
 
-    /// Seals the current mutable layer and creates a new one.  Returns a future
-    /// that the caller should wait on to guarantee existing mutations have completed.
-    pub fn seal(&self) -> impl Future<Output = ()> + '_ {
+    /// Seals the current mutable layer and creates a new one.
+    pub fn seal(&self) {
+        // We need to be sure there are no mutations currently in-progress.  This is currently
+        // guaranteed by ensuring that all mutations take a read lock on `data`.
         let mut data = self.data.write().unwrap();
-        let (event, layer) = std::mem::replace(
-            &mut data.mutable_layer,
-            (Arc::new(DropEvent::new()), Self::new_mutable_layer()),
-        );
-        data.layers.insert(0, layer.as_layer());
-        // The caller should wait for any mutations to the old mutable layer to complete and that's
-        // done by waiting for the event to be dropped and ensuring that the event is cloned
-        // whenever we plan to mutate the layer.
-        event.listen()
+        let layer = std::mem::replace(&mut data.mutable_layer, Self::new_mutable_layer());
+        data.layers.insert(0, layer);
     }
 
     /// Resets the tree to an empty state.
     pub fn reset(&self) {
         let mut data = self.data.write().unwrap();
         data.layers = Vec::new();
-        data.mutable_layer = (Arc::new(DropEvent::new()), Self::new_mutable_layer());
+        data.mutable_layer = Self::new_mutable_layer();
     }
 
     /// Writes the items yielded by the iterator into the supplied object.
@@ -175,7 +167,9 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     pub fn add_all_layers_to_layer_set(&self, layer_set: &mut LayerSet<K, V>) {
         let data = self.data.read().unwrap();
         layer_set.layers.reserve_exact(data.layers.len() + 1);
-        layer_set.layers.push(data.mutable_layer.1.clone().as_layer().into());
+        layer_set
+            .layers
+            .push(LockedLayer::from(data.mutable_layer.clone() as Arc<dyn Layer<K, V>>));
         for layer in &data.layers {
             layer_set.layers.push(layer.clone().into());
         }
@@ -203,47 +197,47 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
 
     /// Inserts an item into the mutable layer.
     /// Returns error if item already exists.
-    pub async fn insert(&self, item: Item<K, V>) -> Result<(), Error> {
-        let (_event, mutable_layer) = {
+    pub fn insert(&self, item: Item<K, V>) -> Result<(), Error> {
+        let key = item.key.clone();
+        let val = item.value.clone();
+        {
+            // `seal` below relies on us holding a read lock whilst we do the mutation.
             let data = self.data.read().unwrap();
             if let Some(mutation_callback) = data.mutation_callback.as_ref() {
                 mutation_callback(Operation::Insert, &item);
             }
-            data.mutable_layer.clone()
-        };
-        let key = item.key.clone();
-        let val = item.value.clone();
-        mutable_layer.insert(item).await?;
+            data.mutable_layer.insert(item)?;
+        }
         self.cache.invalidate(key, Some(val));
         Ok(())
     }
 
     /// Replaces or inserts an item into the mutable layer.
-    pub async fn replace_or_insert(&self, item: Item<K, V>) {
-        let (_event, mutable_layer) = {
+    pub fn replace_or_insert(&self, item: Item<K, V>) {
+        let key = item.key.clone();
+        let val = item.value.clone();
+        {
+            // `seal` below relies on us holding a read lock whilst we do the mutation.
             let data = self.data.read().unwrap();
             if let Some(mutation_callback) = data.mutation_callback.as_ref() {
                 mutation_callback(Operation::ReplaceOrInsert, &item);
             }
-            data.mutable_layer.clone()
-        };
-        let key = item.key.clone();
-        let val = item.value.clone();
-        mutable_layer.replace_or_insert(item).await;
+            data.mutable_layer.replace_or_insert(item);
+        }
         self.cache.invalidate(key, Some(val));
     }
 
     /// Merges the given item into the mutable layer.
-    pub async fn merge_into(&self, item: Item<K, V>, lower_bound: &K) {
-        let (_event, mutable_layer) = {
+    pub fn merge_into(&self, item: Item<K, V>, lower_bound: &K) {
+        let key = item.key.clone();
+        {
+            // `seal` below relies on us holding a read lock whilst we do the mutation.
             let data = self.data.read().unwrap();
             if let Some(mutation_callback) = data.mutation_callback.as_ref() {
                 mutation_callback(Operation::MergeInto, &item);
             }
-            data.mutable_layer.clone()
-        };
-        let key = item.key.clone();
-        mutable_layer.merge_into(item, lower_bound, self.merge_fn).await;
+            data.mutable_layer.merge_into(item, lower_bound, self.merge_fn);
+        }
         self.cache.invalidate(key, None);
     }
 
@@ -276,8 +270,8 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         })
     }
 
-    pub fn mutable_layer(&self) -> Arc<dyn MutableLayer<K, V>> {
-        self.data.read().unwrap().mutable_layer.1.clone()
+    pub fn mutable_layer(&self) -> Arc<SkipListLayer<K, V>> {
+        self.data.read().unwrap().mutable_layer.clone()
     }
 
     /// Sets a mutation callback which is a callback that is triggered whenever any mutations are
@@ -300,13 +294,13 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     }
 
     /// Returns a new mutable layer.
-    pub fn new_mutable_layer() -> Arc<impl MutableLayer<K, V>> {
-        skip_list_layer::SkipListLayer::new(SKIP_LIST_LAYER_ITEMS)
+    pub fn new_mutable_layer() -> Arc<SkipListLayer<K, V>> {
+        SkipListLayer::new(SKIP_LIST_LAYER_ITEMS)
     }
 
     /// Replaces the mutable layer.
-    pub fn set_mutable_layer(&self, layer: Arc<impl MutableLayer<K, V> + 'static>) {
-        self.data.write().unwrap().mutable_layer = (Arc::new(DropEvent::new()), layer);
+    pub fn set_mutable_layer(&self, layer: Arc<SkipListLayer<K, V>>) {
+        self.data.write().unwrap().mutable_layer = layer;
     }
 }
 
@@ -451,8 +445,8 @@ mod tests {
     async fn test_iteration() {
         let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
-        tree.insert(items[0].clone()).await.expect("insert error");
-        tree.insert(items[1].clone()).await.expect("insert error");
+        tree.insert(items[0].clone()).expect("insert error");
+        tree.insert(items[1].clone()).expect("insert error");
         let layers = tree.layer_set();
         let mut merger = layers.merger();
         let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
@@ -474,12 +468,12 @@ mod tests {
             Item::new(TestKey(3..3), 3),
             Item::new(TestKey(4..4), 4),
         ];
-        tree.insert(items[0].clone()).await.expect("insert error");
-        tree.insert(items[1].clone()).await.expect("insert error");
-        tree.seal().await;
-        tree.insert(items[2].clone()).await.expect("insert error");
-        tree.insert(items[3].clone()).await.expect("insert error");
-        tree.seal().await;
+        tree.insert(items[0].clone()).expect("insert error");
+        tree.insert(items[1].clone()).expect("insert error");
+        tree.seal();
+        tree.insert(items[2].clone()).expect("insert error");
+        tree.insert(items[3].clone()).expect("insert error");
+        tree.seal();
         let object = Arc::new(FakeObject::new());
         let handle = FakeObjectHandle::new(object.clone());
         {
@@ -516,11 +510,11 @@ mod tests {
             Item::new(TestKey(4..4), 4),
         ];
         let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
-        tree.insert(items[0].clone()).await.expect("insert error");
-        tree.insert(items[1].clone()).await.expect("insert error");
-        tree.seal().await;
-        tree.insert(items[2].clone()).await.expect("insert error");
-        tree.insert(items[3].clone()).await.expect("insert error");
+        tree.insert(items[0].clone()).expect("insert error");
+        tree.insert(items[1].clone()).expect("insert error");
+        tree.seal();
+        tree.insert(items[2].clone()).expect("insert error");
+        tree.insert(items[3].clone()).expect("insert error");
 
         let item = tree.find(&items[1].key).await.expect("find failed").expect("not found");
         assert_eq!(item, items[1]);
@@ -530,9 +524,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_empty_seal() {
         let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
-        tree.seal().await;
+        tree.seal();
         let item = Item::new(TestKey(1..1), 1);
-        tree.insert(item.clone()).await.expect("insert error");
+        tree.insert(item.clone()).expect("insert error");
         let object = Arc::new(FakeObject::new());
         let handle = FakeObjectHandle::new(object.clone());
         {
@@ -558,10 +552,10 @@ mod tests {
             Item::new(TestKey(4..4), 4),
         ];
         let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
-        tree.insert(items[0].clone()).await.expect("insert error");
-        tree.insert(items[1].clone()).await.expect("insert error");
-        tree.insert(items[2].clone()).await.expect("insert error");
-        tree.insert(items[3].clone()).await.expect("insert error");
+        tree.insert(items[0].clone()).expect("insert error");
+        tree.insert(items[1].clone()).expect("insert error");
+        tree.insert(items[2].clone()).expect("insert error");
+        tree.insert(items[3].clone()).expect("insert error");
 
         let layers = tree.layer_set();
         let mut merger = layers.merger();
@@ -594,13 +588,13 @@ mod tests {
         ];
         let a = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         for item in &items {
-            a.insert(item.clone()).await.expect("insert error");
+            a.insert(item.clone()).expect("insert error");
         }
         let b = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let mut shuffled = items.clone();
         shuffled.shuffle(&mut thread_rng());
         for item in &shuffled {
-            b.insert(item.clone()).await.expect("insert error");
+            b.insert(item.clone()).expect("insert error");
         }
         let layers = a.layer_set();
         let mut merger = layers.merger();
@@ -706,7 +700,7 @@ mod tests {
         assert_eq!(inner.lock().unwrap().stats(), (1, 0, 0, 1));
 
         // Insert attempts to invalidate.
-        let _ = a.insert(item.clone()).await;
+        let _ = a.insert(item.clone());
         assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 1));
 
         // Look for item, find it and insert into the cache.
@@ -717,7 +711,7 @@ mod tests {
         assert_eq!(inner.lock().unwrap().stats(), (2, 1, 1, 1));
 
         // Insert or replace attempts to invalidate as well.
-        a.replace_or_insert(item.clone()).await;
+        a.replace_or_insert(item.clone());
         assert_eq!(inner.lock().unwrap().stats(), (2, 1, 2, 1));
     }
 
@@ -732,7 +726,7 @@ mod tests {
         assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
 
         // Insert attempts to invalidate.
-        let _ = a.insert(item.clone()).await;
+        let _ = a.insert(item.clone());
         assert_eq!(inner.lock().unwrap().stats(), (0, 0, 1, 0));
 
         // Set up the item to find in the cache.
@@ -752,7 +746,7 @@ mod tests {
         let cache = Box::new(AuditCache::new());
         let inner = cache.inner.clone();
         let a = LSMTree::new(emit_left_merge_fn, cache);
-        let _ = a.insert(item.clone()).await;
+        let _ = a.insert(item.clone());
 
         // One invalidation from the insert.
         assert_eq!(inner.lock().unwrap().stats(), (0, 0, 1, 0));
@@ -903,16 +897,16 @@ mod fuzz {
         for action in actions {
             match action {
                 FuzzAction::Insert(item) => {
-                    let _ = block_on(tree.insert(item));
+                    let _ = tree.insert(item);
                 }
                 FuzzAction::ReplaceOrInsert(item) => {
-                    block_on(tree.replace_or_insert(item));
+                    tree.replace_or_insert(item);
                 }
                 FuzzAction::Find(key) => {
                     block_on(tree.find(&key)).expect("find failed");
                 }
-                FuzzAction::MergeInto(item, bound) => block_on(tree.merge_into(item, &bound)),
-                FuzzAction::Seal => block_on(tree.seal()),
+                FuzzAction::MergeInto(item, bound) => tree.merge_into(item, &bound),
+                FuzzAction::Seal => tree.seal(),
             };
         }
     }

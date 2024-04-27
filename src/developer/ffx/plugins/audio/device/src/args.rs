@@ -6,6 +6,7 @@ use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_audio::{
+    dai::DaiFormat,
     device::{Direction, HardwareType},
     Format,
 };
@@ -15,31 +16,41 @@ use fuchsia_audio::{
 #[argh(
     subcommand,
     name = "device",
-    description = "Interact directly with device hardware.",
+    description = "Interact directly with device hardware.
+
+The flags on the device command filter the list of available devices.
+
+Commands that operate on a single device pick the first matching device,
+after filtering. For example, if the target has only one device, and no
+filter flags are provided, `ffx audio device` will use that device by default.",
     example = "Show information about a specific device:
 
-    $ ffx audio device --id 3d99d780 --direction input info
+    $ ffx audio device --name 3d99d780 --direction input info
+
+Show information about a specific device in the audio device registry:
+
+    $ ffx audio device --token-id 1 info
 
 Play a WAV file directly to device hardware:
 
-    $ cat ~/sine.wav | ffx audio device --id a70075f2 play
-    $ ffx audio device --id a70075f2 play --file ~/sine.wav
+    $ cat ~/sine.wav | ffx audio device --name a70075f2 play
+    $ ffx audio device --name a70075f2 play --file ~/sine.wav
 
 Record a WAV file directly from device hardware:
 
-    $ ffx audio device --id 3d99d780 record --format 48000,uint8,1ch --duration 1s
+    $ ffx audio device --name 3d99d780 record --format 48000,uint8,1ch --duration 1s
 
 Mute the stream of an output device:
 
-    $ ffx audio device --id a70075f2 --direction output mute
+    $ ffx audio device --name a70075f2 --direction output mute
 
 Set the gain of an output device to -20 dB:
 
-    $ ffx audio device --id a70075f2 --direction output gain -20
+    $ ffx audio device --name a70075f2 --direction output gain -20
 
 Turn AGC on for an input device:
 
-    $ ffx audio device --id 3d99d780 --direction input agc on"
+    $ ffx audio device --name 3d99d780 --direction input agc on"
 )]
 pub struct DeviceCommand {
     #[argh(subcommand)]
@@ -47,11 +58,17 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        description = "device ID. Specify a devfs node name, \
-        e.g. 3d99d780 for /dev/class/audio-input/3d99d780.
-        If not specified, defaults to the first device alphabetically listed."
+        description = "device devfs node name. \
+        e.g. 3d99d780 for the devfs path /dev/class/audio-input/3d99d780."
     )]
-    pub id: Option<String>,
+    pub name: Option<String>,
+
+    #[argh(
+        option,
+        description = "device token ID, for a device in the audio device registry. \
+        Only applies if the audio device registry is available on the target."
+    )]
+    pub token_id: Option<fadevice::TokenId>,
 
     #[argh(
         option,
@@ -74,12 +91,16 @@ pub struct DeviceCommand {
 pub enum SubCommand {
     List(ListCommand),
     Info(InfoCommand),
-    Play(DevicePlayCommand),
-    Record(DeviceRecordCommand),
-    Gain(DeviceGainCommand),
-    Mute(DeviceMuteCommand),
-    Unmute(DeviceUnmuteCommand),
-    Agc(DeviceAgcCommand),
+    Play(PlayCommand),
+    Record(RecordCommand),
+    Gain(GainCommand),
+    Mute(MuteCommand),
+    Unmute(UnmuteCommmand),
+    Agc(AgcCommand),
+    Set(SetCommand),
+    Start(StartCommand),
+    Stop(StopCommand),
+    Reset(ResetCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -102,7 +123,7 @@ pub struct InfoCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "play", description = "Send audio data directly to device ring buffer.")]
-pub struct DevicePlayCommand {
+pub struct PlayCommand {
     #[argh(
         option,
         description = "file in WAV format containing audio signal. \
@@ -120,7 +141,7 @@ pub struct DevicePlayCommand {
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "record", description = "Capture audio data directly from ring buffer.")]
-pub struct DeviceRecordCommand {
+pub struct RecordCommand {
     #[argh(
         option,
         description = "duration of output signal. Examples: 5ms or 3s. \
@@ -146,18 +167,18 @@ pub struct DeviceRecordCommand {
     name = "gain",
     description = "Request to set the gain of the stream, in decibels."
 )]
-pub struct DeviceGainCommand {
+pub struct GainCommand {
     #[argh(option, description = "gain, in decibels, to set the stream to.")]
     pub gain: f32,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "mute", description = "Request to mute a stream.")]
-pub struct DeviceMuteCommand {}
+pub struct MuteCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "unmute", description = "Request to unmute a stream.")]
-pub struct DeviceUnmuteCommand {}
+pub struct UnmuteCommmand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
@@ -165,7 +186,7 @@ pub struct DeviceUnmuteCommand {}
     name = "agc",
     description = "Request to enable or disable automatic gain control for the stream."
 )]
-pub struct DeviceAgcCommand {
+pub struct AgcCommand {
     #[argh(
         positional,
         description = "enable or disable AGC. Accepted values: on, off",
@@ -173,6 +194,85 @@ pub struct DeviceAgcCommand {
     )]
     pub enable: bool,
 }
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "set", description = "Set a device property.")]
+pub struct SetCommand {
+    #[argh(subcommand)]
+    pub subcommand: SetSubCommand,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum SetSubCommand {
+    DaiFormat(SetDaiFormatCommand),
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "dai-format",
+    description = "Set the DAI format of device or signal processing element.",
+    example = "Set the DAI format for a specific Dai Endpoint signal processing element:
+
+    $ ffx audio device --id 1 set dai-format --element-id 2 48000,2ch,0x3,pcm_signed,16in16,i2s",
+    note = r"This command accepts a DAI format as a comma separated string:
+
+<FrameRate>,<NumChannels>,<ChannelsToUseBitmask>,<DaiSampleFormat>,<SampleSize>,<DaiFrameFormat>
+
+Where:
+    <FrameRate>: integer frame rate in Hz, e.g. 48000
+    <NumChannels>ch: number of channels, e.g. 2ch
+    <ChannelsToUseBitmask>: bitmask for channels that are in use,
+        as a hexadecimal number prefixed with 0x,
+        e.g. 0x3 for the first two channels, usually stereo left/right
+    <DaiSampleFormat>: sample format, one of:
+        pdm, pcm_signed, pcm_unsigned, pcm_float
+    <SampleSize>: sample and slot size in bits as: <ValidBits>in<TotalBits>
+        e.g. 16in32 for 16 valid sample bits in a 32 bit slot
+    <DaiFrameFormat>: frame format, either:
+        a standard format, one of:
+            none, i2s, stereo_left, stereo_right, tdm1, tdm2, tdm3
+        or a custom format:
+                custom:<Justification>;<Clocking>;<FrameSyncOffset>;<FrameSyncSize>
+            where:
+            <Justification>: justification of samples within a slot, one of:
+                left_justified, right_justified
+            <Clocking>: clocking of data samples, one of:
+                raising_sclk, falling_sclk
+            <FrameSyncOffset>: number of sclks between the beginning of a
+                frame sync change and audio samples.
+                e.g. 1 for i2s, 0 for left justified
+            <FrameSyncSize>: number of sclks that the frame sync is high.
+                e.g. 1
+
+Examples:
+    48000,2ch,0x3,pcm_signed,16in32,i2s
+    96000,1ch,0x1,pcm_float,32in32,custom:right_justified;falling_sclk;-1;0"
+)]
+pub struct SetDaiFormatCommand {
+    #[argh(positional, description = "DAI format")]
+    pub format: DaiFormat,
+
+    #[argh(
+        option,
+        description = "signal processing element ID, \
+        for an Endpoint element of type Dai"
+    )]
+    pub element_id: Option<fadevice::ElementId>,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "start", description = "Start device hardware.")]
+pub struct StartCommand {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "stop", description = "Stop device hardware.")]
+pub struct StopCommand {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "reset", description = "Reset device hardware.")]
+pub struct ResetCommand {}
 
 fn string_to_enable(value: &str) -> Result<bool, String> {
     if value == "on" {

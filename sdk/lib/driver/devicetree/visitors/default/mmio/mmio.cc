@@ -19,7 +19,7 @@ constexpr const char kMmioProp[] = "reg";
 zx::result<> MmioVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
   auto property = node.properties().find(kMmioProp);
   if (property == node.properties().end()) {
-    FDF_LOG(DEBUG, "Node '%s' has no mmio properties.", node.name().data());
+    FDF_LOG(DEBUG, "Node '%s' has no mmio properties.", node.name().c_str());
     return zx::ok();
   }
 

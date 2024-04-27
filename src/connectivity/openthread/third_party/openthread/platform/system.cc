@@ -39,29 +39,17 @@
 #include "openthread-system.h"
 
 void platformSimInit(void);
-#ifdef OPENTHREAD_231010
-extern "C" void platformRadioInit(const otPlatformConfig *a_platform_config);
-#endif
-#ifdef OPENTHREAD_240214
 extern "C" void platformRadioInit(const char *aUrl);
-#endif
 
 extern "C" void platformRadioDeinit();
 void platformRandomInit(void);
 void platformAlarmInit(uint32_t a_speed_up_factor);
 
-#ifdef OPENTHREAD_240214
 const char *radio_url_string =
     "spinel+vendor+spi:///dev/class/ot-radio/000?baudrate=115200&no-reset&enable-coex";
-#endif
 
 void otSysInit(otPlatformConfig *a_platform_config) {
-#ifdef OPENTHREAD_231010
-  platformRadioInit(a_platform_config);
-#endif
-#ifdef OPENTHREAD_240214
   platformRadioInit(radio_url_string);
-#endif
   platformRandomInit();
 }
 

@@ -8,11 +8,12 @@ import ipaddress
 import json
 import subprocess
 import unittest
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest import mock
 
 import fuchsia_controller_py as fuchsia_controller
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.transports import ffx
@@ -147,12 +148,12 @@ _EXPECTED_VALUES: dict[str, Any] = {
 
 
 def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
+    testcase_func: Callable[..., None], _: str, param_arg: param
 ) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -162,7 +163,7 @@ class FfxConfigTests(unittest.TestCase):
     """Unit tests for honeydew.transports.ffx.FfxConfig"""
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_call",
         autospec=True,
     )
@@ -212,7 +213,7 @@ class FfxConfigTests(unittest.TestCase):
             )
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_call",
         side_effect=subprocess.CalledProcessError(
             returncode=5,
@@ -241,7 +242,7 @@ class FfxConfigTests(unittest.TestCase):
         mock_subprocess_check_call.assert_called()
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_call",
         side_effect=subprocess.TimeoutExpired(cmd="cmd", timeout=5),
         autospec=True,
@@ -559,7 +560,7 @@ class FfxTests(unittest.TestCase):
         mock_get_target_information.assert_called()
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_output",
         return_value=_MOCK_ARGS["ffx_target_show_output"],
         autospec=True,
@@ -585,13 +586,13 @@ class FfxTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_call",
         return_value=None,
         autospec=True,
     )
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_output",
         return_value=None,
         autospec=True,
@@ -625,7 +626,7 @@ class FfxTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_call",
         return_value=None,
         autospec=True,
@@ -665,7 +666,7 @@ class FfxTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "Popen",
         return_value=None,
         autospec=True,
@@ -741,7 +742,7 @@ class FfxTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_output",
         autospec=True,
     )
@@ -762,7 +763,7 @@ class FfxTests(unittest.TestCase):
         mock_subprocess_check_output.assert_called()
 
     @mock.patch.object(
-        ffx.subprocess,
+        subprocess,
         "check_output",
         side_effect=RuntimeError("error"),
         autospec=True,
@@ -780,7 +781,7 @@ class FfxTests(unittest.TestCase):
 
         mock_subprocess_check_output.assert_called()
 
-    @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
+    @mock.patch.object(subprocess, "check_output", autospec=True)
     def test_add_target(self, mock_subprocess_check_output: mock.Mock) -> None:
         """Test case for ffx_cli.add_target()."""
         self.ffx_obj_with_ip.add_target()
@@ -812,7 +813,7 @@ class FfxTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
+    @mock.patch.object(subprocess, "check_output", autospec=True)
     def test_add_target_exception(
         self,
         parameterized_dict: dict[str, Any],

@@ -4,7 +4,10 @@
 
 source_set("exceptions") {
   testonly = true
-  sources = [ "far-exceptions.cc" ]
+  sources = [
+    "far-exceptions.cc",
+    "user-exceptions.cc",
+  ]
   deps = [
     "//src/lib/elfldltl",
     "//zircon/kernel/lib/arch",

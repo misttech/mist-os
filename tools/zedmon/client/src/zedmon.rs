@@ -472,9 +472,9 @@ impl<InterfaceType: usb_bulk::Open<InterfaceType> + Read + Write> Client<Interfa
             let min_zedmon_timestamp =
                 if time_offset_micros >= 0 { 0u64 } else { -time_offset_micros as u64 };
             let max_zedmon_timestamp = if time_offset_micros >= 0 {
-                std::u64::MAX - (time_offset_micros as u64)
+                u64::MAX - (time_offset_micros as u64)
             } else {
-                std::u64::MAX
+                u64::MAX
             };
 
             for buffer in packet_receiver.iter() {

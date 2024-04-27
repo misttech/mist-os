@@ -8,6 +8,7 @@ import abc
 from collections.abc import Callable
 
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing import custom_types
 
 
 class RebootCapableDevice(abc.ABC):
@@ -44,4 +45,20 @@ class RebootCapableDevice(abc.ABC):
 
         Args:
             timeout: How long in sec to wait for device to go offline.
+        """
+
+
+class FuchsiaDeviceLogger(abc.ABC):
+    """Abstract base class which contains methods for logging message to fuchsia
+    device."""
+
+    @abc.abstractmethod
+    def log_message_to_device(
+        self, message: str, level: custom_types.LEVEL
+    ) -> None:
+        """Log message to fuchsia device at specified level.
+
+        Args:
+            message: Message that need to logged.
+            level: Log message level.
         """

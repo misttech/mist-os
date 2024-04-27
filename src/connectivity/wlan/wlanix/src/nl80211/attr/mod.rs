@@ -151,6 +151,7 @@ impl Nla for Nl80211Attr {
 }
 
 impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for Nl80211Attr {
+    type Error = DecodeError;
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
@@ -190,7 +191,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for Nl80211Attr {
             }
             NL80211_ATTR_MAX_NUM_SCAN_SSIDS => Self::MaxScanSsids(payload[0]),
             NL80211_ATTR_SCAN_FREQUENCIES => NlasIterator::new(payload)
-                .map(|nla| nla.and_then(|v| parse_u32(v.value())))
+                .map(|nla| {
+                    nla.map_err(|err| DecodeError::from(err)).and_then(|v| parse_u32(v.value()))
+                })
                 .collect::<Result<Vec<_>, _>>()
                 .map(Self::ScanFrequencies)
                 .context("Invalid NL80211_ATTR_SCAN_FREQUENCIES value")?,
@@ -267,7 +270,9 @@ mod tests {
         let mut buffer = vec![0; attrs.as_slice().buffer_len()];
         attrs.as_slice().emit(&mut buffer[..]);
         let parsed_attrs = NlasIterator::new(&buffer[..])
-            .map(|nla| nla.and_then(|nla| Nl80211Attr::parse(&nla)))
+            .map(|nla| {
+                nla.map_err(|err| DecodeError::from(err)).and_then(|nla| Nl80211Attr::parse(&nla))
+            })
             .collect::<Result<Vec<_>, _>>()
             .expect("Failed to parse attributes");
         assert_eq!(attrs, parsed_attrs);

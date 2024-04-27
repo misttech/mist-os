@@ -79,6 +79,9 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                 Ok(())
             }
+            fnet_routes::StateRequest::GetRouteTableName { table_id: _, responder: _ } => {
+                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            }
         }
     })
     .await
@@ -193,12 +196,21 @@ pub(crate) async fn serve_state_v4(
     dispatcher: &RouteUpdateDispatcher<Ipv4>,
 ) {
     rs.try_for_each_concurrent(None, |req| match req {
+        // TODO(https://fxbug.dev/336367363): Use the `options` to only watch
+        // for a specific route table.
         fnet_routes::StateV4Request::GetWatcherV4 { options: _, watcher, control_handle: _ } => {
             serve_watcher::<Ipv4>(watcher, dispatcher).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
                 }))
             })
+        }
+        fnet_routes::StateV4Request::GetRuleWatcherV4 {
+            options: _,
+            watcher: _,
+            control_handle: _,
+        } => {
+            todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher");
         }
     })
     .await
@@ -213,12 +225,21 @@ pub(crate) async fn serve_state_v6(
     dispatcher: &RouteUpdateDispatcher<Ipv6>,
 ) {
     rs.try_for_each_concurrent(None, |req| match req {
+        // TODO(https://fxbug.dev/336367363): Use the `options` to only watch
+        // for a specific route table.
         fnet_routes::StateV6Request::GetWatcherV6 { options: _, watcher, control_handle: _ } => {
             serve_watcher::<Ipv6>(watcher, dispatcher).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
                 }))
             })
+        }
+        fnet_routes::StateV6Request::GetRuleWatcherV6 {
+            options: _,
+            watcher: _,
+            control_handle: _,
+        } => {
+            todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher");
         }
     })
     .await

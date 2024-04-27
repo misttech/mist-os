@@ -55,6 +55,8 @@ void LdLoadTestsBase::Needed(
   for (auto [name, found] : name_found_pairs) {
     if (found) {
       ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
+    } else {
+      ASSERT_FALSE(elfldltl::testing::TryGetTestLib(name)) << name;
     }
   }
 }

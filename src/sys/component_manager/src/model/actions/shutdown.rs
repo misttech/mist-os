@@ -7,7 +7,6 @@ use {
         actions::{Action, ActionKey, ActionSet},
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
-        error::ActionError,
     },
     async_trait::async_trait,
     cm_rust::{
@@ -20,6 +19,7 @@ use {
         UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_types::{IterablePath, Name},
+    errors::ActionError,
     futures::future::select_all,
     moniker::{ChildName, ChildNameBase},
     std::collections::{HashMap, HashSet},
@@ -398,10 +398,12 @@ pub trait Component {
     /// returns `None` if none match. In the case of dynamic children, it's
     /// possible for multiple children to match a given `name` and `collection`,
     /// but at most one of them can be live.
+    ///
+    /// Note: `name` is a `&str` because it could be either a `Name` or `LongName`.
     fn find_child(&self, name: &str, collection: Option<&Name>) -> Option<Child> {
-        self.children()
-            .into_iter()
-            .find(|child| child.moniker.name() == name && child.moniker.collection() == collection)
+        self.children().into_iter().find(|child| {
+            child.moniker.name().as_str() == name && child.moniker.collection() == collection
+        })
     }
 }
 
@@ -416,7 +418,7 @@ pub struct Child {
     pub moniker: ChildName,
 
     /// Name of the environment associated with this child, if any.
-    pub environment_name: Option<String>,
+    pub environment_name: Option<Name>,
 }
 
 /// For a given Component, identify capability dependencies between the
@@ -571,7 +573,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
             | UseDecl::Config(UseConfigurationDecl { source, .. })
             | UseDecl::Runner(UseRunnerDecl { source, .. }) => match source {
                 UseSource::Child(name) => instance
-                    .find_child(name, None)
+                    .find_child(name.as_str(), None)
                     .map(|child| ComponentRef::from(child.moniker.clone())),
                 UseSource::Self_ => {
                     if use_.is_from_dictionary() {
@@ -718,7 +720,7 @@ fn find_offer_sources(
 ) -> Vec<ComponentRef> {
     match source {
         OfferSource::Child(ChildRef { name, collection }) => {
-            match instance.find_child(name, collection.as_ref()) {
+            match instance.find_child(name.as_str(), collection.as_ref()) {
                 Some(child) => vec![child.moniker.clone().into()],
                 None => {
                     error!(
@@ -775,7 +777,7 @@ fn find_offer_sources(
 fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<ComponentRef> {
     match target {
         OfferTarget::Child(ChildRef { name, collection }) => {
-            match instance.find_child(name, collection.as_ref()) {
+            match instance.find_child(name.as_str(), collection.as_ref()) {
                 Some(child) => vec![child.moniker.into()],
                 None => {
                     error!(
@@ -803,7 +805,7 @@ fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<Co
 /// component's environment configuration. Children assigned to an environment
 /// depend on components that contribute to that environment.
 fn get_dependencies_from_environments(instance: &impl Component) -> Dependencies {
-    let env_to_sources: HashMap<String, HashSet<ComponentRef>> = instance
+    let env_to_sources: HashMap<Name, HashSet<ComponentRef>> = instance
         .environments()
         .into_iter()
         .map(|env| {
@@ -846,7 +848,7 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
                 let source = match source {
                     DictionarySource::Parent => None,
                     DictionarySource::Child(ChildRef { name, collection }) => {
-                        match instance.find_child(name, collection.as_ref()) {
+                        match instance.find_child(name.as_str(), collection.as_ref()) {
                             Some(child) => Some(child.moniker.clone().into()),
                             None => {
                                 error!(
@@ -872,13 +874,15 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
             CapabilityDecl::Storage(StorageDecl { name, source, .. }) => {
                 let source = match source {
                     StorageDirectorySource::Parent => None,
-                    StorageDirectorySource::Child(name) => match instance.find_child(name, None) {
-                        Some(child) => Some(child.moniker.clone().into()),
-                        None => {
-                            error!("storage source doesn't exist: (name: {:?})", name);
-                            None
+                    StorageDirectorySource::Child(name) => {
+                        match instance.find_child(name.as_str(), None) {
+                            Some(child) => Some(child.moniker.clone().into()),
+                            None => {
+                                error!("storage source doesn't exist: (name: {:?})", name);
+                                None
+                            }
                         }
-                    },
+                    }
                     StorageDirectorySource::Self_ => Some(ComponentRef::Self_),
                 };
                 if let Some(source) = source {
@@ -911,16 +915,18 @@ fn find_environment_sources(
     registration_sources
         .flat_map(|source| match source {
             RegistrationSource::Self_ => vec![ComponentRef::Self_],
-            RegistrationSource::Child(child_name) => match instance.find_child(&child_name, None) {
-                Some(child) => vec![child.moniker.into()],
-                None => {
-                    error!(
-                        "source for environment {:?} doesn't exist: (name: {:?})",
-                        env.name, child_name,
-                    );
-                    vec![]
+            RegistrationSource::Child(child_name) => {
+                match instance.find_child(child_name.as_str(), None) {
+                    Some(child) => vec![child.moniker.into()],
+                    None => {
+                        error!(
+                            "source for environment {:?} doesn't exist: (name: {:?})",
+                            env.name, child_name,
+                        );
+                        vec![]
+                    }
                 }
-            },
+            }
             RegistrationSource::Parent => vec![],
         })
         .collect()
@@ -933,7 +939,6 @@ mod tests {
         crate::model::{
             actions::StopAction,
             component::StartReason,
-            error::StopActionError,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, execution_is_shut_down, has_child,
@@ -945,6 +950,7 @@ mod tests {
         cm_rust::{ComponentDecl, DependencyType, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         cm_types::AllowedOffers,
+        errors::StopActionError,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         maplit::{btreeset, hashmap, hashset},
         moniker::Moniker,
@@ -997,7 +1003,7 @@ mod tests {
                 .children
                 .iter()
                 .map(|c| Child {
-                    moniker: ChildName::try_new(&c.name, None)
+                    moniker: ChildName::try_new(c.name.as_str(), None)
                         .expect("children should have valid monikers"),
                     environment_name: c.environment.clone(),
                 })
@@ -1067,7 +1073,7 @@ mod tests {
             .expose(
                 ExposeBuilder::protocol()
                     .name("serviceFromChild")
-                    .source(ExposeSource::Child("childA".into()))
+                    .source_static_child("childA")
                     .target(ExposeTarget::Parent),
             )
             .child_default("childA")
@@ -1161,7 +1167,10 @@ mod tests {
                     .source_dictionary(DictionarySource::Self_, "other_dict"),
             )
             .capability(CapabilityBuilder::dictionary().name("other_dict").source_dictionary(
-                DictionarySource::Child(ChildRef { name: "childA".into(), collection: None }),
+                DictionarySource::Child(ChildRef {
+                    name: "childA".parse().unwrap(),
+                    collection: None,
+                }),
                 "remote/dict",
             ))
             .offer(
@@ -1288,11 +1297,11 @@ mod tests {
                 // declaration.
                 Child {
                     moniker: "coll:dyn1".try_into().unwrap(),
-                    environment_name: Some("env".to_string()),
+                    environment_name: Some("env".parse().unwrap()),
                 },
                 Child {
                     moniker: "coll:dyn2".try_into().unwrap(),
-                    environment_name: Some("env".to_string()),
+                    environment_name: Some("env".parse().unwrap()),
                 },
             ],
             dynamic_offers: vec![],
@@ -1535,11 +1544,11 @@ mod tests {
                 // it can theoretically be inferred from the collection declaration.
                 Child {
                     moniker: "coll:dyn1".try_into().unwrap(),
-                    environment_name: Some("resolver_env".to_string()),
+                    environment_name: Some("resolver_env".parse().unwrap()),
                 },
                 Child {
                     moniker: "coll:dyn2".try_into().unwrap(),
-                    environment_name: Some("resolver_env".to_string()),
+                    environment_name: Some("resolver_env".parse().unwrap()),
                 },
             ],
             dynamic_offers: vec![],
@@ -1569,7 +1578,7 @@ mod tests {
                 OfferBuilder::directory()
                     .name("some_dir")
                     .source(OfferSource::Child(ChildRef {
-                        name: "childA".into(),
+                        name: "childA".parse().unwrap(),
                         collection: None,
                     }))
                     .target(OfferTarget::Collection("coll".parse().unwrap())),
@@ -1589,11 +1598,11 @@ mod tests {
                     .name("test.protocol")
                     .target_name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn2".into(),
+                        name: "dyn2".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .build(),
@@ -1601,11 +1610,11 @@ mod tests {
                     .name("test.protocol")
                     .target_name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn3".into(),
+                        name: "dyn3".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .build(),
@@ -1655,22 +1664,22 @@ mod tests {
                 OfferBuilder::protocol()
                     .name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll1".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll2".parse().unwrap()),
                     }))
                     .build(),
                 OfferBuilder::protocol()
                     .name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn2".into(),
+                        name: "dyn2".parse().unwrap(),
                         collection: Some("coll2".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll1".parse().unwrap()),
                     }))
                     .build(),
@@ -1707,7 +1716,7 @@ mod tests {
                 .name("test.protocol")
                 .source(OfferSource::Parent)
                 .target(OfferTarget::Child(ChildRef {
-                    name: "dyn1".into(),
+                    name: "dyn1".parse().unwrap(),
                     collection: Some("coll".parse().unwrap()),
                 }))
                 .build()],
@@ -1739,7 +1748,7 @@ mod tests {
                 .name("test.protocol")
                 .source(OfferSource::Self_)
                 .target(OfferTarget::Child(ChildRef {
-                    name: "dyn1".into(),
+                    name: "dyn1".parse().unwrap(),
                     collection: Some("coll".parse().unwrap()),
                 }))
                 .build()],
@@ -1776,7 +1785,7 @@ mod tests {
                 .name("test.protocol")
                 .source_static_child("childA")
                 .target(OfferTarget::Child(ChildRef {
-                    name: "dyn1".into(),
+                    name: "dyn1".parse().unwrap(),
                     collection: Some("coll".parse().unwrap()),
                 }))
                 .build()],
@@ -2229,11 +2238,7 @@ mod tests {
                     .dependency(DependencyType::Weak),
             )
             .child_default("childA")
-            .use_(
-                UseBuilder::protocol()
-                    .name("test.protocol")
-                    .source(UseSource::Child("childA".into())),
-            )
+            .use_(UseBuilder::protocol().name("test.protocol").source_static_child("childA"))
             .build();
 
         pretty_assertions::assert_eq!(
@@ -2285,9 +2290,7 @@ mod tests {
     fn test_use_runner_from_child() {
         let decl = ComponentDeclBuilder::new()
             .child_default("childA")
-            .use_(
-                UseBuilder::runner().name("test.runner").source(UseSource::Child("childA".into())),
-            )
+            .use_(UseBuilder::runner().name("test.runner").source_static_child("childA"))
             .build();
 
         pretty_assertions::assert_eq!(
@@ -2311,11 +2314,7 @@ mod tests {
             )
             .child_default("childA")
             .child_default("childB")
-            .use_(
-                UseBuilder::protocol()
-                    .name("test.protocol")
-                    .source(UseSource::Child("childA".into())),
-            )
+            .use_(UseBuilder::protocol().name("test.protocol").source_static_child("childA"))
             .build();
 
         pretty_assertions::assert_eq!(
@@ -2360,11 +2359,7 @@ mod tests {
             )
             .child_default("childA")
             .child_default("childB")
-            .use_(
-                UseBuilder::protocol()
-                    .name("test.protocol")
-                    .source(UseSource::Child("childA".into())),
-            )
+            .use_(UseBuilder::protocol().name("test.protocol").source_static_child("childA"))
             .build();
 
         pretty_assertions::assert_eq!(
@@ -2392,7 +2387,7 @@ mod tests {
             .use_(
                 UseBuilder::protocol()
                     .name("test.protocol")
-                    .source(UseSource::Child("childA".into()))
+                    .source_static_child("childA")
                     .dependency(DependencyType::Weak),
             )
             .build();
@@ -2418,15 +2413,11 @@ mod tests {
             )
             .child_default("childA")
             .child_default("childB")
-            .use_(
-                UseBuilder::protocol()
-                    .name("test.protocol")
-                    .source(UseSource::Child("childA".into())),
-            )
+            .use_(UseBuilder::protocol().name("test.protocol").source_static_child("childA"))
             .use_(
                 UseBuilder::protocol()
                     .name("test.protocol2")
-                    .source(UseSource::Child("childB".into()))
+                    .source_static_child("childB")
                     .dependency(DependencyType::Weak),
             )
             .build();
@@ -2670,7 +2661,7 @@ mod tests {
                             .name("static_offer_source")
                             .target_name("static_offer_target")
                             .source(OfferSource::Child(ChildRef {
-                                name: "c".into(),
+                                name: "c".parse().unwrap(),
                                 collection: None,
                             }))
                             .target(OfferTarget::Collection("coll".parse().unwrap())),
@@ -3609,11 +3600,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager())
                     .child(ChildBuilder::new().name("c").eager())
-                    .use_(
-                        UseBuilder::protocol()
-                            .source(UseSource::Child("b".to_string()))
-                            .name("serviceC"),
-                    )
+                    .use_(UseBuilder::protocol().source_static_child("b").name("serviceC"))
                     .build(),
             ),
             (
@@ -3685,11 +3672,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager())
                     .child(ChildBuilder::new().name("c").eager())
-                    .use_(
-                        UseBuilder::runner()
-                            .source(UseSource::Child("b".to_string()))
-                            .name("test.runner"),
-                    )
+                    .use_(UseBuilder::runner().source_static_child("b").name("test.runner"))
                     .build(),
             ),
             (
@@ -3760,11 +3743,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager())
                     .child(ChildBuilder::new().name("c").eager())
-                    .use_(
-                        UseBuilder::protocol()
-                            .source(UseSource::Child("b".to_string()))
-                            .name("serviceB"),
-                    )
+                    .use_(UseBuilder::protocol().source_static_child("b").name("serviceB"))
                     .offer(
                         OfferBuilder::protocol()
                             .name("serviceC")
@@ -3852,7 +3831,7 @@ mod tests {
                     .child(ChildBuilder::new().name("c").eager())
                     .use_(
                         UseBuilder::protocol()
-                            .source(UseSource::Child("b".to_string()))
+                            .source_static_child("b")
                             .name("serviceC")
                             .dependency(DependencyType::Weak),
                     )

@@ -8,10 +8,8 @@ use {
         model::{
             component::instance::InstanceState,
             component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance},
-            error::ModelError,
             events::{
                 dispatcher::{EventDispatcher, EventDispatcherScope},
-                error::EventsError,
                 stream::EventStream,
                 synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer},
             },
@@ -30,7 +28,7 @@ use {
     async_trait::async_trait,
     cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl},
     cm_types::Name,
-    flyweights::FlyStr,
+    errors::{EventsError, ModelError},
     futures::lock::Mutex,
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{
@@ -120,20 +118,18 @@ pub struct ComponentEventRoute {
     /// filtering is performed.
     /// * The name of a component relative to its parent
     /// * The name of a collection relative to its parent
-    pub component: ChildRef,
+    ///
+    /// If None, refers to the root component.
+    pub component: Option<ChildRef>,
     /// A list of scopes that this route applies to
     pub scope: Option<Vec<EventScope>>,
 }
 
 impl ComponentEventRoute {
     fn from_moniker(moniker: &Moniker, scope: Option<Vec<EventScope>>) -> ComponentEventRoute {
-        let component = match moniker.leaf() {
-            Some(leaf) => ChildRef {
-                name: FlyStr::new(leaf.name.to_string()),
-                collection: leaf.collection.clone(),
-            },
-            None => ChildRef { name: FlyStr::new("<root>"), collection: None },
-        };
+        let component = moniker
+            .leaf()
+            .map(|leaf| ChildRef { name: leaf.name.clone(), collection: leaf.collection.clone() });
         ComponentEventRoute { component, scope }
     }
 }
@@ -353,10 +349,10 @@ impl EventRegistry {
         let _search_name: Name = event_decl.source_name;
         if let Some(moniker) = component.child_moniker() {
             route.push(ComponentEventRoute {
-                component: ChildRef {
-                    name: FlyStr::new(moniker.name()),
+                component: Some(ChildRef {
+                    name: moniker.name().clone(),
                     collection: moniker.collection().cloned(),
-                },
+                }),
                 scope: event_decl.scope,
             });
         }

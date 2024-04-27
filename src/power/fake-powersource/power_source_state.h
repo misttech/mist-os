@@ -46,7 +46,7 @@ class PowerSourceState {
       .capacity_granularity_low_warning = 20,
       .capacity_granularity_warning_full = 1,
       .present_rate = 2,
-      .remaining_capacity = 2900,
+      .remaining_capacity = 2950,
       .present_voltage = 2910,
       .battery_spec = fuchsia_hardware_powersource::BatterySpec{{
           .max_charging_current_ua = 1000000,

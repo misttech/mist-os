@@ -10,7 +10,7 @@ import("//build/sdk/config.gni")
 #
 # Parameters
 #
-#   category (optional)
+#   category (required)
 #     Describes the minimum category that atoms in this molecule must have.
 #     See //build/sdk/sdk_atom.gni for possible values.
 #
@@ -32,6 +32,8 @@ import("//build/sdk/config.gni")
 #     current build configuration.
 
 template("sdk_molecule") {
+  assert(defined(invoker.category), "Must define an SDK category")
+
   gn_deps = []
 
   if (defined(invoker.deps)) {
@@ -92,19 +94,14 @@ template("sdk_molecule") {
     outputs = [ files.manifest ]
 
     args = [
+             "--category",
+             invoker.category,
              "--areas-file-path",
              rebase_path(files.areas, root_build_dir),
              "--out",
              rebase_path(files.manifest, root_build_dir),
              "--deps",
            ] + rebase_path(dep_manifests, root_build_dir)
-
-    if (defined(invoker.category)) {
-      args += [
-        "--category",
-        invoker.category,
-      ]
-    }
   }
 
   # Verifies that the manifest is valid.

@@ -370,10 +370,7 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   if (unlikely(pages_or.is_error())) {
     return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, pages_or.error_value());
   }
-  timespec cur_time;
-  clock_gettime(CLOCK_REALTIME, &cur_time);
-  SetCTime(cur_time);
-  SetMTime(cur_time);
+  SetTime<Timestamps::ModificationTime>();
   SetDirty();
   return VnodeF2fs::VmoDirty(offset, length);
 }

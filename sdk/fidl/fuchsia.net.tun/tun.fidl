@@ -65,6 +65,10 @@ type BasePortConfig = table {
     /// Required.
     4: tx_types
             vector<fuchsia.hardware.network.FrameTypeSupport>:fuchsia.hardware.network.MAX_FRAME_TYPES;
+    /// Port class.
+    ///
+    /// If not set, interpreted as `VIRTUAL`.
+    5: port_class fuchsia.hardware.network.PortClass;
 };
 
 /// Base device configuration.

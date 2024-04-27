@@ -16,7 +16,7 @@
 
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
-#include <fuchsia/hardware/network/driver/c/banjo.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
 #include <lib/stdcompat/span.h>
 #include <sys/types.h>
 #include <zircon/listnode.h>
@@ -81,8 +81,10 @@ struct brcmf_bus_ops {
   zx_status_t (*prepare_vmo)(brcmf_bus* bus, uint8_t vmo_id, zx_handle_t vmo, uint8_t* mapped_addr,
                              size_t mapped_size);
   zx_status_t (*release_vmo)(brcmf_bus* bus, uint8_t vmo_id);
-  zx_status_t (*queue_rx_space)(brcmf_bus* bus, const rx_space_buffer_t* buffers_list,
-                                size_t buffers_count, uint8_t* vmo_addrs[]);
+  zx_status_t (*queue_rx_space)(
+      brcmf_bus* bus,
+      cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+      uint8_t* vmo_addrs[]);
   wlan::drivers::components::FrameContainer (*acquire_tx_space)(brcmf_bus* bus, size_t count);
 };
 
@@ -188,10 +190,11 @@ static inline zx_status_t brcmf_bus_release_vmo(struct brcmf_bus* bus, uint8_t v
   return bus->ops->release_vmo(bus, vmo_id);
 }
 
-static inline zx_status_t brcmf_bus_queue_rx_space(struct brcmf_bus* bus,
-                                                   const rx_space_buffer_t* buffers_list,
-                                                   size_t buffers_count, uint8_t* vmo_addrs[]) {
-  return bus->ops->queue_rx_space(bus, buffers_list, buffers_count, vmo_addrs);
+static inline zx_status_t brcmf_bus_queue_rx_space(
+    struct brcmf_bus* bus,
+    cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+    uint8_t* vmo_addrs[]) {
+  return bus->ops->queue_rx_space(bus, buffers, vmo_addrs);
 }
 
 static inline wlan::drivers::components::FrameContainer brcmf_bus_acquire_tx_space(

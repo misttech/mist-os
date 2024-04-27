@@ -17,12 +17,11 @@ class FakeCodecAdapter : public CodecAdapter {
   bool IsCoreCodecMappedBufferUseful(CodecPort port) override;
   bool IsCoreCodecHwBased(CodecPort port) override;
   void CoreCodecInit(const fuchsia::media::FormatDetails& initial_input_format_details) override;
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
   void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
+      CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
   void CoreCodecStartStream() override;
   void CoreCodecQueueInputFormatDetails(
       const fuchsia::media::FormatDetails& per_stream_override_format_details) override;
@@ -45,10 +44,10 @@ class FakeCodecAdapter : public CodecAdapter {
 
   // Test hooks
   void SetBufferCollectionConstraints(CodecPort port,
-                                      fuchsia::sysmem::BufferCollectionConstraints constraints);
+                                      fuchsia_sysmem2::BufferCollectionConstraints constraints);
 
  private:
-  std::optional<fuchsia::sysmem::BufferCollectionConstraints>
+  std::optional<fuchsia_sysmem2::BufferCollectionConstraints>
       buffer_collection_constraints_[kPortCount];
 };
 

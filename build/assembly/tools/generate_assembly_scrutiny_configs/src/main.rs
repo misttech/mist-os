@@ -109,7 +109,7 @@ fn get_bootfs_packages_allowlist() -> Vec<String> {
     .filter_map(|v|
         // This script only returns assembly-generated files.
         // Files from AIBs are collected and merged in a separate process.
-        if v.assembly_generated() {
+        if v.assembly_generated(){
             Some(v.to_string())
         } else {
             None
@@ -138,7 +138,9 @@ fn main() {
         .filter_map(|v| match v {
             // This script only returns assembly-generated files.
             // Files from AIBs are collected and merged in a separate process.
-            BootfsDestination::FromAIB(_) | BootfsDestination::ForTest => None,
+            BootfsDestination::FromAIB(_)
+            | BootfsDestination::ForTest
+            | BootfsDestination::SshAuthorizedKeys => None,
             a @ _ => Some(a.to_string()),
         })
         .collect();

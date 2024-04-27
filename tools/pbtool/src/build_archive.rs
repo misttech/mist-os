@@ -13,6 +13,7 @@ use sdk_metadata::ProductBundle;
 use flate2::read::GzDecoder;
 use std::fs::File;
 use std::io::{copy, BufReader};
+use std::os::unix::fs::PermissionsExt;
 
 const FLASH_SCRIPT_TEMPLATE: &str = r#"#!/bin/sh
 DIR="$(dirname "$0")"
@@ -214,6 +215,14 @@ impl GenerateBuildArchive {
                     let destination = self.out_dir.join("fastboot.exe.linux-x64");
                     let mut output = File::create(&destination)
                         .context("Could not create output 'fastboot.exe.linux-x64' file")?;
+                    let mut perms = output
+                        .metadata()
+                        .context("Could not read metadata of 'fastboot.exe.linux-x64'")?
+                        .permissions();
+                    perms.set_mode(0o755);
+                    output
+                        .set_permissions(perms)
+                        .context("Failed to set permissions on 'fastboot.exe.linux-x64'")?;
                     copy(&mut gz, &mut output)
                         .context("Fail to write to 'fastboot.exe.linux-x64' file")?;
                 }

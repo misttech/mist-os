@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, FutureExt, StreamExt},
     ieee80211::{MacAddr, MacAddrBytes},
-    realm_proxy_client::{extend_namespace, InstalledNamespace},
+    realm_client::{extend_namespace, InstalledNamespace},
     std::{
         fmt::Display,
         future::Future,
@@ -97,7 +97,7 @@ impl TestRealmContext {
 
         // Start the driver test realm
         let driver_test_realm_proxy =
-            connect_to_protocol_at::<fidl_driver_test::RealmMarker>(test_ns.prefix())
+            connect_to_protocol_at::<fidl_driver_test::RealmMarker>(&test_ns)
                 .expect("Failed to connect to driver test realm");
 
         let (pkg_client, pkg_server) = create_endpoints();
@@ -423,7 +423,7 @@ impl RetryWithBackoff {
             deadline: Time::after(timeout),
             prev_delay: 0.millis(),
             next_delay: 1.millis(),
-            max_delay: std::i64::MAX.nanos(),
+            max_delay: i64::MAX.nanos(),
         }
     }
     pub fn infinite_with_max_interval(max_delay: zx::Duration) -> Self {

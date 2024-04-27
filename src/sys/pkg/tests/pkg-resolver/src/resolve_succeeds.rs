@@ -1064,3 +1064,88 @@ async fn resolve_of_already_cached_package_is_not_blocked_by_in_progress_blob_fe
 
     env.stop().await;
 }
+
+// To limit concurrency and deduplicate work, pkg-resolver has a package resolve queue and a blob
+// fetch queue.
+// The blob fetch queue also ensures that no particular blob is being written to blobfs more than
+// once at a time (to avoid errors, as c++blobfs does not support concurrent creates of the same
+// blob).
+// During a resolve, pkg-resolver first fetches the meta.far using the queue. If the blob fetch
+// queue is already at its concurrency limit, the straight-forward implementation of this would
+// result in the resolve of a fully-cached package being blocked until the queue works through its
+// backlog of blob fetches so it can process the (no-op) fetch of the package's meta.far.
+// To avoid blocking resolves of fully-cached packages, before adding the meta.far to the queue
+// pkg-resolver checks via pkg-cache to see if the meta.far is already resident.
+// When first implemented, the result of this check (which contains an object that allows writing
+// the blob to blobfs) was reused in the queue, which is incorrect, because the queue could already
+// contain a request to fetch the blob (e.g. if the package is also a subpackage of another package
+// that was being resolved concurrently), and so by the time the queue started processing the fetch
+// of the meta.far, the blob would have already been fetched and the result would be out-of-date,
+// which would result in a blob fetch error that would fail the resolve.
+//
+// This test makes sure that resolves succeed even if the meta.far peek optimization is performed
+// when the meta.far is not in blobfs but a request to fetch the meta.far is already in the queue.
+#[fuchsia::test]
+async fn already_cached_package_blob_queue_bypass_with_concurrent_meta_far_write() {
+    let sub_pkg = PackageBuilder::new("subpackage").build().await.unwrap();
+    let super_pkg = PackageBuilder::new("super-pkg")
+        .add_subpackage("my-subpackage", &sub_pkg)
+        .build()
+        .await
+        .unwrap();
+
+    let (blocker, mut chan) = responder::BlockResponseHeaders::new();
+    let responder = responder::ForPath::new(format!("/blobs/1/{}", sub_pkg.hash()), blocker);
+
+    let env = TestEnvBuilder::new().fxblob().build().await;
+    let repo = Arc::new(
+        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .add_package(&sub_pkg)
+            .add_package(&super_pkg)
+            .build()
+            .await
+            .unwrap(),
+    );
+    let served_repository = repo.server().response_overrider(responder).start().unwrap();
+    env.register_repo(&served_repository).await;
+
+    // Separate resolver proxies to guarantee concurrent processing of resolves.
+    let resolver_proxy_0 = env.connect_to_resolver();
+    let resolver_proxy_1 = env.connect_to_resolver();
+
+    // Resolve the superpackage, which will trigger a fetch of the subpackage meta.far.
+    let super_pkg_fut = resolve_package(&resolver_proxy_0, "fuchsia-pkg://test/super-pkg");
+
+    // Wait until the meta.far is requested from the repo to be sure that the fetch is in the queue,
+    // and block the response so that the fetch stays in the queue until the subpackage resolve
+    // performs the optimization.
+    let blocked_response = chan.next().await.unwrap();
+
+    // Start the subpackage resolve and wait until the fetch is added to the queue to be sure that
+    // the optimization was performed while the other fetch was still in the queue.
+    let sub_pkg_fut = resolve_package(&resolver_proxy_1, "fuchsia-pkg://test/subpackage");
+    let () = env
+        .wait_for_pkg_resolver_inspect_state(diagnostics_assertions::tree_assertion!(
+            root: contains {
+                blob_fetcher: contains {
+                    raw_queue: {
+                        sub_pkg.hash().to_string() => {
+                            running: 1u64,
+                            pending: 1u64,
+                        }
+                    }
+                }
+            }
+        ))
+        .await;
+
+    // Unblock the repo's response for the superpackage's resolve's fetch of the meta.far.
+    // There should only be one request because the second fetch should re-check for the meta.far
+    // in blobfs.
+    let () = blocked_response.unblock();
+
+    let _: (fio::DirectoryProxy, pkg::ResolutionContext) = super_pkg_fut.await.unwrap();
+    let _: (fio::DirectoryProxy, pkg::ResolutionContext) = sub_pkg_fut.await.unwrap();
+
+    env.stop().await;
+}

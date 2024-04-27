@@ -2,18 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_driver", "fuchsia_driver_bind_bytecode", "fuchsia_driver_component")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_driver")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(":driver_binary_test.bzl", "driver_binary_test")
-load(":driver_runner_manifest_test.bzl", "driver_runner_manifest_test")
 
 package(default_visibility = ["//visibility:public"])
 
 test_suite(
     name = "tests",
     tests = [
-        ":test_driver_runner_manifest_all_flags",
-        ":test_driver_runner_manifest_no_flags",
         ":test_driver_with_direct_srcs",
         ":test_fuchsia_cc_driver_without_srcs",
     ],
@@ -30,21 +27,6 @@ driver_binary_test(
     name = "test_driver_with_direct_srcs",
     driver = ":driver_with_srcs",
     fuchsia_api_level = "15",
-)
-
-# Manifest tests
-driver_runner_manifest_test(
-    name = "test_driver_runner_manifest_all_flags",
-    # We want to check the cml file and not the cm file so use the _generated_driver_manifest_gen_cml target
-    cml_file = ":cml_all_flags_generated_driver_manifest_gen_cml",
-    golden_file = ":test_data/driver_manifest_all_flags.cml.golden",
-)
-
-driver_runner_manifest_test(
-    name = "test_driver_runner_manifest_no_flags",
-    # We want to check the cml file and not the cm file so use the _generated_driver_manifest_gen_cml target
-    cml_file = ":cml_no_flags_generated_driver_manifest_gen_cml",
-    golden_file = ":test_data/driver_manifest_no_flags.cml.golden",
 )
 
 # Test Resources
@@ -75,35 +57,4 @@ fuchsia_cc_driver(
         "driver.h",
     ],
     deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
-)
-
-# Uses a fuchsia_driver_component instead of fuchsia_driver_runner_manifest to
-# ensure that we are passing the values correctly through the component
-fuchsia_driver_component(
-    name = "cml_all_flags",
-    bind_bytecode = ":bind_bytecode",
-    colocate = True,
-    component_name = "foo",
-    default_dispatcher_opts = ["some_opt"],
-    default_dispatcher_scheduler_role = "some_role",
-    driver_lib = ":driver_no_srcs",
-    fallback = True,
-    root_resource = True,
-    uses_boot_args = True,
-    uses_profiles = True,
-    uses_sysmem = True,
-)
-
-# Uses a fuchsia_driver_component instead of fuchsia_driver_runner_manifest to
-# ensure that we are passing the values correctly through the component
-fuchsia_driver_component(
-    name = "cml_no_flags",
-    bind_bytecode = ":bind_bytecode",
-    driver_lib = ":driver_no_srcs",
-)
-
-fuchsia_driver_bind_bytecode(
-    name = "bind_bytecode",
-    output = "foo.bindbc",
-    rules = "test_data/foo.bind",
 )

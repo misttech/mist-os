@@ -12,7 +12,10 @@ rustc_library("fuchsia-framebuffer") {
   edition = "2021"
   with_unit_tests = true
   deps = [
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//src/graphics/display/lib/rust/display-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
@@ -21,6 +24,7 @@ rustc_library("fuchsia-framebuffer") {
     "//third_party/rust_crates:anyhow",
   ]
   test_deps = [
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_rust",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]
@@ -28,6 +32,7 @@ rustc_library("fuchsia-framebuffer") {
   sources = [
     "src/lib.rs",
     "src/sysmem.rs",
+    "src/sysmem2.rs",
   ]
 }
 

@@ -8,7 +8,6 @@ use {
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
         model::{
             component::{ComponentInstance, StartReason},
-            error::ModelError,
             hooks::HooksRegistration,
             model::Model,
             testing::{
@@ -32,6 +31,7 @@ use {
     cm_rust::*,
     cm_types::{Name, Url},
     component_id_index::InstanceId,
+    errors::ModelError,
     fidl::{
         self,
         endpoints::{self, create_proxy, ClientEnd, Proxy, ServerEnd},

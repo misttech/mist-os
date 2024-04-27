@@ -11,6 +11,6 @@ prebuilt_package("iwlwifi") {
   visibility = [ "*" ]
 }
 
-export_fuchsia_package_to_bazel("iwlwifi_for_bazel") {
+export_fuchsia_package_to_bazel("iwlwifi.bazel_input") {
   package = ":iwlwifi"
 }

@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::cml;
 use crate::error::Error;
 use crate::features::FeatureSet;
 use crate::include;
 use crate::util;
 use fidl::persist;
-use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile_ext::NamedTempFileExt as _;
 
 /// Read in a CML file and produce the equivalent CM.
-pub fn compile(
+pub(crate) fn compile(
     file: &PathBuf,
     output: &PathBuf,
     depfile: Option<PathBuf>,
@@ -52,7 +50,7 @@ pub fn compile(
         document.merge_from(&mut include_document, &include)?;
     }
     if let Some(ref force_runner) = experimental_force_runner.as_ref() {
-        if let Some(mut program) = document.program.as_mut() {
+        if let Some(program) = document.program.as_mut() {
             program.runner = Some(cm_types::Name::new(force_runner.to_string())?);
         } else {
             document.program = Some(cml::Program {
@@ -73,7 +71,7 @@ pub fn compile(
 
     // Write to the output file, but only if the bytes have changed.
     let mut tmp = tempfile::NamedTempFile::new_in(output_parent)?;
-    tmp.write_all(&persist(&out_data)?);
+    tmp.write_all(&persist(&out_data)?)?;
     tmp.persist_if_changed(&output).map_err(|e| e.error)?;
 
     // Write includes to depfile
@@ -82,33 +80,6 @@ pub fn compile(
     }
 
     Ok(())
-}
-
-macro_rules! test_compile_with_features {
-    (
-        $features:expr,
-        {
-            $(
-                $(#[$m:meta])*
-                $test_name:ident => {
-                    input = $input:expr,
-                    output = $result:expr,
-                },
-            )+
-        }
-    ) => {
-        $(
-            $(#[$m])*
-            #[test]
-            fn $test_name() {
-                let tmp_dir = TempDir::new().unwrap();
-                let tmp_in_path = tmp_dir.path().join("test.cml");
-                let tmp_out_path = tmp_dir.path().join("test.cm");
-                let features = $features;
-                compile_test(tmp_in_path, tmp_out_path, None, $input, $result, &features).expect("compilation failed");
-            }
-        )+
-    }
 }
 
 #[cfg(test)]
@@ -121,9 +92,38 @@ mod tests {
     use fidl_fuchsia_component_decl as fdecl;
     use fidl_fuchsia_data as fdata;
     use serde_json::json;
-    use std::fs::File;
-    use std::io::{self, Read, Write};
+    use std::{
+        fs::File,
+        io::{ErrorKind, Read},
+    };
     use tempfile::TempDir;
+
+    macro_rules! test_compile_with_features {
+        (
+            $features:expr,
+            {
+                $(
+                    $(#[$m:meta])*
+                    $test_name:ident => {
+                        input = $input:expr,
+                        output = $result:expr,
+                    },
+                )+
+            }
+        ) => {
+            $(
+                $(#[$m])*
+                #[test]
+                fn $test_name() {
+                    let tmp_dir = TempDir::new().unwrap();
+                    let tmp_in_path = tmp_dir.path().join("test.cml");
+                    let tmp_out_path = tmp_dir.path().join("test.cm");
+                    let features = $features;
+                    compile_test(tmp_in_path, tmp_out_path, None, $input, $result, &features).expect("compilation failed");
+                }
+            )+
+        }
+    }
 
     #[track_caller]
     fn compile_test_all_options(
@@ -152,7 +152,7 @@ mod tests {
             cml::ProtocolRequirements { must_offer, must_use },
         )?;
         let mut buffer = Vec::new();
-        fs::File::open(&out_path).unwrap().read_to_end(&mut buffer).unwrap();
+        File::open(&out_path).unwrap().read_to_end(&mut buffer).unwrap();
 
         let output: fdecl::Component = unpersist(&buffer).unwrap();
         if output != expected_output {
@@ -1101,8 +1101,8 @@ mod tests {
         }
         // Compilation failed so output should not exist.
         {
-            let result = fs::File::open(&tmp_out_path);
-            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::NotFound);
+            let result = File::open(&tmp_out_path);
+            assert_eq!(result.unwrap_err().kind(), ErrorKind::NotFound);
         }
     }
 
@@ -1129,7 +1129,7 @@ mod tests {
     fn test_good_include() {
         let tmp_dir = TempDir::new().unwrap();
         let foo_path = tmp_dir.path().join("foo.cml");
-        fs::File::create(&foo_path)
+        File::create(&foo_path)
             .unwrap()
             .write_all(format!("{}", json!({ "program": { "runner": "elf" } })).as_bytes())
             .unwrap();
@@ -1183,7 +1183,7 @@ mod tests {
                 },
             ],
         });
-        fs::File::create(&offer_path)
+        File::create(&offer_path)
             .unwrap()
             .write_all(format!("{}", shard_input).as_bytes())
             .unwrap();
@@ -1198,10 +1198,7 @@ mod tests {
                 },
             ],
         });
-        fs::File::create(&foo_path)
-            .unwrap()
-            .write_all(format!("{}", foo_input).as_bytes())
-            .unwrap();
+        File::create(&foo_path).unwrap().write_all(format!("{}", foo_input).as_bytes()).unwrap();
 
         let main_input = json!({
             "include": [
@@ -1265,7 +1262,7 @@ mod tests {
     fn test_good_include_with_force_runner() {
         let tmp_dir = TempDir::new().unwrap();
         let foo_path = tmp_dir.path().join("foo.cml");
-        fs::File::create(&foo_path)
+        File::create(&foo_path)
             .unwrap()
             .write_all(format!("{}", json!({ "program": { "runner": "elf" } })).as_bytes())
             .unwrap();
@@ -1306,13 +1303,13 @@ mod tests {
     fn test_recursive_include() {
         let tmp_dir = TempDir::new().unwrap();
         let foo_path = tmp_dir.path().join("foo.cml");
-        fs::File::create(&foo_path)
+        File::create(&foo_path)
             .unwrap()
             .write_all(format!("{}", json!({ "include": [ "bar.cml" ] })).as_bytes())
             .unwrap();
 
         let bar_path = tmp_dir.path().join("bar.cml");
-        fs::File::create(&bar_path)
+        File::create(&bar_path)
             .unwrap()
             .write_all(format!("{}", json!({ "program": { "runner": "elf" } })).as_bytes())
             .unwrap();
@@ -1352,13 +1349,13 @@ mod tests {
     fn test_cyclic_include() {
         let tmp_dir = TempDir::new().unwrap();
         let foo_path = tmp_dir.path().join("foo.cml");
-        fs::File::create(&foo_path)
+        File::create(&foo_path)
             .unwrap()
             .write_all(format!("{}", json!({ "include": [ "bar.cml" ] })).as_bytes())
             .unwrap();
 
         let bar_path = tmp_dir.path().join("bar.cml");
-        fs::File::create(&bar_path)
+        File::create(&bar_path)
             .unwrap()
             .write_all(format!("{}", json!({ "include": [ "foo.cml" ] })).as_bytes())
             .unwrap();
@@ -1386,7 +1383,7 @@ mod tests {
     fn test_conflicting_includes() {
         let tmp_dir = TempDir::new().unwrap();
         let foo_path = tmp_dir.path().join("foo.cml");
-        fs::File::create(&foo_path)
+        File::create(&foo_path)
             .unwrap()
             .write_all(
                 format!("{}", json!({ "use": [ { "protocol": "foo", "path": "/svc/foo" } ] }))
@@ -1396,7 +1393,7 @@ mod tests {
         let bar_path = tmp_dir.path().join("bar.cml");
 
         // Try to mount protocol "bar" under the same path "/svc/foo".
-        fs::File::create(&bar_path)
+        File::create(&bar_path)
             .unwrap()
             .write_all(
                 format!("{}", json!({ "use": [ { "protocol": "bar", "path": "/svc/foo" } ] }))
@@ -1429,14 +1426,14 @@ mod tests {
     fn test_overlapping_includes() {
         let tmp_dir = TempDir::new().unwrap();
         let foo1_path = tmp_dir.path().join("foo1.cml");
-        fs::File::create(&foo1_path)
+        File::create(&foo1_path)
             .unwrap()
             .write_all(format!("{}", json!({ "use": [ { "protocol": "foo" } ] })).as_bytes())
             .unwrap();
 
         let foo2_path = tmp_dir.path().join("foo2.cml");
         // Include protocol "foo" again
-        fs::File::create(&foo2_path)
+        File::create(&foo2_path)
             .unwrap()
             // Use different but equivalent syntax to further stress any overlap affordances
             .write_all(format!("{}", json!({ "use": [ { "protocol": [ "foo" ] } ] })).as_bytes())

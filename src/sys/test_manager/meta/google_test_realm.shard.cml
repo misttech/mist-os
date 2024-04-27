@@ -47,6 +47,7 @@
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.vulkan.loader.Loader",
 
                 // TODO: add any other required capabilities

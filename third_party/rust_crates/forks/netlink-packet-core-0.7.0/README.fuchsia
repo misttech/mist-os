@@ -1,0 +1,23 @@
+Name: netlink-packet-core-0.7.0
+License File: LICENSE-MIT
+Description:
+
+# What is this crate used for?
+
+Netlink protocol in Starnix.
+
+# Are there any use restrictions? i.e. only for development hosts
+
+No.
+
+# What differs from upstream?
+
+Imported pull request https://github.com/rust-netlink/netlink-packet-core/pull/23.
+
+# Are there any restrictions to how it should be rolled?
+
+No.
+
+# Is there anything else which makes this dependency "special"?
+
+No.

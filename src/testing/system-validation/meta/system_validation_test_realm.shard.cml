@@ -39,6 +39,7 @@
                 "fuchsia.session.scene.Manager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.controller.Controller",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.tracing.provider.Registry",

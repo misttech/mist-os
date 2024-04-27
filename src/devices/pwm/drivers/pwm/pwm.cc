@@ -22,22 +22,24 @@ zx_status_t PwmDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  auto pwm_ids = ddk::GetMetadataArray<pwm_id_t>(parent, DEVICE_METADATA_PWM_IDS);
-  if (!pwm_ids.is_ok()) {
-    return pwm_ids.error_value();
+  auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_pwm::wire::PwmChannelsMetadata>(
+      parent, DEVICE_METADATA_PWM_CHANNELS);
+  if (!metadata.is_ok()) {
+    return metadata.error_value();
   }
 
-  for (auto pwm_id : *pwm_ids) {
+  auto pwm_channels = fidl::ToNatural(*metadata.value());
+  for (auto pwm_channel : *pwm_channels.channels()) {
     fbl::AllocChecker ac;
-    std::unique_ptr<PwmDevice> dev(new (&ac) PwmDevice(parent, &pwm_proto, pwm_id));
+    std::unique_ptr<PwmDevice> dev(new (&ac) PwmDevice(parent, &pwm_proto, pwm_channel));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
 
     char name[20];
-    snprintf(name, sizeof(name), "pwm-%u", pwm_id.id);
+    snprintf(name, sizeof(name), "pwm-%u", *pwm_channel.id());
     zx_device_prop_t props[] = {
-        {BIND_PWM_ID, 0, pwm_id.id},
+        {BIND_PWM_ID, 0, *pwm_channel.id()},
     };
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -95,22 +97,22 @@ void PwmDevice::DdkInit(ddk::InitTxn txn) {
 
 zx_status_t PwmDevice::PwmGetConfig(pwm_config_t* out_config) {
   std::scoped_lock lock(lock_);
-  return pwm_.GetConfig(id_.id, out_config);
+  return pwm_.GetConfig(*channel_.id(), out_config);
 }
 
 zx_status_t PwmDevice::PwmSetConfig(const pwm_config_t* config) {
   std::scoped_lock lock(lock_);
-  return pwm_.SetConfig(id_.id, config);
+  return pwm_.SetConfig(*channel_.id(), config);
 }
 
 zx_status_t PwmDevice::PwmEnable() {
   std::scoped_lock lock(lock_);
-  return pwm_.Enable(id_.id);
+  return pwm_.Enable(*channel_.id());
 }
 
 zx_status_t PwmDevice::PwmDisable() {
   std::scoped_lock lock(lock_);
-  return pwm_.Disable(id_.id);
+  return pwm_.Disable(*channel_.id());
 }
 
 void PwmDevice::GetConfig(GetConfigCompleter::Sync& completer) {

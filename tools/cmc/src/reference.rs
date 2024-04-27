@@ -32,7 +32,7 @@ const CHECK_REFERENCES_URL: &str = "https://fuchsia.dev/go/components/build-erro
 ///     1. If provided program binary in component manifest matches with
 ///        executable target declared in package manifest.
 /// If all checks pass, this function returns Ok(()).
-pub fn validate(
+pub(crate) fn validate(
     component_manifest_path: &PathBuf,
     package_manifest_path: &PathBuf,
     context: Option<&String>,

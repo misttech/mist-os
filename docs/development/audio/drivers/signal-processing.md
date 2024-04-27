@@ -2,10 +2,9 @@
 
 ## Overview
 
-The signal processing interface is available to be potentially used by audio hardware codecs (from
-here on referred to as 'codecs') , DAIs and glue drivers. This interface `SignalProcessing` is a
-FIDL protocol used by the `Codec`, `Dai`, `StreamConfig` and `Composite` protocols to provide audio
-signal processing capabilities.
+The signal processing interface is available to be potentially used by audio composite drivers.
+This interface `SignalProcessing` is a FIDL protocol used by the `Composite` protocol to provide
+audio signal processing capabilities.
 
 The `SignalProcessing` protocol is defined to control signal processing hardware and their
 topologies. We define processing elements (PEs) as a logical unit of audio data processing provided
@@ -29,17 +28,16 @@ FIDL library.
 
 ### Topologies
 
-Each driver can have its own topology. Glue drivers can abstract from applications the topologies
-exposed by DAI or codec drivers as needed for a particular configuration or product. Note that it is
+Each driver can have its own topology. Drivers can abstract from applications the topologies
+exposed by other drivers as needed for a particular configuration or product. Note that it is
 possible although not required to expose topologies to applications, in particular to `audio_core`.
 
 
 Notes:
 
 * Topologies are not meant to fully describe the audio pipeline state/format/configuration
-in and out of every PE. The intent is to describe what can be changed/rearranged by the client (for
-instance a glue driver) based on its knowledge, configuration (for instance from metadata) and
-specific business logic.
+in and out of every PE. The intent is to describe what can be changed/rearranged by the client
+based on its knowledge, configuration (for instance from metadata) and specific business logic.
 * Topologies used for audio drivers providing the `Composite` protocol must include `ENDPOINT`
 PEs that provide an id for the driver's supported ring buffers and DAI interconnects.
 
@@ -50,14 +48,8 @@ expected to be hardware-provided functionality managed by a particular driver (b
 emulated in software, as any other driver functionality). A pipeline is composed of one or more PEs
 and a topology is composed of one or more pipelines.
 
-A codec or DAI driver can expose their topology by implementing the `SignalProcessing` protocol.
-A glue driver can use `Codec` and `Dai` protocols signal processing functionality on the
-particular product or system. Finally a `StreamConfig` user like `audio_core` can use a
-`StreamConfig` protocol `SignalProcessing` functionality.
-
-We refer to the server as the driver that is providing the signal processing protocol, e.g. a codec
-or DAI driver. We refer to the client as the user of the functionality, e.g. a glue driver or an
-application such as `audio_core`.
+We refer to the server as the driver that is providing the signal processing protocol.
+We refer to the client as the user of the functionality, e.g. an application such as `audio_core`.
 
 ## Basic operation
 
@@ -81,8 +73,8 @@ returned by `GetTopologies`, then `SetTopology` can be used to pick the topology
 ### GetElements
 
 `GetElements` allows to optionally get a list of all PEs. For instance this method may
-be called by a glue driver on a codec. Once the list of PEs is known to the client, the client may
-configure the PEs based on the parameters exposed by the PE types.
+be called by a client on a driver abstracting a hardware codec. Once the list of PEs is known to
+the client, the client may configure the PEs based on the parameters exposed by the PE types.
 
 ### SetElementState
 
@@ -103,8 +95,8 @@ different PE, or independent of the client for instance due to a plug detect cha
 ### GetTopologies
 
 `GetTopologies` allows to optionally get a list of topologies. For instance this method may be
-called by a glue driver on a codec. Once the list of topologies is known to the client, the client
-may configure the server to use a particular topology.
+called by a client on a driver abstracting a hardware codec. Once the list of topologies is known to
+the client, the client may configure the server to use a particular topology.
 
 ### SetTopology
 
@@ -124,10 +116,11 @@ Each individual PE may have one or more inputs and one or more output channels. 
 mixing, PEs may make the number of output channels different from the number of input channels.
 
 Data in each channel (a.k.a. the signal that is processed) may be altered by the PE. For instance
-if there is a single PE of type `AGL` in a `Codec` protocol with a `DaiFormat` `number_of_channels`
-set to 2, then AGL (Automatic Gain Limiting) can be enabled or disabled for these 2 channels by a
-client calling `SetElementState` with `state` `enable` set to true or false (this assumes
-the AGL `Element`s `can_disable` was set to true).
+if there is a single PE of type `AGL` in a pipeline that includes an `ENDPOINT` of type
+`DAI_INTERCONNECT` with `DaiFormat` `number_of_channels` set to 2, then AGL (Automatic Gain
+Limiting) can be enabled or disabled for these 2 channels by a client calling `SetElementState`
+with `state` `enable` set to true or false (this assumes the AGL `Element`s `can_disable` was set
+to true).
 
 If optional fields in the different PE types are not included, then the state of the processing
 element is not changed with respect to the particular field. For instance, if an

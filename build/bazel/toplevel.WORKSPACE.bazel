@@ -201,6 +201,7 @@ load(
     "bazel_inputs_repository",
     "boringssl_repository",
     "fuchsia_build_info_repository",
+    "gn_targets_repository",
     "googletest_repository",
 )
 
@@ -232,6 +233,14 @@ boringssl_repository(
 bazel_inputs_repository(
     name = "legacy_ninja_build_outputs",
     inputs_manifest = "//:bazel_inputs_manifest.json",
+)
+
+gn_targets_repository(
+    name = "gn_targets",
+    # LINT.IfChange
+    inputs_manifest = "fuchsia_build_generated/gn_targets_repository_manifest.json",
+    all_licenses_spdx_json = "fuchsia_build_generated/gn_targets_all_licenses_spdx.json",
+    # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 )
 
 # buildifier: disable=load-on-top

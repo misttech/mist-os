@@ -22,6 +22,7 @@ group("config_capabilities") {
     "//sdk/lib/driver_test_realm/*",
     "//src/connectivity/policy/http-client/*",
     "//src/graphics/tests/vkext:*",
+    "//src/graphics/tests/vkloop:*",
     "//src/sys/component_manager/tests/*",
   ]
 }

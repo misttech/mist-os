@@ -4,19 +4,17 @@
 
 #include "src/performance/trace/command.h"
 
+#include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <iostream>
 
 namespace tracing {
 
-Command::Command(sys::ComponentContext* context) : context_(context) {}
+Command::Command() = default;
 
 Command::~Command() = default;
-
-sys::ComponentContext* Command::context() { return context_; }
-
-sys::ComponentContext* Command::context() const { return context_; }
 
 std::ostream& Command::out() {
   // Returning std::cerr on purpose. std::cout is redirected and consumed
@@ -43,12 +41,23 @@ void Command::Done(int32_t return_code) {
   }
 }
 
-CommandWithController::CommandWithController(sys::ComponentContext* context)
-    : Command(context), controller_(context->svc()->Connect<controller::Controller>()) {
-  controller_.set_error_handler([this](zx_status_t status) {
-    FX_LOGS(ERROR) << "Trace controller disconnected unexpectedly";
+void Command::on_fidl_error(fidl::UnbindInfo error) {
+  FX_LOGS(ERROR) << "Trace controller disconnected unexpectedly";
+  Done(EXIT_FAILURE);
+}
+
+void Command::handle_unknown_event(fidl::UnknownEventMetadata<controller::Controller> metadata) {
+  FX_LOGS(ERROR) << "Unknown event: " << metadata.event_ordinal;
+}
+
+CommandWithController::CommandWithController() {
+  zx::result client_end = component::Connect<controller::Controller>();
+  if (client_end.is_error()) {
+    FX_PLOGS(ERROR, client_end.error_value()) << "Trace Controller failed to connect";
     Done(EXIT_FAILURE);
-  });
+  }
+  controller_ = fidl::Client<controller::Controller>{*std::move(client_end),
+                                                     async_get_default_dispatcher(), this};
 }
 
 }  // namespace tracing

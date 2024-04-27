@@ -502,7 +502,7 @@ TEST(ZxTestCase, ThreadSetProfile) {
   zx_profile_info_t info = {};
   info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
   info.priority = ZX_PRIORITY_LOWEST;
-  ASSERT_OK(zx::profile::create(GetRootResource(), 0u, &info, &profile));
+  ASSERT_OK(zx::profile::create(GetProfileResource(), 0u, &info, &profile));
   EXPECT_OK(thread.set_profile(profile, 0u));
 }
 
@@ -756,7 +756,7 @@ TEST(ZxTestCase, IobCreateAndMap) {
   zx_iob_region_t regions[2] = {
       zx_iob_region_t{
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE,
+          .access = ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE,
           .size = ZX_PAGE_SIZE,
           .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
           .private_region =
@@ -766,7 +766,7 @@ TEST(ZxTestCase, IobCreateAndMap) {
       },
       zx_iob_region_t{
           .type = ZX_IOB_REGION_TYPE_PRIVATE,
-          .access = ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE,
+          .access = ZX_IOB_ACCESS_EP1_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE,
           .size = ZX_PAGE_SIZE,
           .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
           .private_region =

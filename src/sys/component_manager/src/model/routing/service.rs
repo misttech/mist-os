@@ -7,7 +7,6 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance},
-            error::{CapabilityProviderError, ModelError, OpenError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
             routing::{CapabilityOpenRequest, CapabilitySource, RouteSource},
@@ -18,6 +17,7 @@ use {
     cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
     cm_types::{IterablePath, Name, RelativePath},
     cm_util::TaskGroup,
+    errors::{CapabilityProviderError, ModelError, OpenError},
     fidl_fuchsia_io as fio,
     flyweights::FlyStr,
     fuchsia_async::{DurationExt, TimeoutExt},
@@ -1087,12 +1087,12 @@ mod tests {
                     .expose(
                         ExposeBuilder::service()
                             .name("my.service.Service")
-                            .source(ExposeSource::Child("static_a".into())),
+                            .source_static_child("static_a"),
                     )
                     .expose(
                         ExposeBuilder::service()
                             .name("my.service.Service")
-                            .source(ExposeSource::Child("static_b".into())),
+                            .source_static_child("static_b"),
                     )
                     .collection(CollectionBuilder::new().name("coll1"))
                     .collection(CollectionBuilder::new().name("coll2"))

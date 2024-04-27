@@ -10,7 +10,9 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <cstdint>
 #include <limits>
+#include <vector>
 
 #include <soc/aml-a1/a1-pwm.h>
 #include <soc/aml-a113/a113-pwm.h>
@@ -176,24 +178,28 @@ bool IsValidConfig(const pwm_config_t* config) {
 
 void CopyConfig(pwm_config_t* dest, const pwm_config_t* src) {
   ZX_DEBUG_ASSERT(dest->mode_config_buffer);
-  ZX_DEBUG_ASSERT(dest->mode_config_size == src->mode_config_size);
-  ZX_DEBUG_ASSERT(dest->mode_config_size == sizeof(mode_config));
+  ZX_DEBUG_ASSERT(dest->mode_config_size >= src->mode_config_size);
+  ZX_DEBUG_ASSERT(dest->mode_config_size >= sizeof(mode_config));
 
   dest->polarity = src->polarity;
   dest->period_ns = src->period_ns;
   dest->duty_cycle = src->duty_cycle;
   memcpy(dest->mode_config_buffer, src->mode_config_buffer, src->mode_config_size);
+  dest->mode_config_size = src->mode_config_size;
 }
 
 }  // namespace
 
 zx_status_t AmlPwm::PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config) {
   if (idx > 1) {
+    zxlogf(ERROR, "Invalid index: %d", idx);
     return ZX_ERR_INVALID_ARGS;
   }
   if (out_config->mode_config_buffer == nullptr ||
-      out_config->mode_config_size != configs_[idx].mode_config_size ||
-      out_config->mode_config_size != sizeof(mode_config)) {
+      out_config->mode_config_size < configs_[idx].mode_config_size ||
+      out_config->mode_config_size < sizeof(mode_config)) {
+    zxlogf(ERROR, "Invalid mode config buffer: %p, size: %zu (expected atleast %lu)",
+           out_config->mode_config_buffer, out_config->mode_config_size, sizeof(mode_config));
     return ZX_ERR_INVALID_ARGS;
   }
   CopyConfig(out_config, &configs_[idx]);
@@ -516,7 +522,7 @@ zx_status_t AmlPwmDevice::Create(void* ctx, zx_device_t* parent) {
 
   if (auto status = device->DdkAdd(ddk::DeviceAddArgs("aml-pwm-device")
                                        .set_proto_id(ZX_PROTOCOL_PWM_IMPL)
-                                       .forward_metadata(parent, DEVICE_METADATA_PWM_IDS));
+                                       .forward_metadata(parent, DEVICE_METADATA_PWM_CHANNELS));
       status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed", __func__);
     return status;
@@ -528,20 +534,60 @@ zx_status_t AmlPwmDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t AmlPwmDevice::Init(zx_device_t* parent) {
-  zx_status_t status = ZX_OK;
-  auto pwm_ids = ddk::GetMetadataArray<pwm_id_t>(parent, DEVICE_METADATA_PWM_IDS);
-  if (!pwm_ids.is_ok()) {
-    return pwm_ids.error_value();
+  ddk::PDevFidl pdev(parent);
+
+  pdev_device_info_t device_info;
+  auto status = pdev.GetDeviceInfo(&device_info);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get GetDeviceInfo : %s", zx_status_get_string(status));
+    return status;
   }
 
-  ddk::PDevFidl pdev(parent);
-  for (uint32_t i = 0;; i++) {
+  std::vector<fdf::MmioBuffer> mmios;
+  for (uint32_t i = 0; i < device_info.mmio_count; i++) {
     std::optional<fdf::MmioBuffer> mmio;
-    if ((status = pdev.MapMmio(i, &mmio)) != ZX_OK) {
-      break;
+    status = pdev.MapMmio(i, &mmio);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to get mmio for index %d : %s", i, zx_status_get_string(status));
+      return status;
     }
-    pwms_.push_back(std::make_unique<AmlPwm>(*std::move(mmio), pwm_ids.value()[2 * i],
-                                             pwm_ids.value()[2 * i + 1]));
+    mmios.push_back(std::move(*mmio));
+  }
+
+  auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_pwm::wire::PwmChannelsMetadata>(
+      parent, DEVICE_METADATA_PWM_CHANNELS);
+  if (!metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to get PWM_IDS metadata : %s", metadata.status_string());
+    return metadata.error_value();
+  }
+
+  return Init(std::move(mmios), fidl::ToNatural(*metadata.value()));
+}
+
+zx_status_t AmlPwmDevice::Init(std::vector<fdf::MmioBuffer> mmios,
+                               fuchsia_hardware_pwm::PwmChannelsMetadata metadata) {
+  // PWM IDs are expected to be continuous starting with 0. There will be 2 PWM ID per mmio.
+  max_pwm_id_ = (mmios.size() * 2) - 1;
+  std::vector<fuchsia_hardware_pwm::PwmChannelInfo> supported_pwm_channels;
+  supported_pwm_channels.resize(mmios.size() * 2lu);
+  for (uint32_t i = 0; i < supported_pwm_channels.size(); i++) {
+    supported_pwm_channels[i].id() = i;
+  }
+
+  // Validate the pwm ids passed in and copy config information. The config is left as default
+  // for the rest of pwms which are not part of the metadata.
+  for (auto& channel : *metadata.channels()) {
+    if (channel.id() > max_pwm_id_) {
+      zxlogf(ERROR, "Invalid PWM ID - %d in metadata. Maximum valid PWM ID is %d", *channel.id(),
+             max_pwm_id_);
+      return ZX_ERR_INVALID_ARGS;
+    }
+    supported_pwm_channels[*channel.id()] = channel;
+  }
+
+  for (uint32_t i = 0; i < mmios.size(); i++) {
+    pwms_.push_back(std::make_unique<AmlPwm>(std::move(mmios[i]), supported_pwm_channels[2lu * i],
+                                             supported_pwm_channels[2lu * i + 1]));
     pwms_.back()->Init();
   }
 
@@ -549,28 +595,29 @@ zx_status_t AmlPwmDevice::Init(zx_device_t* parent) {
 }
 
 zx_status_t AmlPwmDevice::PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config) {
-  if (idx >= pwms_.size() * 2 || out_config == nullptr) {
+  if (idx > max_pwm_id_ || out_config == nullptr) {
+    zxlogf(ERROR, "Invalid arguments index: %d out_config: %p", idx, out_config);
     return ZX_ERR_INVALID_ARGS;
   }
   return pwms_[idx / 2]->PwmImplGetConfig(idx % 2, out_config);
 }
 
 zx_status_t AmlPwmDevice::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
-  if (idx >= pwms_.size() * 2 || config == nullptr || config->mode_config_buffer == nullptr) {
+  if (idx > max_pwm_id_ || config == nullptr || config->mode_config_buffer == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
   return pwms_[idx / 2]->PwmImplSetConfig(idx % 2, config);
 }
 
 zx_status_t AmlPwmDevice::PwmImplEnable(uint32_t idx) {
-  if (idx >= pwms_.size() * 2) {
+  if (idx > max_pwm_id_) {
     return ZX_ERR_INVALID_ARGS;
   }
   return pwms_[idx / 2]->PwmImplEnable(idx % 2);
 }
 
 zx_status_t AmlPwmDevice::PwmImplDisable(uint32_t idx) {
-  if (idx >= pwms_.size() * 2) {
+  if (idx > max_pwm_id_) {
     return ZX_ERR_INVALID_ARGS;
   }
   return pwms_[idx / 2]->PwmImplDisable(idx % 2);

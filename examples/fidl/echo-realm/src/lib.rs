@@ -50,21 +50,11 @@ async fn launch_realm_components() -> Result<(), Error> {
         .await?;
 
     // Create the realm instance
+    println!("Building realm");
     let realm_instance = builder.build().await?;
 
-    // Verify that both client and server components started
-    EventMatcher::ok()
-        .moniker_regex("echo_client$")
-        .wait::<Started>(&mut event_stream)
-        .await
-        .context("failed to observe client start")?;
-    EventMatcher::ok()
-        .moniker_regex("echo_server$")
-        .wait::<Started>(&mut event_stream)
-        .await
-        .context("failed to observe server start")?;
-
     // Verify that the client component exits successfully
+    println!("Waiting for echo_client to exit");
     EventMatcher::ok()
         .stop(Some(ExitStatusMatcher::Clean))
         .moniker_regex("echo_client$")
@@ -73,7 +63,9 @@ async fn launch_realm_components() -> Result<(), Error> {
         .context("failed to observe client exit")?;
 
     // Clean up the realm instance
+    println!("Destroying realm");
     realm_instance.destroy().await?;
 
+    println!("Exiting");
     Ok(())
 }

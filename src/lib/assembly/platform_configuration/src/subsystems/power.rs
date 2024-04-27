@@ -46,15 +46,17 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding power_manager's thermal config file")?;
         }
 
-        builder.platform_bundle("legacy_power_framework");
-        if config.suspend_enabled {
-            ensure!(
-                matches!(
-                    context.feature_set_level,
-                    FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
-                ) && *context.build_type != BuildType::User
-            );
-            builder.platform_bundle("power_framework");
+        if *context.feature_set_level != FeatureSupportLevel::Embeddable {
+            builder.platform_bundle("legacy_power_framework");
+            if config.suspend_enabled {
+                ensure!(
+                    matches!(
+                        context.feature_set_level,
+                        FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
+                    ) && *context.build_type != BuildType::User
+                );
+                builder.platform_bundle("power_framework");
+            }
         }
         builder.set_config_capability(
             "fuchsia.power.SuspendEnabled",

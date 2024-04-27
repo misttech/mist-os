@@ -51,61 +51,71 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_target_echo_repeat(self) -> None:
         """Test `ffx target echo --repeat` is resilient to daemon failure."""
-        process = self.dut.ffx.popen(
+        with self.dut.ffx.popen(
             ["target", "echo", "--repeat"], stdout=subprocess.PIPE
-        )
-        line = process.stdout.readline()
-        asserts.assert_true(
-            line.startswith(b"SUCCESS"), f"First ping didn't succeed: {line}"
-        )
+        ) as process:
+            try:
+                line = process.stdout.readline()
+                asserts.assert_true(
+                    line.startswith(b"SUCCESS"),
+                    f"First ping didn't succeed: {line}",
+                )
+                self.dut.ffx.run(["daemon", "stop"])
+                while True:
+                    line = process.stdout.readline()
+                    if not line.startswith(b"ERROR") and not line.startswith(
+                        b"Waiting for"
+                    ):
+                        break
+                    print(line)
+                asserts.assert_true(
+                    line.startswith(b"SUCCESS"),
+                    f"Success didn't resume after error: {line}",
+                )
+            finally:
+                process.kill()
+
+    def test_target_list_without_discovery(self) -> None:
+        """Test `ffx target list` output returns as expected when discovery is off."""
         self.dut.ffx.run(["daemon", "stop"])
-        while True:
-            line = process.stdout.readline()
-            if line.startswith(b"ERROR"):
-                break
-        line = process.stdout.readline()
-        asserts.assert_true(
-            line.startswith(b"SUCCESS"),
-            f"Success didn't resume after error: {line}",
+        output = self.dut.ffx.run(
+            ["--machine", "json", "-c", "ffx.isolated=true", "target", "list"]
         )
+        output_json = json.loads(output)
+        devices = [
+            o for o in output_json if o["nodename"] == self.dut.device_name
+        ]
+        # Assert ffx's target list device name contain's Honeydew's device.
+        asserts.assert_greater(len(devices), 0)
+        # Assert that we can correctly identify the RCS state
+        asserts.assert_equal(devices[0]["rcs_state"], "Y")
+        # Assert that we can correctly identify the product
+        asserts.assert_not_equal(devices[0]["target_type"], "<unknown>")
+        # Make sure the daemon hadn't started running
+        with asserts.assert_raises(honeydew.errors.FfxCommandError):
+            self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
-    # TODO(b/328505123): reenable when `ffx daemon stop` works in builders
-    # def test_target_list_without_discovery(self) -> None:
-    #     """Test `ffx target list` output returns as expected when discovery is off."""
-    #     self.dut.ffx.run(["daemon", "stop", "-t", "1000"])
-    #     output = self.dut.ffx.run(
-    #         ["--machine", "json", "-c", "ffx.isolated=true", "target", "list"]
-    #     )
-    #     output_json = json.loads(output)
-    #     got_device_name = output_json[0]["nodename"]
-    #     # Assert FFX's target list device name matches Honeydew's.
-    #     asserts.assert_equal(got_device_name, self.dut.device_name)
-    #     # Make sure the daemon hadn't started running
-    #     with asserts.assert_raises(honeydew.errors.FfxCommandError):
-    #         self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
-
-    # TODO(b/328505123): reenable when `ffx daemon stop` works in builders
-    # def test_target_list_nodename_without_discovery(self) -> None:
-    #     """Test `ffx target list <nodename>` output returns as expected when discovery is off."""
-    #     self.dut.ffx.run(["daemon", "stop", "-t", "1000"], capture_output=False)
-    #     output = self.dut.ffx.run(
-    #         [
-    #             "--machine",
-    #             "json",
-    #             "-c",
-    #             "ffx.isolated=true",
-    #             "target",
-    #             "list",
-    #             self.dut.device_name,
-    #         ]
-    #     )
-    #     output_json = json.loads(output)
-    #     got_device_name = output_json[0]["nodename"]
-    #     # Assert FFX's target list device name matches Honeydew's.
-    #     asserts.assert_equal(got_device_name, self.dut.device_name)
-    #     # Make sure the daemon hadn't started running
-    #     with asserts.assert_raises(honeydew.errors.FfxCommandError):
-    #         self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
+    def test_target_list_nodename_without_discovery(self) -> None:
+        """Test `ffx target list <nodename>` output returns as expected when discovery is off."""
+        self.dut.ffx.run(["daemon", "stop"], capture_output=False)
+        output = self.dut.ffx.run(
+            [
+                "--machine",
+                "json",
+                "-c",
+                "ffx.isolated=true",
+                "target",
+                "list",
+                self.dut.device_name,
+            ]
+        )
+        output_json = json.loads(output)
+        device_names = [o["nodename"] for o in output_json]
+        # Assert FFX's target list device name contain's Honeydew's device.
+        asserts.assert_in(self.dut.device_name, device_names)
+        # Make sure the daemon hadn't started running
+        with asserts.assert_raises(honeydew.errors.FfxCommandError):
+            self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
 
 if __name__ == "__main__":

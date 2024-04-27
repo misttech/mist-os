@@ -7,14 +7,13 @@
 import os
 import tempfile
 import unittest
-from parameterized import parameterized, param
+from collections.abc import Callable
 from typing import Any
-from typing import Callable
 from unittest import mock
 
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
-from parameterized import parameterized
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.affordances.fuchsia_controller import tracing as fc_tracing
@@ -23,12 +22,12 @@ from honeydew.transports import fuchsia_controller as fc_transport
 
 
 def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
+    testcase_func: Callable[..., None], _: str, param_arg: param
 ) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_{test_label}"
@@ -392,7 +391,7 @@ class TracingFCTests(unittest.TestCase):
         "terminate_tracing",
         new_callable=mock.AsyncMock,
     )
-    @mock.patch.object(fc_tracing.fc, "Socket")
+    @mock.patch.object(fc, "Socket")
     def test_terminate_and_download(
         self,
         parameterized_dict: dict[str, Any],
@@ -484,7 +483,7 @@ class TracingFCTests(unittest.TestCase):
         "terminate_tracing",
         new_callable=mock.AsyncMock,
     )
-    @mock.patch.object(fc_tracing.fc, "Socket")
+    @mock.patch.object(fc, "Socket")
     def test_trace_session(
         self,
         parameterized_dict: dict[str, Any],

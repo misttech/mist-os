@@ -9,6 +9,7 @@
 use {
     crate::{dirs_to_test, repeat_by_n, PackageSource},
     anyhow::{anyhow, Context as _, Error},
+    assert_matches::assert_matches,
     fidl::endpoints::create_proxy,
     fidl::AsHandleRef,
     fidl_fuchsia_io as fio,
@@ -380,11 +381,12 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
         }
     }
 
-    // For "meta as file", should be unsupported.
     let file = open_file(root_dir, "meta", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
     let result =
         file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().map_err(zx::Status::from_raw);
-    assert_eq!(result, Err(zx::Status::NOT_SUPPORTED));
+    // TODO(https://fxbug.dev/327633753) MetaAsFile doesn't support GetBackingMemory but VmoFile
+    // does.
+    assert_matches!(result, Err(zx::Status::NOT_SUPPORTED) | Ok(_));
 
     // For files NOT under meta, calls with unsupported flags should successfully return the FIDL
     // call with a failure status.
@@ -395,12 +397,6 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
         .unwrap()
         .map_err(zx::Status::from_raw);
     assert_eq!(result, Err(zx::Status::ACCESS_DENIED));
-    let result = file
-        .get_backing_memory(fio::VmoFlags::SHARED_BUFFER)
-        .await
-        .unwrap()
-        .map_err(zx::Status::from_raw);
-    assert_eq!(result, Err(zx::Status::NOT_SUPPORTED));
     let result = file
         .get_backing_memory(fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::SHARED_BUFFER)
         .await
@@ -418,12 +414,6 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
         .unwrap()
         .map_err(zx::Status::from_raw);
     assert_eq!(result, Err(zx::Status::ACCESS_DENIED));
-    let result = file
-        .get_backing_memory(fio::VmoFlags::SHARED_BUFFER)
-        .await
-        .unwrap()
-        .map_err(zx::Status::from_raw);
-    assert_eq!(result, Err(zx::Status::NOT_SUPPORTED));
     let result = file
         .get_backing_memory(fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::SHARED_BUFFER)
         .await

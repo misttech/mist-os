@@ -39,17 +39,29 @@ TEST(AddressRange, Overlaps) {
 
   // A range can contain itself.
   EXPECT_TRUE(range.Overlaps(range));
+  EXPECT_TRUE(range.OverlapsOrAdjacent(range));
 
   // Completely inside.
   EXPECT_TRUE(range.Overlaps(AddressRange(102, 104)));
+  EXPECT_TRUE(range.OverlapsOrAdjacent(AddressRange(102, 104)));
 
   // Completely outside.
   EXPECT_FALSE(range.Overlaps(AddressRange(1, 99)));
+  EXPECT_FALSE(range.OverlapsOrAdjacent(AddressRange(1, 99)));
   EXPECT_FALSE(range.Overlaps(AddressRange(200, 205)));
+  EXPECT_FALSE(range.OverlapsOrAdjacent(AddressRange(200, 205)));
 
   // Partially overlapping.
   EXPECT_TRUE(range.Overlaps(AddressRange(0, 102)));
+  EXPECT_TRUE(range.OverlapsOrAdjacent(AddressRange(0, 102)));
   EXPECT_TRUE(range.Overlaps(AddressRange(102, 200)));
+  EXPECT_TRUE(range.OverlapsOrAdjacent(AddressRange(102, 200)));
+
+  // Ranges that touch are considered non-overlapping but adjacent.
+  EXPECT_FALSE(range.Overlaps(AddressRange(90, 100)));
+  EXPECT_TRUE(range.OverlapsOrAdjacent(AddressRange(90, 100)));
+  EXPECT_FALSE(range.Overlaps(AddressRange(105, 110)));
+  EXPECT_TRUE(range.OverlapsOrAdjacent(AddressRange(105, 110)));
 }
 
 TEST(AddressRange, Union) {

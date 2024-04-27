@@ -140,6 +140,7 @@ group("non_hermetic_deps") {
     "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/usb/drivers/aml-usb-phy:*",
+    "//src/media/audio/drivers/aml-g12-tdm:*",
   ]
 
   # Bluetooth Bazel test packages are wrapped in the bazel_fuchsia_test_package
@@ -178,6 +179,7 @@ group("non_hermetic_deps") {
 
   # Products which use Bazel-based assembly have non-hermetic outputs
   visibility += [
+    "//products/microfuchsia:*",
     "//products/minimal:*",
     "//products/workbench:*",
   ]
@@ -205,7 +207,7 @@ group("non_hermetic_deps") {
     "//src/devices/rtc/drivers/nxp:pcf8563",
     "//src/diagnostics/archivist/tests/pipeline_test:*",
     "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0",
-    "//src/media/codec/codecs/vaapi:codec_runner_intel_gen",
+    "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-oot",
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
   ]
 

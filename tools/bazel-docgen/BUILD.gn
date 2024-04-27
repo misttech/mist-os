@@ -21,21 +21,17 @@ if (is_host) {
     non_go_deps = [ ":stardoc_output" ]
   }
 
-  go_library("templates_lib") {
-    source_dir = "templates"
-    sources = [ "templates.go" ]
-  }
-
   go_library("bazel_docgen_lib") {
     sources = [
       "doc_generator.go",
+      "file_provider.go",
       "markdown_renderer.go",
       "markdown_renderer_test.go",
       "renderer.go",
+      "templates.go",
     ]
     deps = [
       ":proto_lib",
-      ":templates_lib",
       "//third_party/golibs:gopkg.in/yaml.v2",
     ]
   }
@@ -75,7 +71,11 @@ if (is_host) {
     outputs = [
       "${target_gen_dir}/goldens/_toc.yaml",
       "$target_gen_dir/goldens/README.md",
-      "$target_gen_dir/goldens/rule_empty.md",
+      "$target_gen_dir/goldens/rule_example_rule.md",
+      "$target_gen_dir/goldens/func_some_function.md",
+      "$target_gen_dir/goldens/func_empty_function.md",
+      "$target_gen_dir/goldens/provider_FooInfo.md",
+      "$target_gen_dir/goldens/repo_rule_empty_repo.md",
     ]
   }
 
@@ -92,12 +92,16 @@ if (is_host) {
         candidate = "$target_gen_dir/goldens/README.md"
       },
       {
-        golden = "goldens/rule_empty.md.golden"
-        candidate = "$target_gen_dir/goldens/rule_empty.md"
+        golden = "goldens/rule_example_rule.md.golden"
+        candidate = "$target_gen_dir/goldens/rule_example_rule.md"
       },
       {
         golden = "goldens/func_some_function.md.golden"
         candidate = "$target_gen_dir/goldens/func_some_function.md"
+      },
+      {
+        golden = "goldens/func_empty_function.md.golden"
+        candidate = "$target_gen_dir/goldens/func_empty_function.md"
       },
       {
         golden = "goldens/provider_FooInfo.md.golden"

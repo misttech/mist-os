@@ -12,7 +12,7 @@
 use extended_pstate as _;
 use tracing_mutex as _;
 
-use anyhow::Error;
+use anyhow::{Context as _, Error};
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_process_lifecycle as flifecycle;
@@ -21,6 +21,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
+use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_kernel_runner::{
@@ -107,11 +108,16 @@ async fn build_container(
     Ok(container)
 }
 
-#[fuchsia::main(logging_tags = ["starnix"], logging_blocking)]
+#[fuchsia::main(
+    logging_tags = ["starnix"],
+    logging_blocking,
+    logging_panic_prefix="\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n",
+)]
 async fn main() -> Result<(), Error> {
-    // Because the starnix kernel state is shared among all of the processes in the same job,
-    // we need to kill those in addition to the process which panicked.
-    kill_job_on_panic::install_hook("\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n");
+    // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
+    fruntime::job_default()
+        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &*fruntime::process_self())
+        .context("ensuring main process panics kill whole kernel")?;
 
     let _inspect_server_task = inspect_runtime::publish(
         fuchsia_inspect::component::init_inspector_with_size(1_000_000),

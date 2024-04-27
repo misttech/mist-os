@@ -44,6 +44,13 @@ pub enum ReadError {
     InvalidUtf8(#[from] std::string::FromUtf8Error),
 }
 
+impl ReadError {
+    /// Returns true if the read failed because the file was no found.
+    pub fn is_not_found_error(&self) -> bool {
+        matches!(self, ReadError::Open(e) if e.is_not_found_error())
+    }
+}
+
 /// An error encountered while reading a named file
 #[derive(Debug, Error)]
 #[error("error reading '{path}': {source}")]
@@ -63,6 +70,11 @@ impl ReadNamedError {
     /// Unwraps the inner read error, discarding the associated path.
     pub fn into_inner(self) -> ReadError {
         self.source
+    }
+
+    /// Returns true if the read failed because the file was no found.
+    pub fn is_not_found_error(&self) -> bool {
+        self.source.is_not_found_error()
     }
 }
 
@@ -779,5 +791,13 @@ mod tests {
         let file = serve_file(vmo_file.clone(), flags);
         let contents = read_file_with_on_open_event(file).await.unwrap();
         assert_eq!(contents, data);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn read_missing_file_in_namespace() {
+        assert_matches!(
+            read_in_namespace("/pkg/data/missing").await,
+            Err(e) if e.is_not_found_error()
+        );
     }
 }

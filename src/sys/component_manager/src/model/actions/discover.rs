@@ -7,11 +7,11 @@ use {
         actions::{Action, ActionKey},
         component::instance::{InstanceState, UnresolvedInstanceState},
         component::ComponentInstance,
-        error::{ActionError, DiscoverActionError},
         hooks::{Event, EventPayload},
         structured_dict::ComponentInput,
     },
     async_trait::async_trait,
+    errors::{ActionError, DiscoverActionError},
     std::sync::Arc,
 };
 

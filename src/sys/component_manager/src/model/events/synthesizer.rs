@@ -4,13 +4,13 @@
 
 use {
     crate::model::{
-        error::ModelError,
         events::{dispatcher::EventDispatcherScope, event::Event, registry::ComponentEventRoute},
         hooks::{Event as HookEvent, EventType},
     },
     ::routing::event::EventFilter,
     cm_types::Name,
     cm_util::TaskGroup,
+    errors::ModelError,
     futures::{channel::mpsc, future::join_all, SinkExt},
     moniker::ExtendedMoniker,
     std::{collections::HashMap, sync::Arc},

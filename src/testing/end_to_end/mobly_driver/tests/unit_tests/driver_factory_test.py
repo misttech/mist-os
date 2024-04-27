@@ -18,7 +18,7 @@ from mobly_driver.driver import base, common, infra, local
 class DriverFactoryTest(unittest.TestCase):
     """Driver Factory tests"""
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             (
                 "local_env",

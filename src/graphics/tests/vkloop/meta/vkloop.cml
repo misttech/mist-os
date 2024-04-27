@@ -2,25 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "sys/testing/elf_test_runner.shard.cml",
-        "syslog/client.shard.cml",
-    ],
-    program: {
-        binary: "bin/vkloop",
-    },
-    use: [
+    include: [ "syslog/client.shard.cml" ],
+    children: [
         {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
+            name: "test",
+            url: "vkloop_test#meta/vkloop_test_child.cm",
         },
+    ],
+    offer: [
         {
             protocol: [
+                "fuchsia.driver.development.Manager",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],
+            from: "parent",
+            to: [ "#test" ],
+        },
+        {
+            directory: "dev-topological",
+            from: "parent",
+            to: [ "#test" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test",
         },
     ],
 }

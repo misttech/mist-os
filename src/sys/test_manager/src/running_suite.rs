@@ -717,7 +717,7 @@ async fn get_realm(
     // Create the hermetic environment in the test_wrapper.
     let mut test_wrapper_decl = wrapper_realm.get_realm_decl().await?;
     test_wrapper_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: String::from(TEST_ENVIRONMENT_NAME),
+        name: TEST_ENVIRONMENT_NAME.parse().unwrap(),
         extends: fdecl::EnvironmentExtends::Realm,
         resolvers: vec![cm_rust::ResolverRegistration {
             resolver: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
@@ -741,7 +741,7 @@ async fn get_realm(
     test_wrapper_decl.collections.push(cm_rust::CollectionDecl {
         name: TEST_ROOT_COLLECTION.parse().unwrap(),
         durability: fdecl::Durability::Transient,
-        environment: Some(TEST_ENVIRONMENT_NAME.into()),
+        environment: Some(TEST_ENVIRONMENT_NAME.parse().unwrap()),
         allowed_offers: cm_types::AllowedOffers::StaticOnly,
         allow_long_names: false,
         persistent_storage: None,

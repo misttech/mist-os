@@ -171,28 +171,6 @@ pub enum PhyCmd {
         /// id of the phy to query
         phy_id: u16,
     },
-    #[structopt(name = "set-ps-mode")]
-    /// sets the phy's power save mode
-    SetPowerSaveMode {
-        #[structopt(raw(required = "true"))]
-        /// id of the phy to query
-        phy_id: u16,
-        #[structopt(raw(required = "true"))]
-        #[structopt(
-            raw(possible_values = "&PsModeArg::variants()"),
-            raw(case_insensitive = "true"),
-            help = "Specify PS Mode"
-        )]
-        mode: PsModeArg,
-    },
-
-    #[structopt(name = "get-ps-mode")]
-    /// gets the phy's power save mode
-    GetPowerSaveMode {
-        #[structopt(raw(required = "true"))]
-        /// id of the phy to query
-        phy_id: u16,
-    },
 }
 
 #[derive(StructOpt, Clone, Debug, PartialEq)]

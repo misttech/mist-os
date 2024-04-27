@@ -114,7 +114,8 @@ impl Hfp {
     pub async fn run(mut self) -> Result<(), Error> {
         loop {
             select! {
-                // If the profile stream ever terminates, the component should shut down.
+                // If the profile stream ever terminates or produces an irrecoverable error, the
+                // component should shut down.
                 event = self.profile_client.next() => {
                     if let Some(event) = event {
                         self.handle_profile_event(event?).await?;
@@ -358,7 +359,8 @@ mod tests {
         let (battery_client, _test_battery_manager) =
             TestBatteryManager::make_battery_client_with_test_manager().await;
 
-        // dropping the server is expected to produce an error from Hfp::run
+        // Dropping the `bredr.Profile` server should cause the HFP `ProfileClient` to disconnect.
+        // This should cause the HFP main loop to terminate as this is irrecoverable.
         drop(server);
 
         let (_tx, rx1) = mpsc::channel(1);
@@ -377,7 +379,7 @@ mod tests {
             rx2,
         );
         let result = hfp.run().await;
-        assert!(result.is_err());
+        assert_matches!(result, Ok(_));
     }
 
     /// Tests the HFP main run loop from a blackbox perspective by asserting on the FIDL messages

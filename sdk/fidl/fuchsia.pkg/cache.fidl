@@ -145,11 +145,18 @@ type BlobWrittenError = strict enum {
 /// 3. Each of the missing blobs needs to be written using `OpenBlob()` and
 /// `BlobWritten()` should be called after each blob is written.
 ///
-/// Clients must not make multiple `Open[Meta]Blob()` calls for the same `BlobId`
-/// at the same time, even across different `NeededBlobs` connections. I.e.
-/// there should be at most one outstanding `Open[Meta]Blob()` call per `BlobId`
-/// per `PackageCache` server. Violating this may result in errors in later uses
-/// of the protocol.
+/// Clients are responsible for avoiding concurrent creation of the same blob if the underlying
+/// blobstore does not support it.
+/// This manifests as the following constraints (applied per `BlobId`):
+/// 1. If the `BlobWriter` returned by calls to `Open[Meta]Blob` is the `file` variant, once Clients
+///    call Resize on a file, they must close *all* file connections obtained from `Open[Meta]Blob`
+///    before calling `Open[Meta]Blob` again.
+/// 2. If the `BlobWriter` returned by calls to `Open[Meta]Blob` is the `writer` variant, Clients
+///    must not write all the bytes to more than one of the `writer`s.
+/// This applies per `BlobId` to all `BlobWriter`s returned by all calls to `Open[Meta]Blob` across
+/// all `NeededBlobs` connections across all `PackageCache` connections.
+/// Once c++blobfs support is removed and fxblob is changed to support duplicate concurrent creation
+/// requests (https://fxbug.dev/335870456#comment9), this requirement can be dropped.
 ///
 /// Once all needed blobs are written by the client, the package cache will
 /// complete the pending [`PackageCache.Get`] request and close this channel

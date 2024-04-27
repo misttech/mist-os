@@ -178,7 +178,7 @@ class JobDispatcher final
   //
   // This includes runtime for threads that previously ran under those processes, but it does not
   // include runtime for child jobs.
-  zx_status_t AccumulateRuntimeTo(zx_info_task_runtime_t* info) const;
+  TaskRuntimeStats GetTaskRuntimeStats() const;
 
   uint32_t LockOrder() const;
 
@@ -296,7 +296,7 @@ class JobDispatcher final
   fbl::DoublyLinkedList<fbl::RefPtr<DebugExceptionate>> debug_exceptionates_ TA_GUARDED(get_lock());
 
   // Aggregated runtime stats for processes that have exited.
-  TaskRuntimeStats aggregated_runtime_stats_ TA_GUARDED(get_lock());
+  TaskRuntimeStats exited_process_runtime_stats_ TA_GUARDED(get_lock());
 };
 
 // Returns the job that is the ancestor of all other tasks.

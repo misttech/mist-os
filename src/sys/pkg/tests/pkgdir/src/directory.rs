@@ -11,8 +11,7 @@ use {
         AsHandleRef as _,
     },
     fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::open_directory,
-    fuchsia_fs::directory::{DirEntry, DirentKind},
+    fuchsia_fs::directory::{open_directory, DirEntry, DirentKind},
     fuchsia_zircon as zx,
     futures::{future::Future, StreamExt},
     itertools::Itertools as _,
@@ -64,7 +63,7 @@ async fn open_per_package_source(source: PackageSource) {
     assert_open_content_file(&source, "dir", "dir/file").await;
 }
 
-const ALL_FLAGS: [fio::OpenFlags; 15] = [
+const ALL_FLAGS: [fio::OpenFlags; 14] = [
     fio::OpenFlags::empty(),
     fio::OpenFlags::RIGHT_READABLE,
     fio::OpenFlags::RIGHT_WRITABLE,
@@ -74,12 +73,16 @@ const ALL_FLAGS: [fio::OpenFlags; 15] = [
     fio::OpenFlags::CREATE_IF_ABSENT,
     fio::OpenFlags::TRUNCATE,
     fio::OpenFlags::DIRECTORY,
-    fio::OpenFlags::APPEND,
     fio::OpenFlags::NODE_REFERENCE,
     fio::OpenFlags::DESCRIBE,
     fio::OpenFlags::POSIX_WRITABLE,
     fio::OpenFlags::POSIX_EXECUTABLE,
     fio::OpenFlags::NOT_DIRECTORY,
+    // TODO(https://fxbug.dev/327633753): `APPEND` only affects how a file is written and not
+    // whether it can be opened. POSIX, the rust VFS, and the C++ vfs all allow read-only files
+    // and connections without `RIGHT_WRITABLE` to be opened with `APPEND`. It's only MetaFile
+    // and MetaAsFile that disallow `APPEND`.
+    // fio::OpenFlags::APPEND,
 ];
 
 async fn assert_open_root_directory(
@@ -547,15 +550,28 @@ async fn verify_content_file_opened(
     node: fio::NodeProxy,
     flag: fio::OpenFlags,
 ) -> Result<(), Error> {
+    // Calling Node.Query to determine the channel's protocol causes the OnOpen event to be read
+    // from the channel and stored in the NodeProxy. When the channel is then moved from the
+    // NodeProxy to the FileProxy, the OnOpen event gets dropped. The event is read here so it
+    // doesn't get dropped.
+    let on_open_event = if flag.intersects(fio::OpenFlags::DESCRIBE) {
+        Some(
+            node.take_event_stream()
+                .next()
+                .await
+                .ok_or_else(|| anyhow!("no events!"))?
+                .context("event error")?,
+        )
+    } else {
+        None
+    };
+
     let protocol = node.query().await.context("failed to call query")?;
     if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
         if protocol != fio::NODE_PROTOCOL_NAME.as_bytes() {
             return Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)));
         }
-        if flag.intersects(fio::OpenFlags::DESCRIBE) {
-            let event =
-                node.take_event_stream().next().await.ok_or_else(|| anyhow!("no events!"))?;
-            let event = event.context("event error")?;
+        if let Some(event) = on_open_event {
             match event {
                 fio::NodeEvent::OnOpen_ { s, info } => {
                     let () = zx::Status::ok(s).context("OnOpen failed")?;
@@ -573,36 +589,39 @@ async fn verify_content_file_opened(
         if protocol != fio::FILE_PROTOCOL_NAME.as_bytes() {
             return Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)));
         }
-        let file = fio::FileProxy::new(node.into_channel().unwrap());
         {
+            let file = fio::FileProxy::new(node.into_channel().unwrap());
             let fio::FileInfo { observer, .. } =
                 file.describe().await.context("failed to call describe")?;
-            let observer = observer.ok_or_else(|| anyhow!("expected observer to be set"))?;
-            let _: zx::Signals = observer
-                .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
-                .context("FILE_SIGNAL_READABLE not set")?;
+            // Only blobfs blobs set the observer to indicate when the blob is readable. The blobs
+            // should be immediately readable here.
+            if let Some(observer) = observer {
+                let _: zx::Signals = observer
+                    .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
+                    .context("FILE_SIGNAL_READABLE not set")?;
+            }
         }
 
-        if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            let event =
-                file.take_event_stream().next().await.ok_or_else(|| anyhow!("no events!"))?;
-            let event = event.context("event error")?;
+        if let Some(event) = on_open_event {
             match event {
-                fio::FileEvent::OnOpen_ { s, info } => {
+                fio::NodeEvent::OnOpen_ { s, info } => {
                     let () = zx::Status::ok(s).context("OnOpen failed")?;
                     let info = info.ok_or_else(|| anyhow!("missing info"))?;
                     if let fio::NodeInfoDeprecated::File(fio::FileObject { event, stream: _ }) =
                         *info
                     {
-                        let event = event.ok_or_else(|| anyhow!("expected event to be set"))?;
-                        let _: zx::Signals = event
-                            .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
-                            .context("FILE_SIGNAL_READABLE not set")?;
+                        // Only blobfs blobs set the event to indicate when the blob is readable.
+                        // The blobs should be immediately readable here.
+                        if let Some(event) = event {
+                            let _: zx::Signals = event
+                                .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
+                                .context("FILE_SIGNAL_READABLE not set")?;
+                        }
                     } else {
                         return Err(anyhow!("wrong protocol returned: {:?}", info));
                     }
                 }
-                event @ fio::FileEvent::OnRepresentation { .. } => {
+                event @ fio::NodeEvent::OnRepresentation { .. } => {
                     return Err(anyhow!("unexpected event returned: {:?}", event));
                 }
             }

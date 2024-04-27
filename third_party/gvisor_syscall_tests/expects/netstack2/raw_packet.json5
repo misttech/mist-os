@@ -16,6 +16,10 @@
                 // https://fxbug.dev/42171961
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.ICMPv6FilterNotSupported",
+
+                // Netstack2 diverges from Linux and allows sending on packet
+                // sockets when the target device is not provided.
+                "AllPacketSocketTests/PacketSocketTest.SendWithoutTargetDevice/*",
             ],
         },
     ],

@@ -83,13 +83,13 @@ std::pair<fuchsia::media::FormatDetails, size_t> CodecAdapterSbcDecoder::OutputF
   return {std::move(format_details), context_->max_pcm_chunk_size()};
 }
 
-fuchsia::sysmem::BufferCollectionConstraints
-CodecAdapterSbcDecoder::CoreCodecGetBufferCollectionConstraints(
+fuchsia_sysmem2::BufferCollectionConstraints
+CodecAdapterSbcDecoder::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
   std::lock_guard<std::mutex> lock(lock_);
 
-  fuchsia::sysmem::BufferCollectionConstraints result;
+  fuchsia_sysmem2::BufferCollectionConstraints result;
 
   // The CodecImpl won't hand us the sysmem token, so we shouldn't expect to
   // have the token here.
@@ -108,12 +108,12 @@ CodecAdapterSbcDecoder::CoreCodecGetBufferCollectionConstraints(
   // the client wants more buffers the client can demand buffers in its own
   // fuchsia::sysmem::BufferCollection::SetConstraints().
   if (port == kOutputPort) {
-    result.min_buffer_count_for_camping = kMinOutputBufferCountForCamping;
+    result.min_buffer_count_for_camping() = kMinOutputBufferCountForCamping;
   } else {
-    result.min_buffer_count_for_camping = kMinInputBufferCountForCamping;
+    result.min_buffer_count_for_camping() = kMinInputBufferCountForCamping;
   }
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(result.min_buffer_count_for_shared_slack == 0);
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_dedicated_slack().has_value());
+  ZX_DEBUG_ASSERT(!result.min_buffer_count_for_shared_slack().has_value());
 
   uint32_t per_packet_buffer_bytes_min;
   uint32_t per_packet_buffer_bytes_max;
@@ -129,21 +129,18 @@ CodecAdapterSbcDecoder::CoreCodecGetBufferCollectionConstraints(
     per_packet_buffer_bytes_max = 0xFFFFFFFF;
   }
 
-  result.has_buffer_memory_constraints = true;
-  result.buffer_memory_constraints.min_size_bytes = per_packet_buffer_bytes_min;
-  result.buffer_memory_constraints.max_size_bytes = per_packet_buffer_bytes_max;
+  auto& bmc = result.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = per_packet_buffer_bytes_min;
+  bmc.max_size_bytes() = per_packet_buffer_bytes_max;
 
   // These are all false because SW encode.
-  result.buffer_memory_constraints.physically_contiguous_required = false;
-  result.buffer_memory_constraints.secure_required = false;
+  bmc.physically_contiguous_required() = false;
+  bmc.secure_required() = false;
 
-  ZX_DEBUG_ASSERT(result.image_format_constraints_count == 0);
+  ZX_DEBUG_ASSERT(!result.image_format_constraints().has_value());
 
   // We don't have to fill out usage - CodecImpl takes care of that.
-  ZX_DEBUG_ASSERT(!result.usage.cpu);
-  ZX_DEBUG_ASSERT(!result.usage.display);
-  ZX_DEBUG_ASSERT(!result.usage.vulkan);
-  ZX_DEBUG_ASSERT(!result.usage.video);
+  ZX_DEBUG_ASSERT(!result.usage().has_value());
 
   return result;
 }
@@ -363,10 +360,10 @@ void CodecAdapterSbcDecoder::QueueAndSend(size_t bytes_written) {
 }
 
 void CodecAdapterSbcDecoder::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
+    CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   if (port == kInputPort) {
-    ZX_DEBUG_ASSERT(buffer_collection_info.buffer_count >= kMinInputBufferCountForCamping);
+    ZX_DEBUG_ASSERT(buffer_collection_info.buffers()->size() >= kMinInputBufferCountForCamping);
   } else {
-    ZX_DEBUG_ASSERT(buffer_collection_info.buffer_count >= kMinOutputBufferCountForCamping);
+    ZX_DEBUG_ASSERT(buffer_collection_info.buffers()->size() >= kMinOutputBufferCountForCamping);
   }
 }

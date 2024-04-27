@@ -150,7 +150,7 @@ async fn add_component_resolver(
     // Add resolver to the test realm
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
     realm_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: component_resolver.environment(),
+        name: component_resolver.environment().parse().unwrap(),
         extends: fdecl::EnvironmentExtends::Realm,
         runners: vec![],
         resolvers: vec![cm_rust::ResolverRegistration {

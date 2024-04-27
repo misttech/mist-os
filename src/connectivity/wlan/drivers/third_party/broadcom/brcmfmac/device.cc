@@ -38,12 +38,41 @@ constexpr char kApInterfaceName[] = "brcmfmac-wlan-fullmac-ap";
 constexpr uint8_t kApInterfaceId = 1;
 constexpr uint8_t kMaxBufferParts = 1;
 constexpr char kNetDevDriverName[] = "brcmfmac-netdev";
+
+struct InterfaceInfo {
+  const char* const display_name = nullptr;
+  const char* const interface_name = nullptr;
+  const uint8_t interface_id = 0;
+  const bool supported = false;
+};
+
+InterfaceInfo GetInterfaceInfoForRole(fuchsia_wlan_common::wire::WlanMacRole role) {
+  switch (role) {
+    case fuchsia_wlan_common::wire::WlanMacRole::kClient:
+      return InterfaceInfo{"Client", kClientInterfaceName, kClientInterfaceId, true};
+    case fuchsia_wlan_common::wire::WlanMacRole::kAp:
+      return InterfaceInfo{"AP", kApInterfaceName, kApInterfaceId, true};
+    case fuchsia_wlan_common::wire::WlanMacRole::kMesh:
+      return InterfaceInfo{"Mesh"};
+    default:
+      return InterfaceInfo{"<unknown>"};
+  }
+}
+
+fuchsia_wlan_common::wire::WlanMacRole GetMacRoleForInterfaceId(uint16_t interface_id) {
+  switch (interface_id) {
+    case kClientInterfaceId:
+      return fuchsia_wlan_common::wire::WlanMacRole::kClient;
+    case kApInterfaceId:
+      return fuchsia_wlan_common::wire::WlanMacRole::kAp;
+    default:
+      return fuchsia_wlan_common::wire::WlanMacRole();
+  }
+}
+
 }  // namespace
 
-Device::Device()
-    : brcmf_pub_(std::make_unique<brcmf_pub>()),
-      client_interface_(nullptr),
-      ap_interface_(nullptr) {
+Device::Device() : brcmf_pub_(std::make_unique<brcmf_pub>()), network_device_(this) {
   brcmf_pub_->device = this;
   for (auto& entry : brcmf_pub_->if2bss) {
     entry = BRCMF_BSSIDX_INVALID;
@@ -56,13 +85,28 @@ Device::Device()
       std::make_unique<wlan::brcmfmac::RecoveryTrigger>(recovery_start_callback);
 }
 
-Device::~Device() {}
+Device::~Device() = default;
 
-void Device::Shutdown() {
+void Device::Shutdown(fit::callback<void()> on_shutdown_complete) {
   if (brcmf_pub_) {
     // Shut down the default WorkQueue here to ensure that its dispatcher is shutdown properly even
     // if the Device object's destructor is not called.
     brcmf_pub_->default_wq.Shutdown();
+  }
+
+  on_netdev_shutdown_complete_ = [on_shutdown_complete = std::move(on_shutdown_complete),
+                                  this]() mutable {
+    if (netdev_dispatcher_.get()) {
+      netdev_dispatcher_.ShutdownAsync();
+      netdev_dispatcher_shutdown_.Wait();
+      netdev_dispatcher_.close();
+    }
+    on_shutdown_complete();
+  };
+
+  if (!network_device_.Remove()) {
+    // No removal needed, immediately call on_netdev_shutdown_complete to signal we're done
+    on_netdev_shutdown_complete_();
   }
 }
 
@@ -124,42 +168,17 @@ zx_status_t Device::InitWlanPhyImpl() {
   return ZX_OK;
 }
 
-void Device::CreateNetDevice() {
-  network_device_ = std::make_unique<::wlan::drivers::components::NetworkDevice>(this);
-}
-
-zx_status_t Device::AddNetworkDevice(const char* deviceName) {
-  fidl::Arena arena;
-  auto property = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_NETWORK_DEVICE_IMPL);
-  auto args = fdf::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, deviceName)
-                  .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(&property, 1))
-                  .offers2(GetCompatServer().CreateOffers2(arena))
-                  .Build();
-  auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
-  if (endpoints.is_error()) {
-    BRCMF_ERR("Create Endpoints failed: %s", endpoints.status_string());
-    return endpoints.status_value();
+zx_status_t Device::InitDevice(fdf::OutgoingDirectory& outgoing) {
+  auto netdev_dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "brcmfmac-netdev", [this](fdf_dispatcher_t*) { netdev_dispatcher_shutdown_.Signal(); });
+  if (netdev_dispatcher.is_error()) {
+    BRCMF_ERR("Failed to create netdev dispatcher: %s", netdev_dispatcher.status_string());
+    return netdev_dispatcher.status_value();
   }
+  netdev_dispatcher_ = std::move(netdev_dispatcher.value());
 
-  // Add the netdevice child node for the node that this driver is binding to. Doing a sync version
-  // here to reduce chaos.
-  auto result = GetParentNode().sync()->AddChild(std::move(args), std::move(endpoints->server), {});
-  if (!result.ok()) {
-    BRCMF_ERR("Add controller node error due to FIDL error on protocol [Node]: %s",
-              result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    BRCMF_ERR("Add controller node error: %u", static_cast<uint32_t>(result->error_value()));
-    return ZX_ERR_INTERNAL;
-  }
-  NetDev()->Init(std::move(endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  return ZX_OK;
-}
-
-zx_status_t Device::InitDevice() {
-  zx_status_t status = AddNetworkDevice(kNetDevDriverName);
+  zx_status_t status = network_device_.Initialize(GetParentNode(), netdev_dispatcher_.get(),
+                                                  outgoing, kNetDevDriverName);
   if (status != ZX_OK) {
     BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));
     return status;
@@ -239,173 +258,127 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
     return;
   }
 
-  zx_status_t status = ZX_OK;
-  wireless_dev* wdev = nullptr;
-  uint16_t iface_id = 0;
-
-  switch (request->role()) {
-    case fuchsia_wlan_common::wire::WlanMacRole::kClient: {
-      if (client_interface_ != nullptr) {
-        BRCMF_ERR("Device::CreateIface() client interface already exists");
-        completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
-        return;
-      }
-
-      // If we are operating with manufacturing firmware ensure SoftAP IF is also not present
-      if (brcmf_feat_is_enabled(brcmf_pub_.get(), BRCMF_FEAT_MFG)) {
-        if (ap_interface_ != nullptr) {
-          BRCMF_ERR("Simultaneous mode not supported in mfg FW - Ap IF already exists");
-          completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
-          return;
-        }
-      }
-
-      if ((status = brcmf_cfg80211_add_iface(brcmf_pub_.get(), kClientInterfaceName, nullptr,
-                                             request, &wdev)) != ZX_OK) {
-        BRCMF_ERR("Device::CreateIface() failed to create Client interface, %s",
-                  zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
-        return;
-      }
-
-      zx::result create_result =
-          WlanInterface::Create(this, kClientInterfaceName, wdev, request->role());
-      if (create_result.is_error()) {
-        BRCMF_ERR("Failed to create WlanInterface: %s", create_result.status_string());
-        completer.buffer(arena).ReplyError(create_result.status_value());
-        return;
-      }
-
-      client_interface_ = std::move(create_result.value());
-      iface_id = kClientInterfaceId;
-
-      break;
-    }
-
-    case fuchsia_wlan_common::wire::WlanMacRole::kAp: {
-      if (ap_interface_ != nullptr) {
-        BRCMF_ERR("Device::CreateIface() AP interface already exists");
-        completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
-        return;
-      }
-
-      // If we are operating with manufacturing firmware ensure client IF is also not present
-      if (brcmf_feat_is_enabled(brcmf_pub_.get(), BRCMF_FEAT_MFG)) {
-        if (client_interface_ != nullptr) {
-          BRCMF_ERR("Simultaneous mode not supported in mfg FW - Client IF already exists");
-          completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
-          return;
-        }
-      }
-
-      if ((status = brcmf_cfg80211_add_iface(brcmf_pub_.get(), kApInterfaceName, nullptr, request,
-                                             &wdev)) != ZX_OK) {
-        BRCMF_ERR("Device::CreateIface() failed to create AP interface, %s",
-                  zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
-        return;
-      }
-
-      zx::result create_result =
-          WlanInterface::Create(this, kApInterfaceName, wdev, request->role());
-      if (create_result.is_error()) {
-        BRCMF_ERR("Failed to create WlanInterface: %s", create_result.status_string());
-        completer.buffer(arena).ReplyError(create_result.status_value());
-        return;
-      }
-
-      ap_interface_ = std::move(create_result.value());
-      iface_id = kApInterfaceId;
-
-      break;
-    }
-
-    default: {
-      BRCMF_ERR("Device::CreateIface() MAC role %d not supported",
-                fidl::ToUnderlying(request->role()));
-      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  // If we are operating with manufacturing firmware ensure SoftAP IF is also not present
+  if (brcmf_feat_is_enabled(brcmf_pub_.get(), BRCMF_FEAT_MFG)) {
+    if (ap_interface_ || client_interface_) {
+      // Either the interface we're trying to create exists or the other one exists. Neither is
+      // supported in manufacturing FW.
+      BRCMF_ERR("Simultaneous mode not supported in mfg FW - IF already exists");
+      completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
       return;
     }
   }
 
-  // Log the new iface's role, name, and MAC address
-  net_device* ndev = wdev->netdev;
+  std::unique_ptr<WlanInterface>* interface = GetInterfaceForRole(request->role());
+  if (!interface) {
+    BRCMF_ERR("MAC role %u not supported", fidl::ToUnderlying(request->role()));
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  InterfaceInfo info = GetInterfaceInfoForRole(request->role());
+  if (*interface) {
+    BRCMF_ERR("Device::CreateIface() %s interface already exists", info.display_name);
+    completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
+    return;
+  }
 
-  const char* role = request->role() == fuchsia_wlan_common::wire::WlanMacRole::kClient ? "client"
-                     : request->role() == fuchsia_wlan_common::wire::WlanMacRole::kAp   ? "ap"
-                     : request->role() == fuchsia_wlan_common::wire::WlanMacRole::kMesh
-                         ? "mesh"
-                         : "unknown type";
-  BRCMF_DBG(WLANPHY, "Created %s iface with netdev:%s id:%d", role, ndev->name, iface_id);
+  wireless_dev* wdev = nullptr;
+  const zx_status_t status =
+      brcmf_cfg80211_add_iface(brcmf_pub_.get(), info.interface_name, nullptr, request, &wdev);
+  if (status != ZX_OK) {
+    BRCMF_ERR("Device::CreateIface() failed to create %s interface, %s", info.display_name,
+              zx_status_get_string(status));
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+
+  WlanInterface::Create(
+      this, info.interface_name, wdev, request->role(), info.interface_id,
+      [info, interface, wdev, this,
+       completer = completer.ToAsync()](zx::result<std::unique_ptr<WlanInterface>> result) mutable {
+        fdf::Arena arena('WLIF');
+        if (result.is_error()) {
+          BRCMF_ERR("Failed to create WlanInterface: %s", result.status_string());
+          completer.buffer(arena).ReplyError(result.status_value());
+          return;
+        }
+        {
+          // Hold the lock while modifying iface_ptr which points to a member of Device.
+          std::lock_guard<std::mutex> lock(lock_);
+          *interface = std::move(result.value());
+        }
+
+        net_device* ndev = wdev->netdev;
+        BRCMF_DBG(WLANPHY, "Created %s iface with netdev:%s id:%d", info.display_name, ndev->name,
+                  info.interface_id);
 #if !defined(NDEBUG)
-  const uint8_t* mac_addr = ndev_to_if(ndev)->mac_addr;
-  BRCMF_DBG(WLANPHY, "  address: " FMT_MAC, FMT_MAC_ARGS(mac_addr));
+        const uint8_t* mac_addr = ndev_to_if(ndev)->mac_addr;
+        BRCMF_DBG(WLANPHY, "  address: " FMT_MAC, FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
 
-  fidl::Arena fidl_arena;
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
-  builder.iface_id(iface_id);
-  completer.buffer(arena).ReplySuccess(builder.Build());
+        completer.buffer(arena).ReplySuccess(
+            fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(arena)
+                .iface_id(info.interface_id)
+                .Build());
+      });
 }
 
 void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
                           DestroyIfaceCompleter::Sync& completer) {
-  zx_status_t status;
-  std::lock_guard<std::mutex> lock(lock_);
-
   if (!request->has_iface_id()) {
     BRCMF_ERR("Device::DestroyIface() invoked without valid iface_id");
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  uint16_t iface_id = request->iface_id();
-  BRCMF_DBG(WLANPHY, "Destroying interface %d", iface_id);
-  switch (iface_id) {
-    case kClientInterfaceId: {
-      if (client_interface_ == nullptr) {
-        BRCMF_WARN("Client interface not found");
-        completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-        return;
-      }
-      status = client_interface_->DestroyIface();
-      if (status == ZX_OK) {
-        BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
-        client_interface_.reset();
-        completer.buffer(arena).ReplySuccess();
-      } else {
-        // Don't reset client_interface_ here since we failed to delete it.
-        BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
-                  zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
-      }
-      return;
+  DestroyIface(request->iface_id(), [completer = completer.ToAsync()](zx_status_t status) mutable {
+    fdf::Arena arena('BRCM');
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+    } else {
+      completer.buffer(arena).ReplySuccess();
     }
-    case kApInterfaceId: {
-      if (ap_interface_ == nullptr) {
-        BRCMF_ERR("Softap interface not found");
-        completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-        return;
-      }
-      status = ap_interface_->DestroyIface();
-      if (status == ZX_OK) {
-        BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
-        ap_interface_.reset();
-        completer.buffer(arena).ReplySuccess();
-      } else {
-        // Don't reset ap_interface_ here since we failed to delete it.
-        BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
-                  zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
-      }
-      return;
-    }
-    default: {
-      BRCMF_ERR("Device::DestroyIface() Unknown interface id: %d", iface_id);
-      completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-      return;
-    }
+  });
+}
+
+void Device::DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& on_complete) {
+  std::lock_guard<std::mutex> lock(lock_);
+
+  std::unique_ptr<WlanInterface>* iface_ptr = GetInterfaceForId(iface_id);
+  if (!iface_ptr) {
+    BRCMF_ERR("Device::DestroyIface() Unknown interface id: %d", iface_id);
+    on_complete(ZX_ERR_NOT_FOUND);
+    return;
   }
+  InterfaceInfo info = GetInterfaceInfoForRole(GetMacRoleForInterfaceId(iface_id));
+
+  WlanInterface* iface = iface_ptr->get();
+  if (!iface) {
+    // Check the pointer inside the pointer, the actual interface pointer.
+    BRCMF_ERR("%s interface has already been destroyed", info.display_name);
+    on_complete(ZX_ERR_BAD_HANDLE);
+    return;
+  }
+
+  BRCMF_DBG(WLANPHY, "Destroying %s interface", info.display_name);
+  iface->DestroyIface([iface_ptr, iface_id, info, this,
+                       on_complete = std::move(on_complete)](zx_status_t status) mutable {
+    fdf::Arena arena('BRCM');
+    if (status != ZX_OK) {
+      // Don't reset iface_ptr here since we failed to delete it.
+      BRCMF_ERR("Device::DestroyIface() Error destroying %s interface : %s", info.display_name,
+                zx_status_get_string(status));
+      on_complete(status);
+      return;
+    }
+    BRCMF_DBG(WLANPHY, "%s interface %u destroyed successfully", info.display_name, iface_id);
+    {
+      // Hold the lock while modifying iface_ptr which points to a member of Device.
+      std::lock_guard<std::mutex> lock(lock_);
+      iface_ptr->reset();
+    }
+    on_complete(ZX_OK);
+  });
 }
 
 void Device::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
@@ -520,7 +493,11 @@ void Device::NetDevInit(wlan::drivers::components::NetworkDevice::Callbacks::Ini
 }
 
 void Device::NetDevRelease() {
-  // Don't need to do anything here, the release of wlanif should take care of all releasing
+  // This will be called as the final step of the network device removal. We can now call the
+  // shutdown handler to indicate that everything was shut down properly.
+  if (on_netdev_shutdown_complete_) {
+    on_netdev_shutdown_complete_();
+  }
 }
 
 void Device::NetDevStart(wlan::drivers::components::NetworkDevice::Callbacks::StartTxn txn) {
@@ -533,34 +510,40 @@ void Device::NetDevStop(wlan::drivers::components::NetworkDevice::Callbacks::Sto
   txn.Reply();
 }
 
-void Device::NetDevGetInfo(device_impl_info_t* out_info) {
+void Device::NetDevGetInfo(fuchsia_hardware_network_driver::DeviceImplInfo* out_info) {
   std::lock_guard<std::mutex> lock(lock_);
 
-  memset(out_info, 0, sizeof(*out_info));
-  zx_status_t err = brcmf_get_tx_depth(drvr(), &out_info->tx_depth);
+  uint16_t tx_depth = 0;
+  zx_status_t err = brcmf_get_tx_depth(drvr(), &tx_depth);
   ZX_ASSERT(err == ZX_OK);
-  err = brcmf_get_rx_depth(drvr(), &out_info->rx_depth);
+  uint16_t rx_depth = 0;
+  err = brcmf_get_rx_depth(drvr(), &rx_depth);
   ZX_ASSERT(err == ZX_OK);
-  out_info->rx_threshold = out_info->rx_depth / 3;
-  out_info->max_buffer_parts = kMaxBufferParts;
-  out_info->max_buffer_length = ZX_PAGE_SIZE;
-  out_info->buffer_alignment = ZX_PAGE_SIZE;
-  out_info->min_rx_buffer_length = IEEE80211_MSDU_SIZE_MAX;
+  uint16_t tx_tail_length = 0;
+  brcmf_get_tail_length(drvr(), &tx_tail_length);
 
-  out_info->tx_head_length = drvr()->hdrlen;
-  brcmf_get_tail_length(drvr(), &out_info->tx_tail_length);
+  out_info->tx_depth() = tx_depth;
+  out_info->rx_depth() = rx_depth;
+  out_info->rx_threshold() = rx_depth / 3;
+  out_info->max_buffer_parts() = kMaxBufferParts;
+  out_info->max_buffer_length() = ZX_PAGE_SIZE;
+  out_info->buffer_alignment() = ZX_PAGE_SIZE;
+  out_info->min_rx_buffer_length() = IEEE80211_MSDU_SIZE_MAX;
+  out_info->tx_head_length() = drvr()->hdrlen;
+  out_info->tx_tail_length() = tx_tail_length;
   // No hardware acceleration supported yet.
-  out_info->rx_accel_count = 0;
-  out_info->tx_accel_count = 0;
+  out_info->rx_accel() = std::nullopt;
+  out_info->tx_accel() = std::nullopt;
 }
 
 void Device::NetDevQueueTx(cpp20::span<wlan::drivers::components::Frame> frames) {
   brcmf_start_xmit(drvr(), frames);
 }
 
-void Device::NetDevQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count,
-                                uint8_t* vmo_addrs[]) {
-  brcmf_queue_rx_space(drvr(), buffers_list, buffers_count, vmo_addrs);
+void Device::NetDevQueueRxSpace(
+    cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
+    uint8_t* vmo_addrs[]) {
+  brcmf_queue_rx_space(drvr(), buffers, vmo_addrs);
 }
 
 zx_status_t Device::NetDevPrepareVmo(uint8_t vmo_id, zx::vmo vmo, uint8_t* mapped_address,
@@ -572,26 +555,59 @@ void Device::NetDevReleaseVmo(uint8_t vmo_id) { brcmf_release_vmo(drvr(), vmo_id
 
 void Device::NetDevSetSnoopEnabled(bool snoop) {}
 
-void Device::DestroyAllIfaces() {
+void Device::DestroyAllIfaces(fit::callback<void()>&& on_complete) {
   std::lock_guard<std::mutex> lock(lock_);
-  if (client_interface_) {
-    zx_status_t status = client_interface_->DestroyIface();
-    if (status == ZX_OK) {
-      client_interface_.reset();
-    } else {
-      BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying client interface : %s",
-                zx_status_get_string(status));
-    }
+
+  // Pick an interface to start destroying. By moving the pointer we ensure that the next recursive
+  // call to DestroyAllIfaces will not pick up that pointer again.
+  std::unique_ptr<WlanInterface> interface =
+      client_interface_ ? std::move(client_interface_) : std::move(ap_interface_);
+
+  if (!interface) {
+    // No interfaces left to destroy, call on_complete
+    on_complete();
+    return;
   }
 
-  if (ap_interface_) {
-    zx_status_t status = ap_interface_->DestroyIface();
-    if (status == ZX_OK) {
-      ap_interface_.reset();
-    } else {
-      BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying ap interface : %s",
-                zx_status_get_string(status));
+  // Capture interface to keep it alive until destruction completes. Use a raw pointer to safely
+  // call into it after moving it.
+  WlanInterface* interface_ptr = interface.get();
+  interface_ptr->DestroyIface([this, interface = std::move(interface),
+                               on_complete = std::move(on_complete)](zx_status_t status) mutable {
+    if (status != ZX_OK) {
+      InterfaceInfo info = GetInterfaceInfoForRole(interface->Role());
+      BRCMF_ERR("Device::DestroyAllIfaces() : Failed to destroy %s interface : %s",
+                info.display_name, zx_status_get_string(status));
     }
+    // The interface here is moved out of the Device object, it can no longer be accessed by any
+    // other code so no locking is needed here.
+    interface.reset();
+
+    // Call DestroyAllIfaces again to destroy the next interface, if any.
+    DestroyAllIfaces(std::move(on_complete));
+  });
+}
+
+std::unique_ptr<WlanInterface>* Device::GetInterfaceForRole(
+    fuchsia_wlan_common::wire::WlanMacRole role) {
+  switch (role) {
+    case fuchsia_wlan_common::wire::WlanMacRole::kClient:
+      return &client_interface_;
+    case fuchsia_wlan_common::wire::WlanMacRole::kAp:
+      return &ap_interface_;
+    default:
+      return nullptr;
+  }
+}
+
+std::unique_ptr<WlanInterface>* Device::GetInterfaceForId(uint16_t interface_id) {
+  switch (interface_id) {
+    case kClientInterfaceId:
+      return &client_interface_;
+    case kApInterfaceId:
+      return &ap_interface_;
+    default:
+      return nullptr;
   }
 }
 

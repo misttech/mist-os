@@ -14,13 +14,10 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEVICE_H_
 
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
@@ -60,9 +57,9 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   // Device Initialization
   zx_status_t InitServerDispatcher();
   zx_status_t InitWlanPhyImpl();
-  zx_status_t InitDevice();
+  // Initialize Device, services will be added to the |outgoing| directory.
+  zx_status_t InitDevice(fdf::OutgoingDirectory& outgoing);
   void InitPhyDevice();
-  void CreateNetDevice();
   virtual zx_status_t BusInit() = 0;
   WlanInterface* GetClientInterface() { return client_interface_.get(); }
   WlanInterface* GetSoftApInterface() { return ap_interface_.get(); }
@@ -70,12 +67,11 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   // State accessors
   brcmf_pub* drvr();
   const brcmf_pub* drvr() const;
-  ::wlan::drivers::components::NetworkDevice* NetDev() { return network_device_.get(); }
+  ::wlan::drivers::components::NetworkDevice& NetDev() { return network_device_; }
 
   // Virtual state accessors
   virtual async_dispatcher_t* GetTimerDispatcher() = 0;
   virtual DeviceInspect* GetInspect() = 0;
-  virtual compat::DeviceServer& GetCompatServer() = 0;
   virtual fidl::WireClient<fdf::Node>& GetParentNode() = 0;
   virtual std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() = 0;
   virtual const std::shared_ptr<fdf::Namespace>& Incoming() const = 0;
@@ -101,10 +97,11 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   void NetDevRelease() override;
   void NetDevStart(wlan::drivers::components::NetworkDevice::Callbacks::StartTxn txn) override;
   void NetDevStop(wlan::drivers::components::NetworkDevice::Callbacks::StopTxn txn) override;
-  void NetDevGetInfo(device_impl_info_t* out_info) override;
+  void NetDevGetInfo(fuchsia_hardware_network_driver::DeviceImplInfo* out_info) override;
   void NetDevQueueTx(cpp20::span<wlan::drivers::components::Frame> frames) override;
-  void NetDevQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count,
-                          uint8_t* vmo_addrs[]) override;
+  void NetDevQueueRxSpace(
+      cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers_list,
+      uint8_t* vmo_addrs[]) override;
   zx_status_t NetDevPrepareVmo(uint8_t vmo_id, zx::vmo vmo, uint8_t* mapped_address,
                                size_t mapped_size) override;
   void NetDevReleaseVmo(uint8_t vmo_id) override;
@@ -113,6 +110,9 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   virtual zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) = 0;
   virtual zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen,
                                         size_t* actual) = 0;
+  // This is intended for implementations that want to perform additional actions when the driver's
+  // recovery worker has finished.
+  virtual void OnRecoveryComplete() {}
 
   // Fidl error handlers
   void on_fidl_error(fidl::UnbindInfo error) override {
@@ -123,28 +123,23 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
     BRCMF_WARN("Received unknown event: event_ordinal(%lu)", metadata.event_ordinal);
   }
   // Helper functions
-  void DestroyAllIfaces();
+  void DestroyAllIfaces(fit::callback<void()>&& on_complete);
+  void DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& on_complete);
 
  protected:
-  // This will be called when the driver is being shut down, for example during a reboot, power off
-  // or suspend. It is NOT called as part of destruction of the device object (because calling
-  // virtual methods in destructors is unreliable). The device may be subject to multiple stages of
-  // shutdown, it is therefore possible for shutdown to be called multiple times. The device object
-  // may also be destructed after this as a result of the driver framework calling release. Take
-  // care that a multiple shutdowns or a shutdown followed by destruction does not result in double
-  // freeing memory or resources. Because this Device class is not Resumable there is no need to
-  // worry about coming back from a shutdown state, it's irreversible.
-  void Shutdown();
-
-  libsync::Completion completion_;
+  // This should be called by bus implementations when the driver is being shut down, for example
+  // during a reboot, power off or suspend. Because this Device class is not Resumable there is no
+  // need to worry about coming back from a shutdown state, it's irreversible.
+  void Shutdown(fit::callback<void()> on_shutdown_complete);
 
  private:
   // Helpers
-  zx_status_t AddNetworkDevice(const char* deviceName);
   zx_status_t AddWlanPhyImplService();
   void ServiceConnectHandler(fdf_dispatcher_t* dispatcher,
                              fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end);
   void NetDevInitReply(zx_status_t status);
+  std::unique_ptr<WlanInterface>* GetInterfaceForRole(fuchsia_wlan_common::wire::WlanMacRole role);
+  std::unique_ptr<WlanInterface>* GetInterfaceForId(uint16_t interface_id);
 
   std::unique_ptr<brcmf_bus> brcmf_bus_;
   std::unique_ptr<brcmf_pub> brcmf_pub_;
@@ -155,7 +150,11 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   fidl::WireClient<fdf::NodeController> wlanfullmac_controller_client_;
   fidl::WireClient<fdf::NodeController> wlanfullmac_controller_softap_;
 
-  std::unique_ptr<::wlan::drivers::components::NetworkDevice> network_device_;
+  fdf::Dispatcher netdev_dispatcher_;
+  libsync::Completion netdev_dispatcher_shutdown_;
+  fit::callback<void()> on_netdev_shutdown_complete_;
+
+  ::wlan::drivers::components::NetworkDevice network_device_;
   // Two fixed interfaces supported;  the default interface as a client, and a second one as an AP.
   std::unique_ptr<WlanInterface> client_interface_;
   std::unique_ptr<WlanInterface> ap_interface_;

@@ -622,11 +622,8 @@ mod tests {
     /// b: expose to parent from self
     #[fuchsia::test]
     async fn check_use_service_from_child() {
-        let use_decl = UseBuilder::service()
-            .name("foo")
-            .path("/foo")
-            .source(UseSource::Child("b".to_string()))
-            .build();
+        let use_decl =
+            UseBuilder::service().name("foo").path("/foo").source_static_child("b").build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
             (
@@ -731,7 +728,7 @@ mod tests {
                     .environment(EnvironmentBuilder::new().name("env"))
                     .build(),
             ),
-            ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("c", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
@@ -800,26 +797,32 @@ mod tests {
                         OfferBuilder::event_stream()
                             .name("started")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::Child(ChildRef {
-                                name: "b".into(),
-                                collection: None,
-                            }))
+                            .target_static_child("b")
                             .scope(vec![
-                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                                EventScope::Child(ChildRef {
+                                    name: "b".parse().unwrap(),
+                                    collection: None,
+                                }),
+                                EventScope::Child(ChildRef {
+                                    name: "c".parse().unwrap(),
+                                    collection: None,
+                                }),
                             ]),
                     )
                     .offer(
                         OfferBuilder::event_stream()
                             .name("started")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::Child(ChildRef {
-                                name: "c".into(),
-                                collection: None,
-                            }))
+                            .target_static_child("c")
                             .scope(vec![
-                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                                EventScope::Child(ChildRef {
+                                    name: "b".parse().unwrap(),
+                                    collection: None,
+                                }),
+                                EventScope::Child(ChildRef {
+                                    name: "c".parse().unwrap(),
+                                    collection: None,
+                                }),
                             ]),
                     )
                     .child_default("b")
@@ -840,12 +843,9 @@ mod tests {
                         OfferBuilder::event_stream()
                             .name("started")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::Child(ChildRef {
-                                name: "d".into(),
-                                collection: None,
-                            }))
+                            .target_static_child("d")
                             .scope(vec![EventScope::Child(ChildRef {
-                                name: "e".into(),
+                                name: "e".parse().unwrap(),
                                 collection: None,
                             })]),
                     )
@@ -940,7 +940,7 @@ mod tests {
                     .runner_default("elf")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
@@ -988,7 +988,7 @@ mod tests {
                         ResolverRegistration {
                             resolver: "base".parse().unwrap(),
                             source: RegistrationSource::Self_,
-                            scheme: "base".into(),
+                            scheme: "base".parse().unwrap(),
                         },
                     ))
                     .resolver_default("base")
@@ -1032,7 +1032,7 @@ mod tests {
                         ResolverRegistration {
                             resolver: "base".parse().unwrap(),
                             source: RegistrationSource::Self_,
-                            scheme: "base".into(),
+                            scheme: "base".parse().unwrap(),
                         },
                     ))
                     .resolver_default("base")
@@ -1121,7 +1121,7 @@ mod tests {
             .name("foo")
             .target_name("bar")
             .source(OfferSource::Self_)
-            .target(OfferTarget::Child(ChildRef { name: "b".into(), collection: None }))
+            .target_static_child("b")
             .build();
         let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![
@@ -1166,7 +1166,7 @@ mod tests {
     async fn map_route_use_from_child() {
         let use_decl = UseBuilder::protocol()
             .name("bar")
-            .source(UseSource::Child("b".into()))
+            .source(UseSource::Child("b".parse().unwrap()))
             .path("/svc/hippo")
             .build();
         let expose_decl = ExposeBuilder::protocol()
@@ -1261,7 +1261,7 @@ mod tests {
         let b_expose_decl = ExposeBuilder::directory()
             .name("bar_data")
             .target_name("baz_data")
-            .source(ExposeSource::Child("d".to_string()))
+            .source_static_child("d")
             .rights(fio::R_STAR_DIR)
             .build();
         let d_expose_decl = ExposeBuilder::directory()
@@ -1355,7 +1355,7 @@ mod tests {
                     .capability(runner_decl.clone())
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
+            ("b", ComponentDeclBuilder::new_empty_component().program_runner("hobbit").build()),
         ];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
@@ -1594,7 +1594,7 @@ mod tests {
         let registration_decl = ResolverRegistration {
             resolver: "base".parse().unwrap(),
             source: RegistrationSource::Child("c".to_string()),
-            scheme: "base".into(),
+            scheme: "base".parse().unwrap(),
         };
         let expose_decl =
             ExposeBuilder::resolver().name("base").source(ExposeSource::Self_).build();
@@ -1821,7 +1821,8 @@ mod tests {
             name: "elf".parse().unwrap(),
             source_path: Some("/builtin/source/path".parse().unwrap()),
         });
-        let component_decl = ComponentDeclBuilder::new_empty_component().add_program("elf").build();
+        let component_decl =
+            ComponentDeclBuilder::new_empty_component().program_runner("elf").build();
 
         let components = vec![("a", component_decl.clone())];
 
@@ -1892,10 +1893,8 @@ mod tests {
             .build();
         let directory_decl =
             CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
-        let expose_protocol_decl = ExposeBuilder::protocol()
-            .name("bad_protocol")
-            .source(ExposeSource::Child("c".to_string()))
-            .build();
+        let expose_protocol_decl =
+            ExposeBuilder::protocol().name("bad_protocol").source_static_child("c").build();
         let use_event_decl =
             UseBuilder::event_stream().name("started_on_a").path("/started").build();
 
@@ -1919,7 +1918,7 @@ mod tests {
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
-                    .add_program("dwarf")
+                    .program_runner("dwarf")
                     .expose(expose_protocol_decl.clone())
                     .use_(use_directory_decl.clone())
                     .use_(use_event_decl)
@@ -2061,7 +2060,7 @@ mod tests {
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
-                    .add_program("dwarf")
+                    .program_runner("dwarf")
                     .use_(use_protocol_decl.clone())
                     .build(),
             ),
@@ -2106,7 +2105,7 @@ mod tests {
                     .offer(offer_protocol_decl.clone())
                     .build(),
             ),
-            (b_url, ComponentDeclBuilder::new_empty_component().add_program("dwarf").build()),
+            (b_url, ComponentDeclBuilder::new_empty_component().program_runner("dwarf").build()),
         ];
 
         let test =

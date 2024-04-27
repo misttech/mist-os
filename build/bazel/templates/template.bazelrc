@@ -47,7 +47,12 @@ build --host_platform=//build/bazel/platforms:{host_platform}
 common --experimental_workspace_rules_log_file={workspace_log_file}
 
 # Log of actions, including remote executions with cache hit/miss status.
-common:exec_log --execution_log_json_file={execution_log_file}
+# This results in a zstd-compressed log file (proto: tools.protos.ExecLogEntry),
+# that appears as an invocation artifact named 'execution.log'.
+common:exec_log --experimental_execution_log_compact_file={execution_log_file}
+# Need the following to ensure the execution.log is actually uploaded to the RBE CAS.
+common:exec_log --remote_build_event_upload=all
+common --config=exec_log
 
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config={config_file}

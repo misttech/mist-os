@@ -46,7 +46,10 @@ rustc_binary("bin") {
     "//third_party/rust_crates:uuid",
   ]
 
-  test_deps = [ "//src/power/broker/client" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/power/broker/client",
+  ]
 
   sources = [
     "src/broker.rs",

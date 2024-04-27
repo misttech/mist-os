@@ -19,16 +19,13 @@ use {
             },
             context::ModelContext,
             environment::Environment,
-            error::{
-                ActionError, AddChildError, CreateNamespaceError, DynamicOfferError,
-                OpenOutgoingDirError, ResolveActionError,
-            },
             escrow::{self, EscrowedState},
             hooks::{CapabilityReceiver, Event, EventPayload},
             namespace::create_namespace,
             routing::{
                 self,
-                router::{Request, Routable, Router},
+                router_ext::RouterExt,
+                router_ext::WeakComponentTokenExt,
                 service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
                 RoutingError,
             },
@@ -58,12 +55,18 @@ use {
     },
     cm_types::Name,
     config_encoder::ConfigFields,
+    errors::{
+        ActionError, AddChildError, CreateNamespaceError, DynamicOfferError, OpenOutgoingDirError,
+        ResolveActionError, StopError,
+    },
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::{BoxFuture, FutureExt},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, CapabilityTrait, Dict, Open},
+    sandbox::{
+        Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
+    },
     std::{
         collections::{HashMap, HashSet},
         fmt,
@@ -295,7 +298,7 @@ impl shutdown::Component for ResolvedInstanceState {
         ResolvedInstanceState::children(self)
             .map(|(moniker, instance)| shutdown::Child {
                 moniker: moniker.clone(),
-                environment_name: instance.environment().name().map(|n| n.to_string()),
+                environment_name: instance.environment().name().cloned(),
             })
             .collect()
     }
@@ -320,7 +323,7 @@ pub struct ResolvedInstanceState {
     next_dynamic_instance_id: IncarnationId,
 
     /// The set of named Environments defined by this instance.
-    environments: HashMap<String, Arc<Environment>>,
+    environments: HashMap<Name, Arc<Environment>>,
 
     /// Directory that represents the program's namespace.
     ///
@@ -619,7 +622,11 @@ impl ResolvedInstanceState {
     /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
-        let dict = Router::dict_routers_to_open(&self.weak_component, &self.component_output_dict);
+        let dict = Router::dict_routers_to_open(
+            &WeakComponentToken::new(self.weak_component.clone()),
+            &self.weak_component.upgrade().unwrap().execution_scope,
+            &self.component_output_dict,
+        );
         Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
         dict
     }
@@ -691,12 +698,12 @@ impl ResolvedInstanceState {
         self.dynamic_offers.retain(|offer| {
             let source_matches = offer.source()
                 == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                    name: moniker.name().to_string().into(),
+                    name: moniker.name().clone(),
                     collection: moniker.collection().map(|c| c.clone()),
                 });
             let target_matches = offer.target()
                 == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                    name: moniker.name().to_string().into(),
+                    name: moniker.name().clone(),
                     collection: moniker.collection().map(|c| c.clone()),
                 });
             if target_matches && offer.source() == &cm_rust::OfferSource::Self_ {
@@ -713,7 +720,7 @@ impl ResolvedInstanceState {
     fn instantiate_environments(
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
-    ) -> HashMap<String, Arc<Environment>> {
+    ) -> HashMap<Name, Arc<Environment>> {
         let mut environments = HashMap::new();
         for env_decl in &decl.environments {
             environments.insert(
@@ -744,7 +751,7 @@ impl ResolvedInstanceState {
     fn get_environment(
         &self,
         component: &Arc<ComponentInstance>,
-        environment_name: Option<&String>,
+        environment_name: Option<&Name>,
     ) -> Arc<Environment> {
         if let Some(environment_name) = environment_name {
             Arc::clone(
@@ -1018,7 +1025,11 @@ impl ResolvedInstanceState {
 
     async fn discover_static_children(&self, mut child_inputs: StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
-            let child_name = Name::new(child_name.name()).unwrap();
+            if let Some(_) = child_name.collection {
+                continue;
+            }
+            let child_name =
+                Name::new(child_name.name.as_str()).expect("child is static so name is not long");
             let child_input = child_inputs.remove(&child_name).expect("missing child dict");
             ActionSet::register(child_instance.clone(), DiscoverAction::new(child_input))
                 .await
@@ -1120,7 +1131,7 @@ impl ProgramRuntime {
         self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<StopOutcomeWithEscrow, program::StopError> {
+    ) -> Result<StopOutcomeWithEscrow, StopError> {
         let outcome = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
         // Drop the program and join on the exit listener. Dropping the program
         // should cause the exit listener to stop waiting for the channel epitaph and
@@ -1166,14 +1177,20 @@ pub struct StartedInstanceState {
 }
 
 impl StartedInstanceState {
+    /// Creates the state corresponding to a started component.
+    ///
+    /// If `program` is present, also creates a background task waiting for the program to
+    /// terminate. When that happens, uses the [`WeakComponentInstance`] to stop the component.
     pub fn new(
+        program: Option<Program>,
+        component: WeakComponentInstance,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         StartedInstanceState {
-            program: None,
+            program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
             binder_server_ends: vec![],
             start_reason,
@@ -1182,31 +1199,19 @@ impl StartedInstanceState {
         }
     }
 
-    /// If this component is associated with a running [Program], obtain a capability
-    /// representing its runtime directory.
+    /// If this component has a program, obtain a capability representing its runtime directory.
     pub fn runtime_dir(&self) -> Option<&fio::DirectoryProxy> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.runtime())
-    }
-
-    /// Associates the [StartedInstanceState] with a running [Program].
-    ///
-    /// Creates a background task waiting for the program to terminate. When that happens, use the
-    /// [WeakComponentInstance] to stop the component.
-    pub fn set_program(&mut self, program: Program, component: WeakComponentInstance) {
-        self.program = Some(ProgramRuntime::new(program, component));
     }
 
     /// Stops the component. If the component has a program, the timer defines how long
     /// the runner is given to stop the program gracefully before we request the controller
     /// to terminate the program.
-    ///
-    /// Regardless if the runner honored our request, after this method, the [`StartedInstanceState`] is
-    /// no longer associated with a [Program].
     pub async fn stop<'a, 'b>(
         mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<StopOutcomeWithEscrow, program::StopError> {
+    ) -> Result<StopOutcomeWithEscrow, StopError> {
         let program = self.program.take();
         // If the component has a program, also stop the program.
         let ret = if let Some(program) = program {
@@ -1252,7 +1257,7 @@ impl Routable for CapabilityRequestedHook {
     async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
         self.source
             .ensure_started(&StartReason::AccessCapability {
-                target: request.target.moniker.clone(),
+                target: request.target.moniker().clone(),
                 name: self.name.clone(),
             })
             .await?;

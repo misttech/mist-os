@@ -16,8 +16,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
-use vfs::directory::mutable::connection::MutableConnection;
-use vfs::directory::simple::Simple;
+use vfs::directory::immutable::simple::Simple as PseudoDirectory;
 use vfs::file::vmo;
 
 // The location of the added trampolines. The path will be of the form:
@@ -135,15 +134,15 @@ impl Trampolines {
     fn make_tools_dir(
         &self,
         resource: zx::Resource,
-    ) -> Result<(Arc<Simple<MutableConnection>>, String), LauncherError> {
-        let tools_dir = vfs::mut_pseudo_directory! {};
+    ) -> Result<(Arc<PseudoDirectory>, String), LauncherError> {
+        let tools_dir = vfs::pseudo_directory! {};
         let mut path = String::new();
         for (pkg_name, trampolines) in &self.map {
             if !path.is_empty() {
                 path.push(':');
             }
             path.push_str(&format!("{}/{}", BASE_TOOLS_PATH, &pkg_name));
-            let pkg_dir = vfs::mut_pseudo_directory! {};
+            let pkg_dir = vfs::pseudo_directory! {};
 
             for trampoline in trampolines {
                 let read_exec_vmo = make_executable_vmo_file(&resource, &trampoline.contents)?;
@@ -235,9 +234,7 @@ fn make_executable_vmo_file(
 }
 
 // Return a proxy to the given directory, first opening it as executable.
-fn directory_to_proxy(
-    dir: Arc<Simple<MutableConnection>>,
-) -> Result<fio::DirectoryProxy, LauncherError> {
+fn directory_to_proxy(dir: Arc<PseudoDirectory>) -> Result<fio::DirectoryProxy, LauncherError> {
     let (client, server) =
         create_proxy::<fio::DirectoryMarker>().map_err(|_| LauncherError::Internal)?;
     let scope = vfs::execution_scope::ExecutionScope::new();
@@ -312,7 +309,6 @@ mod tests {
     use fuchsia_fs::file::read_to_string;
     use futures::StreamExt;
     use std::fmt;
-    use vfs::directory::immutable::connection::ImmutableConnection;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
 
@@ -408,7 +404,7 @@ mod tests {
         }
     }
 
-    async fn make_pkg(url: &str, name: &str, root: &Arc<Simple<ImmutableConnection>>) -> PkgDir {
+    async fn make_pkg(url: &str, name: &str, root: &Arc<PseudoDirectory>) -> PkgDir {
         let (pkg_url, resource) = parse_url(&url.to_string()).unwrap();
         let (dir, server_end) =
             create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");

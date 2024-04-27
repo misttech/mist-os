@@ -8,8 +8,9 @@ use anyhow::bail;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
-    WlanRecoveryProfile,
+    WlanRecoveryProfile, WlanRoamingProfile,
 };
+use assembly_file_relative_path::FileRelativePathBuf;
 use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct ConnectivitySubsystemConfig;
@@ -27,6 +28,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             // FFX discovery is not enabled on bootstrap, therefore we do not need the wired
             // udp service.
             (FeatureSupportLevel::Bootstrap, _, _) => false,
+            (FeatureSupportLevel::Embeddable, _, _) => false,
 
             // User builds cannot have this service enabled.
             (_, BuildType::User, None) => false,
@@ -43,7 +45,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         }
         if let Some(mdns_config) = &connectivity_config.mdns.config {
             builder.package("mdns").config_data(FileEntry {
-                source: mdns_config.clone(),
+                source: mdns_config.clone().into(),
                 destination: "assembly.config".into(),
             })?;
         }
@@ -62,6 +64,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 bail!("The configuration of networking is not an option for `bootstrap`")
             }
             (FeatureSupportLevel::Bootstrap, _, None) => None,
+            (FeatureSupportLevel::Embeddable, _, _) => None,
 
             // utility, in user mode, only gets networking if requested.
             (FeatureSupportLevel::Utility, BuildType::User, networking) => networking.as_ref(),
@@ -98,22 +101,20 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
-            let config_src = connectivity_config
-                .network
-                .netcfg_config_path
-                .clone()
-                .unwrap_or(context.get_resource("netcfg_default.json"));
+            let config_src = connectivity_config.network.netcfg_config_path.clone().unwrap_or(
+                FileRelativePathBuf::Resolved(context.get_resource("netcfg_default.json")),
+            );
             let config_dir = builder
                 .add_domain_config(PackageSetDestination::Blob(PackageDestination::NetcfgConfig))
                 .directory("netcfg-config");
             config_dir.entry(FileEntry {
-                source: config_src,
+                source: config_src.into(),
                 destination: "netcfg_default.json".into(),
             })?;
 
             if let Some(netstack_config_path) = &connectivity_config.network.netstack_config_path {
                 builder.package("netstack").config_data(FileEntry {
-                    source: netstack_config_path.clone(),
+                    source: netstack_config_path.clone().into(),
                     destination: "default.json".into(),
                 })?;
             }
@@ -122,7 +123,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 &connectivity_config.network.google_maps_api_key_path
             {
                 builder.package("emergency").config_data(FileEntry {
-                    source: google_maps_api_key_path.clone(),
+                    source: google_maps_api_key_path.clone().into(),
                     destination: "google_maps_api_key.txt".into(),
                 })?;
             }
@@ -181,6 +182,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                                 "wlan.recovery_enabled is invalid with wlan.policy_layer ViaWlanix"
                             )
                         }
+
+                        // Ensure we don't have invalid roaming settings
+                        if connectivity_config.wlan.roaming_profile.is_some() {
+                            bail!(
+                                "wlan.roaming_profile is invalid with wlan.policy_layer ViaWlanix"
+                            )
+                        }
                     }
                     WlanPolicyLayer::Platform => {
                         builder.platform_bundle("wlan_policy");
@@ -204,6 +212,23 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                             Config::new(
                                 ConfigValueType::String { max_size: 512 },
                                 recovery_profile.into(),
+                            ),
+                        )?;
+
+                        let roaming_profile = match connectivity_config.wlan.roaming_profile {
+                            Some(WlanRoamingProfile::StationaryRoaming) => {
+                                String::from("stationary_roaming")
+                            }
+                            Some(WlanRoamingProfile::MetricsOnly) => String::from("metrics_only"),
+                            Some(WlanRoamingProfile::RoamingOff) | None => {
+                                String::from("roaming_off")
+                            }
+                        };
+                        builder.set_config_capability(
+                            "fuchsia.wlan.RoamingProfile",
+                            Config::new(
+                                ConfigValueType::String { max_size: 512 },
+                                roaming_profile.into(),
                             ),
                         )?;
                     }

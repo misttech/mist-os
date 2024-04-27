@@ -57,10 +57,19 @@ async fn main() -> Result<()> {
     fuchsia_inspect::component::health().set_starting_up();
 
     // Set up the SystemActivityGovernor.
+    let suspender = match connect_to_suspender(SUSPEND_DEV_PATH).await {
+        Ok(s) => Some(s),
+        Err(e) => {
+            tracing::warn!(
+                "Unable to connect to suspender prototocol at {SUSPEND_DEV_PATH}: {e:?}"
+            );
+            None
+        }
+    };
     let sag = SystemActivityGovernor::new(
         &connect_to_protocol::<fbroker::TopologyMarker>()?,
         inspector.root().clone_weak(),
-        connect_to_suspender(SUSPEND_DEV_PATH).await?,
+        suspender,
     )
     .await?;
 

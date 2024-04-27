@@ -34,6 +34,7 @@ void arch_render_crashlog_registers(FILE& target, const crashlog_regs_t& regs) {
             " R13: %#18" PRIx64 "\n"
             " R14: %#18" PRIx64 "\n"
             " R15: %#18" PRIx64 "\n"
+            "vector: %#18" PRIx64 "\n"
             "errc: %#18" PRIx64 "\n"
             "\n",
             // clang-format on
@@ -41,7 +42,7 @@ void arch_render_crashlog_registers(FILE& target, const crashlog_regs_t& regs) {
             regs.iframe->rbx, regs.iframe->rcx, regs.iframe->rdx, regs.iframe->rsi,
             regs.iframe->rdi, regs.iframe->rbp, regs.iframe->user_sp, regs.iframe->r8,
             regs.iframe->r9, regs.iframe->r10, regs.iframe->r11, regs.iframe->r12, regs.iframe->r13,
-            regs.iframe->r14, regs.iframe->r15, regs.iframe->err_code);
+            regs.iframe->r14, regs.iframe->r15, regs.iframe->vector, regs.iframe->err_code);
   } else {
     fprintf(&target, "x64 REGISTERS: missing\n");
   }

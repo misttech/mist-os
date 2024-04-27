@@ -53,20 +53,20 @@ typedef struct {
  * caller only calls one of them at a time.
  */
 typedef struct {
-  const void *device;
+  void *device;
   /**
    * Start operations on the underlying device and return the SME channel.
    */
-  int32_t (*start)(const void *device, zx_handle_t wlan_softmac_ifc_bridge_client_handle,
+  int32_t (*start)(void *device, zx_handle_t wlan_softmac_ifc_bridge_client_handle,
                    const frame_processor_t *frame_processor, zx_handle_t *out_sme_channel);
   /**
    * Reports the current status to the ethernet driver.
    */
-  int32_t (*set_ethernet_status)(const void *device, uint32_t status);
+  int32_t (*set_ethernet_status)(void *device, uint32_t status);
 } rust_device_interface_t;
 
 typedef struct {
-  const void *ctx;
+  void *ctx;
   /**
    * Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
    *
@@ -75,7 +75,7 @@ typedef struct {
    * Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
    * and `payload_len` is the length of the persisted byte array.
    */
-  zx_status_t (*wlan_tx)(const void *ctx, const uint8_t *payload, uintptr_t payload_len);
+  zx_status_t (*wlan_tx)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
   /**
    * Sends an Ethernet frame to the C++ portion of wlansoftmac.
    *
@@ -84,7 +84,7 @@ typedef struct {
    * Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
    * and `payload_len` is the length of the persisted byte array.
    */
-  zx_status_t (*ethernet_rx)(const void *ctx, const uint8_t *payload, uintptr_t payload_len);
+  zx_status_t (*ethernet_rx)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
 } frame_sender_t;
 
 /**

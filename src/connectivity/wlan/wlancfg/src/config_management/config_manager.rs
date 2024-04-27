@@ -22,7 +22,7 @@ use {
     rand::Rng,
     std::collections::{hash_map::Entry, HashMap, HashSet},
     tracing::{error, info},
-    wlan_stash::policy::{PolicyStorage as Stash, POLICY_STASH_ID},
+    wlan_stash::policy::{PolicyStorage as Stash, POLICY_STORAGE_ID},
 };
 
 const MAX_CONFIGS_PER_SSID: usize = 1;
@@ -129,7 +129,7 @@ impl SavedNetworksManager {
     /// Initializes a new Saved Network Manager by reading saved networks from a secure storage
     /// (stash). It initializes in-memory storage and persistent storage with stash.
     pub async fn new(telemetry_sender: TelemetrySender) -> Self {
-        let stash = Stash::new_with_id(POLICY_STASH_ID)
+        let stash = Stash::new_with_id(POLICY_STORAGE_ID)
             .await
             .map_err(|e| {
                 error!(

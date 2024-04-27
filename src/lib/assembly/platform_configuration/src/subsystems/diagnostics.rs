@@ -52,7 +52,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         } = diagnostics_config;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
-            "fuchsia.component.KcounterBinder",
             "fuchsia.component.PersistenceBinder",
             "fuchsia.component.SamplerBinder",
         ]);
@@ -63,13 +62,16 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         match (context.build_type, context.feature_set_level) {
             // Always clear bind_services for bootstrap (bringup) and utility
             // systems.
-            (_, FeatureSupportLevel::Bootstrap) | (_, FeatureSupportLevel::Utility) => {
+            (_, FeatureSupportLevel::Bootstrap)
+            | (_, FeatureSupportLevel::Embeddable)
+            | (_, FeatureSupportLevel::Utility) => {
                 bind_services.clear();
             }
-            // Detect isn't present on user builds.
+            // Some services aren't present on user builds.
             (BuildType::User, FeatureSupportLevel::Standard) => {}
             (_, FeatureSupportLevel::Standard) => {
                 bind_services.insert("fuchsia.component.DetectBinder");
+                bind_services.insert("fuchsia.component.KernelDebugBrokerBinder");
             }
         };
 
@@ -134,48 +136,44 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             ),
         )?;
 
-        // Add the pipelines on systems that support blobfs, therefore can have a domain config
-        // package.
-        if matches!(
-            context.feature_set_level,
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
-        ) {
-            let pipelines = builder
-                .add_domain_config(PackageSetDestination::Boot(
-                    BootfsPackageDestination::ArchivistPipelines,
-                ))
-                .directory("config");
-            for pipeline in archivist_pipelines {
-                let ArchivistPipeline { name, files } = pipeline;
-                if files.is_empty() {
-                    bail!("An archivist pipeline must have a non-zero number of files");
-                }
-                if *name == PipelineType::All && *context.build_type == BuildType::User {
-                    bail!("The 'all' archivist pipeline is not allowed on user builds");
-                }
+        let pipelines = builder
+            .add_domain_config(PackageSetDestination::Boot(
+                BootfsPackageDestination::ArchivistPipelines,
+            ))
+            .directory("config");
+        for pipeline in archivist_pipelines {
+            let ArchivistPipeline { name, files } = pipeline;
+            if files.is_empty() {
+                bail!("An archivist pipeline must have a non-zero number of files");
+            }
+            if *name == PipelineType::All && *context.build_type == BuildType::User {
+                bail!("The 'all' archivist pipeline is not allowed on user builds");
+            }
 
-                for file in files {
-                    let filename = file.file_name().ok_or(anyhow!(
-                        "Failed to get filename for archivist pipeline: {}",
-                        &file
-                    ))?;
-                    pipelines.entry(FileEntry {
-                        source: file.clone(),
-                        destination: format!("{}/{}", name, filename),
-                    })?;
-                }
+            for file in files {
+                let filename = file
+                    .file_name()
+                    .ok_or(anyhow!("Failed to get filename for archivist pipeline: {}", &file))?;
+                pipelines.entry(FileEntry {
+                    source: file.clone(),
+                    destination: format!("{}/{}", name, filename),
+                })?;
             }
         }
 
-        let exception_handler_available =
-            !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
+        let exception_handler_available = matches!(
+            context.feature_set_level,
+            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+        );
         builder.set_config_capability(
             "fuchsia.diagnostics.ExceptionHandlerAvailable",
             Config::new(ConfigValueType::Bool, exception_handler_available.into()),
         )?;
 
         match context.feature_set_level {
-            FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
+            FeatureSupportLevel::Bootstrap
+            | FeatureSupportLevel::Utility
+            | FeatureSupportLevel::Embeddable => {}
             FeatureSupportLevel::Standard => {
                 if context.board_info.provides_feature("fuchsia::mali_gpu") {
                     builder.platform_bundle("diagnostics_triage_detect_mali");
@@ -299,7 +297,7 @@ mod tests {
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
             Value::Array(vec![
                 "fuchsia.component.DetectBinder".into(),
-                "fuchsia.component.KcounterBinder".into(),
+                "fuchsia.component.KernelDebugBrokerBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
             ])
@@ -459,7 +457,6 @@ mod tests {
         assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
             Value::Array(vec![
-                "fuchsia.component.KcounterBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
             ])

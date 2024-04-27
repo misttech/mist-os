@@ -64,7 +64,7 @@ impl BudgetState {
 
         while self.current > self.capacity {
             // find the container with the oldest log message
-            self.containers.sort_unstable_by_key(|c| c.oldest_timestamp().unwrap_or(std::i64::MAX));
+            self.containers.sort_unstable_by_key(|c| c.oldest_timestamp().unwrap_or(i64::MAX));
 
             let container_with_oldest = Arc::clone(
                 self.containers

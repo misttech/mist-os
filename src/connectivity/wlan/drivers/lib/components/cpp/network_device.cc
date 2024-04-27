@@ -3,21 +3,24 @@
 
 #include "src/connectivity/wlan/drivers/lib/components/cpp/include/wlan/drivers/components/network_device.h"
 
+#include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <lib/ddk/binding_driver.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/zx/vmar.h>
 
 #include "src/connectivity/wlan/drivers/lib/components/cpp/log.h"
 
+namespace netdriver = fuchsia_hardware_network_driver;
+
 namespace {
 
-void PopulateRxBuffer(rx_buffer_t& buffer, rx_buffer_part_t& buffer_part,
+void PopulateRxBuffer(netdriver::wire::RxBuffer& buffer, netdriver::wire::RxBufferPart& buffer_part,
                       const wlan::drivers::components::Frame& frame) {
-  buffer.data_count = 1;
-  buffer.data_list = &buffer_part;
+  buffer.data = ::fidl::VectorView<::netdriver::wire::RxBufferPart>::FromExternal(&buffer_part, 1);
   buffer.meta.port = frame.PortId();
-  buffer.meta.frame_type =
-      static_cast<uint8_t>(::fuchsia_hardware_network::wire::FrameType::kEthernet);
+  buffer.meta.info = netdriver::wire::FrameInfo::WithNoInfo({});
+  buffer.meta.frame_type = ::fuchsia_hardware_network::wire::FrameType::kEthernet;
   buffer_part.id = frame.BufferId();
   buffer_part.length = frame.Size();
   buffer_part.offset = frame.Headroom();
@@ -25,60 +28,113 @@ void PopulateRxBuffer(rx_buffer_t& buffer, rx_buffer_part_t& buffer_part,
 
 }  // anonymous namespace
 
-namespace wlan::drivers::components::internal {
-extern LogMode gLogMode;
-}  // namespace wlan::drivers::components::internal
-
 namespace wlan::drivers::components {
 
 NetworkDevice::Callbacks::~Callbacks() = default;
 
-NetworkDevice::NetworkDevice(zx_device_t* parent, Callbacks* callbacks)
-    : parent_(parent),
-      callbacks_(callbacks),
-      netdev_proto_{&this->network_device_impl_protocol_ops_, this} {
-  internal::set_log_mode(internal::LogMode::DFv1);
+NetworkDevice::NetworkDevice(Callbacks* callbacks) : callbacks_(callbacks) {}
+
+NetworkDevice::~NetworkDevice() {
+  ZX_ASSERT_MSG(!binding_.has_value(),
+                "NetworkDevice is bound. Call Remove and wait for NetDevRelease first.");
+  ZX_ASSERT_MSG(outgoing_directory_ == nullptr,
+                "NetworkDevice service registered. Call Remove and wait for NetDevRelease first.");
+  ZX_ASSERT_MSG(!node_controller_.is_valid(),
+                "NetworkDevice node valid. Call Remove and wait for NetDevRelease first.");
+  ZX_ASSERT_MSG(state_ == State::UnInitialized || state_ == State::Released,
+                "NetworkDevice not released yet. Call Remove and wait for NetDevRelease first.");
 }
 
-NetworkDevice::NetworkDevice(Callbacks* callbacks)
-    : callbacks_(callbacks), netdev_proto_{&this->network_device_impl_protocol_ops_, this} {
-  internal::set_log_mode(internal::LogMode::DFv2);
-}
-
-NetworkDevice::~NetworkDevice() = default;
-
-zx_status_t NetworkDevice::Init(const char* deviceName) {
-  ZX_ASSERT(internal::gLogMode == internal::LogMode::DFv1);
-  return AddNetworkDevice(deviceName);
-}
-
-void NetworkDevice::Init(fidl::ClientEnd<NodeController> client_end,
-                         async_dispatcher_t* dispatcher) {
-  ZX_ASSERT(internal::gLogMode == internal::LogMode::DFv2);
-  controller_node_ = std::make_optional<fidl::WireClient<NodeController>>();
-  controller_node_.value().Bind(std::move(client_end), dispatcher, this);
-}
-
-void NetworkDevice::Remove() {
-  if (device_) {
-    // DFv1 case
-    device_async_remove(device_);
+zx_status_t NetworkDevice::Initialize(fidl::WireClient<fuchsia_driver_framework::Node>& parent,
+                                      fdf_dispatcher_t* dispatcher,
+                                      fdf::OutgoingDirectory& outgoing, const char* device_name) {
+  std::lock_guard lock(mutex_);
+  if (state_ != State::UnInitialized) {
+    LOGF(ERROR, "NetworkDevice already initialized");
+    return ZX_ERR_ALREADY_BOUND;
   }
-  if (controller_node_) {
-    // DFv2 case
-    auto result = controller_node_.value()->Remove();
-    if (!result.ok()) {
-      LOGF(ERROR, "controller node remove failed, FIDL error: %s", result.status_string());
-    }
+  state_ = State::Initialized;
+
+  netdev_dispatcher_ = dispatcher;
+
+  if (zx_status_t status = AddService(outgoing); status != ZX_OK) {
+    // AddService should have logged an error message already.
+    return status;
+  }
+
+  fidl::Arena arena;
+  auto offer = fdf::MakeOffer2<netdriver::Service>(arena, component::kDefaultInstance);
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(device_name)
+                  .offers2(arena, std::vector{offer})
+                  .Build();
+
+  auto [client, server] = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+
+  auto result = parent.sync()->AddChild(args, std::move(server), {});
+  if (!result.ok()) {
+    LOGF(ERROR, "Failed to make add child call: %s", result.FormatDescription().c_str());
+    return result.status();
+  }
+  if (result->is_error()) {
+    LOGF(ERROR, "Failed to add child: %u", static_cast<uint32_t>(result->error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+  node_controller_.Bind(std::move(client), fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
+
+  return ZX_OK;
+}
+
+bool NetworkDevice::Remove() {
+  std::lock_guard lock(mutex_);
+  if (state_ == State::UnInitialized || state_ == State::Released) {
+    // Never initialized or already removed. No need for a removal.
+    return false;
+  }
+  if (state_ != State::Initialized) {
+    // Removal is already in progress. Completion will be signaled through NetDevRelease.
+    return true;
+  }
+  RemoveLocked();
+  return true;
+}
+
+void NetworkDevice::RemoveLocked() {
+  // Attempt to remove the network device child node first. This is to allow the network device
+  // driver to complete shutdown properly which involves calling into our NetworkDeviceImpl server.
+  // Keep the server alive until after the node is gone.
+  if (node_controller_.is_valid()) {
+    // Remove the child node first as mentioned above. The next step in the removal process will be
+    // triggered by the on_fidl_error handler which is called when the node removal is complete.
+    TransitionToState(State::RemovingNode, [this] { RemoveNode(); });
+  } else if (outgoing_directory_) {
+    // Remove the service. The next step will be triggered by the RemoveService call itself as
+    // service removal is a synchronous process.
+    TransitionToState(State::RemovingService, [this] { RemoveService(); });
+  } else if (binding_.has_value()) {
+    // The service has been removed, it's now safe to unbind the server. The remaining removal will
+    // be triggered by the unbind handler.
+    TransitionToState(State::Unbinding, [this] { Unbind(); });
+  } else {
+    // Server has been unbound, call release. This will trigger the transition to the final state,
+    // Released, and call NetDevRelease on the callbacks.
+    TransitionToState(State::Releasing, [this] { Release(); });
   }
 }
 
-void NetworkDevice::Release() { callbacks_->NetDevRelease(); }
+void NetworkDevice::TransitionToState(State new_state, fit::function<void()>&& task) {
+  if (state_ >= new_state) {
+    // Don't perform the task if the desired or a subsequent state has already been reached.
+    return;
+  }
+  state_ = new_state;
+  async::PostTask(parent_dispatcher_, [task = std::move(task)] { task(); });
+}
 
-network_device_ifc_protocol_t NetworkDevice::NetDevIfcProto() const {
-  network_device_ifc_protocol_t proto;
-  netdev_ifc_.GetProto(&proto);
-  return proto;
+void NetworkDevice::WaitUntilServerConnected() { server_connected_.Wait(); }
+
+fdf::WireSharedClient<netdriver::NetworkDeviceIfc>& NetworkDevice::NetDevIfcClient() {
+  return netdev_ifc_;
 }
 
 void NetworkDevice::CompleteRx(Frame&& frame) {
@@ -86,59 +142,82 @@ void NetworkDevice::CompleteRx(Frame&& frame) {
     return;
   }
 
-  rx_buffer_t buffer = {};
-  rx_buffer_part_t buffer_part = {};
+  // Use a FIDL arena here as it can allocate storage on the stack. This avoid any memory
+  // allocations that would happen with an fdf::Arena. The default FIDL arena size should be plenty.
+  fidl::Arena arena;
+  // Still need an fdf::Arena for the actual call.
+  fdf::Arena fdf_arena('NETD');
 
-  PopulateRxBuffer(buffer, buffer_part, frame);
+  fidl::VectorView<netdriver::wire::RxBuffer> buffers(arena, 1u);
+  fidl::VectorView<netdriver::wire::RxBufferPart> buffer_part(arena, 1u);
+
+  PopulateRxBuffer(buffers[0], buffer_part[0], frame);
   frame.ReleaseFromStorage();
 
-  netdev_ifc_.CompleteRx(&buffer, 1u);
+  auto status = netdev_ifc_.buffer(fdf_arena)->CompleteRx(buffers);
+  if (!status.ok()) {
+    LOGF(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
+    return;
+  }
 }
 
 void NetworkDevice::CompleteRx(FrameContainer&& frames) {
-  // Limit the number of buffers per call to CompleteRx. This allows us to avoid a memory allocation
-  // here just to hold these buffers. This value was chosen because it is unlikely to be exceeded
-  // in normal circumstances, thus avoiding multiple CompleteRx calls, while also being small enough
-  // that we don't use up too much stack space.
-  constexpr size_t kRxBuffersPerBatch = 256;
-  rx_buffer_t buffers[kRxBuffersPerBatch];
-  rx_buffer_part_t buffer_parts[std::size(buffers)];
+  // Use a FIDL arena here as it can allocate storage on the stack. This avoid any memory
+  // allocations that would happen with an fdf::Arena. Figure out the maximum possible arena size
+  // needed and use that.
+  constexpr size_t kRxBuffersPerBatch = netdriver::wire::kMaxRxBuffers;
+  constexpr size_t kArenaSize =
+      fidl::MaxSizeInChannel<netdriver::wire::NetworkDeviceIfcCompleteRxRequest,
+                             fidl::MessageDirection::kSending>();
+  fidl::Arena<kArenaSize> arena;
+  // Still need an fdf::Arena for the actual call.
+  fdf::Arena fdf_arena('NETD');
 
-  // Clear whatever buffers we're going to use
-  const size_t buffers_to_fill = std::min(std::size(buffers), frames.size());
-  memset(buffers, 0, buffers_to_fill * sizeof(buffers[0]));
-  memset(buffer_parts, 0, buffers_to_fill * sizeof(buffer_parts[0]));
+  const size_t buffers_to_fill = std::min(kRxBuffersPerBatch, frames.size());
+  fidl::VectorView<netdriver::wire::RxBuffer> buffers(arena, buffers_to_fill);
+  fidl::VectorView<netdriver::wire::RxBufferPart> buffer_parts(arena, buffers_to_fill);
 
   for (auto frame = frames.begin(); frame != frames.end();) {
     size_t count = 0;
-    for (; count < std::size(buffers) && frame != frames.end(); ++frame) {
-      if (!ShouldCompleteFrame(*frame)) {
+    for (; count < kRxBuffersPerBatch && frame != frames.end(); ++frame) {
+      if (!ShouldCompleteFrame(*frame)) [[unlikely]] {
         continue;
       }
       PopulateRxBuffer(buffers[count], buffer_parts[count], *frame);
       frame->ReleaseFromStorage();
       ++count;
     }
-    netdev_ifc_.CompleteRx(buffers, count);
+    if (count > 0) [[likely]] {
+      // The number of buffers might have changed as some frames should not be completed.
+      buffers.set_count(count);
+      auto status = netdev_ifc_.buffer(fdf_arena)->CompleteRx(buffers);
+      if (!status.ok()) {
+        LOGF(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
+        return;
+      }
+    }
   }
 }
 
 void NetworkDevice::CompleteTx(cpp20::span<Frame> frames, zx_status_t status) {
-  // Limit the number of results per call to CompleteTx. This allows us to avoid a memory allocation
-  // here just to hold these results. This value was chosen because it is unlikely to be exceeded
-  // in normal circumstances, thus avoiding multiple CompleteTx calls, while also being small enough
-  // that we don't use up too much stack space.
-  constexpr size_t kTxBuffersPerBatch = 256;
-  tx_result_t results[kTxBuffersPerBatch];
+  // Use a FIDL arena here as it can allocate storage on the stack. This avoid any memory
+  // allocations that would happen with an fdf::Arena. Figure out the maximum possible arena size
+  // needed and use that.
+  constexpr size_t kTxBuffersPerBatch = netdriver::wire::kMaxTxBuffers;
+  constexpr size_t kArenaSize =
+      fidl::MaxSizeInChannel<netdriver::wire::NetworkDeviceIfcCompleteTxRequest,
+                             fidl::MessageDirection::kSending>();
+  fidl::Arena<kArenaSize> arena;
+  // Still need an fdf::Arena for the actual call.
+  fdf::Arena fdf_arena('NETD');
 
-  // Clear whatever results we're going to use
-  const size_t results_to_fill = std::min(std::size(results), frames.size());
-  memset(results, 0, results_to_fill * sizeof(results[0]));
+  fidl::VectorView<netdriver::wire::TxResult> results(arena, kTxBuffersPerBatch);
 
+  const size_t results_to_fill = std::min(results.count(), frames.size());
   for (auto frame = frames.begin(); frame != frames.end();) {
     size_t count = 0;
-    for (; count < std::size(results) && frame != frames.end(); ++frame) {
-      if (unlikely(vmo_addrs_[frame->VmoId()] == nullptr)) {
+    for (; count < results_to_fill && frame != frames.end(); ++frame) {
+      if (vmo_addrs_[frame->VmoId()] == nullptr) [[unlikely]] {
         // Do not complete TX for frames that don't belong to the network device. These could be
         // remnants from after a stop that should not be completed or frames used internally by
         // the driver that made their way to this method.
@@ -148,57 +227,76 @@ void NetworkDevice::CompleteTx(cpp20::span<Frame> frames, zx_status_t status) {
       results[count].status = status;
       ++count;
     }
-    netdev_ifc_.CompleteTx(results, count);
+    if (count > 0) [[unlikely]] {
+      results.set_count(count);
+      auto status = netdev_ifc_.buffer(fdf_arena)->CompleteTx(results);
+      if (!status.ok()) {
+        LOGF(ERROR, "Failed to complete TX: %s", status.FormatDescription().c_str());
+        return;
+      }
+    }
   }
 }
 
 // NetworkDeviceImpl implementation
-void NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
-                                          network_device_impl_init_callback callback,
-                                          void* cookie) {
-  netdev_ifc_ = ::ddk::NetworkDeviceIfcProtocolClient(iface);
-  callbacks_->NetDevInit(Callbacks::InitTxn(callback, cookie));
+void NetworkDevice::Init(netdriver::wire::NetworkDeviceImplInitRequest* request, fdf::Arena& arena,
+                         InitCompleter::Sync& completer) {
+  {
+    std::lock_guard lock(mutex_);
+    netdev_ifc_.Bind(std::move(request->iface), netdev_dispatcher_);
+  }
+  callbacks_->NetDevInit(Callbacks::InitTxn(completer));
 }
 
-void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback callback,
-                                           void* cookie) {
-  std::lock_guard lock(started_mutex_);
-  started_ = true;
-  callbacks_->NetDevStart(Callbacks::StartTxn(callback, cookie));
+void NetworkDevice::Start(fdf::Arena& arena, StartCompleter::Sync& completer) {
+  bool expected = false;
+  if (!started_.compare_exchange_strong(expected, true)) {
+    LOGF(ERROR, "NetworkDevice already started, unexpected Start call");
+    return;
+  }
+  callbacks_->NetDevStart(Callbacks::StartTxn(completer));
 }
 
-void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback callback,
-                                          void* cookie) {
-  std::lock_guard lock(started_mutex_);
-  started_ = false;
-  callbacks_->NetDevStop(Callbacks::StopTxn(callback, cookie));
+void NetworkDevice::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
+  bool expected = true;
+  if (!started_.compare_exchange_strong(expected, false)) {
+    LOGF(ERROR, "NetworkDevice not started, unexpected Stop call");
+    return;
+  }
+  callbacks_->NetDevStop(Callbacks::StopTxn(completer));
 }
 
-void NetworkDevice::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
-  memset(out_info, 0, sizeof(*out_info));
-  callbacks_->NetDevGetInfo(out_info);
+void NetworkDevice::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  netdriver::DeviceImplInfo info;
+  callbacks_->NetDevGetInfo(&info);
+
+  completer.buffer(arena).Reply(fidl::ToWire(arena, std::move(info)));
 }
 
-void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list,
-                                             size_t buffers_count) {
-  std::lock_guard lock(started_mutex_);
-  if (!started_) {
+void NetworkDevice::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* request,
+                            fdf::Arena& arena, QueueTxCompleter::Sync& completer) {
+  if (!started_.load(std::memory_order_relaxed)) {
     // Do not queue TX on a device that is not started. This can happen when a device is being
     // stopped. For threading reasons the Network Device cannot hold locks when its calling into
     // our implementation so it's possible that it will attempt to queue TX after it has called
     // stop. These buffers will need to be completed with an error status.
-    std::vector<tx_result_t> results(buffers_count);
-    for (size_t i = 0; i < buffers_count; ++i) {
-      results[i].id = buffers_list[i].id;
+    fidl::VectorView<netdriver::wire::TxResult> results(arena, request->buffers.count());
+    for (size_t i = 0; i < request->buffers.count(); ++i) {
+      const netdriver::wire::TxBuffer& buffer = request->buffers[i];
+      results[i].id = buffer.id;
       results[i].status = ZX_ERR_UNAVAILABLE;
     }
-    netdev_ifc_.CompleteTx(results.data(), results.size());
+    auto status = netdev_ifc_.buffer(arena)->CompleteTx(results);
+    if (!status.ok()) {
+      LOGF(ERROR, "Failed to reject TX: %s", status.FormatDescription().c_str());
+      return;
+    }
     return;
   }
-  tx_frames_.reserve(buffers_count);
-  for (size_t i = 0; i < buffers_count; ++i) {
-    const tx_buffer_t& buffer = buffers_list[i];
-    const buffer_region_t& region = buffer.data_list[0];
+  tx_frames_.reserve(request->buffers.count());
+  for (size_t i = 0; i < request->buffers.count(); ++i) {
+    const netdriver::wire::TxBuffer& buffer = request->buffers[i];
+    const netdriver::wire::BufferRegion& region = buffer.data[0];
     tx_frames_.emplace_back(nullptr, region.vmo, region.offset, buffer.id,
                             vmo_addrs_[region.vmo] + region.offset, region.length,
                             buffer.meta.port);
@@ -209,16 +307,18 @@ void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list,
   tx_frames_.clear();
 }
 
-void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list,
-                                                  size_t buffers_count) {
-  callbacks_->NetDevQueueRxSpace(buffers_list, buffers_count, vmo_addrs_);
+void NetworkDevice::QueueRxSpace(netdriver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
+                                 fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) {
+  callbacks_->NetDevQueueRxSpace(cpp20::span(request->buffers.begin(), request->buffers.end()),
+                                 vmo_addrs_);
 }
 
-void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
-                                                network_device_impl_prepare_vmo_callback callback,
-                                                void* cookie) {
+void NetworkDevice::PrepareVmo(netdriver::wire::NetworkDeviceImplPrepareVmoRequest* request,
+                               fdf::Arena& arena, PrepareVmoCompleter::Sync& completer) {
   const zx_status_t status = [&]() {
     uint64_t size = 0;
+    const uint8_t id = request->id;
+    zx::vmo& vmo = request->vmo;
     zx_status_t status = vmo.get_size(&size);
     if (status != ZX_OK) {
       LOGF(ERROR, "Failed to get VMO size on prepare: %s", zx_status_get_string(status));
@@ -238,10 +338,12 @@ void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
     return callbacks_->NetDevPrepareVmo(id, std::move(vmo), vmo_addrs_[id], size);
   }();
 
-  callback(cookie, status);
+  completer.buffer(arena).Reply(status);
 }
 
-void NetworkDevice::NetworkDeviceImplReleaseVmo(uint8_t id) {
+void NetworkDevice::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoRequest* request,
+                               fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) {
+  const uint8_t id = request->id;
   callbacks_->NetDevReleaseVmo(id);
   zx_status_t status =
       zx::vmar::root_self()->unmap(reinterpret_cast<zx_vaddr_t>(vmo_addrs_[id]), vmo_lengths_[id]);
@@ -250,10 +352,13 @@ void NetworkDevice::NetworkDeviceImplReleaseVmo(uint8_t id) {
   }
   vmo_addrs_[id] = nullptr;
   vmo_lengths_[id] = 0;
+
+  completer.buffer(arena).Reply();
 }
 
-void NetworkDevice::NetworkDeviceImplSetSnoop(bool snoop) {
-  callbacks_->NetDevSetSnoopEnabled(snoop);
+void NetworkDevice::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
+                             fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
+  callbacks_->NetDevSetSnoopEnabled(request->snoop);
 }
 
 void NetworkDevice::on_fidl_error(fidl::UnbindInfo error) {
@@ -261,27 +366,48 @@ void NetworkDevice::on_fidl_error(fidl::UnbindInfo error) {
     LOGF(ERROR, "NetworkDevice fidl error: %s", error.FormatDescription().c_str());
     return;
   }
-  callbacks_->NetDevRelease();
+  // Begin or continue removal. Either the child node was removed because we initiated the removal
+  // or because the node unexpectedly went away.
+  std::lock_guard lock(mutex_);
+  node_controller_ = {};
+  RemoveLocked();
 }
 
-zx_status_t NetworkDevice::AddNetworkDevice(const char* deviceName) {
-  static zx_protocol_device_t network_device_ops = {
-      .version = DEVICE_OPS_VERSION,
-      .release = [](void* ctx) { static_cast<NetworkDevice*>(ctx)->Release(); },
-  };
-  device_add_args_t netDevArgs = {};
-  netDevArgs.version = DEVICE_ADD_ARGS_VERSION;
-  netDevArgs.name = deviceName;
-  netDevArgs.ctx = this;
-  netDevArgs.ops = &network_device_ops;
-  netDevArgs.proto_id = ZX_PROTOCOL_NETWORK_DEVICE_IMPL;
-  netDevArgs.proto_ops = netdev_proto_.ops;
+zx_status_t NetworkDevice::AddService(fdf::OutgoingDirectory& outgoing) {
+  outgoing_directory_ = &outgoing;
+  parent_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  netdriver::Service::InstanceHandler handler(
+      {.network_device_impl = [this](fdf::ServerEnd<netdriver::NetworkDeviceImpl> server) mutable {
+        std::lock_guard lock(mutex_);
+        binding_ = fdf::BindServer(
+            netdev_dispatcher_, std::move(server), this,
+            [this](NetworkDevice*, fidl::UnbindInfo info,
+                   fdf::ServerEnd<fuchsia_hardware_network_driver::NetworkDeviceImpl>) {
+              if (!info.is_user_initiated()) {
+                LOGF(WARNING, "NetworkDevice server unbound: %s", info.FormatDescription().c_str());
+              }
+              std::lock_guard lock(mutex_);
+              binding_.reset();
+              // Remove the entire network device at this point as it can no longer be used. This
+              // will trigger NetDevRelease to indicate to the owner of this object that the
+              // NetworkDevice is going away. It should be safe to do this even if this unbind is
+              // part of another Remove call as that is part of the removal process.
+              RemoveLocked();
+            });
+        server_connected_.Signal();
+      }});
 
-  return device_add(parent_, &netDevArgs, &device_);
+  auto status = outgoing.AddService<netdriver::Service>(std::move(handler));
+  if (status.is_error()) {
+    LOGF(ERROR, "Failed to add outgoing service: %s", status.status_string());
+    return status.status_value();
+  }
+
+  return ZX_OK;
 }
 
 bool NetworkDevice::ShouldCompleteFrame(const Frame& frame) {
-  if (unlikely(vmo_addrs_[frame.VmoId()] == nullptr)) {
+  if (vmo_addrs_[frame.VmoId()] == nullptr) [[unlikely]] {
     // Do not return frames with VMOs we are not aware of. This can happen if the frame
     // belongs to some internal VMO in the driver, by skipping it here we allow the driver
     // some relaxation in what it passes to us. It can also happen if we are attempting to
@@ -290,6 +416,52 @@ bool NetworkDevice::ShouldCompleteFrame(const Frame& frame) {
     return false;
   }
   return true;
+}
+
+void NetworkDevice::Unbind() {
+  std::lock_guard lock(mutex_);
+  if (binding_.has_value()) {
+    binding_->Unbind();
+  }
+}
+
+void NetworkDevice::RemoveService() {
+  std::lock_guard lock(mutex_);
+  if (outgoing_directory_) {
+    auto result = outgoing_directory_->RemoveService<netdriver::Service>(fdf::kDefaultInstance);
+    if (result.is_error()) {
+      LOGF(ERROR, "Failed to remove service from outgoing directory: %s", result.status_string());
+    }
+    outgoing_directory_ = nullptr;
+  }
+  // Because service removal is synchronous there is no asynchronous notification of completion.
+  // The removal process has to be continued here instead.
+  RemoveLocked();
+}
+
+void NetworkDevice::RemoveNode() {
+  std::lock_guard lock(mutex_);
+  if (node_controller_.is_valid()) {
+    auto result = node_controller_->Remove();
+    if (!result.ok()) {
+      LOGF(ERROR, "Controller node remove failed, FIDL error: %s",
+           result.FormatDescription().c_str());
+    }
+    // Don't destroy the node controller here, it needs to stay alive to call on_fidl_error to
+    // continue the removal procedure.
+  }
+}
+
+void NetworkDevice::Release() {
+  // Now that everything is shut down and removed, move back to the Released state. Don't hold any
+  // locks during the callback. The NetworkDevice object might be destroyed in the callback so any
+  // lock would then attempt to unlock a destroyed mutex when we exit this scope. The state
+  // transition happens before the callback for the same reason.
+  {
+    std::lock_guard lock(mutex_);
+    state_ = State::Released;
+  }
+  callbacks_->NetDevRelease();
 }
 
 }  // namespace wlan::drivers::components

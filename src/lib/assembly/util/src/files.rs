@@ -49,6 +49,8 @@ pub enum BootfsDestination {
     PowerManagerNodeConfig,
     /// The power manager thermal config.
     PowerManagerThermalConfig,
+    /// SSH keys for development access.
+    SshAuthorizedKeys,
     /// The zxcrypt config for the Storage subsystem.
     Zxcrypt,
     /// Variant specifically for making tests easier.
@@ -71,6 +73,7 @@ impl std::fmt::Display for BootfsDestination {
                 Self::CpuManagerNodeConfig => "config/cpu_manager/node_config.json",
                 Self::PowerManagerNodeConfig => "config/power_manager/node_config.json",
                 Self::PowerManagerThermalConfig => "config/power_manager/thermal_config.json",
+                Self::SshAuthorizedKeys => "data/ssh/authorized_keys",
                 Self::Zxcrypt => "config/zxcrypt",
                 Self::ForTest => "for-test",
             }

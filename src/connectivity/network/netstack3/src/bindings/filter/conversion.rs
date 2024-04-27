@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod actions;
 mod matchers;
 
 use std::collections::{BTreeMap, HashMap};
@@ -19,7 +20,52 @@ use crate::bindings::filter::{
     },
     CommitError,
 };
-use matchers::{ConversionResult, IpVersionMismatchError, TryConvertToCoreState as _};
+
+// The requirement or lack thereof that a particular resource's IP version (for
+// example, whether an address matcher is IPv4 or IPv6) must match the version
+// of the state that it is being added to.
+//
+// For a namespace with a specific IP domain, this is `IpVersionMustMatchState`;
+// for a namespace with an IP-agnostic domain, this is
+// `IpVersionCanDifferFromState`.
+#[derive(Clone, Copy)]
+enum IpVersionStrictness {
+    IpVersionMustMatchState,
+    IpVersionCanDifferFromState,
+}
+
+impl IpVersionStrictness {
+    pub(super) fn mismatch_result<T>(&self) -> Result<ConversionResult<T>, IpVersionMismatchError> {
+        match self {
+            IpVersionStrictness::IpVersionMustMatchState => Err(IpVersionMismatchError),
+            IpVersionStrictness::IpVersionCanDifferFromState => Ok(ConversionResult::Omit),
+        }
+    }
+}
+
+enum ConversionResult<CoreState> {
+    State(CoreState),
+    Omit,
+}
+
+struct IpVersionMismatchError;
+
+trait TryConvertToCoreState {
+    type CoreState<I: IpExt>;
+
+    /// Attempts to convert `self` to the associated `netstack3_core::filter::state` type.
+    ///
+    /// If the IP version with which the method is invoked does not match
+    /// `self` (for example, if `self` contains an IPv4-specific address matcher
+    /// and this method is called with `Ipv6`), returns either:
+    ///
+    ///   * Err(IpVersionMismatchError) if `ip_version_strictness` is `IpVersionMustMatchState`
+    ///   * Ok(ConversionResult::Omit) otherwise
+    fn try_convert<I: IpExt>(
+        self,
+        ip_version_strictness: IpVersionStrictness,
+    ) -> Result<ConversionResult<Self::CoreState<I>>, IpVersionMismatchError>;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 struct RoutinePriority {
@@ -71,19 +117,6 @@ struct NatRoutines<I: IpExt> {
 pub(super) struct State<I: IpExt> {
     ip_routines: IpRoutines<I>,
     nat_routines: NatRoutines<I>,
-}
-
-// The requirement or lack thereof that a particular resource's IP version (for
-// example, whether an address matcher is IPv4 or IPv6) must match the version
-// of the state that it is being added to.
-//
-// For a namespace with a specific IP domain, this is `IpVersionMustMatchState`;
-// for a namespace with an IP-agnostic domain, this is
-// `IpVersionCanDifferFromState`.
-#[derive(Clone, Copy)]
-enum IpVersionStrictness {
-    IpVersionMustMatchState,
-    IpVersionCanDifferFromState,
 }
 
 impl<I: IpExt> State<I> {
@@ -248,6 +281,16 @@ where
                         Err(e) => return Some(Err(e)),
                     };
                     netstack3_core::filter::Action::Jump(target)
+                }
+                fnet_filter_ext::Action::TransparentProxy(proxy) => {
+                    let proxy = match proxy.try_convert(ip_version_strictness) {
+                        Ok(ConversionResult::State(proxy)) => proxy,
+                        Ok(ConversionResult::Omit) => return None,
+                        Err(IpVersionMismatchError) => {
+                            return Some(Err(CommitError::RuleWithInvalidMatcher(rule_id)))
+                        }
+                    };
+                    netstack3_core::filter::Action::TransparentProxy(proxy)
                 }
             };
 

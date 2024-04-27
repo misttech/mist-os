@@ -54,8 +54,8 @@ impl ChildNameBase for InstancedChildName {
         Self::try_new(name, coll, instance)
     }
 
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &LongName {
+        &self.name
     }
 
     fn collection(&self) -> Option<&Name> {
@@ -92,14 +92,14 @@ impl InstancedChildName {
 
     /// Converts this child moniker into an instanced moniker.
     pub fn from_child_moniker(m: &ChildName, instance: IncarnationId) -> Self {
-        Self::try_new(m.name(), m.collection().map(|c| c.as_str()), instance)
+        Self::try_new(m.name().as_str(), m.collection().map(|c| c.as_str()), instance)
             .expect("child moniker is guaranteed to be valid")
     }
 
     /// Convert an InstancedChildName to an allocated ChildName
     /// without an InstanceId
     pub fn without_instance_id(&self) -> ChildName {
-        ChildName::try_new(self.name(), self.collection().map(|c| c.as_str()))
+        ChildName::try_new(self.name().as_str(), self.collection().map(|c| c.as_str()))
             .expect("moniker is guaranteed to be valid")
     }
 
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn instanced_child_monikers() {
         let m = InstancedChildName::try_new("test", None, 42).unwrap();
-        assert_eq!("test", m.name());
+        assert_eq!("test", m.name().as_str());
         assert_eq!(None, m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("test:42", format!("{}", m));
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(m, InstancedChildName::from_child_moniker(&"test".try_into().unwrap(), 42));
 
         let m = InstancedChildName::try_new("test", Some("coll"), 42).unwrap();
-        assert_eq!("test", m.name());
+        assert_eq!("test", m.name().as_str());
         assert_eq!(Some(&Name::new("coll").unwrap()), m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("coll:test:42", format!("{}", m));
@@ -186,7 +186,7 @@ mod tests {
             max_coll_length_part, max_name_length_part
         ))
         .expect("valid moniker");
-        assert_eq!(max_name_length_part, m.name());
+        assert_eq!(max_name_length_part, m.name().as_str());
         assert_eq!(Some(&Name::new(max_coll_length_part).unwrap()), m.collection());
         assert_eq!(42, m.instance());
 

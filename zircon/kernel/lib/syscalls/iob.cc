@@ -63,3 +63,29 @@ zx_status_t sys_iob_create(uint64_t options, user_in_ptr<const void> regions, ui
   }
   return result;
 }
+
+// zx_status_t zx_iob_allocate_id
+zx_status_t sys_iob_allocate_id(zx_handle_t handle, zx_iob_allocate_id_options_t options,
+                                uint32_t region_index, user_in_ptr<const void> blob_ptr,
+                                uint64_t blob_size, user_out_ptr<uint32_t> id) {
+  // No options are supported at this time.
+  if (options != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto* up = ProcessDispatcher::GetCurrent();
+
+  fbl::RefPtr<IoBufferDispatcher> iob;
+  zx_status_t status =
+      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &iob);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  zx::result<uint32_t> result =
+      iob->AllocateId(region_index, blob_ptr.reinterpret<const std::byte>(), blob_size);
+  if (result.is_error()) {
+    return result.status_value();
+  }
+  return id.copy_to_user(result.value());
+}

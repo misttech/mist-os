@@ -1,0 +1,21 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "vsock",
+            url: "fuchsia-pkg://fuchsia.com/vsock_service#meta/vsock_service.cm",
+            environment: "#core-env",
+        },
+    ],
+    offer: [
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-vsock",
+            to: "#vsock",
+            subdir: "vsock",
+        },
+    ],
+}

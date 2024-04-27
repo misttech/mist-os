@@ -12,6 +12,7 @@ fidl("fuchsia.bluetooth.le") {
   sources = [
     "advertising_data.fidl",
     "central.fidl",
+    "codec_delay.fidl",
     "connection_options.fidl",
     "iso.fidl",
     "overview.fidl",

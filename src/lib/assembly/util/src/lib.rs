@@ -57,7 +57,7 @@ where
         .with_context(|| format!("cannot serialize {}", json_path.display()))
 }
 
-/// Deserialize an instance of type T from an IO stream of JSON5.
+/// Deserialize an instance of type T from an IO stream of JSON or JSON5
 pub fn from_reader<R, T>(reader: &mut R) -> Result<T>
 where
     R: Read,
@@ -65,7 +65,21 @@ where
 {
     let mut data = String::default();
     reader.read_to_string(&mut data).context("Cannot read the config")?;
-    serde_json5::from_str(&data).context("Cannot parse the config")
+
+    // First parse the json5 to a `serde_json::Value`, which handles the syntax
+    // differences between json5 and json.
+    let value: serde_json::Value =
+        serde_json5::from_str(&data).context("Cannot parse the json5 config")?;
+
+    // Dump the Value into a JSON string.
+    let json = serde_json::to_string_pretty(&value)?;
+
+    // Re-parse using serde_json, which will throw errors when encountering
+    // maps when deserializing unit-type enum variants (serde_json5 doesn't do
+    // this).
+    // TODO: Remove this series of transformations after the following issue
+    // is fixed: https://github.com/google/serde_json5/issues/10
+    serde_json::from_str(&json).context("cannot parse the config using serde_json")
 }
 
 /// Helper fn to insert into an empty Option, or return an Error.

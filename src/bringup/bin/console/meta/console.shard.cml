@@ -53,6 +53,7 @@
         },
         {
             protocol: [
+                "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.ProfileResource",
             ],
@@ -146,7 +147,6 @@
             from: "#kernel_debug_broker",
             to: "#console-launcher",
             source_availability: "unknown",
-            availability: "optional",
         },
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
@@ -166,6 +166,7 @@
             ],
             from: "#role_manager",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             directory: "dev-topological",
@@ -197,6 +198,7 @@
             ],
             from: "#fshost",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -205,11 +207,13 @@
             ],
             from: "#fshost",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.device.NameProvider",
             from: "#device_name_provider",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.pty.Device",
@@ -221,6 +225,7 @@
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "#sysinfo",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
@@ -231,6 +236,7 @@
             protocol: "fuchsia.paver.Paver",
             from: "#paver",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -239,6 +245,7 @@
             ],
             from: "#sysmem",
             to: "#console-launcher",
+            source_availability: "unknown",
         },
         {
             protocol: [

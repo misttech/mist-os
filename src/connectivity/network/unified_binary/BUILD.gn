@@ -33,13 +33,11 @@ rustc_binary("network_unified_binary") {
 }
 
 config("config") {
-  if (!is_debug) {
-    # Add thinlto config if lto variants are not used.
-    if (!is_lto_variant) {
-      # Allow cross-crate optimization since each binary that is unified here is a
-      # different crate.
-      configs = [ "//build/config/lto:thinlto" ]
-    }
+  # Add thinlto config if lto variants are not used.
+  if (!is_lto_variant) {
+    # Allow cross-crate optimization since each binary that is unified here is a
+    # different crate.
+    configs = [ "//build/config/lto:thinlto" ]
   }
 
   visibility = [ ":*" ]

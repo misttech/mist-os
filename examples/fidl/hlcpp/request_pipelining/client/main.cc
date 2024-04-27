@@ -20,10 +20,10 @@ int main(int argc, const char** argv) {
   // [START non-pipelined]
   fuchsia::examples::EchoPtr echo;
   auto callback = [&](fidl::InterfaceHandle<fuchsia::examples::Echo> client_end) {
-    std::cout << "Got non pipelined response" << std::endl;
+    std::cout << "Got non pipelined response\n";
     echo.Bind(std::move(client_end));
     echo->EchoString("hello!", [&](std::string response) {
-      std::cout << "Got echo response " << response << std::endl;
+      std::cout << "Got echo response " << response << "\n";
       if (++num_responses == 2) {
         loop.Quit();
       }
@@ -36,13 +36,15 @@ int main(int argc, const char** argv) {
   fuchsia::examples::EchoPtr echo_pipelined;
   echo_launcher->GetEchoPipelined("pipelined: ", echo_pipelined.NewRequest());
   echo_pipelined->EchoString("hello!", [&](std::string response) {
-    std::cout << "Got echo response " << response << std::endl;
+    std::cout << "Got echo response " << response << "\n";
     if (++num_responses == 2) {
       loop.Quit();
     }
   });
   // [END pipelined]
 
+  std::cout << "Async loop starting\n";
   loop.Run();
+  std::cout << "Async loop finished\n";
   return num_responses == 2 ? 0 : 1;
 }

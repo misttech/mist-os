@@ -13,7 +13,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
-#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
 #include <lib/sync/cpp/completion.h>
@@ -39,83 +38,19 @@
 
 #include <fbl/ref_ptr.h>
 #include <wlan/common/channel.h>
+#include <wlan/drivers/fidl_bridge.h>
 #include <wlan/drivers/log.h>
 
 namespace wlan::drivers::wlansoftmac {
 
+using ::wlan::drivers::fidl_bridge::FidlErrorToStatus;
+
 SoftmacBinding::SoftmacBinding()
-    : unbind_lock_(std::make_shared<std::mutex>()), unbind_called_(std::make_shared<bool>(false)) {
+    : ethernet_proxy_lock_(std::make_shared<std::mutex>()),
+      unbind_lock_(std::make_shared<std::mutex>()),
+      unbind_called_(std::make_shared<bool>(false)) {
   WLAN_TRACE_DURATION();
-  ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
-
-  ethernet_proxy_lock_ = std::make_shared<std::mutex>();
-
-  // Create a dispatcher to serve the WlanSoftmacBridge protocol.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacbridge_server",
-        [](fdf_dispatcher_t*) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacbridge_server shutdown_handler");
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-
-    softmac_bridge_server_dispatcher_ = *std::move(dispatcher);
-  }
-
-  // Create a dispatcher to serve the WlanSoftmacIfc protocol.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifc_server",
-        [](fdf_dispatcher_t*) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacifc_server shutdown_handler");
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-
-    softmac_ifc_server_dispatcher_ = *std::move(dispatcher);
-  }
-
-  // Create a dispatcher for WlanSoftmac method calls to the parent device.
-  //
-  // The Unbind hook relies on client_dispatcher_ implementing a shutdown
-  // handler that performs the following steps in sequence.
-  //
-  //   - Asynchronously destroy softmac_ifc_bridge_
-  //   - Asynchronously call device_unbind_reply()
-  //
-  // Each step of the sequence must occur on its respective dispatcher
-  // to allow all queued task to complete.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
-        [&](fdf_dispatcher_t* client_dispatcher) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_client shutdown_handler");
-          // Every fidl::ServerBinding must be destroyed on the
-          // dispatcher its bound too.
-          async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
-            WLAN_LAMBDA_TRACE_DURATION("softmac_ifc_bridge reset + device_unbind_reply");
-            softmac_ifc_bridge_.reset();
-            device_unbind_reply(device_);
-          });
-          // Explicitly call destroy since Unbind() calls releases this dispatcher before
-          // calling ShutdownAsync().
-          fdf_dispatcher_destroy(client_dispatcher);
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating client dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-    client_dispatcher_ = *std::move(dispatcher);
-  }
 }
 
 // Disable thread safety analysis, as this is a part of device initialization.
@@ -169,29 +104,22 @@ void SoftmacBinding::Init() {
     device_init_reply(device_, status, nullptr);
     return;
   }
-  client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
+  client_ = fdf::SharedClient(std::move(endpoints->client), main_device_dispatcher_->get());
   linfo("Connected to WlanSoftmac service.");
 
   linfo("Starting up Rust WlanSoftmac...");
   auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
-      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
-       device = device_](zx_status_t status) {
-        WLAN_LAMBDA_TRACE_DURATION("startup_rust_completer");
+      [device = device_](zx_status_t status) {
+        WLAN_LAMBDA_TRACE_DURATION("startup_rust_completer + device_init_reply");
         if (status == ZX_OK) {
           linfo("Completed Rust WlanSoftmac startup.");
         } else {
           lerror("Failed to startup Rust WlanSoftmac: %s", zx_status_get_string(status));
         }
-
-        // device_init_reply() must be called on a driver framework managed
-        // dispatcher
-        async::PostTask(main_device_dispatcher, [device, status]() {
-          WLAN_LAMBDA_TRACE_DURATION("device_init_reply");
-          // Specify empty device_init_reply_args_t since SoftmacBinding
-          // does not currently support power or performance state
-          // information.
-          device_init_reply(device, status, nullptr);
-        });
+        // Specify empty device_init_reply_args_t since SoftmacBinding
+        // does not currently support power or performance state
+        // information.
+        device_init_reply(device, status, nullptr);
       });
 
   unbind_lock_->lock();
@@ -214,9 +142,9 @@ void SoftmacBinding::Init() {
 
   {
     std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
-    auto softmac_bridge = SoftmacBridge::New(
-        softmac_bridge_server_dispatcher_, std::move(completer), std::move(sta_shutdown_handler),
-        this, client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_);
+    auto softmac_bridge =
+        SoftmacBridge::New(std::move(completer), std::move(sta_shutdown_handler), this,
+                           client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_);
     if (softmac_bridge.is_error()) {
       lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
       device_init_reply(device_, softmac_bridge.error_value(), nullptr);
@@ -234,21 +162,26 @@ void SoftmacBinding::Unbind() {
 
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
+  auto softmac_ifc_bridge = softmac_ifc_bridge_.release();
+
+  // Synchronize SoftmacBridge::Stop returning before the StopCompleter
+  // calls destroys the SoftmacBridge.
   auto stop_returned = std::make_unique<libsync::Completion>();
   auto unowned_stop_returned = stop_returned.get();
+
   auto stop_completer = std::make_unique<StopCompleter>(
-      [softmac_bridge_server_dispatcher = softmac_bridge_server_dispatcher_.async_dispatcher(),
-       softmac_bridge, client_dispatcher = client_dispatcher_.release(),
-       stop_returned = std::move(stop_returned)]() mutable {
+      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(), softmac_bridge,
+       softmac_ifc_bridge, device = device_, stop_returned = std::move(stop_returned)]() mutable {
         WLAN_LAMBDA_TRACE_DURATION("StopCompleter");
-        async::PostTask(
-            softmac_bridge_server_dispatcher,
-            [softmac_bridge, client_dispatcher, stop_returned = std::move(stop_returned)]() {
-              WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
-              stop_returned->Wait();
-              delete softmac_bridge;
-              fdf_dispatcher_shutdown_async(client_dispatcher);
-            });
+        async::PostTask(main_device_dispatcher, [softmac_bridge, softmac_ifc_bridge, device,
+                                                 stop_returned = std::move(stop_returned)]() {
+          WLAN_LAMBDA_TRACE_DURATION(
+              "SoftmacBridge destruction + softmac_ifc_bridge reset + device_unbind_reply");
+          stop_returned->Wait();
+          delete softmac_bridge;
+          delete softmac_ifc_bridge;
+          device_unbind_reply(device);
+        });
       });
   softmac_bridge->Stop(std::move(stop_completer));
   unowned_stop_returned->Signal();
@@ -264,44 +197,86 @@ void SoftmacBinding::Release() {
 zx_status_t SoftmacBinding::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
-  if (info == nullptr)
+  if (info == nullptr) {
     return ZX_ERR_INVALID_ARGS;
-
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
   }
 
-  auto query_result = client_.sync().buffer(*std::move(arena))->Query();
-  if (!query_result.ok()) {
-    lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
-    return query_result.status();
-  }
-  if (query_result->is_error()) {
-    lerror("Failed getting query result (status %s)",
-           zx_status_get_string(query_result->error_value()));
-    return query_result->error_value();
-  }
+  *info = {
+      .features = ETHERNET_FEATURE_WLAN,
+      .mtu = 1500,
+      .netbuf_size = eth::BorrowedOperation<>::OperationSize(sizeof(ethernet_netbuf_t)),
+  };
 
-  memset(info, 0, sizeof(*info));
-  common::MacAddr(query_result->value()->sta_addr().data()).CopyTo(info->mac);
-  info->features = ETHERNET_FEATURE_WLAN;
+  auto result = [&, info]() -> fit::result<zx_status_t> {
+    zx_status_t status = ZX_OK;
+    {
+      // Use a libsync::Completion to make this call synchronous since
+      // SoftmacBinding::EthernetImplQuery does not provide a completer.
+      //
+      // This synchronous call is a potential risk for deadlock in the ethernet device. Deadlock is
+      // unlikely to occur because the third-party driver is unlikely to rely on a response from the
+      // ethernet device to respond to this request.
+      //
+      // Note: This method is called from an ethernet device dispatcher because this method is
+      // implemented with a Banjo binding.
+      libsync::Completion request_returned;
+      client_->Query().Then(
+          [&request_returned, &status,
+           info](fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::Query>& result) mutable {
+            if (result.is_error()) {
+              auto error = result.error_value();
+              lerror("Failed getting query result (FIDL error %s)", error);
+              status = FidlErrorToStatus(error);
+            } else {
+              common::MacAddr(result.value().sta_addr()->data()).CopyTo(info->mac);
+            }
+            request_returned.Signal();
+          });
+      request_returned.Wait();
+    }
+    if (status != ZX_OK) {
+      return fit::error(status);
+    }
 
-  auto query_mac_sublayer_result =
-      client_.sync().buffer(*std::move(arena))->QueryMacSublayerSupport();
-  if (!query_mac_sublayer_result.ok()) {
-    lerror("Failed getting mac sublayer result (FIDL error %s)",
-           query_mac_sublayer_result.status_string());
-    return query_mac_sublayer_result.status();
+    {
+      // Use a libsync::Completion to make this call synchronous since
+      // SoftmacBinding::EthernetImplQuery does not provide a completer.
+      //
+      // This synchronous call is a potential risk for deadlock in the ethernet device. Deadlock is
+      // unlikely to occur because the third-party driver is unlikely to rely on a response from the
+      // ethernet device to respond to this request.
+      //
+      // Note: This method is called from an ethernet device dispatcher because this method is
+      // implemented with a Banjo binding.
+      libsync::Completion request_returned;
+      client_->QueryMacSublayerSupport().Then(
+          [&request_returned, &status,
+           info](fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::QueryMacSublayerSupport>&
+                     result) mutable {
+            if (result.is_error()) {
+              auto error = result.error_value();
+              lerror("Failed getting mac sublayer result (FIDL error %s)", error);
+              status = FidlErrorToStatus(error);
+            } else {
+              if (result.value().resp().device().is_synthetic()) {
+                info->features |= ETHERNET_FEATURE_SYNTH;
+              }
+            }
+            request_returned.Signal();
+          });
+      request_returned.Wait();
+    }
+    if (status != ZX_OK) {
+      return fit::error(status);
+    }
+
+    return fit::ok();
+  }();
+
+  if (result.is_error()) {
+    *info = {};
+    return result.error_value();
   }
-  if (query_mac_sublayer_result->value()->resp.device.is_synthetic) {
-    info->features |= ETHERNET_FEATURE_SYNTH;
-  }
-
-  info->mtu = 1500;
-  info->netbuf_size = eth::BorrowedOperation<>::OperationSize(sizeof(ethernet_netbuf_t));
-
   return ZX_OK;
 }
 
@@ -351,18 +326,17 @@ void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* ne
   auto op = std::make_unique<eth::BorrowedOperation<>>(netbuf, callback, cookie,
                                                        sizeof(ethernet_netbuf_t));
 
-  // Post a task to `softmac_ifc_server_dispatcher_` to sequence queuing the Ethernet frame
-  // with other calls from `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The
-  // `SoftmacIfcBridge` class is not designed to be thread-safe. Making calls to its methods
-  // from different dispatchers could result in unexpected behavior.
-  async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(),
-                  [&, op = std::move(op), async_id]() {
-                    auto result = softmac_ifc_bridge_->EthernetTx(op.get(), async_id);
-                    if (!result.is_ok()) {
-                      WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
-                    }
-                    op->Complete(result.status_value());
-                  });
+  // Post a task to sequence queuing the Ethernet frame with other calls from
+  // `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The `SoftmacIfcBridge`
+  // class is not designed to be thread-safe. Making calls to its methods from
+  // different dispatchers could result in unexpected behavior.
+  async::PostTask(main_device_dispatcher_->async_dispatcher(), [&, op = std::move(op), async_id]() {
+    auto result = softmac_ifc_bridge_->EthernetTx(op.get(), async_id);
+    if (!result.is_ok()) {
+      WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
+    }
+    op->Complete(result.status_value());
+  });
 }
 
 zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
@@ -411,9 +385,9 @@ zx_status_t SoftmacBinding::Start(zx_handle_t softmac_ifc_bridge_client_handle,
       std::move(softmac_ifc_bridge_client_channel));
 
   unbind_lock_->lock();
-  auto softmac_ifc_bridge = SoftmacIfcBridge::New(softmac_ifc_server_dispatcher_, frame_processor,
-                                                  std::move(endpoints->server),
-                                                  std::move(softmac_ifc_bridge_client_endpoint));
+  auto softmac_ifc_bridge =
+      SoftmacIfcBridge::New(*main_device_dispatcher_, frame_processor, std::move(endpoints->server),
+                            std::move(softmac_ifc_bridge_client_endpoint));
   unbind_lock_->unlock();
 
   if (softmac_ifc_bridge.is_error()) {
@@ -422,18 +396,36 @@ zx_status_t SoftmacBinding::Start(zx_handle_t softmac_ifc_bridge_client_handle,
   }
   softmac_ifc_bridge_ = *std::move(softmac_ifc_bridge);
 
-  auto start_response =
-      client_.sync().buffer(*std::move(arena))->Start(std::move(endpoints->client));
-  if (!start_response.ok()) {
-    lerror("change channel failed (FIDL error %s)", start_response.status_string());
-    return start_response.status();
+  {
+    // Use a libsync::Completion to make this call synchronous since
+    // SoftmacBinding::Start does not provide a completer.
+    //
+    // This synchronous call is a potential risk for deadlock in the Rust portion of wlansoftmac.
+    // This will not lead to deadlock because the Rust portion of wlansoftmac only calls
+    // `WlanSoftmacBridge.Start` during its initialization which is before serving requests from
+    // SME and the C++ portion of wlansoftmac.
+    //
+    // Note: This method is called from a dispatcher dedicated to running the Rust portion of
+    // wlansoftmac.
+    auto status = ZX_OK;
+    auto request_returned = std::make_unique<libsync::Completion>();
+    client_->Start(std::move(endpoints->client))
+        .Then([&request_returned, &status, out_sme_channel](
+                  fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::Start>& result) mutable {
+          if (result.is_error()) {
+            auto error = result.error_value();
+            lerror("Failed getting start result (FIDL error %s)", error);
+            status = FidlErrorToStatus(error);
+          } else {
+            *out_sme_channel = std::move(result.value().sme_channel());
+          }
+          request_returned->Signal();
+        });
+    request_returned->Wait();
+    if (status != ZX_OK) {
+      return status;
+    }
   }
-  if (start_response->is_error()) {
-    lerror("change channel failed (status %s)",
-           zx_status_get_string(start_response->error_value()));
-    return start_response->error_value();
-  }
-  *out_sme_channel = std::move(start_response->value()->sme_channel);
 
   return ZX_OK;
 }

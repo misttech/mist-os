@@ -3,11 +3,26 @@
 # found in the LICENSE file.
 
 import("//sdk/ctf/build/internal/ctf.gni")
+import("//sdk/ctf/build/internal/ctf_releases.gni")
 import("//sdk/ctf/build/internal/platform_version.gni")
 
-generate_ctf_packages("packages_milestone") {
-  api_level = max_supported_api_level
-  manifest = "//prebuilt/ctf/f18/$host_platform/cts/package_archives.json"
+# Store accumulated packages.
+all_package_targets = []
+
+# Expand each CTF release into a ctf packages target.
+# Each release name is assumed to match the pattern /f[0-9]+/, where
+# the number denotes the release version.
+foreach(release, ctf_releases) {
+  target_name = "ctf_$release"
+  level = string_replace("##${release}", "##f", "")
+  assert(level != "##${release}",
+         "Unexpected release name (does not begin with 'f'): ${release}")
+  generate_ctf_packages(target_name) {
+    api_level = level
+    manifest =
+        "//prebuilt/ctf/$release/$host_platform/cts/package_archives.json"
+  }
+  all_package_targets += [ ":$target_name" ]
 }
 
 # To list all packages:
@@ -17,7 +32,11 @@ generate_ctf_packages("packages_milestone") {
 # To list all packages for a specific API level (e.g. 11):
 #   fx set core.x64 --with //sdk/ctf/release/packages
 #   fx gn ls out/default //sdk/ctf/release/packages:* | grep -E "(11)$"
+#
+# To diff code between current checkout and release $N:
+#   git fetch
+#   git diff origin/releases/f$N -- sdk/ctf/tests
 group("packages") {
   testonly = true
-  deps = [ ":packages_milestone" ]
+  deps = all_package_targets
 }

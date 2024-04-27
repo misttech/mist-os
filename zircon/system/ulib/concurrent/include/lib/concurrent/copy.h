@@ -148,7 +148,7 @@ class WellDefinedCopyable {
   // while in the middle of a shared read transaction.
   const T& unsynchronized_get() { return instance_; }
 
- private:
+ protected:
   T instance_;
 };
 

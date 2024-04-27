@@ -18,11 +18,10 @@ use fuchsia_inspect::{ArrayProperty, Property};
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{
     channel::mpsc::{self, Receiver, Sender},
-    future::LocalBoxFuture,
     lock::Mutex,
     prelude::*,
 };
-use power_broker_client::PowerElementContext;
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use std::{
     cell::{OnceCell, RefCell},
     rc::Rc,
@@ -67,7 +66,7 @@ struct ExecutionStateManagerInner {
     /// The context used to manage the execution state power element.
     execution_state: PowerElementContext,
     /// The FIDL proxy to the device used to trigger system suspend.
-    suspender: fhsuspend::SuspenderProxy,
+    suspender: Option<fhsuspend::SuspenderProxy>,
     /// The suspend state index that will be passed to the suspender when system suspend is
     /// triggered.
     suspend_state_index: u64,
@@ -89,7 +88,10 @@ struct ExecutionStateManager {
 
 impl ExecutionStateManager {
     /// Creates a new ExecutionStateManager.
-    fn new(execution_state: PowerElementContext, suspender: fhsuspend::SuspenderProxy) -> Self {
+    fn new(
+        execution_state: PowerElementContext,
+        suspender: Option<fhsuspend::SuspenderProxy>,
+    ) -> Self {
         Self {
             passive_dependency_token: execution_state.passive_dependency_token(),
             inner: Mutex::new(ExecutionStateManagerInner {
@@ -172,23 +174,32 @@ impl ExecutionStateManager {
                 return;
             }
 
+            // LINT.IfChange
             tracing::info!("Suspending");
+            // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
             listener.on_suspend();
 
-            let response = inner
-                .suspender
-                .suspend(&fhsuspend::SuspenderSuspendRequest {
-                    state_index: Some(inner.suspend_state_index),
-                    ..Default::default()
-                })
-                .await;
+            // LINT.IfChange
+            let response = if let Some(suspender) = inner.suspender.as_ref() {
+                Some(
+                    suspender
+                        .suspend(&fhsuspend::SuspenderSuspendRequest {
+                            state_index: Some(inner.suspend_state_index),
+                            ..Default::default()
+                        })
+                        .await,
+                )
+            } else {
+                None
+            };
             tracing::info!(?response, "Resuming");
+            // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
 
             listener.suspend_stats().update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
                 let stats = stats_opt.as_mut().expect("stats is uninitialized");
 
                 match response {
-                    Ok(Ok(res)) => {
+                    Some(Ok(Ok(res))) => {
                         stats.last_time_in_suspend = res.suspend_duration;
                         stats.last_time_in_suspend_operations = res.suspend_overhead;
 
@@ -199,13 +210,16 @@ impl ExecutionStateManager {
                             stats.fail_count = stats.fail_count.map(|c| c + 1);
                         }
                     }
-                    error => {
+                    Some(error) => {
                         tracing::warn!(?error, "Failed to suspend");
                         stats.fail_count = stats.fail_count.map(|c| c + 1);
 
                         if let Ok(Err(error)) = error {
                             stats.last_failed_error = Some(error);
                         }
+                    }
+                    None => {
+                        tracing::warn!("No suspender available, suspend was a no-op");
                     }
                 }
                 true
@@ -318,81 +332,6 @@ impl SuspendStatsManager {
     }
 }
 
-fn default_update_fn<'a>(
-    power_element: &'a PowerElementContext,
-) -> Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()> + 'a> {
-    Box::new(move |new_power_level: fbroker::PowerLevel| {
-        async move {
-            let element_name = power_element.name();
-
-            tracing::debug!(
-                ?element_name,
-                ?new_power_level,
-                "default_update_fn: updating current level"
-            );
-
-            let res = power_element.current_level.update(new_power_level).await;
-            if let Err(error) = res {
-                tracing::warn!(
-                    ?element_name,
-                    ?error,
-                    "default_update_fn: updating current level failed"
-                );
-            }
-        }
-        .boxed_local()
-    })
-}
-
-async fn run_power_element<'a>(
-    element_name: &'a str,
-    required_level: &'a fbroker::RequiredLevelProxy,
-    initial_level: fbroker::PowerLevel,
-    inspect_node: fuchsia_inspect::Node,
-    update_fn: Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()> + 'a>,
-) {
-    let mut last_required_level = initial_level;
-    let power_level_node = inspect_node.create_uint("power_level", last_required_level.into());
-
-    loop {
-        tracing::debug!(
-            ?element_name,
-            ?last_required_level,
-            "run_power_element: waiting for new level"
-        );
-        match required_level.watch().await {
-            Ok(Ok(required_level)) => {
-                tracing::debug!(
-                    ?element_name,
-                    ?required_level,
-                    ?last_required_level,
-                    "run_power_element: new level requested"
-                );
-                if required_level == last_required_level {
-                    tracing::debug!(
-                        ?element_name,
-                        ?required_level,
-                        ?last_required_level,
-                        "run_power_element: required level has not changed, skipping."
-                    );
-                    continue;
-                }
-
-                update_fn(required_level).await;
-                power_level_node.set(required_level.into());
-                last_required_level = required_level;
-            }
-            error => {
-                tracing::warn!(
-                    ?element_name,
-                    ?error,
-                    "run_power_element: watch_required_level failed"
-                )
-            }
-        }
-    }
-}
-
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
 /// APIs.
 pub struct SystemActivityGovernor {
@@ -404,18 +343,16 @@ pub struct SystemActivityGovernor {
     full_wake_handling: PowerElementContext,
     /// The context used to manage the wake handling power element.
     wake_handling: PowerElementContext,
-    /// The context used to manage the execution resume latency power element.
-    execution_resume_latency: PowerElementContext,
+    /// Resume latency information, if available.
+    resume_latency_ctx: Option<Rc<ResumeLatencyContext>>,
     /// The manager used to report suspend stats to inspect and clients of
     /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
-    /// The collection of resume latencies supported by the suspender.
-    resume_latencies: Vec<zx::sys::zx_duration_t>,
     /// The collection of ActivityGovernorListener that have registered through
     /// fuchsia.power.system.ActivityGovernor/RegisterListener.
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
     /// The manager used to modify execution_state and trigger suspend.
-    execution_state_manager: ExecutionStateManager,
+    execution_state_manager: Rc<ExecutionStateManager>,
     /// The context used to manage the boot_control power element.
     boot_control: PowerElementContext,
 }
@@ -424,7 +361,7 @@ impl SystemActivityGovernor {
     pub async fn new(
         topology: &fbroker::TopologyProxy,
         inspect_root: fuchsia_inspect::Node,
-        suspender: fhsuspend::SuspenderProxy,
+        suspender: Option<fhsuspend::SuspenderProxy>,
     ) -> Result<Rc<Self>> {
         let execution_state = PowerElementContext::builder(
             topology,
@@ -508,29 +445,11 @@ impl SystemActivityGovernor {
         .await
         .expect("PowerElementContext encountered error while building wake_handling");
 
-        let resp = suspender
-            .get_suspend_states()
-            .await
-            .expect("FIDL error encountered while calling Suspender")
-            .expect("Suspender returned error when getting suspend states");
-        let suspend_states =
-            resp.suspend_states.expect("Suspend HAL did not return any suspend states");
-        tracing::info!(?suspend_states, "Got suspend states from suspend HAL");
-
-        let resume_latencies: Vec<_> = suspend_states
-            .iter()
-            .map(|s| s.resume_latency.expect("resume_latency not given"))
-            .collect();
-        let latency_count = resume_latencies.len().try_into()?;
-
-        let execution_resume_latency = PowerElementContext::builder(
-            topology,
-            "execution_resume_latency",
-            &Vec::from_iter(0..latency_count),
-        )
-        .build()
-        .await
-        .expect("PowerElementContext encountered error while building execution_resume_latency");
+        let resume_latency_ctx = if let Some(suspender) = &suspender {
+            Some(Rc::new(ResumeLatencyContext::new(suspender, topology).await?))
+        } else {
+            None
+        };
 
         let suspend_stats = SuspendStatsManager::new(inspect_root.create_child("suspend_stats"));
 
@@ -539,11 +458,13 @@ impl SystemActivityGovernor {
             application_activity,
             full_wake_handling,
             wake_handling,
-            execution_resume_latency,
-            resume_latencies,
+            resume_latency_ctx,
             suspend_stats,
             listeners: RefCell::new(Vec::new()),
-            execution_state_manager: ExecutionStateManager::new(execution_state, suspender),
+            execution_state_manager: Rc::new(ExecutionStateManager::new(
+                execution_state,
+                suspender,
+            )),
             boot_control,
         }))
     }
@@ -601,7 +522,7 @@ impl SystemActivityGovernor {
                 &element_name,
                 &required_level,
                 ExecutionStateLevel::Inactive.into_primitive(),
-                execution_state_node,
+                Some(execution_state_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let sag = sag.clone();
                     let mut execution_state_suspend_signaller =
@@ -632,7 +553,7 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
-            let update_fn = Rc::new(default_update_fn(&this.application_activity));
+            let update_fn = Rc::new(basic_update_fn_factory(&this.application_activity));
 
             tracing::info!("System is booting. Acquiring boot control lease.");
             let boot_control_lease = this
@@ -648,7 +569,7 @@ impl SystemActivityGovernor {
                 this.application_activity.name(),
                 &this.application_activity.required_level,
                 ApplicationActivityLevel::Inactive.into_primitive(),
-                application_activity_node,
+                Some(application_activity_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let update_fn = update_fn.clone();
                     let boot_control_lease = boot_control_lease.clone();
@@ -684,8 +605,8 @@ impl SystemActivityGovernor {
                 &this.full_wake_handling.name(),
                 &this.full_wake_handling.required_level,
                 FullWakeHandlingLevel::Inactive.into_primitive(),
-                full_wake_handling_node,
-                default_update_fn(&this.full_wake_handling),
+                Some(full_wake_handling_node),
+                basic_update_fn_factory(&this.full_wake_handling),
             )
             .await;
         })
@@ -701,8 +622,8 @@ impl SystemActivityGovernor {
                 this.wake_handling.name(),
                 &this.wake_handling.required_level,
                 WakeHandlingLevel::Inactive.into_primitive(),
-                wake_handling_node,
-                default_update_fn(&this.wake_handling),
+                Some(wake_handling_node),
+                basic_update_fn_factory(&this.wake_handling),
             )
             .await;
         })
@@ -710,63 +631,14 @@ impl SystemActivityGovernor {
     }
 
     fn run_execution_resume_latency(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
-        let execution_resume_latency_node = inspect_node.create_child("execution_resume_latency");
-        let initial_level = 0;
-        let this = self.clone();
-
-        let resume_latencies_node = execution_resume_latency_node
-            .create_int_array("resume_latencies", self.resume_latencies.len());
-        for (i, val) in self.resume_latencies.iter().enumerate() {
-            resume_latencies_node.set(i, *val);
-        }
-
-        execution_resume_latency_node.record(resume_latencies_node);
-        let resume_latency_node = Rc::new(
-            execution_resume_latency_node.create_int("resume_latency", self.resume_latencies[0]),
-        );
-
-        fasync::Task::local(async move {
-            let sag = this.clone();
-            let update_fn = Rc::new(default_update_fn(&this.execution_resume_latency));
-
-            run_power_element(
-                this.execution_resume_latency.name(),
-                &this.execution_resume_latency.required_level,
+        if let Some(resume_latency_ctx) = &self.resume_latency_ctx {
+            let initial_level = 0;
+            resume_latency_ctx.clone().run(
+                self.execution_state_manager.clone(),
                 initial_level,
-                execution_resume_latency_node,
-                Box::new(move |new_power_level: fbroker::PowerLevel| {
-                    let sag = sag.clone();
-                    let update_fn = update_fn.clone();
-                    let resume_latency_node = resume_latency_node.clone();
-
-                    async move {
-                        // new_power_level for execution_resume_latency is an index into
-                        // the list of resume latencies returned by the suspend HAL.
-
-                        // Before other power elements are informed of the new power level,
-                        // update the value that will be sent to the suspend HAL when suspension
-                        // is triggered to avoid data races.
-                        if (new_power_level as usize) < sag.resume_latencies.len() {
-                            sag.execution_state_manager
-                                .set_suspend_state_index(new_power_level.into())
-                                .await;
-                        }
-
-                        update_fn(new_power_level).await;
-
-                        // After other power elements are informed of the new power level,
-                        // update Inspect to account for the new resume latency value.
-                        let power_level = new_power_level as usize;
-                        if power_level < sag.resume_latencies.len() {
-                            resume_latency_node.set(sag.resume_latencies[power_level]);
-                        }
-                    }
-                    .boxed_local()
-                }),
-            )
-            .await;
-        })
-        .detach();
+                inspect_node.create_child("execution_resume_latency"),
+            );
+        }
     }
 
     async fn run_fidl_server(self: &Rc<Self>) -> Result<()> {
@@ -803,9 +675,9 @@ impl SystemActivityGovernor {
         self: Rc<Self>,
         mut stream: fsystem::ActivityGovernorRequestStream,
     ) {
-        while let Ok(Some(request)) = stream.try_next().await {
+        while let Some(request) = stream.next().await {
             match request {
-                fsystem::ActivityGovernorRequest::GetPowerElements { responder } => {
+                Ok(fsystem::ActivityGovernorRequest::GetPowerElements { responder }) => {
                     let result = responder.send(fsystem::PowerElements {
                         execution_state: Some(fsystem::ExecutionState {
                             passive_dependency_token: Some(
@@ -831,16 +703,10 @@ impl SystemActivityGovernor {
                             ),
                             ..Default::default()
                         }),
-                        execution_resume_latency: Some(fsystem::ExecutionResumeLatency {
-                            passive_dependency_token: Some(
-                                self.execution_resume_latency.passive_dependency_token(),
-                            ),
-                            active_dependency_token: Some(
-                                self.execution_resume_latency.active_dependency_token(),
-                            ),
-                            resume_latencies: Some(self.resume_latencies.clone()),
-                            ..Default::default()
-                        }),
+                        execution_resume_latency: self
+                            .resume_latency_ctx
+                            .as_ref()
+                            .map(|r| r.to_fidl()),
                         ..Default::default()
                     });
 
@@ -851,7 +717,7 @@ impl SystemActivityGovernor {
                         );
                     }
                 }
-                fsystem::ActivityGovernorRequest::RegisterListener { responder, payload } => {
+                Ok(fsystem::ActivityGovernorRequest::RegisterListener { responder, payload }) => {
                     match payload.listener {
                         Some(listener) => {
                             self.listeners.borrow_mut().push(listener.into_proxy().unwrap());
@@ -860,8 +726,11 @@ impl SystemActivityGovernor {
                     }
                     let _ = responder.send();
                 }
-                fsystem::ActivityGovernorRequest::_UnknownMethod { ordinal, .. } => {
+                Ok(fsystem::ActivityGovernorRequest::_UnknownMethod { ordinal, .. }) => {
                     tracing::warn!(?ordinal, "Unknown ActivityGovernorRequest method");
+                }
+                Err(error) => {
+                    tracing::error!(?error, "Error handling ActivityGovernor request stream");
                 }
             }
         }
@@ -907,5 +776,119 @@ impl SuspendResumeListener for SystemActivityGovernor {
         for l in listeners {
             let _ = l.on_resume().await;
         }
+    }
+}
+
+struct ResumeLatencyContext {
+    /// The context used to manage the execution resume latency power element.
+    execution_resume_latency: PowerElementContext,
+    /// The collection of resume latencies supported by the suspender.
+    resume_latencies: Vec<zx::sys::zx_duration_t>,
+}
+
+impl ResumeLatencyContext {
+    async fn new(
+        suspender: &fhsuspend::SuspenderProxy,
+        topology: &fbroker::TopologyProxy,
+    ) -> Result<Self> {
+        let resp = suspender
+            .get_suspend_states()
+            .await
+            .expect("FIDL error encountered while calling Suspender")
+            .expect("Suspender returned error when getting suspend states");
+        let suspend_states =
+            resp.suspend_states.expect("Suspend HAL did not return any suspend states");
+        tracing::info!(?suspend_states, "Got suspend states from suspend HAL");
+
+        let resume_latencies: Vec<_> = suspend_states
+            .iter()
+            .map(|s| s.resume_latency.expect("resume_latency not given"))
+            .collect();
+        let latency_count = resume_latencies.len().try_into()?;
+
+        let execution_resume_latency = PowerElementContext::builder(
+            topology,
+            "execution_resume_latency",
+            &Vec::from_iter(0..latency_count),
+        )
+        .build()
+        .await
+        .expect("PowerElementContext encountered error while building execution_resume_latency");
+
+        Ok(Self { resume_latencies, execution_resume_latency })
+    }
+
+    fn to_fidl(&self) -> fsystem::ExecutionResumeLatency {
+        fsystem::ExecutionResumeLatency {
+            passive_dependency_token: Some(
+                self.execution_resume_latency.passive_dependency_token(),
+            ),
+            active_dependency_token: Some(self.execution_resume_latency.active_dependency_token()),
+            resume_latencies: Some(self.resume_latencies.clone()),
+            ..Default::default()
+        }
+    }
+
+    fn run(
+        self: Rc<Self>,
+        execution_state_manager: Rc<ExecutionStateManager>,
+        initial_level: u8,
+        execution_resume_latency_node: fuchsia_inspect::Node,
+    ) {
+        let resume_latencies_node = execution_resume_latency_node
+            .create_int_array("resume_latencies", self.resume_latencies.len());
+        for (i, val) in self.resume_latencies.iter().enumerate() {
+            resume_latencies_node.set(i, *val);
+        }
+
+        execution_resume_latency_node.record(resume_latencies_node);
+        let resume_latency_node = Rc::new(
+            execution_resume_latency_node.create_int("resume_latency", self.resume_latencies[0]),
+        );
+
+        let this = self.clone();
+        fasync::Task::local(async move {
+            let update_fn = Rc::new(basic_update_fn_factory(&this.execution_resume_latency));
+
+            let resume_latency_ctx = this.clone();
+            run_power_element(
+                this.execution_resume_latency.name(),
+                &this.execution_resume_latency.required_level,
+                initial_level,
+                Some(execution_resume_latency_node),
+                Box::new(move |new_power_level: fbroker::PowerLevel| {
+                    let this = resume_latency_ctx.clone();
+                    let execution_state_manager = execution_state_manager.clone();
+                    let update_fn = update_fn.clone();
+                    let resume_latency_node = resume_latency_node.clone();
+
+                    async move {
+                        // new_power_level for execution_resume_latency is an index into
+                        // the list of resume latencies returned by the suspend HAL.
+
+                        // Before other power elements are informed of the new power level,
+                        // update the value that will be sent to the suspend HAL when suspension
+                        // is triggered to avoid data races.
+                        if (new_power_level as usize) < this.resume_latencies.len() {
+                            execution_state_manager
+                                .set_suspend_state_index(new_power_level.into())
+                                .await;
+                        }
+
+                        update_fn(new_power_level).await;
+
+                        // After other power elements are informed of the new power level,
+                        // update Inspect to account for the new resume latency value.
+                        let power_level = new_power_level as usize;
+                        if power_level < this.resume_latencies.len() {
+                            resume_latency_node.set(this.resume_latencies[power_level]);
+                        }
+                    }
+                    .boxed_local()
+                }),
+            )
+            .await;
+        })
+        .detach();
     }
 }

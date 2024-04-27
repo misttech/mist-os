@@ -329,6 +329,10 @@ zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device, const 
                                                      const char* protocol_name,
                                                      fdf_handle_t request);
 
+// Opens a connection to the specified protocol in driver's incoming namespace.
+// See |fdio_service_connect_at| for more information.
+zx_status_t device_connect_ns_protocol(zx_device_t* device, const char* protocol_name,
+                                       zx_handle_t request);
 // Device Metadata Support
 
 // retrieves metadata for a specific device

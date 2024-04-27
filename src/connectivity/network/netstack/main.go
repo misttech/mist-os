@@ -662,13 +662,29 @@ func Main() {
 		)
 	}
 	{
+		tokenV4, err := zx.NewEvent(0 /* options */)
+		if err != nil {
+			panic("cannot initialize a zircon event")
+		}
 		stubV4 := routesAdmin.RouteTableV4WithCtxStub{
 			Impl: &routesAdminRouteTableV4Impl{
+				routesAdminMainRouteTable: routesAdminMainRouteTable{
+					tableId: v4MainTableId,
+					token:   tokenV4,
+				},
 				ns: ns,
 			},
 		}
+		tokenV6, err := zx.NewEvent(0 /* options */)
+		if err != nil {
+			panic("cannot initialize a zircon event")
+		}
 		stubV6 := routesAdmin.RouteTableV6WithCtxStub{
 			Impl: &routesAdminRouteTableV6Impl{
+				routesAdminMainRouteTable: routesAdminMainRouteTable{
+					tableId: v6MainTableId,
+					token:   tokenV6,
+				},
 				ns: ns,
 			},
 		}

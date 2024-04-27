@@ -11,6 +11,7 @@
 
 #include <hwreg/bitfields.h>
 
+#define VPU_VIU_MISC_CTRL0 (0x1a06 << 2)
 #define VPU_VIU_OSD1_CTRL_STAT (0x1a10 << 2)
 #define VPU_VIU_OSD1_COLOR_ADDR (0x1a11 << 2)
 #define VPU_VIU_OSD1_COLOR (0x1a12 << 2)

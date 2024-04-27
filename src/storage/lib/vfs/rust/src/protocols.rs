@@ -4,12 +4,8 @@
 
 use {
     crate::{
-        common::{io2_conversions, CreationMode},
-        directory::DirectoryOptions,
-        file::FileOptions,
-        node::NodeOptions,
-        service::ServiceOptions,
-        symlink::SymlinkOptions,
+        common::CreationMode, directory::DirectoryOptions, file::FileOptions, node::NodeOptions,
+        service::ServiceOptions, symlink::SymlinkOptions,
     },
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
@@ -265,13 +261,13 @@ impl ProtocolsExt for fio::OpenFlags {
         } else {
             let mut rights = fio::Operations::GET_ATTRIBUTES | fio::Operations::CONNECT;
             if self.contains(fio::OpenFlags::RIGHT_READABLE) {
-                rights |= fio::Operations::READ_BYTES | fio::R_STAR_DIR;
+                rights |= fio::R_STAR_DIR;
             }
             if self.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-                rights |= fio::Operations::WRITE_BYTES | fio::W_STAR_DIR;
+                rights |= fio::W_STAR_DIR;
             }
             if self.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-                rights |= fio::Operations::EXECUTE | fio::X_STAR_DIR;
+                rights |= fio::X_STAR_DIR;
             }
             Some(rights)
         }
@@ -323,7 +319,20 @@ impl ProtocolsExt for fio::OpenFlags {
             return Err(Status::NOT_SUPPORTED);
         }
 
-        Ok(DirectoryOptions { rights: io2_conversions::io1_to_io2(flags) })
+        // Map io1 OpenFlags::RIGHT_* flags to the corresponding set of io2 rights. Using Open1
+        // requires GET_ATTRIBUTES, as this was previously an privileged operation.
+        let mut rights = fio::Rights::GET_ATTRIBUTES;
+        if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+            rights |= fio::R_STAR_DIR;
+        }
+        if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            rights |= fio::W_STAR_DIR;
+        }
+        if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+            rights |= fio::X_STAR_DIR;
+        }
+
+        Ok(DirectoryOptions { rights })
     }
 
     fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
@@ -404,11 +413,16 @@ impl ToFileOptions for fio::ConnectionProtocols {
             return Err(Status::INVALID_ARGS);
         }
 
-        Ok(FileOptions {
-            // If is_file_allowed() returned true, there must be rights.
-            rights: self.rights().unwrap(),
-            is_append: self.is_append(),
-        })
+        // If is_file_allowed() returned true, there must be rights. We downscope the resulting
+        // rights to only include those which apply to files.
+        let rights = self.rights().unwrap()
+            & (fio::Rights::GET_ATTRIBUTES
+                | fio::Rights::UPDATE_ATTRIBUTES
+                | fio::Rights::READ_BYTES
+                | fio::Rights::WRITE_BYTES
+                | fio::Rights::EXECUTE);
+
+        Ok(FileOptions { rights, is_append: self.is_append() })
     }
 }
 

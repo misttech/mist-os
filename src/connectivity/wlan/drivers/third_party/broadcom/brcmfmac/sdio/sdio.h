@@ -554,9 +554,9 @@ struct brcmf_sdio_vmo_data {
 
 struct brcmf_sdio_rx_tx_data {
   // VMOs
-  brcmf_sdio_vmo_data vmos[MAX_VMOS] __TA_GUARDED(vmos_mutex);
+  brcmf_sdio_vmo_data vmos[fuchsia_hardware_network_driver::kMaxVmos] __TA_GUARDED(vmos_mutex);
   std::mutex vmos_mutex;
-  std::array<uint8_t*, MAX_VMOS> vmo_addrs;
+  std::array<uint8_t*, fuchsia_hardware_network_driver::kMaxVmos> vmo_addrs;
 
   // Frame storage for receiving before we have queued RX space from netdev
   wlan::drivers::components::FrameStorage rx_space;

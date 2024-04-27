@@ -386,17 +386,17 @@ class TestController : public Controller {
     // Create a fake bus.
     auto fake_bus = std::make_unique<FakeBus>(support_native_command_queuing_);
 
-    auto dispatcher =
-        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                            "sata-background-init", [](fdf_dispatcher_t*) {});
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sata-background-init",
+        [this](fdf_dispatcher_t*) { test_shutdown_completion_.Signal(); });
     if (dispatcher.is_error()) {
       return dispatcher.take_error();
     }
-    dispatcher_ = *std::move(dispatcher);
+    test_dispatcher_ = *std::move(dispatcher);
 
     // Background work to emulate a SATA device on the fake bus responding to an IDENTIFY DEVICE
     // command.
-    async::PostTask(dispatcher_.async_dispatcher(), [this, fake_bus = fake_bus.get()] {
+    async::PostTask(test_dispatcher_.async_dispatcher(), [this, fake_bus = fake_bus.get()] {
       Port* port = this->port(FakeBus::kTestPortNumber);
       const SataTransaction* command;
       while (true) {
@@ -430,8 +430,19 @@ class TestController : public Controller {
     return zx::ok(std::move(fake_bus));
   }
 
+  void PrepareStop(fdf::PrepareStopCompleter completer) override {
+    if (test_dispatcher_.get()) {
+      test_dispatcher_.ShutdownAsync();
+      test_shutdown_completion_.Wait();
+    }
+    Shutdown();
+    completer(zx::ok());
+  }
+
  private:
-  fdf::Dispatcher dispatcher_;
+  fdf::Dispatcher test_dispatcher_;
+  // Signaled when test_dispatcher_ is shut down.
+  libsync::Completion test_shutdown_completion_;
 };
 
 bool TestController::support_native_command_queuing_;
@@ -558,8 +569,7 @@ TEST_P(AhciTest, SataDeviceRead) {
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 }
 
-// TODO(b/324291694): Re-enable this test after switching to using DF's dispatcher threads.
-TEST_P(AhciTest, DISABLED_ShutdownWaitsForTransactionsInFlight) {
+TEST_P(AhciTest, ShutdownWaitsForTransactionsInFlight) {
   Port* port = dut_->port(FakeBus::kTestPortNumber);
 
   // Set up a transaction that will timeout in 5 seconds.
@@ -585,25 +595,10 @@ TEST_P(AhciTest, DISABLED_ShutdownWaitsForTransactionsInFlight) {
   // True means there are running command(s).
   EXPECT_TRUE(port->Complete());
 
-  bool shutdown_complete = false;
-  zx::duration shutdown_duration;
+  zx::time time = zx::clock::get_monotonic();
+  dut_->Shutdown();
+  zx::duration shutdown_duration = zx::clock::get_monotonic() - time;
 
-  std::thread shutdown_thread([&]() {
-    zx::time time = zx::clock::get_monotonic();
-    dut_->Shutdown();
-    shutdown_duration = zx::clock::get_monotonic() - time;
-    shutdown_complete = true;
-  });
-
-  // TODO(https://fxbug.dev/42061061): This should be handled by a watchdog in the driver.
-  std::thread watchdog_thread([&]() {
-    while (!shutdown_complete) {
-      dut_->SignalWorker();
-    }
-  });
-
-  shutdown_thread.join();
-  watchdog_thread.join();
   // The shutdown duration should be around 5 seconds (+/-). Conservatively check for > 2.5 seconds.
   EXPECT_GT(shutdown_duration, zx::msec(2500));
 

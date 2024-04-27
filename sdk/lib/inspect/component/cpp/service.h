@@ -70,6 +70,25 @@ class TreeServer final : public fidl::WireServer<fuchsia_inspect::Tree> {
   cpp17::optional<fidl::ServerBindingRef<fuchsia_inspect::Tree>> binding_;
 };
 
+class TreeNameIterator final : public fidl::WireServer<fuchsia_inspect::TreeNameIterator> {
+ public:
+  // Start a server that deletes itself on unbind.
+  static void StartSelfManagedServer(async_dispatcher_t* dispatcher,
+                                     fidl::ServerEnd<fuchsia_inspect::TreeNameIterator>&& request,
+                                     std::vector<std::string> names);
+
+  // Get the next batch of names. Names are sent in batches of `kMaxTreeNamesListSize`,
+  // which is defined with the rest of the FIDL protocol.
+  void GetNext(GetNextCompleter::Sync& completer) override;
+
+ private:
+  TreeNameIterator(std::vector<std::string>&& names) : names_(std::move(names)) {}
+
+  cpp17::optional<fidl::ServerBindingRef<fuchsia_inspect::TreeNameIterator>> binding_;
+  std::vector<std::string> names_;
+  uint64_t current_index_ = 0;
+};
+
 }  // namespace inspect
 
 #endif  // LIB_INSPECT_COMPONENT_CPP_SERVICE_H_

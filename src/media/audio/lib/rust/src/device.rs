@@ -213,7 +213,7 @@ impl DevfsSelector {
 
     /// Returns the path for this device relative to the /dev/class directory root.
     pub fn relative_path(&self) -> Utf8PathBuf {
-        Utf8PathBuf::from(self.device_type().devfs_class()).join(self.0.id.clone())
+        Utf8PathBuf::from(self.device_type().devfs_class()).join(self.0.name.clone())
     }
 
     /// Returns the type of this device.
@@ -296,7 +296,7 @@ pub struct Info(pub fadevice::Info);
 
 impl Info {
     pub fn token_id(&self) -> fadevice::TokenId {
-        self.0.token_id.expect("missing token_id")
+        self.0.token_id.expect("missing 'token_id'")
     }
 
     pub fn registry_selector(&self) -> RegistrySelector {
@@ -304,7 +304,11 @@ impl Info {
     }
 
     pub fn device_type(&self) -> Type {
-        Type(self.0.device_type.expect("missing device_type"))
+        Type(self.0.device_type.expect("missing 'device_type'"))
+    }
+
+    pub fn device_name(&self) -> &str {
+        self.0.device_name.as_ref().expect("missing 'device_name'")
     }
 
     pub fn unique_instance_id(&self) -> Option<UniqueInstanceId> {
@@ -665,11 +669,9 @@ pub async fn list_devfs(
         let entries = fuchsia_fs::directory::readdir(&subdir)
             .await
             .map_err(|err| ListDevfsError::Readdir { name: subdir_name.to_string(), err })?;
-        selectors.extend(
-            entries.into_iter().map(|entry| {
-                DevfsSelector(fac::Devfs { id: entry.name, device_type: device_type.0 })
-            }),
-        );
+        selectors.extend(entries.into_iter().map(|entry| {
+            DevfsSelector(fac::Devfs { name: entry.name, device_type: device_type.0 })
+        }));
     }
 
     Ok(selectors)
@@ -760,27 +762,27 @@ mod test {
     }
 
     #[test_case(
-        fac::Devfs { id: "3d99d780".to_string(), device_type: fadevice::DeviceType::Input },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Input },
         "/dev/class/audio-input/3d99d780";
         "input"
     )]
     #[test_case(
-        fac::Devfs { id: "3d99d780".to_string(), device_type: fadevice::DeviceType::Output },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Output },
         "/dev/class/audio-output/3d99d780";
         "output"
     )]
     #[test_case(
-        fac::Devfs { id: "3d99d780".to_string(), device_type: fadevice::DeviceType::Dai },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Dai },
         "/dev/class/dai/3d99d780";
         "dai"
     )]
     #[test_case(
-        fac::Devfs { id: "3d99d780".to_string(), device_type: fadevice::DeviceType::Codec },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Codec },
         "/dev/class/codec/3d99d780";
         "codec"
     )]
     #[test_case(
-        fac::Devfs { id: "3d99d780".to_string(), device_type: fadevice::DeviceType::Composite },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Composite },
         "/dev/class/audio-composite/3d99d780";
         "composite"
     )]
@@ -825,27 +827,27 @@ mod test {
         assert_eq!(
             vec![
                 DevfsSelector(fac::Devfs {
-                    id: "input-0".to_string(),
+                    name: "input-0".to_string(),
                     device_type: fadevice::DeviceType::Input,
                 }),
                 DevfsSelector(fac::Devfs {
-                    id: "input-1".to_string(),
+                    name: "input-1".to_string(),
                     device_type: fadevice::DeviceType::Input,
                 }),
                 DevfsSelector(fac::Devfs {
-                    id: "output-0".to_string(),
+                    name: "output-0".to_string(),
                     device_type: fadevice::DeviceType::Output,
                 }),
                 DevfsSelector(fac::Devfs {
-                    id: "dai-0".to_string(),
+                    name: "dai-0".to_string(),
                     device_type: fadevice::DeviceType::Dai,
                 }),
                 DevfsSelector(fac::Devfs {
-                    id: "codec-0".to_string(),
+                    name: "codec-0".to_string(),
                     device_type: fadevice::DeviceType::Codec,
                 }),
                 DevfsSelector(fac::Devfs {
-                    id: "composite-0".to_string(),
+                    name: "composite-0".to_string(),
                     device_type: fadevice::DeviceType::Composite,
                 }),
             ],

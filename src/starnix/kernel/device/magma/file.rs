@@ -960,7 +960,7 @@ impl FileOps for MagmaFile {
                 if status == MAGMA_STATUS_OK {
                     magma_items.append(&mut child_semaphore_items);
 
-                    let abs_timeout_ns = if control.timeout_ns == std::u64::MAX {
+                    let abs_timeout_ns = if control.timeout_ns == u64::MAX {
                         0
                     } else {
                         zx::Time::get_monotonic().into_nanos() as u64 + control.timeout_ns
@@ -989,7 +989,7 @@ impl FileOps for MagmaFile {
 
                         let current_time_ns = zx::Time::get_monotonic().into_nanos() as u64;
                         let rel_timeout_ns = if abs_timeout_ns == 0 {
-                            std::u64::MAX
+                            u64::MAX
                         } else if abs_timeout_ns > current_time_ns {
                             abs_timeout_ns - current_time_ns
                         } else {
@@ -1011,10 +1011,10 @@ impl FileOps for MagmaFile {
 
                         // Check if the wait timed out before the user-requested timeout.
                         if status == MAGMA_STATUS_TIMED_OUT
-                            && (control.timeout_ns == std::u64::MAX
+                            && (control.timeout_ns == u64::MAX
                                 || (current_time as u64) < abs_timeout_ns)
                         {
-                            if control.timeout_ns != std::u64::MAX {
+                            if control.timeout_ns != u64::MAX {
                                 // Update relative deadline.
                                 let mut control = control;
                                 control.timeout_ns = abs_timeout_ns - (current_time as u64);

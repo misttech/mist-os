@@ -70,9 +70,14 @@ async fn c_crash() {
             .await
             .expect("must see desired messages before end")
             .expect("must not see errors in stream");
-        if next.severity() == Severity::Error && next.msg() == Some("PANIC") {
-            info!(?next, "found panic message");
-            break next;
+        if next.severity() != Severity::Error {
+            continue;
+        }
+        if let Some(m) = next.msg() {
+            if m.contains("STARNIX KERNEL PANIC") {
+                info!(?next, "found panic message");
+                break next;
+            }
         }
     };
 

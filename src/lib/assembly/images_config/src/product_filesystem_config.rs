@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The product options for configuring the filesystem.
 /// The options include which filesystems to build and how, but do not contain constraints derived
 /// from the board or partition size.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductFilesystemConfig {
     /// The filename to use for the zbi and vbmeta.
@@ -39,7 +40,7 @@ pub struct ProductFilesystemConfig {
 }
 
 /// The filename to use for the zbi and vbmeta.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImageName(pub String);
 impl Default for ImageName {
@@ -49,7 +50,7 @@ impl Default for ImageName {
 }
 
 /// Whether for format the data filesystem when a corruption is detected.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FormatDataOnCorruption(pub bool);
 impl Default for FormatDataOnCorruption {
@@ -60,7 +61,7 @@ impl Default for FormatDataOnCorruption {
 
 /// Whether the filesystem should be placed in a separate partition, in a
 /// ramdisk, or nonexistent.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub enum FilesystemImageMode {
     /// No filesystem image should be generated.
@@ -81,7 +82,7 @@ pub enum FilesystemImageMode {
 /// How to configure the filesystem volume.
 /// Some systems may configure this without actually generating filesystem
 /// images in order to configure fshost without needing an actual filesystem.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub enum VolumeConfig {
     /// A fxfs volume.
@@ -94,7 +95,7 @@ pub enum VolumeConfig {
 }
 
 /// A FVM volume.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FvmVolumeConfig {
     /// If specified, a data filesystem will be built for this product.
@@ -111,7 +112,7 @@ pub struct FvmVolumeConfig {
 }
 
 /// Configuration options for a data filesystem.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DataFvmVolumeConfig {
     /// If true, will enable content-detection for partition format, supporting
@@ -131,7 +132,7 @@ pub struct DataFvmVolumeConfig {
 }
 
 /// The data format to use inside the fvm.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "lowercase")]
 pub enum DataFilesystemFormat {
@@ -147,7 +148,7 @@ pub enum DataFilesystemFormat {
 }
 
 /// Configuration options for a blob filesystem.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BlobFvmVolumeConfig {
     /// The format blobfs should store blobs in.
@@ -156,7 +157,7 @@ pub struct BlobFvmVolumeConfig {
 }
 
 /// The internal layout of blobfs.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub enum BlobfsLayout {
     /// A more compact layout than DeprecatedPadded.
@@ -170,7 +171,7 @@ pub enum BlobfsLayout {
 }
 
 /// Configuration options for reserving space in the fvm.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReservedFvmVolumeConfig {
     /// The number of slices to reserve in the fvm.

@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use emulator_instance::{EmulatorInstanceData, EmulatorInstanceInfo, EngineState};
+use emulator_instance::{
+    EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances, EngineState,
+};
 use ffx_emulator_list_args::ListCommand;
-use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv, TryFromEnvWith};
+use fho::{bug, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv, TryFromEnvWith};
 use serde::Serialize;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, path::PathBuf};
 
 // TODO(https://fxbug.dev/42176105): Update this error message once shut down is more robust.
 const BROKEN_MESSAGE: &str = r#"
@@ -25,22 +27,29 @@ pub trait Instances: TryFromEnv + 'static {
     async fn get_all_instances(&self) -> Result<Vec<EmulatorInstanceData>, fho::Error>;
 }
 
-pub struct InstanceData;
+pub struct InstanceData {
+    emu_instances: EmulatorInstances,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct WithInstances<P: Instances>(PhantomData<P>);
 
 #[async_trait(?Send)]
 impl TryFromEnv for InstanceData {
-    async fn try_from_env(_env: &fho::FhoEnvironment) -> Result<Self, fho::Error> {
-        Ok(InstanceData)
+    async fn try_from_env(env: &fho::FhoEnvironment) -> Result<Self, fho::Error> {
+        let instance_root: PathBuf = env
+            .context
+            .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+            .await
+            .map_err(|e| bug!("{e}"))?;
+        Ok(InstanceData { emu_instances: EmulatorInstances::new(instance_root) })
     }
 }
 
 #[async_trait]
 impl Instances for InstanceData {
     async fn get_all_instances(&self) -> Result<Vec<EmulatorInstanceData>, fho::Error> {
-        emulator_instance::get_all_instances().await.map_err(|e| e.into())
+        self.emu_instances.get_all_instances().map_err(|e| e.into())
     }
 }
 

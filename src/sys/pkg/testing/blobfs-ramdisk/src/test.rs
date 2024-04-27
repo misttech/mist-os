@@ -316,6 +316,55 @@ async fn open0_open1_resize0_write0_succeeds() {
     let () = blobfs_server.stop().await.unwrap();
 }
 
+/// On c++blobfs, open connections keep even partially written blobs alive.
+/// Testing for blob presence by opening a blob can therefore conflict with a concurrent operation
+/// that is writing a blob, as the partial blob from a failed write attempt can be kept alive by the
+/// connection from the presence test and prevent the writer from recreating the blob for a retry
+/// attempt.
+#[fuchsia_async::run_singlethreaded(test)]
+async fn open0_open1_resize0_close0_open2_fails() {
+    let blobfs_server = BlobfsRamdisk::start().await.unwrap();
+    let root_dir = blobfs_server.root_dir_proxy().unwrap();
+
+    let (blob0, _) =
+        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
+            .await
+            .unwrap();
+
+    let (blob1, _) =
+        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
+            .await
+            .unwrap();
+
+    let () = blob0.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
+
+    let () = blob0.close().await.unwrap().unwrap();
+
+    // The outstanding blob1 write connection keeps the partially written blob alive, preventing new
+    // write attempts.
+    assert_matches!(
+        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
+            .await,
+        Err(zx::Status::ACCESS_DENIED)
+    );
+
+    // Closing the outstanding connection allows the blob to be created.
+    let () = blob1.close().await.unwrap().unwrap();
+
+    let (blob2, _) =
+        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
+            .await
+            .unwrap();
+    let () = blob2.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
+    let () = write_blob(&blob2, BLOB_CONTENTS).await.unwrap();
+
+    let (blob3, _) =
+        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let () = verify_blob(&blob3, BLOB_CONTENTS).await.unwrap();
+
+    let () = blobfs_server.stop().await.unwrap();
+}
+
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_resize_open_read_fails() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;

@@ -36,7 +36,7 @@ class MoblyDriverLibTest(unittest.TestCase):
         self.mock_driver.generate_test_config.assert_called()
         self.mock_driver.teardown.assert_called()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(
         [
             ["invalid_driver", None, "/py/path", "/test/path", 0],
             ["invalid_python_path", mock.Mock(), "", "/test/path", 0],
@@ -99,7 +99,7 @@ class MoblyDriverLibTest(unittest.TestCase):
             mobly_driver.run(self.mock_driver, "/py/path", "/test/path")
         self.mock_driver.teardown.assert_called()
 
-    @parameterized.expand([[True], [False]])  # type: ignore[misc]
+    @parameterized.expand([[True], [False]])
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
     @mock.patch("mobly_driver.NamedTemporaryFile")

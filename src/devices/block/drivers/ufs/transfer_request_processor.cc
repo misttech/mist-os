@@ -177,6 +177,19 @@ zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu
   return zx::ok(std::move(response_upiu));
 }
 
+zx::result<std::unique_ptr<QueryResponseUpiu>> TransferRequestProcessor::SendQueryRequestUpiu(
+    QueryRequestUpiu &request) {
+  auto response = SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(request);
+  if (response.is_error()) {
+    QueryOpcode query_opcode =
+        static_cast<QueryOpcode>(request.GetData<QueryRequestUpiuData>()->opcode);
+    uint8_t type = request.GetData<QueryRequestUpiuData>()->idn;
+    zxlogf(ERROR, "Failed %s(type:0x%x) query request UPIU: %s", QueryOpcodeToString(query_opcode),
+           type, response.status_string());
+  }
+  return response;
+}
+
 template <class RequestType>
 zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
     RequestType &request, uint8_t lun, uint8_t slot, std::optional<zx::unowned_vmo> data_vmo,

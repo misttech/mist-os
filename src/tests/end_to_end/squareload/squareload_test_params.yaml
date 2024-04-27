@@ -1,6 +1,0 @@
-power_metric: squareload_cpu
-ffx_test_args:
-  - --max-severity-logs
-  - FATAL
-ffx_test_url: fuchsia-pkg://fuchsia.com/squareload_test#meta/squareload_test.cm
-timeout_sec: 600

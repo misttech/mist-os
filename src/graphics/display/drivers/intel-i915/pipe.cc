@@ -445,9 +445,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
   bottom_color.set_csc_enable(!!banjo_display_config->cc_flags);
   bool has_color_layer = banjo_display_config->layer_count &&
-                         banjo_display_config->layer_list[0]->type == LAYER_TYPE_COLOR;
+                         banjo_display_config->layer_list[0].type == LAYER_TYPE_COLOR;
   if (has_color_layer) {
-    const color_layer_t* layer = &banjo_display_config->layer_list[0]->cfg.color;
+    const color_layer_t* layer = &banjo_display_config->layer_list[0].cfg.color;
     const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(layer->format);
     ZX_DEBUG_ASSERT(format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
     uint32_t color = *reinterpret_cast<const uint32_t*>(layer->color_list);
@@ -466,9 +466,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   for (unsigned plane = 0; plane < 3; plane++) {
     const primary_layer_t* primary = nullptr;
     for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
-      const layer_t* layer = banjo_display_config->layer_list[j];
-      if (layer->type == LAYER_TYPE_PRIMARY && (layer->z_index - has_color_layer) == plane) {
-        primary = &layer->cfg.primary;
+      const layer_t& layer = banjo_display_config->layer_list[j];
+      if (layer.type == LAYER_TYPE_PRIMARY && (layer.z_index - has_color_layer) == plane) {
+        primary = &layer.cfg.primary;
         break;
       }
     }

@@ -47,4 +47,10 @@ void LowEnergyConnectionServer::RequestGattClient(fidl::InterfaceRequest<fbg::Cl
 void LowEnergyConnectionServer::AcceptCis(
     fuchsia::bluetooth::le::ConnectionAcceptCisRequest parameters) {}
 
+void LowEnergyConnectionServer::GetCodecLocalDelayRange(
+    ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest
+        CodecDelayGetCodecLocalDelayRangeRequest,
+    GetCodecLocalDelayRangeCallback callback) {
+  callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
+}
 }  // namespace bthost

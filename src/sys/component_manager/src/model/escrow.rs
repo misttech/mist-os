@@ -21,8 +21,9 @@ use std::sync::Mutex;
 use vfs::{directory::entry::OpenRequest, remote::remote_dir};
 use zx::AsHandleRef;
 
-use super::{error::ActionError, start::Start};
+use super::start::Start;
 use crate::{bedrock::program::EscrowRequest, model::component::StartReason};
+use errors::ActionError;
 
 pub struct EscrowedState {
     pub outgoing_dir: ServerEnd<fio::DirectoryMarker>,
@@ -302,10 +303,10 @@ mod tests {
         framework::controller,
         model::{
             component::{IncomingCapabilities, StartReason},
-            error::{ActionError, StartActionError},
             start::Start,
         },
     };
+    use errors::{ActionError, StartActionError};
 
     use super::{Actor, EscrowedState};
 

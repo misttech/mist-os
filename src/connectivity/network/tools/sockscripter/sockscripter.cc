@@ -173,6 +173,10 @@ const struct Command {
     {"log-ipv6-recvpktinfo", nullptr, "log IPV6_RECVPKTINFO option value",
      &SockScripter::LogIpv6RecvPktInfo},
 
+    {"set-transparent", "{0|1}", "set IP_TRANSPARENT flag", &SockScripter::SetIpTransparent},
+    {"log-transparent", nullptr, "log IP_TRANSPARENT option value",
+     &SockScripter::LogIpTransparent},
+
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
     {"drop4", "<mcast-ip>-<local-intf-Addr>",
@@ -766,6 +770,29 @@ bool SockScripter::LogIpv6RecvPktInfo(char* arg) {
   LOG_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_RECVPKTINFO, int)
 #else
   LOG(ERROR) << "IPV6_RECVPKTINFO not defined on this platform";
+  return false;
+#endif
+}
+
+bool SockScripter::SetIpTransparent(char* arg) {
+#ifdef IP_TRANSPARENT
+  int flag;
+  if (!getFlagInt(arg, &flag)) {
+    LOG(ERROR) << "Error: Invalid IP_TRANSPARENT flag='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IP, IP_TRANSPARENT, flag)
+#else
+  LOG(ERROR) << "IP_TRANSPARENT not defined on this platform";
+  return false;
+#endif
+}
+
+bool SockScripter::LogIpTransparent(char* arg) {
+#ifdef IP_TRANSPARENT
+  LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_TRANSPARENT, int)
+#else
+  LOG(ERROR) << "IP_TRANSPARENT not defined on this platform";
   return false;
 #endif
 }

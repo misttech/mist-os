@@ -423,8 +423,9 @@
 #include <zircon/compiler.h>
 
 #include <arch/arm64.h>
+#include <ktl/tuple.h>
 
-typedef uint64_t pte_t;
+using pte_t = uint64_t;
 
 #define ARM64_TLBI_NOADDR(op)        \
   ({                                 \
@@ -457,7 +458,7 @@ static_assert(MMU_ARM64_FIRST_USER_ASID > MMU_ARM64_GLOBAL_ASID);
 // page table. This also indirectly verifies that `MMU_TCR_FLAGS0_RESTRICTED`
 // contains the right value of T0SZ.
 static_assert(((USER_ASPACE_BASE + USER_RESTRICTED_ASPACE_SIZE) &
-               ~((uint64_t)1 << MMU_USER_RESTRICTED_SIZE_SHIFT)) == 0);
+               ~(1UL << MMU_USER_RESTRICTED_SIZE_SHIFT)) == 0);
 
 // max address space id for 8 and 16 bit asid ranges
 const uint16_t MMU_ARM64_MAX_USER_ASID_8 = (1u << 8) - 1;
@@ -465,11 +466,15 @@ const uint16_t MMU_ARM64_MAX_USER_ASID_16 = (1u << 16) - 1;
 
 pte_t* arm64_get_kernel_ptable();
 
-extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
-                                      const paddr_t paddr, const size_t len, const pte_t pte_flags,
-                                      bool allow_large_pages);
-zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const size_t len,
-                             const pte_t pte_flags, bool allow_large_pages);
+// boot time page mapping routines used in start.S and periphmap
+extern "C" void arm64_boot_map_init(uint64_t vaddr_paddr_delta);
+extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr,
+                                      size_t len, pte_t pte_flags, bool allow_large_pages);
+zx_status_t arm64_boot_map_v(vaddr_t vaddr, paddr_t paddr, size_t len, pte_t pte_flags,
+                             bool allow_large_pages);
+
+// return a tuple of the total size reserved for boot page tables and how much was used
+std::tuple<size_t, size_t> arm64_boot_map_used_memory();
 
 // use built-in virtual to physical translation instructions to query
 // the physical address of a virtual address

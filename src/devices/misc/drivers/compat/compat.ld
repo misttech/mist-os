@@ -37,6 +37,7 @@
     device_connect_fragment_fidl_protocol;
     device_connect_runtime_protocol;
     device_connect_fragment_runtime_protocol;
+    device_connect_ns_protocol;
   local:
     *;
 };

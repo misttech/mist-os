@@ -6,7 +6,7 @@ use {
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_test_wlan_realm as fidl_realm, fidl_test_wlan_testcontroller as fidl_testcontroller,
     fuchsia_component::client::connect_to_protocol,
-    realm_proxy_client::{extend_namespace, InstalledNamespace},
+    realm_client::{extend_namespace, InstalledNamespace},
     test_realm_helpers::{constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH, tracing::Tracing},
 };
 

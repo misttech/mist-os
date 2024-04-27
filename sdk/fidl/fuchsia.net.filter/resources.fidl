@@ -284,6 +284,33 @@ type Action = flexible union {
     /// If invoked in an installed routine, equivalent to `accept`, given packets
     /// are accepted by default in the absence of any matching rules.
     4: return Empty;
+    /// Redirect the packet to a local socket without changing the packet header
+    /// in any way.
+    ///
+    /// This is a terminal action, i.e. no further rules will be evaluated for
+    /// this packet, even in other routines on the same hook. This action is
+    /// only valid in the INGRESS hook. This action is also only valid in a rule
+    /// that ensures the presence of a TCP or UDP header by matching on the
+    /// transport protocol, so that the packet can be properly dispatched.
+    ///
+    /// This is analogous to the `tproxy` statement in Netfilter.
+    5: transparent_proxy @generated_name("TransparentProxy") flexible union {
+        /// The bound address of the local socket to redirect the packet to.
+        ///
+        /// The destination port of the packet is used for local delivery.
+        1: local_addr fuchsia.net.IpAddress;
+        /// The bound port of the local socket to redirect the packet to. It
+        /// must be nonzero.
+        ///
+        /// The destination IP address of the packet is used for local delivery.
+        2: local_port uint16;
+        /// The bound address and port of the local socket to redirect the
+        /// packet to. The port must be nonzero.
+        3: local_addr_and_port @generated_name("SocketAddr") struct {
+            addr fuchsia.net.IpAddress;
+            port uint16;
+        };
+    };
 };
 
 /// A rule is a set of criteria (matchers) and a resultant action.

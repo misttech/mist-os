@@ -7,10 +7,11 @@
 import os
 import subprocess
 import unittest
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest import mock
 
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 
 from honeydew.auxiliary_devices import power_switch_dmc
 from honeydew.interfaces.auxiliary_devices import power_switch
@@ -19,12 +20,12 @@ _MOCK_OS_ENVIRON: dict[str, str] = {"DMC_PATH": "/tmp/foo/bar"}
 
 
 def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
+    testcase_func: Callable[..., None], _: str, param_arg: param
 ) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param_arg.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -57,7 +58,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         return_value=b"some output",
         autospec=True,
@@ -99,7 +100,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         side_effect=subprocess.CalledProcessError(
             returncode=1, cmd="some command"
@@ -122,7 +123,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         mock_subprocess_check_output.assert_called_once()
 
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         return_value=b"some output",
         autospec=True,
@@ -164,7 +165,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        power_switch_dmc.subprocess,
+        subprocess,
         "check_output",
         side_effect=subprocess.CalledProcessError(
             returncode=1, cmd="some command"

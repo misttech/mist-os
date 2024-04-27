@@ -277,6 +277,7 @@ pub struct Fxfs {
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
     pub component_type: ComponentType,
+    pub startup_profiling_seconds: Option<u32>,
 }
 
 impl Default for Fxfs {
@@ -286,6 +287,7 @@ impl Default for Fxfs {
             readonly: false,
             fsck_after_every_transaction: false,
             component_type: Default::default(),
+            startup_profiling_seconds: None,
         }
     }
 }
@@ -324,7 +326,7 @@ impl FSConfig for Fxfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                startup_profiling_seconds: 0,
+                startup_profiling_seconds: self.startup_profiling_seconds.unwrap_or(0),
             },
             component_type: self.component_type.clone(),
         }

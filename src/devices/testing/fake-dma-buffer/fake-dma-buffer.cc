@@ -68,6 +68,10 @@ class BufferFactoryImpl : public dma_buffer::BufferFactory {
     if (status != ZX_OK) {
       return status;
     }
+
+    constexpr std::string_view kVmoName = "fake-dma-buffer-contiguous";
+    real_vmo.set_property(ZX_PROP_NAME, kVmoName.data(), kVmoName.length());
+
     void* virt;
     status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, real_vmo, 0, size,
                                         reinterpret_cast<zx_vaddr_t*>(&virt));
@@ -99,6 +103,9 @@ class BufferFactoryImpl : public dma_buffer::BufferFactory {
     if (status != ZX_OK) {
       return status;
     }
+
+    constexpr std::string_view kVmoName = "fake-dma-buffer-paged";
+    real_vmo.set_property(ZX_PROP_NAME, kVmoName.data(), kVmoName.length());
 
     uint8_t* virt;
     status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, real_vmo, 0, size,

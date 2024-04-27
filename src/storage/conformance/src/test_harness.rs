@@ -62,6 +62,23 @@ impl TestHarness {
             .expect("Cannot get directory from test harness");
         client
     }
+
+    /// Returns the abilities [`io_test::File`] objects should have for the harness.
+    pub fn supported_file_abilities(&self) -> fio::Abilities {
+        fio::Abilities::READ_BYTES
+            | fio::Abilities::WRITE_BYTES
+            | fio::Abilities::GET_ATTRIBUTES
+            | fio::Abilities::UPDATE_ATTRIBUTES
+    }
+
+    /// Returns the abilities [`io_test::Directory`] objects should have for the harness.
+    pub fn supported_dir_abilities(&self) -> fio::Abilities {
+        fio::Abilities::GET_ATTRIBUTES
+            | fio::Abilities::UPDATE_ATTRIBUTES
+            | fio::Abilities::ENUMERATE
+            | fio::Abilities::TRAVERSE
+            | fio::Abilities::MODIFY_DIRECTORY
+    }
 }
 
 async fn connect_to_harness() -> io_test::Io1HarnessProxy {
@@ -90,9 +107,7 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
     .expect("Cannot connect to test harness protocol")
 }
 
-/// Returns the aggregate of all rights that are supported for [`io_test::Directory`] objects.
-///
-/// Must support read, write, execute.
+/// Returns the aggregate of all io1 rights that are supported for [`io_test::Directory`] objects.
 fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
     fio::OpenFlags::RIGHT_READABLE
         | fio::OpenFlags::RIGHT_WRITABLE

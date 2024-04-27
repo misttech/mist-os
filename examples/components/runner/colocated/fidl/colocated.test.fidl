@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Library containing a simple calculator protocol.
+/// Library containing a protocol to report VMO usage by the colocated
+/// component.
 library fuchsia.examples.colocated;
 
 using zx;

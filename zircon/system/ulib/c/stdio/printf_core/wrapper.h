@@ -5,6 +5,10 @@
 #ifndef ZIRCON_SYSTEM_ULIB_C_STDIO_PRINTF_CORE_WRAPPER_H_
 #define ZIRCON_SYSTEM_ULIB_C_STDIO_PRINTF_CORE_WRAPPER_H_
 
+#include <cstdarg>
+#include <string_view>
+#include <type_traits>
+
 // TODO(https://fxbug.dev/42105189): These are defined as macros in
 // <zircon/compiler.h> and used by some other headers such as in libzx.  This
 // conflicts with their use as scoped identifiers in the llvm-libc code reached
@@ -18,11 +22,11 @@
 #pragma push_macro("sub_overflow")
 #undef sub_overflow
 
-#include <cstdarg>
-#include <string_view>
-#include <type_traits>
-
 #include "src/stdio/printf_core/printf_main.h"
+
+// TODO(https://fxbug.dev/42105189): See comment above.
+#pragma pop_macro("add_overflow")
+#pragma pop_macro("sub_overflow")
 
 namespace LIBC_NAMESPACE::printf_core {
 
@@ -123,9 +127,5 @@ constexpr auto MakePrintf(T write) {
 }
 
 }  // namespace LIBC_NAMESPACE::printf_core
-
-// TODO(https://fxbug.dev/42105189): See comment above.
-#pragma pop_macro("add_overflow")
-#pragma pop_macro("sub_overflow")
 
 #endif  // ZIRCON_SYSTEM_ULIB_C_STDIO_PRINTF_CORE_WRAPPER_H_

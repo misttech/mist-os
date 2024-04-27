@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/drivers/bazel_driver_package.gni")
+import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
@@ -133,6 +135,10 @@ fuchsia_driver_package("aml-g12-tdm-dai-package") {
 }
 
 # Composite driver (DFv2).
+bazel_driver_package("aml-g12-composite-bazel-package") {
+  bazel_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite"
+  package_name = "aml-g12-composite"
+}
 
 driver_bind_rules("aml-g12-composite-bind") {
   rules = "aml_composite.bind"

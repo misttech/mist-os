@@ -149,7 +149,7 @@ pub trait JournalingObject: Send + Sync {
     /// This method get called when the transaction commits, which can either be during live
     /// operation (See `ObjectManager::apply_mutation`) or during journal replay, in which case
     /// transaction will be None (See `super_block::read`).
-    async fn apply_mutation(
+    fn apply_mutation(
         &self,
         mutation: Mutation,
         context: &ApplyContext<'_, '_>,

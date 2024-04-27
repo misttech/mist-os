@@ -15,9 +15,9 @@ use netlink::{
     NewClientError, NETLINK_LOG_TAG,
 };
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
-use netlink_packet_route::rtnl::RtnlMessage;
+use netlink_packet_route::RouteNetlinkMessage;
 use netlink_packet_sock_diag::message::SockDiagMessage;
-use netlink_packet_utils::Emitable as _;
+use netlink_packet_utils::{DecodeError, Emitable as _};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
@@ -795,7 +795,7 @@ struct RouteNetlinkSocket {
     /// The sender of messages from this socket to Netlink.
     // TODO(https://issuetracker.google.com/285880057): Bound the capacity of
     // the "send buffer".
-    message_sender: UnboundedSender<NetlinkMessage<RtnlMessage>>,
+    message_sender: UnboundedSender<NetlinkMessage<RouteNetlinkMessage>>,
 }
 
 impl RouteNetlinkSocket {
@@ -900,18 +900,26 @@ impl SocketOps for RouteNetlinkSocket {
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         let RouteNetlinkSocket { inner: _, client: _, message_sender } = self;
-        let bytes = data.read_all()?;
-        match NetlinkMessage::<RtnlMessage>::deserialize(&bytes) {
+        let bytes = data.peek_all()?;
+        match NetlinkMessage::<RouteNetlinkMessage>::deserialize(&bytes) {
             Err(e) => {
                 log_warn!(
                     tag = NETLINK_LOG_TAG,
                     "Failed to process write; data could not be deserialized: {:?}",
                     e
                 );
-                error!(EINVAL)
+                if matches!(e, DecodeError::FailedToParseMessageWithType { .. }) {
+                    // Unsupported type.
+                    error!(EOPNOTSUPP)
+                } else {
+                    error!(EINVAL)
+                }
             }
             Ok(msg) => match message_sender.unbounded_send(msg) {
-                Ok(()) => Ok(bytes.len()),
+                Ok(()) => {
+                    data.drain();
+                    Ok(bytes.len())
+                }
                 Err(e) => {
                     log_warn!(
                         tag = NETLINK_LOG_TAG,
@@ -1305,7 +1313,7 @@ impl SocketOps for GenericNetlinkSocket {
 mod tests {
     use super::*;
 
-    use netlink_packet_route::rtnl::RouteMessage;
+    use netlink_packet_route::route::RouteMessage;
     use test_case::test_case;
 
     // Successfully send the message and observe it's stored in the queue.
@@ -1316,8 +1324,8 @@ mod tests {
     fn test_netlink_to_client_sender(sufficient_capacity: bool) {
         const MODERN_GROUP: u32 = 5;
 
-        let mut message: NetlinkMessage<RtnlMessage> =
-            RtnlMessage::NewRoute(RouteMessage::default()).into();
+        let mut message: NetlinkMessage<RouteNetlinkMessage> =
+            RouteNetlinkMessage::NewRoute(RouteMessage::default()).into();
         message.finalize();
 
         let (queue_size, expected_message) = if sufficient_capacity {
@@ -1335,7 +1343,7 @@ mod tests {
             timestamp: false,
         }));
 
-        let mut sender = NetlinkToClientSender::<RtnlMessage>::new(socket_inner.clone());
+        let mut sender = NetlinkToClientSender::<RouteNetlinkMessage>::new(socket_inner.clone());
         sender.send(message, Some(ModernGroup(MODERN_GROUP)));
         let message = socket_inner.lock().read_message();
 
@@ -1348,7 +1356,7 @@ mod tests {
         });
 
         assert_eq!(
-            data.map(|data| NetlinkMessage::<RtnlMessage>::deserialize(data.bytes())
+            data.map(|data| NetlinkMessage::<RouteNetlinkMessage>::deserialize(data.bytes())
                 .expect("message should deserialize into RtnlMessage")),
             expected_message
         )

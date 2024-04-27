@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.ftdi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
-#include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -21,13 +20,8 @@
 
 namespace ftdi_mpsse {
 
-// Fake for the raw nand protocol.
-class FakeSerial : public ddk::SerialImplProtocol<FakeSerial> {
+class FakeSerial : public ftdi_serial::FtdiSerial {
  public:
-  FakeSerial() : proto_({&serial_impl_protocol_ops_, this}) {}
-
-  const serial_impl_protocol_t* proto() const { return &proto_; }
-
   void PushExpectedRead(std::vector<uint8_t> read) { expected_reads_.push_back(std::move(read)); }
 
   void PushExpectedWrite(std::vector<uint8_t> write) {
@@ -36,20 +30,13 @@ class FakeSerial : public ddk::SerialImplProtocol<FakeSerial> {
 
   void FailOnUnexpectedReadWrite(bool b) { unexpected_is_error_ = b; }
 
-  zx_status_t SerialImplGetInfo(serial_port_info_t* out_info) { return ZX_OK; }
-
-  zx_status_t SerialImplConfig(uint32_t baud_rate, uint32_t flags) { return ZX_OK; }
-
-  zx_status_t SerialImplEnable(bool enable) { return ZX_OK; }
-
-  zx_status_t SerialImplRead(uint8_t* out_buf_buffer, size_t buf_size, size_t* out_buf_actual) {
+  zx_status_t Read(uint8_t* out_buf_buffer, size_t buf_size) override {
     uint8_t* out_buf = out_buf_buffer;
     if (expected_reads_.size() == 0) {
       if (unexpected_is_error_) {
         printf("Read with no expected read set\n");
         return ZX_ERR_INTERNAL;
       } else {
-        *out_buf_actual = buf_size;
         return ZX_OK;
       }
     }
@@ -64,18 +51,16 @@ class FakeSerial : public ddk::SerialImplProtocol<FakeSerial> {
     }
 
     expected_reads_.pop_front();
-    *out_buf_actual = buf_size;
     return ZX_OK;
   }
 
-  zx_status_t SerialImplWrite(const uint8_t* buf_buffer, size_t buf_size, size_t* out_actual) {
+  zx_status_t Write(uint8_t* buf_buffer, size_t buf_size) override {
     const uint8_t* out_buf = buf_buffer;
     if (expected_writes_.size() == 0) {
       if (unexpected_is_error_) {
         printf("Write with no expected wrte set\n");
         return ZX_ERR_INTERNAL;
       } else {
-        *out_actual = buf_size;
         return ZX_OK;
       }
     }
@@ -92,26 +77,18 @@ class FakeSerial : public ddk::SerialImplProtocol<FakeSerial> {
       }
     }
     expected_writes_.pop_front();
-    *out_actual = buf_size;
     return ZX_OK;
   }
-
-  zx_status_t SerialImplSetNotifyCallback(const serial_notify_t* cb) { return ZX_OK; }
 
  private:
   bool unexpected_is_error_ = false;
   std::list<std::vector<uint8_t>> expected_reads_;
   std::list<std::vector<uint8_t>> expected_writes_;
-
-  serial_impl_protocol_t proto_;
 };
 
 class FtdiI2cTest : public zxtest::Test {
  public:
-  void SetUp() override {
-    fake_parent_ = MockDevice::FakeRootParent();
-    fake_parent_->AddProtocol(ZX_PROTOCOL_SERIAL_IMPL, serial_.proto()->ops, serial_.proto()->ctx);
-  }
+  void SetUp() override { fake_parent_ = MockDevice::FakeRootParent(); }
 
  protected:
   FtdiI2c FtdiBasicInit(void) {
@@ -121,7 +98,7 @@ class FtdiI2cTest : public zxtest::Test {
     i2c_devices[0].vid = 0;
     i2c_devices[0].pid = 0;
     i2c_devices[0].did = 31;
-    return FtdiI2c(fake_parent_.get(), layout, i2c_devices);
+    return FtdiI2c(fake_parent_.get(), &serial_, layout, i2c_devices);
   }
 
   std::shared_ptr<MockDevice> fake_parent_;
@@ -137,7 +114,7 @@ TEST_F(FtdiI2cTest, DdkLifetimeTest) {
   i2c_devices[0].vid = 0;
   i2c_devices[0].pid = 0;
   i2c_devices[0].did = 31;
-  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), layout, i2c_devices));
+  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), &serial_, layout, i2c_devices));
 
   // These Reads and Writes are to sync the device on bind.
   std::vector<uint8_t> first_write(1);
@@ -166,7 +143,7 @@ TEST_F(FtdiI2cTest, DdkLifetimeFailedInit) {
   i2c_devices[0].vid = 0;
   i2c_devices[0].pid = 0;
   i2c_devices[0].did = 31;
-  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), layout, i2c_devices));
+  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), &serial_, layout, i2c_devices));
 
   // These Reads and Writes are to sync the device on bind.
   std::vector<uint8_t> first_write(1);
@@ -297,7 +274,7 @@ TEST_F(FtdiI2cTest, MetadataTest) {
   i2c_devices[0].vid = 0;
   i2c_devices[0].pid = 0;
   i2c_devices[0].did = 31;
-  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), layout, i2c_devices));
+  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), &serial_, layout, i2c_devices));
 
   std::vector<uint8_t> first_write(1);
   first_write[0] = 0xAB;

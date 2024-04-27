@@ -274,6 +274,12 @@ func (q *QEMUCommandBuilder) AddUSBDrive(d Drive) {
 	q.SetFlag("-device", fmt.Sprintf("usb-storage,drive=%s,removable=on", d.ID))
 }
 
+func (q *QEMUCommandBuilder) AddUFSDrive(d Drive) {
+	q.SetFlag("-device", "ufs")
+	q.SetFlag("-drive", fmt.Sprintf("if=none,id=%s,file=%s,format=raw,discard=unmap", d.ID, d.File))
+	q.SetFlag("-device", fmt.Sprintf("ufs-lu,drive=%s,lun=0", d.ID))
+}
+
 // AddHCI adds an host-controller-interface.
 func (q *QEMUCommandBuilder) AddHCI(hci HCI) {
 	if hci != XHCI {

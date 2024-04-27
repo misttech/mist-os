@@ -5,12 +5,9 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITORS_DRIVERS_PWM_CONTROLLERS_PWM_PWM_VISITOR_H_
 #define LIB_DRIVER_DEVICETREE_VISITORS_DRIVERS_PWM_CONTROLLERS_PWM_PWM_VISITOR_H_
 
+#include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <lib/driver/devicetree/manager/visitor.h>
 #include <lib/driver/devicetree/visitors/property-parser.h>
-
-#include <ddk/metadata/pwm.h>
-
-#include "lib/driver/devicetree/manager/node.h"
 
 namespace pwm_visitor_dt {
 
@@ -28,7 +25,7 @@ class PwmVisitor : public fdf_devicetree::Visitor {
 
  private:
   struct PwmController {
-    std::vector<pwm_id_t> pwm_ids;
+    fuchsia_hardware_pwm::PwmChannelsMetadata pwm_channels;
   };
 
   // Return an existing or a new instance of PwmController.

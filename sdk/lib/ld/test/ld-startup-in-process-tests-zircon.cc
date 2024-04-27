@@ -83,7 +83,7 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
 
   // If a mock loader service has been set up by calls to Needed() et al, send
   // the client end over.
-  if (zx::channel ldsvc = GetLdsvc()) {
+  if (zx::channel ldsvc = TakeLdsvc()) {
     ASSERT_NO_FATAL_FAILURE(bootstrap().AddLdsvc(std::move(ldsvc)));
   }
 }

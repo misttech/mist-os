@@ -150,9 +150,6 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
                                                            : actual_runtime_ns;
 
         tss.runtime_ns_ += actual_runtime_ns;
-        thread.UpdateSchedulerStats({.state = thread.state(),
-                                     .state_time = now.raw_value(),
-                                     .cpu_time = actual_runtime_ns.raw_value()});
         const SchedDuration new_tsr = (tss.time_slice_ns_ <= scaled_actual_runtime_ns)
                                           ? SchedDuration{0}
                                           : (tss.time_slice_ns_ - scaled_actual_runtime_ns);

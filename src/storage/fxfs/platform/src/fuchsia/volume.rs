@@ -34,15 +34,16 @@ use {
         errors::FxfsError,
         filesystem::{self, SyncOptions},
         log::*,
+        object_handle::ObjectHandle,
         object_store::{
-            directory::Directory,
+            directory::{replace_child_with_object, Directory},
             transaction::{lock_keys, LockKey, Options},
-            HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore,
+            HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp,
         },
     },
     std::{
         future::Future,
-        sync::{Arc, Mutex, MutexGuard, Weak},
+        sync::{Arc, Mutex, Weak},
         time::Duration,
     },
     vfs::{
@@ -110,6 +111,14 @@ impl Default for MemoryPressureConfig {
     }
 }
 
+/// Holds all the state about current profile recording and replay.
+struct ProfileHolder {
+    state: ProfileState,
+
+    /// The name for the ongoing recording upon completion and the object id of that recording.
+    recording_info: Option<(String, u64)>,
+}
+
 /// FxVolume represents an opened volume. It is also a (weak) cache for all opened Nodes within the
 /// volume.
 pub struct FxVolume {
@@ -130,7 +139,7 @@ pub struct FxVolume {
 
     dirent_cache: DirentCache,
 
-    profile_state: Mutex<ProfileState>,
+    profile_state: Mutex<ProfileHolder>,
 }
 
 #[fxfs_trace::trace]
@@ -151,7 +160,10 @@ impl FxVolume {
             fs_id,
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
-            profile_state: Mutex::new(ProfileState::new()),
+            profile_state: Mutex::new(ProfileHolder {
+                state: ProfileState::new(),
+                recording_info: None,
+            }),
         })
     }
 
@@ -179,13 +191,52 @@ impl FxVolume {
         &self.scope
     }
 
-    pub fn profile_state_mut(&self) -> MutexGuard<'_, ProfileState> {
-        self.profile_state.lock().unwrap()
+    async fn place_file(self: &Arc<Self>, name: &str, object_id: u64) -> Result<(), Error> {
+        let profile_dir = self.get_profile_directory().await?;
+        let mut lock_keys =
+            lock_keys![LockKey::object(self.store().store_object_id(), profile_dir.object_id(),)];
+        // If we're replacing the old file we must lock that as well.
+        if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
+            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
+            lock_keys.push(LockKey::object(self.store().store_object_id(), id));
+        }
+
+        let mut transaction =
+            self.store().filesystem().new_transaction(lock_keys, Options::default()).await?;
+        self.store.remove_from_graveyard(&mut transaction, object_id);
+        replace_child_with_object(
+            &mut transaction,
+            Some((object_id, ObjectDescriptor::File)),
+            (&profile_dir, name),
+            0,
+            Timestamp::now(),
+        )
+        .await?;
+        transaction.commit().await?;
+
+        Ok(())
     }
 
-    pub fn stop_profiler(&self) {
+    /// Stops the profiling, returns if there is any status to be cleaned finished up from the
+    /// recording. This may be used in a sync context during shutdown when we can't handle the
+    /// mutations to finalize the recording.
+    fn stop_profiler(&self) -> Option<(String, u64)> {
+        let mut profile_state = self.profile_state.lock().unwrap();
+        // Clear recorder first to flush entries.
         self.pager.set_recorder(None);
-        self.profile_state_mut().stop_profiler();
+        // Stop profiler ensuring that the write handle is closed.
+        profile_state.state.stop_profiler();
+        std::mem::take(&mut profile_state.recording_info)
+    }
+
+    /// Stop profiling, recover resources from it and finalize recordings.
+    pub async fn finish_profiling(self: &Arc<Self>) {
+        // If there was a file being recorded, place it in the profile directory.
+        if let Some((name, object_id)) = self.stop_profiler() {
+            if let Err(e) = self.place_file(&name, object_id).await {
+                warn!("Failed to commit new profile recording '{}': {:?}", name, e);
+            }
+        }
     }
 
     pub async fn get_profile_directory(self: &Arc<Self>) -> Result<Directory<FxVolume>, Error> {
@@ -219,34 +270,37 @@ impl FxVolume {
     }
 
     pub async fn record_or_replay_profile(self: &Arc<Self>, name: &str) -> Result<(), Error> {
-        let profile_dir = self.get_profile_directory().await?;
         // We don't meddle in FxDirectory or FxFile here because we don't want a paged object.
         // Normally we ensure that there's only one copy by using the Node cache on the volume, but
         // that would create FxFile, so in this case we just assume that only one profile operation
         // should be ongoing at a time, as that is ensured in `VolumesDirectory`.
-        let mut transaction = self
-            .store()
-            .filesystem()
-            .new_transaction(
-                lock_keys![LockKey::object(
-                    self.store().store_object_id(),
-                    profile_dir.object_id(),
-                )],
-                Options::default(),
-            )
-            .await?;
-        match profile_dir.lookup(name).await? {
-            Some((id, descriptor)) => {
-                ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
-                let handle =
-                    ObjectStore::open_object(self, id, HandleOptions::default(), None).await?;
-                self.profile_state_mut().replay_profile(handle, self.clone());
-            }
-            None => {
-                let handle = profile_dir.create_child_file(&mut transaction, name, None).await?;
-                transaction.commit().await?;
-                self.pager.set_recorder(Some(self.profile_state_mut().record_new(handle)));
-            }
+        let mut transaction =
+            self.store().filesystem().new_transaction(lock_keys![], Options::default()).await?;
+        // Start a recording first. Put it in the graveyard in case we can't properly complete it.
+        let handle = ObjectStore::create_object(
+            self,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await?;
+        let recording_id = handle.handle().object_id();
+        self.store.add_to_graveyard(&mut transaction, recording_id);
+        transaction.commit().await?;
+        {
+            let mut profile_state = self.profile_state.lock().unwrap();
+            self.pager.set_recorder(Some(profile_state.state.record_new(handle)));
+            profile_state.recording_info = Some((name.to_owned(), recording_id));
+        }
+
+        // If there is a recording already, replay it.
+        let profile_dir = self.get_profile_directory().await?;
+        if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
+            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
+            let handle = ObjectStore::open_object(self, id, HandleOptions::default(), None).await?;
+            let mut profile_state = self.profile_state.lock().unwrap();
+            profile_state.state.replay_profile(handle, self.clone());
         }
         Ok(())
     }
@@ -771,7 +825,8 @@ mod tests {
             fsck::{fsck, fsck_volume},
             object_handle::ObjectHandle,
             object_store::{
-                transaction::{lock_keys, Options},
+                directory::replace_child,
+                transaction::{lock_keys, LockKey, Options},
                 volume::root_volume,
                 HandleOptions, ObjectDescriptor, ObjectStore,
             },
@@ -2183,8 +2238,104 @@ mod tests {
         let device = {
             let fixture = blob_testing::new_blob_fixture().await;
 
-            // Page in the zero offsets only to avoid readahead strangeness.
             for i in 0..3u64 {
+                let hash =
+                    fixture.write_blob(i.to_le_bytes().as_slice(), CompressionMode::Never).await;
+                hashes.push(hash);
+            }
+            fixture.close().await
+        };
+        device.ensure_unique();
+
+        device.reopen(false);
+        let mut device = {
+            let fixture = blob_testing::open_blob_fixture(device).await;
+            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
+
+            // Page in the zero offsets only to avoid readahead strangeness.
+            let mut writable = [0u8];
+            for hash in &hashes {
+                let vmo = fixture.get_blob_vmo(*hash).await;
+                vmo.read(&mut writable, 0).expect("Vmo read");
+            }
+            fixture.volume().volume().finish_profiling().await;
+            fixture.close().await
+        };
+
+        // Do this multiple times to ensure that the re-recording doesn't drop anything.
+        for i in 0..3 {
+            device.ensure_unique();
+            device.reopen(false);
+            let fixture = blob_testing::open_blob_fixture(device).await;
+            {
+                // Need to get the root vmo to check committed bytes.
+                let dir = fixture
+                    .volume()
+                    .root()
+                    .clone()
+                    .into_any()
+                    .downcast::<BlobDirectory>()
+                    .expect("Root should be BlobDirectory");
+
+                // Ensure that nothing is paged in right now.
+                for hash in &hashes {
+                    let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
+                    assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
+                }
+
+                fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+
+                // Move the file in flight to ensure a new version lands to be used next time.
+                {
+                    let store_id = fixture.volume().volume().store().store_object_id();
+                    let dir = fixture.volume().volume().get_profile_directory().await.unwrap();
+                    let old_file = dir.lookup("foo").await.unwrap().unwrap().0;
+                    let mut transaction = fixture
+                        .fs()
+                        .clone()
+                        .new_transaction(
+                            lock_keys!(
+                                LockKey::object(store_id, dir.object_id()),
+                                LockKey::object(store_id, old_file),
+                            ),
+                            Options::default(),
+                        )
+                        .await
+                        .unwrap();
+                    replace_child(&mut transaction, Some((&dir, "foo")), (&dir, &i.to_string()))
+                        .await
+                        .expect("Replace old profile.");
+                    transaction.commit().await.unwrap();
+                    assert!(
+                        dir.lookup("foo").await.unwrap().is_none(),
+                        "Old profile should be moved"
+                    );
+                }
+
+                // Await all data being played back by checking that things have paged in.
+                for hash in &hashes {
+                    // Fetch vmo this way as well to ensure that the open is counting the file as
+                    // used in the current recording.
+                    let _vmo = fixture.get_blob_vmo(*hash).await;
+                    let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
+                    while blob.vmo().info().unwrap().committed_bytes == 0 {
+                        fasync::Timer::new(Duration::from_millis(25)).await;
+                    }
+                }
+
+                // Complete the recording.
+                fixture.volume().volume().finish_profiling().await;
+            }
+            device = fixture.close().await;
+        }
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_profile_update() {
+        let mut hashes = Vec::new();
+        let device = {
+            let fixture = blob_testing::new_blob_fixture().await;
+            for i in 0..2u64 {
                 let hash =
                     fixture.write_blob(i.to_le_bytes().as_slice(), CompressionMode::Never).await;
                 hashes.push(hash);
@@ -2199,16 +2350,17 @@ mod tests {
             fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
 
             // Page in the zero offsets only to avoid readahead strangeness.
-            let mut writable = [0u8];
-            for hash in &hashes {
+            {
+                let mut writable = [0u8];
+                let hash = &hashes[0];
                 let vmo = fixture.get_blob_vmo(*hash).await;
                 vmo.read(&mut writable, 0).expect("Vmo read");
             }
-            fixture.volume().volume().stop_profiler();
+            fixture.volume().volume().finish_profiling().await;
             fixture.close().await
         };
-        device.ensure_unique();
 
+        device.ensure_unique();
         device.reopen(false);
         let fixture = blob_testing::open_blob_fixture(device).await;
         {
@@ -2230,13 +2382,66 @@ mod tests {
             fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
 
             // Await all data being played back by checking that things have paged in.
-            for hash in &hashes {
+            {
+                let hash = &hashes[0];
                 let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
                 while blob.vmo().info().unwrap().committed_bytes == 0 {
                     fasync::Timer::new(Duration::from_millis(25)).await;
                 }
             }
-            fixture.volume().volume().stop_profiler();
+
+            // Record the new profile that will overwrite it.
+            {
+                let mut writable = [0u8];
+                let hash = &hashes[1];
+                let vmo = fixture.get_blob_vmo(*hash).await;
+                vmo.read(&mut writable, 0).expect("Vmo read");
+            }
+
+            // Complete the recording.
+            fixture.volume().volume().finish_profiling().await;
+        }
+        let device = fixture.close().await;
+
+        device.ensure_unique();
+        device.reopen(false);
+        let fixture = blob_testing::open_blob_fixture(device).await;
+        {
+            // Need to get the root vmo to check committed bytes.
+            let dir = fixture
+                .volume()
+                .root()
+                .clone()
+                .into_any()
+                .downcast::<BlobDirectory>()
+                .expect("Root should be BlobDirectory");
+
+            // Ensure that nothing is paged in right now.
+            for hash in &hashes {
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
+                assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
+            }
+
+            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+
+            // Await all data being played back by checking that things have paged in.
+            {
+                let hash = &hashes[1];
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
+                while blob.vmo().info().unwrap().committed_bytes == 0 {
+                    fasync::Timer::new(Duration::from_millis(25)).await;
+                }
+            }
+
+            // Complete the recording.
+            fixture.volume().volume().finish_profiling().await;
+
+            // Verify that first blob was not paged in as the it should be dropped from the profile.
+            {
+                let hash = &hashes[0];
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
+                assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
+            }
         }
         fixture.close().await;
     }

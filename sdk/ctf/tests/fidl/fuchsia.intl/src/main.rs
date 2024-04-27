@@ -9,7 +9,7 @@ use fidl_fuchsia_intl_test::*;
 use fidl_fuchsia_settings as fsettings;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
 use futures::StreamExt;
-use realm_proxy_client::{extend_namespace, InstalledNamespace};
+use realm_client::{extend_namespace, InstalledNamespace};
 
 async fn create_realm(options: RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<RealmFactoryMarker>()?;
@@ -18,7 +18,7 @@ async fn create_realm(options: RealmOptions) -> Result<InstalledNamespace> {
     realm_factory
         .create_realm2(options, dict_server)
         .await?
-        .map_err(realm_proxy_client::Error::OperationError)?;
+        .map_err(realm_client::Error::OperationError)?;
     let ns = extend_namespace(realm_factory, dict_client).await?;
 
     Ok(ns)
@@ -28,9 +28,8 @@ async fn create_realm(options: RealmOptions) -> Result<InstalledNamespace> {
 async fn set_then_get() -> Result<()> {
     let realm_options = RealmOptions::default();
     let test_ns = create_realm(realm_options).await?;
-    let intl = connect_to_protocol_at::<fsettings::IntlMarker>(test_ns.prefix())?;
-    let property_provider =
-        connect_to_protocol_at::<fintl::PropertyProviderMarker>(test_ns.prefix())?;
+    let intl = connect_to_protocol_at::<fsettings::IntlMarker>(&test_ns)?;
+    let property_provider = connect_to_protocol_at::<fintl::PropertyProviderMarker>(&test_ns)?;
     let mut event_stream = property_provider.take_event_stream();
 
     // This warms up the intl services component and the set_ui component, avoiding potential

@@ -285,7 +285,7 @@ void SimpleDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count,
+    const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   if (out_client_composition_opcodes_actual != nullptr) {
@@ -296,37 +296,37 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0].display_id) == kDisplayId);
 
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0]->layer_count);
+  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0].layer_count);
   cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, display_configs[0]->layer_count);
+      out_client_composition_opcodes_list, display_configs[0].layer_count);
   std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
   if (out_client_composition_opcodes_actual != nullptr) {
     *out_client_composition_opcodes_actual = client_composition_opcodes.size();
   }
 
   bool success;
-  if (display_configs[0]->layer_count != 1) {
+  if (display_configs[0].layer_count != 1) {
     success = false;
   } else {
-    const primary_layer_t* layer = &display_configs[0]->layer_list[0]->cfg.primary;
+    const primary_layer_t* layer = &display_configs[0].layer_list[0].cfg.primary;
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,
         .width = width_,
         .height = height_,
     };
-    success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
+    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
               layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
               layer->image_metadata.width == width_ && layer->image_metadata.height == height_ &&
               memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
-              display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
+              display_configs[0].cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
     client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
+    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
       client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
@@ -334,10 +334,10 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
 }
 
 void SimpleDisplay::DisplayControllerImplApplyConfiguration(
-    const display_config_t** display_config, size_t display_count,
+    const display_config_t* display_config, size_t display_count,
     const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  has_image_ = display_count != 0 && display_config[0]->layer_count != 0;
+  has_image_ = display_count != 0 && display_config[0].layer_count != 0;
   {
     fbl::AutoLock lock(&mtx_);
     config_stamp_ = display::ToConfigStamp(*banjo_config_stamp);

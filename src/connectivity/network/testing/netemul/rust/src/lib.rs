@@ -62,7 +62,11 @@ pub fn new_endpoint_config(
     mtu: u16,
     mac: Option<fnet::MacAddress>,
 ) -> fnetemul_network::EndpointConfig {
-    fnetemul_network::EndpointConfig { mtu, mac: mac.map(Box::new) }
+    fnetemul_network::EndpointConfig {
+        mtu,
+        mac: mac.map(Box::new),
+        port_class: fnetwork::PortClass::Virtual,
+    }
 }
 
 /// A test sandbox backed by a [`fnetemul::SandboxProxy`].

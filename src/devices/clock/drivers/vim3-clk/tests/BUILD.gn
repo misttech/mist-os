@@ -1,0 +1,46 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+
+test("vim3-clk-driver-test") {
+  output_name = "vim3-clk-driver-test"
+  sources = [
+    "//src/devices/clock/drivers/vim3-clk/aml-fclk-rates.cc",
+    "//src/devices/clock/drivers/vim3-clk/meson_gate.cc",
+    "//src/devices/clock/drivers/vim3-clk/meson_pll.cc",
+    "//src/devices/clock/drivers/vim3-clk/vim3_clk.cc",
+    "test.cc",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/mmio",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+  ]
+}
+
+fuchsia_unittest_package("vim3-clk-test-pkg") {
+  package_name = "vim3_clk_driver_test"
+  deps = [ ":vim3-clk-driver-test" ]
+}

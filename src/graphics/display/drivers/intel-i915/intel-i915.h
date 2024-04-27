@@ -94,10 +94,10 @@ class Controller : public DeviceType,
   }
   void DisplayControllerImplReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayControllerImplCheckConfiguration(
-      const display_config_t** display_configs, size_t display_count,
+      const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t** banjo_display_configs,
+  void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
                                                size_t display_config_count,
                                                const config_stamp_t* banjo_config_stamp);
   void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
@@ -228,13 +228,13 @@ class Controller : public DeviceType,
 
   // Gets the layer_t* config for the given pipe/plane. Return false if there is no layer.
   bool GetPlaneLayer(Pipe* pipe, uint32_t plane,
-                     cpp20::span<const display_config_t*> banjo_display_configs,
+                     cpp20::span<const display_config_t> banjo_display_configs,
                      const layer_t** layer_out) __TA_REQUIRES(display_lock_);
   uint16_t CalculateBuffersPerPipe(size_t active_pipe_count);
   // Returns false if no allocation is possible. When that happens,
   // plane 0 of the failing displays will be set to UINT16_MAX.
   bool CalculateMinimumAllocations(
-      cpp20::span<const display_config_t*> banjo_display_configs,
+      cpp20::span<const display_config_t> banjo_display_configs,
       uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                          [registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
   // Updates plane_buffers_ based pipe_buffers_ and the given parameters
@@ -251,16 +251,16 @@ class Controller : public DeviceType,
       buffer_allocation_t active_allocation[PipeIds<registers::Platform::kKabyLake>().size()])
       __TA_REQUIRES(display_lock_);
   // Reallocates plane buffers based on the given layer config.
-  void ReallocatePlaneBuffers(cpp20::span<const display_config_t*> banjo_display_configs,
+  void ReallocatePlaneBuffers(cpp20::span<const display_config_t> banjo_display_configs,
                               bool reallocate_pipes) __TA_REQUIRES(display_lock_);
 
   // Validates that a basic layer configuration can be supported for the
   // given modes of the displays.
-  bool CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
+  bool CheckDisplayLimits(cpp20::span<const display_config_t> banjo_display_configs,
                           cpp20::span<client_composition_opcode_t> client_composition_opcodes)
       __TA_REQUIRES(display_lock_);
 
-  bool CalculatePipeAllocation(cpp20::span<const display_config_t*> banjo_display_configs,
+  bool CalculatePipeAllocation(cpp20::span<const display_config_t> banjo_display_configs,
                                cpp20::span<display::DisplayId> display_allocated_to_pipe)
       __TA_REQUIRES(display_lock_);
 

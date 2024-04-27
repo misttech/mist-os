@@ -20,9 +20,7 @@ TEST_F(QueryRequestTest, DeviceDescriptor) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   ReadDescriptorUpiu device_desc_upiu(DescriptorType::kDevice);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          device_desc_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(device_desc_upiu);
   ASSERT_OK(response);
   auto device_descriptor =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<DeviceDescriptor>();
@@ -42,9 +40,7 @@ TEST_F(QueryRequestTest, GeometryDescriptor) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   ReadDescriptorUpiu geometry_desc_upiu(DescriptorType::kGeometry);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          geometry_desc_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(geometry_desc_upiu);
   ASSERT_OK(response);
   auto geometry_desc =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<GeometryDescriptor>();
@@ -59,9 +55,7 @@ TEST_F(QueryRequestTest, UnitDescriptor) {
 
   uint8_t lun = 0;
   ReadDescriptorUpiu unit_desc_upiu(DescriptorType::kUnit, lun);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          unit_desc_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(unit_desc_upiu);
   ASSERT_OK(response);
   auto unit_desc = response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
 
@@ -88,9 +82,7 @@ TEST_F(QueryRequestTest, WriteDescriptor) {
   descriptor.bHighPriorityLUN = high_priority_lun;
 
   WriteDescriptorUpiu config_desc_upiu(DescriptorType::kConfiguration, &descriptor);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          config_desc_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(config_desc_upiu);
   ASSERT_OK(response);
 
   ASSERT_EQ(high_priority_lun, mock_device_->GetDeviceDesc().bHighPriorityLUN);
@@ -139,9 +131,7 @@ TEST_F(QueryRequestTest, ReadFlag) {
   mock_device_->SetFlag(Flags::fDeviceInit, device_init);
 
   ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          read_flag_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(read_flag_upiu);
   ASSERT_OK(response);
   auto flag = response->GetResponse<FlagResponseUpiu>().GetFlag();
 
@@ -154,9 +144,7 @@ TEST_F(QueryRequestTest, SetFlag) {
   mock_device_->SetFlag(Flags::fPermanentWPEn, false);
 
   SetFlagUpiu set_flag_upiu(Flags::fPermanentWPEn);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          set_flag_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(set_flag_upiu);
   ASSERT_OK(response);
 
   ASSERT_EQ(true, mock_device_->GetFlag(Flags::fPermanentWPEn));
@@ -169,9 +157,7 @@ TEST_F(QueryRequestTest, ToggleFlag) {
   mock_device_->SetFlag(Flags::fDeviceInit, device_init);
 
   ToggleFlagUpiu toggle_flag_upiu(Flags::fDeviceInit);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          toggle_flag_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(toggle_flag_upiu);
   ASSERT_OK(response);
 
   ASSERT_EQ(!device_init, mock_device_->GetFlag(Flags::fDeviceInit));
@@ -184,13 +170,23 @@ TEST_F(QueryRequestTest, ClearFlag) {
   mock_device_->SetFlag(Flags::fDeviceInit, device_init);
 
   ClearFlagUpiu clear_flag_upiu(Flags::fDeviceInit);
-  auto response =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          clear_flag_upiu);
+  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(clear_flag_upiu);
   ASSERT_OK(response);
 
   device_init = false;
   ASSERT_EQ(device_init, mock_device_->GetFlag(Flags::fDeviceInit));
+}
+
+TEST(QueryRequestTest, QueryOpcodeToString) {
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kNop), "Nop");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kReadDescriptor), "Read Descriptor");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kWriteDescriptor), "Write Descriptor");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kReadAttribute), "Read Attribute");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kWriteAttribute), "Write Attribute");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kReadFlag), "Read Flag");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kSetFlag), "Set Flag");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kClearFlag), "Clear Flag");
+  ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kToggleFlag), "Toggle Flag");
 }
 
 }  // namespace ufs

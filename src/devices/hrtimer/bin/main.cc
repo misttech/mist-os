@@ -187,12 +187,19 @@ int StartTimer(std::string path, std::optional<uint64_t> id, bool is_wait, int64
       return -1;
     }
   }
+
+  // LINT.IfChange
+  std::cout << "Timer started" << std::endl;
+  // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
+
   if (!is_wait) {
     if (supports_event) {
       std::cout << "Waiting on event..." << std::endl;
       zx_signals_t signals;
       event.wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals);
+      // LINT.IfChange
       std::cout << "Event trigged" << std::endl;
+      // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
     }
   }
   return 0;

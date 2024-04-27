@@ -8,7 +8,7 @@ use {
             errors::{FsckError, FsckFatal, FsckWarning},
             FragmentationStats, Fsck, FsckResult,
         },
-        lsm_tree::types::{Item, ItemRef, LayerIterator, MutableLayer},
+        lsm_tree::types::{Item, ItemRef, LayerIterator},
         object_handle::INVALID_OBJECT_ID,
         object_store::{
             allocator::{self, AllocatorKey, AllocatorValue},
@@ -718,7 +718,7 @@ impl<'a> ScannedStore<'a> {
                 AllocatorValue::Abs { count: 1, owner_object_id: self.store_id },
             );
             let lower_bound: AllocatorKey = item.key.lower_bound_for_merge_into();
-            self.fsck.allocations.merge_into(item, &lower_bound, allocator::merge::merge).await;
+            self.fsck.allocations.merge_into(item, &lower_bound, allocator::merge::merge);
         }
         Ok(())
     }

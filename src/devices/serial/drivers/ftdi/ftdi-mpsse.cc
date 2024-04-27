@@ -4,86 +4,13 @@
 
 #include "ftdi-mpsse.h"
 
-#include <fuchsia/hardware/serialimpl/c/banjo.h>
 #include <zircon/types.h>
 
 namespace ftdi_mpsse {
 
-zx_status_t Mpsse::Init() {
-  zx_status_t status = ZX_OK;
+zx_status_t Mpsse::Read(uint8_t* buf, size_t len) { return serial_->Read(buf, len); }
 
-  notify_cb_.callback = Mpsse::NotifyCallback;
-  notify_cb_.ctx = this;
-
-  ftdi_.SetNotifyCallback(&notify_cb_);
-
-  return status;
-}
-
-void Mpsse::NotifyCallback(void* ctx, serial_state_t state) {
-  Mpsse* mpsse = reinterpret_cast<Mpsse*>(ctx);
-
-  if (state & SERIAL_STATE_READABLE) {
-    sync_completion_signal(&mpsse->serial_readable_);
-  } else {
-    sync_completion_reset(&mpsse->serial_readable_);
-  }
-  if (state & SERIAL_STATE_WRITABLE) {
-    sync_completion_signal(&mpsse->serial_writable_);
-  } else {
-    sync_completion_reset(&mpsse->serial_writable_);
-  }
-}
-
-zx_status_t Mpsse::Read(uint8_t* buf, size_t len) {
-  size_t read_len = 0;
-  zx_status_t status;
-  uint8_t* buf_index = buf;
-
-  while (read_len < len) {
-    size_t actual;
-    status = ftdi_.Read(buf_index, len - read_len, &actual);
-    if (status == ZX_ERR_SHOULD_WAIT || (actual == 0)) {
-      status = sync_completion_wait_deadline(&serial_readable_,
-                                             zx::deadline_after(kSerialReadWriteTimeout).get());
-      if (status != ZX_OK) {
-        return status;
-      }
-      continue;
-    }
-    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
-      return status;
-    }
-    read_len += actual;
-    buf_index += actual;
-  }
-  return ZX_OK;
-}
-
-zx_status_t Mpsse::Write(uint8_t* buf, size_t len) {
-  uint8_t* buf_index = buf;
-  size_t write_len = 0;
-
-  while (write_len < len) {
-    size_t actual;
-    zx_status_t status = ftdi_.Write(buf_index, len - write_len, &actual);
-    if (status == ZX_ERR_SHOULD_WAIT || (actual == 0)) {
-      status = sync_completion_wait_deadline(&serial_writable_,
-                                             zx::deadline_after(kSerialReadWriteTimeout).get());
-      if (status != ZX_OK) {
-        return status;
-      }
-      continue;
-    }
-    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
-      return status;
-    }
-    write_len += actual;
-    buf_index += actual;
-  }
-
-  return ZX_OK;
-}
+zx_status_t Mpsse::Write(uint8_t* buf, size_t len) { return serial_->Write(buf, len); }
 
 zx_status_t Mpsse::Sync() {
   constexpr uint8_t nonsense = 0xAB;

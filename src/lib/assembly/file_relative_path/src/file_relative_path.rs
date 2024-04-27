@@ -50,6 +50,7 @@
 use anyhow::{anyhow, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A Utf8PathBuf which can be either file-relative, or has been resolved with
@@ -78,7 +79,7 @@ use serde::{Deserialize, Serialize};
 /// );
 /// ```
 ///
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, JsonSchema)]
 #[serde(from = "FileRelativePathBufSerializationHelper")]
 #[serde(into = "FileRelativePathBufSerializationHelper")]
 pub enum FileRelativePathBuf {
@@ -94,12 +95,20 @@ pub enum FileRelativePathBuf {
     ///
     /// From this state, it can can be resolved against the path to the
     /// containing file to make it usable by the application.
+    #[schemars(schema_with = "path_schema")]
     FileRelative(Utf8PathBuf),
 
     /// The path has been 'resolved'.  This is the state it's in when created directly
     /// using From/Into.  This state can be made relative from a path to a file
     /// that will contain this path as a file-relative path.
+    #[schemars(schema_with = "path_schema")]
     Resolved(Utf8PathBuf),
+}
+
+fn path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <String>::json_schema(gen).into();
+    schema.format = Some("Utf8PathBuf".to_owned());
+    schema.into()
 }
 
 impl FileRelativePathBuf {
