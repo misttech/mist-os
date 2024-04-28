@@ -504,3 +504,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0243_wlan_roaming.md
   - title: "RFC-0244: Raise user-defined Zircon exception"
     path: /docs/contribute/governance/rfcs/0244_raise_exception.md
+  - title: "RFC-2045: VMO Prefetch"
+    path: /docs/contribute/governance/rfcs/2045_vmo_prefetch.md

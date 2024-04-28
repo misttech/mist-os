@@ -3192,3 +3192,16 @@
   reviewers: ['cpu@google.com', 'jamesr@google.com', 'jruthe@google.com']
   submitted: '2024-03-22'
   reviewed: '2024-04-22'
+
+- name: 'RFC-2045'
+  title: 'VMO Prefetch'
+  short_description: 'Operations to prefetch data in VMOs in preparation for read accesses.'
+  authors: ['adanis@google.com']
+  file: '2045_vmo_prefetch.md'
+  area: ['Kernel']
+  issue: ['42082608']
+  gerrit_change_id: ['1010732']
+  status: 'Accepted'
+  reviewers: ['adamperry@google.com', 'dworsham@google.com']
+  submitted: '2024-03-19'
+  reviewed: '2024-04-09'
