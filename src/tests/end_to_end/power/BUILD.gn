@@ -13,6 +13,7 @@ python_library("power_test_utils") {
     "__init__.py",
     "power_test_utils.py",
   ]
+  enable_mypy = true
   library_deps = [ "//src/performance/lib/trace_processing" ]
 }
 
