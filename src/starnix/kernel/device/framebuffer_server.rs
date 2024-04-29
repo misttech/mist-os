@@ -282,19 +282,26 @@ pub fn init_viewport_scene(
     server.present();
 }
 
-pub fn send_view_to_graphical_presenter(
+pub fn start_presentation_loop(
     kernel: &Arc<Kernel>,
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     view_identity: fuiviews::ViewIdentityOnCreation,
     incoming_dir: fidl_fuchsia_io::DirectoryProxy,
 ) {
+    let flatland = server.flatland.clone();
+    let mut flatland_event_stream = flatland.take_event_stream();
+    let server_clone = server.clone();
+    let mut presentation_receiver = server_clone.presentation_receiver.lock();
+    let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
     kernel.kthreads.spawner().spawn(|_, _| {
         let mut executor = fasync::LocalExecutor::new();
+        let scheduler = ThroughputScheduler::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         let mut view_identity = Some(view_identity);
         let mut maybe_view_controller_proxy = None;
         executor.run_singlethreaded(async move {
+            let mut scene_state = None;
             let link_token_pair =
                 ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
             // We don't actually care about the parent viewport at the moment, because we don't resize.
@@ -315,8 +322,29 @@ pub fn send_view_to_graphical_presenter(
                 )
                 .expect("FIDL error");
 
-            // Now that the view has been created, start presenting.
+            // Now that the view has been created, start presenting to Flatland.
+            // We must do this first because GraphicalPresenter can only
+            // service `present_view` once a child view is attached to the view
+            // tree. In order to attach, the child must have presented at least
+            // once.
             server.present();
+            let message = presentation_receiver.next().await;
+            if message.is_some() {
+                scene_state = message;
+                scheduler.request_present();
+                let present_parameters = scheduler.wait_to_update().await;
+                flatland
+                .present(fuicomposition::PresentArgs {
+                    requested_presentation_time: Some(
+                        present_parameters.requested_presentation_time.into_nanos(),
+                    ),
+                    acquire_fences: None,
+                    release_fences: None,
+                    unsquashable: Some(present_parameters.unsquashable),
+                    ..Default::default()
+                })
+                .unwrap_or(());
+            };
 
             let graphical_presenter = connect_to_protocol_at_dir_root::<
                 felement::GraphicalPresenterMarker,
@@ -339,30 +367,16 @@ pub fn send_view_to_graphical_presenter(
             let (annotation_controller_client_end, _annotation_controller_stream) =
                 create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
 
+            // Wait for present_view before processing Flatland events.
             graphical_presenter
-                .present_view(
-                    view_spec,
-                    Some(annotation_controller_client_end),
-                    Some(view_controller_server_end),
-                )
-                .await
-                .expect("failed to present view")
-                .unwrap_or_else(|e| println!("{:?}", e));
-        });
-    });
-}
+            .present_view(
+                view_spec,
+                Some(annotation_controller_client_end),
+                Some(view_controller_server_end),
+            ).await.expect("failed to present view")
+            .unwrap_or_else(|e| println!("{:?}", e));
 
-/// Starts a flatland presentation loop, using the flatland proxy in `server`.
-pub fn start_flatland_presentation_loop(kernel: &Arc<Kernel>, server: Arc<FramebufferServer>) {
-    let flatland = server.flatland.clone();
-    let mut flatland_event_stream = flatland.take_event_stream();
-    let mut presentation_receiver = server.presentation_receiver.lock();
-    let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
-    kernel.kthreads.spawner().spawn(|_, _| {
-        let mut executor = fasync::LocalExecutor::new();
-        let scheduler = ThroughputScheduler::new();
-        executor.run_singlethreaded(async move {
-            let mut scene_state = None;
+            // Start presentation loop to prepare for display updates.
             loop {
                 futures::select! {
                     message = presentation_receiver.next() => {
@@ -432,6 +446,6 @@ pub fn start_flatland_presentation_loop(kernel: &Arc<Kernel>, server: Arc<Frameb
                     }
                 }
             }
-        })
+        });
     });
 }
