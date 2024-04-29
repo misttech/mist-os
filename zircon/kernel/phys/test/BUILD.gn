@@ -287,6 +287,9 @@ if (current_toolchain != default_toolchain) {
       "//zircon/kernel/lib/libc",
     ]
 
+    have_allocation_pool = toolchain_environment != "kernel.efi"
+    defines = [ "HAVE_ALLOCATION_POOL=$have_allocation_pool" ]
+
     # TODO(https://fxbug.dev/42079666): Remove if this doesn't help
     # because that means the timeout is likely not the issue.
     #
