@@ -25,13 +25,13 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
-        future::{ready, BoxFuture},
+        future::{ready, BoxFuture, Fuse},
         lock::Mutex,
         select,
         stream::FuturesUnordered,
         FutureExt, StreamExt,
     },
-    std::{convert::Infallible, fmt::Debug, sync::Arc, unimplemented},
+    std::{convert::Infallible, fmt::Debug, pin::pin, sync::Arc, unimplemented},
     tracing::{debug, error, info, warn},
 };
 
@@ -1309,7 +1309,7 @@ fn attempt_atomic_operation<T: 'static>(
     })
 }
 
-async fn serve_all_iface_functionality(
+async fn serve_iface_functionality(
     iface_manager: &mut IfaceManagerService,
     requests: &mut atomic_oneshot_stream::AtomicOneshotStream<mpsc::Receiver<IfaceManagerRequest>>,
     reconnect_monitor_interval: &mut i64,
@@ -1317,10 +1317,35 @@ async fn serve_all_iface_functionality(
     operation_futures: &mut FuturesUnordered<BoxFuture<'static, IfaceManagerOperation>>,
     defect_receiver: &mut mpsc::UnboundedReceiver<Defect>,
     recovery_action_receiver: &mut recovery::RecoveryActionReceiver,
+    recovery_in_progress: &mut bool,
 ) {
+    let iface_manager_request_fut = Fuse::terminated();
+    let mut iface_manager_request_fut = pin!(iface_manager_request_fut);
+
+    // IfaceManager requests should only be processed if recovery is not in progress.
     let mut atomic_iface_manager_requests = requests.get_atomic_oneshot_stream();
+    if !*recovery_in_progress {
+        iface_manager_request_fut.set(
+            async move {
+                select! {
+                    (token, req) = atomic_iface_manager_requests.select_next_some() => {
+                        (token, req)
+                    }
+                    complete => {
+                        // "complete" here indicates that the IfaceManager request stream has been
+                        // interrupted because some critical interaction is in progress.  This
+                        // future should stall and allow the other IfaceManager internal futures to
+                        // progress.
+                        let pending: std::future::Pending::<(atomic_oneshot_stream::Token, IfaceManagerRequest)> = std::future::pending();
+                        pending.await
+                    }
+                }
+            }.fuse()
+        );
+    }
+
     select! {
-        (token, req) = atomic_iface_manager_requests.select_next_some() => {
+        (token, req) = iface_manager_request_fut.fuse() => {
             handle_iface_manager_request(
                 iface_manager,
                 operation_futures,
@@ -1347,9 +1372,11 @@ async fn serve_all_iface_functionality(
                     previous_state
                 ).await;
             },
+            IfaceManagerOperation::PerformRecovery => {
+                *recovery_in_progress = false;
+            }
             IfaceManagerOperation::ConfigureStateMachine
-            | IfaceManagerOperation::ReportDefect
-            | IfaceManagerOperation::PerformRecovery => {},
+            | IfaceManagerOperation::ReportDefect => {}
         },
         connection_selection_result = iface_manager.connection_selection_futures.select_next_some() => {
             match connection_selection_result {
@@ -1379,6 +1406,7 @@ async fn serve_all_iface_functionality(
             operation_futures.push(initiate_record_defect(iface_manager.phy_manager.clone(), defect))
         },
         action = recovery_action_receiver.select_next_some() => {
+            *recovery_in_progress = true;
             operation_futures.push(initiate_recovery(iface_manager.phy_manager.clone(), action))
         },
     }
@@ -1404,8 +1432,12 @@ pub(crate) async fn serve_iface_manager_requests(
     let mut connectivity_monitor_timer =
         fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
 
+    // Any recovery process needs to be allowed to run to completion before further IfaceManager
+    // requests or new recovery requests are processed.
+    let mut recovery_in_progress = false;
+
     loop {
-        serve_all_iface_functionality(
+        serve_iface_functionality(
             &mut iface_manager,
             &mut requests,
             &mut reconnect_monitor_interval,
@@ -1413,6 +1445,7 @@ pub(crate) async fn serve_iface_manager_requests(
             &mut operation_futures,
             &mut defect_receiver,
             &mut recovery_action_receiver,
+            &mut recovery_in_progress,
         )
         .await;
     }
@@ -1573,7 +1606,7 @@ mod tests {
         client_connections_enabled: bool,
         client_ifaces: Vec<u16>,
         defects: Vec<Defect>,
-        recoveries: Vec<RecoverySummary>,
+        recovery_sender: Option<mpsc::Sender<(RecoverySummary, oneshot::Sender<()>)>>,
     }
 
     #[async_trait]
@@ -1680,7 +1713,16 @@ mod tests {
         }
 
         async fn perform_recovery(&mut self, summary: RecoverySummary) {
-            self.recoveries.push(summary);
+            match self.recovery_sender.as_mut() {
+                Some(recovery_sender) => {
+                    let (sender, receiver) = oneshot::channel();
+                    recovery_sender
+                        .try_send((summary, sender))
+                        .expect("Failed to send recovery summary");
+                    receiver.await.expect("Failed waiting for recovery response");
+                }
+                None => {}
+            }
         }
     }
 
@@ -1782,7 +1824,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         };
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -1841,7 +1883,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         };
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -2342,7 +2384,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         // Configure the mock CSM with the expected connect request
@@ -2423,7 +2465,7 @@ mod tests {
             client_connections_enabled: false,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         // Create the IfaceManager
@@ -2790,7 +2832,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         // Create a PhyManager with a single, known client iface.
@@ -3005,7 +3047,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         {
@@ -3034,7 +3076,7 @@ mod tests {
             client_connections_enabled: false,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         // Delete all client records initially.
@@ -4615,7 +4657,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         },
         TestType::Pass;
         "successfully started client connections"
@@ -4630,7 +4672,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         },
         TestType::Fail;
         "failed to start client connections"
@@ -4645,7 +4687,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         },
         TestType::ClientError;
         "client dropped receiver"
@@ -4695,7 +4737,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         },
         TestType::Pass;
         "successfully stopped client connections"
@@ -4710,7 +4752,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         },
         TestType::Fail;
         "failed to stop client connections"
@@ -4725,7 +4767,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         },
         TestType::ClientError;
         "client dropped receiver"
@@ -5456,7 +5498,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
         let fut = iface_manager.has_wpa3_capable_client();
         let mut fut = pin!(fut);
@@ -5482,7 +5524,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
         let fut = iface_manager.has_wpa3_capable_client();
         let mut fut = pin!(fut);
@@ -5549,7 +5591,7 @@ mod tests {
             client_connections_enabled,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         let mut iface_manager = IfaceManagerService::new(
@@ -5635,7 +5677,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
 
         {
@@ -5676,7 +5718,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: None,
         }));
         let iface_manager = IfaceManagerService::new(
             phy_manager.clone(),
@@ -5723,6 +5765,7 @@ mod tests {
     fn test_receive_recovery_summaries() {
         let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
+        let (recovery_sender, mut recovery_receiver) = mpsc::channel(100);
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
@@ -5732,7 +5775,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
-            recoveries: vec![],
+            recovery_sender: Some(recovery_sender),
         }));
         let iface_manager = IfaceManagerService::new(
             phy_manager.clone(),
@@ -5769,15 +5812,187 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Verify that the recovery summary has been recorded.
-        let phy_manager_fut = phy_manager.lock();
-        let mut phy_manager_fut = pin!(phy_manager_fut);
+        let next_message = recovery_receiver.next();
+        let mut next_message = pin!(next_message);
         assert_variant!(
-            exec.run_until_stalled(&mut phy_manager_fut),
-            Poll::Ready(phy_manager) => {
-                assert_eq!(
-                    phy_manager.recoveries,
-                    vec![recovery::RecoverySummary { defect, action}]
-                )
+            exec.run_until_stalled(&mut next_message),
+            Poll::Ready(Some((summary, responder))) => {
+                assert_eq!(summary, recovery::RecoverySummary { defect, action});
+                responder.send(()).expect("failed to send recovery response");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_iface_manager_requests_not_processed_while_recovering() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = test_setup(&mut exec);
+        let (recovery_sender, mut recovery_receiver) = mpsc::channel(100);
+        let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: true,
+            destroy_iface_ok: true,
+            wpa3_iface: None,
+            set_country_ok: true,
+            country_code: None,
+            client_connections_enabled: true,
+            client_ifaces: vec![],
+            defects: vec![],
+            recovery_sender: Some(recovery_sender),
+        }));
+        let iface_manager = IfaceManagerService::new(
+            phy_manager.clone(),
+            test_values.client_update_sender.clone(),
+            test_values.ap_update_sender.clone(),
+            test_values.monitor_service_proxy.clone(),
+            test_values.saved_networks.clone(),
+            test_values.connection_selection_requester.clone(),
+            test_values.local_roam_manager.clone(),
+            test_values.telemetry_sender.clone(),
+            test_values.defect_sender.clone(),
+        );
+
+        // Send an AP start failure + reset PHY recovery summary to the IfaceManager service loop.
+        let defect = Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 });
+        let action =
+            recovery::RecoveryAction::PhyRecovery(recovery::PhyRecoveryOperation::ResetPhy {
+                phy_id: 0,
+            });
+        test_values
+            .recovery_sender
+            .try_send(recovery::RecoverySummary { defect, action })
+            .expect("failed to send recovery summary");
+
+        // Run the IfaceManager service so that it can process the recovery summary.
+        let (mut iface_manager_sender, iface_manager_receiver) = mpsc::channel(0);
+        let serve_fut = serve_iface_manager_requests(
+            iface_manager,
+            iface_manager_receiver,
+            test_values.defect_receiver,
+            test_values.recovery_receiver,
+        );
+        let mut serve_fut = pin!(serve_fut);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Verify that the recovery summary has been observed.  Hold onto the responder so that the
+        // IfaceManager service loop stalls waiting for a reply.  This is used to demonstrate that
+        // new IfaceManager requests are not processed.
+        let next_message = recovery_receiver.next();
+        let mut next_message = pin!(next_message);
+        let responder = assert_variant!(
+            exec.run_until_stalled(&mut next_message),
+            Poll::Ready(Some((summary, responder))) => {
+                assert_eq!(summary, recovery::RecoverySummary { defect, action});
+                responder
+            }
+        );
+
+        // Request that an AP be stopped.  There aren't any fake APs setup for this test, so this
+        // request would ordinarily finish immediately.  In this case, the processing of this
+        // request should be delayed since recovery is in progress.
+        let (stop_sender, mut stop_receiver) = oneshot::channel();
+        let req = StopAllApsRequest { responder: stop_sender };
+        let req = IfaceManagerRequest::AtomicOperation(AtomicOperation::StopAllAps(req));
+        iface_manager_sender.try_send(req).expect("failed to make stop all APs request");
+
+        // Run the service loop and verify that the stop all APs request has not been acknowledged
+        // yet.
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(stop_receiver.try_recv(), Ok(None));
+
+        // Complete the recovery process and observe that the stop all APs request completes.
+        responder.send(()).expect("failed to ack recovery");
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(stop_receiver.try_recv(), Ok(Some(Ok(()))));
+    }
+
+    #[fuchsia::test]
+    fn test_one_recovery_action_processed_at_a_time() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = test_setup(&mut exec);
+        let (recovery_sender, mut recovery_receiver) = mpsc::channel(100);
+        let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: true,
+            destroy_iface_ok: true,
+            wpa3_iface: None,
+            set_country_ok: true,
+            country_code: None,
+            client_connections_enabled: true,
+            client_ifaces: vec![],
+            defects: vec![],
+            recovery_sender: Some(recovery_sender),
+        }));
+        let iface_manager = IfaceManagerService::new(
+            phy_manager.clone(),
+            test_values.client_update_sender.clone(),
+            test_values.ap_update_sender.clone(),
+            test_values.monitor_service_proxy.clone(),
+            test_values.saved_networks.clone(),
+            test_values.connection_selection_requester.clone(),
+            test_values.local_roam_manager.clone(),
+            test_values.telemetry_sender.clone(),
+            test_values.defect_sender.clone(),
+        );
+
+        // Send an AP start failure + reset PHY recovery summary to the IfaceManager service loop.
+        let defect = Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 });
+        let action =
+            recovery::RecoveryAction::PhyRecovery(recovery::PhyRecoveryOperation::ResetPhy {
+                phy_id: 0,
+            });
+        test_values
+            .recovery_sender
+            .try_send(recovery::RecoverySummary { defect, action })
+            .expect("failed to send recovery summary");
+
+        // Run the IfaceManager service so that it can process the recovery summary.
+        let (_, receiver) = mpsc::channel(0);
+        let serve_fut = serve_iface_manager_requests(
+            iface_manager,
+            receiver,
+            test_values.defect_receiver,
+            test_values.recovery_receiver,
+        );
+        let mut serve_fut = pin!(serve_fut);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Verify that the recovery summary has been observed.  Hold onto the responder so that the
+        // IfaceManager service loop stalls waiting for a reply.  This is used to demonstrate that
+        // more recovery requests are not processed while the current recovery attempt is in
+        // progress.
+        let next_message = recovery_receiver.next();
+        let mut next_message = pin!(next_message);
+        let responder = assert_variant!(
+            exec.run_until_stalled(&mut next_message),
+            Poll::Ready(Some((summary, responder))) => {
+                assert_eq!(summary, recovery::RecoverySummary { defect, action});
+                responder
+            }
+        );
+
+        // Now send a connect failure + destroy iface recovery summary
+        let defect = Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 0 });
+        let action =
+            recovery::RecoveryAction::PhyRecovery(recovery::PhyRecoveryOperation::DestroyIface {
+                iface_id: 0,
+            });
+        test_values
+            .recovery_sender
+            .try_send(recovery::RecoverySummary { defect, action })
+            .expect("failed to send recovery summary");
+
+        // Progress the service loop future and verify that the new summary is not received.
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        let next_message = recovery_receiver.next();
+        let mut next_message = pin!(next_message);
+        assert_variant!(exec.run_until_stalled(&mut next_message), Poll::Pending);
+
+        // Complete the initial recovery event and verify that the next recovery summary is sent.
+        responder.send(()).expect("Failed to send completion event from oneshot");
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut next_message),
+            Poll::Ready(Some((summary, _))) => {
+                assert_eq!(summary, recovery::RecoverySummary { defect, action});
             }
         );
     }
@@ -5877,7 +6092,7 @@ mod tests {
                     client_connections_enabled: false,
                     client_ifaces: vec![],
                     defects: vec![],
-                    recoveries: vec![],
+                    recovery_sender: None,
                 }));
                 iface_manager.phy_manager = phy_manager;
                 let _ = iface_manager.aps.drain(..);
