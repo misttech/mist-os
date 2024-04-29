@@ -127,8 +127,8 @@ class InfraDriver(base.BaseDriver):
             with open(results_path, "r") as f:
                 # Write test result YAML file to stdout so that Mobly output
                 # integrates with with `testparser`.
-                print(api_infra.TESTPARSER_RESULT_HEADER, flush=True)
-                print(f.read(), flush=True)
+                print(api_infra.TESTPARSER_RESULT_HEADER)
+                print(f.read())
         except OSError:
             # It's possible for the Mobly result file to not exist (e.g. if the
             # test crashed). In such cases, don't print anything.

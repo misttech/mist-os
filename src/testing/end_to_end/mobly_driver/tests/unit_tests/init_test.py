@@ -146,5 +146,8 @@ class MoblyDriverLibTest(unittest.TestCase):
             mock_popen.assert_called_once_with(
                 mock.ANY,
                 universal_newlines=mock.ANY,
-                env={"PATH": "/test_data/path:/system/path"},
+                env={
+                    "PATH": "/test_data/path:/system/path",
+                    "PYTHONUNBUFFERED": "1",
+                },
             )

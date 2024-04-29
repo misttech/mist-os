@@ -392,7 +392,9 @@ template("python_mobly_test") {
                            ])
 
     binary_path = python_exe_src
-    args = _host_test_args
+
+    # Disable Python's output buffering when launching Mobly Driver.
+    args = [ "-u" ] + _host_test_args
 
     if (defined(invoker.extra_args)) {
       args += invoker.extra_args

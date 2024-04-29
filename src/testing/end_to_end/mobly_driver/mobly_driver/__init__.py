@@ -57,12 +57,14 @@ def _execute_test(
         # Order matters here as the test data deps are preferred over
         # binaries of existing names on the system.
         test_env["PATH"] = os.pathsep.join([test_data_path, test_env["PATH"]])
+        # Set line-buffering for Mobly tests to flush output immediately.
+        test_env["PYTHONUNBUFFERED"] = "1"
 
     with NamedTemporaryFile(mode="w") as tmp_config:
         config = driver.generate_test_config()
-        print(api_infra.TESTPARSER_PREAMBLE, flush=True)
-        print(config, flush=True)
-        print("======================================", flush=True)
+        print(api_infra.TESTPARSER_PREAMBLE)
+        print(config)
+        print("======================================")
         tmp_config.write(config)
         tmp_config.flush()
 
@@ -70,7 +72,7 @@ def _execute_test(
         if verbose:
             cmd.append("-v")
         cmd_str = " ".join(cmd)
-        print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"', flush=True)
+        print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"')
 
         with subprocess.Popen(
             cmd,
@@ -89,7 +91,9 @@ def _execute_test(
         if return_code != 0:
             # TODO(https://fxbug.dev/42070748) - differentiate between legitimate
             # test failures vs unexpected crashes.
-            raise MoblyTestFailureException("Mobly test failed.")
+            raise MoblyTestFailureException(
+                f"Mobly test failed with return code {return_code}."
+            )
 
 
 def run(
@@ -131,7 +135,7 @@ def run(
         raise ValueError(
             "|timeout_sec| must be None or a non-negative integer."
         )
-    print(f"Running [{driver.__class__.__name__}]", flush=True)
+    print(f"Running [{driver.__class__.__name__}]")
     try:
         _execute_test(
             python_path=python_path,
