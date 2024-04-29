@@ -1232,30 +1232,26 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
       info.pixel_format[pixel_format_index] = config->pixel_formats_[pixel_format_index].ToFidl();
     }
 
-    const char* manufacturer_name = "";
-    const char* monitor_name = "";
-    const char* monitor_serial = "";
-    if (!controller_->GetDisplayIdentifiers(added_display_id, &manufacturer_name, &monitor_name,
-                                            &monitor_serial)) {
-      zxlogf(ERROR, "Failed to get display identifiers");
+    const bool found_display_info =
+        controller_->FindDisplayInfo(added_display_id, [&](const DisplayInfo& display_info) {
+          info.manufacturer_name =
+              fidl::StringView::FromExternal(display_info.GetManufacturerName());
+          info.monitor_name = fidl::StringView::FromExternal(display_info.GetMonitorName());
+          info.monitor_serial = fidl::StringView::FromExternal(display_info.GetMonitorSerial());
+          info.horizontal_size_mm = display_info.GetHorizontalSizeMm();
+          info.vertical_size_mm = display_info.GetVerticalSizeMm();
+        });
+    if (!found_display_info) {
+      zxlogf(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());
       ZX_DEBUG_ASSERT(false);
     }
 
     info.using_fallback_size = false;
-    if (!controller_->GetDisplayPhysicalDimensions(added_display_id, &info.horizontal_size_mm,
-                                                   &info.vertical_size_mm)) {
-      zxlogf(ERROR, "Failed to get display physical dimensions");
-      ZX_DEBUG_ASSERT(false);
-    }
     if (info.horizontal_size_mm == 0 || info.vertical_size_mm == 0) {
       info.horizontal_size_mm = kFallbackHorizontalSizeMm;
       info.vertical_size_mm = kFallbackVerticalSizeMm;
       info.using_fallback_size = true;
     }
-
-    info.manufacturer_name = fidl::StringView::FromExternal(manufacturer_name);
-    info.monitor_name = fidl::StringView::FromExternal(monitor_name);
-    info.monitor_serial = fidl::StringView::FromExternal(monitor_serial);
 
     coded_configs.push_back(info);
   }

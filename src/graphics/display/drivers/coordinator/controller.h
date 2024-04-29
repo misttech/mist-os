@@ -112,11 +112,15 @@ class Controller : public DeviceType,
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
       __TA_REQUIRES(mtx());
 
-  bool GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
-                             const char** monitor_name, const char** monitor_serial)
-      __TA_REQUIRES(mtx());
-  bool GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
-                                    uint32_t* vertical_size_mm) __TA_REQUIRES(mtx());
+  // Calls `callback` with a const DisplayInfo& matching the given `display_id`.
+  //
+  // Returns true iff a DisplayInfo with `display_id` was found and `callback`
+  // was called.
+  //
+  // The controller mutex is guaranteed to be held while `callback` is called.
+  template <typename Callback>
+  bool FindDisplayInfo(DisplayId display_id, Callback callback) __TA_REQUIRES(mtx());
+
   Driver* driver() { return &driver_; }
 
   bool supports_capture() { return supports_capture_; }
@@ -201,6 +205,19 @@ class Controller : public DeviceType,
 
   ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStamp;
 };
+
+template <typename Callback>
+bool Controller::FindDisplayInfo(DisplayId display_id, Callback callback) {
+  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
+
+  for (const DisplayInfo& display : displays_) {
+    if (display.id == display_id) {
+      callback(display);
+      return true;
+    }
+  }
+  return false;
+}
 
 }  // namespace display
 

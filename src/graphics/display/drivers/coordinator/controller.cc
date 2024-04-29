@@ -735,30 +735,6 @@ zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelForm
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-bool Controller::GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
-                                       const char** monitor_name, const char** monitor_serial) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  for (auto& display : displays_) {
-    if (display.id == display_id) {
-      display.GetIdentifiers(manufacturer_name, monitor_name, monitor_serial);
-      return true;
-    }
-  }
-  return false;
-}
-
-bool Controller::GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
-                                              uint32_t* vertical_size_mm) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  for (DisplayInfo& display : displays_) {
-    if (display.id == display_id) {
-      display.GetPhysicalDimensions(horizontal_size_mm, vertical_size_mm);
-      return true;
-    }
-  }
-  return false;
-}
-
 namespace {
 
 void PrintChannelKoids(ClientPriority client_priority, const zx::channel& channel) {
