@@ -315,12 +315,10 @@ From //build/testing/environments.gni:9
 If true, emit additional execution logs, which contains information
 about remote executions and their action digests, cache status,
 remote inputs, and more.
-Caution: these logs can grow to be very large, due to the amount
-of information logged per action.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/bazel/logging.gni:11
+From //build/bazel/logging.gni:9
 
 ### bazel_fuchsia_sdk_all_cpus
 
