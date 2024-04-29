@@ -148,8 +148,7 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
 
     fn destroy_socket_with_demux_id<
         CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
-        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
-            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -218,8 +217,7 @@ impl DualStackIpExt for Ipv4 {
 
     fn destroy_socket_with_demux_id<
         CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
-        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
-            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -347,8 +345,7 @@ impl DualStackIpExt for Ipv6 {
 
     fn destroy_socket_with_demux_id<
         CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
-        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
-            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -444,18 +441,13 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static 
 /// The bindings context for TCP.
 ///
 /// TCP timers are scoped by weak device IDs.
-// TODO(https://fxbug.dev/42083407): Remove type parameters from this trait,
-// they're no longer needed.
-pub trait TcpBindingsContext<I: DualStackIpExt, D: device::WeakId>:
+pub trait TcpBindingsContext:
     Sized + TimerContext2 + TracingContext + RngContext + TcpBindingsTypes
 {
 }
 
-impl<I, D, O> TcpBindingsContext<I, D> for O
-where
-    I: DualStackIpExt,
-    O: TimerContext2 + TracingContext + RngContext + TcpBindingsTypes + Sized,
-    D: device::WeakId,
+impl<BC> TcpBindingsContext for BC where
+    BC: TimerContext2 + TracingContext + RngContext + TcpBindingsTypes + Sized
 {
 }
 
@@ -2031,8 +2023,7 @@ where
     I: DualStackIpExt,
     C: ContextPair,
     C::CoreContext: TcpContext<I, C::BindingsContext> + CounterContext<TcpCounters<I>>,
-    C::BindingsContext:
-        TcpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    C::BindingsContext: TcpBindingsContext,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair, IpVersionMarker { .. }) = self;
@@ -2968,7 +2959,7 @@ where
                         where
                             SockI: DualStackIpExt,
                             WireI: DualStackIpExt,
-                            BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                            BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
@@ -3117,7 +3108,7 @@ where
                         where
                             SockI: DualStackIpExt,
                             WireI: DualStackIpExt,
-                            BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                            BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
@@ -3583,7 +3574,7 @@ where
                 where
                     SockI: DualStackIpExt,
                     WireI: DualStackIpExt,
-                    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                    BC: TcpBindingsContext,
                     CC: TransportIpContext<WireI, BC>
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                         + CounterContext<TcpCounters<SockI>>,
@@ -4037,10 +4028,7 @@ where
     ) where
         C::CoreContext: TcpContext<I::OtherVersion, C::BindingsContext>
             + CounterContext<TcpCounters<I::OtherVersion>>,
-        C::BindingsContext: TcpBindingsContext<
-            I::OtherVersion,
-            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
-        >,
+        C::BindingsContext: TcpBindingsContext,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
 
@@ -4201,11 +4189,7 @@ where
 }
 
 /// Destroys the socket with `id`.
-fn destroy_socket<
-    I: DualStackIpExt,
-    CC: TcpContext<I, BC>,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
->(
+fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsContext>(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
     id: TcpSocketId<I, CC::WeakDeviceId, BC>,
@@ -4298,7 +4282,7 @@ fn close_pending_sockets<I, CC, BC>(
     pending: impl Iterator<Item = TcpSocketId<I, CC::WeakDeviceId, BC>>,
 ) where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 {
     for conn_id in pending {
@@ -4398,7 +4382,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, DC::WeakDeviceId, BC>
         + CounterContext<TcpCounters<SockI>>,
-    BC: TcpBindingsContext<SockI, DC::WeakDeviceId>,
+    BC: TcpBindingsContext,
 {
     if !matches!(state, State::Closed(_)) {
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -4426,7 +4410,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
 ) where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
     while let Some(seg) = core_ctx.with_counters(|counters| {
@@ -4515,7 +4499,7 @@ impl AccessBufferSize for ReceiveBufferSize {
 fn set_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -4554,7 +4538,7 @@ fn set_buffer_size<
 fn get_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -4712,7 +4696,7 @@ fn connect_inner<CC, BC, SockI, WireI>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
         + CounterContext<TcpCounters<SockI>>,
@@ -4934,7 +4918,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
 
 impl<CC, BC> TimerHandler<BC, TimerId<CC::WeakDeviceId, BC>> for CC
 where
-    BC: TcpBindingsContext<Ipv4, CC::WeakDeviceId> + TcpBindingsContext<Ipv6, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<Ipv4, BC>
         + TcpContext<Ipv6, BC>
         + CounterContext<TcpCounters<Ipv4>>
@@ -5889,7 +5873,7 @@ mod tests {
     fn assert_this_stack_conn<
         'a,
         I: DualStackIpExt,
-        BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
         CC: TcpContext<I, BC>,
     >(
         conn: &'a I::ConnectionAndAddr<CC::WeakDeviceId, BC>,
@@ -7672,8 +7656,7 @@ mod tests {
             + TcpContext<I::OtherVersion, BC, DeviceId = FakeDeviceId>
             + CounterContext<TcpCounters<I>>
             + CounterContext<TcpCounters<I::OtherVersion>>,
-        BC: TcpBindingsContext<I, CC::WeakDeviceId>
-            + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext + TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,

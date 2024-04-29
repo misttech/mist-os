@@ -73,8 +73,7 @@ impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for
 impl<I, BC, CC> IpTransportContext<I, BC, CC> for TcpIpTransportContext
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>
-        + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -203,8 +202,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
     incoming: Segment<&[u8]>,
 ) where
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<WireI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -408,7 +406,7 @@ fn lookup_socket<I, CC, BC>(
 ) -> Option<SocketLookupResult<I, CC::WeakDeviceId, BC>>
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 {
     addrs_to_search.find_map(|addr| {
@@ -464,7 +462,7 @@ fn try_handle_incoming_for_connection_dual_stack<SockI, CC, BC>(
 ) -> ConnectionIncomingSegmentDisposition
 where
     SockI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -566,7 +564,7 @@ fn try_handle_incoming_for_connection<SockI, WireI, CC, BC, DC>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -727,9 +725,7 @@ where
         + TcpContext<WireI, BC>
         + TcpContext<WireI::OtherVersion, BC>
         + CounterContext<TcpCounters<SockI>>,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
 {
     match disposition {
         ListenerIncomingSegmentDisposition::FoundSocket => true,
@@ -832,9 +828,7 @@ fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,

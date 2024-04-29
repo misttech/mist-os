@@ -141,7 +141,7 @@ pub trait IpBindingsContext<I: IpExt>:
     BindingsTypes
     + RngContext
     + UdpBindingsContext<I, DeviceId<Self>>
-    + TcpBindingsContext<I, WeakDeviceId<Self>>
+    + TcpBindingsContext
     + FilterBindingsContext
     + IcmpBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
@@ -161,7 +161,7 @@ where
     BC: BindingsTypes
         + RngContext
         + UdpBindingsContext<I, DeviceId<Self>>
-        + TcpBindingsContext<I, WeakDeviceId<Self>>
+        + TcpBindingsContext
         + FilterBindingsContext
         + IcmpBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
