@@ -3,11 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
-        "sys/testing/elf_test_runner.shard.cml",
+        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
-    program: {
-        binary: "bin/vkcopy",
-    },
+    children: [
+        {
+            name: "test",
+            url: "vkcopy-test#meta/vkcopy-test-child.cm",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test",
+        },
+    ],
 }
