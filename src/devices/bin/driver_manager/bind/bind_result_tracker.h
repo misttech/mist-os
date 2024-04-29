@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_RESULT_TRACKER_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_RESULT_TRACKER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_BIND_RESULT_TRACKER_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_BIND_RESULT_TRACKER_H_
 
 #include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -39,4 +39,4 @@ class BindResultTracker {
 
 }  // namespace driver_manager
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_RESULT_TRACKER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_BIND_RESULT_TRACKER_H_

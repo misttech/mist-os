@@ -9,7 +9,7 @@
 
 #include <queue>
 
-#include "src/devices/bin/driver_manager/bind_manager.h"
+#include "src/devices/bin/driver_manager/bind/bind_manager.h"
 #include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
 

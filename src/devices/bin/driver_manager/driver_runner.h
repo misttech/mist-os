@@ -24,7 +24,7 @@
 
 #include <fbl/intrusive_double_list.h>
 
-#include "src/devices/bin/driver_manager/bind_manager.h"
+#include "src/devices/bin/driver_manager/bind/bind_manager.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 #include "src/devices/bin/driver_manager/driver_host.h"

@@ -16,7 +16,7 @@
 #include <stack>
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
-#include "src/devices/bin/driver_manager/bind_result_tracker.h"
+#include "src/devices/bin/driver_manager/bind/bind_result_tracker.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/inspect.h"

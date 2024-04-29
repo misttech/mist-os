@@ -28,23 +28,6 @@ fuchsia_structured_config_values("driver_manager_config_default") {
   }
 }
 
-# TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
-source_set("binding") {
-  sources = [
-    "binding.cc",
-    "binding.h",
-  ]
-  public_deps = [
-    "//src/lib/ddk",
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
-    "//zircon/system/ulib/fbl",
-  ]
-  deps = [
-    "//src/devices/lib/bind:bind-lib",
-    "//src/devices/lib/log",
-  ]
-}
-
 source_set("inspect") {
   visibility = [ "*" ]
   sources = [
@@ -79,10 +62,12 @@ source_set("driver_host_loader_service") {
 
 source_set("driver_runner") {
   sources = [
-    "bind_manager.cc",
-    "bind_manager.h",
-    "bind_result_tracker.cc",
-    "bind_result_tracker.h",
+    "bind/bind_manager.cc",
+    "bind/bind_manager.h",
+    "bind/bind_node_set.cc",
+    "bind/bind_node_set.h",
+    "bind/bind_result_tracker.cc",
+    "bind/bind_result_tracker.h",
     "composite_node_spec_v2.cc",
     "composite_node_spec_v2.h",
     "driver_host.cc",
@@ -109,7 +94,6 @@ source_set("driver_runner") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/zbi-format",
     "//src/bringup/lib/mexec",
-    "//src/devices/bin/driver_manager:binding",
     "//src/devices/bin/driver_manager/composite_node_spec:lib",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/lib/log",
