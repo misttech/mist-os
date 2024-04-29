@@ -133,7 +133,7 @@ template("bazel_sdk_tests_for") {
       "$target_gen_dir/$target_name.stamp",
       "$target_out_dir/$target_name.bazel_events_logs.json",
     ]
-    _exec_log = "$target_out_dir/$target_name.bazel_exec_log.json"
+    _exec_log = "$target_out_dir/$target_name.bazel_exec_log.pb.zstd"
     depfile = "$target_gen_dir/$target_name.d"
 
     # Provide a distinct output_base for each test. This is because the
@@ -223,7 +223,7 @@ template("bazel_sdk_tests_for") {
 
     if (bazel_execution_logs) {
       args += [
-        "--bazel-exec-log-json",
+        "--bazel-exec-log-compact",
         rebase_path(_exec_log, root_build_dir),
       ]
     }
