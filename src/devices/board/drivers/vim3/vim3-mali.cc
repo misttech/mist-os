@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
@@ -63,6 +64,53 @@ static const std::vector<fpbus::Bti> mali_btis{
     }},
 };
 
+namespace {
+constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
+constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
+
+// This power element represents the GPU hardware. Its passive dependency on SAG's (Execution State,
+// wake handling) allows for orderly power down of the hardware before the CPU suspends scheduling.
+fuchsia_hardware_power::PowerElementConfiguration hardware_power_config() {
+  constexpr char kPowerElementName[] = "mali-gpu-hardware";
+
+  auto transitions_from_off =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOn,
+          .latency_us = 500,
+      }}};
+  auto transitions_from_on =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOff,
+          .latency_us = 2000,
+      }}};
+  fuchsia_hardware_power::PowerLevel off = {
+      {.level = kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
+  fuchsia_hardware_power::PowerLevel on = {
+      {.level = kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
+  fuchsia_hardware_power::PowerElement hardware_power = {{
+      .name = kPowerElementName,
+      .levels = {{off, on}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
+      .child_level = kPowerLevelOn,
+      .parent_level =
+          static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
+  }};
+  fuchsia_hardware_power::PowerDependency passive_on_exec_state_wake_handling = {{
+      .child = kPowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kExecutionState),
+      .level_deps = {{on_to_wake_handling}},
+      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
+      {.element = hardware_power, .dependencies = {{passive_on_exec_state_wake_handling}}}};
+  return hardware_power_config;
+}
+}  // namespace
+
 zx_status_t Vim3::MaliInit() {
   {
     fpbus::Node aml_gpu_dev;
@@ -120,6 +168,7 @@ zx_status_t Vim3::MaliInit() {
     mali_dev.mmio() = mali_mmios;
     mali_dev.irq() = mali_irqs;
     mali_dev.bti() = mali_btis;
+    mali_dev.power_config() = std::vector{hardware_power_config()};
 
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('MALI');
