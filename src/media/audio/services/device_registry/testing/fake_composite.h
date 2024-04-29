@@ -31,13 +31,10 @@ static constexpr bool kLogFakeComposite = false;
 class FakeCompositeRingBuffer;
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
-using fuchsia_hardware_audio::Composite;
-using fuchsia_hardware_audio::CompositeConnector;
-using fuchsia_hardware_audio_signalprocessing::SignalProcessing;
-
-class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
-                      public fidl::testing::TestBase<Composite>,
-                      public fidl::testing::TestBase<SignalProcessing> {
+class FakeComposite
+    : public std::enable_shared_from_this<FakeComposite>,
+      public fidl::testing::TestBase<fuchsia_hardware_audio::Composite>,
+      public fidl::testing::TestBase<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
   static constexpr char kDefaultManufacturer[] = "fake_composite device manufacturer";
   static constexpr char kDefaultProduct[] = "fake_composite device product";
@@ -303,14 +300,14 @@ class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
                      GetDaiFormatsCompleter::Sync& completer) override;
   void SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.audio.Health implementation
+  // fuchsia_hardware_audio.Health implementation
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.audio.signalprocessing.Connector implementation
+  // fuchsia_hardware_audio_signalprocessing.Connector implementation
   void SignalProcessingConnect(SignalProcessingConnectRequest& request,
                                SignalProcessingConnectCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.audio.signalprocessing.SignalProcessing implementation (including Reader)
+  // fuchsia_hardware_audio_signalprocessing::SignalProcessing implementation (including Reader)
   void GetElements(GetElementsCompleter::Sync& completer) final;
   void GetTopologies(GetTopologiesCompleter::Sync& completer) final;
   void WatchElementState(WatchElementStateRequest& request,
@@ -330,7 +327,7 @@ class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
   async_dispatcher_t* dispatcher_;
   fidl::ServerEnd<fuchsia_hardware_audio::Composite> server_end_;
   fidl::ClientEnd<fuchsia_hardware_audio::Composite> client_end_;
-  std::optional<fidl::ServerBindingRef<Composite>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio::Composite>> binding_;
 
   bool responsive_ = true;
   std::optional<bool> healthy_ = true;
@@ -342,7 +339,8 @@ class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
   std::optional<ClockDomain> clock_domain_ = fuchsia_hardware_audio::kClockDomainMonotonic;
 
   bool supports_signalprocessing_ = true;
-  std::optional<fidl::ServerBindingRef<SignalProcessing>> signal_processing_binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
+      signal_processing_binding_;
 
   std::unordered_map<ElementId, FakeElementRecord> elements_;
 

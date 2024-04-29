@@ -17,11 +17,12 @@
 namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 bool DaiFormatIsSupported(ElementId element_id,
                           const std::vector<fad::ElementDaiFormatSet>& element_dai_format_sets,
-                          const fuchsia_hardware_audio::DaiFormat& format) {
-  std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets;
+                          const fha::DaiFormat& format) {
+  std::optional<std::vector<fha::DaiSupportedFormats>> dai_format_sets;
   for (const auto& element_sets_entry : element_dai_format_sets) {
     if (element_sets_entry.element_id().has_value() &&
         *element_sets_entry.element_id() == element_id) {
@@ -113,7 +114,7 @@ bool DaiFormatIsSupported(ElementId element_id,
 bool RingBufferFormatIsSupported(
     ElementId element_id,
     const std::vector<fad::ElementRingBufferFormatSet>& element_ring_buffer_format_sets,
-    const fuchsia_hardware_audio::Format& format) {
+    const fha::Format& format) {
   if (!ValidateRingBufferFormat(format)) {
     return false;
   }
@@ -140,36 +141,31 @@ bool RingBufferFormatIsSupported(
     for (auto sample_type : *ring_buffer_format_set.sample_types()) {
       switch (sample_type) {
         case fuchsia_audio::SampleType::kUint8:
-          if (format.pcm_format()->sample_format() ==
-                  fuchsia_hardware_audio::SampleFormat::kPcmUnsigned &&
+          if (format.pcm_format()->sample_format() == fha::SampleFormat::kPcmUnsigned &&
               format.pcm_format()->bytes_per_sample() == 1) {
             match = true;
           }
           break;
         case fuchsia_audio::SampleType::kInt16:
-          if (format.pcm_format()->sample_format() ==
-                  fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
+          if (format.pcm_format()->sample_format() == fha::SampleFormat::kPcmSigned &&
               format.pcm_format()->bytes_per_sample() == 2) {
             match = true;
           }
           break;
         case fuchsia_audio::SampleType::kInt32:
-          if (format.pcm_format()->sample_format() ==
-                  fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
+          if (format.pcm_format()->sample_format() == fha::SampleFormat::kPcmSigned &&
               format.pcm_format()->bytes_per_sample() == 4) {
             match = true;
           }
           break;
         case fuchsia_audio::SampleType::kFloat32:
-          if (format.pcm_format()->sample_format() ==
-                  fuchsia_hardware_audio::SampleFormat::kPcmFloat &&
+          if (format.pcm_format()->sample_format() == fha::SampleFormat::kPcmFloat &&
               format.pcm_format()->bytes_per_sample() == 4) {
             match = true;
           }
           break;
         case fuchsia_audio::SampleType::kFloat64:
-          if (format.pcm_format()->sample_format() ==
-                  fuchsia_hardware_audio::SampleFormat::kPcmFloat &&
+          if (format.pcm_format()->sample_format() == fha::SampleFormat::kPcmFloat &&
               format.pcm_format()->bytes_per_sample() == 8) {
             match = true;
           }

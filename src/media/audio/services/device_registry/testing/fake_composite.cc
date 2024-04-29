@@ -20,11 +20,11 @@
 #include "src/media/audio/services/device_registry/testing/fake_composite_ring_buffer.h"
 
 namespace media_audio {
-using fuchsia_hardware_audio::Composite;
 
-bool FormatIsSupported(
-    const fuchsia_hardware_audio::Format& format,
-    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+namespace fha = fuchsia_hardware_audio;
+
+bool FormatIsSupported(const fha::Format& format,
+                       const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
   if (!format.pcm_format().has_value()) {
     return false;
   }
@@ -109,7 +109,7 @@ void FakeComposite::DropComposite() {
 }
 
 void on_unbind(FakeComposite* fake_composite, fidl::UnbindInfo info,
-               fidl::ServerEnd<fuchsia_hardware_audio::Composite> server_end) {
+               fidl::ServerEnd<fha::Composite> server_end) {
   ADR_LOG(kLogFakeComposite) << "for FakeComposite";
   fake_composite->DropChildren();
 }
@@ -157,7 +157,7 @@ void FakeComposite::DropRingBuffer(ElementId element_id) {
 
 // static
 void FakeComposite::on_rb_unbind(FakeCompositeRingBuffer* fake_ring_buffer, fidl::UnbindInfo info,
-                                 fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer>) {
+                                 fidl::ServerEnd<fha::RingBuffer>) {
   ADR_LOG(kLogFakeComposite) << "for FakeCompositeRingBuffer";
 
   fake_ring_buffer->parent()->RingBufferWasDropped(fake_ring_buffer->element_id());
@@ -172,7 +172,7 @@ void FakeComposite::RingBufferWasDropped(ElementId element_id) {
   ring_buffers_.erase(element_id);
 }
 
-fidl::ClientEnd<fuchsia_hardware_audio::Composite> FakeComposite::Enable() {
+fidl::ClientEnd<fha::Composite> FakeComposite::Enable() {
   ADR_LOG_METHOD(kLogFakeComposite);
   EXPECT_TRUE(server_end_.is_valid());
   EXPECT_TRUE(client_end_.is_valid());
@@ -213,7 +213,7 @@ void FakeComposite::SetupElementsMap() {
 void FakeComposite::GetHealthState(GetHealthStateCompleter::Sync& completer) {
   if (responsive_) {
     if (healthy_.has_value()) {
-      completer.Reply(fuchsia_hardware_audio::HealthState{{healthy_.value()}});
+      completer.Reply(fha::HealthState{{healthy_.value()}});
     } else {
       completer.Reply({});
     }
@@ -254,7 +254,7 @@ void FakeComposite::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
 
   // Gather the properties and return them.
-  fuchsia_hardware_audio::CompositeProperties composite_properties{};
+  fha::CompositeProperties composite_properties{};
   if (manufacturer_) {
     composite_properties.manufacturer(*manufacturer_);
   }
@@ -279,7 +279,7 @@ void FakeComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
   auto element_pair_iter = elements_.find(element_id);
   if (element_pair_iter == elements_.end()) {
     ADR_WARN_METHOD() << "unrecognized element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
   if (*element_pair_iter->second.element.type() !=
@@ -287,14 +287,14 @@ void FakeComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
       *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
           fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
     ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kWrongType));
+    completer.Reply(fit::error(fha::DriverError::kWrongType));
     return;
   }
 
   auto ring_buffer_format_sets = kDefaultRbFormatsMap.find(element_id);
   if (ring_buffer_format_sets == kDefaultRbFormatsMap.end()) {
     ADR_WARN_METHOD() << "no ring_buffer_format_sets specified for element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
 
@@ -329,7 +329,7 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
   auto element_pair_iter = elements_.find(element_id);
   if (element_pair_iter == elements_.end()) {
     ADR_WARN_METHOD() << "unrecognized element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
   if (*element_pair_iter->second.element.type() !=
@@ -337,27 +337,27 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
       *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
           fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
     ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kWrongType));
+    completer.Reply(fit::error(fha::DriverError::kWrongType));
     return;
   }
   auto ring_buffer_format_sets_iter = kDefaultRbFormatsMap.find(element_id);
   if (ring_buffer_format_sets_iter == kDefaultRbFormatsMap.end()) {
     ADR_WARN_METHOD() << "no ring_buffer_format_sets specified for element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
   const auto& ring_buffer_format_sets = ring_buffer_format_sets_iter->second;
   // Make sure the Format is OK
   if (!FormatIsSupported(request.format(), ring_buffer_format_sets)) {
     ADR_WARN_METHOD() << "ring_buffer_format not supported for element_id " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kNotSupported));
+    completer.Reply(fit::error(fha::DriverError::kNotSupported));
     return;
   }
 
   // Make sure the server_end is OK
   if (!request.ring_buffer().is_valid()) {
     ADR_WARN_METHOD() << "ring_buffer server_end is invalid";
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
 
@@ -414,14 +414,14 @@ void FakeComposite::GetDaiFormats(GetDaiFormatsRequest& request,
 
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
 
   auto dai_format_sets = kDefaultDaiFormatsMap.find(element_id);
   if (dai_format_sets == kDefaultDaiFormatsMap.end()) {
     ADR_WARN_METHOD() << "No DaiFormatSet found for element " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
 
@@ -429,8 +429,7 @@ void FakeComposite::GetDaiFormats(GetDaiFormatsRequest& request,
 }
 
 // static
-bool FakeComposite::DaiFormatIsSupported(ElementId element_id,
-                                         const fuchsia_hardware_audio::DaiFormat& format) {
+bool FakeComposite::DaiFormatIsSupported(ElementId element_id, const fha::DaiFormat& format) {
   auto match = kDefaultDaiFormatsMap.find(element_id);
   if (match == kDefaultDaiFormatsMap.end()) {
     return false;
@@ -521,13 +520,13 @@ void FakeComposite::SetDaiFormat(SetDaiFormatRequest& request,
 
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
 
   if (!DaiFormatIsSupported(element_id, request.format())) {
     ADR_WARN_METHOD() << "Format is not supported for element " << element_id;
-    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kNotSupported));
+    completer.Reply(fit::error(fha::DriverError::kNotSupported));
     return;
   }
 

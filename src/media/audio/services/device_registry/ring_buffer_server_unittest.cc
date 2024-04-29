@@ -26,6 +26,7 @@ namespace media_audio {
 namespace {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
                              public fidl::AsyncEventHandler<fad::RingBuffer> {
@@ -223,9 +224,9 @@ TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
         EXPECT_EQ(result->ring_buffer()->consumer_bytes(),
                   FakeCompositeRingBuffer::kDefaultDriverTransferBytes);
         EXPECT_TRUE(result->ring_buffer()->reference_clock()->is_valid());
-        EXPECT_EQ(result->ring_buffer()->reference_clock_domain().value_or(
-                      fuchsia_hardware_audio::kClockDomainMonotonic),
-                  fuchsia_hardware_audio::kClockDomainMonotonic);
+        EXPECT_EQ(
+            result->ring_buffer()->reference_clock_domain().value_or(fha::kClockDomainMonotonic),
+            fha::kClockDomainMonotonic);
         received_callback = true;
       });
 
@@ -838,9 +839,9 @@ TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
         // consumer_bytes is minimal, based on driver_transfer_bytes
         EXPECT_EQ(result->ring_buffer()->consumer_bytes(), 12u);
         EXPECT_TRUE(result->ring_buffer()->reference_clock()->is_valid());
-        EXPECT_EQ(result->ring_buffer()->reference_clock_domain().value_or(
-                      fuchsia_hardware_audio::kClockDomainMonotonic),
-                  fuchsia_hardware_audio::kClockDomainMonotonic);
+        EXPECT_EQ(
+            result->ring_buffer()->reference_clock_domain().value_or(fha::kClockDomainMonotonic),
+            fha::kClockDomainMonotonic);
         received_callback = true;
       });
 

@@ -26,12 +26,11 @@ namespace media_audio {
 namespace {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
-// Minimal `fuchsia_hardware_audio::Codec` used to emulate a fake devfs directory for tests.
-using fuchsia_hardware_audio::Codec;
-using fuchsia_hardware_audio::CodecConnector;
-class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
-                       public fidl::testing::TestBase<Codec> {
+// Minimal Codec used to emulate a fake devfs directory for tests.
+class FakeAudioCodec : public fidl::testing::TestBase<fha::CodecConnector>,
+                       public fidl::testing::TestBase<fha::Codec> {
  public:
   explicit FakeAudioCodec(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -44,7 +43,7 @@ class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<CodecConnector> c) {
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fha::CodecConnector> c) {
       connector_binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
       return ZX_OK;
     });
@@ -54,21 +53,19 @@ class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
   async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  private:
-  // FIDL method for fuchsia.hardware.audio.CodecConnector.
+  // FIDL method for fuchsia.hardware.audio.fha::CodecConnector.
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
     binding_ = fidl::BindServer(dispatcher(), std::move(request.codec_protocol()), this);
   }
 
   async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBindingRef<CodecConnector>> connector_binding_;
-  std::optional<fidl::ServerBindingRef<Codec>> binding_;
+  std::optional<fidl::ServerBindingRef<fha::CodecConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<fha::Codec>> binding_;
 };
 
-using fuchsia_hardware_audio::Composite;
 // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove Connector.
-using fuchsia_hardware_audio::CompositeConnector;
-class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
-                           public fidl::testing::TestBase<CompositeConnector> {
+class FakeAudioComposite : public fidl::testing::TestBase<fha::Composite>,
+                           public fidl::testing::TestBase<fha::CompositeConnector> {
  public:
   explicit FakeAudioComposite(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -80,7 +77,7 @@ class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Composite> c) {
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fha::Composite> c) {
       binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
       return ZX_OK;
     });
@@ -97,14 +94,12 @@ class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
   }
 
   async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBindingRef<CompositeConnector>> connector_binding_;
-  std::optional<fidl::ServerBindingRef<Composite>> binding_;
+  std::optional<fidl::ServerBindingRef<fha::CompositeConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<fha::Composite>> binding_;
 };
 
-using fuchsia_hardware_audio::StreamConfig;
-using fuchsia_hardware_audio::StreamConfigConnector;
-class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnector>,
-                              public fidl::testing::TestBase<StreamConfig> {
+class FakeAudioStreamConfig : public fidl::testing::TestBase<fha::StreamConfigConnector>,
+                              public fidl::testing::TestBase<fha::StreamConfig> {
  public:
   explicit FakeAudioStreamConfig(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -116,7 +111,7 @@ class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnect
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<StreamConfigConnector> c) {
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fha::StreamConfigConnector> c) {
       connector_binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
       return ZX_OK;
     });
@@ -131,8 +126,8 @@ class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnect
   }
 
   async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBindingRef<StreamConfigConnector>> connector_binding_;
-  std::optional<fidl::ServerBindingRef<StreamConfig>> binding_;
+  std::optional<fidl::ServerBindingRef<fha::StreamConfigConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<fha::StreamConfig>> binding_;
 };
 
 class DeviceTracker {

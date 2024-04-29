@@ -21,14 +21,15 @@
 namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 namespace {
 
 /////////////////////////////////////////////////////
 // Utility functions
 // In the enclosed vector<SampleFormat>, how many are 'format_to_match'?
-size_t CountFormatMatches(const std::vector<fuchsia_hardware_audio::SampleFormat>& sample_formats,
-                          fuchsia_hardware_audio::SampleFormat format_to_match) {
+size_t CountFormatMatches(const std::vector<fha::SampleFormat>& sample_formats,
+                          fha::SampleFormat format_to_match) {
   return std::count_if(sample_formats.begin(), sample_formats.end(),
                        [format_to_match](const auto& rb_sample_format) {
                          return rb_sample_format == format_to_match;
@@ -36,13 +37,12 @@ size_t CountFormatMatches(const std::vector<fuchsia_hardware_audio::SampleFormat
 }
 
 // In the enclosed vector<ChannelSet>, how many num_channels equal 'channel_count_to_match'?
-size_t CountChannelMatches(const std::vector<fuchsia_hardware_audio::ChannelSet>& channel_sets,
+size_t CountChannelMatches(const std::vector<fha::ChannelSet>& channel_sets,
                            size_t channel_count_to_match) {
-  return std::count_if(
-      channel_sets.begin(), channel_sets.end(),
-      [channel_count_to_match](const fuchsia_hardware_audio::ChannelSet& channel_set) {
-        return channel_set.attributes()->size() == channel_count_to_match;
-      });
+  return std::count_if(channel_sets.begin(), channel_sets.end(),
+                       [channel_count_to_match](const fha::ChannelSet& channel_set) {
+                         return channel_set.attributes()->size() == channel_count_to_match;
+                       });
 }
 
 // In the enclosed vector<uint8_t>, how many values equal 'uchar_to_match'?
@@ -69,11 +69,11 @@ bool ClientIsValidForDeviceType(const fad::DeviceType& device_type,
   }
 }
 
-// Translate from fuchsia_hardware_audio::SupportedFormats to fad::PcmFormatSet.
+// Translate from fha::SupportedFormats to fad::PcmFormatSet.
 std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
-    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+    const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
   // translated_ring_buffer_format_sets is more complex to copy, since fad defines
-  // its tables from scratch instead of reusing types from fuchsia_hardware_audio. We build from the
+  // its tables from scratch instead of reusing types from fha. We build from the
   // inside-out: populating attributes then channel_sets then translated_ring_buffer_format_sets.
   std::vector<fad::PcmFormatSet> translated_ring_buffer_format_sets;
   for (auto& ring_buffer_format_set : ring_buffer_format_sets) {
@@ -107,13 +107,11 @@ std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
     // fuchsia_audio::SampleType defines a sparse set of types, so we populate the vector
     // in a bespoke manner (first unsigned, then signed, then float).
     std::vector<fuchsia_audio::SampleType> sample_types;
-    if (CountFormatMatches(*pcm_formats.sample_formats(),
-                           fuchsia_hardware_audio::SampleFormat::kPcmUnsigned) > 0 &&
+    if (CountFormatMatches(*pcm_formats.sample_formats(), fha::SampleFormat::kPcmUnsigned) > 0 &&
         CountUcharMatches(*pcm_formats.bytes_per_sample(), 1) > 0) {
       sample_types.push_back(fuchsia_audio::SampleType::kUint8);
     }
-    if (CountFormatMatches(*pcm_formats.sample_formats(),
-                           fuchsia_hardware_audio::SampleFormat::kPcmSigned) > 0) {
+    if (CountFormatMatches(*pcm_formats.sample_formats(), fha::SampleFormat::kPcmSigned) > 0) {
       if (CountUcharMatches(*pcm_formats.bytes_per_sample(), 2) > 0) {
         sample_types.push_back(fuchsia_audio::SampleType::kInt16);
       }
@@ -121,8 +119,7 @@ std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
         sample_types.push_back(fuchsia_audio::SampleType::kInt32);
       }
     }
-    if (CountFormatMatches(*pcm_formats.sample_formats(),
-                           fuchsia_hardware_audio::SampleFormat::kPcmFloat) > 0 &&
+    if (CountFormatMatches(*pcm_formats.sample_formats(), fha::SampleFormat::kPcmFloat) > 0 &&
         CountUcharMatches(*pcm_formats.bytes_per_sample(), 4) > 0) {
       if (CountUcharMatches(*pcm_formats.bytes_per_sample(), 4) > 0) {
         sample_types.push_back(fuchsia_audio::SampleType::kFloat32);
@@ -154,9 +151,9 @@ std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
   return translated_ring_buffer_format_sets;
 }
 
-bool ValidateStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_props,
-                              std::optional<const fuchsia_hardware_audio::GainState> gain_state,
-                              std::optional<const fuchsia_hardware_audio::PlugState> plug_state) {
+bool ValidateStreamProperties(const fha::StreamProperties& stream_props,
+                              std::optional<const fha::GainState> gain_state,
+                              std::optional<const fha::PlugState> plug_state) {
   ADR_LOG(kLogDeviceMethods);
   LogStreamProperties(stream_props);
 
@@ -228,8 +225,7 @@ bool ValidateStreamProperties(const fuchsia_hardware_audio::StreamProperties& st
 
   // If we already have this device's PlugState, double-check against that.
   if (plug_state && !(*plug_state->plugged()) &&
-      *stream_props.plug_detect_capabilities() ==
-          fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired) {
+      *stream_props.plug_detect_capabilities() == fha::PlugDetectCapabilities::kHardwired) {
     FX_LOGS(WARNING) << "GetProperties reports HARDWIRED, but StreamConfig reports as UNPLUGGED";
     return false;
   }
@@ -238,7 +234,7 @@ bool ValidateStreamProperties(const fuchsia_hardware_audio::StreamProperties& st
 }
 
 bool ValidateRingBufferFormatSets(
-    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+    const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
   LogRingBufferFormatSets(ring_buffer_format_sets);
 
   if (ring_buffer_format_sets.empty()) {
@@ -285,7 +281,7 @@ bool ValidateRingBufferFormatSets(
       return false;
     }
     auto max_allowed_frequency = max_supported_frame_rate / 2;
-    for (const fuchsia_hardware_audio::ChannelSet& chan_set : *pcm_format_set.channel_sets()) {
+    for (const fha::ChannelSet& chan_set : *pcm_format_set.channel_sets()) {
       if (!chan_set.attributes() || chan_set.attributes()->empty()) {
         FX_LOGS(WARNING) << "GetSupportedFormats: ChannelSet.attributes[] is "
                          << (chan_set.attributes() ? "empty" : "absent");
@@ -345,22 +341,20 @@ bool ValidateRingBufferFormatSets(
     }
     uint8_t prev_bytes_per_sample = 0, max_bytes_per_sample = 0;
     for (const auto& bytes : *pcm_format_set.bytes_per_sample()) {
-      if (CountFormatMatches(rb_sample_formats, fuchsia_hardware_audio::SampleFormat::kPcmSigned) &&
+      if (CountFormatMatches(rb_sample_formats, fha::SampleFormat::kPcmSigned) &&
           (bytes != 2 && bytes != 4)) {
         FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample ("
                          << static_cast<uint16_t>(bytes)
                          << ") must be 2 or 4 for PCM_SIGNED format";
         return false;
       }
-      if (CountFormatMatches(rb_sample_formats, fuchsia_hardware_audio::SampleFormat::kPcmFloat) &&
+      if (CountFormatMatches(rb_sample_formats, fha::SampleFormat::kPcmFloat) &&
           (bytes != 4 && bytes != 8)) {
         FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample ("
                          << static_cast<uint16_t>(bytes) << ") must be 4 or 8 for PCM_FLOAT format";
         return false;
       }
-      if (CountFormatMatches(rb_sample_formats,
-                             fuchsia_hardware_audio::SampleFormat::kPcmUnsigned) &&
-          bytes != 1) {
+      if (CountFormatMatches(rb_sample_formats, fha::SampleFormat::kPcmUnsigned) && bytes != 1) {
         FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample ("
                          << static_cast<uint16_t>(bytes) << ") must be 1 for PCM_UNSIGNED format";
         return false;
@@ -407,8 +401,8 @@ bool ValidateRingBufferFormatSets(
   return true;
 }
 
-bool ValidateCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props,
-                             std::optional<const fuchsia_hardware_audio::PlugState> plug_state) {
+bool ValidateCodecProperties(const fha::CodecProperties& codec_props,
+                             std::optional<const fha::PlugState> plug_state) {
   ADR_LOG(kLogDeviceMethods);
   LogCodecProperties(codec_props);
 
@@ -426,8 +420,7 @@ bool ValidateCodecProperties(const fuchsia_hardware_audio::CodecProperties& code
 
   // If we already have this device's PlugState, double-check against that.
   if (plug_state && !(*plug_state->plugged()) &&
-      *codec_props.plug_detect_capabilities() ==
-          fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired) {
+      *codec_props.plug_detect_capabilities() == fha::PlugDetectCapabilities::kHardwired) {
     FX_LOGS(WARNING) << "GetProperties reports HARDWIRED, but Codec reports as UNPLUGGED";
     return false;
   }
@@ -435,8 +428,7 @@ bool ValidateCodecProperties(const fuchsia_hardware_audio::CodecProperties& code
   return true;
 }
 
-bool ValidateDaiFormatSets(
-    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+bool ValidateDaiFormatSets(const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
   LogDaiFormatSets(dai_format_sets);
 
   if (dai_format_sets.empty()) {
@@ -451,8 +443,7 @@ bool ValidateDaiFormatSets(
     }
     uint32_t previous_chans = 0;
     for (const auto& chans : dai_format_set.number_of_channels()) {
-      if (chans <= previous_chans ||
-          chans > fuchsia_hardware_audio::kMaxCountDaiSupportedNumberOfChannels) {
+      if (chans <= previous_chans || chans > fha::kMaxCountDaiSupportedNumberOfChannels) {
         FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats number_of_channels: " << chans;
         return false;
       }
@@ -526,13 +517,12 @@ bool ValidateDaiFormatSets(
   return true;
 }
 
-bool ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
+bool ValidateDaiFormat(const fha::DaiFormat& dai_format) {
   ADR_LOG(kLogDeviceMethods);
   LogDaiFormat(dai_format);
 
   if (dai_format.number_of_channels() == 0 ||
-      dai_format.number_of_channels() >
-          fuchsia_hardware_audio::kMaxCountDaiSupportedNumberOfChannels) {
+      dai_format.number_of_channels() > fha::kMaxCountDaiSupportedNumberOfChannels) {
     FX_LOGS(WARNING) << "Non-compliant DaiFormat number_of_channels: "
                      << dai_format.number_of_channels();
     return false;
@@ -551,10 +541,10 @@ bool ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
   }
 
   switch (dai_format.sample_format()) {
-    case fuchsia_hardware_audio::DaiSampleFormat::kPdm:
-    case fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned:
-    case fuchsia_hardware_audio::DaiSampleFormat::kPcmUnsigned:
-    case fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat:
+    case fha::DaiSampleFormat::kPdm:
+    case fha::DaiSampleFormat::kPcmSigned:
+    case fha::DaiSampleFormat::kPcmUnsigned:
+    case fha::DaiSampleFormat::kPcmFloat:
       break;
     default:
       FX_LOGS(WARNING) << "Non-compliant DaiFormat sample_format: UNKNOWN enum";
@@ -567,8 +557,8 @@ bool ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
     return false;
   }
   switch (dai_format.frame_format().Which()) {
-    case fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatStandard:
-    case fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatCustom:
+    case fha::DaiFrameFormat::Tag::kFrameFormatStandard:
+    case fha::DaiFrameFormat::Tag::kFrameFormatCustom:
       break;
     default:
       FX_LOGS(WARNING) << "Non-compliant DaiFormat frame_format: UNKNOWN union tag";
@@ -597,7 +587,7 @@ bool ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
   return true;
 }
 
-bool ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info) {
+bool ValidateCodecFormatInfo(const fha::CodecFormatInfo& format_info) {
   ADR_LOG(kLogDeviceMethods);
   LogCodecFormatInfo(format_info);
 
@@ -616,8 +606,7 @@ bool ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& form
   return true;
 }
 
-bool ValidateCompositeProperties(
-    const fuchsia_hardware_audio::CompositeProperties& composite_props) {
+bool ValidateCompositeProperties(const fha::CompositeProperties& composite_props) {
   LogCompositeProperties(composite_props);
 
   if (!composite_props.clock_domain()) {
@@ -635,8 +624,8 @@ bool ValidateCompositeProperties(
   return true;
 }
 
-bool ValidateGainState(const fuchsia_hardware_audio::GainState& gain_state,
-                       std::optional<const fuchsia_hardware_audio::StreamProperties> stream_props) {
+bool ValidateGainState(const fha::GainState& gain_state,
+                       std::optional<const fha::StreamProperties> stream_props) {
   ADR_LOG(kLogDeviceMethods);
   LogGainState(gain_state);
 
@@ -673,9 +662,8 @@ bool ValidateGainState(const fuchsia_hardware_audio::GainState& gain_state,
   return true;
 }
 
-bool ValidatePlugState(
-    const fuchsia_hardware_audio::PlugState& plug_state,
-    std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities) {
+bool ValidatePlugState(const fha::PlugState& plug_state,
+                       std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities) {
   LogPlugState(plug_state);
 
   if (!plug_state.plugged() || !plug_state.plug_state_time()) {
@@ -691,7 +679,7 @@ bool ValidatePlugState(
 
   // If we already have this device's PlugDetectCapabilities, double-check against those.
   if (plug_detect_capabilities) {
-    if (*plug_detect_capabilities == fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired &&
+    if (*plug_detect_capabilities == fha::PlugDetectCapabilities::kHardwired &&
         !plug_state.plugged().value_or(true)) {
       FX_LOGS(WARNING) << "Reported 'plug_state' (UNPLUGGED) is unsupported (HARDWIRED)";
       return false;
@@ -777,7 +765,7 @@ bool ValidateDeviceInfo(const fad::Info& device_info) {
   return true;
 }
 
-bool ValidateRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props) {
+bool ValidateRingBufferProperties(const fha::RingBufferProperties& rb_props) {
   ADR_LOG(kLogDeviceMethods);
   LogRingBufferProperties(rb_props);
 
@@ -796,7 +784,7 @@ bool ValidateRingBufferProperties(const fuchsia_hardware_audio::RingBufferProper
   return true;
 }
 
-bool ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format) {
+bool ValidateRingBufferFormat(const fha::Format& ring_buffer_format) {
   ADR_LOG(kLogDeviceMethods);
   LogRingBufferFormat(ring_buffer_format);
   if (!ring_buffer_format.pcm_format()) {
@@ -814,17 +802,17 @@ bool ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_
     FX_LOGS(WARNING) << "RingBuffer bytes_per_sample is too low";
     return false;
   }
-  if (pcm_format.sample_format() == fuchsia_hardware_audio::SampleFormat::kPcmUnsigned &&
+  if (pcm_format.sample_format() == fha::SampleFormat::kPcmUnsigned &&
       pcm_format.bytes_per_sample() > sizeof(uint8_t)) {
     FX_LOGS(WARNING) << "RingBuffer bytes_per_sample is too high";
     return false;
   }
-  if (pcm_format.sample_format() == fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
+  if (pcm_format.sample_format() == fha::SampleFormat::kPcmSigned &&
       pcm_format.bytes_per_sample() > sizeof(uint32_t)) {
     FX_LOGS(WARNING) << "RingBuffer bytes_per_sample is too high";
     return false;
   }
-  if (pcm_format.sample_format() == fuchsia_hardware_audio::SampleFormat::kPcmFloat &&
+  if (pcm_format.sample_format() == fha::SampleFormat::kPcmFloat &&
       pcm_format.bytes_per_sample() > sizeof(double)) {
     FX_LOGS(WARNING) << "RingBuffer bytes_per_sample is too high";
     return false;
@@ -854,17 +842,13 @@ bool ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_
   return true;
 }
 
-bool ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
-                                       fuchsia_hardware_audio::SampleFormat sample_format) {
+bool ValidateSampleFormatCompatibility(uint8_t bytes_per_sample, fha::SampleFormat sample_format) {
   // Explicitly check for fuchsia_audio::SampleType kUint8, kInt16, kInt32, kFloat32, kFloat64
-  if ((sample_format == fuchsia_hardware_audio::SampleFormat::kPcmUnsigned &&
-       bytes_per_sample == 1) ||
-      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
-       bytes_per_sample == 2) ||
-      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
-       bytes_per_sample == 4) ||
-      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmFloat && bytes_per_sample == 4) ||
-      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmFloat && bytes_per_sample == 8)) {
+  if ((sample_format == fha::SampleFormat::kPcmUnsigned && bytes_per_sample == 1) ||
+      (sample_format == fha::SampleFormat::kPcmSigned && bytes_per_sample == 2) ||
+      (sample_format == fha::SampleFormat::kPcmSigned && bytes_per_sample == 4) ||
+      (sample_format == fha::SampleFormat::kPcmFloat && bytes_per_sample == 4) ||
+      (sample_format == fha::SampleFormat::kPcmFloat && bytes_per_sample == 8)) {
     return true;
   }
 
@@ -873,8 +857,7 @@ bool ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
   return false;
 }
 
-bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                           const fuchsia_hardware_audio::Format& rb_format) {
+bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, const fha::Format& rb_format) {
   ADR_LOG(kLogDeviceMethods);
   LogRingBufferVmo(vmo, num_frames, rb_format);
 
@@ -900,7 +883,7 @@ bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
   return true;
 }
 
-bool ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_info) {
+bool ValidateDelayInfo(const fha::DelayInfo& delay_info) {
   ADR_LOG(kLogDeviceMethods);
   LogDelayInfo(delay_info);
 

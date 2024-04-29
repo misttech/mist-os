@@ -117,8 +117,7 @@ class ObserverServerCompositeTest : public ObserverServerTest {
 
     adr_service()->AddDevice(Device::Create(
         adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
-        fad::DriverClient::WithComposite(
-            fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable()))));
+        fad::DriverClient::WithComposite(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }

@@ -29,6 +29,7 @@
 namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 /////////////////////
 // Codec tests
@@ -130,7 +131,7 @@ TEST_F(CodecTest, DistinctTokenIds) {
   ASSERT_TRUE(IsInitialized(device));
 
   // Set up a second, entirely distinct fake device.
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+  auto [client, server] = fidl::Endpoints<fha::Codec>::Create();
 
   auto fake_driver2 =
       std::make_shared<FakeCodec>(server.TakeChannel(), client.TakeChannel(), dispatcher());
@@ -266,12 +267,11 @@ TEST_F(CodecTest, GetDaiFormats) {
   ASSERT_TRUE(AddObserver(device));
 
   bool received_get_dai_formats_callback = false;
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
       [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id,
-          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
@@ -299,12 +299,11 @@ TEST_F(CodecTest, SetDaiFormat) {
   ASSERT_TRUE(IsControlled(device));
 
   bool received_get_dai_formats_callback = false;
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
       [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id,
-          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
@@ -334,12 +333,11 @@ TEST_F(CodecTest, InitiallyStopped) {
   ASSERT_TRUE(IsControlled(device));
 
   bool received_get_dai_formats_callback = false;
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
       [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id,
-          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
@@ -369,11 +367,10 @@ TEST_F(CodecTest, Start) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -398,11 +395,10 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -436,11 +432,10 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -474,11 +469,10 @@ TEST_F(CodecTest, StartStop) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -507,11 +501,10 @@ TEST_F(CodecTest, StartStart) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -541,11 +534,10 @@ TEST_F(CodecTest, StopStop) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -582,11 +574,10 @@ TEST_F(CodecTest, Reset) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -777,7 +768,7 @@ TEST_F(CompositeTest, DistinctTokenIds) {
   ASSERT_TRUE(IsInitialized(device));
 
   // Set up a second, entirely distinct fake device.
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Composite>::Create();
+  auto [client, server] = fidl::Endpoints<fha::Composite>::Create();
 
   auto fake_driver2 =
       std::make_shared<FakeComposite>(server.TakeChannel(), client.TakeChannel(), dispatcher());
@@ -831,7 +822,7 @@ TEST_F(CompositeTest, DefaultClock) {
   auto device = InitializeDeviceForFakeComposite(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
-  EXPECT_EQ(device_clock(device)->domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(device_clock(device)->domain(), fha::kClockDomainMonotonic);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
   EXPECT_FALSE(device_clock(device)->adjustable());
 
@@ -840,7 +831,7 @@ TEST_F(CompositeTest, DefaultClock) {
 }
 
 TEST_F(CompositeTest, ClockInOtherDomain) {
-  const uint32_t kNonMonotonicClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic + 1;
+  const uint32_t kNonMonotonicClockDomain = fha::kClockDomainMonotonic + 1;
   auto fake_driver = MakeFakeComposite();
   fake_driver->set_clock_domain(kNonMonotonicClockDomain);
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -1108,8 +1099,7 @@ TEST_F(CompositeTest, Reset) {
 //
 // Creating a RingBuffer should succeed.
 void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
-                                         ElementId element_id,
-                                         const fuchsia_hardware_audio::Format& safe_format) {
+                                         ElementId element_id, const fha::Format& safe_format) {
   std::stringstream stream;
   stream << "Validating CreateRingBuffer on element_id " << element_id << " with format "
          << *safe_format.pcm_format();
@@ -1164,8 +1154,7 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
   EXPECT_TRUE(rb_info.ring_buffer.reference_clock()->is_valid());
 
   ASSERT_TRUE(rb_info.ring_buffer.reference_clock_domain().has_value());
-  EXPECT_EQ(*rb_info.ring_buffer.reference_clock_domain(),
-            fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(*rb_info.ring_buffer.reference_clock_domain(), fha::kClockDomainMonotonic);
 
   // Now client can drop its RingBuffer connection.
   device->DropRingBuffer(element_id);
@@ -2015,7 +2004,7 @@ TEST_F(StreamConfigTest, DeviceInfo) {
   EXPECT_TRUE(info.gain_caps());
   EXPECT_TRUE(info.plug_detect_caps());
   EXPECT_TRUE(info.clock_domain());
-  EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(*info.clock_domain(), fha::kClockDomainMonotonic);
 }
 
 TEST_F(StreamConfigTest, DistinctTokenIds) {
@@ -2024,7 +2013,7 @@ TEST_F(StreamConfigTest, DistinctTokenIds) {
   ASSERT_TRUE(IsInitialized(device));
 
   // Set up a second, entirely distinct fake device.
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
+  auto [client, server] = fidl::Endpoints<fha::StreamConfig>::Create();
 
   auto fake_driver2 =
       std::make_shared<FakeStreamConfig>(server.TakeChannel(), client.TakeChannel(), dispatcher());
@@ -2079,7 +2068,7 @@ TEST_F(StreamConfigTest, DefaultClock) {
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
-  EXPECT_EQ(device_clock(device)->domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(device_clock(device)->domain(), fha::kClockDomainMonotonic);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
   EXPECT_FALSE(device_clock(device)->adjustable());
 
@@ -2088,7 +2077,7 @@ TEST_F(StreamConfigTest, DefaultClock) {
 }
 
 TEST_F(StreamConfigTest, ClockInOtherDomain) {
-  const uint32_t kNonMonotonicClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic + 1;
+  const uint32_t kNonMonotonicClockDomain = fha::kClockDomainMonotonic + 1;
   auto fake_driver = MakeFakeStreamConfigInput();
   fake_driver->set_clock_domain(kNonMonotonicClockDomain);
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);

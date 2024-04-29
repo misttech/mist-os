@@ -28,6 +28,7 @@ namespace media_audio {
 namespace {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                  public fidl::AsyncEventHandler<fad::Control>,
@@ -2200,12 +2201,12 @@ TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatWrongDeviceType) {
   ASSERT_EQ(ControlServer::count(), 1u);
   auto received_callback = false;
 
-  fuchsia_hardware_audio::DaiFormat dai_format{{
+  fha::DaiFormat dai_format{{
       .number_of_channels = 1,
       .channels_to_use_bitmask = 1,
-      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
-      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-          fuchsia_hardware_audio::DaiFrameFormatStandard::kNone),
+      .sample_format = fha::DaiSampleFormat::kPcmSigned,
+      .frame_format =
+          fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kNone),
       .frame_rate = 48000,
       .bits_per_slot = 16,
       .bits_per_sample = 16,

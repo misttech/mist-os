@@ -15,6 +15,7 @@ namespace media_audio {
 namespace {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 // These tests rely upon a single, already-created Provider.
 class ProviderServerCodecWarningTest : public AudioDeviceRegistryServerTestBase {};
@@ -142,8 +143,7 @@ TEST_F(ProviderServerCodecWarningTest, InvalidDriverClient) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fad::DeviceType::kCodec,
-          .driver_client =
-              fad::DriverClient::WithCodec(fidl::ClientEnd<fuchsia_hardware_audio::Codec>()),
+          .driver_client = fad::DriverClient::WithCodec(fidl::ClientEnd<fha::Codec>()),
       }})
       .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
@@ -311,8 +311,7 @@ TEST_F(ProviderServerCompositeWarningTest, InvalidDriverClient) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fad::DeviceType::kComposite,
-          .driver_client = fad::DriverClient::WithComposite(
-              fidl::ClientEnd<fuchsia_hardware_audio::Composite>()),
+          .driver_client = fad::DriverClient::WithComposite(fidl::ClientEnd<fha::Composite>()),
       }})
       .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
@@ -376,7 +375,7 @@ TEST_F(ProviderServerDaiWarningTest, Unsupported) {
           // Set a Dai device_type and driver_client -- which ADR doesn't yet support.
           .driver_client = fad::DriverClient::WithDai(
               // (as elsewhere, the zx::channel is from FakeStreamConfig, but that's irrelevant)
-              fidl::ClientEnd<fuchsia_hardware_audio::Dai>(fake_driver->Enable().TakeChannel())),
+              fidl::ClientEnd<fha::Dai>(fake_driver->Enable().TakeChannel())),
       }})
       .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
@@ -512,8 +511,8 @@ TEST_F(ProviderServerStreamConfigWarningTest, InvalidDriverClient) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fad::DeviceType::kOutput,
-          .driver_client = fad::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>()),
+          .driver_client =
+              fad::DriverClient::WithStreamConfig(fidl::ClientEnd<fha::StreamConfig>()),
       }})
       .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;

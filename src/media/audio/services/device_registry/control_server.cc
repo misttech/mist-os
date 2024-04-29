@@ -28,6 +28,7 @@
 namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 // static
 std::shared_ptr<ControlServer> ControlServer::Create(std::shared_ptr<const FidlThread> thread,
@@ -170,7 +171,7 @@ void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& com
     return;
   }
 
-  fuchsia_hardware_audio::GainState gain_state{{.gain_db = *request.target_state()->gain_db()}};
+  fha::GainState gain_state{{.gain_db = *request.target_state()->gain_db()}};
   if (request.target_state()->muted()) {
     gain_state.muted(*request.target_state()->muted());
   }
@@ -377,9 +378,9 @@ void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
 // The Device's DaiFormat has changed. If `dai_format` is set, this resulted from `SetDaiFormat`
 // being called. Otherwise, the Device is newly-initialized or `Reset` was called, so
 // SetDaiFormat must be called again.
-void ControlServer::DaiFormatChanged(
-    ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
-    const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) {
+void ControlServer::DaiFormatChanged(ElementId element_id,
+                                     const std::optional<fha::DaiFormat>& dai_format,
+                                     const std::optional<fha::CodecFormatInfo>& codec_format_info) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods) << "(" << element_id << ")";
 
   auto completer_match = set_dai_format_completers_.find(element_id);
@@ -411,8 +412,7 @@ void ControlServer::DaiFormatChanged(
   }
 }
 
-void ControlServer::DaiFormatNotSet(ElementId element_id,
-                                    const fuchsia_hardware_audio::DaiFormat& dai_format,
+void ControlServer::DaiFormatNotSet(ElementId element_id, const fha::DaiFormat& dai_format,
                                     fad::ControlSetDaiFormatError error) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(" << element_id << ", error " << fidl::ToUnderlying(error) << ") for dai_format:";

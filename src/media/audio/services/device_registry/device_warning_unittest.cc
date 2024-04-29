@@ -18,6 +18,7 @@ namespace media_audio {
 namespace {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 class CodecWarningTest : public CodecTest {};
 class CompositeWarningTest : public CompositeTest {
@@ -25,7 +26,7 @@ class CompositeWarningTest : public CompositeTest {
   // Creating a RingBuffer should fail with `expected_error`.
   void ExpectCreateRingBufferError(const std::shared_ptr<Device>& device, ElementId element_id,
                                    fad::ControlCreateRingBufferError expected_error,
-                                   const fuchsia_hardware_audio::Format& format,
+                                   const fha::Format& format,
                                    uint32_t requested_ring_buffer_bytes = 1024) {
     std::stringstream stream;
     stream << "Validating CreateRingBuffer on element_id " << element_id << " with format "
@@ -188,11 +189,10 @@ TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_FALSE(notify()->dai_format());
   ASSERT_FALSE(notify()->codec_is_started());
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -216,11 +216,10 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
@@ -248,11 +247,10 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& format_sets) {
+      dai_element_id(), [&dai_formats](ElementId element_id,
+                                       const std::vector<fha::DaiSupportedFormats>& format_sets) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         for (const auto& format_set : format_sets) {
           dai_formats.push_back(format_set);
@@ -316,10 +314,10 @@ TEST_F(CodecWarningTest, CreateRingBufferWrongDeviceType) {
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  auto format = fuchsia_hardware_audio::Format{{
-      fuchsia_hardware_audio::PcmFormat{{
+  auto format = fha::Format{{
+      fha::PcmFormat{{
           .number_of_channels = 1,
-          .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
+          .sample_format = fha::SampleFormat::kPcmSigned,
           .bytes_per_sample = 2u,
           .valid_bits_per_sample = 16,
           .frame_rate = 48000,
@@ -910,7 +908,7 @@ TEST_F(StreamConfigWarningTest, CodecDeviceCallsFail) {
 
   ASSERT_TRUE(IsInitialized(device));
 
-  device->SetDaiFormat(1, fuchsia_hardware_audio::DaiFormat{{}});
+  device->SetDaiFormat(1, fha::DaiFormat{{}});
   EXPECT_FALSE(device->Reset());
   EXPECT_FALSE(device->CodecStart());
   EXPECT_FALSE(device->CodecStop());

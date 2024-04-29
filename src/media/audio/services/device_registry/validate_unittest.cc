@@ -21,82 +21,82 @@
 
 namespace media_audio {
 
+namespace fha = fuchsia_hardware_audio;
+
 // These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
 
 const std::vector<uint8_t> kChannels = {1, 8, 255};
-const std::vector<std::pair<uint8_t, fuchsia_hardware_audio::SampleFormat>> kFormats = {
-    {1, fuchsia_hardware_audio::SampleFormat::kPcmUnsigned},
-    {2, fuchsia_hardware_audio::SampleFormat::kPcmSigned},
-    {4, fuchsia_hardware_audio::SampleFormat::kPcmSigned},
-    {4, fuchsia_hardware_audio::SampleFormat::kPcmFloat},
-    {8, fuchsia_hardware_audio::SampleFormat::kPcmFloat},
+const std::vector<std::pair<uint8_t, fha::SampleFormat>> kFormats = {
+    {1, fha::SampleFormat::kPcmUnsigned}, {2, fha::SampleFormat::kPcmSigned},
+    {4, fha::SampleFormat::kPcmSigned},   {4, fha::SampleFormat::kPcmFloat},
+    {8, fha::SampleFormat::kPcmFloat},
 };
 const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
 
 // Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
 TEST(ValidateTest, ValidateCodecProperties) {
-  EXPECT_TRUE(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+  EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
       // is_input missing
       .manufacturer = " ",  // minimal value (empty is disallowed)
       .product =            // maximal value
       "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
       // unique_id missing
-      .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
   }}));
-  EXPECT_TRUE(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+  EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
       .is_input = false,
       .manufacturer =  // maximal value
       "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
       // product missing
       .unique_id = {{}},  // minimal value
-      .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
   }}));
-  EXPECT_TRUE(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+  EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
       .is_input = true,
       // manufacturer missing
       .product = " ",  // minimal value (empty is disallowed)
       .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
                      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
-      .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
   }}));
 }
 
 // Unittest ValidateCompositeProperties -- the missing, minimal and maximal possibilities
 TEST(ValidateTest, ValidateCompositeProperties) {
-  EXPECT_TRUE(ValidateCompositeProperties(fuchsia_hardware_audio::CompositeProperties{{
+  EXPECT_TRUE(ValidateCompositeProperties(fha::CompositeProperties{{
       // manufacturer missing
       .product = " ",  // minimal value (empty is disallowed)
       .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
                      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
-      .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+      .clock_domain = fha::kClockDomainMonotonic,
   }}));
-  EXPECT_TRUE(ValidateCompositeProperties(fuchsia_hardware_audio::CompositeProperties{{
+  EXPECT_TRUE(ValidateCompositeProperties(fha::CompositeProperties{{
       .manufacturer = " ",  // minimal value (empty is disallowed)
       .product =            // maximal value
       "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
       // unique_id missing
-      .clock_domain = fuchsia_hardware_audio::kClockDomainExternal,
+      .clock_domain = fha::kClockDomainExternal,
   }}));
-  EXPECT_TRUE(ValidateCompositeProperties(fuchsia_hardware_audio::CompositeProperties{{
+  EXPECT_TRUE(ValidateCompositeProperties(fha::CompositeProperties{{
       .manufacturer =  // maximal value
       "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
       // product missing
       .unique_id = {{}},  // minimal value
-      .clock_domain = fuchsia_hardware_audio::kClockDomainExternal,
+      .clock_domain = fha::kClockDomainExternal,
   }}));
 }
 
 TEST(ValidateTest, ValidateStreamProperties) {
-  fuchsia_hardware_audio::StreamProperties stream_properties{{
+  fha::StreamProperties stream_properties{{
       .is_input = false,
       .min_gain_db = 0.0f,
       .max_gain_db = 0.0f,
       .gain_step_db = 0.0f,
-      .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-      .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
+      .clock_domain = fha::kClockDomainMonotonic,
   }};
-  fuchsia_hardware_audio::GainState gain_state{{.gain_db = 0.0f}};
-  fuchsia_hardware_audio::PlugState plug_state{{.plugged = true, .plug_state_time = 0}};
+  fha::GainState gain_state{{.gain_db = 0.0f}};
+  fha::PlugState plug_state{{.plugged = true, .plug_state_time = 0}};
 
   EXPECT_TRUE(ValidateStreamProperties(stream_properties));
   EXPECT_TRUE(ValidateStreamProperties(stream_properties, gain_state));
@@ -111,10 +111,10 @@ TEST(ValidateTest, ValidateStreamProperties) {
       .min_gain_db = -10.0f,
       .max_gain_db = 10.0f,
       .gain_step_db = 20.0f,
-      .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
       .manufacturer = "Fuchsia2",
       .product = "Test2",
-      .clock_domain = fuchsia_hardware_audio::kClockDomainExternal,
+      .clock_domain = fha::kClockDomainExternal,
   }};
   gain_state = {{.muted = true, .agc_enabled = true, .gain_db = -4.2f}};
   plug_state = {{.plugged = false, .plug_state_time = zx::clock::get_monotonic().get()}};
@@ -126,20 +126,20 @@ TEST(ValidateTest, ValidateStreamProperties) {
 
 // TODO(https://fxbug.dev/42069012): Unittest ValidateDeviceInfo, incl. manuf & prod 256 chars long
 
-fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
-  return fuchsia_hardware_audio::SupportedFormats{{
-      .pcm_supported_formats = fuchsia_hardware_audio::PcmSupportedFormats{{
+fha::SupportedFormats CompliantFormatSet() {
+  return fha::SupportedFormats{{
+      .pcm_supported_formats = fha::PcmSupportedFormats{{
           .channel_sets = {{
-              fuchsia_hardware_audio::ChannelSet{{
+              fha::ChannelSet{{
                   .attributes = {{
-                      fuchsia_hardware_audio::ChannelAttributes{{
+                      fha::ChannelAttributes{{
                           .min_frequency = 20,
                           .max_frequency = 20000,
                       }},
                   }},
               }},
           }},
-          .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmSigned}},
+          .sample_formats = {{fha::SampleFormat::kPcmSigned}},
           .bytes_per_sample = {{2}},
           .valid_bits_per_sample = {{16}},
           .frame_rates = {{48000}},
@@ -148,21 +148,21 @@ fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
 }
 
 TEST(ValidateTest, ValidateRingBufferProperties) {
-  EXPECT_TRUE(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+  EXPECT_TRUE(ValidateRingBufferProperties(fha::RingBufferProperties{{
       .needs_cache_flush_or_invalidate = false,
       .turn_on_delay = 125,
       .driver_transfer_bytes = 32,
   }}));
 
   // TODO(b/311694769): Resolve driver_transfer_bytes lower limit: specifically is 0 allowed?
-  EXPECT_TRUE(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+  EXPECT_TRUE(ValidateRingBufferProperties(fha::RingBufferProperties{{
       .needs_cache_flush_or_invalidate = true,
       .turn_on_delay = 0,  // can be zero
       .driver_transfer_bytes = 1,
   }}));
 
   // TODO(b/311694769): Resolve driver_transfer_bytes upper limit: no limit? Soft guideline?
-  EXPECT_TRUE(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+  EXPECT_TRUE(ValidateRingBufferProperties(fha::RingBufferProperties{{
       .needs_cache_flush_or_invalidate = true,
       // turn_on_delay (optional) is missing
       .driver_transfer_bytes = 128,
@@ -170,125 +170,125 @@ TEST(ValidateTest, ValidateRingBufferProperties) {
 }
 
 TEST(ValidateTest, ValidateGainState) {
-  EXPECT_TRUE(ValidateGainState(fuchsia_hardware_audio::GainState{{
+  EXPECT_TRUE(ValidateGainState(fha::GainState{{
       // muted (optional) is missing: NOT muted
       // agc_enabled (optional) is missing: NOT enabled
       .gain_db = -42.0f,
   }}  // If StreamProperties is not provided, assume the device cannot mute or agc
                                 ));
   EXPECT_TRUE(
-      ValidateGainState(fuchsia_hardware_audio::GainState{{
+      ValidateGainState(fha::GainState{{
                             .muted = false,
                             .agc_enabled = false,
                             .gain_db = 0,
                         }},
                         // If StreamProperties is not provided, assume the device cannot mute or agc
                         std::nullopt));
-  EXPECT_TRUE(ValidateGainState(
-      fuchsia_hardware_audio::GainState{{
-          .muted = false,
-          .agc_enabled = true,
-          .gain_db = -12.0f,
-      }},
-      fuchsia_hardware_audio::StreamProperties{{
-          .is_input = false,
-          // can_mute (optional) is missing: device cannot mute
-          .can_agc = true,
-          .min_gain_db = -12.0f,
-          .max_gain_db = 12.0f,
-          .gain_step_db = 0.5f,
-          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-          .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-      }}));
-  EXPECT_TRUE(ValidateGainState(
-      fuchsia_hardware_audio::GainState{{
-          .muted = true,
-          .agc_enabled = false,
-          .gain_db = -12.0f,
-      }},
-      fuchsia_hardware_audio::StreamProperties{{
-          .is_input = false,
-          .can_mute = true,
-          // can_agc (optional) is missing: device cannot agc
-          .min_gain_db = -24.0f,
-          .max_gain_db = -12.0f,
-          .gain_step_db = 2.0f,
-          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-          .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-      }}));
-  EXPECT_TRUE(ValidateGainState(
-      fuchsia_hardware_audio::GainState{{
-          // muted (optional) is missing: NOT muted
-          .agc_enabled = false,
-          .gain_db = -12.0f,
-      }},
-      fuchsia_hardware_audio::StreamProperties{{
-          .is_input = false,
-          .can_mute = false,
-          .can_agc = true,
-          .min_gain_db = -12.0f,
-          .max_gain_db = 12.0f,
-          .gain_step_db = 0.5f,
-          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-          .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-      }}));
-  EXPECT_TRUE(ValidateGainState(
-      fuchsia_hardware_audio::GainState{{
-          .muted = false,
-          // agc_enabled (optional) is missing: NOT enabled
-          .gain_db = -12.0f,
-      }},
-      fuchsia_hardware_audio::StreamProperties{{
-          .is_input = false,
-          .can_mute = true,
-          .can_agc = false,
-          .min_gain_db = -24.0f,
-          .max_gain_db = -12.0f,
-          .gain_step_db = 2.0f,
-          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
-          .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
-      }}));
+  EXPECT_TRUE(
+      ValidateGainState(fha::GainState{{
+                            .muted = false,
+                            .agc_enabled = true,
+                            .gain_db = -12.0f,
+                        }},
+                        fha::StreamProperties{{
+                            .is_input = false,
+                            // can_mute (optional) is missing: device cannot mute
+                            .can_agc = true,
+                            .min_gain_db = -12.0f,
+                            .max_gain_db = 12.0f,
+                            .gain_step_db = 0.5f,
+                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
+                            .clock_domain = fha::kClockDomainMonotonic,
+                        }}));
+  EXPECT_TRUE(
+      ValidateGainState(fha::GainState{{
+                            .muted = true,
+                            .agc_enabled = false,
+                            .gain_db = -12.0f,
+                        }},
+                        fha::StreamProperties{{
+                            .is_input = false,
+                            .can_mute = true,
+                            // can_agc (optional) is missing: device cannot agc
+                            .min_gain_db = -24.0f,
+                            .max_gain_db = -12.0f,
+                            .gain_step_db = 2.0f,
+                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
+                            .clock_domain = fha::kClockDomainMonotonic,
+                        }}));
+  EXPECT_TRUE(
+      ValidateGainState(fha::GainState{{
+                            // muted (optional) is missing: NOT muted
+                            .agc_enabled = false,
+                            .gain_db = -12.0f,
+                        }},
+                        fha::StreamProperties{{
+                            .is_input = false,
+                            .can_mute = false,
+                            .can_agc = true,
+                            .min_gain_db = -12.0f,
+                            .max_gain_db = 12.0f,
+                            .gain_step_db = 0.5f,
+                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
+                            .clock_domain = fha::kClockDomainMonotonic,
+                        }}));
+  EXPECT_TRUE(
+      ValidateGainState(fha::GainState{{
+                            .muted = false,
+                            // agc_enabled (optional) is missing: NOT enabled
+                            .gain_db = -12.0f,
+                        }},
+                        fha::StreamProperties{{
+                            .is_input = false,
+                            .can_mute = true,
+                            .can_agc = false,
+                            .min_gain_db = -24.0f,
+                            .max_gain_db = -12.0f,
+                            .gain_step_db = 2.0f,
+                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
+                            .clock_domain = fha::kClockDomainMonotonic,
+                        }}));
 }
 
 TEST(ValidateTest, ValidatePlugState) {
-  EXPECT_TRUE(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+  EXPECT_TRUE(ValidatePlugState(fha::PlugState{{
       .plugged = true,
       .plug_state_time = 0,
   }}));
-  EXPECT_TRUE(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+  EXPECT_TRUE(ValidatePlugState(fha::PlugState{{
       .plugged = false,
       .plug_state_time = zx::clock::get_monotonic().get(),
   }}));
-  EXPECT_TRUE(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+  EXPECT_TRUE(ValidatePlugState(fha::PlugState{{
                                     .plugged = true,
                                     .plug_state_time = zx::clock::get_monotonic().get(),
                                 }},
-                                fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired));
-  EXPECT_TRUE(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
+                                fha::PlugDetectCapabilities::kHardwired));
+  EXPECT_TRUE(ValidatePlugState(fha::PlugState{{
                                     .plugged = false,
                                     .plug_state_time = zx::clock::get_monotonic().get(),
                                 }},
-                                fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify));
+                                fha::PlugDetectCapabilities::kCanAsyncNotify));
 }
 
 TEST(ValidateTest, ValidateRingBufferFormatSets) {
   EXPECT_TRUE(ValidateRingBufferFormatSets({CompliantFormatSet()}));
 
-  fuchsia_hardware_audio::SupportedFormats minimal_values_format_set;
+  fha::SupportedFormats minimal_values_format_set;
   minimal_values_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
                 {{.max_frequency = 50}},
             }}}},
       }},
-      .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmUnsigned}},
+      .sample_formats = {{fha::SampleFormat::kPcmUnsigned}},
       .bytes_per_sample = {{1}},
       .valid_bits_per_sample = {{1}},
       .frame_rates = {{1000}},
   }};
   EXPECT_TRUE(ValidateRingBufferFormatSets({minimal_values_format_set}));
 
-  fuchsia_hardware_audio::SupportedFormats maximal_values_format_set;
+  fha::SupportedFormats maximal_values_format_set;
   maximal_values_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
@@ -296,7 +296,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
                 {{.max_frequency = 96000}},
             }}}},
       }},
-      .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmFloat}},
+      .sample_formats = {{fha::SampleFormat::kPcmFloat}},
       .bytes_per_sample = {{8}},
       .valid_bits_per_sample = {{64}},
       .frame_rates = {{192000}},
@@ -304,7 +304,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
   EXPECT_TRUE(ValidateRingBufferFormatSets({maximal_values_format_set}));
 
   // Probe fully-populated values, in multiple format sets.
-  fuchsia_hardware_audio::SupportedFormats signed_format_set;
+  fha::SupportedFormats signed_format_set;
   signed_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
@@ -326,7 +326,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
                 {{.min_frequency = 24000}},
             }}}},
       }},
-      .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmSigned}},
+      .sample_formats = {{fha::SampleFormat::kPcmSigned}},
       .bytes_per_sample = {{2, 4}},
       .valid_bits_per_sample = {{1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
                                  13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32}},
@@ -335,7 +335,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
   }};
   EXPECT_TRUE(ValidateRingBufferFormatSets({signed_format_set}));
 
-  fuchsia_hardware_audio::SupportedFormats unsigned_format_set;
+  fha::SupportedFormats unsigned_format_set;
   unsigned_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
@@ -357,7 +357,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
                 {{.min_frequency = 24000}},
             }}}},
       }},
-      .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmUnsigned}},
+      .sample_formats = {{fha::SampleFormat::kPcmUnsigned}},
       .bytes_per_sample = {{1}},
       .valid_bits_per_sample = {{1, 2, 3, 4, 5, 6, 7, 8}},
       .frame_rates = {{1000, 2000, 4000, 8000, 11025, 16000, 22050, 24000, 44100, 48000, 88200,
@@ -365,7 +365,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
   }};
   EXPECT_TRUE(ValidateRingBufferFormatSets({unsigned_format_set}));
 
-  fuchsia_hardware_audio::SupportedFormats float_format_set;
+  fha::SupportedFormats float_format_set;
   float_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
@@ -387,7 +387,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
                 {{.max_frequency = 2500}},
             }}}},
       }},
-      .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmFloat}},
+      .sample_formats = {{fha::SampleFormat::kPcmFloat}},
       .bytes_per_sample = {{4, 8}},
       .valid_bits_per_sample = {{1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16,
                                  18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 60, 64}},
@@ -411,8 +411,8 @@ TEST(ValidateTest, ValidateRingBufferFormat) {
   for (auto chans : kChannels) {
     for (auto [bytes, sample_format] : kFormats) {
       for (auto rate : kFrameRates) {
-        EXPECT_TRUE(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{{
-            .pcm_format = fuchsia_hardware_audio::PcmFormat{{
+        EXPECT_TRUE(ValidateRingBufferFormat(fha::Format{{
+            .pcm_format = fha::PcmFormat{{
                 .number_of_channels = chans,
                 .sample_format = sample_format,
                 .bytes_per_sample = bytes,
@@ -420,8 +420,8 @@ TEST(ValidateTest, ValidateRingBufferFormat) {
                 .frame_rate = rate,
             }},
         }}));
-        EXPECT_TRUE(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{{
-            .pcm_format = fuchsia_hardware_audio::PcmFormat{{
+        EXPECT_TRUE(ValidateRingBufferFormat(fha::Format{{
+            .pcm_format = fha::PcmFormat{{
                 .number_of_channels = chans,
                 .sample_format = sample_format,
                 .bytes_per_sample = bytes,
@@ -429,8 +429,8 @@ TEST(ValidateTest, ValidateRingBufferFormat) {
                 .frame_rate = rate,
             }},
         }}));
-        EXPECT_TRUE(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{{
-            .pcm_format = fuchsia_hardware_audio::PcmFormat{{
+        EXPECT_TRUE(ValidateRingBufferFormat(fha::Format{{
+            .pcm_format = fha::PcmFormat{{
                 .number_of_channels = chans,
                 .sample_format = sample_format,
                 .bytes_per_sample = bytes,
@@ -458,28 +458,27 @@ TEST(ValidateTest, ValidateRingBufferVmo) {
   constexpr uint8_t kChannelCount = 1;
   constexpr uint8_t kSampleSize = 2;
   uint32_t num_frames = static_cast<uint32_t>(kVmoContentSize / kChannelCount / kSampleSize);
-  EXPECT_TRUE(ValidateRingBufferVmo(
-      vmo, num_frames,
-      {{
-          .pcm_format = fuchsia_hardware_audio::PcmFormat{{
-              .number_of_channels = kChannelCount,
-              .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
-              .bytes_per_sample = kSampleSize,
-              .valid_bits_per_sample = 16,
-              .frame_rate = 8000,
-          }},
-      }}));
+  EXPECT_TRUE(ValidateRingBufferVmo(vmo, num_frames,
+                                    {{
+                                        .pcm_format = fha::PcmFormat{{
+                                            .number_of_channels = kChannelCount,
+                                            .sample_format = fha::SampleFormat::kPcmSigned,
+                                            .bytes_per_sample = kSampleSize,
+                                            .valid_bits_per_sample = 16,
+                                            .frame_rate = 8000,
+                                        }},
+                                    }}));
 }
 
 TEST(ValidateTest, ValidateDelayInfo) {
-  EXPECT_TRUE(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
+  EXPECT_TRUE(ValidateDelayInfo(fha::DelayInfo{{
       .internal_delay = 0,
   }}));
-  EXPECT_TRUE(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
+  EXPECT_TRUE(ValidateDelayInfo(fha::DelayInfo{{
       .internal_delay = 125,
       .external_delay = 0,
   }}));
-  EXPECT_TRUE(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
+  EXPECT_TRUE(ValidateDelayInfo(fha::DelayInfo{{
       .internal_delay = 0,
       .external_delay = 125,
   }}));
@@ -489,9 +488,9 @@ TEST(ValidateTest, ValidateDaiFormatSets) {
   EXPECT_TRUE(ValidateDaiFormatSets({{
       {{
           .number_of_channels = {1},
-          .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
-          .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-              fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+          .sample_formats = {fha::DaiSampleFormat::kPcmSigned},
+          .frame_formats = {fha::DaiFrameFormat::WithFrameFormatStandard(
+              fha::DaiFrameFormatStandard::kI2S)},
           .frame_rates = {48000},
           .bits_per_slot = {32},
           .bits_per_sample = {16},
@@ -504,9 +503,9 @@ TEST(ValidateTest, ValidateDaiFormat) {
   EXPECT_TRUE(ValidateDaiFormat({{
       .number_of_channels = 2,
       .channels_to_use_bitmask = 0x03,
-      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
-      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-          fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+      .sample_format = fha::DaiSampleFormat::kPcmSigned,
+      .frame_format =
+          fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kI2S),
       .frame_rate = 48000,
       .bits_per_slot = 32,
       .bits_per_sample = 16,
@@ -515,9 +514,9 @@ TEST(ValidateTest, ValidateDaiFormat) {
   EXPECT_TRUE(ValidateDaiFormat({{
       .number_of_channels = 1,
       .channels_to_use_bitmask = 0x01,
-      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPdm,
-      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-          fuchsia_hardware_audio::DaiFrameFormatStandard::kNone),
+      .sample_format = fha::DaiSampleFormat::kPdm,
+      .frame_format =
+          fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kNone),
       .frame_rate = 1000,
       .bits_per_slot = 8,
       .bits_per_sample = 1,
@@ -526,8 +525,8 @@ TEST(ValidateTest, ValidateDaiFormat) {
   EXPECT_TRUE(ValidateDaiFormat({{
       .number_of_channels = 32,
       .channels_to_use_bitmask = 0xFFFFFFFF,
-      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
-      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom({{
+      .sample_format = fha::DaiSampleFormat::kPcmSigned,
+      .frame_format = fha::DaiFrameFormat::WithFrameFormatCustom({{
           .left_justified = true,
           .sclk_on_raising = false,
           .frame_sync_sclks_offset = 0,
@@ -541,8 +540,8 @@ TEST(ValidateTest, ValidateDaiFormat) {
   EXPECT_TRUE(ValidateDaiFormat({{
       .number_of_channels = 64,
       .channels_to_use_bitmask = 0xFFFFFFFFFFFFFFFF,
-      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat,
-      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom({{
+      .sample_format = fha::DaiSampleFormat::kPcmFloat,
+      .frame_format = fha::DaiFrameFormat::WithFrameFormatCustom({{
           .left_justified = true,
           .sclk_on_raising = false,
           .frame_sync_sclks_offset = -128,
@@ -555,17 +554,17 @@ TEST(ValidateTest, ValidateDaiFormat) {
 }
 
 TEST(ValidateTest, ValidateCodecFormatInfo) {
-  EXPECT_TRUE(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{}));
+  EXPECT_TRUE(ValidateCodecFormatInfo(fha::CodecFormatInfo{}));
   // For all three fields, test missing, minimal and maximal values.
-  EXPECT_TRUE(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+  EXPECT_TRUE(ValidateCodecFormatInfo(fha::CodecFormatInfo{{
       .external_delay = 0,
       .turn_off_delay = zx::time::infinite().get(),
   }}));
-  EXPECT_TRUE(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+  EXPECT_TRUE(ValidateCodecFormatInfo(fha::CodecFormatInfo{{
       .external_delay = zx::time::infinite().get(),
       .turn_on_delay = 0,
   }}));
-  EXPECT_TRUE(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+  EXPECT_TRUE(ValidateCodecFormatInfo(fha::CodecFormatInfo{{
       .turn_on_delay = zx::time::infinite().get(),
       .turn_off_delay = 0,
   }}));

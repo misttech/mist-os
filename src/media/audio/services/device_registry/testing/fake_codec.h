@@ -27,12 +27,10 @@ namespace media_audio {
 inline constexpr bool kLogFakeCodec = false;
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
-using fuchsia_hardware_audio::Codec;
-using fuchsia_hardware_audio::CodecConnector;
-using fuchsia_hardware_audio_signalprocessing::SignalProcessing;
-class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
-                  public fidl::testing::TestBase<Codec>,
-                  public fidl::testing::TestBase<SignalProcessing> {
+class FakeCodec
+    : public fidl::testing::TestBase<fuchsia_hardware_audio::CodecConnector>,
+      public fidl::testing::TestBase<fuchsia_hardware_audio::Codec>,
+      public fidl::testing::TestBase<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
   static constexpr char kDefaultManufacturer[] = "fake_codec device manufacturer";
   static constexpr char kDefaultProduct[] = "fake_codec device product";
@@ -73,8 +71,8 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // This returns a fidl::client_end<Codec>. The driver will not start serving requests until
-  // Enable is called, which is why the construction/Enable separation exists.
+  // This returns a fidl::client_end<Codec>. The driver will not start serving requests until Enable
+  // is called, which is why the construction/Enable separation exists.
   fidl::ClientEnd<fuchsia_hardware_audio::Codec> Enable();
   void DropCodec();
 
@@ -170,14 +168,14 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
     ADR_LOG_OBJECT(kLogFakeCodec);
   }
 
-  // fuchsia.hardware.audio.Health
+  // fuchsia_hardware_audio.Health
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.audio.signalprocessing.Connector
+  // fuchsia_hardware_audio_signalprocessing.Connector
   void SignalProcessingConnect(SignalProcessingConnectRequest& request,
                                SignalProcessingConnectCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.audio.signalprocessing.SignalProcessing
+  // fuchsia_hardware_audio_signalprocessing::SignalProcessing
   // These won't be called until SignalProcessingConnect is implemented, but we'll be safe.
   // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
   void GetElements(GetElementsCompleter::Sync& completer) final {
@@ -212,7 +210,7 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
   async_dispatcher_t* dispatcher_;
   fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end_;
   fidl::ClientEnd<fuchsia_hardware_audio::Codec> client_end_;
-  std::optional<fidl::ServerBindingRef<Codec>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio::Codec>> binding_;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_processing_binding_;
 

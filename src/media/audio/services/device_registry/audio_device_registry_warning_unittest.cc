@@ -88,7 +88,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdRemoved) {
 TEST_F(AudioDeviceRegistryServerWarningTest, FindCompositeByTokenIdError) {
   auto fake_driver = CreateFakeComposite();
   fake_driver->set_health_state(false);
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test composite", fad::DeviceType::kComposite,
                         fad::DriverClient::WithComposite(std::move(client)));
 
@@ -103,7 +103,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindCompositeByTokenIdError) {
 
 TEST_F(AudioDeviceRegistryServerWarningTest, FindCompositeByTokenIdRemoved) {
   auto fake_driver = CreateFakeComposite();
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test composite", fad::DeviceType::kComposite,
                         fad::DriverClient::WithComposite(std::move(client)));
 

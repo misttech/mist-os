@@ -14,22 +14,22 @@
 #include <gtest/gtest.h>
 
 namespace media_audio {
-using fuchsia_hardware_audio::Codec;
 
-const fuchsia_hardware_audio::DaiFrameFormat FakeCodec::kDefaultFrameFormat =
-    fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-        fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S);
+namespace fha = fuchsia_hardware_audio;
+
+const fha::DaiFrameFormat FakeCodec::kDefaultFrameFormat =
+    fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kI2S);
 
 const std::vector<uint32_t> FakeCodec::kDefaultNumberOfChannelsSet{
     FakeCodec::kDefaultNumberOfChannels, FakeCodec::kDefaultNumberOfChannels2};
-const std::vector<fuchsia_hardware_audio::DaiSampleFormat> FakeCodec::kDefaultSampleFormatsSet{
+const std::vector<fha::DaiSampleFormat> FakeCodec::kDefaultSampleFormatsSet{
     FakeCodec::kDefaultDaiSampleFormat};
-const std::vector<fuchsia_hardware_audio::DaiFrameFormat> FakeCodec::kDefaultFrameFormatsSet{
+const std::vector<fha::DaiFrameFormat> FakeCodec::kDefaultFrameFormatsSet{
     FakeCodec::kDefaultFrameFormat};
 const std::vector<uint32_t> FakeCodec::kDefaultFrameRatesSet{FakeCodec::kDefaultFrameRates};
 const std::vector<uint8_t> FakeCodec::kDefaultBitsPerSlotSet{FakeCodec::kDefaultBitsPerSlot};
 const std::vector<uint8_t> FakeCodec::kDefaultBitsPerSampleSet{FakeCodec::kDefaultBitsPerSample};
-const fuchsia_hardware_audio::DaiSupportedFormats FakeCodec::kDefaultDaiFormatSet{{
+const fha::DaiSupportedFormats FakeCodec::kDefaultDaiFormatSet{{
     .number_of_channels = FakeCodec::kDefaultNumberOfChannelsSet,
     .sample_formats = FakeCodec::kDefaultSampleFormatsSet,
     .frame_formats = FakeCodec::kDefaultFrameFormatsSet,
@@ -38,7 +38,7 @@ const fuchsia_hardware_audio::DaiSupportedFormats FakeCodec::kDefaultDaiFormatSe
     .bits_per_sample = FakeCodec::kDefaultBitsPerSampleSet,
 }};
 
-const std::vector<fuchsia_hardware_audio::DaiSupportedFormats> FakeCodec::kDefaultDaiFormatSets{
+const std::vector<fha::DaiSupportedFormats> FakeCodec::kDefaultDaiFormatSets{
     FakeCodec::kDefaultDaiFormatSet};
 
 FakeCodec::FakeCodec(zx::channel server_end, zx::channel client_end, async_dispatcher_t* dispatcher)
@@ -58,11 +58,11 @@ FakeCodec::~FakeCodec() {
 }
 
 void on_unbind(FakeCodec* fake_codec, fidl::UnbindInfo info,
-               fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
+               fidl::ServerEnd<fha::Codec> server_end) {
   ADR_LOG(kLogFakeCodec || kLogObjectLifetimes) << "FakeCodec disconnected";
 }
 
-fidl::ClientEnd<fuchsia_hardware_audio::Codec> FakeCodec::Enable() {
+fidl::ClientEnd<fha::Codec> FakeCodec::Enable() {
   ADR_LOG_METHOD(kLogFakeCodec);
   EXPECT_TRUE(server_end_.is_valid());
   EXPECT_TRUE(client_end_.is_valid());
@@ -86,7 +86,7 @@ void FakeCodec::GetHealthState(GetHealthStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCodec);
   if (responsive_) {
     if (healthy_.has_value()) {
-      completer.Reply(fuchsia_hardware_audio::HealthState{{healthy_.value()}});
+      completer.Reply(fha::HealthState{{healthy_.value()}});
     } else {
       completer.Reply({});
     }
@@ -116,7 +116,7 @@ void FakeCodec::SignalProcessingConnect(SignalProcessingConnectRequest& request,
 void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCodec);
   // Gather the properties and return them.
-  fuchsia_hardware_audio::CodecProperties codec_properties{};
+  fha::CodecProperties codec_properties{};
   if (is_input_) {
     codec_properties.is_input(*is_input_);
   }
@@ -139,7 +139,7 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
 void FakeCodec::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCodec);
 
-  completer.Reply(fit::ok(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>{
+  completer.Reply(fit::ok(std::vector<fha::DaiSupportedFormats>{
       {{
           .number_of_channels = number_of_channels_,
           .sample_formats = sample_formats_,
@@ -151,7 +151,7 @@ void FakeCodec::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
   }));
 }
 
-bool FakeCodec::CheckDaiFormatSupported(const fuchsia_hardware_audio::DaiFormat& candidate) {
+bool FakeCodec::CheckDaiFormatSupported(const fha::DaiFormat& candidate) {
   return (std::find(number_of_channels_.begin(), number_of_channels_.end(),
                     candidate.number_of_channels()) != std::end(number_of_channels_) &&
           candidate.channels_to_use_bitmask() < (1u << candidate.number_of_channels()) &&
@@ -176,7 +176,7 @@ void FakeCodec::SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter
 
   selected_format_.emplace(request.format());
 
-  fuchsia_hardware_audio::CodecFormatInfo info;
+  fha::CodecFormatInfo info;
   if (external_delay_) {
     info.external_delay(external_delay_->get());
   }
@@ -242,7 +242,7 @@ void FakeCodec::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   // If pending plug state change, clear the dirty bit and return the state with this completer.
   if (plug_has_changed_) {
     plug_has_changed_ = false;
-    completer.Reply(fuchsia_hardware_audio::PlugState{{
+    completer.Reply(fha::PlugState{{
         .plugged = plugged_,
         .plug_state_time = plug_state_time_.get(),
     }});
@@ -282,7 +282,7 @@ void FakeCodec::InjectUnpluggedAt(zx::time plug_time) {
 void FakeCodec::HandlePlugResponse() {
   // A WatchPlugState is pending; complete it.
   if (watch_plug_state_completer_) {
-    watch_plug_state_completer_->Reply(fuchsia_hardware_audio::PlugState{{
+    watch_plug_state_completer_->Reply(fha::PlugState{{
         .plugged = plugged_,
         .plug_state_time = plug_state_time_.get(),
     }});

@@ -25,6 +25,7 @@
 namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   if (!unique_instance_id) {
@@ -48,7 +49,7 @@ std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   return str;
 }
 
-void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_props) {
+void LogStreamProperties(const fha::StreamProperties& stream_props) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -102,9 +103,9 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
   std::string clock_domain_str{"   clock _domain     "};
   if (stream_props.clock_domain()) {
     clock_domain_str += std::to_string(*stream_props.clock_domain());
-    if (*stream_props.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
+    if (*stream_props.clock_domain() == fha::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
-    } else if (*stream_props.clock_domain() == fuchsia_hardware_audio::kClockDomainExternal) {
+    } else if (*stream_props.clock_domain() == fha::kClockDomainExternal) {
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
@@ -210,8 +211,7 @@ void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_b
   }
 }
 
-void LogRingBufferFormatSets(
-    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -293,7 +293,7 @@ void LogRingBufferFormatSets(
   }
 }
 
-void LogGainState(const fuchsia_hardware_audio::GainState& gain_state) {
+void LogGainState(const fha::GainState& gain_state) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -312,7 +312,7 @@ void LogGainState(const fuchsia_hardware_audio::GainState& gain_state) {
   }
 }
 
-void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
+void LogPlugState(const fha::PlugState& plug_state) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -326,7 +326,7 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
                                                  : "<none> (non-compliant)");
 }
 
-void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props) {
+void LogCodecProperties(const fha::CodecProperties& codec_props) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -384,8 +384,7 @@ void LogElementDaiFormatSet(const fad::ElementDaiFormatSet& element_dai_format_s
   }
 }
 
-void LogDaiFormatSets(
-    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+void LogDaiFormatSets(const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -435,7 +434,7 @@ void LogDaiFormatSets(
   }
 }
 
-void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format) {
+void LogDaiFormat(std::optional<fha::DaiFormat> dai_format) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -457,7 +456,7 @@ void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format) {
                 << static_cast<uint16_t>(dai_format->bits_per_sample());
 }
 
-void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info) {
+void LogCodecFormatInfo(std::optional<fha::CodecFormatInfo> format_info) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -478,7 +477,7 @@ void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> f
                                                   : "<none>");
 }
 
-void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& composite_props) {
+void LogCompositeProperties(const fha::CompositeProperties& composite_props) {
   if constexpr (!kLogCompositeFidlResponseValues) {
     return;
   }
@@ -1006,9 +1005,9 @@ void LogDeviceInfo(const fad::Info& device_info) {
   std::string clock_domain_str{"  clock_domain                 "};
   if (device_info.clock_domain()) {
     clock_domain_str += std::to_string(*device_info.clock_domain());
-    if (*device_info.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
+    if (*device_info.clock_domain() == fha::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
-    } else if (*device_info.clock_domain() == fuchsia_hardware_audio::kClockDomainExternal) {
+    } else if (*device_info.clock_domain() == fha::kClockDomainExternal) {
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
@@ -1051,7 +1050,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
   }
 }
 
-void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props) {
+void LogRingBufferProperties(const fha::RingBufferProperties& rb_props) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -1076,7 +1075,7 @@ void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties&
   }
 }
 
-void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format) {
+void LogRingBufferFormat(const fha::Format& ring_buffer_format) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -1100,8 +1099,7 @@ void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_forma
                 << ring_buffer_format.pcm_format()->frame_rate();
 }
 
-void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                      fuchsia_hardware_audio::Format rb_format) {
+void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, fha::Format rb_format) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -1142,7 +1140,7 @@ void LogActiveChannels(uint64_t channel_bitmask, zx::time set_time) {
   FX_LOGS(INFO) << "    set_time             " << set_time.get();
 }
 
-void LogDelayInfo(const fuchsia_hardware_audio::DelayInfo& info) {
+void LogDelayInfo(const fha::DelayInfo& info) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }

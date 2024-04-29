@@ -18,6 +18,7 @@
 namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
 
 namespace {
 
@@ -98,14 +99,14 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
   std::optional<fad::DriverClient> driver_client;
 
   if (device_type == fad::DeviceType::kCodec) {
-    zx::result client_end = component::ConnectAt<fuchsia_hardware_audio::CodecConnector>(dir, name);
+    zx::result client_end = component::ConnectAt<fha::CodecConnector>(dir, name);
     if (client_end.is_error()) {
       FX_PLOGS(ERROR, client_end.error_value())
           << "DeviceDetector failed to connect to device node at '" << name << "'";
       return;
     }
     fidl::Client connector(std::move(client_end.value()), dispatcher_);
-    auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+    auto [client, server] = fidl::Endpoints<fha::Codec>::Create();
     auto status = connector->Connect(std::move(server));
     if (!status.is_ok()) {
       FX_PLOGS(ERROR, status.error_value().status())
@@ -114,7 +115,7 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     }
     driver_client = fad::DriverClient::WithCodec(std::move(client));
   } else if (device_type == fad::DeviceType::kComposite) {
-    zx::result client_end = component::ConnectAt<fuchsia_hardware_audio::Composite>(dir, name);
+    zx::result client_end = component::ConnectAt<fha::Composite>(dir, name);
     if (client_end.is_error()) {
       FX_PLOGS(ERROR, client_end.error_value())
           << "DeviceDetector failed to connect to DFv2 Composite node at '" << name << "'";
@@ -122,15 +123,14 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     }
     driver_client = fad::DriverClient::WithComposite(std::move(client_end.value()));
   } else if (device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput) {
-    zx::result client_end =
-        component::ConnectAt<fuchsia_hardware_audio::StreamConfigConnector>(dir, name);
+    zx::result client_end = component::ConnectAt<fha::StreamConfigConnector>(dir, name);
     if (client_end.is_error()) {
       FX_PLOGS(ERROR, client_end.error_value())
           << "DeviceDetector failed to connect to device node at '" << name << "'";
       return;
     }
     fidl::Client connector(std::move(client_end.value()), dispatcher_);
-    auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
+    auto [client, server] = fidl::Endpoints<fha::StreamConfig>::Create();
     auto status = connector->Connect(std::move(server));
     if (!status.is_ok()) {
       FX_PLOGS(ERROR, status.error_value().status())

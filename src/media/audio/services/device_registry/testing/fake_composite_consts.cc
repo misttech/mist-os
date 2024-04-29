@@ -12,29 +12,29 @@
 
 namespace media_audio {
 
+namespace fha = fuchsia_hardware_audio;
+
 // static definitions: signalprocessing elements/topologies and format sets
 
 // DaiFormats and format sets
 //
-const fuchsia_hardware_audio::DaiFrameFormat FakeComposite::kDefaultDaiFrameFormat =
-    fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-        fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S);
-const fuchsia_hardware_audio::DaiFrameFormat FakeComposite::kDefaultDaiFrameFormat2 =
-    fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-        fuchsia_hardware_audio::DaiFrameFormatStandard::kNone);
+const fha::DaiFrameFormat FakeComposite::kDefaultDaiFrameFormat =
+    fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kI2S);
+const fha::DaiFrameFormat FakeComposite::kDefaultDaiFrameFormat2 =
+    fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kNone);
 
 const std::vector<uint32_t> FakeComposite::kDefaultDaiNumberOfChannelsSet{
     kDefaultDaiNumberOfChannels, kDefaultDaiNumberOfChannels2};
 const std::vector<uint32_t> FakeComposite::kDefaultDaiNumberOfChannelsSet2{
     kDefaultDaiNumberOfChannels2};
-const std::vector<fuchsia_hardware_audio::DaiSampleFormat>
-    FakeComposite::kDefaultDaiSampleFormatsSet{kDefaultDaiSampleFormat};
-const std::vector<fuchsia_hardware_audio::DaiSampleFormat>
-    FakeComposite::kDefaultDaiSampleFormatsSet2{kDefaultDaiSampleFormat, kDefaultDaiSampleFormat2};
-const std::vector<fuchsia_hardware_audio::DaiFrameFormat> FakeComposite::kDefaultDaiFrameFormatsSet{
+const std::vector<fha::DaiSampleFormat> FakeComposite::kDefaultDaiSampleFormatsSet{
+    kDefaultDaiSampleFormat};
+const std::vector<fha::DaiSampleFormat> FakeComposite::kDefaultDaiSampleFormatsSet2{
+    kDefaultDaiSampleFormat, kDefaultDaiSampleFormat2};
+const std::vector<fha::DaiFrameFormat> FakeComposite::kDefaultDaiFrameFormatsSet{
     kDefaultDaiFrameFormat, kDefaultDaiFrameFormat2};
-const std::vector<fuchsia_hardware_audio::DaiFrameFormat>
-    FakeComposite::kDefaultDaiFrameFormatsSet2{kDefaultDaiFrameFormat2};
+const std::vector<fha::DaiFrameFormat> FakeComposite::kDefaultDaiFrameFormatsSet2{
+    kDefaultDaiFrameFormat2};
 const std::vector<uint32_t> FakeComposite::kDefaultDaiFrameRates{kDefaultDaiFrameRate};
 const std::vector<uint32_t> FakeComposite::kDefaultDaiFrameRates2{kDefaultDaiFrameRate,
                                                                   kDefaultDaiFrameRate2};
@@ -45,7 +45,7 @@ const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSampleSet{kDefaultDa
 const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSampleSet2{kDefaultDaiBitsPerSample,
                                                                        kDefaultDaiBitsPerSample2};
 
-const fuchsia_hardware_audio::DaiSupportedFormats FakeComposite::kDefaultDaiFormatSet{{
+const fha::DaiSupportedFormats FakeComposite::kDefaultDaiFormatSet{{
     .number_of_channels = kDefaultDaiNumberOfChannelsSet,
     .sample_formats = kDefaultDaiSampleFormatsSet,
     .frame_formats = kDefaultDaiFrameFormatsSet,
@@ -53,7 +53,7 @@ const fuchsia_hardware_audio::DaiSupportedFormats FakeComposite::kDefaultDaiForm
     .bits_per_slot = kDefaultDaiBitsPerSlotSet,
     .bits_per_sample = kDefaultDaiBitsPerSampleSet,
 }};
-const fuchsia_hardware_audio::DaiSupportedFormats FakeComposite::kDefaultDaiFormatSet2{{
+const fha::DaiSupportedFormats FakeComposite::kDefaultDaiFormatSet2{{
     .number_of_channels = kDefaultDaiNumberOfChannelsSet2,
     .sample_formats = kDefaultDaiSampleFormatsSet2,
     .frame_formats = kDefaultDaiFrameFormatsSet2,
@@ -63,20 +63,20 @@ const fuchsia_hardware_audio::DaiSupportedFormats FakeComposite::kDefaultDaiForm
 }};
 
 // DaiFormatSets that are returned by the driver.
-const std::vector<fuchsia_hardware_audio::DaiSupportedFormats> FakeComposite::kDefaultDaiFormatSets{
+const std::vector<fha::DaiSupportedFormats> FakeComposite::kDefaultDaiFormatSets{
     kDefaultDaiFormatSet};
-const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>
-    FakeComposite::kDefaultDaiFormatSets2{kDefaultDaiFormatSet2};
+const std::vector<fha::DaiSupportedFormats> FakeComposite::kDefaultDaiFormatSets2{
+    kDefaultDaiFormatSet2};
 
 // Map of Dai format sets, by element. Used within the driver.
-const std::unordered_map<ElementId, std::vector<fuchsia_hardware_audio::DaiSupportedFormats>>
+const std::unordered_map<ElementId, std::vector<fha::DaiSupportedFormats>>
     FakeComposite::kDefaultDaiFormatsMap = {{
         {kSourceDaiElementId, kDefaultDaiFormatSets},
         {kDestDaiElementId, kDefaultDaiFormatSets2},
     }};
 
 // Specific DAI formats
-const fuchsia_hardware_audio::DaiFormat FakeComposite::kDefaultDaiFormat{{
+const fha::DaiFormat FakeComposite::kDefaultDaiFormat{{
     .number_of_channels = kDefaultDaiNumberOfChannels,
     .channels_to_use_bitmask = (1u << kDefaultDaiNumberOfChannels) - 1u,
     .sample_format = kDefaultDaiSampleFormat,
@@ -85,7 +85,7 @@ const fuchsia_hardware_audio::DaiFormat FakeComposite::kDefaultDaiFormat{{
     .bits_per_slot = kDefaultDaiBitsPerSlot,
     .bits_per_sample = kDefaultDaiBitsPerSample,
 }};
-const fuchsia_hardware_audio::DaiFormat FakeComposite::kDefaultDaiFormat2{{
+const fha::DaiFormat FakeComposite::kDefaultDaiFormat2{{
     .number_of_channels = kDefaultDaiNumberOfChannels2,
     .channels_to_use_bitmask = (1u << kDefaultDaiNumberOfChannels2) - 1u,
     .sample_format = kDefaultDaiSampleFormat2,
@@ -97,37 +97,35 @@ const fuchsia_hardware_audio::DaiFormat FakeComposite::kDefaultDaiFormat2{{
 
 // RingBufferFormats and format sets
 //
-const fuchsia_hardware_audio::ChannelAttributes FakeComposite::kDefaultRbAttributes{{
+const fha::ChannelAttributes FakeComposite::kDefaultRbAttributes{{
     .min_frequency = kDefaultRbChannelAttributeMinFrequency,
     .max_frequency = kDefaultRbChannelAttributeMaxFrequency,
 }};
-const fuchsia_hardware_audio::ChannelAttributes FakeComposite::kDefaultRbAttributes2{{
+const fha::ChannelAttributes FakeComposite::kDefaultRbAttributes2{{
     .min_frequency = kDefaultRbChannelAttributeMinFrequency2,
 }};
-const fuchsia_hardware_audio::ChannelAttributes FakeComposite::kDefaultRbAttributes3{{
+const fha::ChannelAttributes FakeComposite::kDefaultRbAttributes3{{
     .max_frequency = kDefaultRbChannelAttributeMaxFrequency2,
 }};
-const std::vector<fuchsia_hardware_audio::ChannelAttributes> FakeComposite::kDefaultRbAttributeSet{
+const std::vector<fha::ChannelAttributes> FakeComposite::kDefaultRbAttributeSet{
     kDefaultRbAttributes,
 };
-const std::vector<fuchsia_hardware_audio::ChannelAttributes> FakeComposite::kDefaultRbAttributeSet2{
+const std::vector<fha::ChannelAttributes> FakeComposite::kDefaultRbAttributeSet2{
     kDefaultRbAttributes2,
 };
-const fuchsia_hardware_audio::ChannelSet FakeComposite::kDefaultRbChannelsSet{{
+const fha::ChannelSet FakeComposite::kDefaultRbChannelsSet{{
     .attributes = kDefaultRbAttributeSet,
 }};
-const fuchsia_hardware_audio::ChannelSet FakeComposite::kDefaultRbChannelsSet2{{
+const fha::ChannelSet FakeComposite::kDefaultRbChannelsSet2{{
     .attributes = kDefaultRbAttributeSet2,
 }};
-const std::vector<fuchsia_hardware_audio::ChannelSet> FakeComposite::kDefaultRbChannelsSets{
+const std::vector<fha::ChannelSet> FakeComposite::kDefaultRbChannelsSets{
     kDefaultRbChannelsSet,
 };
-const std::vector<fuchsia_hardware_audio::ChannelSet> FakeComposite::kDefaultRbChannelsSets2{
-    kDefaultRbChannelsSet2};
+const std::vector<fha::ChannelSet> FakeComposite::kDefaultRbChannelsSets2{kDefaultRbChannelsSet2};
 
-const std::vector<fuchsia_hardware_audio::SampleFormat> FakeComposite::kDefaultRbSampleFormats{
-    kDefaultRbSampleFormat};
-const std::vector<fuchsia_hardware_audio::SampleFormat> FakeComposite::kDefaultRbSampleFormats2{
+const std::vector<fha::SampleFormat> FakeComposite::kDefaultRbSampleFormats{kDefaultRbSampleFormat};
+const std::vector<fha::SampleFormat> FakeComposite::kDefaultRbSampleFormats2{
     kDefaultRbSampleFormat2};
 const std::vector<uint8_t> FakeComposite::kDefaultRbBytesPerSampleSet{kDefaultRbBytesPerSample};
 const std::vector<uint8_t> FakeComposite::kDefaultRbBytesPerSampleSet2{kDefaultRbBytesPerSample2};
@@ -138,49 +136,47 @@ const std::vector<uint8_t> FakeComposite::kDefaultRbValidBitsPerSampleSet2{
 const std::vector<uint32_t> FakeComposite::kDefaultRbFrameRates{kDefaultRbFrameRate};
 const std::vector<uint32_t> FakeComposite::kDefaultRbFrameRates2{kDefaultRbFrameRate2};
 
-const fuchsia_hardware_audio::PcmSupportedFormats FakeComposite::kDefaultPcmRingBufferFormatSet{{
+const fha::PcmSupportedFormats FakeComposite::kDefaultPcmRingBufferFormatSet{{
     .channel_sets = kDefaultRbChannelsSets,
     .sample_formats = kDefaultRbSampleFormats,
     .bytes_per_sample = kDefaultRbBytesPerSampleSet,
     .valid_bits_per_sample = kDefaultRbValidBitsPerSampleSet,
     .frame_rates = kDefaultRbFrameRates,
 }};
-const fuchsia_hardware_audio::PcmSupportedFormats FakeComposite::kDefaultPcmRingBufferFormatSet2{{
+const fha::PcmSupportedFormats FakeComposite::kDefaultPcmRingBufferFormatSet2{{
     .channel_sets = kDefaultRbChannelsSets2,
     .sample_formats = kDefaultRbSampleFormats2,
     .bytes_per_sample = kDefaultRbBytesPerSampleSet2,
     .valid_bits_per_sample = kDefaultRbValidBitsPerSampleSet2,
     .frame_rates = kDefaultRbFrameRates2,
 }};
-const fuchsia_hardware_audio::SupportedFormats FakeComposite::kDefaultRbFormatSet{{
+const fha::SupportedFormats FakeComposite::kDefaultRbFormatSet{{
     .pcm_supported_formats = kDefaultPcmRingBufferFormatSet,
 }};
-const fuchsia_hardware_audio::SupportedFormats FakeComposite::kDefaultRbFormatSet2{{
+const fha::SupportedFormats FakeComposite::kDefaultRbFormatSet2{{
     .pcm_supported_formats = kDefaultPcmRingBufferFormatSet2,
 }};
 
 // RingBuffer format sets that are returned by the driver.
-const std::vector<fuchsia_hardware_audio::SupportedFormats> FakeComposite::kDefaultRbFormatSets{
-    kDefaultRbFormatSet};
-const std::vector<fuchsia_hardware_audio::SupportedFormats> FakeComposite::kDefaultRbFormatSets2{
-    kDefaultRbFormatSet2};
+const std::vector<fha::SupportedFormats> FakeComposite::kDefaultRbFormatSets{kDefaultRbFormatSet};
+const std::vector<fha::SupportedFormats> FakeComposite::kDefaultRbFormatSets2{kDefaultRbFormatSet2};
 
 // Map of RingBuffer format sets, by element. Used internally by the driver.
-const std::unordered_map<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>
+const std::unordered_map<ElementId, std::vector<fha::SupportedFormats>>
     FakeComposite::kDefaultRbFormatsMap = {{
         {kDestRbElementId, kDefaultRbFormatSets},
         {kSourceRbElementId, kDefaultRbFormatSets2},
     }};
 
 // Specific RingBuffer formats
-const fuchsia_hardware_audio::PcmFormat FakeComposite::kDefaultRbFormat{{
+const fha::PcmFormat FakeComposite::kDefaultRbFormat{{
     .number_of_channels = kDefaultRbNumberOfChannels,
     .sample_format = kDefaultRbSampleFormat,
     .bytes_per_sample = kDefaultRbBytesPerSample,
     .valid_bits_per_sample = kDefaultRbValidBitsPerSample,
     .frame_rate = kDefaultRbFrameRate,
 }};
-const fuchsia_hardware_audio::PcmFormat FakeComposite::kDefaultRbFormat2{{
+const fha::PcmFormat FakeComposite::kDefaultRbFormat2{{
     .number_of_channels = kDefaultRbNumberOfChannels2,
     .sample_format = kDefaultRbSampleFormat2,
     .bytes_per_sample = kDefaultRbBytesPerSample2,
