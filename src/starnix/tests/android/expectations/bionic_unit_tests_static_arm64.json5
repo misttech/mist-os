@@ -26,6 +26,8 @@
                 "sys_cachectl.__riscv_flush_icache",
                 "sys_hwprobe.__riscv_hwprobe",
                 "sys_hwprobe.__riscv_hwprobe_fail",
+                "sys_hwprobe.__riscv_hwprobe_misaligned_scalar",
+                "sys_hwprobe.__riscv_hwprobe_misaligned_vector",
                 "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
 
                 // TODO(https://fxbug.dev/317335324): Flaky on the bots - needs to be investigated.
