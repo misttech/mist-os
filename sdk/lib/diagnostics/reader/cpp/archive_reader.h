@@ -30,6 +30,10 @@ class ArchiveReader {
   // Create a new ArchiveReader.
   ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors);
 
+  // Creates a new ArchiveReader using the specified client.
+  ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors,
+                fidl::ClientEnd<fuchsia_diagnostics::ArchiveAccessor> archive);
+
   // Get a snapshot of the Inspect data at the current point in time.
   //
   // Returns an error if the ArchiveAccessorPtr is not bound.
@@ -53,7 +57,9 @@ class ArchiveReader {
   fidl::SharedClient<fuchsia_diagnostics::BatchIterator> GetBatchIterator(
       fuchsia_diagnostics::DataType data_type, fuchsia_diagnostics::StreamMode stream_mode);
 
-  fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> Bind(async_dispatcher_t* dispatcher);
+  fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> Bind(
+      async_dispatcher_t* dispatcher,
+      fidl::ClientEnd<fuchsia_diagnostics::ArchiveAccessor> archive);
 
   // Resolved archive if present.
   fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> archive_;
