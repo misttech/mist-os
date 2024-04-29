@@ -405,9 +405,9 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceCon
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv4DeviceState<BC> {
-    fn new<D: device::StrongId, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
+    fn new<D: device::WeakId, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
-        device_id: D::Weak,
+        device_id: D,
     ) -> Ipv4DeviceState<BC> {
         Ipv4DeviceState {
             ip_state: IpDeviceState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
@@ -688,9 +688,9 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
-    pub fn new<D: device::StrongId, CC: CoreTimerContext<Ipv6DeviceTimerId<D>, BC>>(
+    pub fn new<D: device::WeakId, CC: CoreTimerContext<Ipv6DeviceTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
-        device_id: D::Weak,
+        device_id: D,
     ) -> Self {
         Ipv6DeviceState {
             learned_params: Default::default(),
@@ -745,12 +745,12 @@ pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext2> DualStackIpDeviceState<BC> {
     pub(crate) fn new<
-        D: device::StrongId,
+        D: device::WeakId,
         CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>
             + CoreTimerContext<IpDeviceTimerId<Ipv4, D>, BC>,
     >(
         bindings_ctx: &mut BC,
-        device_id: D::Weak,
+        device_id: D,
         metric: RawMetric,
     ) -> Self {
         Self {

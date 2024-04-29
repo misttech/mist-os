@@ -429,8 +429,8 @@ impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNoti
 /// layer to fulfill [`DeviceApi`].
 pub trait DeviceApiIpLayerCoreContext<D: Device, BC: DeviceLayerTypes>:
     DeviceIdAnyCompatContext<D>
-    + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>
-    + CoreTimerContext<IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>
+    + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>, BC>
+    + CoreTimerContext<IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>, BC>
 {
 }
 
@@ -439,7 +439,12 @@ where
     D: Device,
     BC: DeviceLayerTypes,
     O: DeviceIdAnyCompatContext<D>
-        + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>
-        + CoreTimerContext<IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>,
+        + CoreTimerContext<
+            IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            BC,
+        > + CoreTimerContext<
+            IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            BC,
+        >,
 {
 }

@@ -1492,10 +1492,10 @@ impl<'a, Config, L, BC: BindingsContext> CoreTimerContext<DadTimerId<WeakDeviceI
     }
 }
 
-impl<I: IpDeviceIpExt, BT: BindingsTypes, L> CoreTimerContext<IpDeviceTimerId<I, DeviceId<BT>>, BT>
-    for CoreCtx<'_, BT, L>
+impl<I: IpDeviceIpExt, BT: BindingsTypes, L>
+    CoreTimerContext<IpDeviceTimerId<I, WeakDeviceId<BT>>, BT> for CoreCtx<'_, BT, L>
 {
-    fn convert_timer(dispatch_id: IpDeviceTimerId<I, DeviceId<BT>>) -> BT::DispatchId {
+    fn convert_timer(dispatch_id: IpDeviceTimerId<I, WeakDeviceId<BT>>) -> BT::DispatchId {
         dispatch_id.into()
     }
 }

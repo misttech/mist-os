@@ -91,12 +91,12 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
 impl<T, BC: DeviceLayerTypes + TimerContext2> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
     pub(super) fn new<
-        D: device::StrongId,
+        D: device::WeakId,
         CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>
             + CoreTimerContext<IpDeviceTimerId<Ipv4, D>, BC>,
     >(
         bindings_ctx: &mut BC,
-        device_id: D::Weak,
+        device_id: D,
         link: T,
         metric: RawMetric,
         origin: OriginTracker,
