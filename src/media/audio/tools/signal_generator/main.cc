@@ -240,6 +240,12 @@ void usage(const char* prog_name) {
 }
 
 int main(int argc, const char** argv) {
+  printf(
+      "WARNING: signal_generator is deprecated. Please use `ffx audio gen`\n"
+      "to generate signals and `ffx audio play`/`ffx audio device play`\n"
+      "to play them. For more information, run `ffx audio gen --help`,\n"
+      "`ffx audio play --help`, and `ffx audio device play --help`\n");
+
   const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
 
   if (command_line.HasOption(kHelpSwitch) || command_line.HasOption(kHelp2Switch)) {
