@@ -1513,9 +1513,6 @@ mod tests {
         pub client_update_sender: listener::ClientListenerMessageSender,
         pub client_update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         pub ap_update_sender: listener::ApListenerMessageSender,
-        // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
-        #[allow(dead_code)]
-        pub ap_update_receiver: mpsc::UnboundedReceiver<listener::ApMessage>,
         pub saved_networks: Arc<dyn SavedNetworksManagerApi>,
         pub local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
         pub scan_requester: Arc<FakeScanRequester>,
@@ -1539,7 +1536,7 @@ mod tests {
             monitor_service_requests.into_stream().expect("failed to create stream");
 
         let (client_sender, client_receiver) = mpsc::unbounded();
-        let (ap_sender, ap_receiver) = mpsc::unbounded();
+        let (ap_sender, _) = mpsc::unbounded();
 
         let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
         let saved_networks = Arc::new(saved_networks);
@@ -1563,7 +1560,6 @@ mod tests {
             client_update_sender: client_sender,
             client_update_receiver: client_receiver,
             ap_update_sender: ap_sender,
-            ap_update_receiver: ap_receiver,
             saved_networks,
             local_roam_manager,
             scan_requester,
