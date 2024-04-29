@@ -40,7 +40,7 @@ use netlink_packet_route::{
     },
     AddressFamily, RouteNetlinkMessage,
 };
-use netlink_packet_utils::{nla::Nla, DecodeError, Emitable};
+use netlink_packet_utils::{nla::Nla, DecodeError};
 
 use crate::{
     client::{ClientTable, InternalClient},
@@ -48,7 +48,7 @@ use crate::{
     logging::{log_debug, log_error, log_warn},
     messaging::Sender,
     multicast_groups::ModernGroup,
-    netlink_packet::{errno::Errno, ip_addr_from_bytes, UNSPECIFIED_SEQUENCE_NUMBER},
+    netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
     util::respond_to_completer,
 };
@@ -941,30 +941,21 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
 impl<I: Ip> From<NetlinkRouteMessage> for fnet_routes_ext::Route<I> {
     fn from(netlink_route_message: NetlinkRouteMessage) -> Self {
         let NetlinkRouteMessage(route_message) = netlink_route_message;
-        let RouteNlaView { subnet: subnet_bytes, metric, interface_id, next_hop: next_hop_bytes } =
+        let RouteNlaView { subnet, metric, interface_id, next_hop } =
             view_existing_route_nlas(&route_message);
-        let subnet_bytes = match subnet_bytes {
-            Some(bytes) => {
-                // TODO(b/336360759): Convert to map_ip.
-                let mut address_bytes = vec![0; bytes.buffer_len()];
-                bytes.emit(&mut address_bytes);
-                ip_addr_from_bytes::<I>(&address_bytes).expect("should be valid addr")
-            }
+        let subnet = match subnet {
+            Some(subnet) => crate::netlink_packet::ip_addr_from_route::<I>(&subnet)
+                .expect("should be valid addr"),
             None => I::UNSPECIFIED_ADDRESS,
         };
 
-        let subnet = Subnet::new(subnet_bytes, route_message.header.destination_prefix_length)
+        let subnet = Subnet::new(subnet, route_message.header.destination_prefix_length)
             .expect("should be valid subnet");
 
-        let next_hop = match next_hop_bytes {
-            Some(bytes) => {
-                // TODO(b/336360759): Convert to map_ip.
-                let mut address_bytes = vec![0; bytes.buffer_len()];
-                bytes.emit(&mut address_bytes);
-                ip_addr_from_bytes::<I>(&address_bytes)
-            }
-            .map(|addr| SpecifiedAddr::new(addr))
-            .expect("should be valid addr if present"),
+        let next_hop = match next_hop {
+            Some(next_hop) => crate::netlink_packet::ip_addr_from_route::<I>(&next_hop)
+                .map(SpecifiedAddr::new)
+                .expect("should be valid addr"),
             None => None,
         };
 
@@ -1066,9 +1057,8 @@ fn new_route_matches_existing<I: Ip>(
             next_hop: _,
         } = view_existing_route_nlas(existing_route);
         let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
-            let mut address_bytes = vec![0; dst.buffer_len()];
-            dst.emit(&mut address_bytes);
-            &address_bytes[..] == subnet.network().bytes()
+            crate::netlink_packet::ip_addr_from_route::<I>(&dst)
+                .is_ok_and(|dst: I::Addr| dst == subnet.network())
         });
         let metric_matches = existing_metric == priority;
         subnet_matches && metric_matches
@@ -1107,21 +1097,17 @@ fn select_route_for_deletion<I: Ip>(
                 next_hop: existing_next_hop,
             } = view_existing_route_nlas(existing_route);
             let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
-                let mut bytes = vec![0; dst.buffer_len()];
-                dst.emit(&mut bytes);
-                &bytes[..] == subnet.network().bytes()
+                crate::netlink_packet::ip_addr_from_route::<I>(&dst)
+                    .is_ok_and(|dst: I::Addr| dst == subnet.network())
             });
             let metric_matches = priority.map_or(true, |p| p.get() == *existing_metric);
             let interface_matches =
                 outbound_interface.map_or(true, |i| i.get() == (*existing_interface).into());
             let next_hop_matches = next_hop.map_or(true, |n| {
-                existing_next_hop
-                    .map(|e| {
-                        let mut address_bytes = vec![0; e.buffer_len()];
-                        e.emit(&mut address_bytes);
-                        address_bytes
-                    })
-                    .is_some_and(|e| n.get().bytes() == e)
+                existing_next_hop.map_or(false, |e| {
+                    crate::netlink_packet::ip_addr_from_route::<I>(&e)
+                        .is_ok_and(|e: I::Addr| e == n.get())
+                })
             });
             if subnet_matches && metric_matches && interface_matches && next_hop_matches {
                 Some((route, *existing_metric))

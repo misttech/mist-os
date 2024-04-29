@@ -6,12 +6,14 @@
 
 use std::num::NonZeroI32;
 
-use net_types::ip::{Ip, IpAddress, IpInvariant, Ipv4Addr, Ipv6Addr};
+use net_types::ip::{Ip, Ipv4Addr, Ipv6Addr};
 use netlink_packet_core::{
     buffer::NETLINK_HEADER_LEN, constants::NLM_F_MULTIPART, DoneMessage, ErrorMessage,
     NetlinkHeader, NetlinkMessage, NetlinkPayload, NetlinkSerializable,
 };
+use netlink_packet_route::route::RouteAddress;
 use netlink_packet_utils::Emitable as _;
+use tracing::warn;
 
 use crate::netlink_packet::errno::Errno;
 
@@ -34,35 +36,25 @@ pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> Net
     message
 }
 
-/// Produces an `I::Addr` from an array of bytes.
-pub(crate) fn ip_addr_from_bytes<I: Ip>(addr_bytes: &[u8]) -> Result<I::Addr, Errno> {
+/// Produces an `I::Addr` from the given `RouteAddress`
+pub(crate) fn ip_addr_from_route<I: Ip>(route_addr: &RouteAddress) -> Result<I::Addr, Errno> {
     I::map_ip(
-        IpInvariant(addr_bytes),
-        |IpInvariant(addr_bytes)| {
-            const BYTES: usize = Ipv4Addr::BYTES as usize;
-            // To conform to Linux expectations, we allow more than the needed bytes
-            // to be present and cut off the remainder.
-            if addr_bytes.len() < BYTES {
-                return Err(Errno::EINVAL);
+        (),
+        |()| match route_addr {
+            RouteAddress::Inet(v4_addr) => Ok(Ipv4Addr::new(v4_addr.octets())),
+            RouteAddress::Inet6(_) => {
+                warn!("expected IPv4 address from route but got an IPv6 address");
+                Err(Errno::EINVAL)
             }
-
-            let mut bytes = [0; BYTES as usize];
-            bytes.copy_from_slice(&addr_bytes[..BYTES]);
-            let addr: Ipv4Addr = bytes.into();
-            Ok(addr)
+            RouteAddress::Mpls(_) | RouteAddress::Other(_) | _ => Err(Errno::ENOTSUP),
         },
-        |IpInvariant(addr_bytes)| {
-            const BYTES: usize = Ipv6Addr::BYTES as usize;
-            // To conform to Linux expectations, we allow more than the needed bytes
-            // to be present and cut off the remainder.
-            if addr_bytes.len() < BYTES {
-                return Err(Errno::EINVAL);
+        |()| match route_addr {
+            RouteAddress::Inet6(v6_addr) => Ok(Ipv6Addr::new(v6_addr.segments())),
+            RouteAddress::Inet(_) => {
+                warn!("expected IPv6 address from route but got an IPv4 address");
+                Err(Errno::EINVAL)
             }
-
-            let mut bytes = [0; BYTES];
-            bytes.copy_from_slice(&addr_bytes[..BYTES]);
-            let addr: Ipv6Addr = bytes.into();
-            Ok(addr)
+            RouteAddress::Mpls(_) | RouteAddress::Other(_) | _ => Err(Errno::ENOTSUP),
         },
     )
 }

@@ -86,8 +86,8 @@ pub mod route {
     };
     use net_types::{
         ip::{
-            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpInvariant, IpVersion, Ipv4, Ipv6,
-            Subnet,
+            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpInvariant, IpVersion, Ipv4, Ipv4Addr,
+            Ipv6, Ipv6Addr, Subnet,
         },
         SpecifiedAddr,
     };
@@ -97,12 +97,11 @@ pub mod route {
         route::{RouteAttribute, RouteMessage, RouteType},
         AddressFamily, RouteNetlinkMessage,
     };
-    use netlink_packet_utils::Emitable;
 
     use crate::{
         eventloop::UnifiedRequest,
         interfaces,
-        netlink_packet::{self, errno::Errno, ip_addr_from_bytes},
+        netlink_packet::{self, errno::Errno},
         routes,
         rules::{RuleRequest, RuleRequestArgs},
     };
@@ -194,12 +193,12 @@ pub mod route {
             }
         };
 
-        let mut address_bytes = None;
-        let mut local_bytes = None;
+        let mut address = None;
+        let mut local = None;
         let mut addr_flags = None;
         message.attributes.iter().for_each(|nla| match nla {
-            AddressAttribute::Address(bytes) => address_bytes = Some(bytes),
-            AddressAttribute::Local(bytes) => local_bytes = Some(bytes),
+            AddressAttribute::Address(a) => address = Some(a),
+            AddressAttribute::Local(l) => local = Some(l),
             AddressAttribute::Flags(flags) => addr_flags = Some(*flags),
             nla => {
                 log_warn!(
@@ -249,7 +248,7 @@ pub mod route {
         // to be added/removed. When both are included, `IFA_LOCAL` is treated
         // as the "local" address and `IFA_ADDRESS` is treated as the "peer".
         // TODO(https://fxbug.dev/42079868): Support peer addresses.
-        let address_bytes = match (local_bytes, address_bytes) {
+        let addr = match (local, address) {
             (Some(local), Some(address)) => {
                 if local == address {
                     address
@@ -257,11 +256,11 @@ pub mod route {
                     log_debug!(
                     "got different `IFA_ADDRESS` and `IFA_LOCAL` values for {} address request from {}: {:?}",
                     kind, client, req,
-                );
+                    );
                     return Err(Errno::ENOTSUP);
                 }
             }
-            (Some(bytes), None) | (None, Some(bytes)) => bytes,
+            (Some(addr), None) | (None, Some(addr)) => addr,
             (None, None) => {
                 log_debug!(
                     "missing `IFA_ADDRESS` and `IFA_LOCAL` in address {} request from {}: {:?}",
@@ -275,35 +274,39 @@ pub mod route {
 
         let addr = match message.header.family {
             AddressFamily::Inet => {
-                let addr = address_bytes;
                 if addr.is_unspecified() {
                     // Linux treats adding the unspecified IPv4 address as a
                     // no-op.
                     return Ok(None);
                 }
-                match address_bytes {
-                    std::net::IpAddr::V4(v4) => {
-                        IpAddr::V4(ip_addr_from_bytes::<Ipv4>(&v4.octets())?)
-                    }
-                    std::net::IpAddr::V6(v6) => {
-                        IpAddr::V6(ip_addr_from_bytes::<Ipv6>(&v6.octets())?)
+                match addr {
+                    std::net::IpAddr::V4(v4) => IpAddr::V4(Ipv4Addr::new(v4.octets())),
+                    std::net::IpAddr::V6(_) => {
+                        log_debug!(
+                            "expected IPv4 address in new address request from {}: {:?}",
+                            client,
+                            req
+                        );
+                        return Err(Errno::EINVAL);
                     }
                 }
             }
             AddressFamily::Inet6 => {
-                let addr = address_bytes;
                 if addr.is_unspecified() {
                     // Linux returns this error when adding the unspecified IPv6
                     // address.
                     return Err(Errno::EADDRNOTAVAIL);
                 }
-                match address_bytes {
-                    std::net::IpAddr::V4(v4) => {
-                        IpAddr::V4(ip_addr_from_bytes::<Ipv4>(&v4.octets())?)
+                match addr {
+                    std::net::IpAddr::V4(_) => {
+                        log_debug!(
+                            "expected IPv6 address in new address request from {}: {:?}",
+                            client,
+                            req
+                        );
+                        return Err(Errno::EINVAL);
                     }
-                    std::net::IpAddr::V6(v6) => {
-                        IpAddr::V6(ip_addr_from_bytes::<Ipv6>(&v6.octets())?)
-                    }
+                    std::net::IpAddr::V6(v6) => IpAddr::V6(Ipv6Addr::new(v6.segments())),
                 }
             }
             family => {
@@ -432,14 +435,14 @@ pub mod route {
         let destination_prefix_len = message.header.destination_prefix_length;
         let mut table: u32 = message.header.table.into();
 
-        let mut destination_bytes = None;
+        let mut destination_addr = None;
         let mut outbound_interface = None;
-        let mut next_hop_bytes = None;
+        let mut next_hop_addr = None;
         let mut priority = None;
         message.attributes.iter().for_each(|nla| match nla {
-            RouteAttribute::Destination(bytes) => destination_bytes = Some(bytes),
+            RouteAttribute::Destination(addr) => destination_addr = Some(addr),
             RouteAttribute::Oif(id) => outbound_interface = Some(id),
-            RouteAttribute::Gateway(bytes) => next_hop_bytes = Some(bytes),
+            RouteAttribute::Gateway(addr) => next_hop_addr = Some(addr),
             RouteAttribute::Priority(num) => priority = Some(*num),
             RouteAttribute::Table(num) => {
                 // When the table is set to `RT_TABLE_COMPAT`, the table id is greater than
@@ -474,13 +477,8 @@ pub mod route {
         let priority = priority.map(NonZeroU32::new).flatten();
         let table = NonZeroU32::new(table)
             .unwrap_or(NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap());
-        let destination_addr = match destination_bytes {
-            Some(bytes) => {
-                // TODO(b/336360759): Convert to map_ip
-                let mut route_bytes = vec![0; bytes.buffer_len()];
-                bytes.emit(&mut route_bytes);
-                ip_addr_from_bytes::<I>(&route_bytes)?
-            }
+        let destination_addr = match destination_addr {
+            Some(addr) => crate::netlink_packet::ip_addr_from_route::<I>(addr)?,
             None => {
                 // Use the unspecified address if there wasn't a destination NLA present
                 // and the prefix len is 0.
@@ -499,15 +497,12 @@ pub mod route {
             }
         };
 
-        let next_hop = match next_hop_bytes {
-            Some(bytes) => {
+        let next_hop = match next_hop_addr {
+            Some(addr) => {
                 // Linux ignores the provided nexthop if it is the default route. To conform
                 // to Linux expectations, `SpecifiedAddr::new()` becomes `None` when the addr
                 // is unspecified.
-                // TODO(b/336360759): Convert to map_ip.
-                let mut address_bytes = vec![0; bytes.buffer_len()];
-                bytes.emit(&mut address_bytes);
-                ip_addr_from_bytes::<I>(&address_bytes).map(|addr| SpecifiedAddr::new(addr))?
+                crate::netlink_packet::ip_addr_from_route::<I>(addr).map(SpecifiedAddr::new)?
             }
             None => None,
         };
