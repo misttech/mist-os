@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <csignal>
+#include <cstdlib>
 #include <filesystem>
 #include <system_error>
 
@@ -28,6 +29,8 @@ constexpr std::string_view kFuchsiaDeviceSshPort = "FUCHSIA_SSH_PORT";
 constexpr std::string_view kFuchsiaSshKey = "FUCHSIA_SSH_KEY";
 constexpr std::string_view kTestOutDir = "FUCHSIA_TEST_OUTDIR";
 constexpr std::string_view kFfxIsolateDir = "zxdb_e2e_tests_ffx_isolate_dir";
+constexpr std::string_view kFfxCommonConfig =
+    "log.level=debug,ffx.isolated=true,fastboot.usb.disabled=true,discovery.mdns.enabled=false";
 
 // This is atomic so it can be used in the signal handler below.
 std::atomic<FfxDebugAgentBridge*> global_instance = nullptr;
@@ -85,7 +88,8 @@ std::vector<char*> GetFfxArgV(const std::filesystem::path& ffx_test_data_path,
     ffx_args.push_back(device_addr);
   }
   ffx_args.push_back(const_cast<char*>("--config"));
-  std::string ffx_config_arg{"log.level=debug,ffx.subtool-search-paths="};
+  std::string ffx_config_arg(kFfxCommonConfig);
+  ffx_config_arg.append(",ffx.subtool-search-paths=");
   ffx_config_arg.append(ffx_test_data_path);
   char* test_outdir = std::getenv(kTestOutDir.data());
   if (test_outdir) {
@@ -135,9 +139,21 @@ std::vector<char*> GetFfxEnv() {
   return new_env;
 }
 
-Err InitFfxIsolate(const std::string& isolate_dir) {
+Err InitFfxIsolate(const std::filesystem::path& ffx_path, const std::string& isolate_dir) {
   // In the isolate directory, this will spawn the daemon and add the configured target.
-  std::string target_add_cmd = "ffx --isolate-dir " + isolate_dir + " target add ";
+  std::string target_add_cmd =
+      std::filesystem::absolute(ffx_path).string() + " --isolate-dir " + isolate_dir;
+
+  target_add_cmd.append(" --config ");
+  target_add_cmd.append(kFfxCommonConfig);
+
+  char* test_outdir = std::getenv(kTestOutDir.data());
+  if (test_outdir) {
+    target_add_cmd.append(const_cast<char*>(",log.dir="));
+    target_add_cmd.append(test_outdir);
+  }
+
+  target_add_cmd.append(" target add ");
 
   if (auto dev = std::getenv(kFuchsiaDeviceSshAddr.data()); dev != nullptr) {
     // Don't do any special handling for ipv6 addresses. It's expected that fx test correctly
@@ -151,7 +167,12 @@ Err InitFfxIsolate(const std::string& isolate_dir) {
       target_add_cmd.append(port);
     }
 
-    system(target_add_cmd.data());
+    FX_LOGS(INFO) << "running ffx target add: " << target_add_cmd;
+    int result = system(target_add_cmd.data());
+    if (WEXITSTATUS(result) != 0) {
+      return Err("Target add command failed: %s.\nCommand was: %s", strerror(WEXITSTATUS(result)),
+                 target_add_cmd.c_str());
+    }
   } else {
     return Err("%s was not defined in the environment!", kFuchsiaDeviceSshAddr.data());
   }
@@ -242,13 +263,13 @@ Err FfxDebugAgentBridge::SetupPipeAndFork() {
 
     // Initialize the isolated FFX daemon and add the target (which will not be discovered via
     // mdns).
-    if (auto err = InitFfxIsolate(ffx_isolate_dir_); err.has_error()) {
+    if (auto err = InitFfxIsolate(ffx_path, ffx_isolate_dir_); err.has_error()) {
       FX_LOGS(ERROR) << "Failed to initialize the ffx isolate: " << err.msg();
       exit(EXIT_FAILURE);
     }
 
-    execve(ffx_path.c_str(), GetFfxArgV(ffx_test_data, ffx_isolate_dir_).data(),
-           GetFfxEnv().data());
+    execve(std::filesystem::absolute(ffx_path).c_str(),
+           GetFfxArgV(ffx_test_data, ffx_isolate_dir_).data(), GetFfxEnv().data());
 
     FX_NOTREACHED();
   } else {
