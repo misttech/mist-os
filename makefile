@@ -25,6 +25,7 @@ info: ## Print build info
 args: ## Set up build dir and arguments file
 	$(NOECHO)mkdir -p $(OUTPUT)
 	$(NOECHO)echo "target_os=\"mistos\"" > $(OUTPUT)/args.gn
+	$(NOECHO)echo "host_test_labels=[]" >> $(OUTPUT)/args.gn
 .PHONY: args
 
 gen: ## Generate ninja
@@ -55,6 +56,8 @@ kasan: args ## Compile with Kernel Address Sanitazier enabled
 .PHONY: kasan
 
 zxtest: args ## Enable zxtest
+	$(NOECHO)echo "host_test_labels += [ \"//zircon/system/ulib/zxtest/test:zxtest\" ]" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "host_test_labels += [ \"//zircon/system/ulib/fbl/test:fbl\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "register_zxtest=true" >> $(OUTPUT)/args.gn
 .PHONY: zxtest
 

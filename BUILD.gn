@@ -3,6 +3,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/compiled_action.gni")
+import("//build/config/build_api_module.gni")
+import("//build/testing/validated_test_types_group.gni")
+
+declare_args() {
+  # Host-only tests.  These cannot have any dependency on an assembled platform
+  # image, or the compiled OS itself, not even for their host_test_data().
+  #
+  # These will be added to the build using the host toolchain.
+  host_test_labels = []
+}
+
 if (host_os == "mac") {
   import("//build/config/mac/mac_sdk.gni")
 }
@@ -11,11 +23,85 @@ assert(
     current_toolchain == default_toolchain,
     "The root build file (//BUILD.gn) can only be processed in the `default_toolchain`.")
 
-# This provides metadata in the //:boot_tests schema.
-group("boot_tests") {
-  testonly = true
+###
+### Build API modules.
+###
 
-  deps = [ "//zircon/kernel:boot_tests" ]
+# Tests in the build.
+#
+#  Below, the "testing root" refers to $root_build_dir on host, and the full
+#  filesystem path from the root on device.
+#
+#  This rule outputs the tests.json file in the build directory,
+#  which is aggregated at test time.
+#
+#  The format is documented at
+#  https://fuchsia.dev/fuchsia-src/reference/testing/tests-json-format
+#
+# Type: list(scope)
+#
+#   * name
+#     - Required: Name of test.
+#     - Type: string
+#
+#   * label
+#     - Required: GN label associated with the test
+#     - Type: label_with_toolchain
+#
+#   * path
+#     - Required: Path to the test's executable.
+#     - Type: path relative to the testing root.
+#
+#   * cpu, os
+#     - Required: cpu and os values, respectively, for which this test is
+#       intended. Defaults to $current_cpu and $current_os if not manually
+#       specified.
+#     - Type: string
+#
+#   * disabled
+#     - Optional: a free-form string indicating a reason for the test being
+#       disabled.
+#     - Type: string
+#
+#   * runtime_deps
+#     - Optional: a JSON file containing a list of root_build_dir-relative
+#       paths defining ascribed runtime dependencies of the test. These
+#       dependencies are aggregated via the metadata graph of the associated
+#       test target under a data key of "test_runtime_deps.
+#     - Type: path relative to root_build_dir
+#
+#   * isolated
+#     - Optional: whether the test needs to be run in isolation to other tests.
+#     - Type: bool
+#
+#   * timeout_secs
+#     - Optional: the timeout in seconds for the test.
+#     - Type: int
+#
+build_api_module("tests") {
+  testonly = true
+  data_keys = [ "tests" ]
+  walk_keys = [ "tests_barrier" ]
+  deps = [
+    # Pull in tests from the non-device type-specific test groups.
+    "//:host_tests",
+  ]
+}
+
+
+# Host-only tests.  These cannot have any dependency on an assembled platform
+# image, or the compiled OS itself, not even for their host_test_data().
+validated_test_types_group("host_tests") {
+  testonly = true
+  visibility = [ ":*" ]
+  allowed_test_types = [ "host_only" ]
+
+  deps = []
+  foreach(label, host_test_labels) {
+    # Strip any toolchain that is provided, and replace with the host toolchain.
+    full_label = get_label_info(label, "label_no_toolchain")
+    deps += [ "$full_label($host_toolchain)" ]
+  }
 }
 
 ###
@@ -24,6 +110,7 @@ group("boot_tests") {
 group("default") {
   testonly = true
   deps = [
+    "//:tests",
     "//bundles/boot_tests",
 
     #
