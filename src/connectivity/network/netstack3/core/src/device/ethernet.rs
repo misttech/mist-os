@@ -36,8 +36,8 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, RecvFrameContext, ResourceCounterContext, RngContext,
-        SendFrameContext, TimerContext2, TimerHandler,
+        CoreTimerContext, CounterContext, NestedIntoCoreTimerCtx, RecvFrameContext,
+        ResourceCounterContext, RngContext, SendFrameContext, TimerContext2, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -1481,12 +1481,12 @@ impl DeviceStateSpec for EthernetLinkDevice {
         self_id: CC::WeakDeviceId,
         EthernetCreationProperties { mac, max_frame_size }: Self::CreationProperties,
     ) -> Self::Link<BC> {
-        let ipv4_arp = Mutex::new(ArpState::new(bindings_ctx, self_id.clone(), |arp| {
-            CC::convert_timer(EthernetTimerId::from(arp))
-        }));
-        let ipv6_nud = Mutex::new(NudState::new(bindings_ctx, self_id, |nud| {
-            CC::convert_timer(EthernetTimerId::from(nud))
-        }));
+        let ipv4_arp = Mutex::new(ArpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
+            bindings_ctx,
+            self_id.clone(),
+        ));
+        let ipv6_nud =
+            Mutex::new(NudState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, self_id));
         EthernetDeviceState {
             counters: Default::default(),
             ipv4_arp,
@@ -1510,6 +1510,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::net_mac;
     use net_types::ip::{AddrSubnet, IpAddr, IpVersion};
+    use netstack3_base::IntoCoreTimerCtx;
     use packet_formats::{
         ethernet::ETHERNET_MIN_BODY_LEN_NO_TAG,
         icmp::IcmpDestUnreachable,
@@ -1982,7 +1983,10 @@ mod tests {
                             FAKE_CONFIG_V4.local_mac,
                             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                         ),
-                        ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeDeviceId), Into::into),
+                        ArpState::new::<_, IntoCoreTimerCtx>(
+                            bindings_ctx,
+                            FakeWeakDeviceId(FakeDeviceId),
+                        ),
                     )
                 },
             );
@@ -2023,7 +2027,10 @@ mod tests {
             |bindings_ctx| {
                 FakeCoreCtx::with_inner_and_outer_state(
                     FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
-                    ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeDeviceId), Into::into),
+                    ArpState::new::<_, IntoCoreTimerCtx>(
+                        bindings_ctx,
+                        FakeWeakDeviceId(FakeDeviceId),
+                    ),
                 )
             },
         );

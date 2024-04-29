@@ -21,8 +21,8 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantBindingsTypes, SendFrameContext, TimerContext2,
-        TracingContext,
+        CoreTimerContext, CounterContext, EventContext, InstantBindingsTypes, SendFrameContext,
+        TimerContext2, TracingContext,
     },
     counters::Counter,
     device::{
@@ -632,12 +632,11 @@ pub struct ArpState<D: ArpDevice, BT: NudBindingsTypes<D>> {
 }
 
 impl<D: ArpDevice, BC: NudBindingsTypes<D> + TimerContext2> ArpState<D, BC> {
-    pub fn new<DeviceId: device::WeakId, F: Fn(ArpTimerId<D, DeviceId>) -> BC::DispatchId>(
+    pub fn new<DeviceId: device::WeakId, CC: CoreTimerContext<ArpTimerId<D, DeviceId>, BC>>(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
-        convert: F,
     ) -> Self {
-        ArpState { nud: NudState::new(bindings_ctx, device_id, convert) }
+        ArpState { nud: NudState::new::<_, CC>(bindings_ctx, device_id) }
     }
 }
 
@@ -647,6 +646,7 @@ mod tests {
     use core::iter;
 
     use net_types::ethernet::Mac;
+    use netstack3_base::IntoCoreTimerCtx;
     use packet::{Buf, ParseBuffer};
     use packet_formats::{
         arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
@@ -708,7 +708,10 @@ mod tests {
             FakeArpCtx {
                 proto_addr: Some(TEST_LOCAL_IPV4),
                 hw_addr: UnicastAddr::new(TEST_LOCAL_MAC).unwrap(),
-                arp_state: ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeLinkDeviceId), |t| t),
+                arp_state: ArpState::new::<_, IntoCoreTimerCtx>(
+                    bindings_ctx,
+                    FakeWeakDeviceId(FakeLinkDeviceId),
+                ),
                 inner: FakeArpInnerCtx,
                 config: FakeArpConfigCtx,
                 counters: Default::default(),
