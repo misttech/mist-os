@@ -95,7 +95,7 @@ pub struct SlaacAddrs<'a, BC: BindingsContext> {
 /// type.
 pub struct SlaacAddrsIter<'x, BC: BindingsContext> {
     core_ctx: CoreCtx<'x, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>,
-    addrs: ip::device::state::AddressIdIter<'x, BC::Instant, Ipv6>,
+    addrs: ip::device::state::AddressIdIter<'x, Ipv6, BC>,
     device_id: &'x DeviceId<BC>,
 }
 

@@ -61,7 +61,7 @@ const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 /// An `Ip` extension trait adding IP device state properties.
 pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
     /// The information stored about an IP address assigned to an interface.
-    type AssignedAddress<I: Instant>: AssignedAddress<Self::Addr> + Debug;
+    type AssignedAddress<BT: IpDeviceStateBindingsTypes>: AssignedAddress<Self::Addr> + Debug;
     /// The per-group state kept by the Group Messaging Protocol (GMP) used to announce
     /// membership in an IP multicast group for this version of IP.
     ///
@@ -87,7 +87,7 @@ pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
-    type AssignedAddress<I: Instant> = Ipv4AddressEntry<I>;
+    type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpGroupState<I: Instant> = IgmpGroupState<I>;
     type GmpTimerId<D: device::WeakId> = IgmpTimerId<D>;
@@ -104,7 +104,7 @@ impl IpDeviceStateIpExt for Ipv4 {
     }
 }
 
-impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
+impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<BT>> {
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
         IpDeviceAddr::new_ipv4_specified(self.addr_sub.addr())
     }
@@ -114,7 +114,7 @@ impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
     }
 }
 
-impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
+impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<BT>> {
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
         IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub.addr())
     }
@@ -125,7 +125,7 @@ impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
 }
 
 impl IpDeviceStateIpExt for Ipv6 {
-    type AssignedAddress<I: Instant> = Ipv6AddressEntry<I>;
+    type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpGroupState<I: Instant> = MldGroupState<I>;
     type GmpTimerId<D: device::WeakId> = MldTimerId<D>;
@@ -148,13 +148,13 @@ pub trait AssignedAddress<A: IpAddress> {
     fn addr(&self) -> IpDeviceAddr<A>;
 }
 
-impl<I: Instant> AssignedAddress<Ipv4Addr> for Ipv4AddressEntry<I> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv4Addr> for Ipv4AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
         IpDeviceAddr::new_ipv4_specified(self.addr_sub().addr())
     }
 }
 
-impl<I: Instant> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<I> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
         IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
     }
@@ -187,7 +187,7 @@ pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> 
     /// Detection).
     ///
     /// Does not contain any duplicates.
-    pub addrs: RwLock<IpDeviceAddresses<BT::Instant, I>>,
+    pub addrs: RwLock<IpDeviceAddresses<I, BT>>,
 
     /// Multicast groups and GMP handling state.
     pub multicast_groups: RwLock<IpDeviceMulticastGroups<I, BT>>,
@@ -203,11 +203,11 @@ pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> 
 impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
     RwLockFor<crate::lock_ordering::IpDeviceAddresses<I>> for DualStackIpDeviceState<BT>
 {
-    type Data = IpDeviceAddresses<BT::Instant, I>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<BT::Instant, I>>
+    type Data = IpDeviceAddresses<I, BT>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, BT>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<BT::Instant, I>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, BT>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -313,32 +313,32 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext2> IpDe
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug))]
-pub struct IpDeviceAddresses<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> {
-    addrs: Vec<PrimaryRc<I::AssignedAddress<Instant>>>,
+pub struct IpDeviceAddresses<I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
+    addrs: Vec<PrimaryRc<I::AssignedAddress<BT>>>,
 }
 
 // TODO(https://fxbug.dev/42165707): Once we figure out what invariants we want to
 // hold regarding the set of IP addresses assigned to a device, ensure that all
 // of the methods on `IpDeviceAddresses` uphold those invariants.
-impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, I> {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I, BT> {
     /// Iterates over the addresses assigned to this device.
     pub(crate) fn iter(
         &self,
-    ) -> impl ExactSizeIterator<Item = &PrimaryRc<I::AssignedAddress<Instant>>> + ExactSizeIterator + Clone
+    ) -> impl ExactSizeIterator<Item = &PrimaryRc<I::AssignedAddress<BT>>> + ExactSizeIterator + Clone
     {
         self.addrs.iter()
     }
 
     /// Iterates over strong clones of addresses assigned to this device.
-    pub(crate) fn strong_iter(&self) -> AddressIdIter<'_, Instant, I> {
+    pub(crate) fn strong_iter(&self) -> AddressIdIter<'_, I, BT> {
         AddressIdIter(self.addrs.iter())
     }
 
     /// Adds an IP address to this interface.
     pub(crate) fn add(
         &mut self,
-        addr: I::AssignedAddress<Instant>,
-    ) -> Result<StrongRc<I::AssignedAddress<Instant>>, crate::error::ExistsError> {
+        addr: I::AssignedAddress<BT>,
+    ) -> Result<StrongRc<I::AssignedAddress<BT>>, crate::error::ExistsError> {
         if self.iter().any(|a| a.addr() == addr.addr()) {
             return Err(crate::error::ExistsError);
         }
@@ -352,8 +352,8 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
     pub(crate) fn remove(
         &mut self,
         addr: &I::Addr,
-    ) -> Result<PrimaryRc<I::AssignedAddress<Instant>>, crate::error::NotFoundError> {
-        let (index, _entry): (_, &PrimaryRc<I::AssignedAddress<Instant>>) = self
+    ) -> Result<PrimaryRc<I::AssignedAddress<BT>>, crate::error::NotFoundError> {
+        let (index, _entry): (_, &PrimaryRc<I::AssignedAddress<BT>>) = self
             .addrs
             .iter()
             .enumerate()
@@ -364,14 +364,14 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
 }
 
 /// An iterator over address StrongIds. Created from `IpDeviceAddresses`.
-pub struct AddressIdIter<'a, Instant: crate::Instant, I: Ip + IpDeviceStateIpExt>(
-    core::slice::Iter<'a, PrimaryRc<I::AssignedAddress<Instant>>>,
+pub struct AddressIdIter<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>(
+    core::slice::Iter<'a, PrimaryRc<I::AssignedAddress<BT>>>,
 );
 
-impl<'a, Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> Iterator
-    for AddressIdIter<'a, Instant, I>
+impl<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Iterator
+    for AddressIdIter<'a, I, BT>
 {
-    type Item = StrongRc<I::AssignedAddress<Instant>>;
+    type Item = StrongRc<I::AssignedAddress<BT>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self(inner) = self;
@@ -842,14 +842,15 @@ impl<I> Default for Ipv4AddrConfig<I> {
 }
 
 /// Data associated with an IPv4 address on an interface.
-#[derive(Debug)]
-pub struct Ipv4AddressEntry<Instant> {
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct Ipv4AddressEntry<BT: IpDeviceStateBindingsTypes> {
     pub(crate) addr_sub: AddrSubnet<Ipv4Addr>,
-    pub(crate) state: RwLock<Ipv4AddressState<Instant>>,
+    pub(crate) state: RwLock<Ipv4AddressState<BT::Instant>>,
 }
 
-impl<Instant> Ipv4AddressEntry<Instant> {
-    pub(crate) fn new(addr_sub: AddrSubnet<Ipv4Addr>, config: Ipv4AddrConfig<Instant>) -> Self {
+impl<BT: IpDeviceStateBindingsTypes> Ipv4AddressEntry<BT> {
+    pub(crate) fn new(addr_sub: AddrSubnet<Ipv4Addr>, config: Ipv4AddrConfig<BT::Instant>) -> Self {
         Self { addr_sub, state: RwLock::new(Ipv4AddressState { config }) }
     }
 
@@ -862,12 +863,14 @@ impl<Instant> Ipv4AddressEntry<Instant> {
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv4DeviceAddressState> for Ipv4AddressEntry<I> {
-    type Data = Ipv4AddressState<I>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4AddressState<I>>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv4DeviceAddressState>
+    for Ipv4AddressEntry<BT>
+{
+    type Data = Ipv4AddressState<BT::Instant>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4AddressState<BT::Instant>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4AddressState<I>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4AddressState<BT::Instant>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -1007,18 +1010,19 @@ impl<Instant: crate::Instant> Inspectable for Ipv6AddressState<Instant> {
 
 /// Data associated with an IPv6 address on an interface.
 // TODO(https://fxbug.dev/42173351): Should this be generalized for loopback?
-#[derive(Debug)]
-pub struct Ipv6AddressEntry<Instant> {
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct Ipv6AddressEntry<BT: IpDeviceStateBindingsTypes> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     pub(crate) dad_state: Mutex<Ipv6DadState>,
-    pub(crate) state: RwLock<Ipv6AddressState<Instant>>,
+    pub(crate) state: RwLock<Ipv6AddressState<BT::Instant>>,
 }
 
-impl<Instant> Ipv6AddressEntry<Instant> {
+impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
     pub(crate) fn new(
         addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         dad_state: Ipv6DadState,
-        config: Ipv6AddrConfig<Instant>,
+        config: Ipv6AddrConfig<BT::Instant>,
     ) -> Self {
         let assigned = match dad_state {
             Ipv6DadState::Assigned => true,
@@ -1041,7 +1045,9 @@ impl<Instant> Ipv6AddressEntry<Instant> {
     }
 }
 
-impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad> for Ipv6AddressEntry<I> {
+impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad>
+    for Ipv6AddressEntry<BT>
+{
     type Data = Ipv6DadState;
     type Guard<'l> = crate::sync::LockGuard<'l, Ipv6DadState>
         where
@@ -1051,12 +1057,14 @@ impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad> for Ipv6Add
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv6AddressEntry<I> {
-    type Data = Ipv6AddressState<I>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6AddressState<I>>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState>
+    for Ipv6AddressEntry<BT>
+{
+    type Data = Ipv6AddressState<BT::Instant>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6AddressState<BT::Instant>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6AddressState<I>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6AddressState<BT::Instant>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -1075,13 +1083,15 @@ mod tests {
 
     use test_case::test_case;
 
+    type FakeBindingsCtxImpl = crate::context::testutil::FakeBindingsCtx<(), (), (), ()>;
+
     #[test_case(Lifetime::Infinite ; "with infinite valid_until")]
     #[test_case(Lifetime::Finite(FakeInstant::from(Duration::from_secs(1))); "with finite valid_until")]
     fn test_add_addr_ipv4(valid_until: Lifetime<FakeInstant>) {
         const ADDRESS: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
         const PREFIX_LEN: u8 = 8;
 
-        let mut ipv4 = IpDeviceAddresses::<FakeInstant, Ipv4>::default();
+        let mut ipv4 = IpDeviceAddresses::<Ipv4, FakeBindingsCtxImpl>::default();
 
         let _: StrongRc<_> = ipv4
             .add(Ipv4AddressEntry::new(
@@ -1107,7 +1117,7 @@ mod tests {
             Ipv6Addr::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6]);
         const PREFIX_LEN: u8 = 8;
 
-        let mut ipv6 = IpDeviceAddresses::<FakeInstant, Ipv6>::default();
+        let mut ipv6 = IpDeviceAddresses::<Ipv6, FakeBindingsCtxImpl>::default();
 
         let _: StrongRc<_> = ipv6
             .add(Ipv6AddressEntry::new(

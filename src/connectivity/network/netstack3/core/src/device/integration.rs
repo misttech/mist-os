@@ -301,7 +301,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv4> for CoreCtx<'_, BC, L> {
-    type AddressId = StrongRc<Ipv4AddressEntry<BC::Instant>>;
+    type AddressId = StrongRc<Ipv4AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
@@ -394,7 +394,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         })
     }
 
-    type AddressIdsIter<'a> = AddressIdIter<'a, BC::Instant, Ipv4>;
+    type AddressIdsIter<'a> = AddressIdIter<'a, Ipv4, BC>;
     fn with_address_ids<
         O,
         F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
@@ -590,7 +590,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv6> for CoreCtx<'_, BC, L> {
-    type AddressId = StrongRc<Ipv6AddressEntry<BC::Instant>>;
+    type AddressId = StrongRc<Ipv6AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
@@ -683,7 +683,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         })
     }
 
-    type AddressIdsIter<'a> = AddressIdIter<'a, BC::Instant, Ipv6>;
+    type AddressIdsIter<'a> = AddressIdIter<'a, Ipv6, BC>;
     fn with_address_ids<
         O,
         F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
