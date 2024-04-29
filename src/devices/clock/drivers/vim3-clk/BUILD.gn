@@ -31,10 +31,10 @@ fuchsia_driver("vim3-clk-driver") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
+    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/hwreg",
   ]
 }

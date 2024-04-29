@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
@@ -10,48 +12,109 @@
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/vmo.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
+#include <cstdint>
+#include <memory>
+
 #include <gtest/gtest.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-s905d2/s905d2-hiu-regs.h>
-#include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
 #include "../vim3_clk.h"
-#include "fidl/fuchsia.hardware.clockimpl/cpp/markers.h"
-#include "lib/component/incoming/cpp/constants.h"
-#include "lib/zx/handle.h"
-#include "lib/zx/resource.h"
-#include "lib/zx/vmo.h"
 #include "src/devices/lib/mmio/test-helper.h"
 
 namespace vim3_clock {
 
-constexpr size_t kRegisterCount = A311D_HIU_LENGTH / sizeof(uint32_t);
-class FakeHiuMmio {
+class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
  public:
-  FakeHiuMmio() : mmio_(sizeof(uint32_t), kRegisterCount) {
-    mmio_[HHI_GP0_PLL_CNTL0].SetReadCallback([]() { return HHI_PLL_LOCK; });
+  FakePDev()
+      : hui_mmio_(fdf_testing::CreateMmioBuffer(A311D_HIU_LENGTH, ZX_CACHE_POLICY_UNCACHED_DEVICE)),
+        dos_mmio_(
+            fdf_testing::CreateMmioBuffer(A311D_DOS_LENGTH, ZX_CACHE_POLICY_UNCACHED_DEVICE)) {
+    hui_mmio_.Write32(HHI_PLL_LOCK, HHI_GP0_PLL_CNTL0);
   }
 
-  fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
+  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler(
+      async_dispatcher_t* dispatcher) {
+    return fuchsia_hardware_platform_device::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  void ClearHiu() { ClearMmioBuffer(hui_mmio_); }
+  void ClearDos() { ClearMmioBuffer(dos_mmio_); }
+
+  bool IsHiuDirty() const { return IsMmioBufferDirty(hui_mmio_); }
+  bool IsDosDirty() const { return IsMmioBufferDirty(dos_mmio_); }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
+
+  void GetMmioById(fuchsia_hardware_platform_device::wire::DeviceGetMmioByIdRequest* request,
+                   GetMmioByIdCompleter::Sync& completer) override {
+    zx::vmo vmo;
+    zx_status_t st;
+    size_t sz;
+    switch (request->index) {
+      case kHiuMmioIndex:
+        st = hui_mmio_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+        sz = A311D_HIU_LENGTH;
+        break;
+      case kDosMmioIndex:
+        st = dos_mmio_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+        sz = A311D_DOS_LENGTH;
+        break;
+      default:
+        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+    }
+
+    if (st != ZX_OK) {
+      completer.ReplyError(st);
+      return;
+    }
+
+    fidl::Arena arena;
+    auto result = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
+                      .size(sz)
+                      .offset(0)
+                      .vmo(std::move(vmo))
+                      .Build();
+
+    completer.ReplySuccess(std::move(result));
+  }
 
  private:
-  ddk_fake::FakeMmioRegRegion mmio_;
+  static void ClearMmioBuffer(fdf::MmioBuffer& buffer) {
+    const size_t sz = buffer.get_size();
+    auto empty = std::make_unique<uint8_t[]>(sz);
+    memset(empty.get(), 0, sz);
+    buffer.WriteBuffer(0, empty.get(), sz);
+  }
+
+  static bool IsMmioBufferDirty(const fdf::MmioBuffer& buffer) {
+    const size_t sz = buffer.get_size();
+    auto contents = std::make_unique<uint8_t[]>(sz);
+    buffer.ReadBuffer(0, contents.get(), sz);
+
+    for (size_t i = 0; i < sz; i++) {
+      if (contents.get()[i] != 0x0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
+
+  fdf::MmioBuffer hui_mmio_;
+  fdf::MmioBuffer dos_mmio_;
 };
 
 class TestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    fake_pdev::FakePDevFidl::Config config;
-
-    config.mmios[kHiuMmioIndex] = hiu_mmio_.mmio();
-    config.mmios[kDosMmioIndex] =
-        fdf_testing::CreateMmioBuffer(A311D_DOS_LENGTH, ZX_CACHE_POLICY_UNCACHED_DEVICE);
-
-    pdev_.SetConfig(std::move(config));
-
     async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
     auto result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
         pdev_.GetInstanceHandler(dispatcher));
@@ -60,9 +123,10 @@ class TestEnvironment : public fdf_testing::Environment {
     return zx::ok();
   }
 
+  FakePDev& PDev() { return pdev_; }
+
  private:
-  fake_pdev::FakePDevFidl pdev_;
-  FakeHiuMmio hiu_mmio_;
+  FakePDev pdev_;
 };
 
 class FixtureConfig final {
@@ -178,6 +242,42 @@ TEST_F(DriverTest, ClkEnablePll) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   }
+}
+
+TEST_F(DriverTest, ClkTestHiuRegRegion) {
+  /// Make sure that HIU clocks are actually touching the HIU registers.
+  fdf::Arena arena('TEST');
+
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.PDev().ClearDos();
+    env.PDev().ClearHiu();
+  });
+
+  auto enable_result = client_.buffer(arena)->Enable(g12b_clk::G12B_CLK_AUDIO);
+  ASSERT_TRUE(enable_result.ok());
+
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    ASSERT_TRUE(env.PDev().IsHiuDirty());
+    ASSERT_FALSE(env.PDev().IsDosDirty());
+  });
+}
+
+TEST_F(DriverTest, ClkTestDosRegRegion) {
+  /// Make sure that DOS clocks are actually touching the DOS registers.
+  fdf::Arena arena('TEST');
+
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.PDev().ClearDos();
+    env.PDev().ClearHiu();
+  });
+
+  auto enable_result = client_.buffer(arena)->Enable(g12b_clk::G12B_CLK_DOS_GCLK_VDEC);
+  ASSERT_TRUE(enable_result.ok());
+
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    ASSERT_FALSE(env.PDev().IsHiuDirty());
+    ASSERT_TRUE(env.PDev().IsDosDirty());
+  });
 }
 
 }  // namespace vim3_clock
