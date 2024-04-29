@@ -360,8 +360,12 @@ fn configure_subsystems(
     fonts::FontsSubsystem::define_configuration(context, &platform.fonts, builder)
         .context("Configuring the 'fonts' subsystem")?;
 
-    intl::IntlSubsystem::define_configuration(context, &platform.intl, builder)
-        .context("Confguring the 'intl' subsystem")?;
+    intl::IntlSubsystem::define_configuration(
+        context,
+        &(&platform.intl, &platform.session),
+        builder,
+    )
+    .context("Confguring the 'intl' subsystem")?;
 
     setui::SetUiSubsystem::define_configuration(context, &platform.setui, builder)
         .context("Confguring the 'SetUI' subsystem")?;

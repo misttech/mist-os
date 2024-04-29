@@ -793,7 +793,7 @@ assembly_input_bundle("core_realm") {
             "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
             "//src/recovery/system/meta/core_shards/base.shard.cml",
             "//src/recovery/system/meta/core_shards/ui.shard.cml",
-            "//src/session/bin/session_manager/meta/all_products_capabilities.core_shard.cml",
+            "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
             "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
             "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
             "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",

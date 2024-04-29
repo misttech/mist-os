@@ -192,7 +192,6 @@
             protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
             from: "parent/smart-trusted-apps",
             to: "#session",
-            availability: "same_as_target",
         },
         {
             // Routed to session-manager via factory_store_providers.core_shard.cml.
@@ -242,7 +241,7 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via all_products_capabilities.core_shard.cml.
+            // Routed to session-manager via session_manager.core_shard.cml.
             protocol: [
                 "fuchsia.update.channel.Provider",
                 "fuchsia.update.channelcontrol.ChannelControl",

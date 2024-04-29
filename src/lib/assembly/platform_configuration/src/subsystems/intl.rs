@@ -3,16 +3,19 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use assembly_config_schema::platform_config::intl_config::{IntlConfig, Type};
+use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
 
 pub(crate) struct IntlSubsystem;
-impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
+impl DefineSubsystemConfiguration<(&IntlConfig, &PlatformSessionConfig)> for IntlSubsystem {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &IntlConfig,
+        platform_config: &(&IntlConfig, &PlatformSessionConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
+        let (config, session_config) = *platform_config;
+
         // These settings require a core realm.
         if *context.feature_set_level != FeatureSupportLevel::Standard {
             if config.config_type.is_some() {
@@ -38,11 +41,19 @@ impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
                         .context("while configuring the 'Intl' subsystem")?;
                 }
                 Type::Small => {
+                    ensure!(
+                        session_config.enabled,
+                        "Internationalization small is only supported with a session manager"
+                    );
                     builder
                         .icu_platform_bundle("intl_services_small")
                         .context("while configuring the 'small Intl' subsystem")?;
                 }
                 Type::SmallWithTimezone => {
+                    ensure!(
+                        session_config.enabled,
+                        "Internationalization small_with_timezone is only supported with a session manager"
+                    );
                     builder
                         .icu_platform_bundle("intl_services_small_with_timezone")
                         .context("while configuring the 'small Intl with timezone' subsystem")?;

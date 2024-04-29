@@ -10,7 +10,7 @@
 // [2]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/session/bin/session_manager/meta/session_manager.cml
 {
     include: [
-        "//src/session/bin/session_manager/meta/all_products_capabilities.core_shard.cml",
+        "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
         "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
     ],
 }

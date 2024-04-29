@@ -5,6 +5,14 @@
 // This shard contains all capability routes for session manager that are
 // expected to be valid on every product.
 {
+    children: [
+        {
+            name: "session-manager",
+            url: "fuchsia-pkg://fuchsia.com/session_manager#meta/session_manager.cm",
+            startup: "eager",
+            environment: "#session-env",
+        },
+    ],
     offer: [
         // The routes listed below originate from other core components.
         // Routes are sorted by source component name.
@@ -273,6 +281,20 @@
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
             ],
+        },
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            to: [ "#session-manager" ],
+            availability: "optional",
+        },
+        {
+            from: "parent",
+            to: "#session-manager",
+            config: "fuchsia.power.SuspendEnabled",
         },
 
         // TODO(https://fxbug.dev/42077029): As of 2023-04-26, `session-manager` only uses

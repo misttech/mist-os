@@ -14,12 +14,6 @@
             url: "fuchsia-pkg://fuchsia.com/sl4f-ffx-proxy-server#meta/sl4f_proxy_server.cm",
             environment: "#core-env",
         },
-        {
-            name: "session-manager",
-            url: "fuchsia-pkg://fuchsia.com/session_manager#meta/session_manager.cm",
-            startup: "eager",
-            environment: "#session-env",
-        },
 
         // TODO(https://fxbug.dev/42074694) Remove comment when this transformation is complete.
         // This is the future home of system update-related components.
@@ -538,20 +532,6 @@
             // See:
             //      `//src/sys/time/timekeeper/config.shard.cml`
             availability: "optional",
-        },
-        {
-            protocol: [
-                "fuchsia.power.broker.Topology",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
-            from: "parent",
-            to: [ "#session-manager" ],
-            availability: "optional",
-        },
-        {
-            from: "parent",
-            to: "#session-manager",
-            config: "fuchsia.power.SuspendEnabled",
         },
         {
             protocol: [
