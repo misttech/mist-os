@@ -37,5 +37,8 @@ pub mod ref_counted_hash_map {
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
-    pub use crate::time::testutil::{FakeInstant, FakeInstantCtx};
+    pub use crate::time::testutil::{
+        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
+        WithFakeTimerContext,
+    };
 }
