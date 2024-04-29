@@ -14,10 +14,10 @@
 #include <zircon/status.h>
 
 #include <memory>
+#include <mutex>
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <fbl/macros.h>
 
 #include "src/devices/block/drivers/zxcrypt/device-info.h"
@@ -51,7 +51,7 @@ zx_status_t DeviceManager::Create(void* ctx, zx_device_t* parent) {
 
 zx_status_t DeviceManager::Bind() {
   zx_status_t rc;
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   if ((rc = DdkAdd(ddk::DeviceAddArgs("zxcrypt")
                        .set_flags(DEVICE_ADD_NON_BINDABLE)
@@ -67,7 +67,7 @@ zx_status_t DeviceManager::Bind() {
 }
 
 void DeviceManager::DdkUnbind(ddk::UnbindTxn txn) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   switch (state_) {
     case kSealed:
       break;
@@ -88,7 +88,7 @@ void DeviceManager::DdkUnbind(ddk::UnbindTxn txn) {
 void DeviceManager::DdkRelease() { delete this; }
 
 void DeviceManager::DdkChildPreRelease(void* child_ctx) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   switch (state_) {
     case kSealing:
       // We initiated the removal of our child.
@@ -120,7 +120,7 @@ void DeviceManager::DdkChildPreRelease(void* child_ctx) {
 }
 
 void DeviceManager::Format(FormatRequestView request, FormatCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   if (state_ != kSealed) {
     zxlogf(ERROR, "can't format zxcrypt, state=%d", state_);
     completer.Reply(ZX_ERR_BAD_STATE);
@@ -130,7 +130,7 @@ void DeviceManager::Format(FormatRequestView request, FormatCompleter::Sync& com
 }
 
 void DeviceManager::Unseal(UnsealRequestView request, UnsealCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   if (state_ != kSealed) {
     zxlogf(ERROR, "can't unseal zxcrypt, state=%d", state_);
     completer.Reply(ZX_ERR_BAD_STATE);
@@ -140,7 +140,7 @@ void DeviceManager::Unseal(UnsealRequestView request, UnsealCompleter::Sync& com
 }
 
 void DeviceManager::Seal(SealCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   if (state_ != kUnsealed && state_ != kUnsealedShredded) {
     zxlogf(ERROR, "can't seal zxcrypt, state=%d", state_);
@@ -155,7 +155,7 @@ void DeviceManager::Seal(SealCompleter::Sync& completer) {
 }
 
 void DeviceManager::Shred(ShredCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   if (state_ != kSealed && state_ != kUnsealed && state_ != kUnsealedShredded) {
     zxlogf(ERROR, "can't shred zxcrypt, state=%d", state_);

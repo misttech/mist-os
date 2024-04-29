@@ -16,9 +16,9 @@
 #include <lib/zx/interrupt.h>
 #include <zircon/threads.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "dma-descriptor-builder.h"
 #include "sdhci-reg.h"
@@ -116,7 +116,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   };
 
   RequestStatus GetRequestStatus() TA_EXCL(&mtx_) {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     if (pending_request_.is_pending()) {
       const bool has_data = pending_request_.cmd_flags & SDMMC_RESP_DATA_PRESENT;
       const bool busy_response = pending_request_.cmd_flags & SDMMC_RESP_LEN_48B;
@@ -190,7 +190,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   zx::bti bti_;
 
   // Held when a command or action is in progress.
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // used to signal request complete
   sync_completion_t req_completion_;

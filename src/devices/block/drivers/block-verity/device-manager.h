@@ -12,9 +12,10 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
 #include <fbl/macros.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/block-verity/driver-sealer.h"
 #include "src/devices/block/drivers/block-verity/superblock-verifier.h"
@@ -175,7 +176,7 @@ class DeviceManager final : public DeviceManagerType {
   std::optional<OpenForVerifiedReadCompleter::Async> open_for_verified_read_completer_;
 
   // Used to ensure FIDL calls are exclusive to each other, and protects access to `state_`.
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // What state is this device in?  See more details for the state machine above
   // where `State` is defined.

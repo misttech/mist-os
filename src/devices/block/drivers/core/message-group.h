@@ -10,11 +10,10 @@
 #include <zircon/types.h>
 
 #include <cstring>
+#include <mutex>
 #include <optional>
 
-#include <fbl/auto_lock.h>
 #include <fbl/macros.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
 
@@ -49,12 +48,12 @@ class MessageGroup {
   void Complete(zx_status_t status) TA_EXCL(lock_);
 
   bool StatusOkPendingLastOp() const {
-    fbl::AutoLock guard(&lock_);
+    std::lock_guard<std::mutex> guard(lock_);
     return op_count_ == 1 && pending_ && response_.status == ZX_OK;
   }
 
  private:
-  mutable fbl::Mutex lock_;
+  mutable std::mutex lock_;
   bool pending_ TA_GUARDED(lock_) = false;
   block_fifo_response_t response_ TA_GUARDED(lock_);
   uint32_t op_count_ TA_GUARDED(lock_) = 0;

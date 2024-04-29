@@ -17,9 +17,8 @@
 #include <atomic>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <random>
-
-#include <fbl/auto_lock.h>
 
 #include "src/devices/block/lib/common/include/common-dfv1.h"
 #include "zircon/errors.h"
@@ -87,7 +86,7 @@ zx_status_t Ramdisk::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 
 void Ramdisk::DdkUnbind(ddk::UnbindTxn txn) {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     dead_ = true;
   }
   sync_completion_signal(&signal_);
@@ -97,7 +96,7 @@ void Ramdisk::DdkUnbind(ddk::UnbindTxn txn) {
 void Ramdisk::DdkRelease() {
   {
     // Idempotent, so if this has already been triggered earlier it is a no-op.
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     dead_ = true;
   }
   // Wake up the worker thread, in case it is sleeping
@@ -142,7 +141,7 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
       }
 
       {
-        fbl::AutoLock lock(&lock_);
+        std::lock_guard<std::mutex> lock(lock_);
         if (!(dead = dead_)) {
           if (!read) {
             block_counts_.received += txn.operation()->rw.length;
@@ -160,7 +159,7 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
     }
     case BLOCK_OPCODE_FLUSH: {
       {
-        fbl::AutoLock lock(&lock_);
+        std::lock_guard<std::mutex> lock(lock_);
         if (!(dead = dead_)) {
           txn_list_.push(std::move(txn));
         }
@@ -181,7 +180,7 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
 
 void Ramdisk::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     flags_ = request->flags;
   }
   completer.Reply();
@@ -189,7 +188,7 @@ void Ramdisk::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& com
 
 void Ramdisk::Wake(WakeCompleter::Sync& completer) {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
 
     if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
       // Fill all blocks with a fill pattern.
@@ -212,7 +211,7 @@ void Ramdisk::Wake(WakeCompleter::Sync& completer) {
 
 void Ramdisk::SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Sync& completer) {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     asleep_ = false;
     memset(&block_counts_, 0, sizeof(block_counts_));
     pre_sleep_write_block_count_ = request->count;
@@ -225,7 +224,7 @@ void Ramdisk::SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Syn
 }
 
 void Ramdisk::GetBlockCounts(GetBlockCountsCompleter::Sync& completer) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   completer.Reply(block_counts_);
 }
 
@@ -248,7 +247,7 @@ zx_status_t Ramdisk::BlockPartitionGetName(char* out_name, size_t capacity) {
 }
 
 void Ramdisk::Grow(GrowRequestView request, GrowCompleter::Sync& completer) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   if (request->new_size < block_size_ * block_count_) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
@@ -279,7 +278,7 @@ void Ramdisk::ProcessRequests() {
 
     do {
       {
-        fbl::AutoLock lock(&lock_);
+        std::lock_guard<std::mutex> lock(lock_);
         defer =
             static_cast<bool>(flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kResumeOnWake);
         block_write_limit = pre_sleep_write_block_count_ == 0 && !asleep_
@@ -319,7 +318,7 @@ void Ramdisk::ProcessRequests() {
       if (block_write_limit == 0) {
         status = ZX_ERR_UNAVAILABLE;
       } else {
-        fbl::AutoLock lock(&lock_);
+        std::lock_guard<std::mutex> lock(lock_);
         blocks_written_since_last_flush_.clear();
       }
       txn->Complete(status);
@@ -351,7 +350,7 @@ void Ramdisk::ProcessRequests() {
 
       // Update the ramdisk block counts. Since we aren't failing read transactions, only include
       // write transaction counts.
-      fbl::AutoLock lock(&lock_);
+      std::lock_guard<std::mutex> lock(lock_);
       // Increment the count based on the result of the last transaction.
       if (status == ZX_OK) {
         block_counts_.successful += blocks;

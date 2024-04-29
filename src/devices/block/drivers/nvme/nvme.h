@@ -15,8 +15,9 @@
 #include <zircon/listnode.h>
 #include <zircon/types.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/queue-pair.h"
@@ -102,14 +103,14 @@ class Nvme : public DeviceType {
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
 
-  fbl::Mutex commands_lock_;
+  std::mutex commands_lock_;
   // The pending list consists of commands that have been received via QueueIoCommand() and are
   // waiting for IO to start.
   list_node_t pending_commands_ TA_GUARDED(commands_lock_);
 
   // Admin submission and completion queues.
   std::unique_ptr<QueuePair> admin_queue_;
-  fbl::Mutex admin_lock_;  // Used to serialize admin transactions.
+  std::mutex admin_lock_;  // Used to serialize admin transactions.
 
   // IO submission and completion queues.
   std::unique_ptr<QueuePair> io_queue_;

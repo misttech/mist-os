@@ -8,7 +8,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
-#include <fbl/auto_lock.h>
+#include <mutex>
 
 #include "src/devices/block/drivers/block-verity/constants.h"
 #include "src/devices/block/drivers/block-verity/device-info.h"
@@ -51,7 +51,7 @@ VerifiedDevice::VerifiedDevice(zx_device_t* parent, DeviceInfo&& info,
 zx_status_t VerifiedDevice::Init() {
   {
     // Scope to avoid holding lock when PrepareAsync callback is called
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
 
     ZX_ASSERT(state_ == kInitial);
 
@@ -61,7 +61,7 @@ zx_status_t VerifiedDevice::Init() {
   zx_status_t rc = block_verifier_.PrepareAsync(this, BlockVerifierPrepareCallback);
 
   if (rc != ZX_OK) {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     state_ = kFailed;
   }
 
@@ -83,7 +83,7 @@ zx_status_t VerifiedDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
 }
 
 void VerifiedDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   // Change internal state to stop servicing new block requests.
   if (state_ == kFailed) {
     txn.Reply();
@@ -112,7 +112,7 @@ void VerifiedDevice::BlockImplQuery(block_info_t* out_info, size_t* out_op_size)
 
 void VerifiedDevice::BlockImplQueue(block_op_t* block_op, block_impl_queue_callback completion_cb,
                                     void* cookie) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   extra_op_t* extra = BlockToExtra(block_op, info_.op_size);
   // Save original values in extra, and adjust block_op's block/vmo offsets.
@@ -147,7 +147,7 @@ void VerifiedDevice::BlockImplQueue(block_op_t* block_op, block_impl_queue_callb
 
 void VerifiedDevice::RequestBlocks(uint64_t start_block, uint64_t block_count, zx::vmo& vmo,
                                    void* cookie, BlockLoaderCallback callback) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
   block_op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   // The cast below is guaranteed not to overflow because
@@ -170,7 +170,7 @@ void VerifiedDevice::RequestBlocks(uint64_t start_block, uint64_t block_count, z
 void VerifiedDevice::OnBlockLoaderRequestComplete(zx_status_t status, block_op_t* block) {
   {
     // Only need to hold the lock while updating outstanding_block_requests_.
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     outstanding_block_requests_--;
   }
 
@@ -206,7 +206,7 @@ void VerifiedDevice::ForwardTranslatedBlockOp(block_op_t* block_op) {
 }
 
 void VerifiedDevice::OnClientBlockRequestComplete(zx_status_t status, block_op_t* block) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   outstanding_block_requests_--;
 
   // Restore data that may have changed
@@ -248,7 +248,7 @@ void VerifiedDevice::OnClientBlockRequestComplete(zx_status_t status, block_op_t
 }
 
 void VerifiedDevice::OnBlockVerifierPrepareComplete(zx_status_t status) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   ZX_ASSERT(state_ == kLoading);
   state_ = kActive;
 

@@ -42,7 +42,7 @@ zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 
 void BlockDevice::UpdateStats(bool success, zx::ticks start_tick, block_op_t* op) {
   uint64_t bytes_transfered = op->rw.length * info_.block_size;
-  fbl::AutoLock lock(&stat_lock_);
+  std::lock_guard<std::mutex> lock(stat_lock_);
   stats_.UpdateStats(success, start_tick, op->command.opcode, bytes_transfered);
 }
 
@@ -55,7 +55,7 @@ constexpr uint32_t kMaxMidlayerIO = 8192;
 
 zx_status_t BlockDevice::DoIo(zx::vmo& vmo, size_t buf_len, zx_off_t off, zx_off_t vmo_off,
                               bool write) {
-  fbl::AutoLock lock(&io_lock_);
+  std::lock_guard<std::mutex> lock(io_lock_);
   const size_t block_size = info_.block_size;
   const size_t max_xfer = std::min(info_.max_transfer_size, kMaxMidlayerIO);
 
@@ -154,7 +154,7 @@ void BlockDevice::GetInfo(GetInfoCompleter::Sync& completer) {
 }
 
 void BlockDevice::GetStats(GetStatsRequestView request, GetStatsCompleter::Sync& completer) {
-  fbl::AutoLock lock(&stat_lock_);
+  std::lock_guard<std::mutex> lock(stat_lock_);
   if (!enable_stats_) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;

@@ -21,10 +21,10 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <mutex>
 
 #include <ddktl/device.h>
 #include <fbl/macros.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers//ftl/metrics.h"
 #include "src/devices/block/drivers/ftl/nand_driver.h"
@@ -123,7 +123,7 @@ class BlockDevice : public DeviceType,
 
   BlockParams params_ = {};
 
-  fbl::Mutex lock_;
+  std::mutex lock_;
   list_node_t txn_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(txn_list_);
   bool dead_ TA_GUARDED(lock_) = false;
 

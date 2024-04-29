@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <fbl/algorithm.h>
@@ -203,7 +204,7 @@ void BlockDevice::IrqRingUpdate() {
     struct vring_desc* desc = vring_.DescFromIndex(static_cast<uint16_t>(i));
     auto head_desc = desc;  // Save the first element.
     {
-      fbl::AutoLock lock(&ring_lock_);
+      std::lock_guard<std::mutex> lock(ring_lock_);
       for (;;) {
         int next;
         if (zxlog_level_enabled(TRACE)) {
@@ -228,7 +229,7 @@ void BlockDevice::IrqRingUpdate() {
     std::optional<uint8_t> status;
     block_txn_t* txn = nullptr;
     {
-      fbl::AutoLock lock(&txn_lock_);
+      std::lock_guard<std::mutex> lock(txn_lock_);
 
       // Search our pending txn list to see if this completes it.
       list_for_every_entry (&pending_txn_list_, txn, block_txn_t, node) {
@@ -274,7 +275,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   size_t req_index;
   std::optional<size_t> discard_req_index;
   {
-    fbl::AutoLock lock(&txn_lock_);
+    std::lock_guard<std::mutex> lock(txn_lock_);
     req_index = alloc_blk_req();
     if (req_index >= blk_req_count) {
       zxlogf(TRACE, "too many block requests queued (%zu)!", req_index);
@@ -325,12 +326,12 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   uint16_t num_descriptors =
       (type == VIRTIO_BLK_T_DISCARD ? 3u : 2u) + static_cast<uint16_t>(pagecount);
   {
-    fbl::AutoLock lock(&ring_lock_);
+    std::lock_guard<std::mutex> lock(ring_lock_);
     desc = vring_.AllocDescChain(num_descriptors, &i);
   }
   if (!desc) {
     zxlogf(TRACE, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
-    fbl::AutoLock lock(&txn_lock_);
+    std::lock_guard<std::mutex> lock(txn_lock_);
     free_blk_req(req_index);
     if (discard_req_index) {
       free_blk_req(*discard_req_index);
@@ -531,7 +532,7 @@ void BlockDevice::WorkerThread() {
       uint16_t idx;
       status = QueueTxn(txn, type, bytes, pages, num_pages, &idx);
       if (status == ZX_OK) {
-        fbl::AutoLock lock(&txn_lock_);
+        std::lock_guard<std::mutex> lock(txn_lock_);
         list_add_tail(&pending_txn_list_, &txn->node);
         vring_.SubmitChain(idx);
         vring_.Kick();
@@ -542,7 +543,7 @@ void BlockDevice::WorkerThread() {
       if (cannot_fail) {
         zxlogf(ERROR, "failed to queue txn to hw: %s", zx_status_get_string(status));
         {
-          fbl::AutoLock lock(&txn_lock_);
+          std::lock_guard<std::mutex> lock(txn_lock_);
           free_blk_req(txn->req_index);
           if (txn->discard_req_index) {
             free_blk_req(*txn->discard_req_index);
@@ -553,7 +554,7 @@ void BlockDevice::WorkerThread() {
       }
 
       {
-        fbl::AutoLock lock(&txn_lock_);
+        std::lock_guard<std::mutex> lock(txn_lock_);
         if (list_is_empty(&pending_txn_list_)) {
           // We hold the txn lock and the list is empty, if we fail this time around
           // there's no point in trying again.
@@ -585,7 +586,7 @@ void BlockDevice::WorkerThread() {
 void BlockDevice::FlushPendingTxns() {
   for (;;) {
     {
-      fbl::AutoLock lock(&txn_lock_);
+      std::lock_guard<std::mutex> lock(txn_lock_);
       if (list_is_empty(&pending_txn_list_)) {
         return;
       }
@@ -612,7 +613,7 @@ void BlockDevice::CleanupPendingTxns() {
       txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
     }
   }
-  fbl::AutoLock lock(&txn_lock_);
+  std::lock_guard<std::mutex> lock(txn_lock_);
   list_for_every_entry_safe (&pending_txn_list_, txn, temp_entry, block_txn_t, node) {
     free_blk_req(txn->req_index);
     if (txn->discard_req_index) {

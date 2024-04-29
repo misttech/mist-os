@@ -18,12 +18,12 @@
 #include <zircon/types.h>
 
 #include <atomic>
+#include <mutex>
 
 #include <bitmap/raw-bitmap.h>
 #include <bitmap/storage.h>
 #include <ddktl/device.h>
 #include <fbl/macros.h>
-#include <fbl/mutex.h>
 
 #include "lib/inspect/cpp/inspector.h"
 #include "src/devices/block/drivers/zxcrypt/device-info.h"
@@ -129,7 +129,7 @@ class Device final : public DeviceType,
   Worker workers_[kNumWorkers];
 
   // Primary lock for accessing the write queue
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // Indicates which blocks of the write buffer are in use.
   bitmap::RawBitmapGeneric<bitmap::DefaultStorage> map_ __TA_GUARDED(mtx_);

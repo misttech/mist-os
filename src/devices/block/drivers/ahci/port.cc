@@ -11,8 +11,7 @@
 #include <unistd.h>
 
 #include <algorithm>
-
-#include <fbl/auto_lock.h>
+#include <mutex>
 
 #include "controller.h"
 
@@ -55,7 +54,7 @@ bool Port::SlotBusyLocked(uint32_t slot) {
 }
 
 zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t max_command_tag) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   num_ = num;
   max_command_tag_ = max_command_tag;
   bus_ = bus;
@@ -194,12 +193,12 @@ void Port::Reset() {
 }
 
 void Port::SetDevInfo(const SataDeviceInfo* devinfo) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   memcpy(&devinfo_, devinfo, sizeof(devinfo_));
 }
 
 zx_status_t Port::Queue(SataTransaction* txn) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   if (!is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -214,44 +213,46 @@ zx_status_t Port::Queue(SataTransaction* txn) {
 }
 
 bool Port::Complete() {
-  fbl::AutoLock lock(&lock_);
-  if (!is_valid()) {
-    return false;
-  }
-
   SataTransaction* txn_complete[AHCI_MAX_COMMANDS];
   size_t complete_count = 0;
   bool active_txns = false;
 
-  for (uint32_t slot = 0; slot < AHCI_MAX_COMMANDS; slot++) {
-    SataTransaction* txn = commands_[slot];
-    if (txn == nullptr) {
-      continue;  // No transaction in this slot.
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+
+    if (!is_valid()) {
+      return false;
     }
-    uint32_t slot_bit = (1u << slot);
-    if ((completed_ & slot_bit) == 0) {
-      // Not complete, check if timeout expired.
-      zx::time now = zx::clock::get_monotonic();
-      if (txn->timeout > now) {
-        active_txns = true;
-        continue;  // Still in progress.
+
+    for (uint32_t slot = 0; slot < AHCI_MAX_COMMANDS; slot++) {
+      SataTransaction* txn = commands_[slot];
+      if (txn == nullptr) {
+        continue;  // No transaction in this slot.
       }
-      // Timed out.
-      zx::duration delta = now - txn->timeout;
-      FDF_LOG(ERROR, "port %u: timed out txn %p (%ld ms)", num_, txn, delta.to_msecs());
-      txn->timeout = zx::time::infinite_past();  // Signal that timeout occurred.
+      uint32_t slot_bit = (1u << slot);
+      if ((completed_ & slot_bit) == 0) {
+        // Not complete, check if timeout expired.
+        zx::time now = zx::clock::get_monotonic();
+        if (txn->timeout > now) {
+          active_txns = true;
+          continue;  // Still in progress.
+        }
+        // Timed out.
+        zx::duration delta = now - txn->timeout;
+        FDF_LOG(ERROR, "port %u: timed out txn %p (%ld ms)", num_, txn, delta.to_msecs());
+        txn->timeout = zx::time::infinite_past();  // Signal that timeout occurred.
+      }
+      // Completed or timed out.
+      commands_[slot] = nullptr;
+      running_ &= ~slot_bit;
+      completed_ &= ~slot_bit;
+      txn_complete[complete_count] = txn;
+      complete_count++;
     }
-    // Completed or timed out.
-    commands_[slot] = nullptr;
-    running_ &= ~slot_bit;
-    completed_ &= ~slot_bit;
-    txn_complete[complete_count] = txn;
-    complete_count++;
+    if (!running_) {
+      paused_cmd_issuing_ = false;
+    }
   }
-  if (!running_) {
-    paused_cmd_issuing_ = false;
-  }
-  lock.release();
 
   for (size_t i = 0; i < complete_count; i++) {
     SataTransaction* txn = txn_complete[i];
@@ -270,9 +271,9 @@ bool Port::Complete() {
 }
 
 bool Port::ProcessQueued() {
-  lock_.Acquire();
+  lock_.lock();
   if (!is_valid()) {
-    lock_.Release();
+    lock_.unlock();
     return false;
   }
 
@@ -320,19 +321,19 @@ bool Port::ProcessQueued() {
       running_ |= (1u << slot);
       commands_[slot] = txn;
     } else {
-      lock_.Release();
+      lock_.unlock();
       txn->Complete(st);
-      lock_.Acquire();
+      lock_.lock();
       continue;
     }
     added_txns = true;
   }
-  lock_.Release();
+  lock_.unlock();
   return added_txns;
 }
 
 void Port::TxnComplete(zx_status_t status) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   uint32_t active = RegRead(kPortSataActive);  // Transactions active in hardware.
   uint32_t running = running_;                 // Transactions tagged as running.
   // Transactions active in hardware but not tagged as running.

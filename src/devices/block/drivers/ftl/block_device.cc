@@ -16,11 +16,11 @@
 #include <zircon/types.h>
 
 #include <iostream>
+#include <mutex>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/algorithm.h>
-#include <fbl/auto_lock.h>
 
 #include "lib/inspect/cpp/vmo/types.h"
 #include "nand_driver.h"
@@ -286,12 +286,12 @@ bool BlockDevice::InitFtl() {
 }
 
 void BlockDevice::Kill() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   dead_ = true;
 }
 
 bool BlockDevice::AddToList(FtlOp* operation) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   if (!dead_) {
     list_add_tail(&txn_list_, &operation->node);
   }
@@ -299,7 +299,7 @@ bool BlockDevice::AddToList(FtlOp* operation) {
 }
 
 bool BlockDevice::RemoveFromList(FtlOp** operation) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   *operation = list_remove_head_type(&txn_list_, FtlOp, node);
   return !dead_;
 }

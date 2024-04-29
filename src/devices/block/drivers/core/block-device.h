@@ -33,19 +33,18 @@
 #include <algorithm>
 #include <limits>
 #include <list>
+#include <mutex>
 #include <new>
 
 #include <ddktl/device.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "src/storage/lib/storage-metrics/block-metrics.h"
 
 // To maintain stats related to time taken by a command or its success/failure, we need to
 // intercept command completion with a callback routine. This might introduce memory
 // overhead.
-// TODO(https://fxbug.dev/42072576): We should be able to turn on/off stats either at compile-time or
-// load-time.
+// TODO(https://fxbug.dev/42072576): We should be able to turn on/off stats either at compile-time
+// or load-time.
 struct StatsCookie {
   zx::ticks start_tick;
 };
@@ -124,15 +123,15 @@ class BlockDevice : public BlockDeviceType,
   // True if we have metadata for a ZBI partition map.
   bool has_bootpart_ = false;
 
-  fbl::Mutex io_lock_;
+  std::mutex io_lock_;
   zx::vmo io_vmo_ TA_GUARDED(io_lock_);
   zx_status_t io_status_ = ZX_OK;
   sync_completion_t io_signal_;
   std::unique_ptr<uint8_t[]> io_op_;
 
-  fbl::Mutex stat_lock_;
-  // TODO(https://fxbug.dev/42072576): We should consider adding the ability to toggle stats, or remove this
-  // boolean if we aren't going to.
+  std::mutex stat_lock_;
+  // TODO(https://fxbug.dev/42072576): We should consider adding the ability to toggle stats, or
+  // remove this boolean if we aren't going to.
   bool enable_stats_ TA_GUARDED(stat_lock_) = true;
   storage_metrics::BlockDeviceMetrics stats_ TA_GUARDED(stat_lock_) = {};
 

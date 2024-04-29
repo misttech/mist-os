@@ -13,11 +13,11 @@
 #include <zircon/syscalls/port.h>
 
 #include <algorithm>
+#include <mutex>
 #include <utility>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <safemath/clamped_math.h>
 
 #include "lib/inspect/cpp/inspector.h"
@@ -45,7 +45,7 @@ Device::~Device() { LOG_ENTRY(); }
 zx_status_t Device::Init(const DdkVolume& volume) {
   LOG_ENTRY();
   zx_status_t rc;
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   // Set up allocation bitmap
   if ((rc = map_.Reset(Volume::kBufferSize / info_.block_size)) != ZX_OK) {
@@ -287,7 +287,7 @@ void Device::BlockComplete(block_op_t* block, zx_status_t status) {
     uint64_t len = block->rw.length;
     extra->data = nullptr;
 
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     ZX_DEBUG_ASSERT(map_.Get(off, off + len));
     rc = map_.Clear(off, off + len);
     ZX_DEBUG_ASSERT(rc == ZX_OK);
@@ -313,55 +313,57 @@ void Device::BlockComplete(block_op_t* block, zx_status_t status) {
 void Device::EnqueueWrite(block_op_t* block) {
   LOG_ENTRY_ARGS("block=%p", block);
   zx_status_t rc = ZX_OK;
-
-  fbl::AutoLock lock(&mtx_);
-
-  // Append the request to the write queue (if not null)
   extra_op_t* extra;
-  if (block) {
-    extra = BlockToExtra(block, info_.op_size);
-    list_add_tail(&queue_, &extra->node);
-  }
-  if (stalled_.load()) {
-    zxlogf(TRACE, "early return; no requests completed since last stall");
-    return;
-  }
-
-  // Process as many pending write requests as we can right now.
   list_node_t pending;
-  list_initialize(&pending);
-  while (!list_is_empty(&queue_)) {
-    extra = list_peek_head_type(&queue_, extra_op_t, node);
-    block = ExtraToBlock(extra, info_.op_size);
 
-    // Find an available offset in the write buffer
-    uint64_t off;
-    uint64_t len = block->rw.length;
-    if ((rc = map_.Find(false, hint_, map_.size(), len, &off)) == ZX_ERR_NO_RESOURCES &&
-        (rc = map_.Find(false, 0, map_.size(), len, &off)) == ZX_ERR_NO_RESOURCES) {
-      zxlogf(DEBUG, "zxcrypt device %p stalled pending request completion", this);
-      stalled_.store(true);
-      break;
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    // Append the request to the write queue (if not null)
+    if (block) {
+      extra = BlockToExtra(block, info_.op_size);
+      list_add_tail(&queue_, &extra->node);
+    }
+    if (stalled_.load()) {
+      zxlogf(TRACE, "early return; no requests completed since last stall");
+      return;
     }
 
-    // We don't expect any other errors
-    ZX_DEBUG_ASSERT(rc == ZX_OK);
-    rc = map_.Set(off, off + len);
-    ZX_DEBUG_ASSERT(rc == ZX_OK);
+    // Process as many pending write requests as we can right now.
+    list_initialize(&pending);
+    while (!list_is_empty(&queue_)) {
+      extra = list_peek_head_type(&queue_, extra_op_t, node);
+      block = ExtraToBlock(extra, info_.op_size);
 
-    // Save a hint as to where to start looking next time
-    hint_ = (off + len) % map_.size();
+      // Find an available offset in the write buffer
+      uint64_t off;
+      uint64_t len = block->rw.length;
+      if ((rc = map_.Find(false, hint_, map_.size(), len, &off)) == ZX_ERR_NO_RESOURCES &&
+          (rc = map_.Find(false, 0, map_.size(), len, &off)) == ZX_ERR_NO_RESOURCES) {
+        zxlogf(DEBUG, "zxcrypt device %p stalled pending request completion", this);
+        stalled_.store(true);
+        break;
+      }
 
-    // Modify request to use write buffer
-    extra->data = info_.base + (off * info_.block_size);
-    block->rw.vmo = info_.vmo.get();
-    block->rw.offset_vmo = (extra->data - info_.base) / info_.block_size;
+      // We don't expect any other errors
+      ZX_DEBUG_ASSERT(rc == ZX_OK);
+      rc = map_.Set(off, off + len);
+      ZX_DEBUG_ASSERT(rc == ZX_OK);
 
-    list_add_tail(&pending, list_remove_head(&queue_));
+      // Save a hint as to where to start looking next time
+      hint_ = (off + len) % map_.size();
+
+      // Modify request to use write buffer
+      extra->data = info_.base + (off * info_.block_size);
+      block->rw.vmo = info_.vmo.get();
+      block->rw.offset_vmo = (extra->data - info_.base) / info_.block_size;
+
+      list_add_tail(&pending, list_remove_head(&queue_));
+    }
+
+    // Release the lock and send blocks that are ready to the workers
   }
 
-  // Release the lock and send blocks that are ready to the workers
-  lock.release();
   extra_op_t* tmp;
   list_for_every_entry_safe (&pending, extra, tmp, extra_op_t, node) {
     list_delete(&extra->node);

@@ -6,8 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_BLOCK_VERITY_BLOCK_VERIFIER_H_
 
 #include <array>
-
-#include <fbl/auto_lock.h>
+#include <mutex>
 
 #include "src/devices/block/drivers/block-verity/block-loader-interface.h"
 #include "src/devices/block/drivers/block-verity/constants.h"
@@ -94,7 +93,7 @@ class BlockVerifier final {
 
   BlockVerifierState state_ __TA_GUARDED(mtx_);
 
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // Copy of the root hash lent to us at initialization.
   // Stays the same over the lifetime of this instance.

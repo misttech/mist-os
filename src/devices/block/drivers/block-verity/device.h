@@ -8,8 +8,9 @@
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/device.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/block-verity/device-info.h"
 
@@ -53,7 +54,7 @@ class Device : public DeviceType, public ddk::BlockImplProtocol<Device, ddk::bas
   void BlockComplete(block_op_t* block, zx_status_t status);
 
  private:
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // Device configuration, as provided by the DeviceManager at creation. Its
   // constness allows it to be used without holding the lock.

@@ -34,7 +34,7 @@ FakeRegisters::FakeRegisters() {
       .set_contiguous_queues_required(true)
       .set_max_queue_entries_raw(65535);
   // Admin queue doorbells.
-  fbl::AutoLock lock(&doorbells_lock_);
+  std::lock_guard<std::mutex> lock(doorbells_lock_);
   completion_doorbells_.emplace(0, nvme::DoorbellReg{});
   submission_doorbells_.emplace(0, nvme::DoorbellReg{});
 }
@@ -100,7 +100,7 @@ void FakeRegisters::Write32(uint32_t val, zx_off_t offs) {
     const size_t queue_id = offs >> 1;
     nvme::DoorbellReg* doorbell;
     {
-      fbl::AutoLock lock(&doorbells_lock_);
+      std::lock_guard<std::mutex> lock(doorbells_lock_);
       auto& doorbells = is_completion ? completion_doorbells_ : submission_doorbells_;
       auto iter = doorbells.find(queue_id);
       ZX_ASSERT(iter != doorbells.end());

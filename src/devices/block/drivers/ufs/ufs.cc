@@ -11,9 +11,9 @@
 #include <zircon/threads.h>
 
 #include <array>
+#include <mutex>
 #include <vector>
 
-#include <fbl/auto_lock.h>
 #include <safemath/safe_conversions.h>
 
 namespace ufs {
@@ -109,7 +109,7 @@ void Ufs::ProcessIoSubmissions() {
   while (true) {
     IoCommand* io_cmd;
     {
-      fbl::AutoLock lock(&commands_lock_);
+      std::lock_guard<std::mutex> lock(commands_lock_);
       io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node);
     }
 
@@ -162,7 +162,7 @@ void Ufs::ProcessIoSubmissions() {
         transfer_request_processor_->SendScsiUpiu(upiu, io_cmd->lun, vmo_optional, io_cmd);
     if (response.is_error()) {
       if (response.error_value() == ZX_ERR_NO_RESOURCES) {
-        fbl::AutoLock lock(&commands_lock_);
+        std::lock_guard<std::mutex> lock(commands_lock_);
         list_add_head(&pending_commands_, &io_cmd->node);
         return;
       }
@@ -341,7 +341,7 @@ void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_w
 
   // Queue transaction.
   {
-    fbl::AutoLock lock(&commands_lock_);
+    std::lock_guard<std::mutex> lock(commands_lock_);
     list_add_tail(&pending_commands_, &io_cmd->node);
   }
   sync_completion_signal(&io_signal_);

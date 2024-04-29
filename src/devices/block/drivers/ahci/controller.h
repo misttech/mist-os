@@ -13,9 +13,9 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <mutex>
 
 #include <fbl/condition_variable.h>
-#include <fbl/mutex.h>
 
 #include "ahci.h"
 #include "bus.h"
@@ -87,7 +87,7 @@ class Controller : public fdf::DriverBase {
 
   std::optional<inspect::ComponentInspector> exposed_inspector_;
 
-  fbl::Mutex lock_;
+  std::mutex lock_;
   bool shutdown_ __TA_GUARDED(lock_) = false;
 
   // Dispatcher for handling interrupt requests.

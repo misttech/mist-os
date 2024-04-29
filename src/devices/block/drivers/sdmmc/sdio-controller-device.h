@@ -18,11 +18,10 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "sdio-function-device.h"
 #include "sdmmc-device.h"
@@ -175,11 +174,11 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   void SdioIrqHandler();
   uint8_t interrupt_enabled_mask_ TA_GUARDED(lock_) = UINT8_MAX;
 
-  fbl::Mutex irq_dispatcher_lock_;  // Used to make dispatcher creation and shutdown atomic.
+  std::mutex irq_dispatcher_lock_;  // Used to make dispatcher creation and shutdown atomic.
   fdf::Dispatcher irq_dispatcher_;
   libsync::Completion irq_shutdown_completion_;
 
-  fbl::Mutex lock_;
+  std::mutex lock_;
   SdmmcRootDevice* const parent_;
   std::unique_ptr<SdmmcDevice> sdmmc_;
   std::atomic<bool> shutdown_ = false;

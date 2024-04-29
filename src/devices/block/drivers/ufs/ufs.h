@@ -194,7 +194,7 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
 
-  fbl::Mutex commands_lock_;
+  std::mutex commands_lock_;
   // The pending list consists of commands that have been received via QueueIoCommand() and are
   // waiting for IO to start.
   list_node_t pending_commands_ TA_GUARDED(commands_lock_);

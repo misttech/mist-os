@@ -22,8 +22,8 @@
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
+#include <mutex>
+
 #include <hwreg/bitfields.h>
 
 #include "src/devices/block/drivers/nvme/commands/features.h"
@@ -41,8 +41,8 @@ constexpr size_t kMaxNamespacesToBind = 4;
 // c.f. NVMe Base Specification 2.0, section 3.1.3.8 "AQA - Admin Queue Attributes"
 constexpr size_t kAdminQueueMaxEntries = 4096;
 
-// TODO(https://fxbug.dev/42053036): Consider using interrupt vector - dedicated interrupt (and IO thread) per
-// namespace/queue.
+// TODO(https://fxbug.dev/42053036): Consider using interrupt vector - dedicated interrupt (and IO
+// thread) per namespace/queue.
 int Nvme::IrqLoop() {
   while (true) {
     zx_status_t status = irq_.wait(nullptr);
@@ -81,7 +81,7 @@ int Nvme::IrqLoop() {
 zx::result<Completion> Nvme::DoAdminCommandSync(Submission& submission,
                                                 std::optional<zx::unowned_vmo> admin_data) {
   zx_status_t status;
-  fbl::AutoLock lock(&admin_lock_);
+  std::lock_guard<std::mutex> lock(admin_lock_);
 
   uint64_t data_size = 0;
   if (admin_data.has_value()) {
@@ -139,7 +139,7 @@ void Nvme::ProcessIoSubmissions() {
   while (true) {
     IoCommand* io_cmd;
     {
-      fbl::AutoLock lock(&commands_lock_);
+      std::lock_guard<std::mutex> lock(commands_lock_);
       io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node);
     }
 
@@ -174,7 +174,7 @@ void Nvme::ProcessIoSubmissions() {
         // We can't proceed if there is no available space in the submission queue. Put command back
         // at front of queue for further processing later.
         {
-          fbl::AutoLock lock(&commands_lock_);
+          std::lock_guard<std::mutex> lock(commands_lock_);
           list_add_head(&pending_commands_, &io_cmd->node);
         }
         return;
@@ -241,7 +241,7 @@ int Nvme::IoLoop() {
 
 void Nvme::QueueIoCommand(IoCommand* io_cmd) {
   {
-    fbl::AutoLock lock(&commands_lock_);
+    std::lock_guard<std::mutex> lock(commands_lock_);
     list_add_tail(&pending_commands_, &io_cmd->node);
   }
 
@@ -265,7 +265,7 @@ void Nvme::DdkRelease() {
 
   // Error out any pending commands
   {
-    fbl::AutoLock lock(&commands_lock_);
+    std::lock_guard<std::mutex> lock(commands_lock_);
     IoCommand* io_cmd;
     while ((io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node)) != nullptr) {
       io_cmd->Complete(ZX_ERR_PEER_CLOSED);
