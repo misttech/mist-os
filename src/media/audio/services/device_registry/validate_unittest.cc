@@ -20,8 +20,10 @@
 #include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
 
 namespace media_audio {
+namespace {
 
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 // These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
 
@@ -586,7 +588,7 @@ TEST(ValidateTest, MapElements) {
 
   EXPECT_EQ(*map.at(*kElement1.id()).element.type(), *kElement1.type());
   EXPECT_EQ(*map.at(*kElement1.id()).element.type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+            fhasp::EndpointType::kDaiInterconnect);
 
   EXPECT_EQ(*map.at(*kElement2.id()).element.type(), *kElement2.type());
 
@@ -596,7 +598,7 @@ TEST(ValidateTest, MapElements) {
 
   EXPECT_EQ(*map.at(*kElement4.id()).element.type(), *kElement4.type());
   EXPECT_EQ(*map.at(*kElement4.id()).element.type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
+            fhasp::EndpointType::kRingBuffer);
 }
 
 TEST(ValidateTest, ValidateTopologies) {
@@ -633,4 +635,5 @@ TEST(ValidateTest, ValidateElementState) {
   // Add more cases here
 }
 
+}  // namespace
 }  // namespace media_audio

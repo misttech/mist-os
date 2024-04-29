@@ -13,6 +13,7 @@
 namespace media_audio {
 
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 // static definitions: signalprocessing elements/topologies and format sets
 
@@ -187,121 +188,106 @@ const fha::PcmFormat FakeComposite::kDefaultRbFormat2{{
 // signalprocessing elements and topologies
 //
 // Individual elements
-const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kSourceDaiElement{{
+const fhasp::Element FakeComposite::kSourceDaiElement{{
     .id = kSourceDaiElementId,
-    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint,
-    .type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint({{
-        .type = fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
-        .plug_detect_capabilities =
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify,
+    .type = fhasp::ElementType::kEndpoint,
+    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
+        .type = fhasp::EndpointType::kDaiInterconnect,
+        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
     .can_disable = false,
     .description = "Endpoint::DaiInterconnect source element description",
 }};
-const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kDestDaiElement{{
+const fhasp::Element FakeComposite::kDestDaiElement{{
     .id = kDestDaiElementId,
-    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint,
-    .type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint({{
-        .type = fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
-        .plug_detect_capabilities =
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify,
+    .type = fhasp::ElementType::kEndpoint,
+    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
+        .type = fhasp::EndpointType::kDaiInterconnect,
+        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
     .can_disable = false,
     .description = "Endpoint::DaiInterconnect destination element description",
 }};
-const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kSourceRbElement{{
+const fhasp::Element FakeComposite::kSourceRbElement{{
     .id = kSourceRbElementId,
-    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint,
-    .type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint({{
-        .type = fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-        .plug_detect_capabilities =
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
+    .type = fhasp::ElementType::kEndpoint,
+    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
+        .type = fhasp::EndpointType::kRingBuffer,
+        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
     }}),
     .can_disable = false,
     .description = "Endpoint::RingBuffer source element description",
 }};
-const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kDestRbElement{{
+const fhasp::Element FakeComposite::kDestRbElement{{
     .id = kDestRbElementId,
-    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint,
-    .type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint({{
-        .type = fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-        .plug_detect_capabilities =
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
+    .type = fhasp::ElementType::kEndpoint,
+    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
+        .type = fhasp::EndpointType::kRingBuffer,
+        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
     }}),
     .can_disable = false,
     .description = "Endpoint::RingBuffer destination element description",
 }};
-const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kMuteElement{{
+const fhasp::Element FakeComposite::kMuteElement{{
     .id = kMuteElementId,
-    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kMute,
+    .type = fhasp::ElementType::kMute,
     .can_disable = true,
     .description = "Mute element description",
 }};
 
 // ElementStates - note that the two Dai endpoints have vendor_specific_data that can be queried.
-const fuchsia_hardware_audio_signalprocessing::Latency FakeComposite::kSourceDaiElementLatency =
-    fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(0);
-const fuchsia_hardware_audio_signalprocessing::Latency FakeComposite::kDestDaiElementLatency =
-    fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(10417);
-const fuchsia_hardware_audio_signalprocessing::Latency FakeComposite::kSourceRbElementLatency =
-    fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyFrames(1);
-const fuchsia_hardware_audio_signalprocessing::Latency FakeComposite::kDestRbElementLatency =
-    fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyFrames(0);
-const fuchsia_hardware_audio_signalprocessing::ElementState
-    FakeComposite::kSourceDaiElementInitState{{
-        .type_specific =
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint({{
-                .plug_state = fuchsia_hardware_audio_signalprocessing::PlugState{{
-                    .plugged = true,
-                    .plug_state_time = ZX_TIME_INFINITE_PAST,
-                }},
-            }}),
-        .enabled = true,
-        .latency = kSourceDaiElementLatency,
-        .vendor_specific_data = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8},
-    }};
-const fuchsia_hardware_audio_signalprocessing::ElementState FakeComposite::kDestDaiElementInitState{
-    {
-        .type_specific =
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint({{
-                .plug_state = fuchsia_hardware_audio_signalprocessing::PlugState{{
-                    .plugged = true,
-                    .plug_state_time = ZX_TIME_INFINITE_PAST,
-                }},
-            }}),
-        .enabled = true,
-        .latency = kDestDaiElementLatency,
-        .vendor_specific_data = std::vector<uint8_t>{8, 7, 6, 5, 4, 3, 2, 1, 0},
-    }};
-const fuchsia_hardware_audio_signalprocessing::ElementState
-    FakeComposite::kSourceRbElementInitState{{
-        .type_specific =
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint({{
-                .plug_state = fuchsia_hardware_audio_signalprocessing::PlugState{{
-                    .plugged = true,
-                    .plug_state_time = ZX_TIME_INFINITE_PAST,
-                }},
-            }}),
-        .enabled = true,
-        .latency = kSourceRbElementLatency,
-    }};
-const fuchsia_hardware_audio_signalprocessing::ElementState FakeComposite::kDestRbElementInitState{{
-    .type_specific =
-        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint({{
-            .plug_state = fuchsia_hardware_audio_signalprocessing::PlugState{{
-                .plugged = true,
-                .plug_state_time = ZX_TIME_INFINITE_PAST,
-            }},
-        }}),
+const fhasp::Latency FakeComposite::kSourceDaiElementLatency = fhasp::Latency::WithLatencyTime(0);
+const fhasp::Latency FakeComposite::kDestDaiElementLatency = fhasp::Latency::WithLatencyTime(10417);
+const fhasp::Latency FakeComposite::kSourceRbElementLatency = fhasp::Latency::WithLatencyFrames(1);
+const fhasp::Latency FakeComposite::kDestRbElementLatency = fhasp::Latency::WithLatencyFrames(0);
+const fhasp::ElementState FakeComposite::kSourceDaiElementInitState{{
+    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+        .plug_state = fhasp::PlugState{{
+            .plugged = true,
+            .plug_state_time = ZX_TIME_INFINITE_PAST,
+        }},
+    }}),
+    .enabled = true,
+    .latency = kSourceDaiElementLatency,
+    .vendor_specific_data = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8},
+}};
+const fhasp::ElementState FakeComposite::kDestDaiElementInitState{{
+    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+        .plug_state = fhasp::PlugState{{
+            .plugged = true,
+            .plug_state_time = ZX_TIME_INFINITE_PAST,
+        }},
+    }}),
+    .enabled = true,
+    .latency = kDestDaiElementLatency,
+    .vendor_specific_data = std::vector<uint8_t>{8, 7, 6, 5, 4, 3, 2, 1, 0},
+}};
+const fhasp::ElementState FakeComposite::kSourceRbElementInitState{{
+    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+        .plug_state = fhasp::PlugState{{
+            .plugged = true,
+            .plug_state_time = ZX_TIME_INFINITE_PAST,
+        }},
+    }}),
+    .enabled = true,
+    .latency = kSourceRbElementLatency,
+}};
+const fhasp::ElementState FakeComposite::kDestRbElementInitState{{
+    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+        .plug_state = fhasp::PlugState{{
+            .plugged = true,
+            .plug_state_time = ZX_TIME_INFINITE_PAST,
+        }},
+    }}),
     .enabled = true,
     .latency = kDestRbElementLatency,
 }};
-const fuchsia_hardware_audio_signalprocessing::ElementState FakeComposite::kMuteElementInitState{{
+const fhasp::ElementState FakeComposite::kMuteElementInitState{{
     .enabled = false,
 }};
 
 // Element set
-const std::vector<fuchsia_hardware_audio_signalprocessing::Element> FakeComposite::kElements{{
+const std::vector<fhasp::Element> FakeComposite::kElements{{
     kSourceDaiElement,
     kDestDaiElement,
     kSourceRbElement,
@@ -312,44 +298,44 @@ const std::vector<fuchsia_hardware_audio_signalprocessing::Element> FakeComposit
 // Topologies and element paths
 //
 // element paths
-const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyInputEdgePair{{
+const fhasp::EdgePair FakeComposite::kTopologyInputEdgePair{{
     .processing_element_id_from = kSourceDaiElementId,
     .processing_element_id_to = kDestRbElementId,
 }};
-const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyOutputEdgePair{{
+const fhasp::EdgePair FakeComposite::kTopologyOutputEdgePair{{
     .processing_element_id_from = kSourceRbElementId,
     .processing_element_id_to = kDestDaiElementId,
 }};
-const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyRbToMuteEdgePair{{
+const fhasp::EdgePair FakeComposite::kTopologyRbToMuteEdgePair{{
     .processing_element_id_from = kSourceRbElementId,
     .processing_element_id_to = kMuteElementId,
 }};
-const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyMuteToDaiEdgePair{{
+const fhasp::EdgePair FakeComposite::kTopologyMuteToDaiEdgePair{{
     .processing_element_id_from = kMuteElementId,
     .processing_element_id_to = kDestDaiElementId,
 }};
 
 // Individual topologies
-const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kInputOnlyTopology{{
+const fhasp::Topology FakeComposite::kInputOnlyTopology{{
     .id = kInputOnlyTopologyId,
     .processing_elements_edge_pairs = {{
         kTopologyInputEdgePair,
     }},
 }};
-const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kFullDuplexTopology{{
+const fhasp::Topology FakeComposite::kFullDuplexTopology{{
     .id = kFullDuplexTopologyId,
     .processing_elements_edge_pairs = {{
         kTopologyInputEdgePair,
         kTopologyOutputEdgePair,
     }},
 }};
-const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kOutputOnlyTopology{{
+const fhasp::Topology FakeComposite::kOutputOnlyTopology{{
     .id = kOutputOnlyTopologyId,
     .processing_elements_edge_pairs = {{
         kTopologyOutputEdgePair,
     }},
 }};
-const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kOutputWithMuteTopology{{
+const fhasp::Topology FakeComposite::kOutputWithMuteTopology{{
     .id = kOutputWithMuteTopologyId,
     .processing_elements_edge_pairs = {{
         kTopologyRbToMuteEdgePair,
@@ -358,7 +344,7 @@ const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kOutputWi
 }};
 
 // Topology set
-const std::vector<fuchsia_hardware_audio_signalprocessing::Topology> FakeComposite::kTopologies{{
+const std::vector<fhasp::Topology> FakeComposite::kTopologies{{
     kInputOnlyTopology,
     kFullDuplexTopology,
     kOutputOnlyTopology,

@@ -27,7 +27,7 @@ class RegistryServerStreamConfigTest : public RegistryServerTest {};
 /////////////////////
 // Device-less tests
 //
-// A client can drop their fad::Registry connection without hang, and without WARNING being logged.
+// A client can drop their Registry connection without hang, and without WARNING being logged.
 TEST_F(RegistryServerTest, CleanClientDrop) {
   auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
@@ -46,7 +46,7 @@ TEST_F(RegistryServerTest, CleanServerShutdown) {
 /////////////////////
 // Codec tests
 //
-// Device already exists before the fad::Registry connection is created.
+// Device already exists before the Registry connection is created.
 // Client calls WatchDevicesAdded and is notified.
 TEST_F(RegistryServerCodecTest, DeviceAddThenRegistryCreate) {
   auto fake_driver = CreateFakeCodecOutput();
@@ -238,7 +238,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
-// Create a fad::Registry connection then add and remove device (see ADR count go up and down).
+// Create a Registry connection then add and remove device (see ADR count go up and down).
 // Then when client calls WatchDevicesAdded and WatchDeviceRemoved, no notifications should occur.
 TEST_F(RegistryServerCodecTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
@@ -396,7 +396,7 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
 
 /////////////////////
 // Composite tests
-// Device already exists before the fad::Registry connection is created.
+// Device already exists before the Registry connection is created.
 TEST_F(RegistryServerCompositeTest, DeviceAddThenRegistryCreate) {
   auto fake_driver = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
@@ -587,7 +587,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveThenWatchRemoves) {
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
-// Create a fad::Registry connection then add and remove device (see ADR count go up and down).
+// Create a Registry connection then add and remove device (see ADR count go up and down).
 // Then when client calls WatchDevicesAdded and WatchDeviceRemoved, no notifications should occur.
 TEST_F(RegistryServerCompositeTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
@@ -745,7 +745,7 @@ TEST_F(RegistryServerCompositeTest, CreateObserver) {
 
 /////////////////////
 // StreamConfig tests
-// Device already exists before the fad::Registry connection is created.
+// Device already exists before the Registry connection is created.
 TEST_F(RegistryServerStreamConfigTest, DeviceAddThenRegistryCreate) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service()->AddDevice(
@@ -936,7 +936,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
-// Create a fad::Registry connection then add and remove device (see ADR count go up and down).
+// Create a Registry connection then add and remove device (see ADR count go up and down).
 // Then when client calls WatchDevicesAdded and WatchDeviceRemoved, no notifications should occur.
 TEST_F(RegistryServerStreamConfigTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();

@@ -9,14 +9,15 @@
 
 namespace media_audio {
 
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
+
 std::unordered_set<ElementId> dai_endpoints(
     const std::unordered_map<ElementId, ElementRecord>& element_map) {
   std::unordered_set<ElementId> dai_endpoints;
   for (const auto& element_entry_pair : element_map) {
-    if (element_entry_pair.second.element.type() ==
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
+    if (element_entry_pair.second.element.type() == fhasp::ElementType::kEndpoint &&
         element_entry_pair.second.element.type_specific()->endpoint()->type() ==
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect) {
+            fhasp::EndpointType::kDaiInterconnect) {
       dai_endpoints.insert(element_entry_pair.first);
     }
   }
@@ -27,10 +28,9 @@ std::unordered_set<ElementId> ring_buffer_endpoints(
     const std::unordered_map<ElementId, ElementRecord>& element_map) {
   std::unordered_set<ElementId> ring_buffer_endpoints;
   for (const auto& element_entry_pair : element_map) {
-    if (element_entry_pair.second.element.type() ==
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
+    if (element_entry_pair.second.element.type() == fhasp::ElementType::kEndpoint &&
         element_entry_pair.second.element.type_specific()->endpoint()->type() ==
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
+            fhasp::EndpointType::kRingBuffer) {
       ring_buffer_endpoints.insert(element_entry_pair.first);
     }
   }
@@ -39,7 +39,7 @@ std::unordered_set<ElementId> ring_buffer_endpoints(
 
 // This maps ElementId->ElementRecord but populates only the Element portion of the ElementRecord.
 std::unordered_map<ElementId, ElementRecord> MapElements(
-    const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
+    const std::vector<fhasp::Element>& elements) {
   auto element_map = std::unordered_map<ElementId, ElementRecord>{};
 
   for (const auto& element : elements) {
@@ -57,11 +57,9 @@ std::unordered_map<ElementId, ElementRecord> MapElements(
 }
 
 // Returns empty map if any topology_id values are duplicated.
-std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
-MapTopologies(const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies) {
-  auto topology_map =
-      std::unordered_map<TopologyId,
-                         std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>{};
+std::unordered_map<TopologyId, std::vector<fhasp::EdgePair>> MapTopologies(
+    const std::vector<fhasp::Topology>& topologies) {
+  auto topology_map = std::unordered_map<TopologyId, std::vector<fhasp::EdgePair>>{};
 
   for (const auto& topology : topologies) {
     if (!topology.id().has_value() || !topology.processing_elements_edge_pairs().has_value() ||

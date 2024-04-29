@@ -26,6 +26,7 @@ namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   if (!unique_instance_id) {
@@ -508,9 +509,8 @@ void LogCompositeProperties(const fha::CompositeProperties& composite_props) {
   }
 }
 
-void LogElementStateInternal(
-    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state,
-    const std::string& indent) {
+void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_state,
+                             const std::string& indent) {
   if (!element_state.has_value()) {
     FX_LOGS(INFO) << indent << "                      <none>  (during device initialization)";
     return;
@@ -518,19 +518,19 @@ void LogElementStateInternal(
 
   if (element_state->type_specific().has_value()) {
     switch (element_state->type_specific()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kVendorSpecific:
+      case fhasp::TypeSpecificElementState::Tag::kVendorSpecific:
         FX_LOGS(INFO) << indent << "type_specific         VendorSpecific";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain:
+      case fhasp::TypeSpecificElementState::Tag::kGain:
         FX_LOGS(INFO) << indent << "type_specific         Gain";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer:
+      case fhasp::TypeSpecificElementState::Tag::kEqualizer:
         FX_LOGS(INFO) << indent << "type_specific         Equalizer";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics:
+      case fhasp::TypeSpecificElementState::Tag::kDynamics:
         FX_LOGS(INFO) << indent << "type_specific         Dynamics";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint:
+      case fhasp::TypeSpecificElementState::Tag::kEndpoint:
         FX_LOGS(INFO) << indent << "type_specific         Endpoint";
         break;
       default:
@@ -548,7 +548,7 @@ void LogElementStateInternal(
 
   if (element_state->latency().has_value()) {
     switch (element_state->latency()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime:
+      case fhasp::Latency::Tag::kLatencyTime:
         FX_LOGS(INFO) << indent << "latency (time)";
         if (element_state->latency()->latency_time().has_value()) {
           FX_LOGS(INFO) << indent << "                      "
@@ -557,7 +557,7 @@ void LogElementStateInternal(
           FX_LOGS(INFO) << indent << "                      <none> ns (non-compliant)";
         }
         break;
-      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames:
+      case fhasp::Latency::Tag::kLatencyFrames:
         FX_LOGS(INFO) << indent << "latency (frames)";
         if (element_state->latency()->latency_frames().has_value()) {
           FX_LOGS(INFO) << indent << "                      "
@@ -583,8 +583,7 @@ void LogElementStateInternal(
   }
 }
 
-void LogElementState(
-    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state) {
+void LogElementState(const std::optional<fhasp::ElementState>& element_state) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -593,8 +592,8 @@ void LogElementState(
   LogElementStateInternal(element_state, "    ");
 }
 
-void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& element,
-                        std::string indent, std::optional<size_t> index = std::nullopt,
+void LogElementInternal(const fhasp::Element& element, std::string indent,
+                        std::optional<size_t> index = std::nullopt,
                         std::string_view addl_indent = "") {
   std::string first_indent{indent};
   if (index.has_value()) {
@@ -615,19 +614,19 @@ void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& 
   type_specific << "type_specific    ";
   if (element.type_specific()) {
     switch (element.type_specific()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kVendorSpecific:
+      case fhasp::TypeSpecificElement::Tag::kVendorSpecific:
         type_specific << "vendor_specific";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kGain:
+      case fhasp::TypeSpecificElement::Tag::kGain:
         type_specific << "gain";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEqualizer:
+      case fhasp::TypeSpecificElement::Tag::kEqualizer:
         type_specific << "equalizer";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kDynamics:
+      case fhasp::TypeSpecificElement::Tag::kDynamics:
         type_specific << "dynamics";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEndpoint:
+      case fhasp::TypeSpecificElement::Tag::kEndpoint:
         type_specific << element.type_specific()->endpoint().value();
         break;
       default:
@@ -646,7 +645,7 @@ void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& 
                 << (element.description() ? std::string("'") + *element.description() + "'"
                                           : "<none>");
 }
-void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element) {
+void LogElement(const fhasp::Element& element) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -654,7 +653,7 @@ void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element)
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Element";
   LogElementInternal(element, "    ");
 }
-void LogElements(const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
+void LogElements(const std::vector<fhasp::Element>& elements) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -685,8 +684,8 @@ void LogElementMap(const std::unordered_map<ElementId, ElementRecord>& element_m
   }
 }
 
-void LogTopologyInternal(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
-                         std::string indent, std::optional<size_t> index = std::nullopt,
+void LogTopologyInternal(const fhasp::Topology& topology, std::string indent,
+                         std::optional<size_t> index = std::nullopt,
                          std::string_view addl_indent = "") {
   std::string first_indent{indent};
   if (index.has_value()) {
@@ -715,7 +714,7 @@ void LogTopologyInternal(const fuchsia_hardware_audio_signalprocessing::Topology
     FX_LOGS(INFO) << indent << "processing_elements_edge_pairs <none> (non-compliant)";
   }
 }
-void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology) {
+void LogTopology(const fhasp::Topology& topology) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -723,8 +722,7 @@ void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topolo
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Topology";
   LogTopologyInternal(topology, "        ");
 }
-void LogTopologies(
-    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies) {
+void LogTopologies(const std::vector<fhasp::Topology>& topologies) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }

@@ -22,6 +22,7 @@ namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 namespace {
 
@@ -907,9 +908,7 @@ bool ValidateDelayInfo(const fha::DelayInfo& delay_info) {
   return true;
 }
 
-bool ValidateElementState(
-    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
-    const fuchsia_hardware_audio_signalprocessing::Element& element) {
+bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp::Element& element) {
   LogElementState(element_state);
 
   if (!ValidateElement(element)) {
@@ -918,20 +917,19 @@ bool ValidateElementState(
 
   bool type_specific_matches_element_type;
   switch (*element.type()) {
-    case fuchsia_hardware_audio_signalprocessing::ElementType::kVendorSpecific:
-      type_specific_matches_element_type = (element_state.type_specific().has_value() &&
-                                            element_state.type_specific()->Which() ==
-                                                fuchsia_hardware_audio_signalprocessing::
-                                                    TypeSpecificElementState::Tag::kVendorSpecific);
+    case fhasp::ElementType::kVendorSpecific:
+      type_specific_matches_element_type =
+          (element_state.type_specific().has_value() &&
+           element_state.type_specific()->Which() ==
+               fhasp::TypeSpecificElementState::Tag::kVendorSpecific);
 
       // Need additional vendor-specific checks?
       // Is .vendor_specific_data required?
       break;
-    case fuchsia_hardware_audio_signalprocessing::ElementType::kGain:
+    case fhasp::ElementType::kGain:
       type_specific_matches_element_type =
           (element_state.type_specific().has_value() &&
-           element_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain &&
+           element_state.type_specific()->Which() == fhasp::TypeSpecificElementState::Tag::kGain &&
            element_state.type_specific()->gain().has_value() &&
            element_state.type_specific()->gain()->gain().has_value() &&
            *element_state.type_specific()->gain()->gain() >=
@@ -939,40 +937,40 @@ bool ValidateElementState(
            *element_state.type_specific()->gain()->gain() <=
                element.type_specific()->gain()->max_gain());
       break;
-    case fuchsia_hardware_audio_signalprocessing::ElementType::kEqualizer:
+    case fhasp::ElementType::kEqualizer:
       type_specific_matches_element_type =
           (element_state.type_specific().has_value() &&
            element_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer &&
+               fhasp::TypeSpecificElementState::Tag::kEqualizer &&
            element_state.type_specific()->equalizer().has_value() &&
            element_state.type_specific()->equalizer()->band_states().has_value() &&
            !element_state.type_specific()->equalizer()->band_states()->empty());
 
       // Need additional EQ-specific checks on each EqualizerBandState.
       break;
-    case fuchsia_hardware_audio_signalprocessing::ElementType::kDynamics:
+    case fhasp::ElementType::kDynamics:
       type_specific_matches_element_type =
           (element_state.type_specific().has_value() &&
            element_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics &&
+               fhasp::TypeSpecificElementState::Tag::kDynamics &&
            element_state.type_specific()->dynamics().has_value() &&
            element_state.type_specific()->dynamics()->band_states().has_value() &&
            !element_state.type_specific()->dynamics()->band_states()->empty());
 
       // Need additional dynamics-specific checks on each DynamicsBandState.
       break;
-    case fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint:
+    case fhasp::ElementType::kEndpoint:
       type_specific_matches_element_type =
           (element_state.type_specific().has_value() &&
            element_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint &&
+               fhasp::TypeSpecificElementState::Tag::kEndpoint &&
            element_state.type_specific()->endpoint().has_value() &&
            element_state.type_specific()->endpoint()->plug_state().has_value() &&
            element_state.type_specific()->endpoint()->plug_state()->plugged().has_value() &&
            element_state.type_specific()->endpoint()->plug_state()->plug_state_time().has_value() &&
            (element_state.type_specific()->endpoint()->plug_state()->plugged() ||
             *element.type_specific()->endpoint()->plug_detect_capabilities() ==
-                fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify));
+                fhasp::PlugDetectCapabilities::kCanAsyncNotify));
       break;
     default:
       type_specific_matches_element_type = true;
@@ -994,8 +992,7 @@ bool ValidateElementState(
     }
   }
   if (element_state.latency().has_value()) {
-    if (element_state.latency()->Which() ==
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime &&
+    if (element_state.latency()->Which() == fhasp::Latency::Tag::kLatencyTime &&
         element_state.latency()->latency_time().value() < 0) {
       FX_LOGS(WARNING) << "WatchElementState: latency, if a duration, must not be negative";
     }
@@ -1011,7 +1008,7 @@ bool ValidateElementState(
   return true;
 }
 
-bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element) {
+bool ValidateElement(const fhasp::Element& element) {
   LogElement(element);
 
   if (!element.id().has_value()) {
@@ -1022,8 +1019,7 @@ bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& ele
     FX_LOGS(WARNING) << "SignalProcessing.element.type is missing";
     return false;
   }
-  if (*element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
-      !element.type_specific().has_value()) {
+  if (*element.type() == fhasp::ElementType::kEndpoint && !element.type_specific().has_value()) {
     FX_LOGS(WARNING) << "SignalProcessing.element.type is ENDPOINT but type_specific is missing";
     return false;
   }
@@ -1031,20 +1027,20 @@ bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& ele
   if (element.type_specific().has_value()) {
     const auto type = *element.type();
     switch (element.type_specific()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kVendorSpecific:
-        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kVendorSpecific);
+      case fhasp::TypeSpecificElement::Tag::kVendorSpecific:
+        mismatch = (type != fhasp::ElementType::kVendorSpecific);
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kGain:
-        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kGain);
+      case fhasp::TypeSpecificElement::Tag::kGain:
+        mismatch = (type != fhasp::ElementType::kGain);
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEqualizer:
-        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kEqualizer);
+      case fhasp::TypeSpecificElement::Tag::kEqualizer:
+        mismatch = (type != fhasp::ElementType::kEqualizer);
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kDynamics:
-        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kDynamics);
+      case fhasp::TypeSpecificElement::Tag::kDynamics:
+        mismatch = (type != fhasp::ElementType::kDynamics);
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEndpoint:
-        mismatch = (type != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+      case fhasp::TypeSpecificElement::Tag::kEndpoint:
+        mismatch = (type != fhasp::ElementType::kEndpoint);
         break;
       default:
         FX_LOGS(WARNING) << "Unknown element.type_specific union found";
@@ -1064,8 +1060,7 @@ bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& ele
   return true;
 }
 
-bool ValidateElements(
-    const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
+bool ValidateElements(const std::vector<fhasp::Element>& elements) {
   LogElements(elements);
 
   if (elements.empty()) {
@@ -1082,7 +1077,7 @@ bool ValidateElements(
   return (!MapElements(elements).empty());
 }
 
-bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+bool ValidateTopology(const fhasp::Topology& topology,
                       const std::unordered_map<ElementId, ElementRecord>& element_map) {
   LogTopology(topology);
   if (!topology.id().has_value()) {
@@ -1128,8 +1123,7 @@ bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& t
   for (auto& [id, element_record] : element_map) {
     if (source_elements.find(id) != source_elements.end() &&
         destination_elements.find(id) == destination_elements.end()) {
-      if (*element_record.element.type() !=
-          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      if (*element_record.element.type() != fhasp::ElementType::kEndpoint) {
         FX_LOGS(WARNING) << "Element " << id << " has no incoming edges but is not an Endpoint! Is "
                          << *element_record.element.type();
         return false;
@@ -1137,8 +1131,7 @@ bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& t
     }
     if (source_elements.find(id) == source_elements.end() &&
         destination_elements.find(id) != destination_elements.end()) {
-      if (*element_record.element.type() !=
-          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      if (*element_record.element.type() != fhasp::ElementType::kEndpoint) {
         FX_LOGS(WARNING) << "Element " << id << " has no outgoing edges but is not an Endpoint! Is "
                          << *element_record.element.type();
         return false;
@@ -1149,9 +1142,8 @@ bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& t
   return true;
 }
 
-bool ValidateTopologies(
-    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
-    const std::unordered_map<ElementId, ElementRecord>& element_map) {
+bool ValidateTopologies(const std::vector<fhasp::Topology>& topologies,
+                        const std::unordered_map<ElementId, ElementRecord>& element_map) {
   LogTopologies(topologies);
 
   if (topologies.empty()) {

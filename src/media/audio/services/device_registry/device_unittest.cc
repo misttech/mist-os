@@ -30,6 +30,7 @@ namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 /////////////////////
 // Codec tests
@@ -1543,7 +1544,7 @@ TEST_F(CompositeTest, GetElements) {
     ASSERT_TRUE(elements->at(0).type().has_value());
     ASSERT_TRUE(element.description().has_value());
     ASSERT_TRUE(element.can_disable().has_value());
-    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+    if (element.type() == fhasp::ElementType::kEndpoint) {
       ASSERT_TRUE(element.type_specific().has_value());
       ASSERT_TRUE(element.type_specific()->endpoint().has_value());
       ASSERT_TRUE(element.type_specific()->endpoint()->type().has_value());
@@ -1553,44 +1554,38 @@ TEST_F(CompositeTest, GetElements) {
 
   EXPECT_EQ(elements->at(0).id(), FakeComposite::kSourceDaiElementId);
   EXPECT_EQ(elements->at(1).id(), FakeComposite::kDestDaiElementId);
-  EXPECT_EQ(elements->at(0).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  EXPECT_EQ(elements->at(1).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(0).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(1).type(), fhasp::ElementType::kEndpoint);
   EXPECT_FALSE(elements->at(0).can_disable().value());
   EXPECT_FALSE(elements->at(1).can_disable().value());
   EXPECT_EQ(*elements->at(0).description(), *FakeComposite::kSourceDaiElement.description());
   EXPECT_EQ(*elements->at(1).description(), *FakeComposite::kDestDaiElement.description());
   EXPECT_EQ(*elements->at(0).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+            fhasp::EndpointType::kDaiInterconnect);
   EXPECT_EQ(*elements->at(1).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+            fhasp::EndpointType::kDaiInterconnect);
   EXPECT_EQ(elements->at(0).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify);
   EXPECT_EQ(elements->at(1).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify);
 
   EXPECT_EQ(elements->at(2).id(), FakeComposite::kSourceRbElementId);
   EXPECT_EQ(elements->at(3).id(), FakeComposite::kDestRbElementId);
-  EXPECT_EQ(elements->at(2).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  EXPECT_EQ(elements->at(3).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(2).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(3).type(), fhasp::ElementType::kEndpoint);
   EXPECT_FALSE(elements->at(2).can_disable().value());
   EXPECT_FALSE(elements->at(3).can_disable().value());
   EXPECT_EQ(*elements->at(2).description(), *FakeComposite::kSourceRbElement.description());
   EXPECT_EQ(*elements->at(3).description(), *FakeComposite::kDestRbElement.description());
-  EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
-  EXPECT_EQ(*elements->at(3).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
+  EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
+  EXPECT_EQ(*elements->at(3).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
   EXPECT_EQ(elements->at(2).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+            fhasp::PlugDetectCapabilities::kHardwired);
   EXPECT_EQ(elements->at(3).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+            fhasp::PlugDetectCapabilities::kHardwired);
 
   EXPECT_EQ(elements->at(4).id(), FakeComposite::kMuteElementId);
-  EXPECT_EQ(elements->at(4).type(), fuchsia_hardware_audio_signalprocessing::ElementType::kMute);
+  EXPECT_EQ(elements->at(4).type(), fhasp::ElementType::kMute);
   EXPECT_TRUE(elements->at(4).can_disable().value());
   EXPECT_EQ(*elements->at(4).description(), *FakeComposite::kMuteElement.description());
   EXPECT_FALSE(elements->at(4).type_specific().has_value());
@@ -1658,13 +1653,11 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.vendor_specific_data().has_value());
 
   EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kSourceDaiElementLatency.latency_time().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state1 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state1.has_value());
   ASSERT_TRUE(endpt_state1->plug_state().has_value());
@@ -1682,13 +1675,11 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.vendor_specific_data().has_value());
 
   EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kDestDaiElementLatency.latency_time().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state2 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state2.has_value());
   ASSERT_TRUE(endpt_state2->plug_state().has_value());
@@ -1706,16 +1697,14 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_FALSE(state.vendor_specific_data().has_value());
 
   EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)
                   ->second.latency()
                   ->latency_frames()
                   .has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
             FakeComposite::kSourceRbElementLatency.latency_frames().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state3 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state3.has_value());
   ASSERT_TRUE(endpt_state3->plug_state().has_value());
@@ -1730,13 +1719,11 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_FALSE(state.vendor_specific_data().has_value());
 
   EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(state.latency()->latency_frames().has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
             FakeComposite::kDestRbElementLatency.latency_frames().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state4 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state4.has_value());
   ASSERT_TRUE(endpt_state4->plug_state().has_value());
@@ -1764,8 +1751,7 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
   ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
   // Determine which states we can inject change into.
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states_to_inject;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states_to_inject;
   auto plug_change_time_to_inject = zx::clock::get_monotonic();
   for (const auto& element : elements) {
     auto element_id = *element.id();
@@ -1774,21 +1760,19 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     auto state = match_state->second;
 
     // Handle the Mute node
-    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kMute &&
-        element.can_disable().value_or(false)) {
+    if (element.type() == fhasp::ElementType::kMute && element.can_disable().value_or(false)) {
       // By configuration, our Mute starts disabled (we enable it as our ElementState change).
       ASSERT_TRUE(state.enabled().has_value());
       EXPECT_FALSE(*state.enabled());
-      element_states_to_inject.insert_or_assign(
-          element_id, fuchsia_hardware_audio_signalprocessing::ElementState{{.enabled = true}});
+      element_states_to_inject.insert_or_assign(element_id, fhasp::ElementState{{.enabled = true}});
       continue;
     }
 
     // Then weed out any non-pluggable elements.
-    if (element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
-        !element.type_specific().has_value() || !element.type_specific()->endpoint().has_value() ||
+    if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
+        !element.type_specific()->endpoint().has_value() ||
         element.type_specific()->endpoint()->plug_detect_capabilities() !=
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify) {
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;
     }
     if (!state.type_specific().has_value() || !state.type_specific()->endpoint().has_value() ||
@@ -1798,18 +1782,15 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       continue;
     }
     auto was_plugged = state.type_specific()->endpoint()->plug_state()->plugged();
-    auto new_state = fuchsia_hardware_audio_signalprocessing::ElementState{{
-        .type_specific =
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
-                fuchsia_hardware_audio_signalprocessing::EndpointElementState{{
-                    fuchsia_hardware_audio_signalprocessing::PlugState{{
-                        !was_plugged,
-                        plug_change_time_to_inject.get(),
-                    }},
-                }}),
+    auto new_state = fhasp::ElementState{{
+        .type_specific = fhasp::TypeSpecificElementState::WithEndpoint(fhasp::EndpointElementState{{
+            fhasp::PlugState{{
+                !was_plugged,
+                plug_change_time_to_inject.get(),
+            }},
+        }}),
         .enabled = true,
-        .latency =
-            fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(ZX_USEC(element_id)),
+        .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
     }};
@@ -1854,8 +1835,7 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_EQ(state_received.enabled(), true);
 
       ASSERT_TRUE(state_received.latency().has_value());
-      ASSERT_EQ(state_received.latency()->Which(),
-                fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+      ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
       EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
 
       ASSERT_TRUE(state_received.vendor_specific_data().has_value());
@@ -1943,7 +1923,7 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
               notify()->element_states().end());
   notify()->clear_element_states();
-  fuchsia_hardware_audio_signalprocessing::ElementState state{{.enabled = true}};
+  fhasp::ElementState state{{.enabled = true}};
 
   EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
 

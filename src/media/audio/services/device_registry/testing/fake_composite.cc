@@ -22,6 +22,7 @@
 namespace media_audio {
 
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 bool FormatIsSupported(const fha::Format& format,
                        const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
@@ -282,10 +283,9 @@ void FakeComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
     completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
-  if (*element_pair_iter->second.element.type() !=
-          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
+  if (*element_pair_iter->second.element.type() != fhasp::ElementType::kEndpoint ||
       *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
-          fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
+          fhasp::EndpointType::kRingBuffer) {
     ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
     completer.Reply(fit::error(fha::DriverError::kWrongType));
     return;
@@ -332,10 +332,9 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
     completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
-  if (*element_pair_iter->second.element.type() !=
-          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
+  if (*element_pair_iter->second.element.type() != fhasp::ElementType::kEndpoint ||
       *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
-          fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
+          fhasp::EndpointType::kRingBuffer) {
     ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
     completer.Reply(fit::error(fha::DriverError::kWrongType));
     return;
@@ -598,8 +597,7 @@ void FakeComposite::SetElementState(SetElementStateRequest& request,
   completer.Reply(fit::ok());
 }
 
-void FakeComposite::InjectElementStateChange(
-    ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState new_state) {
+void FakeComposite::InjectElementStateChange(ElementId element_id, fhasp::ElementState new_state) {
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
   auto match = elements_.find(element_id);
   ASSERT_NE(match, elements_.end());

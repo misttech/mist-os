@@ -39,6 +39,7 @@ namespace media_audio {
 
 namespace fad = fuchsia_audio_device;
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 TokenId NextTokenId() {
   static TokenId token_id = 0;
@@ -65,8 +66,7 @@ void Device::EndpointFidlErrorHandler<fha::RingBuffer>::on_fidl_error(fidl::Unbi
 
 // Invoked when a SignalProcessing channel drops. This can occur during device initialization.
 template <>
-void Device::FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::
-    on_fidl_error(fidl::UnbindInfo info) {
+void Device::FidlErrorHandler<fhasp::SignalProcessing>::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(SignalProcessing)";
   // If a device already encountered some other error, disconnects like this are not unexpected.
   if (device_->state_ == State::Error) {
@@ -866,7 +866,7 @@ void Device::RetrieveSignalProcessingState() {
   }
 
   auto [sig_proc_client_end, sig_proc_server_end] =
-      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
+      fidl::Endpoints<fhasp::SignalProcessing>::Create();
 
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
@@ -946,45 +946,42 @@ void Device::RetrieveSignalProcessingElements() {
 
   (*sig_proc_client_)
       ->GetElements()
-      .Then(
-          [this](
-              fidl::Result<fuchsia_hardware_audio_signalprocessing::SignalProcessing::GetElements>&
-                  result) {
-            std::string context("signalprocessing::GetElements response");
-            if (result.is_error() && result.error_value().is_domain_error() &&
-                result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
-              ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context << ": NOT_SUPPORTED";
+      .Then([this](fidl::Result<fhasp::SignalProcessing::GetElements>& result) {
+        std::string context("signalprocessing::GetElements response");
+        if (result.is_error() && result.error_value().is_domain_error() &&
+            result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
+          ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context << ": NOT_SUPPORTED";
 
-              SetSignalProcessingSupported(false);
-              return;
-            }
-            if (LogResultError(result, context.c_str())) {
-              return;
-            }
+          SetSignalProcessingSupported(false);
+          return;
+        }
+        if (LogResultError(result, context.c_str())) {
+          return;
+        }
 
-            ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-            if (!ValidateElements(result->processing_elements())) {
-              OnError(ZX_ERR_INVALID_ARGS);
-              return;
-            }
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+        if (!ValidateElements(result->processing_elements())) {
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
 
-            sig_proc_elements_ = result->processing_elements();
-            sig_proc_element_map_ = MapElements(sig_proc_elements_);
-            if (sig_proc_element_map_.empty()) {
-              ADR_WARN_OBJECT() << "Empty element map";
-              OnError(ZX_ERR_INVALID_ARGS);
-              return;
-            }
-            for (const auto& [element_id, _] : sig_proc_element_map_) {
-              element_ids_.insert(element_id);
-            }
-            RetrieveSignalProcessingTopologies();
+        sig_proc_elements_ = result->processing_elements();
+        sig_proc_element_map_ = MapElements(sig_proc_elements_);
+        if (sig_proc_element_map_.empty()) {
+          ADR_WARN_OBJECT() << "Empty element map";
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+        for (const auto& [element_id, _] : sig_proc_element_map_) {
+          element_ids_.insert(element_id);
+        }
+        RetrieveSignalProcessingTopologies();
 
-            if (is_composite()) {
-              RetrieveCompositeDaiFormatSets();
-              RetrieveCompositeRingBufferFormatSets();
-            }
-          });
+        if (is_composite()) {
+          RetrieveCompositeDaiFormatSets();
+          RetrieveCompositeRingBufferFormatSets();
+        }
+      });
 }
 
 void Device::RetrieveSignalProcessingTopologies() {
@@ -997,9 +994,7 @@ void Device::RetrieveSignalProcessingTopologies() {
 
   (*sig_proc_client_)
       ->GetTopologies()
-      .Then([this](fidl::Result<
-                   fuchsia_hardware_audio_signalprocessing::SignalProcessing::GetTopologies>&
-                       result) {
+      .Then([this](fidl::Result<fhasp::SignalProcessing::GetTopologies>& result) {
         std::string context("signalprocessing::GetTopologies response");
         if (result.is_error() && result.error_value().is_domain_error() &&
             result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
@@ -1045,9 +1040,7 @@ void Device::RetrieveCurrentTopology() {
 
   (*sig_proc_client_)
       ->WatchTopology()
-      .Then([this](fidl::Result<
-                   fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchTopology>&
-                       result) {
+      .Then([this](fidl::Result<fhasp::SignalProcessing::WatchTopology>& result) {
         TopologyId topology_id = result->topology_id();
         std::string context("signalprocessing::WatchTopology response: topology_id ");
         context.append(std::to_string(topology_id));
@@ -1097,9 +1090,7 @@ void Device::RetrieveElementState(ElementId element_id) {
   (*sig_proc_client_)
       ->WatchElementState({element_id})
       .Then([this, element_id,
-             element](fidl::Result<
-                      fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchElementState>&
-                          result) {
+             element](fidl::Result<fhasp::SignalProcessing::WatchElementState>& result) {
         std::string context("signalprocessing::WatchElementState response: element_id ");
         context.append(std::to_string(element_id));
         if (LogResultFrameworkError(result, context.c_str())) {
@@ -1167,28 +1158,24 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
 
   (*sig_proc_client_)
       ->SetTopology(topology_id)
-      .Then(
-          [this, topology_id](
-              fidl::Result<fuchsia_hardware_audio_signalprocessing::SignalProcessing::SetTopology>&
-                  result) {
-            std::string context("SigProc::SetTopology response: topology_id ");
-            context.append(std::to_string(topology_id));
-            if (LogResultError(result, context.c_str())) {
-              return;
-            }
+      .Then([this, topology_id](fidl::Result<fhasp::SignalProcessing::SetTopology>& result) {
+        std::string context("SigProc::SetTopology response: topology_id ");
+        context.append(std::to_string(topology_id));
+        if (LogResultError(result, context.c_str())) {
+          return;
+        }
 
-            ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-            // Our hanging WatchTopology call will complete now, updating topology_id_ and calling
-            // ObserverNotify::TopologyChanged (or not, if no change).
-          });
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+        // Our hanging WatchTopology call will complete now, updating topology_id_ and calling
+        // ObserverNotify::TopologyChanged (or not, if no change).
+      });
 
   return ZX_OK;
 }
 
 // If the method does not return ZX_OK, then the driver was not called.
-zx_status_t Device::SetElementState(
-    ElementId element_id,
-    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state) {
+zx_status_t Device::SetElementState(ElementId element_id,
+                                    const fhasp::ElementState& element_state) {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
 
   if (state_ == State::Error) {
@@ -1221,10 +1208,7 @@ zx_status_t Device::SetElementState(
 
   (*sig_proc_client_)
       ->SetElementState({element_id, element_state})
-      .Then([this, element_id](
-                fidl::Result<
-                    fuchsia_hardware_audio_signalprocessing::SignalProcessing::SetElementState>&
-                    result) {
+      .Then([this, element_id](fidl::Result<fhasp::SignalProcessing::SetElementState>& result) {
         std::string context("SigProc::SetElementState response: element_id ");
         context.append(std::to_string(element_id));
         if (LogResultError(result, context.c_str())) {

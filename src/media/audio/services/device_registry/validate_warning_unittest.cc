@@ -23,6 +23,7 @@
 // These cases unittest the Validate... functions with inputs that cause WARNING log output.
 
 namespace media_audio {
+namespace {
 
 namespace fha = fuchsia_hardware_audio;
 
@@ -1146,4 +1147,5 @@ TEST(ValidateWarningTest, BadElementState) {
   // Add more negative-test cases here
 }
 
+}  // namespace
 }  // namespace media_audio

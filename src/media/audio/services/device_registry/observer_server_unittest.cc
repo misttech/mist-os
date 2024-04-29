@@ -28,6 +28,7 @@ namespace media_audio {
 namespace {
 
 namespace fad = fuchsia_audio_device;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
                            public fidl::AsyncEventHandler<fad::Observer> {
@@ -671,7 +672,7 @@ TEST_F(ObserverServerCompositeTest, GetTopologies) {
 
   auto observer = CreateTestObserverServer(device);
   auto received_callback = false;
-  std::vector<::fuchsia_hardware_audio_signalprocessing::Topology> received_topologies;
+  std::vector<fhasp::Topology> received_topologies;
 
   observer->client()->GetTopologies().Then([&received_callback, &received_topologies](
                                                fidl::Result<fad::Observer::GetTopologies>& result) {
@@ -702,7 +703,7 @@ TEST_F(ObserverServerCompositeTest, GetElements) {
 
   auto observer = CreateTestObserverServer(device);
   auto received_callback = false;
-  std::vector<::fuchsia_hardware_audio_signalprocessing::Element> received_elements;
+  std::vector<fhasp::Element> received_elements;
 
   observer->client()->GetElements().Then(
       [&received_callback, &received_elements](fidl::Result<fad::Observer::GetElements>& result) {
@@ -852,8 +853,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateInitial) {
   auto observer = CreateTestObserverServer(device);
   auto& elements_from_device = element_map(device);
   auto received_callback = false;
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states;
 
   // Gather the complete set of initial element states.
   for (auto& element_map_entry : elements_from_device) {
@@ -896,8 +896,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateNoChange) {
   auto observer = CreateTestObserverServer(device);
   auto& elements_from_device = element_map(device);
   auto received_callback = false;
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states;
 
   // Gather the complete set of initial element states.
   for (auto& element_map_entry : elements_from_device) {
@@ -946,8 +945,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
   auto observer = CreateTestObserverServer(device);
   auto& elements_from_device = element_map(device);
   auto received_callback = false;
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states;
 
   // Gather the complete set of initial element states.
   for (auto& element_map_entry : elements_from_device) {
@@ -966,17 +964,16 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
   }
 
   // Determine which states we can change.
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states_to_inject;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states_to_inject;
   auto plug_change_time_to_inject = zx::clock::get_monotonic();
   for (const auto& element_map_entry : elements_from_device) {
     auto element_id = element_map_entry.first;
     const auto& element = element_map_entry.second.element;
     const auto& state = element_map_entry.second.state;
-    if (element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
-        !element.type_specific().has_value() || !element.type_specific()->endpoint().has_value() ||
+    if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
+        !element.type_specific()->endpoint().has_value() ||
         element.type_specific()->endpoint()->plug_detect_capabilities() !=
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify) {
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;
     }
     if (!state.has_value() || !state->type_specific().has_value() ||
@@ -987,18 +984,15 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
       continue;
     }
     auto was_plugged = state->type_specific()->endpoint()->plug_state()->plugged();
-    auto new_state = fuchsia_hardware_audio_signalprocessing::ElementState{{
-        .type_specific =
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
-                fuchsia_hardware_audio_signalprocessing::EndpointElementState{{
-                    fuchsia_hardware_audio_signalprocessing::PlugState{{
-                        !was_plugged,
-                        plug_change_time_to_inject.get(),
-                    }},
-                }}),
+    auto new_state = fhasp::ElementState{{
+        .type_specific = fhasp::TypeSpecificElementState::WithEndpoint(fhasp::EndpointElementState{{
+            fhasp::PlugState{{
+                !was_plugged,
+                plug_change_time_to_inject.get(),
+            }},
+        }}),
         .enabled = true,
-        .latency =
-            fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(ZX_USEC(element_id)),
+        .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
     }};
@@ -1011,8 +1005,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
         << "No element states can be changed, so dynamic element_state change cannot be tested";
   }
 
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states_received;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states_received;
 
   // Inject the changes.
   for (const auto& element_state_entry : element_states_to_inject) {
@@ -1050,8 +1043,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     EXPECT_EQ(state_received.enabled(), true);
 
     ASSERT_TRUE(state_received.latency().has_value());
-    ASSERT_EQ(state_received.latency()->Which(),
-              fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+    ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
     EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
 
     ASSERT_TRUE(state_received.vendor_specific_data().has_value());

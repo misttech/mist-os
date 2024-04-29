@@ -172,7 +172,7 @@ TEST_F(RingBufferServerCompositeTest, DriverCompositeDropCausesCleanRingBufferSe
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// Verify that fad::Control/CreateRingBuffer succeeds and returns the expected parameters.
+// Verify that Control/CreateRingBuffer succeeds and returns the expected parameters.
 TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
   auto fake_driver = CreateFakeComposite();
   auto element_id =
@@ -797,7 +797,7 @@ TEST_F(RingBufferServerStreamConfigTest,
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// Verify that fad::Control/CreateRingBuffer succeeds and returns the expected parameters.
+// Verify that Control/CreateRingBuffer succeeds and returns the expected parameters.
 TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);

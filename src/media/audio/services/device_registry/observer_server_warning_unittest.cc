@@ -650,8 +650,8 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before GetReferenceClock. Expect Obs/Ctl/RingBuf to drop + Reg/WatchRemove notif.
 
-// TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
-// test fixture. Then add negative test cases for
+// TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the
+// FakeStreamConfig test fixture. Then add negative test cases for
 // GetTopologies/GetElements/WatchTopology/WatchElementState, as are in Composite.
 
 // Verify WatchTopology if the driver does not support signalprocessing.
