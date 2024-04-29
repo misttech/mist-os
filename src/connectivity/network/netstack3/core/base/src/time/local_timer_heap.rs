@@ -309,7 +309,7 @@ impl<T: Instant, K> PartialOrd for HeapEntry<T, K> {
 
 #[cfg(any(test, feature = "testutils"))]
 mod testutil {
-    use core::fmt::Debug;
+    use core::{fmt::Debug, ops::RangeBounds};
 
     use super::*;
 
@@ -355,6 +355,26 @@ mod testutil {
                 .min_by_key(|(_key, MapEntry { time, .. })| time)
                 .map(|(key, MapEntry { time: _, value })| (key, value));
             assert_eq!(top, Some((key, value)));
+        }
+
+        /// Asserts that the given timer is installed with an instant at the
+        /// provided range.
+        #[track_caller]
+        pub fn assert_range<
+            'a,
+            R: RangeBounds<BC::Instant> + Debug,
+            I: IntoIterator<Item = (&'a K, R)>,
+        >(
+            &'a self,
+            expect: I,
+        ) {
+            for (timer, range) in expect {
+                let time = self
+                    .get(timer)
+                    .map(|(t, _)| t)
+                    .unwrap_or_else(|| panic!("timer {timer:?} not present"));
+                assert!(range.contains(&time), "timer {timer:?} is at {time:?} not in {range:?}");
+            }
         }
     }
 }

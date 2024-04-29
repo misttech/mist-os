@@ -66,7 +66,7 @@ use crate::{
         },
         gmp::{
             igmp::{IgmpPacketHandler, IgmpTimerId},
-            mld::{MldDelayedReportTimerId, MldPacketHandler},
+            mld::{MldPacketHandler, MldTimerId},
             GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult,
         },
         types::IpTypesIpExt,
@@ -91,13 +91,13 @@ pub struct IpDeviceTimerId<I: IpDeviceIpExt, D: device::StrongId>(I::Timer<D>);
 // TODO(https://fxbug.dev/42083407): Change to a weak device id bound once all
 // internal timers are transitioned.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct Ipv4DeviceTimerId<D: device::StrongId>(IgmpTimerId<D>);
+pub struct Ipv4DeviceTimerId<D: device::StrongId>(IgmpTimerId<D::Weak>);
 
 impl<D: device::StrongId> Ipv4DeviceTimerId<D> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D> {
         let Self(this) = self;
-        Some(this.device_id().clone())
+        this.device_id().upgrade()
     }
 }
 
@@ -113,8 +113,8 @@ impl<D: device::StrongId> From<Ipv4DeviceTimerId<D>> for IpDeviceTimerId<Ipv4, D
     }
 }
 
-impl<D: device::StrongId> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
-    fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D> {
+impl<D: device::StrongId> From<IgmpTimerId<D::Weak>> for Ipv4DeviceTimerId<D> {
+    fn from(id: IgmpTimerId<D::Weak>) -> Ipv4DeviceTimerId<D> {
         Ipv4DeviceTimerId(id)
     }
 }
@@ -127,17 +127,7 @@ impl_timer_context!(
     id
 );
 
-// If we are provided with an impl of `TimerContext<Ipv4DeviceTimerId<_>>`, then
-// we can in turn provide an impl of `TimerContext` for IGMP.
-impl_timer_context!(
-    D: device::StrongId,
-    Ipv4DeviceTimerId<D>,
-    IgmpTimerId::<D>,
-    Ipv4DeviceTimerId(id),
-    id
-);
-
-impl<D: device::StrongId, BC, CC: TimerHandler<BC, IgmpTimerId<D>>>
+impl<D: device::StrongId, BC, CC: TimerHandler<BC, IgmpTimerId<D::Weak>>>
     TimerHandler<BC, Ipv4DeviceTimerId<D>> for CC
 {
     fn handle_timer(&mut self, bindings_ctx: &mut BC, Ipv4DeviceTimerId(id): Ipv4DeviceTimerId<D>) {
@@ -169,7 +159,7 @@ where
 // internal timers are transitioned.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Ipv6DeviceTimerId<D: device::StrongId> {
-    Mld(MldDelayedReportTimerId<D>),
+    Mld(MldTimerId<D::Weak>),
     Dad(DadTimerId<D>),
     Rs(RsTimerId<D::Weak>),
     RouteDiscovery(Ipv6DiscoveredRouteTimerId<D::Weak>),
@@ -192,7 +182,7 @@ impl<D: device::StrongId> Ipv6DeviceTimerId<D> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D> {
         match self {
-            Self::Mld(id) => Some(id.device_id().clone()),
+            Self::Mld(id) => id.device_id().upgrade(),
             Self::Dad(id) => Some(id.device_id().clone()),
             Self::Rs(id) => id.device_id().upgrade(),
             Self::RouteDiscovery(id) => id.device_id().upgrade(),
@@ -201,8 +191,8 @@ impl<D: device::StrongId> Ipv6DeviceTimerId<D> {
     }
 }
 
-impl<D: device::StrongId> From<MldDelayedReportTimerId<D>> for Ipv6DeviceTimerId<D> {
-    fn from(id: MldDelayedReportTimerId<D>) -> Ipv6DeviceTimerId<D> {
+impl<D: device::StrongId> From<MldTimerId<D::Weak>> for Ipv6DeviceTimerId<D> {
+    fn from(id: MldTimerId<D::Weak>) -> Ipv6DeviceTimerId<D> {
         Ipv6DeviceTimerId::Mld(id)
     }
 }
@@ -239,15 +229,6 @@ impl_timer_context!(
     id
 );
 
-// If we are provided with an impl of `TimerContext<Ipv6DeviceTimerId<_>>`, then
-// we can in turn provide an impl of `TimerContext` for MLD and DAD.
-impl_timer_context!(
-    D: device::StrongId,
-    Ipv6DeviceTimerId<D>,
-    MldDelayedReportTimerId::<D>,
-    Ipv6DeviceTimerId::Mld(id),
-    id
-);
 impl_timer_context!(
     D: device::StrongId,
     Ipv6DeviceTimerId<D>,
@@ -261,7 +242,7 @@ impl<
         BC,
         CC: TimerHandler<BC, RsTimerId<D::Weak>>
             + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D::Weak>>
-            + TimerHandler<BC, MldDelayedReportTimerId<D>>
+            + TimerHandler<BC, MldTimerId<D::Weak>>
             + TimerHandler<BC, SlaacTimerId<D::Weak>>
             + TimerHandler<BC, DadTimerId<D>>,
     > TimerHandler<BC, Ipv6DeviceTimerId<D>> for CC
@@ -2047,9 +2028,9 @@ mod tests {
 
         // Enable the device and observe an auto-generated link-local address,
         // router solicitation and DAD for the auto-generated address.
-        let test_enable_device = |ctx: &mut FakeCtx, extra_group, expected_prev| {
+        let test_enable_device = |ctx: &mut FakeCtx, expected_prev| {
             enable_ipv6_device(ctx, &device_id, ll_addr, expected_prev);
-            let mut timers = vec![
+            let timers = vec![
                 (
                     TimerId(TimerIdInner::Ipv6Device(
                         Ipv6DeviceTimerId::Rs(RsTimerId::new(device_id.downgrade())).into(),
@@ -2068,30 +2049,18 @@ mod tests {
                 ),
                 (
                     TimerId(TimerIdInner::Ipv6Device(
-                        Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(GmpDelayedReportTimerId {
-                            device: device_id.clone(),
-                            group_addr: ll_addr.addr().to_solicited_node_address(),
+                        Ipv6DeviceTimerId::Mld(MldTimerId(GmpDelayedReportTimerId {
+                            device: device_id.downgrade(),
+                            _marker: Default::default(),
                         }))
                         .into(),
                     )),
                     ..,
                 ),
             ];
-            if let Some(group_addr) = extra_group {
-                timers.push((
-                    TimerId(TimerIdInner::Ipv6Device(
-                        Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(GmpDelayedReportTimerId {
-                            device: device_id.clone(),
-                            group_addr,
-                        }))
-                        .into(),
-                    )),
-                    ..,
-                ))
-            }
             ctx.bindings_ctx.timer_ctx().assert_timers_installed_range(timers);
         };
-        test_enable_device(&mut ctx, None, false);
+        test_enable_device(&mut ctx, false);
         let weak_device_id = device_id.downgrade();
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
@@ -2170,7 +2139,7 @@ mod tests {
             ]
         );
 
-        let (mut core_ctx, bindings_ctx) = ctx.contexts();
+        let mut core_ctx = ctx.core_ctx();
         let core_ctx = &mut core_ctx;
         IpDeviceStateContext::<Ipv6, _>::with_address_ids(
             core_ctx,
@@ -2183,8 +2152,6 @@ mod tests {
         // Assert that static NDP entry was removed on link down.
         nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(core_ctx, ethernet_device_id, addr);
 
-        let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
-        join_ip_multicast::<Ipv6, _, _>(core_ctx, bindings_ctx, &device_id, multicast_addr);
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
@@ -2209,7 +2176,7 @@ mod tests {
             })]
         );
 
-        test_enable_device(&mut ctx, Some(multicast_addr), false);
+        test_enable_device(&mut ctx, false);
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
             [
@@ -2281,8 +2248,7 @@ mod tests {
             "manual addresses should not be removed on device disable"
         );
 
-        leave_ip_multicast::<Ipv6, _, _>(core_ctx, bindings_ctx, &device_id, multicast_addr);
-        test_enable_device(&mut ctx, None, false);
+        test_enable_device(&mut ctx, false);
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
             [
@@ -2299,7 +2265,7 @@ mod tests {
         );
 
         // Verify that a redundant "enable" does not generate any events.
-        test_enable_device(&mut ctx, None, true);
+        test_enable_device(&mut ctx, true);
         assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         // Disable device again so timers are cancelled.

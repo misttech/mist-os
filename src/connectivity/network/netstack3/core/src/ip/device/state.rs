@@ -35,12 +35,18 @@ use crate::{
             slaac::{SlaacConfiguration, SlaacState},
             IpAddressId, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
         },
-        gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
+        gmp::{
+            igmp::{IgmpGroupState, IgmpState, IgmpTimerId},
+            mld::{MldGroupState, MldTimerId},
+            GmpDelayedReportTimerId, GmpState, MulticastGroupSet,
+        },
         types::{IpTypesIpExt, RawMetric},
     },
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     Instant,
 };
+
+use super::Ipv4DeviceTimerId;
 
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
@@ -56,20 +62,46 @@ const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<I: Instant>: AssignedAddress<Self::Addr> + Debug;
-
-    /// The state kept by the Group Messaging Protocol (GMP) used to announce
+    /// The per-group state kept by the Group Messaging Protocol (GMP) used to announce
     /// membership in an IP multicast group for this version of IP.
     ///
     /// Note that a GMP is only used when membership must be explicitly
     /// announced. For example, a GMP is not used in the context of a loopback
     /// device (because there are no remote hosts) or in the context of an IPsec
     /// device (because multicast is not supported).
-    type GmpState<I: Instant>;
+    type GmpGroupState<I: Instant>;
+    /// The GMP protocol-specific state.
+    type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
+    /// The timer id for GMP timers.
+    type GmpTimerId<D: device::WeakId>: From<GmpDelayedReportTimerId<Self, D>>;
+
+    /// Creates a new [`Self::GmpProtoState`].
+    fn new_gmp_state<
+        D: device::WeakId,
+        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
+        BC: IpDeviceStateBindingsTypes + TimerContext2,
+    >(
+        bindings_ctx: &mut BC,
+        device_id: D,
+    ) -> Self::GmpProtoState<BC>;
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddress<I: Instant> = Ipv4AddressEntry<I>;
-    type GmpState<I: Instant> = IgmpGroupState<I>;
+    type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
+    type GmpGroupState<I: Instant> = IgmpGroupState<I>;
+    type GmpTimerId<D: device::WeakId> = IgmpTimerId<D>;
+
+    fn new_gmp_state<
+        D: device::WeakId,
+        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
+        BC: IpDeviceStateBindingsTypes + TimerContext2,
+    >(
+        bindings_ctx: &mut BC,
+        device_id: D,
+    ) -> Self::GmpProtoState<BC> {
+        IgmpState::new::<_, CC>(bindings_ctx, device_id)
+    }
 }
 
 impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
@@ -94,7 +126,20 @@ impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
 
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddress<I: Instant> = Ipv6AddressEntry<I>;
-    type GmpState<I: Instant> = MldGroupState<I>;
+    type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
+    type GmpGroupState<I: Instant> = MldGroupState<I>;
+    type GmpTimerId<D: device::WeakId> = MldTimerId<D>;
+
+    fn new_gmp_state<
+        D: device::WeakId,
+        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
+        BC: IpDeviceStateBindingsTypes + TimerContext2,
+    >(
+        _bindings_ctx: &mut BC,
+        _device_id: D,
+    ) -> Self::GmpProtoState<BC> {
+        ()
+    }
 }
 
 /// The state associated with an IP address assigned to an IP device.
@@ -122,10 +167,19 @@ pub struct IpDeviceFlags {
     pub ip_enabled: bool,
 }
 
+/// The state kept for each device to handle multicast group membership.
+pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
+    /// Multicast groups this device has joined.
+    pub groups: MulticastGroupSet<I::Addr, I::GmpGroupState<BT::Instant>>,
+    /// Protocol-specific GMP state.
+    pub gmp_proto: I::GmpProtoState<BT>,
+    /// GMP state.
+    pub gmp: GmpState<I, BT>,
+}
+
 /// The state common to all IP devices.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-#[cfg_attr(test, derive(Debug))]
 pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// IP addresses assigned to this device.
     ///
@@ -135,8 +189,8 @@ pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> 
     /// Does not contain any duplicates.
     pub addrs: RwLock<IpDeviceAddresses<BT::Instant, I>>,
 
-    /// Multicast groups this device has joined.
-    pub multicast_groups: RwLock<MulticastGroupSet<I::Addr, I::GmpState<BT::Instant>>>,
+    /// Multicast groups and GMP handling state.
+    pub multicast_groups: RwLock<IpDeviceMulticastGroups<I, BT>>,
 
     /// The default TTL (IPv4) or hop limit (IPv6) for outbound packets sent
     /// over this device.
@@ -167,11 +221,11 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
 impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
     RwLockFor<crate::lock_ordering::IpDeviceGmp<I>> for DualStackIpDeviceState<BT>
 {
-    type Data = MulticastGroupSet<I::Addr, I::GmpState<BT::Instant>>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<I::Addr, I::GmpState<BT::Instant>>>
+    type Data = IpDeviceMulticastGroups<I, BT>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceMulticastGroups<I, BT>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<I::Addr, I::GmpState<BT::Instant>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceMulticastGroups<I, BT>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -238,11 +292,18 @@ impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::Routin
     }
 }
 
-impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Default for IpDeviceState<I, BT> {
-    fn default() -> IpDeviceState<I, BT> {
+impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext2> IpDeviceState<I, BC> {
+    fn new<D: device::WeakId, CC: CoreTimerContext<I::GmpTimerId<D>, BC>>(
+        bindings_ctx: &mut BC,
+        device_id: D,
+    ) -> IpDeviceState<I, BC> {
         IpDeviceState {
             addrs: Default::default(),
-            multicast_groups: Default::default(),
+            multicast_groups: RwLock::new(IpDeviceMulticastGroups {
+                groups: Default::default(),
+                gmp_proto: I::new_gmp_state::<_, CC, _>(bindings_ctx, device_id.clone()),
+                gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
+            }),
             default_hop_limit: RwLock::new(DEFAULT_HOP_LIMIT),
             flags: Default::default(),
         }
@@ -342,9 +403,18 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceCon
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> Default for Ipv4DeviceState<BT> {
-    fn default() -> Ipv4DeviceState<BT> {
-        Ipv4DeviceState { ip_state: Default::default(), config: Default::default() }
+impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv4DeviceState<BC> {
+    fn new<D: device::StrongId, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
+        bindings_ctx: &mut BC,
+        device_id: D::Weak,
+    ) -> Ipv4DeviceState<BC> {
+        Ipv4DeviceState {
+            ip_state: IpDeviceState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+                device_id,
+            ),
+            config: Default::default(),
+        }
     }
 }
 
@@ -631,7 +701,10 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
                 bindings_ctx,
                 device_id.clone(),
             )),
-            ip_state: Default::default(),
+            ip_state: IpDeviceState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+                device_id.clone(),
+            ),
             config: Default::default(),
             slaac_state: Mutex::new(SlaacState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
                 bindings_ctx,
@@ -670,14 +743,24 @@ pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext2> DualStackIpDeviceState<BC> {
-    pub(crate) fn new<D: device::StrongId, CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>>(
+    pub(crate) fn new<
+        D: device::StrongId,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device_id: D::Weak,
         metric: RawMetric,
     ) -> Self {
         Self {
-            ipv4: Default::default(),
-            ipv6: Ipv6DeviceState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
+            ipv4: Ipv4DeviceState::new::<_, NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv4, D>>>(
+                bindings_ctx,
+                device_id.clone(),
+            ),
+            ipv6: Ipv6DeviceState::new::<_, NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv6, D>>>(
+                bindings_ctx,
+                device_id,
+            ),
             metric,
         }
     }

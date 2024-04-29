@@ -35,39 +35,35 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{RngContext, TimerContext, TimerHandler},
-    device::{AnyDevice, DeviceIdContext},
+    context::TimerHandler,
+    device::{self, AnyDevice, DeviceIdContext},
     filter::MaybeTransportPacket,
     ip::{
         device::IpDeviceSendContext,
         gmp::{
-            gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
-            GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
-            QueryTarget,
+            gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
+            GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
+            GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+            ProtocolSpecific, QueryTarget,
         },
         IpLayerHandler,
     },
     Instant,
 };
 
+/// The bindings types for MLD.
+pub(crate) trait MldBindingsTypes: GmpBindingsTypes {}
+impl<BT> MldBindingsTypes for BT where BT: GmpBindingsTypes {}
+
 /// The bindings execution context for MLD.
-pub(crate) trait MldBindingsContext<DeviceId>:
-    RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>
-{
-}
-impl<DeviceId, BC: RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>>
-    MldBindingsContext<DeviceId> for BC
-{
-}
+pub(crate) trait MldBindingsContext: GmpBindingsContext {}
+impl<BC> MldBindingsContext for BC where BC: GmpBindingsContext {}
 
 /// Provides immutable access to MLD state.
-pub(crate) trait MldStateContext<BC: MldBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice>
-{
+pub(crate) trait MldStateContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -75,12 +71,12 @@ pub(crate) trait MldStateContext<BC: MldBindingsContext<Self::DeviceId>>:
 }
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
-pub(crate) trait MldContext<BC: MldBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv6, BC> + IpLayerHandler<Ipv6, BC>
+pub(crate) trait MldContext<BT: MldBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv6, BT> + IpLayerHandler<Ipv6, BT>
 {
     /// Calls the function with a mutable reference to the device's MLD state
     /// and whether or not MLD is enabled for the `device`.
-    fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
+    fn with_mld_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BT>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -108,9 +104,7 @@ pub trait MldPacketHandler<BC, DeviceId> {
     );
 }
 
-impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId>
-    for CC
-{
+impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId> for CC {
     fn receive_mld_packet<B: ByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
@@ -184,19 +178,15 @@ impl IpExt for Ipv6 {
     }
 }
 
-impl<BC: MldBindingsContext<CC::DeviceId>, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, BC>
-    for CC
-{
+impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, BT> for CC {
     type ProtocolSpecific = MldProtocolSpecific;
-    type GroupState = MldGroupState<BC::Instant>;
+    type GroupState = MldGroupState<BT::Instant>;
 }
 
-impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldStateContext<BC>> GmpStateContext<Ipv6, BC>
-    for CC
-{
+impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
     fn with_gmp_state<
         O,
-        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BC::Instant>>) -> O,
+        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -206,10 +196,10 @@ impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldStateContext<BC>> GmpStateCont
     }
 }
 
-impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
+impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
     type Err = MldError;
 
-    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
+    fn with_gmp_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BC>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -277,10 +267,10 @@ pub(crate) enum MldError {
 pub(crate) type MldResult<T> = Result<T, MldError>;
 
 #[derive(PartialEq, Eq, Clone, Copy, Default, Debug)]
-pub(crate) struct MldProtocolSpecific;
+pub struct MldProtocolSpecific;
 
 #[derive(Debug)]
-pub(crate) struct MldConfig {
+pub struct MldConfig {
     unsolicited_report_interval: Duration,
     send_leave_anyway: bool,
 }
@@ -349,42 +339,26 @@ impl<I: Instant> AsMut<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupStat
 
 /// An MLD timer to delay the sending of a report.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
-pub struct MldDelayedReportTimerId<DeviceId>(
-    pub(crate) GmpDelayedReportTimerId<Ipv6Addr, DeviceId>,
-);
+pub struct MldTimerId<D: device::WeakId>(pub(crate) GmpDelayedReportTimerId<Ipv6, D>);
 
-impl<DeviceId> MldDelayedReportTimerId<DeviceId> {
-    pub(crate) fn device_id(&self) -> &DeviceId {
+impl<D: device::WeakId> MldTimerId<D> {
+    pub(crate) fn device_id(&self) -> &D {
         let Self(this) = self;
         this.device_id()
     }
 }
 
-impl<DeviceId> From<GmpDelayedReportTimerId<Ipv6Addr, DeviceId>>
-    for MldDelayedReportTimerId<DeviceId>
-{
-    fn from(id: GmpDelayedReportTimerId<Ipv6Addr, DeviceId>) -> MldDelayedReportTimerId<DeviceId> {
-        MldDelayedReportTimerId(id)
+impl<D: device::WeakId> From<GmpDelayedReportTimerId<Ipv6, D>> for MldTimerId<D> {
+    fn from(id: GmpDelayedReportTimerId<Ipv6, D>) -> MldTimerId<D> {
+        MldTimerId(id)
     }
 }
 
-impl_timer_context!(
-    DeviceId,
-    MldDelayedReportTimerId<DeviceId>,
-    GmpDelayedReportTimerId::<Ipv6Addr, DeviceId>,
-    MldDelayedReportTimerId(id),
-    id
-);
-
-impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldContext<BC>>
-    TimerHandler<BC, MldDelayedReportTimerId<CC::DeviceId>> for CC
+impl<BC: MldBindingsContext, CC: MldContext<BC>> TimerHandler<BC, MldTimerId<CC::WeakDeviceId>>
+    for CC
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        timer: MldDelayedReportTimerId<CC::DeviceId>,
-    ) {
-        let MldDelayedReportTimerId(id) = timer;
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer: MldTimerId<CC::WeakDeviceId>) {
+        let MldTimerId(id) = timer;
         gmp_handle_timer(self, bindings_ctx, id);
     }
 }
@@ -394,7 +368,7 @@ impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldContext<BC>>
 /// The MLD packet being sent should have its `hop_limit` to be 1 and a
 /// `RouterAlert` option in its Hop-by-Hop Options extensions header.
 fn send_mld_packet<
-    BC: MldBindingsContext<CC::DeviceId>,
+    BC: MldBindingsContext,
     CC: MldContext<BC>,
     M: IcmpMldv1MessageType + MaybeTransportPacket,
 >(
@@ -446,7 +420,11 @@ fn send_mld_packet<
 mod tests {
 
     use assert_matches::assert_matches;
-    use net_types::{ethernet::Mac, ip::Ip as _};
+    use net_types::{
+        ethernet::Mac,
+        ip::{Ip as _, IpVersionMarker},
+    };
+    use netstack3_base::IntoCoreTimerCtx;
     use packet::{BufferMut, ParseBuffer};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
@@ -462,7 +440,7 @@ mod tests {
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-            testutil::FakeDeviceId,
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
         filter::ProofOfEgressCheck,
@@ -473,7 +451,7 @@ mod tests {
                 Ipv6DeviceTimerId,
             },
             gmp::{
-                GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState,
+                GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
                 QueryReceivedActions, QueryReceivedGenericAction,
             },
             testutil::FakeIpDeviceIdCtx,
@@ -507,20 +485,25 @@ mod tests {
     /// [`MldContext::get_ipv6_link_local_addr`].
     struct FakeMldCtx {
         groups: MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>,
+        gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
         ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
-    impl Default for FakeMldCtx {
-        fn default() -> FakeMldCtx {
-            FakeMldCtx {
+    fn new_context() -> FakeCtxImpl {
+        FakeCtxImpl::with_default_bindings_ctx(|bindings_ctx| {
+            FakeCoreCtxImpl::with_state(FakeMldCtx {
                 groups: MulticastGroupSet::default(),
+                gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
+                    bindings_ctx,
+                    FakeWeakDeviceId(FakeDeviceId),
+                ),
                 mld_enabled: true,
                 ipv6_link_local: None,
                 ip_device_id_ctx: Default::default(),
-            }
-        }
+            })
+        })
     }
 
     impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeMldCtx {
@@ -531,7 +514,7 @@ mod tests {
 
     type FakeCtxImpl = crate::context::testutil::FakeCtx<
         FakeMldCtx,
-        MldDelayedReportTimerId<FakeDeviceId>,
+        MldTimerId<FakeWeakDeviceId<FakeDeviceId>>,
         MldFrameMetadata<FakeDeviceId>,
         (),
         FakeDeviceId,
@@ -543,7 +526,7 @@ mod tests {
         FakeDeviceId,
     >;
     type FakeBindingsCtxImpl = crate::context::testutil::FakeBindingsCtx<
-        MldDelayedReportTimerId<FakeDeviceId>,
+        MldTimerId<FakeWeakDeviceId<FakeDeviceId>>,
         (),
         (),
         (),
@@ -558,8 +541,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeMldCtx { groups, mld_enabled: _, ipv6_link_local: _, ip_device_id_ctx: _ } =
-                self.get_ref();
+            let FakeMldCtx { groups, .. } = self.get_ref();
             cb(groups)
         }
     }
@@ -567,15 +549,14 @@ mod tests {
     impl MldContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state_mut<
             O,
-            F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<FakeInstant>>) -> O,
+            F: FnOnce(GmpStateRef<'_, Ipv6, Self, FakeBindingsCtxImpl>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeMldCtx { groups, mld_enabled, ipv6_link_local: _, ip_device_id_ctx: _ } =
-                self.get_mut();
-            cb(GmpState { enabled: *mld_enabled, groups })
+            let FakeMldCtx { groups, mld_enabled, gmp_state, .. } = self.get_mut();
+            cb(GmpStateRef { enabled: *mld_enabled, groups, gmp: gmp_state })
         }
 
         fn get_ipv6_link_local_addr(
@@ -689,10 +670,10 @@ mod tests {
     const ROUTER_MAC: Mac = Mac::new([6, 5, 4, 3, 2, 1]);
     const GROUP_ADDR: MulticastAddr<Ipv6Addr> =
         unsafe { MulticastAddr::new_unchecked(Ipv6Addr::new([0xff02, 0, 0, 0, 0, 0, 0, 3])) };
-    const TIMER_ID: MldDelayedReportTimerId<FakeDeviceId> =
-        MldDelayedReportTimerId(GmpDelayedReportTimerId {
-            device: FakeDeviceId,
-            group_addr: GROUP_ADDR,
+    const TIMER_ID: MldTimerId<FakeWeakDeviceId<FakeDeviceId>> =
+        MldTimerId(GmpDelayedReportTimerId {
+            device: FakeWeakDeviceId(FakeDeviceId),
+            _marker: IpVersionMarker::new(),
         });
 
     fn receive_mld_query(
@@ -806,8 +787,7 @@ mod tests {
     #[test]
     fn test_mld_simple_integration() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -821,6 +801,7 @@ mod tests {
                 Duration::from_secs(10),
                 GROUP_ADDR,
             );
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
 
             // We should get two MLD reports - one for the unsolicited one for
@@ -838,8 +819,7 @@ mod tests {
     #[test]
     fn test_mld_immediate_query() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -864,8 +844,7 @@ mod tests {
     #[test]
     fn test_mld_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -874,6 +853,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
@@ -892,6 +872,7 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
@@ -905,8 +886,7 @@ mod tests {
     #[test]
     fn test_mld_integration_immediate_query_wont_fallback() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -915,6 +895,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
@@ -941,8 +922,7 @@ mod tests {
 
     #[test]
     fn test_mld_integration_delay_reset_timer() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
         // This seed was carefully chosen to produce a substantial duration
         // value below.
         bindings_ctx.seed_rng(123456);
@@ -950,8 +930,10 @@ mod tests {
             core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
             GroupJoinResult::Joined(())
         );
-        bindings_ctx.timer_ctx().assert_timers_installed([(
-            TIMER_ID,
+
+        core_ctx.state.gmp_state.timers.assert_timers([(
+            GROUP_ADDR,
+            (),
             FakeInstant::from(Duration::from_micros(590_354)),
         )]);
         let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
@@ -960,8 +942,9 @@ mod tests {
 
         receive_mld_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
         assert_eq!(core_ctx.frames().len(), 1);
-        bindings_ctx.timer_ctx().assert_timers_installed([(
-            TIMER_ID,
+        core_ctx.state.gmp_state.timers.assert_timers([(
+            GROUP_ADDR,
+            (),
             FakeInstant::from(Duration::from_micros(34_751)),
         )]);
         let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
@@ -980,8 +963,7 @@ mod tests {
     #[test]
     fn test_mld_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -989,10 +971,12 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(
-                TIMER_ID,
-                now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
-            )]);
+
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             // The initial unsolicited report.
             assert_eq!(core_ctx.frames().len(), 1);
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
@@ -1024,8 +1008,7 @@ mod tests {
     #[test]
     fn test_mld_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1033,10 +1016,11 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(
-                TIMER_ID,
-                now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
-            )]);
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             assert_eq!(core_ctx.frames().len(), 1);
             receive_mld_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
             bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -1060,8 +1044,7 @@ mod tests {
     #[test]
     fn test_mld_with_link_local() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
@@ -1069,6 +1052,7 @@ mod tests {
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
@@ -1121,7 +1105,7 @@ mod tests {
             };
 
             let new_ctx = || {
-                let mut ctx = FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+                let mut ctx = new_context();
                 ctx.bindings_ctx.seed_rng(seed);
                 ctx
             };
@@ -1152,8 +1136,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Simple MLD integration test to check that when we call top-level
             // multicast join and leave functions, MLD is performed.
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1164,7 +1147,8 @@ mod tests {
             assert_eq!(core_ctx.frames().len(), 1);
             let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(TIMER_ID, range.clone())]);
+
+            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range.clone())]);
             let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
@@ -1175,7 +1159,7 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(TIMER_ID, range.clone())]);
+            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range.clone())]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1183,7 +1167,8 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(TIMER_ID, range)]);
+
+            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range)]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1200,8 +1185,7 @@ mod tests {
     #[test]
     fn test_mld_enable_disable() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-                FakeCtxImpl::with_core_ctx(FakeCoreCtxImpl::default());
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
             assert_eq!(core_ctx.take_frames(), []);
 
@@ -1313,10 +1297,15 @@ mod tests {
         let now = ctx.bindings_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
         let snmc_addr = ll_addr.to_solicited_node_address();
+
+        // NB: The assertions made on this timer_id are valid because we only
+        // ever join a single group for the duration of the test. Given that,
+        // the timer ID in bindings matches the state of the single timer id in
+        // the local timer heap in GMP.
         let snmc_timer_id = TimerId(TimerIdInner::Ipv6Device(
-            Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(GmpDelayedReportTimerId {
-                device: device_id.clone(),
-                group_addr: snmc_addr,
+            Ipv6DeviceTimerId::Mld(MldTimerId(GmpDelayedReportTimerId {
+                device: device_id.downgrade(),
+                _marker: IpVersionMarker::new(),
             }))
             .into(),
         ));

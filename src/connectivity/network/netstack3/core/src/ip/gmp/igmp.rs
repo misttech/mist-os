@@ -31,40 +31,56 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{RngContext, TimerContext, TimerHandler},
-    device::{AnyDevice, DeviceIdContext},
+    context::{CoreTimerContext, TimerContext2, TimerHandler},
+    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     ip::{
         device::IpDeviceSendContext,
         gmp::{
-            gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
-            GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
-            QueryTarget,
+            gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
+            GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
+            GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+            ProtocolSpecific, QueryTarget,
         },
         IpLayerHandler,
     },
     Instant,
 };
 
+/// The bindings types for IGMP.
+pub trait IgmpBindingsTypes: GmpBindingsTypes {}
+impl<BT> IgmpBindingsTypes for BT where BT: GmpBindingsTypes {}
+
 /// The bindings execution context for IGMP.
-pub(crate) trait IgmpBindingsContext<DeviceId>:
-    RngContext + TimerContext<IgmpTimerId<DeviceId>>
-{
+pub trait IgmpBindingsContext: GmpBindingsContext {}
+impl<BC> IgmpBindingsContext for BC where BC: GmpBindingsContext {}
+
+pub struct IgmpState<BT: IgmpBindingsTypes> {
+    v1_router_present_timer: BT::Timer,
 }
-impl<DeviceId, BC: RngContext + TimerContext<IgmpTimerId<DeviceId>>> IgmpBindingsContext<DeviceId>
-    for BC
-{
+
+impl<BC: IgmpBindingsTypes + TimerContext2> IgmpState<BC> {
+    pub(crate) fn new<D: device::WeakId, CC: CoreTimerContext<IgmpTimerId<D>, BC>>(
+        bindings_ctx: &mut BC,
+        device: D,
+    ) -> Self {
+        Self {
+            v1_router_present_timer: CC::new_timer(
+                bindings_ctx,
+                IgmpTimerId::V1RouterPresent { device },
+            ),
+        }
+    }
 }
 
 /// Provides immutable access to IGMP state.
-pub(crate) trait IgmpStateContext<BC: IgmpBindingsContext<Self::DeviceId>>:
+pub(crate) trait IgmpStateContext<BT: IgmpBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
     /// Calls the function with an immutable reference to the device's IGMP
     /// state.
     fn with_igmp_state<
         O,
-        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
+        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -73,12 +89,12 @@ pub(crate) trait IgmpStateContext<BC: IgmpBindingsContext<Self::DeviceId>>:
 }
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
-pub(crate) trait IgmpContext<BC: IgmpBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv4, BC> + IpLayerHandler<Ipv4, BC>
+pub(crate) trait IgmpContext<BT: IgmpBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv4, BT> + IpLayerHandler<Ipv4, BT>
 {
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
-    fn with_igmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O>(
+    fn with_igmp_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv4, Self, BT>, &mut IgmpState<BT>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -103,9 +119,7 @@ pub(crate) trait IgmpPacketHandler<BC, DeviceId> {
     );
 }
 
-impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::DeviceId>
-    for CC
-{
+impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::DeviceId> for CC {
     fn receive_igmp_packet<B: BufferMut>(
         &mut self,
         bindings_ctx: &mut BC,
@@ -192,19 +206,15 @@ impl IpExt for Ipv4 {
     }
 }
 
-impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv4, BC>
-    for CC
-{
+impl<BT: IgmpBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv4, BT> for CC {
     type ProtocolSpecific = Igmpv2ProtocolSpecific;
-    type GroupState = IgmpGroupState<BC::Instant>;
+    type GroupState = IgmpGroupState<BT::Instant>;
 }
 
-impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpStateContext<BC>> GmpStateContext<Ipv4, BC>
-    for CC
-{
+impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> for CC {
     fn with_gmp_state<
         O,
-        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
+        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -214,18 +224,15 @@ impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpStateContext<BC>> GmpStateCo
     }
 }
 
-impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpContext<BC>> GmpContext<Ipv4, BC> for CC {
+impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> GmpContext<Ipv4, BC> for CC {
     type Err = IgmpError;
 
-    fn with_gmp_state_mut<
-        O,
-        F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
-    >(
+    fn with_gmp_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv4, Self, BC>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_igmp_state_mut(device, cb)
+        self.with_igmp_state_mut(device, |state_ref, IgmpState { .. }| cb(state_ref))
     }
 
     fn send_message(
@@ -282,12 +289,18 @@ impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpContext<BC>> GmpContext<Ipv4
         device: &Self::DeviceId,
         actions: Igmpv2Actions,
     ) {
-        match actions {
-            Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
-                let _: Option<BC::Instant> = bindings_ctx
-                    .schedule_timer(duration, IgmpTimerId::new_v1_router_present(device.clone()));
-            }
-        }
+        // TODO(https://fxbug.dev/336871374): We're currently reacquiring a lock
+        // here because of the shape of the GmpContext trait. We should change
+        // the shape of the GMP trait so this is not necessary.
+        self.with_igmp_state_mut(
+            device,
+            |_, IgmpState { v1_router_present_timer }| match actions {
+                Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
+                    let _: Option<BC::Instant> =
+                        bindings_ctx.schedule_timer2(duration, v1_router_present_timer);
+                }
+            },
+        );
     }
 
     fn not_a_member_err(addr: Ipv4Addr) -> Self::Err {
@@ -309,15 +322,15 @@ pub(crate) enum IgmpError {
 pub(crate) type IgmpResult<T> = Result<T, IgmpError>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub(crate) enum IgmpTimerId<DeviceId> {
+pub enum IgmpTimerId<D: device::WeakId> {
     /// A GMP timer.
-    Gmp(GmpDelayedReportTimerId<Ipv4Addr, DeviceId>),
+    Gmp(GmpDelayedReportTimerId<Ipv4, D>),
     /// The timer used to determine whether there is a router speaking IGMPv1.
-    V1RouterPresent { device: DeviceId },
+    V1RouterPresent { device: D },
 }
 
-impl<DeviceId> IgmpTimerId<DeviceId> {
-    pub(crate) fn device_id(&self) -> &DeviceId {
+impl<D: device::WeakId> IgmpTimerId<D> {
+    pub(crate) fn device_id(&self) -> &D {
         match self {
             Self::Gmp(id) => id.device_id(),
             Self::V1RouterPresent { device } => device,
@@ -325,48 +338,37 @@ impl<DeviceId> IgmpTimerId<DeviceId> {
     }
 }
 
-impl<DeviceId> From<GmpDelayedReportTimerId<Ipv4Addr, DeviceId>> for IgmpTimerId<DeviceId> {
-    fn from(id: GmpDelayedReportTimerId<Ipv4Addr, DeviceId>) -> IgmpTimerId<DeviceId> {
+impl<D: device::WeakId> From<GmpDelayedReportTimerId<Ipv4, D>> for IgmpTimerId<D> {
+    fn from(id: GmpDelayedReportTimerId<Ipv4, D>) -> IgmpTimerId<D> {
         IgmpTimerId::Gmp(id)
     }
 }
 
-// Impl `TimerContext<GmpDelayedReportTimerId<Ipv4Addr, C::DeviceId>>` for all
-// implementors of `TimerContext<IgmpTimerId<C::DeviceId>> + DeviceIdContext<AnyDevice>`.
-impl_timer_context!(
-    DeviceId,
-    IgmpTimerId<DeviceId>,
-    GmpDelayedReportTimerId::<Ipv4Addr, DeviceId>,
-    IgmpTimerId::Gmp(id),
-    id
-);
-
-impl<DeviceId> IgmpTimerId<DeviceId> {
-    fn new_v1_router_present(device: DeviceId) -> IgmpTimerId<DeviceId> {
-        IgmpTimerId::V1RouterPresent { device }
-    }
-}
-
-impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpContext<BC>>
-    TimerHandler<BC, IgmpTimerId<CC::DeviceId>> for CC
+impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> TimerHandler<BC, IgmpTimerId<CC::WeakDeviceId>>
+    for CC
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer: IgmpTimerId<CC::DeviceId>) {
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer: IgmpTimerId<CC::WeakDeviceId>) {
         match timer {
             IgmpTimerId::Gmp(id) => gmp_handle_timer(self, bindings_ctx, id),
-            IgmpTimerId::V1RouterPresent { device } => IgmpContext::with_igmp_state_mut(
-                self,
-                &device,
-                |GmpState { enabled: _, groups }| {
-                    for (_, IgmpGroupState(state)) in groups.iter_mut() {
-                        state.v1_router_present_timer_expired();
-                    }
-                },
-            ),
+            IgmpTimerId::V1RouterPresent { device } => {
+                let Some(device) = device.upgrade() else {
+                    return;
+                };
+                IgmpContext::with_igmp_state_mut(
+                    self,
+                    &device,
+                    |GmpStateRef { groups, .. }, IgmpState { .. }| {
+                        for (_, IgmpGroupState(state)) in groups.iter_mut() {
+                            state.v1_router_present_timer_expired();
+                        }
+                    },
+                )
+            }
         }
     }
 }
 
-fn send_igmp_message<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpContext<BC>, M>(
+fn send_igmp_message<BC: IgmpBindingsContext, CC: IgmpContext<BC>, M>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
@@ -414,7 +416,7 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Igmpv2ProtocolSpecific {
+pub struct Igmpv2ProtocolSpecific {
     v1_router_present: bool,
 }
 
@@ -425,12 +427,12 @@ impl Default for Igmpv2ProtocolSpecific {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub(super) enum Igmpv2Actions {
+pub enum Igmpv2Actions {
     ScheduleV1RouterPresentTimer(Duration),
 }
 
 #[derive(Debug)]
-pub(super) struct Igmpv2HostConfig {
+pub struct Igmpv2HostConfig {
     // When a host wants to send a report not because of a query, this value is
     // used as the delay timer.
     unsolicited_report_interval: Duration,
@@ -550,7 +552,11 @@ mod tests {
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
 
-    use net_types::{ethernet::Mac, ip::Ip};
+    use net_types::{
+        ethernet::Mac,
+        ip::{Ip, IpVersionMarker},
+    };
+    use netstack3_base::IntoCoreTimerCtx;
     use packet::{serialize::Buf, ParsablePacket as _};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
@@ -567,7 +573,7 @@ mod tests {
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-            testutil::FakeDeviceId,
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
         filter::{MaybeTransportPacket, ProofOfEgressCheck},
@@ -577,7 +583,7 @@ mod tests {
                 Ipv4DeviceTimerId,
             },
             gmp::{
-                GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState,
+                GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
             },
             testutil::FakeIpDeviceIdCtx,
@@ -611,20 +617,11 @@ mod tests {
     /// [`IgmpContext::get_ip_addr_subnet`].
     struct FakeIgmpCtx {
         groups: MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>,
+        gmp_state: GmpState<Ipv4, FakeBindingsCtx>,
+        igmp_state: IgmpState<FakeBindingsCtx>,
         igmp_enabled: bool,
         addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
         ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
-    }
-
-    impl Default for FakeIgmpCtx {
-        fn default() -> FakeIgmpCtx {
-            FakeIgmpCtx {
-                groups: MulticastGroupSet::default(),
-                igmp_enabled: true,
-                addr_subnet: None,
-                ip_device_id_ctx: Default::default(),
-            }
-        }
     }
 
     impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeIgmpCtx {
@@ -635,7 +632,7 @@ mod tests {
 
     type FakeCtx = crate::context::testutil::FakeCtx<
         FakeIgmpCtx,
-        IgmpTimerId<FakeDeviceId>,
+        IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>>,
         IgmpPacketMetadata<FakeDeviceId>,
         (),
         FakeDeviceId,
@@ -648,8 +645,12 @@ mod tests {
         FakeDeviceId,
     >;
 
-    type FakeBindingsCtx =
-        crate::context::testutil::FakeBindingsCtx<IgmpTimerId<FakeDeviceId>, (), (), ()>;
+    type FakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
+        IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>>,
+        (),
+        (),
+        (),
+    >;
 
     impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
@@ -660,8 +661,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeIgmpCtx { groups, igmp_enabled: _, addr_subnet: _, ip_device_id_ctx: _ } =
-                self.get_ref();
+            let FakeIgmpCtx { groups, .. } = self.get_ref();
             cb(groups)
         }
     }
@@ -669,15 +669,17 @@ mod tests {
     impl IgmpContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state_mut<
             O,
-            F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<FakeInstant>>) -> O,
+            F: FnOnce(
+                GmpStateRef<'_, Ipv4, Self, FakeBindingsCtx>,
+                &mut IgmpState<FakeBindingsCtx>,
+            ) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeIgmpCtx { groups, igmp_enabled, addr_subnet: _, ip_device_id_ctx: _ } =
-                self.get_mut();
-            cb(GmpState { enabled: *igmp_enabled, groups })
+            let FakeIgmpCtx { groups, igmp_enabled, gmp_state, igmp_state, .. } = self.get_mut();
+            cb(GmpStateRef { enabled: *igmp_enabled, groups, gmp: gmp_state }, igmp_state)
         }
 
         fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
@@ -834,15 +836,13 @@ mod tests {
     const GROUP_ADDR: MulticastAddr<Ipv4Addr> = Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS;
     const GROUP_ADDR_2: MulticastAddr<Ipv4Addr> =
         unsafe { MulticastAddr::new_unchecked(Ipv4Addr::new([224, 0, 0, 4])) };
-    const REPORT_DELAY_TIMER_ID: IgmpTimerId<FakeDeviceId> =
-        IgmpTimerId::Gmp(GmpDelayedReportTimerId { device: FakeDeviceId, group_addr: GROUP_ADDR });
-    const REPORT_DELAY_TIMER_ID_2: IgmpTimerId<FakeDeviceId> =
+    const GMP_TIMER_ID: IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>> =
         IgmpTimerId::Gmp(GmpDelayedReportTimerId {
-            device: FakeDeviceId,
-            group_addr: GROUP_ADDR_2,
+            device: FakeWeakDeviceId(FakeDeviceId),
+            _marker: IpVersionMarker::new(),
         });
-    const V1_ROUTER_PRESENT_TIMER_ID: IgmpTimerId<FakeDeviceId> =
-        IgmpTimerId::V1RouterPresent { device: FakeDeviceId };
+    const V1_ROUTER_PRESENT_TIMER_ID: IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>> =
+        IgmpTimerId::V1RouterPresent { device: FakeWeakDeviceId(FakeDeviceId) };
 
     fn receive_igmp_query(
         core_ctx: &mut FakeCoreCtx,
@@ -880,7 +880,22 @@ mod tests {
         seed: u128,
         a: Option<AddrSubnet<Ipv4Addr>>,
     ) -> FakeCtx {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::default());
+        let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+            FakeCoreCtx::with_state(FakeIgmpCtx {
+                groups: MulticastGroupSet::default(),
+                gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
+                    bindings_ctx,
+                    FakeWeakDeviceId(FakeDeviceId),
+                ),
+                igmp_state: IgmpState::new::<_, IntoCoreTimerCtx>(
+                    bindings_ctx,
+                    FakeWeakDeviceId(FakeDeviceId),
+                ),
+                igmp_enabled: true,
+                addr_subnet: None,
+                ip_device_id_ctx: Default::default(),
+            })
+        });
         ctx.bindings_ctx.seed_rng(seed);
         ctx.core_ctx.get_mut().addr_subnet = a;
         ctx
@@ -939,7 +954,8 @@ mod tests {
 
             // Should send a report after a query.
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             check_report(&mut core_ctx);
         });
     }
@@ -954,7 +970,8 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
@@ -967,7 +984,8 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             ensure_ttl_ihl_rtr(&core_ctx);
         });
@@ -983,10 +1001,11 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(
-                REPORT_DELAY_TIMER_ID,
-                now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
-            )]);
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0));
@@ -1006,14 +1025,20 @@ mod tests {
             // Two timers: one for the delayed report, one for the v1 router
             // timer.
             let now = bindings_ctx.now();
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             bindings_ctx.timer_ctx().assert_timers_installed_range([
-                (REPORT_DELAY_TIMER_ID, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL)),
+                (GMP_TIMER_ID, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL)),
                 (V1_ROUTER_PRESENT_TIMER_ID, now..=(now + DEFAULT_V1_ROUTER_PRESENT_TIMEOUT)),
             ]);
             let instant2 = bindings_ctx.timer_ctx().timers()[1].0.clone();
             assert_eq!(instant1, instant2);
 
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             // After the first timer, we send out our V1 report.
             assert_eq!(core_ctx.frames().len(), 2);
             // The last frame being sent should be a V1 report.
@@ -1036,7 +1061,8 @@ mod tests {
             }
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // Now we should get V2 report
             assert_eq!(core_ctx.frames().last().unwrap().1[24], 0x16);
@@ -1053,10 +1079,11 @@ mod tests {
             GroupJoinResult::Joined(())
         );
         let now = bindings_ctx.now();
-        bindings_ctx.timer_ctx().assert_timers_installed_range([(
-            REPORT_DELAY_TIMER_ID,
-            now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
-        )]);
+        core_ctx
+            .state
+            .gmp_state
+            .timers
+            .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
         let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         let start = bindings_ctx.now();
         let duration = Duration::from_micros(((instant1 - start).as_micros() / 2) as u64);
@@ -1064,13 +1091,12 @@ mod tests {
         receive_igmp_query(&mut core_ctx, &mut bindings_ctx, duration);
         assert_eq!(core_ctx.frames().len(), 1);
         let now = bindings_ctx.now();
-        bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, now..=(now + duration))]);
+        core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, now..=(now + duration))]);
         let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         // Because of the message, our timer should be reset to a nearer future.
         assert!(instant2 <= instant1);
-        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+        core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
         assert!(bindings_ctx.now() - start <= duration);
         assert_eq!(core_ctx.frames().len(), 2);
         // Make sure it is a V2 report.
@@ -1087,13 +1113,15 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(
-                REPORT_DELAY_TIMER_ID,
-                now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
-            )]);
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             // The initial unsolicited report.
             assert_eq!(core_ctx.frames().len(), 1);
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
+            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             // The report after the delay.
             assert_eq!(core_ctx.frames().len(), 2);
             assert_eq!(
@@ -1142,10 +1170,11 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed_range([(
-                REPORT_DELAY_TIMER_ID,
-                now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
-            )]);
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             assert_eq!(core_ctx.frames().len(), 1);
             receive_igmp_report(&mut core_ctx, &mut bindings_ctx);
             bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -1176,30 +1205,28 @@ mod tests {
             );
             let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            bindings_ctx.timer_ctx().assert_timers_installed_range([
-                (REPORT_DELAY_TIMER_ID, range.clone()),
-                (REPORT_DELAY_TIMER_ID_2, range),
-            ]);
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, range.clone()), (&GROUP_ADDR_2, range)]);
             // The initial unsolicited report.
             assert_eq!(core_ctx.frames().len(), 2);
-            bindings_ctx.trigger_timers_and_expect_unordered(
-                [REPORT_DELAY_TIMER_ID, REPORT_DELAY_TIMER_ID_2],
-                &mut core_ctx,
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 4);
             const RESP_TIME: Duration = Duration::from_secs(10);
             receive_igmp_general_query(&mut core_ctx, &mut bindings_ctx, RESP_TIME);
             // Two new timers should be there.
             let now = bindings_ctx.now();
             let range = now..=(now + RESP_TIME);
-            bindings_ctx.timer_ctx().assert_timers_installed_range([
-                (REPORT_DELAY_TIMER_ID, range.clone()),
-                (REPORT_DELAY_TIMER_ID_2, range),
-            ]);
-            bindings_ctx.trigger_timers_and_expect_unordered(
-                [REPORT_DELAY_TIMER_ID, REPORT_DELAY_TIMER_ID_2],
-                &mut core_ctx,
-            );
+            core_ctx
+                .state
+                .gmp_state
+                .timers
+                .assert_range([(&GROUP_ADDR, range.clone()), (&GROUP_ADDR_2, range)]);
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             // Two new reports should be sent.
             assert_eq!(core_ctx.frames().len(), 6);
             ensure_ttl_ihl_rtr(&core_ctx);
@@ -1211,8 +1238,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Test that we do not perform IGMP when IGMP is disabled.
 
-            let FakeCtx { mut core_ctx, mut bindings_ctx } =
-                FakeCtx::with_core_ctx(FakeCoreCtx::default());
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             bindings_ctx.seed_rng(seed);
             core_ctx.get_mut().igmp_enabled = false;
 
@@ -1267,9 +1293,7 @@ mod tests {
             assert_eq!(core_ctx.frames().len(), 1);
             let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            bindings_ctx
-                .timer_ctx()
-                .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, range.clone())]);
+            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range.clone())]);
             ensure_ttl_ihl_rtr(&core_ctx);
 
             assert_eq!(
@@ -1278,9 +1302,7 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx
-                .timer_ctx()
-                .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, range.clone())]);
+            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range.clone())]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1288,9 +1310,7 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx
-                .timer_ctx()
-                .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, range)]);
+            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range)]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1416,10 +1436,14 @@ mod tests {
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         let now = ctx.bindings_ctx.now();
+        // NB: The assertions made on this timer_id are valid because we only
+        // ever join a single group for the duration of the test. Given that,
+        // the timer ID in bindings matches the state of the single timer id in
+        // the local timer heap in GMP.
         let timer_id = TimerId(TimerIdInner::Ipv4Device(
             Ipv4DeviceTimerId::from(IgmpTimerId::Gmp(GmpDelayedReportTimerId {
-                device: device_id.clone(),
-                group_addr: GROUP_ADDR,
+                device: device_id.downgrade(),
+                _marker: Default::default(),
             }))
             .into(),
         ));

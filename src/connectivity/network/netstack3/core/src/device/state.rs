@@ -7,7 +7,7 @@
 use alloc::sync::Arc;
 use core::fmt::Debug;
 
-use net_types::ip::Ipv6;
+use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     context::{CoreTimerContext, TimerContext2},
@@ -90,7 +90,11 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
 
 impl<T, BC: DeviceLayerTypes + TimerContext2> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
-    pub(super) fn new<D: device::StrongId, CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>>(
+    pub(super) fn new<
+        D: device::StrongId,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device_id: D::Weak,
         link: T,

@@ -54,17 +54,18 @@ use crate::{
             },
             state::{
                 DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceStateBindingsTypes, Ipv4DeviceConfiguration, Ipv6AddrConfig,
-                Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
+                IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, Ipv4DeviceConfiguration,
+                Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
+                SlaacConfig,
             },
             AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
             IpDeviceIpExt, IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr,
         },
         gmp::{
             self,
-            igmp::{IgmpContext, IgmpGroupState, IgmpStateContext},
+            igmp::{IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext},
             mld::{MldContext, MldGroupState, MldStateContext},
-            GmpHandler, GmpQueryHandler, GmpState, MulticastGroupSet,
+            GmpHandler, GmpQueryHandler, GmpStateRef, MulticastGroupSet,
         },
         socket::ipv6_source_address_selection::SasCandidate,
         types::AddableMetric,
@@ -260,7 +261,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
     ) -> O {
         crate::device::integration::with_ip_device_state(self, device, |mut state| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-            cb(&state)
+            let IpDeviceMulticastGroups { groups, .. } = &*state;
+            cb(groups)
         })
     }
 }
@@ -278,7 +280,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
     ) -> O {
         crate::device::integration::with_ip_device_state(self, device, |mut state| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-            cb(&state)
+            let IpDeviceMulticastGroups { groups, .. } = &*state;
+            cb(&groups)
         })
     }
 }
@@ -1266,7 +1269,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
+        F: FnOnce(GmpStateRef<'_, Ipv4, Self, BC>, &mut IgmpState<BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1285,8 +1288,9 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
             // IP enabled are not possible.
             let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
+            let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
             let enabled = ip_enabled && *gmp_enabled;
-            cb(GmpState { enabled, groups: &mut state })
+            cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
         })
     }
 
@@ -1303,7 +1307,7 @@ impl<
         L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>,
     > MldContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
+    fn with_mld_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BC>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -1319,8 +1323,9 @@ impl<
         crate::device::integration::with_ip_device_state(core_ctx, device, |mut state| {
             let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+            let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
             let enabled = ip_enabled && *gmp_enabled;
-            cb(GmpState { enabled, groups: &mut state })
+            cb(GmpStateRef { enabled, groups, gmp })
         })
     }
 
