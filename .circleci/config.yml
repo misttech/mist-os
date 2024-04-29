@@ -28,7 +28,7 @@ jobs:
           paths:
             - .cipd
             - prebuild
-      - run: make ci
+      - run: make test && make ci
 
 workflows:
   build-workflow:
