@@ -17,7 +17,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext, TimerHandler,
+        CoreTimerContext, HandleableTimer, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
     },
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     time::LocalTimerHeap,
@@ -211,17 +211,14 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6RouteDiscoveryContext<BC>>
 }
 
 impl<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6RouteDiscoveryContext<BC>>
-    TimerHandler<BC, Ipv6DiscoveredRouteTimerId<CC::WeakDeviceId>> for CC
+    HandleableTimer<CC, BC> for Ipv6DiscoveredRouteTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        Ipv6DiscoveredRouteTimerId { device_id }: Ipv6DiscoveredRouteTimerId<CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
-        self.with_discovered_routes_mut(
+        core_ctx.with_discovered_routes_mut(
             &device_id,
             |Ipv6RouteDiscoveryState { routes, timers }, core_ctx| {
                 let Some((route, ())) = timers.pop(bindings_ctx) else {

@@ -51,7 +51,7 @@ use zerocopy::{ByteSlice, ByteSliceMut};
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext, TimerHandler,
+        CoreTimerContext, HandleableTimer, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
     },
     ip::IpExt,
     time::LocalTimerHeap,
@@ -204,15 +204,12 @@ impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> Fragment
     }
 }
 
-impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>>
-    TimerHandler<BC, FragmentTimerId<I>> for CC
+impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> HandleableTimer<CC, BC>
+    for FragmentTimerId<I>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        FragmentTimerId(IpVersionMarker { .. }): FragmentTimerId<I>,
-    ) {
-        self.with_state_mut(|cache| {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self(IpVersionMarker { .. }) = self;
+        core_ctx.with_state_mut(|cache| {
             let Some((key, ())) = cache.timers.pop(bindings_ctx) else {
                 return;
             };

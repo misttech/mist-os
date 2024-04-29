@@ -31,7 +31,7 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{CoreTimerContext, TimerContext, TimerHandler},
+    context::{CoreTimerContext, HandleableTimer, TimerContext},
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     ip::{
         device::IpDeviceSendContext,
@@ -344,18 +344,18 @@ impl<D: device::WeakId> From<GmpDelayedReportTimerId<Ipv4, D>> for IgmpTimerId<D
     }
 }
 
-impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> TimerHandler<BC, IgmpTimerId<CC::WeakDeviceId>>
-    for CC
+impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> HandleableTimer<CC, BC>
+    for IgmpTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer: IgmpTimerId<CC::WeakDeviceId>) {
-        match timer {
-            IgmpTimerId::Gmp(id) => gmp_handle_timer(self, bindings_ctx, id),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        match self {
+            IgmpTimerId::Gmp(id) => gmp_handle_timer(core_ctx, bindings_ctx, id),
             IgmpTimerId::V1RouterPresent { device } => {
                 let Some(device) = device.upgrade() else {
                     return;
                 };
                 IgmpContext::with_igmp_state_mut(
-                    self,
+                    core_ctx,
                     &device,
                     |GmpStateRef { groups, .. }, IgmpState { .. }| {
                         for (_, IgmpGroupState(state)) in groups.iter_mut() {

@@ -35,7 +35,7 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::TimerHandler,
+    context::HandleableTimer,
     device::{self, AnyDevice, DeviceIdContext},
     filter::MaybeTransportPacket,
     ip::{
@@ -354,12 +354,12 @@ impl<D: device::WeakId> From<GmpDelayedReportTimerId<Ipv6, D>> for MldTimerId<D>
     }
 }
 
-impl<BC: MldBindingsContext, CC: MldContext<BC>> TimerHandler<BC, MldTimerId<CC::WeakDeviceId>>
-    for CC
+impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
+    for MldTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer: MldTimerId<CC::WeakDeviceId>) {
-        let MldTimerId(id) = timer;
-        gmp_handle_timer(self, bindings_ctx, id);
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self(id) = self;
+        gmp_handle_timer(core_ctx, bindings_ctx, id);
     }
 }
 

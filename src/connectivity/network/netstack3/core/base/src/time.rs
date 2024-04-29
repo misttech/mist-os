@@ -132,6 +132,38 @@ pub trait TimerContext: InstantContext + TimerBindingsTypes {
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
 }
 
+/// A handler for timer firing events.
+///
+/// A `TimerHandler` is a type capable of handling the event of a timer firing.
+///
+/// `TimerHandler` is offered as a blanket implementation for all timers that
+/// implement [`HandleableTimer`]. `TimerHandler` is meant to be used as bounds
+/// on core context types. whereas `HandleableTimer` allows split-crate
+/// implementations sidestepping coherence issues.
+pub trait TimerHandler<BC, Id> {
+    /// Handle a timer firing.
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
+}
+
+impl<Id, CC, BC> TimerHandler<BC, Id> for CC
+where
+    Id: HandleableTimer<CC, BC>,
+{
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id) {
+        id.handle(self, bindings_ctx)
+    }
+}
+
+/// A timer that can be handled by a pair of core context `CC` and bindings
+/// context `BC`.
+///
+/// This trait exists to sidestep coherence issues when dealing with timer
+/// layers, see [`TimerHandler`] for more.
+pub trait HandleableTimer<CC, BC> {
+    /// Handles this timer firing.
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC);
+}
+
 /// A core context providing timer type conversion.
 ///
 /// This trait is used to convert from a core-internal timer type `T` to the

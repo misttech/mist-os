@@ -37,7 +37,8 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
+        EventContext, HandleableTimer, InstantBindingsTypes, InstantContext, RngContext,
+        TimerContext, TimerHandler,
     },
     device::{self, AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
@@ -117,28 +118,26 @@ impl<D: device::WeakId> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
     }
 }
 
-impl<D: device::WeakId, BC, CC: TimerHandler<BC, IgmpTimerId<D>>>
-    TimerHandler<BC, Ipv4DeviceTimerId<D>> for CC
+impl<D: device::WeakId, BC, CC: TimerHandler<BC, IgmpTimerId<D>>> HandleableTimer<CC, BC>
+    for Ipv4DeviceTimerId<D>
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, Ipv4DeviceTimerId(id): Ipv4DeviceTimerId<D>) {
-        TimerHandler::handle_timer(self, bindings_ctx, id)
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self(id) = self;
+        core_ctx.handle_timer(bindings_ctx, id);
     }
 }
 
-impl<CC, BC> TimerHandler<BC, IpDeviceTimerId<Ipv4, CC::WeakDeviceId>> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for IpDeviceTimerId<Ipv4, CC::WeakDeviceId>
 where
     BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        IpDeviceTimerId(id): IpDeviceTimerId<Ipv4, CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self(id) = self;
         let Some(device_id) = id.device_id() else {
             return;
         };
-        self.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
+        core_ctx.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
             TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
         })
     }
@@ -218,35 +217,30 @@ impl<
             + TimerHandler<BC, MldTimerId<D>>
             + TimerHandler<BC, SlaacTimerId<D>>
             + TimerHandler<BC, DadTimerId<D>>,
-    > TimerHandler<BC, Ipv6DeviceTimerId<D>> for CC
+    > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D>
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Ipv6DeviceTimerId<D>) {
-        match id {
-            Ipv6DeviceTimerId::Mld(id) => TimerHandler::handle_timer(self, bindings_ctx, id),
-            Ipv6DeviceTimerId::Dad(id) => TimerHandler::handle_timer(self, bindings_ctx, id),
-            Ipv6DeviceTimerId::Rs(id) => TimerHandler::handle_timer(self, bindings_ctx, id),
-            Ipv6DeviceTimerId::RouteDiscovery(id) => {
-                TimerHandler::handle_timer(self, bindings_ctx, id)
-            }
-            Ipv6DeviceTimerId::Slaac(id) => TimerHandler::handle_timer(self, bindings_ctx, id),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        match self {
+            Ipv6DeviceTimerId::Mld(id) => core_ctx.handle_timer(bindings_ctx, id),
+            Ipv6DeviceTimerId::Dad(id) => core_ctx.handle_timer(bindings_ctx, id),
+            Ipv6DeviceTimerId::Rs(id) => core_ctx.handle_timer(bindings_ctx, id),
+            Ipv6DeviceTimerId::RouteDiscovery(id) => core_ctx.handle_timer(bindings_ctx, id),
+            Ipv6DeviceTimerId::Slaac(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }
 
-impl<CC, BC> TimerHandler<BC, IpDeviceTimerId<Ipv6, CC::WeakDeviceId>> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for IpDeviceTimerId<Ipv6, CC::WeakDeviceId>
 where
     BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv6, BC>,
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        IpDeviceTimerId(id): IpDeviceTimerId<Ipv6, CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self(id) = self;
         let Some(device_id) = id.device_id() else {
             return;
         };
-        self.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
+        core_ctx.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
             TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
         })
     }

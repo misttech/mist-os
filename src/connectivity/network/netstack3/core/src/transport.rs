@@ -66,7 +66,7 @@ use net_types::{
 };
 
 use crate::{
-    context::TimerHandler,
+    context::{HandleableTimer, TimerHandler},
     device::WeakDeviceId,
     error::ZonedAddressError,
     ip::EitherDeviceId,
@@ -145,14 +145,14 @@ pub(crate) enum TransportLayerTimerId<BT: BindingsTypes> {
     Tcp(tcp::socket::TimerId<WeakDeviceId<BT>, BT>),
 }
 
-impl<CC, BT> TimerHandler<BT, TransportLayerTimerId<BT>> for CC
+impl<CC, BT> HandleableTimer<CC, BT> for TransportLayerTimerId<BT>
 where
     BT: BindingsTypes,
     CC: TimerHandler<BT, tcp::socket::TimerId<WeakDeviceId<BT>, BT>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BT, id: TransportLayerTimerId<BT>) {
-        match id {
-            TransportLayerTimerId::Tcp(id) => self.handle_timer(bindings_ctx, id),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
+        match self {
+            TransportLayerTimerId::Tcp(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }

@@ -13,7 +13,7 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext, TimerHandler,
+        CoreTimerContext, HandleableTimer, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
     },
     time::Instant,
 };
@@ -151,11 +151,12 @@ impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> 
     }
 }
 
-impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> TimerHandler<BC, PmtuTimerId<I>>
-    for CC
+impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> HandleableTimer<CC, BC>
+    for PmtuTimerId<I>
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, _timer: PmtuTimerId<I>) {
-        self.with_state_mut(|cache| {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self(IpVersionMarker { .. }) = self;
+        core_ctx.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             cache.handle_timer(now);
             let is_empty = cache.is_empty();

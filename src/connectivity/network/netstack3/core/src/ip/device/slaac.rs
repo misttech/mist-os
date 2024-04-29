@@ -26,8 +26,8 @@ pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
     algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
     context::{
-        CoreTimerContext, CounterContext, InstantBindingsTypes, InstantContext, RngContext,
-        TimerBindingsTypes, TimerContext, TimerHandler,
+        CoreTimerContext, CounterContext, HandleableTimer, InstantBindingsTypes, InstantContext,
+        RngContext, TimerBindingsTypes, TimerContext,
     },
     counters::Counter,
     device::{self, AnyDevice, DeviceIdContext, Id, WeakId as _},
@@ -872,18 +872,15 @@ fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext>(
     ControlFlow::Continue(slaac_type)
 }
 
-impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>>
-    TimerHandler<BC, SlaacTimerId<CC::WeakDeviceId>> for CC
+impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
+    for SlaacTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        SlaacTimerId { device_id }: SlaacTimerId<CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
-        self.with_slaac_addrs_mut_and_configs(&device_id, |slaac_addrs_config, slaac_state| {
+        core_ctx.with_slaac_addrs_mut_and_configs(&device_id, |slaac_addrs_config, slaac_state| {
             let Some((timer_id, ())) = slaac_state.timers.pop(bindings_ctx) else {
                 return;
             };

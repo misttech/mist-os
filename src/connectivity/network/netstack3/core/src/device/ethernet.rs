@@ -36,8 +36,9 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, NestedIntoCoreTimerCtx, RecvFrameContext,
-        ResourceCounterContext, RngContext, SendFrameContext, TimerContext, TimerHandler,
+        CoreTimerContext, CounterContext, HandleableTimer, NestedIntoCoreTimerCtx,
+        RecvFrameContext, ResourceCounterContext, RngContext, SendFrameContext, TimerContext,
+        TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -835,17 +836,17 @@ impl<I: Ip, D: device::WeakId> From<NudTimerId<I, EthernetLinkDevice, D>> for Et
     }
 }
 
-impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::WeakDeviceId>> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for EthernetTimerId<CC::WeakDeviceId>
 where
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::WeakDeviceId>>
         + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::WeakDeviceId>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: EthernetTimerId<CC::WeakDeviceId>) {
-        match id {
-            EthernetTimerId::Arp(id) => self.handle_timer(bindings_ctx, id),
-            EthernetTimerId::Nudv6(id) => self.handle_timer(bindings_ctx, id),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        match self {
+            EthernetTimerId::Arp(id) => core_ctx.handle_timer(bindings_ctx, id),
+            EthernetTimerId::Nudv6(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }

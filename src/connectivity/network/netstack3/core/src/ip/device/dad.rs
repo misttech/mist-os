@@ -14,7 +14,7 @@ use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
 use tracing::debug;
 
 use crate::{
-    context::{CoreTimerContext, EventContext, TimerBindingsTypes, TimerContext, TimerHandler},
+    context::{CoreTimerContext, EventContext, HandleableTimer, TimerBindingsTypes, TimerContext},
     device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
     ip::device::{
         state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext,
@@ -396,20 +396,17 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, 
     }
 }
 
-impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>>
-    TimerHandler<BC, DadTimerId<CC::WeakDeviceId>> for CC
+impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> HandleableTimer<CC, BC>
+    for DadTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        DadTimerId { device_id, addr }: DadTimerId<CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id, addr } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
-        let addr_id = self.get_address_id(&device_id, addr);
+        let addr_id = core_ctx.get_address_id(&device_id, addr);
         do_duplicate_address_detection(
-            self,
+            core_ctx,
             bindings_ctx,
             &device_id,
             &addr_id,
@@ -435,7 +432,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _,
+            InstantContext as _, SendFrameContext as _, TimerHandler,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::{device::Ipv6DeviceAddr, testutil::FakeIpDeviceIdCtx},

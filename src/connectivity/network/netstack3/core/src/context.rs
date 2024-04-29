@@ -50,8 +50,8 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    ContextPair, CoreTimerContext, InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx,
-    TimerBindingsTypes, TimerContext,
+    ContextPair, CoreTimerContext, HandleableTimer, InstantBindingsTypes, InstantContext,
+    NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -93,14 +93,6 @@ pub(crate) fn new_cached_instant_context<I: InstantContext + ?Sized>(
     bindings_ctx: &I,
 ) -> CachedInstantCtx<I::Instant> {
     CachedInstantCtx(bindings_ctx.now())
-}
-
-/// A handler for timer firing events.
-///
-/// A `TimerHandler` is a type capable of handling the event of a timer firing.
-pub trait TimerHandler<BC, Id> {
-    /// Handle a timer firing.
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
 }
 
 // NOTE:

@@ -16,7 +16,10 @@ use packet_formats::icmp::ndp::{
 use rand::Rng as _;
 
 use crate::{
-    context::{CoreTimerContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler},
+    context::{
+        CoreTimerContext, HandleableTimer, RngContext, TimerBindingsTypes, TimerContext,
+        TimerHandler,
+    },
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     filter::MaybeTransportPacket,
 };
@@ -171,16 +174,13 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
     }
 }
 
-impl<BC: RsBindingsContext, CC: RsContext<BC>> TimerHandler<BC, RsTimerId<CC::WeakDeviceId>>
-    for CC
+impl<BC: RsBindingsContext, CC: RsContext<BC>> HandleableTimer<CC, BC>
+    for RsTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        RsTimerId { device_id }: RsTimerId<CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id } = self;
         if let Some(device_id) = device_id.upgrade() {
-            do_router_solicitation(self, bindings_ctx, &device_id)
+            do_router_solicitation(core_ctx, bindings_ctx, &device_id)
         }
     }
 }

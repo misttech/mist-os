@@ -11,7 +11,7 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use tracing::trace;
 
 use crate::{
-    context::{CoreCtx, CoreTimerContext, TimerHandler},
+    context::{CoreCtx, CoreTimerContext, HandleableTimer, TimerHandler},
     device::{DeviceLayerTimerId, WeakDeviceId},
     ip::{
         device::{IpDeviceIpExt, IpDeviceTimerId},
@@ -87,7 +87,7 @@ impl<BT: BindingsTypes, I: IpDeviceIpExt> From<IpDeviceTimerId<I, WeakDeviceId<B
     }
 }
 
-impl<BT, CC> TimerHandler<BT, TimerId<BT>> for CC
+impl<CC, BT> HandleableTimer<CC, BT> for TimerId<BT>
 where
     BT: BindingsTypes,
     CC: TimerHandler<BT, DeviceLayerTimerId<BT>>
@@ -96,14 +96,14 @@ where
         + TimerHandler<BT, IpDeviceTimerId<Ipv4, WeakDeviceId<BT>>>
         + TimerHandler<BT, IpDeviceTimerId<Ipv6, WeakDeviceId<BT>>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BT, id: TimerId<BT>) {
-        trace!("handle_timer: dispatching timerid: {id:?}");
-        match id {
-            TimerId(TimerIdInner::DeviceLayer(x)) => self.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::TransportLayer(x)) => self.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::IpLayer(x)) => self.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::Ipv4Device(x)) => self.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::Ipv6Device(x)) => self.handle_timer(bindings_ctx, x),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
+        trace!("handle_timer: dispatching timerid: {self:?}");
+        match self {
+            TimerId(TimerIdInner::DeviceLayer(x)) => core_ctx.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::TransportLayer(x)) => core_ctx.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::IpLayer(x)) => core_ctx.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::Ipv4Device(x)) => core_ctx.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::Ipv6Device(x)) => core_ctx.handle_timer(bindings_ctx, x),
         }
     }
 }

@@ -41,8 +41,8 @@ use tracing::{debug, error, trace};
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, EventContext, InstantContext, NestedIntoCoreTimerCtx,
-        NonTestCtxMarker, TimerContext, TimerHandler, TracingContext,
+        CoreTimerContext, CounterContext, EventContext, HandleableTimer, InstantContext,
+        NestedIntoCoreTimerCtx, NonTestCtxMarker, TimerContext, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -1639,19 +1639,19 @@ impl<I: Ip> From<PmtuTimerId<I>> for IpLayerTimerId {
     }
 }
 
-impl<CC, BC> TimerHandler<BC, IpLayerTimerId> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for IpLayerTimerId
 where
     CC: TimerHandler<BC, FragmentTimerId<Ipv4>>
         + TimerHandler<BC, FragmentTimerId<Ipv6>>
         + TimerHandler<BC, PmtuTimerId<Ipv4>>
         + TimerHandler<BC, PmtuTimerId<Ipv6>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: IpLayerTimerId) {
-        match id {
-            IpLayerTimerId::ReassemblyTimeoutv4(id) => self.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::ReassemblyTimeoutv6(id) => self.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::PmtuTimeoutv4(id) => self.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::PmtuTimeoutv6(id) => self.handle_timer(bindings_ctx, id),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        match self {
+            IpLayerTimerId::ReassemblyTimeoutv4(id) => core_ctx.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::ReassemblyTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::PmtuTimeoutv4(id) => core_ctx.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::PmtuTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }

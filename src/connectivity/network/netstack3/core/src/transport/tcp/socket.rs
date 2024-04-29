@@ -47,8 +47,8 @@ use tracing::{debug, error, trace};
 use crate::{
     algorithm::{self, PortAllocImpl},
     context::{
-        ContextPair, CoreTimerContext, CounterContext, CtxPair, InstantBindingsTypes, RngContext,
-        TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+        ContextPair, CoreTimerContext, CounterContext, CtxPair, HandleableTimer,
+        InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
@@ -4916,7 +4916,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
     }
 }
 
-impl<CC, BC> TimerHandler<BC, TimerId<CC::WeakDeviceId, BC>> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for TimerId<CC::WeakDeviceId, BC>
 where
     BC: TcpBindingsContext,
     CC: TcpContext<Ipv4, BC>
@@ -4924,9 +4924,9 @@ where
         + CounterContext<TcpCounters<Ipv4>>
         + CounterContext<TcpCounters<Ipv6>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer_id: TimerId<CC::WeakDeviceId, BC>) {
-        let ctx_pair = CtxPair { core_ctx: self, bindings_ctx };
-        match timer_id {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let ctx_pair = CtxPair { core_ctx, bindings_ctx };
+        match self {
             TimerId::V4(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
             TimerId::V6(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
         }

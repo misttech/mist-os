@@ -37,8 +37,8 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, EventContext, InstantBindingsTypes, TimerBindingsTypes,
-        TimerContext, TimerHandler,
+        CoreTimerContext, CounterContext, EventContext, HandleableTimer, InstantBindingsTypes,
+        TimerBindingsTypes, TimerContext,
     },
     counters::Counter,
     device::{
@@ -1919,23 +1919,16 @@ impl<
         D: LinkDevice,
         BC: NudBindingsContext<I, D, CC::DeviceId>,
         CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
-    > TimerHandler<BC, NudTimerId<I, D, CC::WeakDeviceId>> for CC
+    > HandleableTimer<CC, BC> for NudTimerId<I, D, CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        NudTimerId { device_id, timer_type, _marker: PhantomData }: NudTimerId<
-            I,
-            D,
-            CC::WeakDeviceId,
-        >,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id, timer_type, _marker: PhantomData } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
         match timer_type {
-            NudTimerType::Neighbor => handle_neighbor_timer(self, bindings_ctx, device_id),
-            NudTimerType::GarbageCollection => collect_garbage(self, bindings_ctx, device_id),
+            NudTimerType::Neighbor => handle_neighbor_timer(core_ctx, bindings_ctx, device_id),
+            NudTimerType::GarbageCollection => collect_garbage(core_ctx, bindings_ctx, device_id),
         }
     }
 }
