@@ -3,12 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
-        "sys/testing/elf_test_runner.shard.cml",
+        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
-    program: {
-        binary: "bin/cmd-buf-benchmark",
-        args: [ "-offscreen" ],
-    },
+    children: [
+        {
+            name: "test",
+            url: "cmd-buf-benchmark-test#meta/cmd-buf-benchmark-test-child.cm",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test",
+        },
+    ],
 }

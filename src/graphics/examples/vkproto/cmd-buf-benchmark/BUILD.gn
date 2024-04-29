@@ -20,10 +20,15 @@ packaged_shared_library("libvulkan") {
   library = "//third_party/Vulkan-Loader:libvulkan"
 }
 
-fuchsia_test_component("cmd-buf-benchmark-component") {
+fuchsia_component_manifest("cmd-buf-benchmark-child-manifest") {
+  component_name = "cmd-buf-benchmark-test-child"
+  manifest = "meta/cmd-buf-benchmark-child.cml"
+}
+
+fuchsia_component("cmd-buf-benchmark-test-child-component") {
   testonly = true
-  component_name = "cmd-buf-benchmark-test"
-  manifest = "meta/cmd-buf-benchmark.cml"
+  component_name = "cmd-buf-benchmark-test-child"
+  cm_label = ":cmd-buf-benchmark-child-manifest"
   deps = [
     ":bin",
     ":libvulkan",
@@ -31,7 +36,22 @@ fuchsia_test_component("cmd-buf-benchmark-component") {
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
-  test_type = "vulkan"
+}
+
+fuchsia_structured_config_values("default_config") {
+  cm_label = ":cmd-buf-benchmark-child-manifest"
+  values = {
+    gpu_vendor_id = 0
+  }
+}
+
+fuchsia_package("cmd-buf-benchmark-test-child") {
+  package_name = "cmd-buf-benchmark-test"
+  testonly = true
+  deps = [
+    ":cmd-buf-benchmark-test-child-component",
+    ":default_config",
+  ]
 }
 
 config("vulkan_sdk_linux_config") {
@@ -44,6 +64,7 @@ config("vulkan_sdk_linux_config") {
 }
 
 executable("bin") {
+  testonly = true
   output_name = "cmd-buf-benchmark"
   sources = [ "main.cc" ]
 
@@ -57,6 +78,7 @@ executable("bin") {
     deps = [
       # TODO(https://fxbug.dev/42180987): workaround for toolchain issues, see bug
       "//build/config/fuchsia:uses-outline-atomics-fxbug98632",
+      "//src/graphics/examples/vkproto/common:config_query",
       "//src/lib/vulkan",
       "//src/lib/vulkan/swapchain",
     ]
@@ -113,8 +135,15 @@ group("cmd-buf-benchmark-glfw") {
   deps = [ ":bin($host_toolchain)" ]
 }
 
+fuchsia_test_component("cmd-buf-benchmark-test-component") {
+  component_name = "cmd-buf-benchmark-test"
+  test_type = "vulkan"
+  manifest = "meta/cmd-buf-benchmark.cml"
+}
+
 fuchsia_test_package("cmd-buf-benchmark-test") {
-  test_components = [ ":cmd-buf-benchmark-component" ]
+  test_components = [ ":cmd-buf-benchmark-test-component" ]
+  subpackages = [ ":cmd-buf-benchmark-test-child" ]
   test_specs = {
     environments = vulkan_envs
   }
