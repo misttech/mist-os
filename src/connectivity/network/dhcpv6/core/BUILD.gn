@@ -13,6 +13,7 @@ rustc_library("core") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats-dhcp",
     "//src/lib/network/packet",
+    "//third_party/rust_crates:arrayvec",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",

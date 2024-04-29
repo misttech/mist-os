@@ -414,7 +414,7 @@ impl InterfaceState {
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
     ) -> Result<(), errors::Error> {
-        let Self { config, provisioning, .. } = self;
+        let Self { config, provisioning, interface_naming_id, .. } = self;
         let fnet_interfaces_ext::Properties { online, .. } = properties;
 
         // Netcfg won't handle interface update results for a delegated
@@ -447,6 +447,7 @@ impl InterfaceState {
                 if let Some(dhcpv6_client_provider) = dhcpv6_client_provider {
                     let sockaddr = start_dhcpv6_client(
                         properties,
+                        dhcpv6::duid(interface_naming_id.mac),
                         dhcpv6_client_provider,
                         dhcpv6_pd_config.clone(),
                         watchers,
@@ -569,6 +570,7 @@ fn start_dhcpv6_client(
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
     }: &fnet_interfaces_ext::Properties,
+    duid: fnet_dhcpv6::Duid,
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
     pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
     watchers: &mut DnsServerWatchers<'_>,
@@ -625,6 +627,7 @@ fn start_dhcpv6_client(
         dhcpv6_client_provider,
         *id,
         sockaddr,
+        duid,
         pd_config.clone(),
     )
         .with_context(|| {
@@ -1694,6 +1697,7 @@ impl<'a> NetCfg<'a> {
                                 interface_admin_auth,
                             }),
                         control,
+                        interface_naming_id,
                         ..
                     }) => {
                         if previous_online.is_some() {
@@ -1792,6 +1796,7 @@ impl<'a> NetCfg<'a> {
                         if dhcpv6_client_state.is_none() {
                             let sockaddr = start_dhcpv6_client(
                                 current_properties,
+                                dhcpv6::duid(interface_naming_id.mac),
                                 &dhcpv6_client_provider,
                                 dhcpv6_pd_config.clone(),
                                 watchers,
@@ -2667,7 +2672,7 @@ impl<'a> NetCfg<'a> {
             ),
         };
         // Look for all eligible interfaces and start/restart DHCPv6 client as needed.
-        for (id, InterfaceState { config, .. }) in interface_state_iter {
+        for (id, InterfaceState { config, interface_naming_id, .. }) in interface_state_iter {
             let HostInterfaceState {
                 dhcpv4_client: _,
                 dhcpv6_client_state,
@@ -2712,6 +2717,7 @@ impl<'a> NetCfg<'a> {
             // Restart DHCPv6 client and configure it to perform PD.
             let sockaddr = match start_dhcpv6_client(
                 properties,
+                dhcpv6::duid(interface_naming_id.mac),
                 &dhcpv6_client_provider,
                 Some(pd_config.clone()),
                 dns_watchers,
@@ -2788,7 +2794,9 @@ impl<'a> NetCfg<'a> {
             .expect("DHCPv6 prefix provider handler must be present");
         let dhcpv6_client_provider =
             self.dhcpv6_client_provider.as_ref().expect("DHCPv6 client provider must be present");
-        for (id, InterfaceState { config, .. }) in self.interface_states.iter_mut() {
+        for (id, InterfaceState { config, interface_naming_id, .. }) in
+            self.interface_states.iter_mut()
+        {
             let dhcpv6_client_state = match config {
                 InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
                     continue;
@@ -2829,6 +2837,7 @@ impl<'a> NetCfg<'a> {
             // Restart DHCPv6 client without PD.
             let sockaddr = match start_dhcpv6_client(
                 properties,
+                dhcpv6::duid(interface_naming_id.mac),
                 &dhcpv6_client_provider,
                 None,
                 dns_watchers,
@@ -3228,7 +3237,7 @@ mod tests {
     use futures::future::{self, FutureExt as _};
     use futures::stream::{FusedStream as _, TryStreamExt as _};
     use net_declare::{
-        fidl_ip, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_subnet,
+        fidl_ip, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_mac, fidl_subnet,
     };
     use test_case::test_case;
 
@@ -3431,6 +3440,7 @@ mod tests {
                     request,
                     control_handle: _,
                 } => {
+                    let stateful = prefix_delegation_config.is_some();
                     let params: fnet_dhcpv6_ext::NewClientParams = params.try_into()?;
                     assert_eq!(
                         params,
@@ -3447,6 +3457,9 @@ mod tests {
                                     preferred_addresses: None,
                                 }
                             },
+                            duid: stateful.then_some(fnet_dhcpv6::Duid::LinkLayerAddress(
+                                fnet_dhcpv6::LinkLayerAddress::Ethernet(TEST_MAC)
+                            )),
                         }
                     );
 
@@ -3471,10 +3484,10 @@ mod tests {
         )
     }
 
+    const TEST_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("00:01:02:03:04:05");
+
     fn test_interface_naming_id() -> interface::InterfaceNamingIdentifier {
-        interface::generate_identifier(&fidl_fuchsia_net_ext::MacAddress {
-            octets: [0x1, 0x2, 0x3, 0x4, 0x5, 0x6],
-        })
+        interface::generate_identifier(&TEST_MAC.into())
     }
 
     async fn expect_get_interface_auth(control: &mut fnet_interfaces_admin::ControlRequestStream) {

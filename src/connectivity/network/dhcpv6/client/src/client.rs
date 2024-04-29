@@ -12,13 +12,13 @@ use std::{
     time::Duration,
 };
 
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ControlHandle as _, ServerEnd};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcpv6::{
     ClientMarker, ClientRequest, ClientRequestStream, ClientWatchAddressResponder,
-    ClientWatchPrefixesResponder, ClientWatchServersResponder, Empty, Lifetimes, Prefix,
-    PrefixDelegationConfig, RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS,
-    RELAY_AGENT_AND_SERVER_PORT,
+    ClientWatchPrefixesResponder, ClientWatchServersResponder, Duid, Empty, Lifetimes,
+    LinkLayerAddress, LinkLayerAddressPlusTime, Prefix, PrefixDelegationConfig,
+    RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS, RELAY_AGENT_AND_SERVER_PORT,
 };
 use fidl_fuchsia_net_dhcpv6_ext::{
     AddressConfig, ClientConfig, InformationConfig, NewClientParams,
@@ -37,6 +37,7 @@ use futures::{
 use anyhow::{Context as _, Result};
 use assert_matches::assert_matches;
 use async_utils::futures::{FutureExt as _, ReplaceValue};
+use byteorder::{NetworkEndian, WriteBytesExt as _};
 use dns_server_watcher::DEFAULT_DNS_PORT;
 use net_types::{
     ip::{Ip as _, Ipv6, Ipv6Addr, Subnet, SubnetError},
@@ -93,8 +94,10 @@ pub enum ClientError {
     DoubleWatch,
     #[error("unsupported DHCPv6 configuration")]
     UnsupportedConfigs,
+    #[error("socket create error")]
+    SocketCreate(std::io::Error),
     #[error("socket receive error")]
-    SocketRecv(#[source] std::io::Error),
+    SocketRecv(std::io::Error),
     #[error("unimplemented DHCPv6 functionality: {:?}()", _0)]
     Unimplemented(String),
 }
@@ -196,6 +199,7 @@ const IA_PD_IAID: v6::IAID = v6::IAID::new(0);
 
 /// Creates a state machine for the input client config.
 fn create_state_machine(
+    duid: Option<dhcpv6_core::ClientDuid>,
     transaction_id: [u8; 3],
     ClientConfig {
         information_config,
@@ -253,19 +257,29 @@ fn create_state_machine(
         configured_delegated_prefixes,
     ) {
         (true, true, None) => Err(ClientError::UnsupportedConfigs),
-        (false, true, None) => Ok(dhcpv6_core::client::ClientStateMachine::start_stateless(
-            transaction_id,
-            information_option_codes,
-            StdRng::from_entropy(),
-            now,
-        )),
+        (false, true, None) => {
+            if duid.is_some() {
+                Err(ClientError::UnsupportedConfigs)
+            } else {
+                Ok(dhcpv6_core::client::ClientStateMachine::start_stateless(
+                    transaction_id,
+                    information_option_codes,
+                    StdRng::from_entropy(),
+                    now,
+                ))
+            }
+        }
         (
             _request_information,
             _configure_non_temporary_addresses,
             configured_delegated_prefixes,
         ) => Ok(dhcpv6_core::client::ClientStateMachine::start_stateful(
             transaction_id,
-            v6::duid_uuid(),
+            if let Some(duid) = duid {
+                duid
+            } else {
+                return Err(ClientError::UnsupportedConfigs);
+            },
             configured_non_temporary_addresses,
             configured_delegated_prefixes.unwrap_or_else(Default::default),
             information_option_codes,
@@ -294,18 +308,19 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
     ///
     /// Input `transaction_id` is used to label outgoing messages and match incoming ones.
     pub(crate) async fn start(
+        duid: Option<dhcpv6_core::ClientDuid>,
         transaction_id: [u8; 3],
         config: ClientConfig,
         interface_id: u64,
-        socket: S,
+        socket_fn: impl FnOnce() -> std::io::Result<S>,
         server_addr: SocketAddr,
         request_stream: ClientRequestStream,
     ) -> Result<Self, ClientError> {
-        let (state_machine, actions) = create_state_machine(transaction_id, config)?;
+        let (state_machine, actions) = create_state_machine(duid, transaction_id, config)?;
         let mut client = Self {
             state_machine,
             interface_id,
-            socket,
+            socket: socket_fn().map_err(ClientError::SocketCreate)?,
             server_addr,
             request_stream,
             timer_abort_handles: HashMap::new(),
@@ -669,7 +684,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
 }
 
 /// Creates a socket listening on the input address.
-async fn create_socket(addr: SocketAddr) -> Result<fasync::net::UdpSocket> {
+fn create_socket(addr: SocketAddr) -> std::io::Result<fasync::net::UdpSocket> {
     let socket = socket2::Socket::new(
         socket2::Domain::IPV6,
         socket2::Type::DGRAM,
@@ -678,7 +693,7 @@ async fn create_socket(addr: SocketAddr) -> Result<fasync::net::UdpSocket> {
     // It is possible to run multiple clients on the same address.
     let () = socket.set_reuse_port(true)?;
     let () = socket.bind(&addr.into())?;
-    fasync::net::UdpSocket::from_socket(socket.into()).context("converting socket")
+    fasync::net::UdpSocket::from_socket(socket.into())
 }
 
 /// Returns `true` if the input address is a link-local address (`fe80::/64`).
@@ -689,11 +704,61 @@ fn is_unicast_link_local_strict(addr: &fnet::Ipv6Address) -> bool {
     addr.addr[..8] == [0xfe, 0x80, 0, 0, 0, 0, 0, 0]
 }
 
+fn duid_from_fidl(duid: Duid) -> Result<dhcpv6_core::ClientDuid, ()> {
+    /// According to [RFC 8415, section 11.2], DUID of type DUID-LLT has a type value of 1
+    ///
+    /// [RFC 8415, section 11.2]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.2
+    const DUID_TYPE_LLT: [u8; 2] = [0, 1];
+    /// According to [RFC 8415, section 11.4], DUID of type DUID-LL has a type value of 3
+    ///
+    /// [RFC 8415, section 11.4]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.4
+    const DUID_TYPE_LL: [u8; 2] = [0, 3];
+    /// According to [RFC 8415, section 11.5], DUID of type DUID-UUID has a type value of 4.
+    ///
+    /// [RFC 8415, section 11.5]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.5
+    const DUID_TYPE_UUID: [u8; 2] = [0, 4];
+    /// According to [RFC 8415, section 11.2], the hardware type of Ethernet as assigned by
+    /// [IANA] is 1.
+    ///
+    /// [RFC 8415, section 11.2]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.2
+    /// [IANA]: https://www.iana.org/assignments/arp-parameters/arp-parameters.xhtml
+    const HARDWARE_TYPE_ETHERNET: [u8; 2] = [0, 1];
+    match duid {
+        // DUID-LLT with a MAC address is 14 bytes (2 bytes for the type + 2
+        // bytes for the hardware type + 4 bytes for the timestamp + 6 bytes
+        // for the MAC address), which is guaranteed to fit in the 18-byte limit
+        // of `ClientDuid`.
+        Duid::LinkLayerAddressPlusTime(LinkLayerAddressPlusTime {
+            time,
+            link_layer_address: LinkLayerAddress::Ethernet(mac),
+        }) => {
+            let mut duid = dhcpv6_core::ClientDuid::new();
+            duid.try_extend_from_slice(&DUID_TYPE_LLT).unwrap();
+            duid.try_extend_from_slice(&HARDWARE_TYPE_ETHERNET).unwrap();
+            duid.write_u32::<NetworkEndian>(time).unwrap();
+            duid.try_extend_from_slice(&mac.octets).unwrap();
+            Ok(duid)
+        }
+        // DUID-LL with a MAC address is 10 bytes (2 bytes for the type + 2
+        // bytes for the hardware type + 6 bytes for the MAC address), which
+        // is guaranteed to fit in the 18-byte limit of `ClientDuid`.
+        Duid::LinkLayerAddress(LinkLayerAddress::Ethernet(mac)) => Ok(DUID_TYPE_LL
+            .into_iter()
+            .chain(HARDWARE_TYPE_ETHERNET.into_iter())
+            .chain(mac.octets.into_iter())
+            .collect()),
+        // DUID-UUID is 18 bytes (2 bytes for the type + 16 bytes for the UUID),
+        // which is guaranteed to fit in the 18-byte limit of `ClientDuid`.
+        Duid::Uuid(uuid) => Ok(DUID_TYPE_UUID.into_iter().chain(uuid.into_iter()).collect()),
+        _ => Err(()),
+    }
+}
+
 /// Starts a client based on `params`.
 ///
 /// `request` will be serviced by the client.
 pub(crate) async fn serve_client(
-    NewClientParams { interface_id, address, config }: NewClientParams,
+    NewClientParams { interface_id, address, duid, config }: NewClientParams,
     request: ServerEnd<ClientMarker>,
 ) -> Result<()> {
     if Ipv6Addr::from(address.address.addr).is_multicast()
@@ -712,15 +777,37 @@ pub(crate) async fn serve_client(
                 RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS,
             )
         })?;
-    let mut client = Client::<fasync::net::UdpSocket>::start(
+    let duid = match duid.map(|fidl| duid_from_fidl(fidl)).transpose() {
+        Ok(duid) => duid,
+        Err(()) => {
+            return request
+                .close_with_epitaph(zx::Status::INVALID_ARGS)
+                .context("closing request channel with epitaph")
+        }
+    };
+    let (request_stream, control_handle) = request
+        .into_stream_and_control_handle()
+        .context("getting new client request stream from channel")?;
+    let mut client = match Client::<fasync::net::UdpSocket>::start(
+        duid,
         dhcpv6_core::client::transaction_id(),
         config,
         interface_id,
-        create_socket(addr).await?,
+        || create_socket(addr),
         SocketAddr::new(servers_addr, RELAY_AGENT_AND_SERVER_PORT),
-        request.into_stream().context("getting new client request stream from channel")?,
+        request_stream,
     )
-    .await?;
+    .await
+    {
+        Ok(client) => client,
+        Err(ClientError::UnsupportedConfigs) => {
+            control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+            return Ok(());
+        }
+        Err(e) => {
+            return Err(e.into());
+        }
+    };
     let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
     loop {
         match client.handle_next_event(&mut buf).await? {
@@ -746,8 +833,8 @@ mod tests {
 
     use assert_matches::assert_matches;
     use net_declare::{
-        fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_socket_addr, fidl_socket_addr_v6, net_ip_v6,
-        net_subnet_v6, std_socket_addr,
+        fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_mac, fidl_socket_addr, fidl_socket_addr_v6,
+        net_ip_v6, net_subnet_v6, std_socket_addr,
     };
     use net_types::ip::IpAddress as _;
     use packet::serialize::InnerPacketBuilder;
@@ -811,6 +898,31 @@ mod tests {
         ReceivedMessage { transaction_id: *msg.transaction_id(), client_id: client_id }
     }
 
+    const TEST_MAC: fnet::MacAddress = fidl_mac!("00:01:02:03:04:05");
+
+    #[test_case(
+        Duid::LinkLayerAddress(LinkLayerAddress::Ethernet(TEST_MAC)),
+        &[0, 3, 0, 1, 0, 1, 2, 3, 4, 5];
+        "ll"
+    )]
+    #[test_case(
+        Duid::LinkLayerAddressPlusTime(LinkLayerAddressPlusTime {
+            time: 0,
+            link_layer_address: LinkLayerAddress::Ethernet(TEST_MAC),
+        }),
+        &[0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5];
+        "llt"
+    )]
+    #[test_case(
+        Duid::Uuid([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+        &[0, 4, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        "uuid"
+    )]
+    #[fuchsia::test]
+    fn test_duid_from_fidl(duid: Duid, want: &[u8]) {
+        assert_eq!(duid_from_fidl(duid), Ok(dhcpv6_core::ClientDuid::try_from(want).unwrap()));
+    }
+
     #[fuchsia::test]
     fn test_create_client_with_unsupported_config() {
         let prefix_delegation_configs = [
@@ -828,6 +940,7 @@ mod tests {
         for prefix_delegation_config in prefix_delegation_configs.iter() {
             assert_matches!(
                 create_state_machine(
+                    prefix_delegation_config.is_some().then(|| CLIENT_ID.into()),
                     [1, 2, 3],
                     ClientConfig {
                         information_config: Default::default(),
@@ -860,6 +973,7 @@ mod tests {
                     interface_id: 1,
                     address: fidl_socket_addr_v6!("[::1]:546"),
                     config: STATELESS_CLIENT_CONFIG,
+                    duid: None,
                 },
                 server_end,
             ),
@@ -913,6 +1027,7 @@ mod tests {
                     interface_id: 1,
                     address: fidl_socket_addr_v6!("[::1]:546"),
                     config: STATELESS_CLIENT_CONFIG,
+                    duid: None,
                 },
                 server_end,
             )
@@ -982,6 +1097,13 @@ mod tests {
                                             .clone(),
                                         prefix_delegation_config: prefix_delegation_config.clone(),
                                     },
+                                    duid: (non_temporary_address_config.address_count != 0
+                                        || prefix_delegation_config.is_some())
+                                    .then(|| fnet_dhcpv6::Duid::LinkLayerAddress(
+                                        fnet_dhcpv6::LinkLayerAddress::Ethernet(fidl_mac!(
+                                            "00:11:22:33:44:55"
+                                        ))
+                                    )),
                                 },
                                 server_end
                             )
@@ -999,6 +1121,8 @@ mod tests {
         }
     }
 
+    const CLIENT_ID: [u8; 18] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+
     #[fuchsia::test]
     async fn test_client_starts_in_correct_mode() {
         for information_config @ InformationConfig { dns_servers } in VALID_INFORMATION_CONFIGS {
@@ -1008,16 +1132,16 @@ mod tests {
             } in get_valid_non_temporary_address_configs()
             {
                 for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS {
-                    let want_msg_type = if address_count == 0 && prefix_delegation_config.is_none()
-                    {
-                        if !dns_servers {
-                            continue;
+                    let (stateful, want_msg_type) =
+                        if address_count == 0 && prefix_delegation_config.is_none() {
+                            if !dns_servers {
+                                continue;
+                            } else {
+                                (false, v6::MessageType::InformationRequest)
+                            }
                         } else {
-                            v6::MessageType::InformationRequest
-                        }
-                    } else {
-                        v6::MessageType::Solicit
-                    };
+                            (true, v6::MessageType::Solicit)
+                        };
 
                     let (_, client_stream): (ClientEnd<ClientMarker>, _) =
                         create_request_stream::<ClientMarker>()
@@ -1030,6 +1154,7 @@ mod tests {
                         information_config, non_temporary_address_config, prefix_delegation_config
                     );
                     let _: Client<fasync::net::UdpSocket> = Client::start(
+                        stateful.then(|| CLIENT_ID.into()),
                         [1, 2, 3], /* transaction ID */
                         ClientConfig {
                             information_config: information_config.clone(),
@@ -1037,7 +1162,7 @@ mod tests {
                             prefix_delegation_config: prefix_delegation_config.clone(),
                         },
                         1, /* interface ID */
-                        client_socket,
+                        || Ok(client_socket),
                         server_addr,
                         client_stream,
                     )
@@ -1054,6 +1179,8 @@ mod tests {
         }
     }
 
+    // TODO(https://fxbug.dev/335656784): Replace this with a netemul test that isn't
+    // sensitive to implementation details.
     #[fuchsia::test]
     async fn test_client_fails_to_start_with_invalid_args() {
         for params in vec![
@@ -1066,6 +1193,7 @@ mod tests {
                     zone_index: 1,
                 },
                 config: STATELESS_CLIENT_CONFIG,
+                duid: None,
             },
             // Multicast address is invalid.
             NewClientParams {
@@ -1076,6 +1204,30 @@ mod tests {
                     zone_index: 1,
                 },
                 config: STATELESS_CLIENT_CONFIG,
+                duid: None,
+            },
+            // Stateless with DUID.
+            NewClientParams {
+                interface_id: 1,
+                address: fidl_socket_addr_v6!("[2001:db8::1]:12345"),
+                config: STATELESS_CLIENT_CONFIG,
+                duid: Some(fnet_dhcpv6::Duid::LinkLayerAddress(
+                    fnet_dhcpv6::LinkLayerAddress::Ethernet(fidl_mac!("00:11:22:33:44:55")),
+                )),
+            },
+            // Stateful missing DUID.
+            NewClientParams {
+                interface_id: 1,
+                address: fidl_socket_addr_v6!("[2001:db8::1]:12345"),
+                config: ClientConfig {
+                    information_config: InformationConfig { dns_servers: true },
+                    non_temporary_address_config: AddressConfig {
+                        address_count: 1,
+                        preferred_addresses: None,
+                    },
+                    prefix_delegation_config: None,
+                },
+                duid: None,
             },
         ] {
             let (client_proxy, server_end) =
@@ -1146,10 +1298,11 @@ mod tests {
         let (server_socket, server_addr) = create_test_socket();
         let mut client = exec
             .run_singlethreaded(Client::<fasync::net::UdpSocket>::start(
+                None,
                 transaction_id,
                 STATELESS_CLIENT_CONFIG,
                 1, /* interface ID */
-                client_socket,
+                || Ok(client_socket),
                 server_addr,
                 client_stream,
             ))
@@ -1380,10 +1533,11 @@ mod tests {
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
         let client = Client::<fasync::net::UdpSocket>::start(
+            None,
             transaction_id,
             STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
-            client_socket,
+            || Ok(client_socket),
             server_addr,
             client_stream,
         )
@@ -1449,6 +1603,7 @@ mod tests {
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
+            Some(CLIENT_ID.into()),
             [1, 2, 3],
             ClientConfig {
                 information_config: Default::default(),
@@ -1456,7 +1611,7 @@ mod tests {
                 prefix_delegation_config: Some(PrefixDelegationConfig::Empty(Empty {})),
             },
             1, /* interface ID */
-            client_socket,
+            || Ok(client_socket),
             server_addr,
             client_stream,
         )
@@ -1701,10 +1856,11 @@ mod tests {
         let (client_socket, _client_addr) = create_test_socket();
         let (_server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
+            None,
             [1, 2, 3], /* transaction ID */
             STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
-            client_socket,
+            || Ok(client_socket),
             server_addr,
             client_stream,
         )
@@ -1783,10 +1939,11 @@ mod tests {
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
+            None,
             [1, 2, 3], /* transaction ID */
             STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
-            client_socket,
+            || Ok(client_socket),
             server_addr,
             client_stream,
         )
@@ -1935,6 +2092,7 @@ mod tests {
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
+            Some(CLIENT_ID.into()),
             [1, 2, 3], /* transaction ID */
             ClientConfig {
                 information_config: Default::default(),
@@ -1945,7 +2103,7 @@ mod tests {
                 prefix_delegation_config: None,
             },
             1, /* interface ID */
-            client_socket,
+            || Ok(client_socket),
             server_addr,
             client_stream,
         )
@@ -1975,10 +2133,11 @@ mod tests {
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
+            None,
             [1, 2, 3], /* transaction ID */
             STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
-            client_socket,
+            || Ok(client_socket),
             server_addr,
             client_stream,
         )
@@ -2064,10 +2223,11 @@ mod tests {
             create_request_stream::<ClientMarker>().expect("failed to create test request stream");
 
         let mut client = Client::<StubSocket>::start(
+            None,
             [1, 2, 3], /* transaction ID */
             STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
-            StubSocket {},
+            || Ok(StubSocket {}),
             std_socket_addr!("[::1]:0"),
             client_stream,
         )

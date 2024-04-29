@@ -17,7 +17,7 @@ const INTERFACE_PREFIX_AP: &str = "ap";
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub(crate) struct InterfaceNamingIdentifier {
-    mac: fidl_fuchsia_net_ext::MacAddress,
+    pub(crate) mac: fidl_fuchsia_net_ext::MacAddress,
 }
 
 pub(crate) fn generate_identifier(

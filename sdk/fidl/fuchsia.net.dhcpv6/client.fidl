@@ -56,6 +56,14 @@ type Prefix = struct {
     };
 };
 
+/// Link layer address used to generate a DUID as defined in
+/// [RFC 8415, Section 11].
+///
+/// [RFC 8415, Section 11]: https://datatracker.ietf.org/doc/html/rfc8415#section-11
+type LinkLayerAddress = flexible union {
+    1: ethernet fuchsia.net.MacAddress;
+};
+
 /// Parameters to start a new DHCPv6 client with.
 type NewClientParams = table {
     /// The ID of the interface the client will run on.
@@ -86,7 +94,7 @@ type NewClientParams = table {
     /// If the configuration requests both addresses and other
     /// configuration parameters, all information is requested in the
     /// same message exchange, running in stateful mode. If only
-    /// configuration parameters are requested (no addresses), the
+    /// configuration parameters are requested (no addresses or prefixes), the
     /// client runs in stateless mode, as described in
     /// [RFC 8415, Section 6.1](https://tools.ietf.org/html/rfc8415#section-6.1).
     ///
@@ -165,6 +173,43 @@ type NewClientParams = table {
             /// the address must be all zeroes; otherwise client creation will fail.
             3: prefix fuchsia.net.Ipv6AddressWithPrefix;
         };
+    };
+
+    /// DHCP Unique Identifier (DUID) configuration.
+    ///
+    /// The DUID is used by the client to identify itself to servers as
+    /// defined in [RFC 8415, section 11]. The field must be present if and
+    /// only if the client is started in stateful mode, otherwise client
+    /// creation will fail and the pipelined channel will be closed.
+    ///
+    /// [RFC 8415, section 11]: https://datatracker.ietf.org/doc/html/rfc8415#section-11
+    4: duid flexible union {
+        /// Configure DUID based on link-layer address plus time (DUID-LLT),
+        /// as defined in [RFC 8415, section 11.2].
+        ///
+        /// [RFC 8415, section 11.2]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.2
+        1: link_layer_address_plus_time struct {
+            /// Timestamp when the DUID is generated. According to
+            /// [RFC 8415, section 11.2]:
+            ///
+            ///   The time value is the time that the DUID is generated,
+            ///   represented in seconds since midnight (UTC), January 1,
+            ///   2000, modulo 2^32.
+            ///
+            /// [RFC 8415, section 11.2]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.2
+            time uint32;
+            /// The link layer address.
+            link_layer_address LinkLayerAddress;
+        };
+        /// Configure DUID based on link-layer address (DUID-LL), as defined in
+        /// [RFC 8415, section 11.4].
+        ///
+        /// [RFC 8415, section 11.4]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.4
+        2: link_layer_address LinkLayerAddress;
+        /// Configure DUID with a UUID, as defined in [RFC 8415, section 11.5].
+        ///
+        /// [RFC 8415, section 11.5]: https://datatracker.ietf.org/doc/html/rfc8415#section-11.5
+        3: uuid array<byte, 16>;
     };
 };
 

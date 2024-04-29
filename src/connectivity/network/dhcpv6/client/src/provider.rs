@@ -103,6 +103,7 @@ mod tests {
                                 non_temporary_address_config: Default::default(),
                                 prefix_delegation_config: None,
                             },
+                            duid: None,
                         }
                         .into(),
                         server_end,

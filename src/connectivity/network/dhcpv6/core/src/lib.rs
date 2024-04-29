@@ -57,3 +57,7 @@ impl Instant for std::time::Instant {
         std::time::Instant::checked_add(self, duration)
     }
 }
+
+// The client currently supports DUID-LL and DUID-LLT with MAC addresses only
+// and DUID-UUID, the largest of which is DUID-UUID which takes up 18 bytes.
+pub type ClientDuid = arrayvec::ArrayVec<u8, 18>;

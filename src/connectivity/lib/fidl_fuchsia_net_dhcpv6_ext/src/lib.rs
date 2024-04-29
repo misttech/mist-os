@@ -53,6 +53,14 @@ pub struct NewClientParams {
     ///
     /// [RFC 8415, Section 6.1]: https://tools.ietf.org/html/rfc8415#section-6.1
     pub config: ClientConfig,
+    #[fidl_field_type(optional)]
+    /// DHCP Unique Identifier (DUID) configuration.
+    ///
+    /// The DUID is used by the client to identify itself to servers, as defined
+    /// in [RFC 8415 section 11].
+    ///
+    /// [RFC 8415 section 11]: https://datatracker.ietf.org/doc/html/rfc8415#section-11
+    pub duid: Option<fidl_fuchsia_net_dhcpv6::Duid>,
 }
 
 /// Configuration for what the client should request from DHCPv6 server(s).
