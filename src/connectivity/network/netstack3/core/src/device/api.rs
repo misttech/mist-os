@@ -14,7 +14,7 @@ use tracing::debug;
 use crate::{
     context::{
         ContextPair, CoreTimerContext, RecvFrameContext, ReferenceNotifiers,
-        ResourceCounterContext, TimerContext2,
+        ResourceCounterContext, TimerContext,
     },
     device::{
         config::{
@@ -420,10 +420,9 @@ where
 
 /// A marker trait for all the bindings context traits required to fulfill the
 /// [`DeviceApi`].
-pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers + TimerContext2 {}
+pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers + TimerContext {}
 
-impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers + TimerContext2
-{}
+impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers + TimerContext {}
 
 /// A marker trait with traits required to tie the device layer with the IP
 /// layer to fulfill [`DeviceApi`].

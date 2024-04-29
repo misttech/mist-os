@@ -16,7 +16,7 @@ use packet_formats::icmp::ndp::{
 use rand::Rng as _;
 
 use crate::{
-    context::{CoreTimerContext, RngContext, TimerBindingsTypes, TimerContext2, TimerHandler},
+    context::{CoreTimerContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler},
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     filter::MaybeTransportPacket,
 };
@@ -66,7 +66,7 @@ pub struct RsState<BT: RsBindingsTypes> {
     timer: BT::Timer,
 }
 
-impl<BC: RsBindingsTypes + TimerContext2> RsState<BC> {
+impl<BC: RsBindingsTypes + TimerContext> RsState<BC> {
     pub fn new<D: device::WeakId, CC: CoreTimerContext<RsTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -126,8 +126,8 @@ pub trait RsBindingsTypes: TimerBindingsTypes {}
 impl<BT> RsBindingsTypes for BT where BT: TimerBindingsTypes {}
 
 /// The bindings execution context for router solicitation.
-pub trait RsBindingsContext: RngContext + TimerContext2 {}
-impl<BC> RsBindingsContext for BC where BC: RngContext + TimerContext2 {}
+pub trait RsBindingsContext: RngContext + TimerContext {}
+impl<BC> RsBindingsContext for BC where BC: RngContext + TimerContext {}
 
 /// An implementation of Router Solicitation.
 pub trait RsHandler<BC>:
@@ -158,7 +158,7 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
                     let delay = bindings_ctx
                         .rng()
                         .gen_range(Duration::new(0, 0)..MAX_RTR_SOLICITATION_DELAY);
-                    assert_eq!(bindings_ctx.schedule_timer2(delay, timer), None);
+                    assert_eq!(bindings_ctx.schedule_timer(delay, timer), None);
                 }
             }
         });
@@ -166,7 +166,7 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
 
     fn stop_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         self.with_rs_state_mut(device_id, |state| {
-            let _: Option<BC::Instant> = bindings_ctx.cancel_timer2(&mut state.timer);
+            let _: Option<BC::Instant> = bindings_ctx.cancel_timer(&mut state.timer);
         });
     }
 }
@@ -231,7 +231,7 @@ fn do_router_solicitation<BC: RsBindingsContext, CC: RsContext<BC>>(
         match *remaining {
             None => {}
             Some(NonZeroU8 { .. }) => {
-                assert_eq!(bindings_ctx.schedule_timer2(RTR_SOLICITATION_INTERVAL, timer), None);
+                assert_eq!(bindings_ctx.schedule_timer(RTR_SOLICITATION_INTERVAL, timer), None);
             }
         }
     });

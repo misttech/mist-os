@@ -663,7 +663,7 @@ where
                     assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
                 },
             );
-            let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+            let _: Option<_> = bindings_ctx.cancel_timer(timer);
             if let Some(accept_queue) = accept_queue {
                 accept_queue.remove(&conn_id);
                 *defunct = true;
@@ -1006,7 +1006,7 @@ where
                     // later. This only runs when inserting into the demux
                     // succeeds so it's okay.
                     assert_eq!(
-                        bindings_ctx_moved.schedule_timer_instant2(poll_send_at, &mut timer),
+                        bindings_ctx_moved.schedule_timer_instant(poll_send_at, &mut timer),
                         None
                     );
                     TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })

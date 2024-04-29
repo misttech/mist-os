@@ -51,7 +51,7 @@ use zerocopy::{ByteSlice, ByteSliceMut};
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext2, TimerHandler,
+        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext, TimerHandler,
     },
     ip::IpExt,
     time::LocalTimerHeap,
@@ -99,8 +99,8 @@ pub trait FragmentBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
 impl<BT> FragmentBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
 
 /// The bindings execution context for IP packet fragment reassembly.
-pub trait FragmentBindingsContext: TimerContext2 + FragmentBindingsTypes {}
-impl<BC> FragmentBindingsContext for BC where BC: TimerContext2 + FragmentBindingsTypes {}
+pub trait FragmentBindingsContext: TimerContext + FragmentBindingsTypes {}
+impl<BC> FragmentBindingsContext for BC where BC: TimerContext + FragmentBindingsTypes {}
 
 /// The timer ID for the fragment cache.
 #[derive(Hash, Eq, PartialEq, Default, Clone, Debug, GenericOverIp)]

@@ -37,7 +37,7 @@ use tracing::trace;
 use crate::{
     context::{
         CoreTimerContext, CounterContext, NestedIntoCoreTimerCtx, RecvFrameContext,
-        ResourceCounterContext, RngContext, SendFrameContext, TimerContext2, TimerHandler,
+        ResourceCounterContext, RngContext, SendFrameContext, TimerContext, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -83,10 +83,10 @@ const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
 pub(crate) trait EthernetIpLinkDeviceBindingsContext:
-    RngContext + TimerContext2 + DeviceLayerTypes
+    RngContext + TimerContext + DeviceLayerTypes
 {
 }
-impl<BC: RngContext + TimerContext2 + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
+impl<BC: RngContext + TimerContext + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
 
 /// Provides access to an ethernet device's static state.
 pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
@@ -1475,7 +1475,7 @@ impl DeviceStateSpec for EthernetLinkDevice {
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
-        BC: DeviceLayerTypes + TimerContext2,
+        BC: DeviceLayerTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         self_id: CC::WeakDeviceId,

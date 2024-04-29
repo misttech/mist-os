@@ -48,7 +48,7 @@ use crate::{
     algorithm::{self, PortAllocImpl},
     context::{
         ContextPair, CoreTimerContext, CounterContext, CtxPair, InstantBindingsTypes, RngContext,
-        TimerBindingsTypes, TimerContext2, TimerHandler, TracingContext,
+        TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
@@ -442,12 +442,12 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static 
 ///
 /// TCP timers are scoped by weak device IDs.
 pub trait TcpBindingsContext:
-    Sized + TimerContext2 + TracingContext + RngContext + TcpBindingsTypes
+    Sized + TimerContext + TracingContext + RngContext + TcpBindingsTypes
 {
 }
 
 impl<BC> TcpBindingsContext for BC where
-    BC: TimerContext2 + TracingContext + RngContext + TcpBindingsTypes + Sized
+    BC: TimerContext + TracingContext + RngContext + TcpBindingsTypes + Sized
 {
 }
 
@@ -2988,7 +2988,7 @@ where
                                             .remove(demux_id, addr)
                                             .expect("failed to remove from socketmap");
                                     });
-                                    let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+                                    let _: Option<_> = bindings_ctx.cancel_timer(timer);
                                 }
                                 now_closed
                             } else {
@@ -3004,7 +3004,7 @@ where
                                     addr,
                                 );
                                 debug_assert_eq!(
-                                    bindings_ctx.scheduled_instant2(timer),
+                                    bindings_ctx.scheduled_instant(timer),
                                     None,
                                     "lingering timer for {:?}",
                                     id,
@@ -3618,7 +3618,7 @@ where
                                     panic!("failed to remove from socketmap: {e:?}");
                                 }
                             });
-                            let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+                            let _: Option<_> = bindings_ctx.cancel_timer(timer);
                         }
                         (true, PrevState::Closed) | (false, _) => (),
                     }
@@ -3994,7 +3994,7 @@ where
                         );
                     }
                 };
-                let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+                let _: Option<_> = bindings_ctx.cancel_timer(timer);
                 match accept_queue {
                     Some(accept_queue) => {
                         accept_queue.remove(&id);
@@ -4295,7 +4295,7 @@ fn close_pending_sockets<I, CC, BC>(
                 }) => (conn, timer),
                 "invalid socket ID"
             );
-            let _: Option<BC::Instant> = bindings_ctx.cancel_timer2(timer);
+            let _: Option<BC::Instant> = bindings_ctx.cancel_timer(timer);
             let this_or_other_stack = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                     let (conn, addr) = converter.convert(conn_and_addr);
@@ -4391,7 +4391,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
                 .remove(demux_id, conn_addr)
                 .expect("failed to remove from socketmap");
         });
-        let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+        let _: Option<_> = bindings_ctx.cancel_timer(timer);
     }
 
     if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
@@ -4427,7 +4427,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
     }
 
     if let Some(instant) = conn.state.poll_send_at() {
-        let _: Option<_> = bindings_ctx.schedule_timer_instant2(instant, timer);
+        let _: Option<_> = bindings_ctx.schedule_timer_instant(instant, timer);
     }
 }
 
@@ -4803,7 +4803,7 @@ where
     );
 
     let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
-    assert_eq!(bindings_ctx.schedule_timer_instant2(poll_send_at, &mut timer), None);
+    assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, &mut timer), None);
 
     let conn = convert_back_op(
         Connection {
@@ -5295,25 +5295,25 @@ mod tests {
     }
 
     /// Delegate implementation to internal thing.
-    impl<D: FakeStrongDeviceId> TimerContext2 for TcpBindingsCtx<D> {
+    impl<D: FakeStrongDeviceId> TimerContext for TcpBindingsCtx<D> {
         fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
             self.timers.new_timer(id)
         }
 
-        fn schedule_timer_instant2(
+        fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             timer: &mut Self::Timer,
         ) -> Option<Self::Instant> {
-            self.timers.schedule_timer_instant2(time, timer)
+            self.timers.schedule_timer_instant(time, timer)
         }
 
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.cancel_timer2(timer)
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.cancel_timer(timer)
         }
 
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.scheduled_instant2(timer)
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.scheduled_instant(timer)
         }
     }
 

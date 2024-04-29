@@ -50,7 +50,7 @@ use rand::Rng;
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext2,
+        CoreTimerContext, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult},
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
@@ -882,8 +882,8 @@ pub trait GmpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
 impl<BT> GmpBindingsTypes for BT where BT: InstantBindingsTypes + TimerBindingsTypes {}
 
 /// The bindings execution context for GMP.
-pub trait GmpBindingsContext: RngContext + TimerContext2 + GmpBindingsTypes {}
-impl<BC> GmpBindingsContext for BC where BC: RngContext + TimerContext2 + GmpBindingsTypes {}
+pub trait GmpBindingsContext: RngContext + TimerContext + GmpBindingsTypes {}
+impl<BC> GmpBindingsContext for BC where BC: RngContext + TimerContext + GmpBindingsTypes {}
 
 /// An extension trait to [`Ip`].
 pub trait IpExt: Ip {
@@ -898,7 +898,7 @@ pub struct GmpState<I: Ip, BT: GmpBindingsTypes> {
 
 // NB: This block is not bound on GmpBindingsContext because we don't need
 // RngContext to construct GmpState.
-impl<I: Ip, BC: GmpBindingsTypes + TimerContext2> GmpState<I, BC> {
+impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
     pub(crate) fn new<
         D: device::WeakId,
         CC: CoreTimerContext<GmpDelayedReportTimerId<I, D>, BC>,

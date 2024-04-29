@@ -37,7 +37,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext2, TimerHandler,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
     },
     device::{self, AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
@@ -427,7 +427,7 @@ impl<
 
 /// The bindings execution context for IP devices.
 pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
-    TimerContext2
+    TimerContext
     + RngContext
     + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>
 {
@@ -435,7 +435,7 @@ pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
 impl<
         D: device::StrongId,
         I: IpDeviceIpExt,
-        BC: TimerContext2
+        BC: TimerContext
             + RngContext
             + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>,
     > IpDeviceBindingsContext<I, D> for BC

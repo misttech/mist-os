@@ -165,14 +165,6 @@ impl<BT: BindingsTypes> From<tcp::socket::TimerId<WeakDeviceId<BT>, BT>>
     }
 }
 
-impl_timer_context!(
-    BT: BindingsTypes,
-    TransportLayerTimerId<BT>,
-    tcp::socket::TimerId<WeakDeviceId<BT>, BT>,
-    TransportLayerTimerId::Tcp(id),
-    id
-);
-
 /// Returns the address and device that should be used for a socket.
 ///
 /// Given an address for a socket and an optional device that the socket is

@@ -14,7 +14,7 @@ use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
 use tracing::debug;
 
 use crate::{
-    context::{CoreTimerContext, EventContext, TimerBindingsTypes, TimerContext2, TimerHandler},
+    context::{CoreTimerContext, EventContext, TimerBindingsTypes, TimerContext, TimerHandler},
     device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
     ip::device::{
         state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext,
@@ -145,11 +145,11 @@ impl<BT> DadBindingsTypes for BT where BT: TimerBindingsTypes {}
 
 /// The bindings execution context for DAD.
 pub trait DadBindingsContext<DeviceId>:
-    DadBindingsTypes + TimerContext2 + EventContext<DadEvent<DeviceId>>
+    DadBindingsTypes + TimerContext + EventContext<DadEvent<DeviceId>>
 {
 }
 impl<DeviceId, BC> DadBindingsContext<DeviceId> for BC where
-    BC: DadBindingsTypes + TimerContext2 + EventContext<DadEvent<DeviceId>>
+    BC: DadBindingsTypes + TimerContext + EventContext<DadEvent<DeviceId>>
 {
 }
 
@@ -271,7 +271,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     //      Solicitation before ending the Duplicate Address Detection
                     //      process.
                     assert_eq!(
-                        bindings_ctx.schedule_timer2(retrans_timer.get(), timer),
+                        bindings_ctx.schedule_timer(retrans_timer.get(), timer),
                         None,
                         "Unexpected DAD timer; addr={}, device_id={:?}",
                         addr.addr(),
@@ -369,7 +369,7 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, 
                 let leave_group = match dad_state {
                     Ipv6DadState::Assigned => true,
                     Ipv6DadState::Tentative { dad_transmits_remaining: _, timer } => {
-                        assert_ne!(bindings_ctx.cancel_timer2(timer), None);
+                        assert_ne!(bindings_ctx.cancel_timer(timer), None);
 
                         true
                     }

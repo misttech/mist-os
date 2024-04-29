@@ -13,7 +13,7 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext2, TimerHandler,
+        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext, TimerHandler,
     },
     time::Instant,
 };
@@ -49,8 +49,8 @@ pub trait PmtuBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
 impl<BT> PmtuBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
 
 /// The bindings execution context for path MTU discovery.
-trait PmtuBindingsContext: PmtuBindingsTypes + TimerContext2 {}
-impl<BC> PmtuBindingsContext for BC where BC: PmtuBindingsTypes + TimerContext2 {}
+trait PmtuBindingsContext: PmtuBindingsTypes + TimerContext {}
+impl<BC> PmtuBindingsContext for BC where BC: PmtuBindingsTypes + TimerContext {}
 
 /// A handler for incoming PMTU events.
 ///
@@ -94,14 +94,14 @@ fn maybe_schedule_timer<BC: PmtuBindingsContext>(
         return;
     }
 
-    match bindings_ctx.scheduled_instant2(timer) {
+    match bindings_ctx.scheduled_instant(timer) {
         Some(scheduled_at) => {
             let _: BC::Instant = scheduled_at;
             // Timer already set, nothing to do.
         }
         None => {
             // We only enter this match arm if a timer was not already set.
-            assert_eq!(bindings_ctx.schedule_timer2(MAINTENANCE_PERIOD, timer), None)
+            assert_eq!(bindings_ctx.schedule_timer(MAINTENANCE_PERIOD, timer), None)
         }
     }
 }
@@ -200,7 +200,7 @@ pub struct PmtuCache<I: Ip, BT: PmtuBindingsTypes> {
     timer: BT::Timer,
 }
 
-impl<I: Ip, BC: PmtuBindingsTypes + TimerContext2> PmtuCache<I, BC> {
+impl<I: Ip, BC: PmtuBindingsTypes + TimerContext> PmtuCache<I, BC> {
     pub(crate) fn new<CC: CoreTimerContext<PmtuTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
             cache: Default::default(),

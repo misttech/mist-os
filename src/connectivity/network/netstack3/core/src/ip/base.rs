@@ -42,7 +42,7 @@ use tracing::{debug, error, trace};
 use crate::{
     context::{
         CoreTimerContext, CounterContext, EventContext, InstantContext, NestedIntoCoreTimerCtx,
-        NonTestCtxMarker, TimerContext2, TimerHandler, TracingContext,
+        NonTestCtxMarker, TimerContext, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -1235,7 +1235,7 @@ impl Ipv4StateBuilder {
     pub(crate) fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
         StrongDeviceId: StrongId,
-        BC: TimerContext2 + IpLayerBindingsTypes,
+        BC: TimerContext + IpLayerBindingsTypes,
     >(
         self,
         bindings_ctx: &mut BC,
@@ -1261,7 +1261,7 @@ impl Ipv6StateBuilder {
     pub(crate) fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
         StrongDeviceId: StrongId,
-        BC: TimerContext2 + IpLayerBindingsTypes,
+        BC: TimerContext + IpLayerBindingsTypes,
     >(
         self,
         bindings_ctx: &mut BC,
@@ -1598,7 +1598,7 @@ impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, Device
     }
 }
 
-impl<I: IpLayerIpExt, DeviceId, BC: TimerContext2 + IpStateBindingsTypes>
+impl<I: IpLayerIpExt, DeviceId, BC: TimerContext + IpStateBindingsTypes>
     IpStateInner<I, DeviceId, BC>
 {
     pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {

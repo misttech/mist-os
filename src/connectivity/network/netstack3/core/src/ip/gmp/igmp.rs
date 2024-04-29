@@ -31,7 +31,7 @@ use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{CoreTimerContext, TimerContext2, TimerHandler},
+    context::{CoreTimerContext, TimerContext, TimerHandler},
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     ip::{
         device::IpDeviceSendContext,
@@ -58,7 +58,7 @@ pub struct IgmpState<BT: IgmpBindingsTypes> {
     v1_router_present_timer: BT::Timer,
 }
 
-impl<BC: IgmpBindingsTypes + TimerContext2> IgmpState<BC> {
+impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
     pub(crate) fn new<D: device::WeakId, CC: CoreTimerContext<IgmpTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device: D,
@@ -297,7 +297,7 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> GmpContext<Ipv4, BC> for CC {
             |_, IgmpState { v1_router_present_timer }| match actions {
                 Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
                     let _: Option<BC::Instant> =
-                        bindings_ctx.schedule_timer2(duration, v1_router_present_timer);
+                        bindings_ctx.schedule_timer(duration, v1_router_present_timer);
                 }
             },
         );

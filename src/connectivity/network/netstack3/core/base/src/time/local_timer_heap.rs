@@ -8,11 +8,11 @@ use alloc::collections::{binary_heap, hash_map, BinaryHeap, HashMap};
 use core::hash::Hash;
 use core::time::Duration;
 
-use crate::{CoreTimerContext, Instant, InstantBindingsTypes, TimerBindingsTypes, TimerContext2};
+use crate::{CoreTimerContext, Instant, InstantBindingsTypes, TimerBindingsTypes, TimerContext};
 
 /// A local timer heap that keeps timers for core modules.
 ///
-/// `LocalTimerHeap` manages its wakeups through a [`TimerContext2`].
+/// `LocalTimerHeap` manages its wakeups through a [`TimerContext`].
 ///
 /// `K` is the key that timers are keyed on. `V` is optional sidecar data to be
 /// kept with each timer.
@@ -28,7 +28,7 @@ pub struct LocalTimerHeap<K, V, BT: TimerBindingsTypes + InstantBindingsTypes> {
 impl<K, V, BC> LocalTimerHeap<K, V, BC>
 where
     K: Hash + Eq + Clone,
-    BC: TimerContext2,
+    BC: TimerContext,
 {
     /// Creates a new `LocalTimerHeap` with wakeup dispatch ID `dispatch_id`.
     pub fn new(bindings_ctx: &mut BC, dispatch_id: BC::DispatchId) -> Self {
@@ -121,8 +121,8 @@ where
             false
         });
         let _: Option<BC::Instant> = match new_top {
-            Some(time) => bindings_ctx.schedule_timer_instant2(time, next_wakeup),
-            None => bindings_ctx.cancel_timer2(next_wakeup),
+            Some(time) => bindings_ctx.schedule_timer_instant(time, next_wakeup),
+            None => bindings_ctx.cancel_timer(next_wakeup),
         };
     }
 }
@@ -317,7 +317,7 @@ mod testutil {
     where
         K: Hash + Eq + Clone + Debug,
         V: Debug + Eq + PartialEq,
-        BC: TimerContext2,
+        BC: TimerContext,
     {
         /// Asserts installed timers with an iterator of `(key, value, instant)`
         /// tuples.
@@ -407,12 +407,12 @@ mod tests {
         type DispatchId = ();
     }
 
-    impl TimerContext2 for FakeTimerCtx {
+    impl TimerContext for FakeTimerCtx {
         fn new_timer(&mut self, (): Self::DispatchId) -> Self::Timer {
             FakeTimer::default()
         }
 
-        fn schedule_timer_instant2(
+        fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             timer: &mut Self::Timer,
@@ -420,11 +420,11 @@ mod tests {
             timer.scheduled.replace(time)
         }
 
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             timer.scheduled.take()
         }
 
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             timer.scheduled.clone()
         }
     }

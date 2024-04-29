@@ -24,7 +24,7 @@ use packet_formats::utils::NonZeroDuration;
 use crate::{
     context::{
         CoreTimerContext, InstantBindingsTypes, NestedIntoCoreTimerCtx, TimerBindingsTypes,
-        TimerContext2,
+        TimerContext,
     },
     device,
     inspect::{Inspectable, InspectableValue, Inspector},
@@ -80,7 +80,7 @@ pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
     fn new_gmp_state<
         D: device::WeakId,
         CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext2,
+        BC: IpDeviceStateBindingsTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -96,7 +96,7 @@ impl IpDeviceStateIpExt for Ipv4 {
     fn new_gmp_state<
         D: device::WeakId,
         CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext2,
+        BC: IpDeviceStateBindingsTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -134,7 +134,7 @@ impl IpDeviceStateIpExt for Ipv6 {
     fn new_gmp_state<
         D: device::WeakId,
         CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext2,
+        BC: IpDeviceStateBindingsTypes + TimerContext,
     >(
         _bindings_ctx: &mut BC,
         _device_id: D,
@@ -293,7 +293,7 @@ impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::Routin
     }
 }
 
-impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext2> IpDeviceState<I, BC> {
+impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDeviceState<I, BC> {
     fn new<D: device::WeakId, CC: CoreTimerContext<I::GmpTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -404,7 +404,7 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceCon
     }
 }
 
-impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv4DeviceState<BC> {
+impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv4DeviceState<BC> {
     fn new<D: device::WeakId, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -687,7 +687,7 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     pub(crate) slaac_state: Mutex<SlaacState<BT>>,
 }
 
-impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
+impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
     pub fn new<D: device::WeakId, CC: CoreTimerContext<Ipv6DeviceTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -743,7 +743,7 @@ pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
     pub metric: RawMetric,
 }
 
-impl<BC: IpDeviceStateBindingsTypes + TimerContext2> DualStackIpDeviceState<BC> {
+impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
     pub(crate) fn new<
         D: device::WeakId,
         CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>

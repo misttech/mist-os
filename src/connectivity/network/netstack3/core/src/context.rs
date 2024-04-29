@@ -35,7 +35,7 @@
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
 
-use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug, time::Duration};
+use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug};
 
 use lock_order::Unlocked;
 
@@ -51,7 +51,7 @@ use crate::{
 
 pub use netstack3_base::{
     ContextPair, CoreTimerContext, InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx,
-    TimerBindingsTypes, TimerContext2,
+    TimerBindingsTypes, TimerContext,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -93,52 +93,6 @@ pub(crate) fn new_cached_instant_context<I: InstantContext + ?Sized>(
     bindings_ctx: &I,
 ) -> CachedInstantCtx<I::Instant> {
     CachedInstantCtx(bindings_ctx.now())
-}
-
-/// A context that supports scheduling timers.
-pub trait TimerContext<Id>: InstantContext {
-    /// Schedule a timer to fire after some duration.
-    ///
-    /// `schedule_timer` schedules the given timer to be fired after `duration`
-    /// has elapsed, overwriting any previous timer with the same ID.
-    ///
-    /// If there was previously a timer with that ID, return the time at which
-    /// is was scheduled to fire.
-    ///
-    /// # Panics
-    ///
-    /// `schedule_timer` may panic if `duration` is large enough that
-    /// `self.now() + duration` overflows.
-    fn schedule_timer(&mut self, duration: Duration, id: Id) -> Option<Self::Instant> {
-        self.schedule_timer_instant(self.now().checked_add(duration).unwrap(), id)
-    }
-
-    /// Schedule a timer to fire at some point in the future.
-    ///
-    /// `schedule_timer` schedules the given timer to be fired at `time`,
-    /// overwriting any previous timer with the same ID.
-    ///
-    /// If there was previously a timer with that ID, return the time at which
-    /// is was scheduled to fire.
-    fn schedule_timer_instant(&mut self, time: Self::Instant, id: Id) -> Option<Self::Instant>;
-
-    /// Cancel a timer.
-    ///
-    /// If a timer with the given ID exists, it is canceled and the instant at
-    /// which it was scheduled to fire is returned.
-    fn cancel_timer(&mut self, id: Id) -> Option<Self::Instant>;
-
-    /// Cancel all timers which satisfy a predicate.
-    ///
-    /// `cancel_timers_with` calls `f` on each scheduled timer, and cancels any
-    /// timer for which `f` returns true.
-    fn cancel_timers_with<F: FnMut(&Id) -> bool>(&mut self, f: F);
-
-    /// Get the instant a timer will fire, if one is scheduled.
-    ///
-    /// Returns the [`Instant`] a timer with ID `id` will be invoked. If no
-    /// timer with the given ID exists, `scheduled_instant` will return `None`.
-    fn scheduled_instant(&self, id: Id) -> Option<Self::Instant>;
 }
 
 /// A handler for timer firing events.
@@ -450,7 +404,7 @@ pub(crate) mod testutil {
     use alloc::{boxed::Box, collections::BinaryHeap, format, string::String, sync::Arc, vec::Vec};
     #[cfg(test)]
     use alloc::{collections::HashMap, vec};
-    use core::{convert::Infallible as Never, fmt::Debug, hash::Hash};
+    use core::{convert::Infallible as Never, fmt::Debug, hash::Hash, time::Duration};
     #[cfg(test)]
     use core::{marker::PhantomData, ops};
 
@@ -727,45 +681,27 @@ pub(crate) mod testutil {
         type DispatchId = Id;
     }
 
-    impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext2 for FakeTimerCtx<Id> {
+    impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext for FakeTimerCtx<Id> {
         fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
             id
         }
 
-        fn schedule_timer_instant2(
+        fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             timer: &mut Self::Timer,
         ) -> Option<Self::Instant> {
-            self.schedule_timer_instant(time, timer.clone())
-        }
-
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.cancel_timer(timer.clone())
-        }
-
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.scheduled_instant(timer.clone())
-        }
-    }
-
-    impl<Id: PartialEq> TimerContext<Id> for FakeTimerCtx<Id> {
-        fn schedule_timer_instant(&mut self, time: FakeInstant, id: Id) -> Option<FakeInstant> {
-            let ret = self.cancel_timer_inner(&id);
-            self.timers.push(InstantAndData::new(time, id));
+            let ret = self.cancel_timer_inner(timer);
+            self.timers.push(InstantAndData::new(time, timer.clone()));
             ret
         }
 
-        fn cancel_timer(&mut self, id: Id) -> Option<FakeInstant> {
-            self.cancel_timer_inner(&id)
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.cancel_timer_inner(timer)
         }
 
-        fn cancel_timers_with<F: FnMut(&Id) -> bool>(&mut self, mut f: F) {
-            self.timers = self.timers.drain().filter(|t| !f(&t.1)).collect::<Vec<_>>().into();
-        }
-
-        fn scheduled_instant(&self, id: Id) -> Option<FakeInstant> {
-            self.timers.iter().find_map(|x| if x.1 == id { Some(x.0) } else { None })
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.iter().find_map(|x| if x.1 == *timer { Some(x.0) } else { None })
         }
     }
 
@@ -1260,47 +1196,27 @@ pub(crate) mod testutil {
         type DispatchId = <FakeTimerCtx<Id> as TimerBindingsTypes>::DispatchId;
     }
 
-    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext2
+    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext
         for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
             self.timers.new_timer(id)
         }
 
-        fn schedule_timer_instant2(
+        fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             timer: &mut Self::Timer,
         ) -> Option<Self::Instant> {
-            self.timers.schedule_timer_instant2(time, timer)
+            self.timers.schedule_timer_instant(time, timer)
         }
 
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.cancel_timer2(timer)
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.cancel_timer(timer)
         }
 
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.scheduled_instant2(timer)
-        }
-    }
-
-    impl<Id: Debug + PartialEq, Event: Debug, State, FrameMeta> TimerContext<Id>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn schedule_timer_instant(&mut self, time: FakeInstant, id: Id) -> Option<FakeInstant> {
-            self.timers.schedule_timer_instant(time, id)
-        }
-
-        fn cancel_timer(&mut self, id: Id) -> Option<FakeInstant> {
-            self.timers.cancel_timer(id)
-        }
-
-        fn cancel_timers_with<F: FnMut(&Id) -> bool>(&mut self, f: F) {
-            self.timers.cancel_timers_with(f);
-        }
-
-        fn scheduled_instant(&self, id: Id) -> Option<FakeInstant> {
-            self.timers.scheduled_instant(id)
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.scheduled_instant(timer)
         }
     }
 
@@ -2223,20 +2139,24 @@ pub(crate) mod testutil {
             // When one timer is installed, it should be triggered.
             let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
 
-            // No timer with id `0` exists yet.
-            assert_eq!(bindings_ctx.scheduled_instant(0), None);
+            let mut timer0 = bindings_ctx.new_timer(0);
+            let mut timer1 = bindings_ctx.new_timer(1);
+            let mut timer2 = bindings_ctx.new_timer(2);
 
-            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
+            // No timer with id `0` exists yet.
+            assert_eq!(bindings_ctx.scheduled_instant(&mut timer0), None);
+
+            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, &mut timer0), None);
 
             // Timer with id `0` scheduled to execute at `ONE_SEC_INSTANT`.
-            assert_eq!(bindings_ctx.scheduled_instant(0).unwrap(), ONE_SEC_INSTANT);
+            assert_eq!(bindings_ctx.scheduled_instant(&mut timer0).unwrap(), ONE_SEC_INSTANT);
 
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(0));
             assert_eq!(core_ctx.get_ref().as_slice(), [(0, ONE_SEC_INSTANT)]);
 
             // After the timer fires, it should not still be scheduled at some
             // instant.
-            assert_eq!(bindings_ctx.scheduled_instant(0), None);
+            assert_eq!(bindings_ctx.scheduled_instant(&mut timer0), None);
 
             // The time should have been advanced.
             assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
@@ -2250,27 +2170,27 @@ pub(crate) mod testutil {
             // If we schedule a timer but then cancel it, it shouldn't fire.
             let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
 
-            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
-            assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
+            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, &mut timer0), None);
+            assert_eq!(bindings_ctx.cancel_timer(&mut timer0), Some(ONE_SEC_INSTANT));
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
             assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // If we schedule a timer but then schedule the same ID again, the
             // second timer should overwrite the first one.
             let FakeCtx { core_ctx: _, mut bindings_ctx } = new_ctx();
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), &mut timer0), None);
             assert_eq!(
-                bindings_ctx.schedule_timer(ONE_SEC, 0),
+                bindings_ctx.schedule_timer(ONE_SEC, &mut timer0),
                 Some(Duration::from_secs(0).into())
             );
-            assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
+            assert_eq!(bindings_ctx.cancel_timer(&mut timer0), Some(ONE_SEC_INSTANT));
 
             // If we schedule three timers and then run `trigger_timers_until`
             // with the appropriate value, only two of them should fire.
             let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None,);
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(1), 1), None,);
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 2), None,);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), &mut timer0), None);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(1), &mut timer1), None);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), &mut timer2), None);
             assert_eq!(
                 bindings_ctx.trigger_timers_until_instant(ONE_SEC_INSTANT, &mut core_ctx),
                 vec![0, 1],
@@ -2283,15 +2203,15 @@ pub(crate) mod testutil {
             );
 
             // They should be canceled now.
-            assert_eq!(bindings_ctx.cancel_timer(0), None);
-            assert_eq!(bindings_ctx.cancel_timer(1), None);
+            assert_eq!(bindings_ctx.cancel_timer(&mut timer0), None);
+            assert_eq!(bindings_ctx.cancel_timer(&mut timer1), None);
 
             // The clock should have been updated.
             assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
 
             // The last timer should not have fired.
             assert_eq!(
-                bindings_ctx.cancel_timer(2),
+                bindings_ctx.cancel_timer(&mut timer2),
                 Some(FakeInstant::from(Duration::from_secs(2)))
             );
         }
@@ -2302,8 +2222,10 @@ pub(crate) mod testutil {
             // point, the time should still be advanced.
             let FakeCtx { mut core_ctx, mut bindings_ctx } =
                 FakeCtx::<Vec<(usize, FakeInstant)>, usize, (), (), FakeDeviceId, ()>::default();
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None);
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 1), None);
+            let mut timer0 = bindings_ctx.new_timer(0);
+            let mut timer1 = bindings_ctx.new_timer(1);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), &mut timer0), None);
+            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), &mut timer1), None);
             bindings_ctx.trigger_timers_until_and_expect_unordered(
                 ONE_SEC_INSTANT,
                 vec![0],

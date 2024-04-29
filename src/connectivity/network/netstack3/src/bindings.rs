@@ -24,9 +24,7 @@ mod root_fidl_worker;
 mod routes;
 mod socket;
 mod stack_fidl_worker;
-mod timers;
-// TODO(https://fxbug.dev/42083407): Rename this module when everything is using
-// the new timer context.
+
 mod timers2;
 mod util;
 mod verifier_worker;
@@ -64,7 +62,6 @@ use devices::{
     StaticCommonInfo, StaticNetdeviceInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
-use timers::TimerDispatcher;
 
 use net_types::{
     ethernet::Mac,
@@ -91,7 +88,7 @@ use netstack3_core::{
     sync::RwLock as CoreRwLock,
     udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
-    TimerBindingsTypes, TimerContext, TimerContext2, TimerId, TracingContext,
+    TimerBindingsTypes, TimerContext, TimerId, TracingContext,
 };
 
 mod ctx {
@@ -265,49 +262,20 @@ const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 pub(crate) struct BindingsCtxInner {
-    timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
-    timers2: timers2::TimerDispatcher<TimerId<BindingsCtx>>,
+    timers: timers2::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
 }
 
 impl BindingsCtxInner {
     fn new(routes_change_sink: routes::ChangeSink) -> Self {
-        Self {
-            timers: Default::default(),
-            timers2: Default::default(),
-            devices: Default::default(),
-            routes: routes_change_sink,
-        }
-    }
-}
-
-impl AsRef<timers::TimerDispatcher<TimerId<BindingsCtx>>> for BindingsCtx {
-    fn as_ref(&self) -> &TimerDispatcher<TimerId<BindingsCtx>> {
-        &self.timers
+        Self { timers: Default::default(), devices: Default::default(), routes: routes_change_sink }
     }
 }
 
 impl AsRef<Devices<DeviceId<BindingsCtx>>> for BindingsCtx {
     fn as_ref(&self) -> &Devices<DeviceId<BindingsCtx>> {
         &self.devices
-    }
-}
-
-impl timers::TimerHandler<TimerId<BindingsCtx>> for Ctx {
-    fn handle_expired_timer(&mut self, timer: TimerId<BindingsCtx>) {
-        self.api().handle_timer(timer)
-    }
-
-    fn get_timer_dispatcher(&mut self) -> &timers::TimerDispatcher<TimerId<BindingsCtx>> {
-        self.bindings_ctx().as_ref()
-    }
-}
-
-impl timers::TimerContext<TimerId<BindingsCtx>> for Netstack {
-    type Handler = Ctx;
-    fn handler(&self) -> Ctx {
-        self.ctx.clone()
     }
 }
 
@@ -459,12 +427,12 @@ impl TimerBindingsTypes for BindingsCtx {
     type DispatchId = TimerId<BindingsCtx>;
 }
 
-impl TimerContext2 for BindingsCtx {
+impl TimerContext for BindingsCtx {
     fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-        self.timers2.new_timer(id)
+        self.timers.new_timer(id)
     }
 
-    fn schedule_timer_instant2(
+    fn schedule_timer_instant(
         &mut self,
         StackTime(time): Self::Instant,
         timer: &mut Self::Timer,
@@ -472,34 +440,12 @@ impl TimerContext2 for BindingsCtx {
         timer.schedule(time).map(Into::into)
     }
 
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+    fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         timer.cancel().map(Into::into)
     }
 
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+    fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         timer.scheduled_time().map(Into::into)
-    }
-}
-
-impl TimerContext<TimerId<BindingsCtx>> for BindingsCtx {
-    fn schedule_timer_instant(
-        &mut self,
-        time: StackTime,
-        id: TimerId<BindingsCtx>,
-    ) -> Option<StackTime> {
-        self.timers.schedule_timer(id, time)
-    }
-
-    fn cancel_timer(&mut self, id: TimerId<BindingsCtx>) -> Option<StackTime> {
-        self.timers.cancel_timer(&id)
-    }
-
-    fn cancel_timers_with<F: FnMut(&TimerId<BindingsCtx>) -> bool>(&mut self, f: F) {
-        self.timers.cancel_timers_with(f);
-    }
-
-    fn scheduled_instant(&self, id: TimerId<BindingsCtx>) -> Option<StackTime> {
-        self.timers.scheduled_time(&id)
     }
 }
 
@@ -1151,15 +1097,10 @@ impl NetstackSeed {
         } = self;
 
         // Start servicing timers.
-        let timers_task =
-            NamedTask::new("timers", netstack.ctx.bindings_ctx().timers.spawn(netstack.clone()));
-
         let mut timer_handler_ctx = netstack.ctx.clone();
-        // TODO(https://fxbug.dev/42083407): Don't forget to rename this
-        // variable and the string below when deleting old timers impl.
-        let timers2_task = NamedTask::new(
-            "timers2",
-            netstack.ctx.bindings_ctx().timers2.spawn(move |timer| {
+        let timers_task = NamedTask::new(
+            "timers",
+            netstack.ctx.bindings_ctx().timers.spawn(move |timer| {
                 timer_handler_ctx.api().handle_timer(timer);
             }),
         );
@@ -1205,7 +1146,6 @@ impl NetstackSeed {
         let no_finish_tasks = loopback_tasks.into_iter().chain([
             interfaces_worker_task,
             timers_task,
-            timers2_task,
             neighbor_worker_task,
         ]);
         let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
@@ -1503,7 +1443,6 @@ impl NetstackSeed {
             .expect("loopback task must still be running");
         // Stop the timer dispatcher.
         ctx.bindings_ctx().timers.stop();
-        ctx.bindings_ctx().timers2.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
         // Stop the neighbor watcher worker.

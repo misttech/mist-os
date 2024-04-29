@@ -17,7 +17,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext2, TimerHandler,
+        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext, TimerHandler,
     },
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     time::LocalTimerHeap,
@@ -118,11 +118,11 @@ impl<BT> Ipv6RouteDiscoveryBindingsTypes for BT where BT: TimerBindingsTypes + I
 
 /// The bindings execution context for IPv6 route discovery.
 pub trait Ipv6RouteDiscoveryBindingsContext:
-    Ipv6RouteDiscoveryBindingsTypes + TimerContext2
+    Ipv6RouteDiscoveryBindingsTypes + TimerContext
 {
 }
 impl<BC> Ipv6RouteDiscoveryBindingsContext for BC where
-    BC: Ipv6RouteDiscoveryBindingsTypes + TimerContext2
+    BC: Ipv6RouteDiscoveryBindingsTypes + TimerContext
 {
 }
 

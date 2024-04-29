@@ -25,7 +25,7 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, ResourceCounterContext, SendFrameContext, TimerContext2,
+        CoreTimerContext, CounterContext, ResourceCounterContext, SendFrameContext, TimerContext,
     },
     device::{
         self,
@@ -90,7 +90,7 @@ impl DeviceStateSpec for LoopbackDevice {
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
-        BC: DeviceLayerTypes + TimerContext2,
+        BC: DeviceLayerTypes + TimerContext,
     >(
         _bindings_ctx: &mut BC,
         _self_id: CC::WeakDeviceId,

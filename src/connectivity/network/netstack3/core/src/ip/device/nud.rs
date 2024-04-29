@@ -38,7 +38,7 @@ use zerocopy::ByteSlice;
 use crate::{
     context::{
         CoreTimerContext, CounterContext, EventContext, InstantBindingsTypes, TimerBindingsTypes,
-        TimerContext2, TimerHandler,
+        TimerContext, TimerHandler,
     },
     counters::Counter,
     device::{
@@ -1452,7 +1452,7 @@ struct TimerHeap<I: Ip, BT: TimerBindingsTypes + InstantBindingsTypes> {
     neighbor: LocalTimerHeap<SpecifiedAddr<I::Addr>, NudEvent, BT>,
 }
 
-impl<I: Ip, BC: TimerContext2> TimerHeap<I, BC> {
+impl<I: Ip, BC: TimerContext> TimerHeap<I, BC> {
     fn new<
         DeviceId: device::WeakId,
         L: LinkDevice,
@@ -1530,7 +1530,7 @@ impl<I: Ip, BC: TimerContext2> TimerHeap<I, BC> {
         last_gc: &Option<BC::Instant>,
     ) {
         let Self { gc, neighbor: _ } = self;
-        if num_entries > MAX_ENTRIES && bindings_ctx.scheduled_instant2(gc).is_none() {
+        if num_entries > MAX_ENTRIES && bindings_ctx.scheduled_instant(gc).is_none() {
             let instant = if let Some(last_gc) = last_gc {
                 last_gc.add(MIN_GARBAGE_COLLECTION_INTERVAL.get())
             } else {
@@ -1539,7 +1539,7 @@ impl<I: Ip, BC: TimerContext2> TimerHeap<I, BC> {
             // Scheduling a timer requires a mutable borrow and we're
             // currently holding it exclusively. We just checked that the timer
             // is not scheduled, so this assertion always holds.
-            assert_eq!(bindings_ctx.schedule_timer_instant2(instant, gc), None);
+            assert_eq!(bindings_ctx.schedule_timer_instant(instant, gc), None);
         }
     }
 }
@@ -1552,7 +1552,7 @@ pub struct NudState<I: Ip, D: LinkDevice, BT: NudBindingsTypes<D>> {
     timer_heap: TimerHeap<I, BT>,
 }
 
-impl<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D> + TimerContext2> NudState<I, D, BC> {
+impl<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D> + TimerContext> NudState<I, D, BC> {
     pub fn new<DeviceId: device::WeakId, CC: CoreTimerContext<NudTimerId<I, D, DeviceId>, BC>>(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
@@ -1567,7 +1567,7 @@ impl<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D> + TimerContext2> NudState<I, 
 
 /// The bindings context for NUD.
 pub trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
-    TimerContext2
+    TimerContext
     + LinkResolutionContext<D>
     + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
 {
@@ -1577,7 +1577,7 @@ impl<
         I: Ip,
         D: LinkDevice,
         DeviceId,
-        BC: TimerContext2
+        BC: TimerContext
             + LinkResolutionContext<D>
             + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>,
     > NudBindingsContext<I, D, DeviceId> for BC
@@ -4998,7 +4998,7 @@ mod tests {
             true,
         );
         assert_eq!(
-            bindings_ctx.timer_ctx().scheduled_instant2(&mut core_ctx.outer.nud.timer_heap.gc),
+            bindings_ctx.timer_ctx().scheduled_instant(&mut core_ctx.outer.nud.timer_heap.gc),
             None
         );
     }
