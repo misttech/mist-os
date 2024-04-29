@@ -286,6 +286,14 @@ if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; the
   )
   package_tool_args=( repository publish "${repo_dir}" "${package_tool_flags[@]}" )
 
+  # Check for erroneously running instances of package-tool
+  package_tool_pids=$(pgrep -f "package-tool repository publish $(fx get-build-dir)/amber-files --watch")
+  if [[ -n $package_tool_pids ]]; then
+    fx-error "Incremental auto-publisher for this build config is/are already running under pid(s): $(echo $package_tool_pids)."
+    fx-error "This is probably an error. Please terminate the auto-publisher process(es) and restart."
+    exit 1
+  fi
+
   # the manifest list file has relative paths and package manifest watcher looks for them
   # from PWD, so the command needs to be executed in "$FUCHSIA_BUILD_DIR"
   if [[ "${verbose}" == true ]]; then
