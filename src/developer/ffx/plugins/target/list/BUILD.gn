@@ -19,19 +19,18 @@ ffx_plugin("ffx_list") {
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:regex",
   ]

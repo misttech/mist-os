@@ -144,11 +144,6 @@ When updating, please add the value in alphabetical order.
 :                                         : Defaults to first available of:    :
 :                                         :   `$FUCHSIA_DEVICE_ADDR`           :
 :                                         :   `$FUCHSIA_NODENAME`              :
-| `target.host_pipe_ssh_timeout`          | Time the target waits for an       |
-:                                         : initial response from ssh on the   :
-:                                         : target (currently, only in `ffx    :
-:                                         : target list`). Defaults to `10`    :
-:                                         : seconds.                           :
 | `targets.manual`                        | Contains the list of manual        |
 :                                         : targets. Defaults to an empty list :
 | `ffx.subtool-search-paths`              | A list of paths to search for non- |

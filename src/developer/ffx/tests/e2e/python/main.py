@@ -82,15 +82,9 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
             ["--machine", "json", "-c", "ffx.isolated=true", "target", "list"]
         )
         output_json = json.loads(output)
-        devices = [
-            o for o in output_json if o["nodename"] == self.dut.device_name
-        ]
-        # Assert ffx's target list device name contain's Honeydew's device.
-        asserts.assert_greater(len(devices), 0)
-        # Assert that we can correctly identify the RCS state
-        asserts.assert_equal(devices[0]["rcs_state"], "Y")
-        # Assert that we can correctly identify the product
-        asserts.assert_not_equal(devices[0]["target_type"], "<unknown>")
+        device_names = [o["nodename"] for o in output_json]
+        # Assert FFX's target list device name contain's Honeydew's device.
+        asserts.assert_in(self.dut.device_name, device_names)
         # Make sure the daemon hadn't started running
         with asserts.assert_raises(honeydew.errors.FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])

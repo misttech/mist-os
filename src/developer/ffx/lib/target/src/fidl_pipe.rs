@@ -87,11 +87,11 @@ impl FidlPipe {
     ///     target: the address to the Fuchsia target.
     ///     overnet_node: The backing overnet node for this connection.
     pub async fn new(
-        env_context: &EnvironmentContext,
+        env_context: EnvironmentContext,
         target: SocketAddr,
         overnet_node: Arc<overnet_core::Router>,
     ) -> Result<Self> {
-        let ssh_connector = SshConnector::new(target, env_context)
+        let ssh_connector = SshConnector::new(target, &env_context)
             .await
             .map_err(|e| FidlPipeError::SpawnError(e.to_string()))?;
         let socket = create_overnet_socket(overnet_node).map_err(|e| {
