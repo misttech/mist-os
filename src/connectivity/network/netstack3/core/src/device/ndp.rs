@@ -534,7 +534,7 @@ mod tests {
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(
             Ipv6DeviceTimerId::Dad(crate::ip::device::dad::DadTimerId {
-                device_id: id.into(),
+                device_id: id.downgrade().into(),
                 addr: addr.get(),
             })
             .into(),

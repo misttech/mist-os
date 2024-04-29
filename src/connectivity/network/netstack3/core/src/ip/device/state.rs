@@ -30,6 +30,7 @@ use crate::{
     inspect::{Inspectable, InspectableValue, Inspector},
     ip::{
         device::{
+            dad::DadBindingsTypes,
             route_discovery::Ipv6RouteDiscoveryState,
             router_solicitation::RsState,
             slaac::{SlaacConfiguration, SlaacState},
@@ -777,8 +778,9 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
 }
 
 /// The various states DAD may be in for an address.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Ipv6DadState {
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub enum Ipv6DadState<BT: DadBindingsTypes> {
     /// The address is assigned to an interface and can be considered bound to
     /// it (all packets destined to the address will be accepted).
     Assigned,
@@ -789,7 +791,7 @@ pub enum Ipv6DadState {
     ///
     /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
     /// to be sent and DAD may be resolved.
-    Tentative { dad_transmits_remaining: Option<NonZeroU16> },
+    Tentative { dad_transmits_remaining: Option<NonZeroU16>, timer: BT::Timer },
 
     /// The address has not yet been initialized.
     Uninitialized,
@@ -1011,23 +1013,22 @@ impl<Instant: crate::Instant> Inspectable for Ipv6AddressState<Instant> {
 /// Data associated with an IPv6 address on an interface.
 // TODO(https://fxbug.dev/42173351): Should this be generalized for loopback?
 #[derive(Derivative)]
-#[derivative(Debug)]
+#[derivative(Debug(bound = ""))]
 pub struct Ipv6AddressEntry<BT: IpDeviceStateBindingsTypes> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    pub(crate) dad_state: Mutex<Ipv6DadState>,
+    pub(crate) dad_state: Mutex<Ipv6DadState<BT>>,
     pub(crate) state: RwLock<Ipv6AddressState<BT::Instant>>,
 }
 
 impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
     pub(crate) fn new(
         addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        dad_state: Ipv6DadState,
+        dad_state: Ipv6DadState<BT>,
         config: Ipv6AddrConfig<BT::Instant>,
     ) -> Self {
         let assigned = match dad_state {
             Ipv6DadState::Assigned => true,
-            Ipv6DadState::Tentative { dad_transmits_remaining: _ }
-            | Ipv6DadState::Uninitialized => false,
+            Ipv6DadState::Tentative { .. } | Ipv6DadState::Uninitialized => false,
         };
 
         Self {
@@ -1048,8 +1049,8 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
 impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad>
     for Ipv6AddressEntry<BT>
 {
-    type Data = Ipv6DadState;
-    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6DadState>
+    type Data = Ipv6DadState<BT>;
+    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6DadState<BT>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -1119,10 +1120,15 @@ mod tests {
 
         let mut ipv6 = IpDeviceAddresses::<Ipv6, FakeBindingsCtxImpl>::default();
 
+        let mut bindings_ctx = FakeBindingsCtxImpl::default();
+
         let _: StrongRc<_> = ipv6
             .add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
-                Ipv6DadState::Tentative { dad_transmits_remaining: None },
+                Ipv6DadState::Tentative {
+                    dad_transmits_remaining: None,
+                    timer: bindings_ctx.new_timer(()),
+                },
                 Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }),
             ))
             .unwrap();

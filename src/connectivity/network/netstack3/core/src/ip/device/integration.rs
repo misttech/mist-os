@@ -32,7 +32,7 @@ use packet_formats::{
 
 use crate::{
     context::{CoreTimerContext, CounterContext, InstantContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext},
+    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
     ip::{
@@ -60,6 +60,7 @@ use crate::{
             },
             AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
             IpDeviceIpExt, IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr,
+            Ipv6DeviceTimerId,
         },
         gmp::{
             self,
@@ -75,7 +76,7 @@ use crate::{
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
-use super::state::Ipv6NetworkLearnedParameters;
+use super::{dad::DadTimerId, state::Ipv6NetworkLearnedParameters};
 
 pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
@@ -840,7 +841,7 @@ impl<
         .expect("DAD address must always exist")
     }
 
-    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>>) -> O>(
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>, BC>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
@@ -1480,6 +1481,14 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::NudCounter
 impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::NudCounters<I>>())
+    }
+}
+
+impl<'a, Config, L, BC: BindingsContext> CoreTimerContext<DadTimerId<WeakDeviceId<BC>>, BC>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
+    fn convert_timer(dispatch_id: DadTimerId<WeakDeviceId<BC>>) -> BC::DispatchId {
+        IpDeviceTimerId::<Ipv6, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
     }
 }
 
