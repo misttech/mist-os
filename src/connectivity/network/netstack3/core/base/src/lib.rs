@@ -14,6 +14,7 @@ extern crate fakealloc as alloc;
 
 mod context;
 mod counters;
+mod data_structures;
 mod inspect;
 mod time;
 
@@ -25,6 +26,13 @@ pub use time::{
     InstantBindingsTypes, InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx,
     TimerBindingsTypes, TimerContext, TimerHandler,
 };
+
+/// Reference counted hash map data structure.
+pub mod ref_counted_hash_map {
+    pub use crate::data_structures::ref_counted_hash_map::{
+        InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
+    };
+}
 
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]

@@ -13,6 +13,8 @@ rustc_library_with_features("netstack3-base") {
   sources = [
     "src/context.rs",
     "src/counters.rs",
+    "src/data_structures.rs",
+    "src/data_structures/ref_counted_hash_map.rs",
     "src/inspect.rs",
     "src/lib.rs",
     "src/time.rs",
@@ -21,6 +23,7 @@ rustc_library_with_features("netstack3-base") {
   ]
   deps = [
     "//src/connectivity/lib/net-types",
+    "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
   ]
 

@@ -6,8 +6,8 @@ use alloc::collections::hash_map::{Entry, HashMap};
 use core::{hash::Hash, num::NonZeroUsize};
 
 /// The result of inserting an element into a [`RefCountedHashMap`].
-#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-pub(crate) enum InsertResult<O> {
+#[derive(Debug, Eq, PartialEq)]
+pub enum InsertResult<O> {
     /// The key was not previously in the map, so it was inserted.
     Inserted(O),
     /// The key was already in the map, so we incremented the entry's reference
@@ -16,8 +16,8 @@ pub(crate) enum InsertResult<O> {
 }
 
 /// The result of removing an entry from a [`RefCountedHashMap`].
-#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-pub(crate) enum RemoveResult<V> {
+#[derive(Debug, Eq, PartialEq)]
+pub enum RemoveResult<V> {
     /// The reference count reached 0, so the entry was removed.
     Removed(V),
     /// The reference count did not reach 0, so the entry still exists in the map.
@@ -27,8 +27,8 @@ pub(crate) enum RemoveResult<V> {
 }
 
 /// A [`HashMap`] which keeps a reference count for each entry.
-#[cfg_attr(test, derive(Debug))]
-pub(crate) struct RefCountedHashMap<K, V> {
+#[derive(Debug)]
+pub struct RefCountedHashMap<K, V> {
     inner: HashMap<K, (NonZeroUsize, V)>,
 }
 
@@ -43,11 +43,7 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
     ///
     /// If the key isn't in the map, the given function is called to create its
     /// associated value.
-    pub(crate) fn insert_with<O, F: FnOnce() -> (V, O)>(
-        &mut self,
-        key: K,
-        f: F,
-    ) -> InsertResult<O> {
+    pub fn insert_with<O, F: FnOnce() -> (V, O)>(&mut self, key: K, f: F) -> InsertResult<O> {
         match self.inner.entry(key) {
             Entry::Occupied(mut entry) => {
                 let (refcnt, _): &mut (NonZeroUsize, V) = entry.get_mut();
@@ -67,7 +63,7 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
     ///
     /// If the reference count reaches 0, the entry will be removed and its
     /// value returned.
-    pub(crate) fn remove(&mut self, key: K) -> RemoveResult<V> {
+    pub fn remove(&mut self, key: K) -> RemoveResult<V> {
         match self.inner.entry(key) {
             Entry::Vacant(_) => RemoveResult::NotPresent,
             Entry::Occupied(mut entry) => {
@@ -87,30 +83,30 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
     }
 
     /// Returns `true` if the map contains a value for the specified key.
-    pub(crate) fn contains_key(&self, key: &K) -> bool {
+    pub fn contains_key(&self, key: &K) -> bool {
         self.inner.contains_key(key)
     }
 
     /// Returns a reference to the value corresponding to the key.
-    #[cfg(test)]
-    pub(crate) fn get(&self, key: &K) -> Option<&V> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         self.inner.get(key).map(|(_, value)| value)
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
-    pub(crate) fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         self.inner.get_mut(key).map(|(_, value)| value)
     }
 
     /// An iterator visiting all key-value pairs in arbitrary order, with
     /// mutable references to the values.
-    pub(crate) fn iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = (&'a K, &'a mut V)> {
+    pub fn iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = (&'a K, &'a mut V)> {
         self.inner.iter_mut().map(|(key, (_, value))| (key, value))
     }
 }
 
 /// A [`RefCountedHashMap`] where the value is `()`.
-pub(crate) struct RefCountedHashSet<T> {
+#[derive(Debug)]
+pub struct RefCountedHashSet<T> {
     inner: RefCountedHashMap<T, ()>,
 }
 
@@ -122,7 +118,7 @@ impl<T> Default for RefCountedHashSet<T> {
 
 impl<T: Eq + Hash> RefCountedHashSet<T> {
     /// Increments the reference count of the given value.
-    pub(crate) fn insert(&mut self, value: T) -> InsertResult<()> {
+    pub fn insert(&mut self, value: T) -> InsertResult<()> {
         self.inner.insert_with(value, || ((), ()))
     }
 
@@ -130,24 +126,22 @@ impl<T: Eq + Hash> RefCountedHashSet<T> {
     ///
     /// If the reference count reaches 0, the value will be removed from the
     /// set.
-    pub(crate) fn remove(&mut self, value: T) -> RemoveResult<()> {
+    pub fn remove(&mut self, value: T) -> RemoveResult<()> {
         self.inner.remove(value)
     }
 
     /// Returns `true` if the set contains the given value.
-    pub(crate) fn contains(&self, value: &T) -> bool {
+    pub fn contains(&self, value: &T) -> bool {
         self.inner.contains_key(value)
     }
 
     /// Returns the number of values in the set.
-    #[cfg(any(test, feature = "testutils"))]
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.inner.inner.len()
     }
 
     /// Iterates over values and reference counts.
-    #[cfg(any(test, feature = "testutils"))]
-    pub(crate) fn iter_counts(&self) -> impl Iterator<Item = (&'_ T, NonZeroUsize)> + '_ {
+    pub fn iter_counts(&self) -> impl Iterator<Item = (&'_ T, NonZeroUsize)> + '_ {
         self.inner.inner.iter().map(|(key, (count, ()))| (key, *count))
     }
 }

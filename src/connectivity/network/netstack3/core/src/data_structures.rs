@@ -4,6 +4,11 @@
 
 //! Common data structures.
 
-pub(crate) mod ref_counted_hash_map;
+pub(crate) mod ref_counted_hash_map {
+    pub(crate) use netstack3_base::ref_counted_hash_map::{
+        InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
+    };
+}
+
 pub(crate) mod socketmap;
 pub(crate) mod token_bucket;
