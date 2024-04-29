@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_MANAGER_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_MANAGER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 
 #include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
@@ -16,7 +16,7 @@
 
 #include <list>
 
-#include "src/devices/bin/driver_manager/node_remover.h"
+#include "src/devices/bin/driver_manager/shutdown/node_remover.h"
 
 namespace driver_manager {
 using fuchsia_device_manager::SystemPowerState;
@@ -180,4 +180,4 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
 };
 
 }  // namespace driver_manager
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_MANAGER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_

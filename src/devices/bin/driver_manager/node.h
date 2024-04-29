@@ -20,7 +20,7 @@
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/inspect.h"
-#include "src/devices/bin/driver_manager/shutdown_helper.h"
+#include "src/devices/bin/driver_manager/shutdown/shutdown_helper.h"
 
 namespace driver_manager {
 

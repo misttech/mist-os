@@ -38,7 +38,7 @@
 #include "src/devices/bin/driver_manager/driver_host_loader_service.h"
 #include "src/devices/bin/driver_manager/driver_manager_config.h"
 #include "src/devices/bin/driver_manager/driver_runner.h"
-#include "src/devices/bin/driver_manager/shutdown_manager.h"
+#include "src/devices/bin/driver_manager/shutdown/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"

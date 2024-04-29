@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_HELPER_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_HELPER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_HELPER_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_HELPER_H_
 
 #include <lib/async_patterns/cpp/task_scope.h>
 #include <stdint.h>
@@ -165,4 +165,4 @@ class ShutdownHelper {
 
 }  // namespace driver_manager
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_HELPER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_HELPER_H_

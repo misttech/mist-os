@@ -14,7 +14,7 @@
 
 #include <bind/fuchsia/platform/cpp/bind.h>
 
-#include "src/devices/bin/driver_manager/node_removal_tracker.h"
+#include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
 

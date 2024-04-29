@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_NODE_REMOVAL_TRACKER_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_NODE_REMOVAL_TRACKER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_NODE_REMOVAL_TRACKER_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_NODE_REMOVAL_TRACKER_H_
 
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
@@ -62,4 +62,4 @@ class NodeRemovalTracker {
 };
 
 }  // namespace driver_manager
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_NODE_REMOVAL_TRACKER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_NODE_REMOVAL_TRACKER_H_

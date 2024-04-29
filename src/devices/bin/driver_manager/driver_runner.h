@@ -30,9 +30,9 @@
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/node.h"
-#include "src/devices/bin/driver_manager/node_removal_tracker.h"
-#include "src/devices/bin/driver_manager/node_remover.h"
 #include "src/devices/bin/driver_manager/runner.h"
+#include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
+#include "src/devices/bin/driver_manager/shutdown/node_remover.h"
 #include "src/devices/lib/log/log.h"
 
 // Note, all of the logic here assumes we are operating on a single-threaded
