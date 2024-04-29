@@ -130,7 +130,7 @@ pub fn new_fuse_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let mut mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
+    let mut mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
     let fd = fs_args::parse::<FdNumber>(
         mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?.as_ref(),
     )?;

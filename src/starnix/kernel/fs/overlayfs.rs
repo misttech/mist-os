@@ -944,7 +944,7 @@ impl OverlayFs {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
-        let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
+        let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
         match mount_options.get("redirect_dir".as_bytes()) {
             None => (),
             Some(o) if o == "off" => (),

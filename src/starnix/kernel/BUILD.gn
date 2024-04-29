@@ -368,6 +368,7 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:netlink-packet-route",
     "//third_party/rust_crates:netlink-packet-sock-diag",
     "//third_party/rust_crates:netlink-packet-utils",
+    "//third_party/rust_crates:nom",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:once_cell",
