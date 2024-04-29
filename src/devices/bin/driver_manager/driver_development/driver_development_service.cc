@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/driver_development_service.h"
+#include "src/devices/bin/driver_manager/driver_development/driver_development_service.h"
 
-#include <fidl/fuchsia.driver.framework/cpp/wire_types.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fidl/cpp/wire/internal/transport.h>
 
 #include <queue>
 #include <unordered_set>

@@ -127,8 +127,8 @@ source_set("driver_runner") {
 
 source_set("driver_development_service") {
   sources = [
-    "driver_development_service.cc",
-    "driver_development_service.h",
+    "driver_development/driver_development_service.cc",
+    "driver_development/driver_development_service.h",
   ]
   public_deps = [
     ":driver_runner",

@@ -34,7 +34,7 @@
 #include <fbl/unique_fd.h>
 
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
-#include "src/devices/bin/driver_manager/driver_development_service.h"
+#include "src/devices/bin/driver_manager/driver_development/driver_development_service.h"
 #include "src/devices/bin/driver_manager/driver_host_loader_service.h"
 #include "src/devices/bin/driver_manager/driver_manager_config.h"
 #include "src/devices/bin/driver_manager/driver_runner.h"
