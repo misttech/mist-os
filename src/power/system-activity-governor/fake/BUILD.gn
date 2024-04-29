@@ -1,4 +1,4 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -6,60 +6,55 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
-  name = "system_activity_governor"
+  name = "fake_system_activity_governor"
   edition = "2021"
   sources = [
     "src/main.rs",
-    "src/system_activity_governor.rs",
+    "src/system_activity_governor_control.rs",
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/lib/device-watcher/rust",
     "//src/lib/async-utils",
-    "//src/lib/diagnostics/inspect/runtime/rust",
-    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/power/broker/client",
+    "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_rust",
+    "//src/power/system-activity-governor/integration/testing/fidl:test.suspendcontrol_rust",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }
 
 fuchsia_component_manifest("manifest") {
-  manifest = "meta/system-activity-governor.cml"
-  component_name = "system-activity-governor"
-}
-
-group("system-activity-governor") {
-  testonly = true
-  deps = [
-    ":bin",
-    ":tests",
-  ]
+  manifest = "meta/fake-system-activity-governor.cml"
+  component_name = "fake-system-activity-governor"
 }
 
 fuchsia_component("component") {
   cm_label = ":manifest"
-  deps = [ ":bin" ]
+  deps = [
+    ":bin",
+    "//src/devices/misc/drivers/test-parent",
+    "//src/power/system-activity-governor:component",
+    "//src/power/system-activity-governor/integration/testing/fake-suspend",
+  ]
 }
 
 fuchsia_package("package") {
-  package_name = "system-activity-governor"
+  testonly = true
+  package_name = "fake-system-activity-governor"
   deps = [ ":component" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ "integration/tests" ]
+  deps = [ "tests" ]
 }

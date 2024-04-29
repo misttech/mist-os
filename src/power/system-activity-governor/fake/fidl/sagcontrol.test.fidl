@@ -1,0 +1,61 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library test.sagcontrol;
+using fuchsia.power.system;
+
+/// Errors associated with SetSystemActivityGovernorState methods.
+type SetSystemActivityGovernorStateError = strict enum : uint32 {
+    /// Indicates that the requested state is not supported by SAG's power
+    /// tooplogy.
+    NOT_SUPPORTED = 1;
+    /// Indicates that the request failed due to an internal error.
+    INTERNAL = 2;
+};
+
+type SystemActivityGovernorState = table {
+    1: execution_state_level fuchsia.power.system.ExecutionStateLevel;
+    2: application_activity_level fuchsia.power.system.ApplicationActivityLevel;
+    3: full_wake_handling_level fuchsia.power.system.FullWakeHandlingLevel;
+    4: wake_handling_level fuchsia.power.system.WakeHandlingLevel;
+};
+
+@discoverable
+open protocol State {
+    /// Sets the power elements to specific states supported by SAG.
+    ///
+    /// The initial state of SAG is (2, 0, 0, 0). SAG maintains execution_state_level == 2 until a
+    /// "boot complete" logic is triggered. "boot complete" logic is triggered by setting SAG states
+    /// to (2, 1, any, any).
+    ///
+    /// Supported states before "boot complete":
+    /// - (2, any, any, any)
+    /// Supported states after "boot complete":
+    /// - (2, 1, any, any)
+    /// - (1, 0, 1, any)
+    /// - (1, 0, any, 1)
+    /// - (0, 0, 0, 0)
+    ///
+    /// In SystemActivityGovernorState, omitting specifying a power element's state will preserve
+    /// its existing state.
+    strict Set(SystemActivityGovernorState) -> () error SetSystemActivityGovernorStateError;
+
+    /// Return immediately with the current state of SAG.
+    strict Get() -> (SystemActivityGovernorState);
+
+    /// On a given connection, the first call will return immediately with SAG's
+    /// current state. Subsequent `Watch` requests will only
+    /// return if and only if a `test.sagcontrol.State.Set` call sends a request and SAG's
+    /// state has changed to the requested supported state.
+    ///
+    /// For example, if the current state of SAG is (1, 0, 1, 0), the first
+    /// `Watch` will return (1, 0, 1, 0). If a `test.sagcontrol.State.Set`
+    /// call sends a request to change state to (2, 1, 0, 1), the next `Watch`
+    /// will return when the SAG's state has fully transitioned to (2, 1, 0, 1),
+    /// any intermediate transient state (in this example, (2, 0, 1, 0),
+    /// (2, 1, 1, 0) and (2, 1, 1, 1)) will not be returned.
+    ///
+    /// Clients should use this to synchronize SAG states.
+    strict Watch() -> (SystemActivityGovernorState);
+};
