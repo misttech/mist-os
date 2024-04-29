@@ -613,6 +613,12 @@ impl<'a> RequestHandler<'a> {
                     .send(maybe_log_error!("sendmsg", result))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
+            fppacket::SocketRequest::SetMark { domain: _, mark: _, responder } => responder
+                .send(Err(fposix::Errno::Eopnotsupp))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fppacket::SocketRequest::GetMark { domain: _, responder } => responder
+                .send(Err(fposix::Errno::Eopnotsupp))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
         }
         ControlFlow::Continue(None)
     }

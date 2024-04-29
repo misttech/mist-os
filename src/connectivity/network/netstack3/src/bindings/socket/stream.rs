@@ -1579,6 +1579,18 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .send(result)
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
+            fposix_socket::StreamSocketRequest::SetMark { domain: _, mark: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+            }
+            fposix_socket::StreamSocketRequest::GetMark { domain: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+            }
         }
         ControlFlow::Continue(None)
     }

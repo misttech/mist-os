@@ -1471,6 +1471,18 @@ where
             Request::GetIpPacketInfo { responder } => {
                 respond_not_supported!("syncudp::GetIpPacketInfo", responder)
             }
+            Request::SetMark { domain: _, mark: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+            }
+            Request::GetMark { domain: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+            }
         }
         ControlFlow::Continue(None)
     }
