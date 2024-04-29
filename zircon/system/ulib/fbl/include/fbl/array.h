@@ -117,7 +117,7 @@ Array<T> MakeArray(fbl::AllocChecker* ac, size_t n) {
   return Array<T>(alloc, n);
 }
 
-#if !defined(_KERNEL) || defined(_KERNEL_MISTOS)
+#ifndef _KERNEL
 // Allocate memory for an array of size `n`.
 template <typename T>
 Array<T> MakeArray(size_t n) {

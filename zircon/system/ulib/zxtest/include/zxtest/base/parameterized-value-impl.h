@@ -6,7 +6,9 @@
 #define ZXTEST_BASE_PARAMETERIZED_VALUE_IMPL_H_
 
 #include <lib/stdcompat/string_view.h>
+#include <zircon/assert.h>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/base/parameterized-value.h>
 #include <zxtest/base/runner.h>
 
@@ -41,10 +43,15 @@ class ParameterizedTestCaseInfoImpl : public ParameterizedTestCaseInfo {
                         zxtest::internal::ValueProvider<ParamType>& provider,
                         const SourceLocation& location,
                         std::function<std::string(zxtest::TestParamInfo<ParamType>)> name_fn) {
-    instantiation_fns_.push_back([this, provider = std::move(provider), name_fn, location,
-                                  instantiation_name](Runner* runner) mutable {
-      Instantiate<FixtureType, ParamType>(instantiation_name, location, provider, name_fn, runner);
-    });
+    fbl::AllocChecker ac;
+    instantiation_fns_.push_back(
+        [this, provider = std::move(provider), name_fn, location,
+         instantiation_name](Runner* runner) mutable {
+          Instantiate<FixtureType, ParamType>(instantiation_name, location, provider, name_fn,
+                                              runner);
+        },
+        &ac);
+    ZX_ASSERT(ac.check());
   }
 
   // Adds a test to the test case.
@@ -56,7 +63,9 @@ class ParameterizedTestCaseInfoImpl : public ParameterizedTestCaseInfo {
     info.name = name;
     info.location = location;
     info.factory = &TestImpl::template CreateFactory<TestImpl>;
-    test_entries_.push_back(std::move(info));
+    fbl::AllocChecker ac;
+    test_entries_.push_back(std::move(info), &ac);
+    ZX_ASSERT(ac.check());
   }
 
   // Registers all parametrized tests of this test case with |runner|.

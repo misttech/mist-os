@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/string_printf.h>
 #include <zxtest/base/event-broadcaster.h>
 
@@ -85,7 +86,9 @@ void EventBroadcaster::OnTestCaseEnd(const TestCase& test_case) {
 void EventBroadcaster::Subscribe(LifecycleObserver* observer) {
   ZX_DEBUG_ASSERT_MSG(observer != this, "EventBroadcaster cannot observe itself.");
   ZX_DEBUG_ASSERT_MSG(observer != nullptr, "Canno register nullptr as a LifecycleObserver");
-  lifecycle_observers_.push_back(observer);
+  fbl::AllocChecker ac;
+  lifecycle_observers_.push_back(observer, &ac);
+  ZX_ASSERT(ac.check());
 }
 
 // Reports before any environment is torn down.

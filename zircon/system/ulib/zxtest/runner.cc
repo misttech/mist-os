@@ -88,7 +88,9 @@ TestRef Runner::RegisterTest(const fbl::String& test_case_name, const fbl::Strin
 
   // If there is no existing test case with |test_case_name|, create a new one.
   if (target_test_case == nullptr) {
-    test_cases_.push_back(TestCase(test_case_name, std::move(set_up), std::move(tear_down)));
+    fbl::AllocChecker ac;
+    test_cases_.push_back(TestCase(test_case_name, std::move(set_up), std::move(tear_down)), &ac);
+    ZX_ASSERT(ac.check());
     target_test_case = &test_cases_[test_cases_.size() - 1];
   }
 

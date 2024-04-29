@@ -7,10 +7,12 @@
 
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/string_view.h>
+#include <zircon/assert.h>
 
 #include <atomic>
 #include <cstdio>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/string.h>
 #include <fbl/vector.h>
 #include <zxtest/base/assertion.h>
@@ -209,7 +211,9 @@ class Runner {
     }
     ZX_ASSERT_MSG(delegate->AddTest(target_suite, test_name, location), "Failed to add a test");
     if (target_suite == new_suite.get()) {
-      parameterized_test_info_.push_back(std::move(new_suite));
+      fbl::AllocChecker ac;
+      parameterized_test_info_.push_back(std::move(new_suite), &ac);
+      ZX_ASSERT(ac.check());
     }
     return true;
   }
@@ -249,7 +253,9 @@ class Runner {
 
   // Adds an environment to be set up and tear down for each iteration.
   void AddGlobalTestEnvironment(std::unique_ptr<Environment> environment) {
-    environments_.push_back(std::move(environment));
+    fbl::AllocChecker ac;
+    environments_.push_back(std::move(environment), &ac);
+    ZX_ASSERT(ac.check());
   }
 
   // Provides an entry point for assertions. The runner will propagate the assertion to the

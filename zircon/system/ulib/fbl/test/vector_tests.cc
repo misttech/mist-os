@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -814,6 +815,7 @@ void InitializerList() {
   ASSERT_TRUE(ItemTraits::CheckCtorDtorCount());
 }
 
+#if !_KERNEL
 TEST(VectorTest, ImplicitConversion) {
   {
     fbl::Vector<fbl::String> v;
@@ -846,6 +848,7 @@ TEST(VectorTest, ImplicitConversion) {
     ASSERT_EQ(strcmp(v[3].c_str(), "Fourth"), 0);
   }
 }
+#endif
 
 TEST(VectorTest, VectorDataConstness) {
   fbl::Vector<int> vector_int;
@@ -891,6 +894,7 @@ RUN_FOR_ALL(Swap)
 RUN_FOR_ALL(Iterator)
 RUN_FOR_ALL(InsertDelete)
 RUN_TRAIT_TEST(Resize, ValueTypeTraits)
+#if !_KERNEL
 RUN_FOR_ALL(NoAllocCheck)
 
 TEST(VectorTest, InitializerListValueType) {
@@ -914,5 +918,6 @@ TEST(VectorTest, ImplicitlyConvertibleToConstSpan) {
   EXPECT_EQ(vector_int.size(), vector_span.size());
   EXPECT_EQ(vector_int.data(), vector_span.data());
 }
+#endif
 
 }  // namespace

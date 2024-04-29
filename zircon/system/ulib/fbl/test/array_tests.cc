@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -41,7 +42,9 @@ TEST(ArrayTest, Destructor) {
 
 TEST(ArrayTest, MoveToConstCtor) {
   constexpr size_t kSize = 10;
-  fbl::Array<uint32_t> array(new uint32_t[kSize], kSize);
+  fbl::AllocChecker ac;
+  fbl::Array<uint32_t> array(new (ac) uint32_t[kSize], kSize);
+  EXPECT_TRUE(ac.check());
   for (uint32_t i = 0; i < kSize; ++i) {
     array[i] = i;
   }
@@ -59,7 +62,9 @@ TEST(ArrayTest, MoveToConstCtor) {
 
 TEST(ArrayTest, MoveToConstAssignment) {
   constexpr size_t kSize = 10;
-  fbl::Array<uint32_t> array(new uint32_t[kSize], kSize);
+  fbl::AllocChecker ac;
+  fbl::Array<uint32_t> array(new (ac) uint32_t[kSize], kSize);
+  EXPECT_TRUE(ac.check());
   for (uint32_t i = 0; i < kSize; ++i) {
     array[i] = i;
   }
@@ -76,6 +81,7 @@ TEST(ArrayTest, MoveToConstAssignment) {
   }
 }
 
+#if !_KERNEL
 TEST(ArrayTest, MakeArraySimple) {
   constexpr size_t kSize = 10;
   fbl::Array<uint32_t> array = fbl::MakeArray<uint32_t>(kSize);
@@ -89,6 +95,7 @@ TEST(ArrayTest, MakeArraySimple) {
     array[i] = i;
   }
 }
+#endif
 
 TEST(ArrayTest, MakeArrayAllocChecker) {
   constexpr size_t kSize = 10;
@@ -120,6 +127,7 @@ TEST(ArrayTest, MakeArrayFailingAllocChecker) {
   EXPECT_EQ(array.data(), nullptr);
 }
 
+#if !_KERNEL
 TEST(ArrayTest, MakeArrayEmpty) {
   fbl::Array<uint32_t> array = fbl::MakeArray<uint32_t>(0);
   EXPECT_EQ(array.size(), 0);
@@ -137,5 +145,6 @@ TEST(ArrayTest, MakeArrayDefaultConstructed) {
     EXPECT_EQ(array[i].value, 42);
   }
 }
+#endif
 
 }  // namespace

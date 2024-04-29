@@ -166,9 +166,11 @@ void Reporter::OnTestSkip(const TestCase& test_case, const TestInfo& test) {
 
 void Reporter::OnTestFailure(const TestCase& test_case, const TestInfo& test) {
   int64_t elapsed_time = timers_.test.GetElapsedTime();
+  fbl::AllocChecker ac;
 #ifdef _KERNEL_MISTOS
   size_t size = test_case.name().size() + test.name().size() + 2;
-  char* buffer = new char[size];
+  char* buffer = new (ac) char[size];
+  ZX_ASSERT(ac.check());
   auto defer = fit::defer([&buffer] { delete[] buffer; });
   snprintf(buffer, size, "%s.%s", test_case.name().c_str(), test.name().c_str());
 #else
@@ -176,7 +178,8 @@ void Reporter::OnTestFailure(const TestCase& test_case, const TestInfo& test) {
   sprintf(buffer, "%s.%s", test_case.name().c_str(), test.name().c_str());
 #endif
   iteration_summary_.failed++;
-  iteration_summary_.failed_tests.push_back(buffer);
+  iteration_summary_.failed_tests.push_back(buffer, &ac);
+  ZX_ASSERT(ac.check());
   log_sink_->Write("[  FAILED  ] %s.%s (%" PRIi64 " ms)\n", test_case.name().c_str(),
                    test.name().c_str(), elapsed_time);
   log_sink_->Flush();

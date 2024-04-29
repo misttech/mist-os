@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 #include <lib/fit/function.h>
+#include <zircon/assert.h>
 
 #include <cstdlib>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/base/assertion.h>
 #include <zxtest/base/event-broadcaster.h>
 #include <zxtest/base/observer.h>
@@ -95,7 +97,9 @@
 // with |event_broadcaster|.
 #define REGISTER_OBSERVERS(observer_list, event_broadcaster, on_notify_def) \
   for (int i = 0; i < kNumObservers; ++i) {                                 \
-    observer_list.push_back({});                                            \
+    fbl::AllocChecker _ac;                                                  \
+    observer_list.push_back({}, &_ac);                                      \
+    ZX_ASSERT(_ac.check());                                                 \
     auto& observer = observer_list[observer_list.size() - 1];               \
     observer.on_notify = on_notify_def;                                     \
     event_broadcaster.Subscribe(&observer);                                 \
@@ -130,7 +134,9 @@ void EventBroadcasterOnProgramStart() {
 
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
   Runner runner(MakeSilentReporter());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&runner](const Runner& actual_runner) {
@@ -148,7 +154,9 @@ void EventBroadcasterOnIterationStart() {
 
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
   Runner runner(MakeSilentReporter());
 
   REGISTER_OBSERVERS(
@@ -169,7 +177,9 @@ void EventBroadcasterOnEnvironmentSetUp() {
 
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
   Runner runner(MakeSilentReporter());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&runner](const Runner& actual_runner) {
@@ -188,7 +198,9 @@ void EventBroadcasterOnTestCaseStart() {
   TestCase test_case(kTestCaseName, &Stub, &Stub);
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&test_case](const TestCase& actual) {
     ZX_ASSERT_MSG(&actual == &test_case,
@@ -207,7 +219,9 @@ void EventBroadcasterOnTestStart() {
   TestInfo test_info(kTestName, kLocation, nullptr);
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(
       observers, event_broadcaster, [&](const TestCase& actual, const TestInfo& actual_info) {
@@ -230,7 +244,9 @@ void EventBroadcasterOnAssertion() {
                       {.filename = "test.cpp", .line_number = 99999}, /*is_fatal*/ false,
                       zxtest::Runner::GetInstance()->GetScopedTraces());
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&](const Assertion& actual) {
     ZX_ASSERT_MSG(&actual == &assertion,
@@ -248,7 +264,9 @@ void EventBroadcasterOnMessage() {
   internal::EventBroadcaster event_broadcaster;
   Message message("Message", {.filename = "test.cpp", .line_number = 99999});
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&](const Message& actual) {
     ZX_ASSERT_MSG(&actual == &message,
@@ -267,7 +285,9 @@ void EventBroadcasterOnTestSkip() {
   TestInfo test_info(kTestName, kLocation, nullptr);
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(
       observers, event_broadcaster, [&](const TestCase& actual, const TestInfo& actual_info) {
@@ -289,7 +309,9 @@ void EventBroadcasterOnTestSuccess() {
   TestInfo test_info(kTestName, kLocation, nullptr);
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(
       observers, event_broadcaster, [&](const TestCase& actual, const TestInfo& actual_info) {
@@ -311,7 +333,9 @@ void EventBroadcasterOnTestFailure() {
   TestInfo test_info(kTestName, kLocation, nullptr);
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(
       observers, event_broadcaster, [&](const TestCase& actual, const TestInfo& actual_info) {
@@ -332,7 +356,9 @@ void EventBroadcasterOnTestCaseEnd() {
   TestCase test_case(kTestCaseName, &Stub, &Stub);
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&test_case](const TestCase& actual) {
     ZX_ASSERT_MSG(&actual == &test_case,
@@ -349,7 +375,9 @@ void EventBroadcasterOnEnvironmentTearDown() {
 
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
   Runner runner(MakeSilentReporter());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&runner](const Runner& actual_runner) {
@@ -367,7 +395,9 @@ void EventBroadcasterOnIterationEnd() {
 
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
   Runner runner(MakeSilentReporter());
 
   REGISTER_OBSERVERS(
@@ -389,7 +419,9 @@ void EventBroadcasterOnProgramEnd() {
 
   internal::EventBroadcaster event_broadcaster;
   fbl::Vector<FakeObserver> observers;
-  observers.reserve(kNumObservers);
+  fbl::AllocChecker ac;
+  observers.reserve(kNumObservers, &ac);
+  ZX_ASSERT(ac.check());
   Runner runner(MakeSilentReporter());
 
   REGISTER_OBSERVERS(observers, event_broadcaster, [&runner](const Runner& actual_runner) {

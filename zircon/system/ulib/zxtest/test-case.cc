@@ -39,11 +39,14 @@ size_t TestCase::MatchingTestCount() const { return selected_indexes_.size(); }
 
 void TestCase::Filter(TestCase::FilterFn filter) {
   fbl::Vector<unsigned long> filtered_indexes;
-  filtered_indexes.reserve(test_infos_.size());
+  fbl::AllocChecker ac;
+  filtered_indexes.reserve(test_infos_.size(), &ac);
+  ZX_ASSERT(ac.check());
   for (unsigned long i = 0; i < test_infos_.size(); ++i) {
     const auto& test_info = test_infos_[i];
     if (!filter || filter(name_, test_info.name())) {
-      filtered_indexes.push_back(i);
+      filtered_indexes.push_back(i, &ac);
+      ZX_ASSERT(ac.check());
     }
   }
   selected_indexes_.swap(filtered_indexes);
@@ -82,8 +85,11 @@ bool TestCase::RegisterTest(const fbl::String& name, const SourceLocation& locat
     return false;
   }
 
-  selected_indexes_.push_back(selected_indexes_.size());
-  test_infos_.push_back(TestInfo(name, location, std::move(factory)));
+  fbl::AllocChecker ac;
+  selected_indexes_.push_back(selected_indexes_.size(), &ac);
+  ZX_ASSERT(ac.check());
+  test_infos_.push_back(TestInfo(name, location, std::move(factory)), &ac);
+  ZX_ASSERT(ac.check());
   return true;
 }
 

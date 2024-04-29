@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/base/observer.h>
 #include <zxtest/base/test-case.h>
 #include <zxtest/base/test-driver.h>
@@ -285,7 +286,11 @@ void TestCaseShuffle() {
   ZX_ASSERT_MSG(test_case.RegisterTest(kTestName, kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(1); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(1, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -293,7 +298,11 @@ void TestCaseShuffle() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName2", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(2); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(2, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -301,7 +310,11 @@ void TestCaseShuffle() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName3", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(3); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(3, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -342,7 +355,11 @@ void TestCaseUnShuffle() {
   ZX_ASSERT_MSG(test_case.RegisterTest(kTestName, kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(1); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(1, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -350,7 +367,11 @@ void TestCaseUnShuffle() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName2", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(2); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(2, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -358,7 +379,11 @@ void TestCaseUnShuffle() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName3", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(3); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(3, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -382,7 +407,11 @@ void TestCaseUnShuffleFiltered() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName1", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(1); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(1, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -390,7 +419,11 @@ void TestCaseUnShuffleFiltered() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName2", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(2); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(2, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
@@ -398,7 +431,11 @@ void TestCaseUnShuffleFiltered() {
   ZX_ASSERT_MSG(test_case.RegisterTest("TestName3", kLocation,
                                        [&run_order](TestDriver* driver) {
                                          auto test = Test::Create<FakeTest>(driver);
-                                         test->body = [&run_order]() { run_order.push_back(3); };
+                                         test->body = [&run_order]() {
+                                           fbl::AllocChecker ac;
+                                           run_order.push_back(3, &ac);
+                                           ZX_ASSERT(ac.check());
+                                         };
                                          return test;
                                        }),
                 "TestCase failed to register a test.");
