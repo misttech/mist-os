@@ -22,10 +22,11 @@ source_set("util") {
   testonly = true
 
   sources = [
-    "../os.h",
     "util.cc",
     "util.h",
   ]
+
+  public_deps = [ "//src/connectivity/network/tests:os" ]
 
   deps = [
     "//src/lib/testing/predicates",
@@ -52,7 +53,6 @@ test("netstack_${name_provider_service_not_present_label}_test") {
 
 test("netstack_${bsdsocket_label}_test") {
   sources = [
-    "../os.h",
     "bsdsocket_test.cc",
     "no_network_test.cc",
   ]
@@ -70,10 +70,7 @@ test("netstack_${bsdsocket_label}_test") {
 }
 
 test("netstack_${dgramsocket_label}_test") {
-  sources = [
-    "../os.h",
-    "dgramsocket_test.cc",
-  ]
+  sources = [ "dgramsocket_test.cc" ]
 
   deps = [
     ":util",
@@ -112,10 +109,7 @@ test("netstack_${if_nameindex_label}_test") {
 }
 
 test("netstack_${streamsocket_label}_test") {
-  sources = [
-    "../os.h",
-    "streamsocket_test.cc",
-  ]
+  sources = [ "streamsocket_test.cc" ]
 
   deps = [
     ":util",
@@ -131,10 +125,7 @@ test("netstack_${streamsocket_label}_test") {
 }
 
 test("netstack_${fuchsia_label}_test") {
-  sources = [
-    "../os.h",
-    "fdio_test.cc",
-  ]
+  sources = [ "fdio_test.cc" ]
 
   deps = [
     ":util",
@@ -158,10 +149,7 @@ test("netstack_${packetsocket_label}_test") {
 }
 
 test("netstack_${rawsocket_label}_test") {
-  sources = [
-    "../os.h",
-    "rawsocket_test.cc",
-  ]
+  sources = [ "rawsocket_test.cc" ]
 
   deps = [
     ":util",
