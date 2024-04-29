@@ -928,23 +928,43 @@ def merge_power_data(
 
     # Finally, we can get the cross correlation between power and cpu usage. We run a known cpu
     # heavy workload in the first 5ish seconds of the test so we limit our signal correlation to
-    # that portion. The power reading shouldn't be delayed by more than a second, so we take the
-    # first 4 seconds of the power readings and attempt to match it up.
+    # that portion. Power and CPU readings can be offset in either direction, but shouldn't be
+    # separated by more than a second. Thus, we take the first 4 seconds of the power readings,
+    # attempt to match them up with the first 5 seconds of CPU readings, and then vice-versa.
+    # Afterwards, we choose an alignment by picking the higher of the two correlation scores.
     (
-        strongest_correlation,
-        strongest_correlation_idx,
+        power_after_cpu_correlation,
+        power_after_cpu_correlation_idx,
     ) = cross_correlate_arg_max(
         avg_cpu_combined[0:25000], [s.current for s in power_samples[0:20000]]
     )
-    offset_ns = power_samples[strongest_correlation_idx].timestamp
-
-    print(f"Delaying power readings by {offset_ns/1000/1000}ms")
-    starting_ticks = int(
-        (earliest_ts + trace_time.TimeDelta(offset_ns))
-        .to_epoch_delta()
-        .to_nanoseconds()
-        * TICKS_PER_NS
+    (
+        cpu_after_power_correlation,
+        cpu_after_power_correlation_idx,
+    ) = cross_correlate_arg_max(
+        [s.current for s in power_samples[0:25000]], avg_cpu_combined[0:20000]
     )
-    print(f"Aligning Power Trace to start at {starting_ticks} ticks")
+    starting_ticks = 0
+    if power_after_cpu_correlation >= cpu_after_power_correlation:
+        offset_ns = power_samples[power_after_cpu_correlation_idx].timestamp
 
+        print(f"Delaying power readings by {offset_ns/1000/1000}ms")
+        starting_ticks = int(
+            (earliest_ts + trace_time.TimeDelta(offset_ns))
+            .to_epoch_delta()
+            .to_nanoseconds()
+            * TICKS_PER_NS
+        )
+    else:
+        offset_ns = power_samples[cpu_after_power_correlation_idx].timestamp
+
+        print(f"Delaying CPU trace by {offset_ns/1000/1000}ms")
+        starting_ticks = int(
+            (earliest_ts + trace_time.TimeDelta(-offset_ns))
+            .to_epoch_delta()
+            .to_nanoseconds()
+            * TICKS_PER_NS
+        )
+
+    print(f"Aligning Power Trace to start at {starting_ticks} ticks")
     append_power_data(fxt_path, power_samples, starting_ticks)
