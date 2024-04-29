@@ -93,6 +93,36 @@ impl<T> From<*mut T> for BpfValue {
     }
 }
 
+impl From<BpfValue> for u8 {
+    fn from(v: BpfValue) -> u8 {
+        v.0 as u8
+    }
+}
+
+impl From<BpfValue> for u16 {
+    fn from(v: BpfValue) -> u16 {
+        v.0 as u16
+    }
+}
+
+impl From<BpfValue> for u32 {
+    fn from(v: BpfValue) -> u32 {
+        v.0 as u32
+    }
+}
+
+impl From<BpfValue> for u64 {
+    fn from(v: BpfValue) -> u64 {
+        v.0
+    }
+}
+
+impl From<BpfValue> for usize {
+    fn from(v: BpfValue) -> usize {
+        v.0 as usize
+    }
+}
+
 impl BpfValue {
     pub fn as_u8(&self) -> u8 {
         self.0 as u8
