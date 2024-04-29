@@ -16,10 +16,11 @@
 
 namespace media_audio {
 
-bool DaiFormatIsSupported(
-    ElementId element_id,
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    const fuchsia_hardware_audio::DaiFormat& format) {
+namespace fad = fuchsia_audio_device;
+
+bool DaiFormatIsSupported(ElementId element_id,
+                          const std::vector<fad::ElementDaiFormatSet>& element_dai_format_sets,
+                          const fuchsia_hardware_audio::DaiFormat& format) {
   std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets;
   for (const auto& element_sets_entry : element_dai_format_sets) {
     if (element_sets_entry.element_id().has_value() &&
@@ -111,13 +112,12 @@ bool DaiFormatIsSupported(
 
 bool RingBufferFormatIsSupported(
     ElementId element_id,
-    const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
-        element_ring_buffer_format_sets,
+    const std::vector<fad::ElementRingBufferFormatSet>& element_ring_buffer_format_sets,
     const fuchsia_hardware_audio::Format& format) {
   if (!ValidateRingBufferFormat(format)) {
     return false;
   }
-  std::optional<std::vector<fuchsia_audio_device::PcmFormatSet>> ring_buffer_format_sets;
+  std::optional<std::vector<fad::PcmFormatSet>> ring_buffer_format_sets;
   for (const auto& element_sets_entry : element_ring_buffer_format_sets) {
     if (element_sets_entry.element_id().has_value() &&
         *element_sets_entry.element_id() == element_id) {

@@ -14,10 +14,11 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 // static
 std::shared_ptr<ControlCreatorServer> ControlCreatorServer::Create(
-    std::shared_ptr<const FidlThread> thread,
-    fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end,
+    std::shared_ptr<const FidlThread> thread, fidl::ServerEnd<fad::ControlCreator> server_end,
     const std::shared_ptr<AudioDeviceRegistry>& parent) {
   ADR_LOG_STATIC(kLogControlCreatorServerMethods) << " parent " << parent;
 
@@ -42,23 +43,23 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
 
   if (!request.token_id()) {
     ADR_WARN_METHOD() << "required 'token_id' is absent";
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kInvalidTokenId));
+    completer.Reply(fit::error(fad::ControlCreatorError::kInvalidTokenId));
     return;
   }
 
   if (!request.control_server()) {
     ADR_WARN_METHOD() << "required 'control_server' is absent";
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kInvalidControl));
+    completer.Reply(fit::error(fad::ControlCreatorError::kInvalidControl));
     return;
   }
 
   auto [status, device] = parent_->FindDeviceByTokenId(*request.token_id());
   if (status == AudioDeviceRegistry::DevicePresence::Unknown) {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kDeviceNotFound));
+    completer.Reply(fit::error(fad::ControlCreatorError::kDeviceNotFound));
     return;
   }
   if (status == AudioDeviceRegistry::DevicePresence::Error) {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kDeviceError));
+    completer.Reply(fit::error(fad::ControlCreatorError::kDeviceError));
     return;
   }
 
@@ -68,11 +69,11 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
   auto control = parent_->CreateControlServer(std::move(*request.control_server()), device);
 
   if (!control) {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kAlreadyAllocated));
+    completer.Reply(fit::error(fad::ControlCreatorError::kAlreadyAllocated));
     return;
   }
 
-  completer.Reply(fit::success(fuchsia_audio_device::ControlCreatorCreateResponse{}));
+  completer.Reply(fit::success(fad::ControlCreatorCreateResponse{}));
 }
 
 }  // namespace media_audio

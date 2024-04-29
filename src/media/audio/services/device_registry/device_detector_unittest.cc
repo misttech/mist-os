@@ -23,8 +23,9 @@
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace media_audio {
-
 namespace {
+
+namespace fad = fuchsia_audio_device;
 
 // Minimal `fuchsia_hardware_audio::Codec` used to emulate a fake devfs directory for tests.
 using fuchsia_hardware_audio::Codec;
@@ -134,15 +135,12 @@ class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnect
   std::optional<fidl::ServerBindingRef<StreamConfig>> binding_;
 };
 
-using fuchsia_audio_device::DeviceType;
-using fuchsia_audio_device::DriverClient;
-
 class DeviceTracker {
  public:
   struct DeviceConnection {
     std::string_view name;
-    DeviceType device_type;
-    DriverClient client;
+    fad::DeviceType device_type;
+    fad::DriverClient client;
   };
 
   DeviceTracker(async_dispatcher_t* dispatcher, bool detection_is_expected)
@@ -156,8 +154,8 @@ class DeviceTracker {
   async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  private:
-  DeviceDetectionHandler handler_ = [this](std::string_view name, DeviceType device_type,
-                                           DriverClient driver_client) {
+  DeviceDetectionHandler handler_ = [this](std::string_view name, fad::DeviceType device_type,
+                                           fad::DriverClient driver_client) {
     ASSERT_TRUE(detection_is_expected_) << "Unexpected device detection";
 
     devices_.emplace_back(DeviceConnection{name, device_type, std::move(driver_client)});
@@ -359,20 +357,20 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
     int num_inputs = 0, num_composites = 0, num_outputs = 0, num_codecs = 0;
     for (auto dev_num = 0u; dev_num < tracker->size(); ++dev_num) {
       auto& device = tracker->devices()[dev_num];
-      if (device.device_type == DeviceType::kInput) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
+      if (device.device_type == fad::DeviceType::kInput) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kStreamConfig);
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_inputs;
-      } else if (device.device_type == DeviceType::kComposite) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kComposite);
+      } else if (device.device_type == fad::DeviceType::kComposite) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kComposite);
         EXPECT_TRUE(device.client.composite()->is_valid());
         ++num_composites;
-      } else if (device.device_type == DeviceType::kOutput) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
+      } else if (device.device_type == fad::DeviceType::kOutput) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kStreamConfig);
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_outputs;
-      } else if (device.device_type == DeviceType::kCodec) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kCodec);
+      } else if (device.device_type == fad::DeviceType::kCodec) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kCodec);
         EXPECT_TRUE(device.client.codec()->is_valid());
         ++num_codecs;
       } else {
@@ -390,17 +388,17 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
   // After the detector is gone, preexisting devices we detected should still be bound.
   std::for_each(tracker->devices().begin(), tracker->devices().end(), [](const auto& device) {
     switch (device.device_type) {
-      case DeviceType::kCodec:
+      case fad::DeviceType::kCodec:
         EXPECT_TRUE(device.client.codec()->is_valid());
         break;
-      case DeviceType::kComposite:
+      case fad::DeviceType::kComposite:
         EXPECT_TRUE(device.client.composite()->is_valid());
         break;
-      case DeviceType::kInput:
-      case DeviceType::kOutput:
+      case fad::DeviceType::kInput:
+      case fad::DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case DeviceType::kDai:
+      case fad::DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
         break;
@@ -480,10 +478,10 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
     RunLoopUntilIdle();  // Allow erroneous extra device additions to reveal themselves.
     ASSERT_EQ(tracker->size(), 4u) << "Timed out waiting for codec device to be detected";
 
-    EXPECT_EQ(tracker->devices()[0].device_type, DeviceType::kOutput);
-    EXPECT_EQ(tracker->devices()[1].device_type, DeviceType::kInput);
-    EXPECT_EQ(tracker->devices()[2].device_type, DeviceType::kComposite);
-    EXPECT_EQ(tracker->devices()[3].device_type, DeviceType::kCodec);
+    EXPECT_EQ(tracker->devices()[0].device_type, fad::DeviceType::kOutput);
+    EXPECT_EQ(tracker->devices()[1].device_type, fad::DeviceType::kInput);
+    EXPECT_EQ(tracker->devices()[2].device_type, fad::DeviceType::kComposite);
+    EXPECT_EQ(tracker->devices()[3].device_type, fad::DeviceType::kCodec);
   }
 
   // After the device detector is gone, dynamically-detected devices should still be bound.
@@ -491,17 +489,17 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
 
   std::for_each(tracker->devices().begin(), tracker->devices().end(), [](const auto& device) {
     switch (device.device_type) {
-      case DeviceType::kCodec:
+      case fad::DeviceType::kCodec:
         EXPECT_TRUE(device.client.codec()->is_valid());
         break;
-      case DeviceType::kComposite:
+      case fad::DeviceType::kComposite:
         EXPECT_TRUE(device.client.composite()->is_valid());
         break;
-      case DeviceType::kInput:
-      case DeviceType::kOutput:
+      case fad::DeviceType::kInput:
+      case fad::DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case DeviceType::kDai:
+      case fad::DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
         break;
@@ -545,5 +543,4 @@ TEST_F(DeviceDetectorTest, NoDanglingDetectors) {
 }
 
 }  // namespace
-
 }  // namespace media_audio

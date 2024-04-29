@@ -24,6 +24,8 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   if (!unique_instance_id) {
     return "<none>";
@@ -112,8 +114,7 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
 }
 
 void LogElementRingBufferFormatSets(
-    const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
-        element_ring_buffer_format_sets) {
+    const std::vector<fad::ElementRingBufferFormatSet>& element_ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -124,7 +125,7 @@ void LogElementRingBufferFormatSets(
 }
 
 void LogElementRingBufferFormatSet(
-    const fuchsia_audio_device::ElementRingBufferFormatSet& element_ring_buffer_format_set) {
+    const fad::ElementRingBufferFormatSet& element_ring_buffer_format_set) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -144,12 +145,12 @@ void LogElementRingBufferFormatSet(
 }
 
 void LogTranslatedRingBufferFormatSets(
-    const std::vector<fuchsia_audio_device::PcmFormatSet>& translated_ring_buffer_format_sets) {
+    const std::vector<fad::PcmFormatSet>& translated_ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
 
-  FX_LOGS(INFO) << "fuchsia_audio_device::translated_ring_buffer_format_sets";
+  FX_LOGS(INFO) << "fuchsia_audio_device/translated_ring_buffer_format_sets";
   FX_LOGS(INFO) << "    PcmFormatSet[" << translated_ring_buffer_format_sets.size() << "]";
   for (auto idx = 0u; idx < translated_ring_buffer_format_sets.size(); ++idx) {
     FX_LOGS(INFO) << "      [" << idx << "]";
@@ -157,8 +158,7 @@ void LogTranslatedRingBufferFormatSets(
   }
 }
 
-void LogTranslatedRingBufferFormatSet(
-    const fuchsia_audio_device::PcmFormatSet& translated_ring_buffer_format_set) {
+void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_buffer_format_set) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -356,8 +356,7 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_pro
   }
 }
 
-void LogElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets) {
+void LogElementDaiFormatSets(const std::vector<fad::ElementDaiFormatSet>& element_dai_format_sets) {
   if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -367,8 +366,7 @@ void LogElementDaiFormatSets(
   }
 }
 
-void LogElementDaiFormatSet(
-    const fuchsia_audio_device::ElementDaiFormatSet& element_dai_format_set) {
+void LogElementDaiFormatSet(const fad::ElementDaiFormatSet& element_dai_format_set) {
   if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -741,7 +739,7 @@ void LogTopologies(
 }
 
 // Signal the successful detection, querying, initialization and addition of a device.
-void LogDeviceAddition(const fuchsia_audio_device::Info& device_info) {
+void LogDeviceAddition(const fad::Info& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     FX_DCHECK(device_info.device_type().has_value());
     FX_LOGS(INFO) << device_info.device_type() << " device "
@@ -757,7 +755,7 @@ void LogDeviceAddition(const fuchsia_audio_device::Info& device_info) {
 
 // Mirror (bookend) the analogous `LogDeviceAddition` for device removal. Removals may be "normal"
 // (USB unplug) or caused by fatal error. The latter can happen before `device_info` is created.
-void LogDeviceRemoval(const std::optional<fuchsia_audio_device::Info>& device_info) {
+void LogDeviceRemoval(const std::optional<fad::Info>& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     if (device_info.has_value()) {
       FX_DCHECK(device_info->device_type().has_value());
@@ -777,7 +775,7 @@ void LogDeviceRemoval(const std::optional<fuchsia_audio_device::Info>& device_in
 
 // Mirror (bookend) the analogous `LogDeviceAddition`, for a device error.
 // This can also occur before a device has been successfully added: device_info may not be set.
-void LogDeviceError(const std::optional<fuchsia_audio_device::Info>& device_info) {
+void LogDeviceError(const std::optional<fad::Info>& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     if (device_info.has_value()) {
       FX_DCHECK(device_info->device_type().has_value());
@@ -795,7 +793,7 @@ void LogDeviceError(const std::optional<fuchsia_audio_device::Info>& device_info
   }
 }
 
-void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
+void LogDeviceInfo(const fad::Info& device_info) {
   if constexpr (!kLogDeviceInfo) {
     return;
   }
@@ -899,8 +897,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     FX_LOGS(INFO) << "   ring_buffer_format_sets      <none>"
-                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
-                       device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput)
+                  << ((device_info.device_type() == fad::DeviceType::kInput ||
+                       device_info.device_type() == fad::DeviceType::kOutput)
                           ? " (non-compliant)"
                           : "");
   }
@@ -964,9 +962,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     FX_LOGS(INFO) << "   dai_format_sets              <none>"
-                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kCodec)
-                          ? " (non-compliant)"
-                          : "");
+                  << ((device_info.device_type() == fad::DeviceType::kCodec) ? " (non-compliant)"
+                                                                             : "");
   }
 
   if (device_info.gain_caps()) {
@@ -998,8 +995,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                           : "<none> (false)");
   } else {
     FX_LOGS(INFO) << "   gain_caps                    <none>"
-                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
-                       device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput)
+                  << ((device_info.device_type() == fad::DeviceType::kInput ||
+                       device_info.device_type() == fad::DeviceType::kOutput)
                           ? " (non-compliant)"
                           : "");
   }
@@ -1016,9 +1013,9 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     clock_domain_str += "<none>";
-    if (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite ||
-        device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
-        device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+    if (device_info.device_type() == fad::DeviceType::kComposite ||
+        device_info.device_type() == fad::DeviceType::kInput ||
+        device_info.device_type() == fad::DeviceType::kOutput) {
       clock_domain_str += " (non-compliant)";
     }
   }
@@ -1034,9 +1031,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     FX_LOGS(INFO) << "  signal_processing_elements   <none>"
-                  << (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite
-                          ? " (non-compliant)"
-                          : "");
+                  << (device_info.device_type() == fad::DeviceType::kComposite ? " (non-compliant)"
+                                                                               : "");
   }
 
   if (device_info.signal_processing_topologies()) {
@@ -1050,9 +1046,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     FX_LOGS(INFO) << "  signal_processing_topologies <none>"
-                  << (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite
-                          ? " (non-compliant)"
-                          : "");
+                  << (device_info.device_type() == fad::DeviceType::kComposite ? " (non-compliant)"
+                                                                               : "");
   }
 }
 

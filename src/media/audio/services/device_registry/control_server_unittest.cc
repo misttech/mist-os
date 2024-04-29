@@ -23,17 +23,14 @@
 namespace media_audio {
 namespace {
 
-using Control = fuchsia_audio_device::Control;
-using DriverClient = fuchsia_audio_device::DriverClient;
+namespace fad = fuchsia_audio_device;
 
 class ControlServerTest : public AudioDeviceRegistryServerTestBase {
  protected:
-  std::optional<TokenId> WaitForAddedDeviceTokenId(
-      fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
+  std::optional<TokenId> WaitForAddedDeviceTokenId(fidl::Client<fad::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
     registry_client->WatchDevicesAdded().Then(
-        [&added_device_id](
-            fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        [&added_device_id](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
@@ -45,13 +42,11 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
   }
 
   // Obtain a control via ControlCreator/Create (not the synthetic CreateTestControlServer method).
-  fidl::Client<fuchsia_audio_device::Control> ConnectToControl(
-      fidl::Client<fuchsia_audio_device::ControlCreator>& control_creator_client,
-      TokenId token_id) {
-    auto [control_client_end, control_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
-    auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-        std::move(control_client_end), dispatcher(), control_fidl_handler().get());
+  fidl::Client<fad::Control> ConnectToControl(
+      fidl::Client<fad::ControlCreator>& control_creator_client, TokenId token_id) {
+    auto [control_client_end, control_server_end] = CreateNaturalAsyncClientOrDie<fad::Control>();
+    auto control_client = fidl::Client<fad::Control>(std::move(control_client_end), dispatcher(),
+                                                     control_fidl_handler().get());
     bool received_callback = false;
 
     control_creator_client
@@ -59,8 +54,7 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
             .token_id = token_id,
             .control_server = std::move(control_server_end),
         }})
-        .Then([&received_callback](
-                  fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
+        .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -75,9 +69,8 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
   static ElementId dai_element_id() { return kDaiElementId; }
 
  private:
-  static constexpr ElementId kRingBufferElementId =
-      fuchsia_audio_device::kDefaultRingBufferElementId;
-  static constexpr ElementId kDaiElementId = fuchsia_audio_device::kDefaultDaiInterconnectElementId;
+  static constexpr ElementId kRingBufferElementId = fad::kDefaultRingBufferElementId;
+  static constexpr ElementId kDaiElementId = fad::kDefaultDaiInterconnectElementId;
 };
 
 class ControlServerCodecTest : public ControlServerTest {
@@ -86,8 +79,8 @@ class ControlServerCodecTest : public ControlServerTest {
     auto fake_driver = CreateFakeCodecOutput();
 
     adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                            fuchsia_audio_device::DeviceType::kCodec,
-                                            DriverClient::WithCodec(fake_driver->Enable())));
+                                            fad::DeviceType::kCodec,
+                                            fad::DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -98,9 +91,9 @@ class ControlServerCompositeTest : public ControlServerTest {
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
-    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                            fuchsia_audio_device::DeviceType::kComposite,
-                                            DriverClient::WithComposite(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(
+        adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+        fad::DriverClient::WithComposite(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -111,9 +104,9 @@ class ControlServerStreamConfigTest : public ControlServerTest {
   std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
-                                            fuchsia_audio_device::DeviceType::kOutput,
-                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(
+        Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                       fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -122,7 +115,7 @@ class ControlServerStreamConfigTest : public ControlServerTest {
 /////////////////////
 // Codec tests
 //
-// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+// When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerCodecTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service()->devices().begin());
@@ -132,7 +125,8 @@ TEST_F(ControlServerCodecTest, CleanClientDrop) {
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
-  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
+  // If fad::Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a
+  // failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
@@ -148,9 +142,9 @@ TEST_F(ControlServerCodecTest, CleanServerShutdown) {
   // If ControlServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+// When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 //
-// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
+// (Same as "CleanClientDrop" test case, but the fad::Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerCodecTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -235,7 +229,7 @@ TEST_F(ControlServerCodecTest, SetDaiFormat) {
 
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
-      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
@@ -267,7 +261,7 @@ TEST_F(ControlServerCodecTest, CodecStart) {
 
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
-      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -279,7 +273,7 @@ TEST_F(ControlServerCodecTest, CodecStart) {
   received_callback = false;
 
   control->client()->CodecStart().Then(
-      [&received_callback, &start_time](fidl::Result<Control::CodecStart>& result) {
+      [&received_callback, &start_time](fidl::Result<fad::Control::CodecStart>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->start_time().has_value());
@@ -312,7 +306,7 @@ TEST_F(ControlServerCodecTest, CodecStop) {
 
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
-      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -322,7 +316,7 @@ TEST_F(ControlServerCodecTest, CodecStop) {
   received_callback = false;
 
   control->client()->CodecStart().Then(
-      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+      [&received_callback](fidl::Result<fad::Control::CodecStart>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -334,7 +328,7 @@ TEST_F(ControlServerCodecTest, CodecStop) {
   received_callback = false;
 
   control->client()->CodecStop().Then(
-      [&received_callback, &stop_time](fidl::Result<Control::CodecStop>& result) {
+      [&received_callback, &stop_time](fidl::Result<fad::Control::CodecStop>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->stop_time().has_value());
@@ -367,7 +361,7 @@ TEST_F(ControlServerCodecTest, Reset) {
 
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
-      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -378,7 +372,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   zx::time first_start_time;
 
   control->client()->CodecStart().Then(
-      [&received_callback, &first_start_time](fidl::Result<Control::CodecStart>& result) {
+      [&received_callback, &first_start_time](fidl::Result<fad::Control::CodecStart>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->start_time());
@@ -389,7 +383,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   ASSERT_TRUE(received_callback);
   received_callback = false;
 
-  control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
+  control->client()->Reset().Then([&received_callback](fidl::Result<fad::Control::Reset>& result) {
     received_callback = true;
     EXPECT_TRUE(result.is_ok()) << result.error_value();
   });
@@ -401,7 +395,7 @@ TEST_F(ControlServerCodecTest, Reset) {
 
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
-      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -413,7 +407,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   zx::time second_start_time;
 
   control->client()->CodecStart().Then(
-      [&received_callback, &second_start_time](fidl::Result<Control::CodecStart>& result) {
+      [&received_callback, &second_start_time](fidl::Result<fad::Control::CodecStart>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->start_time());
@@ -452,7 +446,7 @@ TEST_F(ControlServerCodecTest, GetTopologiesUnsupported) {
   auto received_callback = false;
 
   control->client()->GetTopologies().Then([&received_callback](
-                                              fidl::Result<Control::GetTopologies>& result) {
+                                              fidl::Result<fad::Control::GetTopologies>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -483,7 +477,7 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
   auto received_callback = false;
 
   control->client()->GetElements().Then([&received_callback](
-                                            fidl::Result<Control::GetElements>& result) {
+                                            fidl::Result<fad::Control::GetElements>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -499,7 +493,7 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
 /////////////////////
 // Composite tests
 //
-// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+// When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerCompositeTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service()->devices().begin());
@@ -509,7 +503,8 @@ TEST_F(ControlServerCompositeTest, CleanClientDrop) {
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
-  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
+  // If fad::Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a
+  // failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
@@ -525,9 +520,9 @@ TEST_F(ControlServerCompositeTest, CleanServerShutdown) {
   // If ControlServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+// When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 //
-// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
+// (Same as "CleanClientDrop" test case, but the fad::Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerCompositeTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -611,10 +606,10 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client_end, ring_buffer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+        CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
     bool received_callback = false;
 
-    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+    auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
         std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
     auto requested_format = SafeRingBufferFormatFromElementRingBufferFormatSets(
         ring_buffer_element_id, device->ring_buffer_format_sets());
@@ -623,14 +618,14 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
     control->client()
         ->CreateRingBuffer({{
             ring_buffer_element_id,
-            fuchsia_audio_device::RingBufferOptions{{
+            fad::RingBufferOptions{{
                 .format = requested_format,
                 .ring_buffer_min_bytes = requested_ring_buffer_bytes,
             }},
             std::move(ring_buffer_server_end),
         }})
         .Then([&received_callback, requested_format,
-               requested_ring_buffer_bytes](fidl::Result<Control::CreateRingBuffer>& result) {
+               requested_ring_buffer_bytes](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
 
@@ -704,7 +699,7 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// Verify that the Control lives, even if the client drops its child RingBuffer.
+// Verify that the fad::Control lives, even if the client drops its child RingBuffer.
 TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -721,23 +716,23 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client_end, ring_buffer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+        CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
     bool received_callback = false;
 
-    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+    auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
         std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
 
     control->client()
         ->CreateRingBuffer({{
             ring_buffer_element_id,
-            fuchsia_audio_device::RingBufferOptions{{
+            fad::RingBufferOptions{{
                 .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
                     ring_buffer_element_id, device->ring_buffer_format_sets()),
                 .ring_buffer_min_bytes = 2000,
             }},
             std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -760,7 +755,7 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// Verify that the Control lives, even if the driver drops its RingBuffer connection.
+// Verify that the fad::Control lives, even if the driver drops its RingBuffer connection.
 TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -777,20 +772,20 @@ TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client, ring_buffer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+        CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
     bool received_callback = false;
 
     control->client()
         ->CreateRingBuffer({{
             ring_buffer_element_id,
-            fuchsia_audio_device::RingBufferOptions{{
+            fad::RingBufferOptions{{
                 .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
                     ring_buffer_element_id, device->ring_buffer_format_sets()),
                 .ring_buffer_min_bytes = 2000,
             }},
             std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -839,7 +834,7 @@ TEST_F(ControlServerCompositeTest, SetDaiFormat) {
             dai_element_id,
             dai_format,
         }})
-        .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           EXPECT_FALSE(result->state());
@@ -875,7 +870,7 @@ TEST_F(ControlServerCompositeTest, Reset) {
             dai_element_id,
             dai_format,
         }})
-        .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -887,10 +882,11 @@ TEST_F(ControlServerCompositeTest, Reset) {
 
     received_callback = false;
 
-    control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
-      received_callback = true;
-      EXPECT_TRUE(result.is_ok()) << result.error_value();
-    });
+    control->client()->Reset().Then(
+        [&received_callback](fidl::Result<fad::Control::Reset>& result) {
+          received_callback = true;
+          EXPECT_TRUE(result.is_ok()) << result.error_value();
+        });
 
     // Only way to verify that DaiFormat is reset: set the same format again.
     RunLoopUntilIdle();
@@ -901,7 +897,7 @@ TEST_F(ControlServerCompositeTest, Reset) {
             dai_element_id,
             dai_format,
         }})
-        .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -917,7 +913,7 @@ TEST_F(ControlServerCompositeTest, Reset) {
 }
 
 // Retrieves the static list of Topologies and their properties.
-// Compare results from Control/GetTopologies to the topologies returned in the Device info.
+// Compare results from fad::Control/GetTopologies to the topologies returned in the Device info.
 TEST_F(ControlServerCompositeTest, GetTopologies) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -933,13 +929,13 @@ TEST_F(ControlServerCompositeTest, GetTopologies) {
   auto received_callback = false;
   std::vector<::fuchsia_hardware_audio_signalprocessing::Topology> received_topologies;
 
-  control->client()->GetTopologies().Then(
-      [&received_callback, &received_topologies](fidl::Result<Control::GetTopologies>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        received_topologies = result->topologies();
-        EXPECT_FALSE(received_topologies.empty());
-      });
+  control->client()->GetTopologies().Then([&received_callback, &received_topologies](
+                                              fidl::Result<fad::Control::GetTopologies>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    received_topologies = result->topologies();
+    EXPECT_FALSE(received_topologies.empty());
+  });
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -950,7 +946,7 @@ TEST_F(ControlServerCompositeTest, GetTopologies) {
 }
 
 // Retrieves the static list of Elements and their properties.
-// Compare results from Control/GetElements to the elements returned in the Device info.
+// Compare results from fad::Control/GetElements to the elements returned in the Device info.
 TEST_F(ControlServerCompositeTest, GetElements) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -967,7 +963,7 @@ TEST_F(ControlServerCompositeTest, GetElements) {
   std::vector<::fuchsia_hardware_audio_signalprocessing::Element> received_elements;
 
   control->client()->GetElements().Then(
-      [&received_callback, &received_elements](fidl::Result<Control::GetElements>& result) {
+      [&received_callback, &received_elements](fidl::Result<fad::Control::GetElements>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_elements = result->processing_elements();
@@ -998,7 +994,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyInitial) {
   std::optional<TopologyId> topology_id;
 
   control->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Control::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Control::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -1028,7 +1024,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyNoChange) {
   std::optional<TopologyId> topology_id;
 
   control->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Control::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Control::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -1040,7 +1036,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyNoChange) {
   received_callback = false;
 
   control->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Control::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Control::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -1068,7 +1064,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyUpdate) {
   std::optional<TopologyId> topology_id;
 
   control->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Control::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Control::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -1092,7 +1088,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyUpdate) {
   topology_id.reset();
 
   control->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Control::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Control::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -1135,7 +1131,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateInitial) {
     control->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states](fidl::Result<Control::WatchElementState>& result) {
+               &element_states](fidl::Result<fad::Control::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states.insert_or_assign(element_id, result->state());
@@ -1182,7 +1178,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateNoChange) {
     control->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states](fidl::Result<Control::WatchElementState>& result) {
+               &element_states](fidl::Result<fad::Control::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states.insert_or_assign(element_id, result->state());
@@ -1198,7 +1194,8 @@ TEST_F(ControlServerCompositeTest, WatchElementStateNoChange) {
     auto element_id = element_map_entry.first;
     control->client()
         ->WatchElementState(element_id)
-        .Then([&received_callback, element_id](fidl::Result<Control::WatchElementState>& result) {
+        .Then([&received_callback,
+               element_id](fidl::Result<fad::Control::WatchElementState>& result) {
           received_callback = true;
           FAIL() << "Unexpected WatchElementState completion for element_id " << element_id;
         });
@@ -1233,7 +1230,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     control->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states](fidl::Result<Control::WatchElementState>& result) {
+               &element_states](fidl::Result<fad::Control::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states.insert_or_assign(element_id, result->state());
@@ -1302,7 +1299,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     control->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states_received](fidl::Result<Control::WatchElementState>& result) {
+               &element_states_received](fidl::Result<fad::Control::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states_received.insert_or_assign(element_id, result->state());
@@ -1369,12 +1366,12 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
   auto received_callback = false;
   std::optional<TopologyId> current_topology_id;
 
-  control->client()->WatchTopology().Then(
-      [&received_callback, &current_topology_id](fidl::Result<Control::WatchTopology>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        current_topology_id = result->topology_id();
-      });
+  control->client()->WatchTopology().Then([&received_callback, &current_topology_id](
+                                              fidl::Result<fad::Control::WatchTopology>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    current_topology_id = result->topology_id();
+  });
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
@@ -1391,7 +1388,7 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
   std::optional<TopologyId> new_topology_id;
 
   control->client()->WatchTopology().Then(
-      [&received_callback, &new_topology_id](fidl::Result<Control::WatchTopology>& result) {
+      [&received_callback, &new_topology_id](fidl::Result<fad::Control::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         new_topology_id = result->topology_id();
@@ -1403,7 +1400,7 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
 
   control->client()
       ->SetTopology(topology_id_to_set)
-      .Then([&received_callback2](fidl::Result<Control::SetTopology>& result) {
+      .Then([&received_callback2](fidl::Result<fad::Control::SetTopology>& result) {
         received_callback2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -1423,7 +1420,7 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
 /////////////////////
 // StreamConfig tests
 //
-// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+// When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service()->devices().begin());
@@ -1433,7 +1430,8 @@ TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
-  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
+  // If fad::Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a
+  // failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
@@ -1449,9 +1447,9 @@ TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
   // If ControlServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+// When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 //
-// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
+// (Same as "CleanClientDrop" test case, but the fad::Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerStreamConfigTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -1511,12 +1509,12 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
   ASSERT_EQ(ControlServer::count(), 1u);
 
   auto [ring_buffer_client, ring_buffer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+      CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
   bool received_callback = false;
 
   control->client()
       ->CreateRingBuffer({{
-          .options = fuchsia_audio_device::RingBufferOptions{{
+          .options = fad::RingBufferOptions{{
               .format = fuchsia_audio::Format{{
                   .sample_type = fuchsia_audio::SampleType::kInt16,
                   .channel_count = 2,
@@ -1526,7 +1524,7 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
           }},
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -1549,7 +1547,7 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
   EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the Control lives, even if the client drops its child RingBuffer.
+// Verify that the fad::Control lives, even if the client drops its child RingBuffer.
 TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -1565,15 +1563,15 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
 
   {
     auto [ring_buffer_client_end, ring_buffer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+        CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
     bool received_callback = false;
 
-    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+    auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
         std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
 
     control->client()
         ->CreateRingBuffer({{
-            .options = fuchsia_audio_device::RingBufferOptions{{
+            .options = fad::RingBufferOptions{{
                 .format = fuchsia_audio::Format{{
                     .sample_type = fuchsia_audio::SampleType::kInt16,
                     .channel_count = 2,
@@ -1583,7 +1581,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
             }},
             .ring_buffer_server = std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -1607,7 +1605,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// Verify that the Control lives, even if the driver drops its RingBuffer connection.
+// Verify that the fad::Control lives, even if the driver drops its RingBuffer connection.
 TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -1622,13 +1620,13 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
   ASSERT_EQ(ControlServer::count(), 1u);
 
   auto [ring_buffer_client, ring_buffer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+      CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
   bool received_callback = false;
 
   control->client()
       ->CreateRingBuffer({{
           .element_id = ring_buffer_element_id(),
-          .options = fuchsia_audio_device::RingBufferOptions{{
+          .options = fad::RingBufferOptions{{
               .format = fuchsia_audio::Format{{
                   .sample_type = fuchsia_audio::SampleType::kInt16,
                   .channel_count = 2,
@@ -1638,7 +1636,7 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
           }},
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -1679,9 +1677,9 @@ TEST_F(ControlServerStreamConfigTest, SetGain) {
 
   control->client()
       ->SetGain({{
-          .target_state = fuchsia_audio_device::GainState{{.gain_db = -1.0f}},
+          .target_state = fad::GainState{{.gain_db = -1.0f}},
       }})
-      .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::SetGain>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -1715,7 +1713,7 @@ TEST_F(ControlServerStreamConfigTest, GetTopologiesUnsupported) {
   auto received_callback = false;
 
   control->client()->GetTopologies().Then([&received_callback](
-                                              fidl::Result<Control::GetTopologies>& result) {
+                                              fidl::Result<fad::Control::GetTopologies>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -1746,7 +1744,7 @@ TEST_F(ControlServerStreamConfigTest, GetElementsUnsupported) {
   auto received_callback = false;
 
   control->client()->GetElements().Then([&received_callback](
-                                            fidl::Result<Control::GetElements>& result) {
+                                            fidl::Result<fad::Control::GetElements>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();

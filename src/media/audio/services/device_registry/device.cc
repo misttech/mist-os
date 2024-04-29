@@ -37,6 +37,8 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 TokenId NextTokenId() {
   static TokenId token_id = 0;
   return token_id++;
@@ -110,8 +112,8 @@ void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
 // static
 std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                                        async_dispatcher_t* dispatcher, std::string_view name,
-                                       fuchsia_audio_device::DeviceType device_type,
-                                       fuchsia_audio_device::DriverClient driver_client) {
+                                       fad::DeviceType device_type,
+                                       fad::DriverClient driver_client) {
   ADR_LOG_STATIC(kLogObjectLifetimes);
 
   // The constructor is private, forcing clients to use Device::Create().
@@ -119,8 +121,7 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
    public:
     MakePublicCtor(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                    async_dispatcher_t* dispatcher, std::string_view name,
-                   fuchsia_audio_device::DeviceType device_type,
-                   fuchsia_audio_device::DriverClient driver_client)
+                   fad::DeviceType device_type, fad::DriverClient driver_client)
         : Device(std::move(presence_watcher), dispatcher, name, device_type,
                  std::move(driver_client)) {}
   };
@@ -133,9 +134,8 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
 // removed. The dispatcher member is needed for Device to create client connections to protocols
 // such as fuchsia.hardware.audio.signalprocessing.Reader or fuchsia.hardware.audio.RingBuffer.
 Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
-               async_dispatcher_t* dispatcher, std::string_view name,
-               fuchsia_audio_device::DeviceType device_type,
-               fuchsia_audio_device::DriverClient driver_client)
+               async_dispatcher_t* dispatcher, std::string_view name, fad::DeviceType device_type,
+               fad::DriverClient driver_client)
     : presence_watcher_(std::move(presence_watcher)),
       dispatcher_(dispatcher),
       name_(name.substr(0, name.find('\0'))),
@@ -147,22 +147,22 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
   LogObjectCounts();
 
   switch (device_type_) {
-    case fuchsia_audio_device::DeviceType::kCodec:
+    case fad::DeviceType::kCodec:
       codec_handler_ = {this, "Codec"};
       codec_client_ = {driver_client_.codec().take().value(), dispatcher, &codec_handler_};
       break;
-    case fuchsia_audio_device::DeviceType::kComposite:
+    case fad::DeviceType::kComposite:
       composite_handler_ = {this, "Composite"};
       composite_client_ = {driver_client_.composite().take().value(), dispatcher,
                            &composite_handler_};
       break;
-    case fuchsia_audio_device::DeviceType::kInput:
-    case fuchsia_audio_device::DeviceType::kOutput:
+    case fad::DeviceType::kInput:
+    case fad::DeviceType::kOutput:
       stream_config_handler_ = {this, "StreamConfig"};
       stream_config_client_ = {driver_client_.stream_config().take().value(), dispatcher,
                                &stream_config_handler_};
       break;
-    case fuchsia_audio_device::DeviceType::kDai:
+    case fad::DeviceType::kDai:
       ADR_WARN_METHOD() << "Dai device type is not yet implemented";
       OnError(ZX_ERR_WRONG_TYPE);
       return;
@@ -263,18 +263,18 @@ void Device::OnError(zx_status_t error) {
 }
 bool Device::IsFullyInitialized() {
   switch (device_type_) {
-    case fuchsia_audio_device::DeviceType::kCodec:
+    case fad::DeviceType::kCodec:
       return has_codec_properties() && has_health_state() && checked_for_signalprocessing() &&
              dai_format_sets_retrieved() && has_plug_state();
-    case fuchsia_audio_device::DeviceType::kComposite:
+    case fad::DeviceType::kComposite:
       return has_composite_properties() && has_health_state() && checked_for_signalprocessing() &&
              dai_format_sets_retrieved() && ring_buffer_format_sets_retrieved();
-    case fuchsia_audio_device::DeviceType::kInput:
-    case fuchsia_audio_device::DeviceType::kOutput:
+    case fad::DeviceType::kInput:
+    case fad::DeviceType::kOutput:
       return has_stream_config_properties() && has_health_state() &&
              checked_for_signalprocessing() && ring_buffer_format_sets_retrieved() &&
              has_gain_state() && has_plug_state();
-    case fuchsia_audio_device::DeviceType::kDai:
+    case fad::DeviceType::kDai:
       ADR_WARN_METHOD() << "Don't yet support Dai";
       return false;
     default:
@@ -295,7 +295,7 @@ void Device::OnInitializationResponse() {
   }
 
   switch (device_type_) {
-    case fuchsia_audio_device::DeviceType::kCodec:
+    case fad::DeviceType::kCodec:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
           << " (RECEIVED|pending)"                                                 //
           << "   " << (has_codec_properties() ? "PROPS" : "props")                 //
@@ -304,7 +304,7 @@ void Device::OnInitializationResponse() {
           << "   " << (dai_format_sets_retrieved() ? "DAIFORMATS" : "daiformats")  //
           << "   " << (has_plug_state() ? "PLUG" : "plug");
       break;
-    case fuchsia_audio_device::DeviceType::kComposite:
+    case fad::DeviceType::kComposite:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
           << " (RECEIVED|pending)"                                                 //
           << "   " << (has_composite_properties() ? "PROPS" : "props")             //
@@ -313,8 +313,8 @@ void Device::OnInitializationResponse() {
           << "   " << (dai_format_sets_retrieved() ? "DAIFORMATS" : "daiformats")  //
           << "   " << (ring_buffer_format_sets_retrieved() ? "RB_FORMATS" : "rb_formats");
       break;
-    case fuchsia_audio_device::DeviceType::kInput:
-    case fuchsia_audio_device::DeviceType::kOutput:
+    case fad::DeviceType::kInput:
+    case fad::DeviceType::kOutput:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
           << " (RECEIVED|pending)"                                                         //
           << "   " << (has_stream_config_properties() ? "PROPS" : "props")                 //
@@ -324,7 +324,7 @@ void Device::OnInitializationResponse() {
           << "   " << (has_plug_state() ? "PLUG" : "plug")                                 //
           << "   " << (has_gain_state() ? "GAIN" : "gain");
       break;
-    case fuchsia_audio_device::DeviceType::kDai:
+    case fad::DeviceType::kDai:
     default:
       ADR_WARN_METHOD() << "Invalid device_type_";
       return;
@@ -370,11 +370,10 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
     // DaiFormat(s)
     if (is_codec()) {
       if (codec_format_) {
-        notify->DaiFormatChanged(fuchsia_audio_device::kDefaultDaiInterconnectElementId,
-                                 codec_format_->dai_format, codec_format_->codec_format_info);
+        notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, codec_format_->dai_format,
+                                 codec_format_->codec_format_info);
       } else {
-        notify->DaiFormatChanged(fuchsia_audio_device::kDefaultDaiInterconnectElementId,
-                                 std::nullopt, std::nullopt);
+        notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt, std::nullopt);
       }
       // Codec start state
       codec_start_state_.started ? notify->CodecStarted(codec_start_state_.start_stop_time)
@@ -456,10 +455,9 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
 
   // (4) PlugState (if Codec or StreamConfig).
   if (is_codec() || is_stream_config()) {
-    observer_to_add->PlugStateChanged(*plug_state_->plugged()
-                                          ? fuchsia_audio_device::PlugState::kPlugged
-                                          : fuchsia_audio_device::PlugState::kUnplugged,
-                                      zx::time(*plug_state_->plug_state_time()));
+    observer_to_add->PlugStateChanged(
+        *plug_state_->plugged() ? fad::PlugState::kPlugged : fad::PlugState::kUnplugged,
+        zx::time(*plug_state_->plug_state_time()));
   }
 
   LogObjectCounts();
@@ -794,7 +792,7 @@ void Device::RetrieveStreamRingBufferFormatSets() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   RetrieveRingBufferFormatSets(
-      fuchsia_audio_device::kDefaultRingBufferElementId,
+      fad::kDefaultRingBufferElementId,
       [this](ElementId element_id,
              const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
         if (state_ == State::Error) {
@@ -817,7 +815,7 @@ void Device::RetrieveStreamRingBufferFormatSets() {
             },
         }};
         element_ring_buffer_format_sets_ = {{
-            fuchsia_audio_device::ElementRingBufferFormatSet{{
+            fad::ElementRingBufferFormatSet{{
                 .element_id = element_id,
                 .format_sets = translated_ring_buffer_format_sets,
             }},
@@ -839,11 +837,11 @@ void Device::RetrieveRingBufferFormatSets(
   }
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
-  if (element_id != fuchsia_audio_device::kDefaultRingBufferElementId) {
+  if (element_id != fad::kDefaultRingBufferElementId) {
     OnError(ZX_ERR_INVALID_ARGS);
     return;
   }
-  ring_buffer_endpoint_ids_.insert(fuchsia_audio_device::kDefaultRingBufferElementId);
+  ring_buffer_endpoint_ids_.insert(fad::kDefaultRingBufferElementId);
 
   (*stream_config_client_)
       ->GetSupportedFormats()
@@ -1250,7 +1248,7 @@ zx_status_t Device::SetElementState(
 void Device::RetrieveCodecDaiFormatSets() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
   RetrieveDaiFormatSets(
-      fuchsia_audio_device::kDefaultDaiInterconnectElementId,
+      fad::kDefaultDaiInterconnectElementId,
       [this](ElementId element_id,
              const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
         if (state_ == State::Error) {
@@ -1297,7 +1295,7 @@ void Device::RetrieveDaiFormatSets(
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
   if (is_codec()) {
-    if (element_id != fuchsia_audio_device::kDefaultDaiInterconnectElementId) {
+    if (element_id != fad::kDefaultDaiInterconnectElementId) {
       OnError(ZX_ERR_INVALID_ARGS);
       return;
     }
@@ -1476,9 +1474,8 @@ void Device::RetrieveStreamPlugState() {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
           ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
-            obs->PlugStateChanged(plug_state.plugged().value_or(true)
-                                      ? fuchsia_audio_device::PlugState::kPlugged
-                                      : fuchsia_audio_device::PlugState::kUnplugged,
+            obs->PlugStateChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
+                                                                      : fad::PlugState::kUnplugged,
                                   zx::time(*plug_state.plug_state_time()));
           });
         }
@@ -1525,9 +1522,8 @@ void Device::RetrieveCodecPlugState() {
           ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
           ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
-            obs->PlugStateChanged(plug_state.plugged().value_or(true)
-                                      ? fuchsia_audio_device::PlugState::kPlugged
-                                      : fuchsia_audio_device::PlugState::kUnplugged,
+            obs->PlugStateChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
+                                                                      : fad::PlugState::kUnplugged,
                                   zx::time(*plug_state.plug_state_time()));
           });
         }
@@ -1646,13 +1642,13 @@ void Device::RetrieveCompositeHealthState() {
       });
 }
 
-// Return a fuchsia_audio_device::Info object based on this device's member values.
+// Return a fuchsia_audio_device/Info object based on this device's member values.
 // Required fields (guaranteed for the caller) include: token_id, device_type, device_name.
 // Other fields are required for some driver types but optional or absent for others.
-fuchsia_audio_device::Info Device::CreateDeviceInfo() {
+fad::Info Device::CreateDeviceInfo() {
   ADR_LOG_METHOD(kLogDeviceMethods);
 
-  auto info = fuchsia_audio_device::Info{{
+  auto info = fad::Info{{
       // Required for all device types:
       .token_id = token_id_,
       .device_type = device_type_,
@@ -1674,13 +1670,12 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
         // Required for Codec and StreamConfig; absent for Composite and Dai:
         .plug_detect_caps(*codec_properties_->plug_detect_capabilities() ==
                                   fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired
-                              ? fuchsia_audio_device::PlugDetectCapabilities::kHardwired
-                              : fuchsia_audio_device::PlugDetectCapabilities::kPluggable);
+                              ? fad::PlugDetectCapabilities::kHardwired
+                              : fad::PlugDetectCapabilities::kPluggable);
     // Codec properties stores unique_id as a string, so we must handle as a special case.
     if (codec_properties_->unique_id()) {
-      std::array<unsigned char, fuchsia_audio_device::kUniqueInstanceIdSize> uid{};
-      memcpy(uid.data(), codec_properties_->unique_id()->data(),
-             fuchsia_audio_device::kUniqueInstanceIdSize);
+      std::array<unsigned char, fad::kUniqueInstanceIdSize> uid{};
+      memcpy(uid.data(), codec_properties_->unique_id()->data(), fad::kUniqueInstanceIdSize);
       info.unique_instance_id(uid);
     }
   } else if (is_composite()) {
@@ -1704,7 +1699,7 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
         // Required for Dai and StreamConfig; optional for Composite; absent for Codec:
         .ring_buffer_format_sets(ring_buffer_format_sets())
         // Required for StreamConfig; absent for Codec, Composite and Dai:
-        .gain_caps(fuchsia_audio_device::GainCapabilities{{
+        .gain_caps(fad::GainCapabilities{{
             .min_gain_db = stream_config_properties_->min_gain_db(),
             .max_gain_db = stream_config_properties_->max_gain_db(),
             .gain_step_db = stream_config_properties_->gain_step_db(),
@@ -1714,8 +1709,8 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
         // Required for Codec and StreamConfig; absent for Composite and Dai:
         .plug_detect_caps(*stream_config_properties_->plug_detect_capabilities() ==
                                   fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired
-                              ? fuchsia_audio_device::PlugDetectCapabilities::kHardwired
-                              : fuchsia_audio_device::PlugDetectCapabilities::kPluggable)
+                              ? fad::PlugDetectCapabilities::kHardwired
+                              : fad::PlugDetectCapabilities::kPluggable)
         // Required for Composite, Dai and StreamConfig; absent for Codec:
         .clock_domain(stream_config_properties_->clock_domain());
   }
@@ -1939,7 +1934,7 @@ void Device::SetDaiFormat(ElementId element_id,
   if (!is_codec() && !is_composite()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot SetDaiFormat";
     notify->DaiFormatNotSet(element_id, dai_format,
-                            fuchsia_audio_device::ControlSetDaiFormatError::kWrongDeviceType);
+                            fad::ControlSetDaiFormatError::kWrongDeviceType);
     return;
   }
 
@@ -1947,30 +1942,28 @@ void Device::SetDaiFormat(ElementId element_id,
       << "Cannot call SetDaiFormat before device is initialized";
   if (state_ == State::Error) {
     ADR_WARN_METHOD() << "device already has an error";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fuchsia_audio_device::ControlSetDaiFormatError::kDeviceError);
+    notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError::kDeviceError);
     return;
   }
 
-  if (is_codec() ? (element_id != fuchsia_audio_device::kDefaultDaiInterconnectElementId)
+  if (is_codec() ? (element_id != fad::kDefaultDaiInterconnectElementId)
                  : (dai_endpoint_ids_.find(element_id) == dai_endpoint_ids_.end())) {
     ADR_WARN_METHOD() << "element_id not found, or not a DaiInterconnect Endpoint";
     notify->DaiFormatNotSet(element_id, dai_format,
-                            fuchsia_audio_device::ControlSetDaiFormatError::kInvalidElementId);
+                            fad::ControlSetDaiFormatError::kInvalidElementId);
     return;
   }
 
   if (!ValidateDaiFormat(dai_format)) {
     ADR_WARN_METHOD() << "Invalid dai_format -- cannot SetDaiFormat";
     notify->DaiFormatNotSet(element_id, dai_format,
-                            fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
+                            fad::ControlSetDaiFormatError::kInvalidDaiFormat);
     return;
   }
 
   if (!DaiFormatIsSupported(element_id, dai_format_sets(), dai_format)) {
     ADR_WARN_METHOD() << "Unsupported dai_format cannot be set";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch);
+    notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError::kFormatMismatch);
     return;
   }
 
@@ -1995,12 +1988,12 @@ void Device::SetDaiFormat(ElementId element_id,
           if (state_ == State::Error) {
             ADR_WARN_OBJECT() << "Codec/SetDaiFormat response: device already has an error";
             notify->DaiFormatNotSet(element_id, dai_format,
-                                    fuchsia_audio_device::ControlSetDaiFormatError::kDeviceError);
+                                    fad::ControlSetDaiFormatError::kDeviceError);
             return;
           }
 
           if (!result.is_ok()) {
-            fuchsia_audio_device::ControlSetDaiFormatError error;
+            fad::ControlSetDaiFormatError error;
             // These types of errors don't lead us to mark the device as in Error state.
             if (result.error_value().is_domain_error() &&
                 (result.error_value().domain_error() == ZX_ERR_INVALID_ARGS ||
@@ -2008,11 +2001,11 @@ void Device::SetDaiFormat(ElementId element_id,
               ADR_WARN_OBJECT()
                   << "Codec/SetDaiFormat response: ZX_ERR_INVALID_ARGS or ZX_ERR_NOT_SUPPORTED";
               error = (result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED
-                           ? fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch
-                           : fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
+                           ? fad::ControlSetDaiFormatError::kFormatMismatch
+                           : fad::ControlSetDaiFormatError::kInvalidDaiFormat);
             } else {
               LogResultError(result, "SetDaiFormat response");
-              error = fuchsia_audio_device::ControlSetDaiFormatError::kOther;
+              error = fad::ControlSetDaiFormatError::kOther;
             }
             notify->DaiFormatNotSet(element_id, dai_format, error);
             return;
@@ -2022,17 +2015,15 @@ void Device::SetDaiFormat(ElementId element_id,
           if (!ValidateCodecFormatInfo(result->state())) {
             FX_LOGS(ERROR) << "Codec/SetDaiFormat error: " << result.error_value();
             OnError(ZX_ERR_INVALID_ARGS);
-            notify->DaiFormatNotSet(
-                element_id, dai_format,
-                fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
+            notify->DaiFormatNotSet(element_id, dai_format,
+                                    fad::ControlSetDaiFormatError::kInvalidDaiFormat);
             return;
           }
 
           if (codec_format_ && codec_format_->dai_format == dai_format &&
               codec_format_->codec_format_info == result->state()) {
             // No DaiFormat change for this element
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fuchsia_audio_device::ControlSetDaiFormatError(0));
+            notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
             return;
           }
 
@@ -2067,26 +2058,26 @@ void Device::SetDaiFormat(ElementId element_id,
           if (state_ == State::Error) {
             ADR_WARN_OBJECT() << context << "device already has an error";
             notify->DaiFormatNotSet(element_id, dai_format,
-                                    fuchsia_audio_device::ControlSetDaiFormatError::kDeviceError);
+                                    fad::ControlSetDaiFormatError::kDeviceError);
             return;
           }
 
           if (!result.is_ok()) {
-            fuchsia_audio_device::ControlSetDaiFormatError error;
+            fad::ControlSetDaiFormatError error;
             // These types of errors don't lead us to mark the device as in Error state.
             if (result.error_value().is_domain_error() &&
                 (result.error_value().domain_error() ==
                  fuchsia_hardware_audio::DriverError::kInvalidArgs)) {
               ADR_WARN_OBJECT() << context << "kInvalidArgs";
-              error = fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat;
+              error = fad::ControlSetDaiFormatError::kInvalidDaiFormat;
             } else if (result.error_value().is_domain_error() &&
                        result.error_value().domain_error() ==
                            fuchsia_hardware_audio::DriverError::kNotSupported) {
               ADR_WARN_OBJECT() << context << "kNotSupported";
-              error = fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch;
+              error = fad::ControlSetDaiFormatError::kFormatMismatch;
             } else {
               LogResultError(result, context.c_str());
-              error = fuchsia_audio_device::ControlSetDaiFormatError::kOther;
+              error = fad::ControlSetDaiFormatError::kOther;
             }
             notify->DaiFormatNotSet(element_id, dai_format, error);
             return;
@@ -2096,8 +2087,7 @@ void Device::SetDaiFormat(ElementId element_id,
           if (auto match = composite_dai_formats_.find(element_id);
               match != composite_dai_formats_.end() && match->second == dai_format) {
             // No DaiFormat change for this element
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fuchsia_audio_device::ControlSetDaiFormatError(0));
+            notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
             return;
           }
 
@@ -2151,8 +2141,8 @@ bool Device::Reset() {
             // Reset our DaiFormat, even if no ControlNotify listens for notifications.
             codec_format_.reset();
             if (auto notify = GetControlNotify(); notify) {
-              notify->DaiFormatChanged(fuchsia_audio_device::kDefaultDaiInterconnectElementId,
-                                       std::nullopt, std::nullopt);
+              notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
+                                       std::nullopt);
             }
           }
 
@@ -2316,27 +2306,23 @@ bool Device::CodecStop() {
 bool Device::CreateRingBuffer(
     ElementId element_id, const fuchsia_hardware_audio::Format& format,
     uint32_t requested_ring_buffer_bytes,
-    fit::callback<void(
-        fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>)>
+    fit::callback<void(fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>)>
         create_ring_buffer_callback) {
   ADR_LOG_METHOD(kLogRingBufferMethods);
   if (!is_composite() && !is_stream_config()) {
     ADR_WARN_METHOD() << "Wrong device type";
-    create_ring_buffer_callback(
-        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kWrongDeviceType));
+    create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kWrongDeviceType));
     return false;
   }
 
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Device must be controlled before CreateRingBuffer can be called";
-    create_ring_buffer_callback(
-        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kOther));
+    create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kOther));
     return false;
   }
 
   if (ring_buffer_endpoint_ids_.find(element_id) == ring_buffer_endpoint_ids_.end()) {
-    create_ring_buffer_callback(
-        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId));
+    create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
     return false;
   }
 
@@ -2344,7 +2330,7 @@ bool Device::CreateRingBuffer(
 
   // This method create the ring_buffer map entry, upon success.
   if (auto status = ConnectRingBufferFidl(element_id, format);
-      status != fuchsia_audio_device::ControlCreateRingBufferError(0)) {
+      status != fad::ControlCreateRingBufferError(0)) {
     create_ring_buffer_callback(fit::error(status));
     return false;
   }
@@ -2362,28 +2348,28 @@ bool Device::CreateRingBuffer(
 // Here, we detect all the error cases that we can, before calling into the driver. If we call into
 // the driver, we return "no error", otherwise we return an error code that can be returned to
 // clients as the reason the CreateRingBuffer call failed.
-fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl(
+fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(
     ElementId element_id, fuchsia_hardware_audio::Format driver_format) {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
 
   if (state_ == State::Error) {
     ADR_WARN_METHOD() << "device already has an error";
-    return fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError;
+    return fad::ControlCreateRingBufferError::kDeviceError;
   }
 
   if (!ValidateRingBufferFormat(driver_format)) {
-    return fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat;
+    return fad::ControlCreateRingBufferError::kInvalidFormat;
   }
 
   auto bytes_per_sample = driver_format.pcm_format()->bytes_per_sample();
   auto sample_format = driver_format.pcm_format()->sample_format();
   if (!ValidateSampleFormatCompatibility(bytes_per_sample, sample_format)) {
-    return fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat;
+    return fad::ControlCreateRingBufferError::kInvalidFormat;
   }
 
   if (!RingBufferFormatIsSupported(element_id, element_ring_buffer_format_sets_, driver_format)) {
     ADR_WARN_METHOD() << "RingBuffer not supported";
-    return fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch;
+    return fad::ControlCreateRingBufferError::kFormatMismatch;
   }
 
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::RingBuffer>::Create();
@@ -2392,7 +2378,7 @@ fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl
     auto result = (*stream_config_client_)->CreateRingBuffer({driver_format, std::move(server)});
     if (!result.is_ok()) {
       FX_PLOGS(ERROR, result.error_value().status()) << "StreamConfig/CreateRingBuffer failed";
-      return fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch;
+      return fad::ControlCreateRingBufferError::kFormatMismatch;
     }
   } else {
     (*composite_client_)
@@ -2462,7 +2448,7 @@ fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl
   });
   SetRingBufferState(element_id, RingBufferState::Creating);
 
-  return fuchsia_audio_device::ControlCreateRingBufferError(0);
+  return fad::ControlCreateRingBufferError(0);
 }
 
 void Device::RetrieveRingBufferProperties(ElementId element_id) {
@@ -2596,7 +2582,7 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   if (!ref_clock.is_ok()) {
     ADR_WARN_METHOD() << "reference clock is not ok";
     ring_buffer.create_ring_buffer_callback(
-        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError));
+        fit::error(fad::ControlCreateRingBufferError::kDeviceError));
     ring_buffer.create_ring_buffer_callback = nullptr;
     OnError(ZX_ERR_INTERNAL);
     return;
@@ -2617,7 +2603,7 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
           .reference_clock = std::move(*ref_clock),
           .reference_clock_domain = *device_info_->clock_domain(),
       }},
-      .properties = fuchsia_audio_device::RingBufferProperties{{
+      .properties = fad::RingBufferProperties{{
           .valid_bits_per_sample = valid_bits_per_sample(element_id),
           .turn_on_delay = ring_buffer.ring_buffer_properties->turn_on_delay().value_or(0),
       }},

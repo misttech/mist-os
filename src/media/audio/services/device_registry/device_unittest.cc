@@ -28,6 +28,8 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 /////////////////////
 // Codec tests
 //
@@ -86,7 +88,7 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_TRUE(info.token_id().has_value());
 
   ASSERT_TRUE(info.device_type().has_value());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kCodec);
+  EXPECT_EQ(*info.device_type(), fad::DeviceType::kCodec);
 
   ASSERT_TRUE(info.device_name().has_value());
   EXPECT_TRUE(!info.device_name()->empty());
@@ -227,7 +229,7 @@ TEST_F(CodecTest, InitialPlugState) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
 }
 
@@ -242,7 +244,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
   notify()->plug_state().reset();
 
@@ -251,7 +253,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_FALSE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kUnplugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
@@ -270,7 +272,7 @@ TEST_F(CodecTest, GetDaiFormats) {
       [&received_get_dai_formats_callback, &dai_formats](
           ElementId element_id,
           const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -303,7 +305,7 @@ TEST_F(CodecTest, SetDaiFormat) {
       [&received_get_dai_formats_callback, &dai_formats](
           ElementId element_id,
           const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -338,7 +340,7 @@ TEST_F(CodecTest, InitiallyStopped) {
       [&received_get_dai_formats_callback, &dai_formats](
           ElementId element_id,
           const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -372,7 +374,7 @@ TEST_F(CodecTest, Start) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -401,7 +403,7 @@ TEST_F(CodecTest, SetDaiFormatChange) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -439,7 +441,7 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -477,7 +479,7 @@ TEST_F(CodecTest, StartStop) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -510,7 +512,7 @@ TEST_F(CodecTest, StartStart) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -544,7 +546,7 @@ TEST_F(CodecTest, StopStop) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -585,7 +587,7 @@ TEST_F(CodecTest, Reset) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -657,7 +659,7 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_TRUE(info.token_id().has_value());
 
   ASSERT_TRUE(info.device_type().has_value());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kComposite);
+  EXPECT_EQ(*info.device_type(), fad::DeviceType::kComposite);
 
   ASSERT_TRUE(info.device_name().has_value());
   EXPECT_FALSE(info.device_name()->empty());
@@ -986,7 +988,7 @@ TEST_F(CompositeTest, SetDaiFormatNoChange) {
     ASSERT_FALSE(notify()->dai_format_errors().empty());
     auto error_match = notify()->dai_format_errors().find(dai_element_id);
     ASSERT_NE(error_match, notify()->dai_format_errors().end());
-    EXPECT_EQ(error_match->second, fuchsia_audio_device::ControlSetDaiFormatError(0));
+    EXPECT_EQ(error_match->second, fad::ControlSetDaiFormatError(0));
     format_match = notify()->dai_formats().find(dai_element_id);
     EXPECT_EQ(format_match, notify()->dai_formats().end());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
@@ -1071,8 +1073,8 @@ TEST_F(CompositeTest, Reset) {
 
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1119,9 +1121,8 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
 
   EXPECT_TRUE(device->CreateRingBuffer(
       element_id, safe_format, requested_ring_buffer_bytes,
-      [&callback_received, &rb_info](
-          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-              result) {
+      [&callback_received,
+       &rb_info](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         callback_received = true;
         ASSERT_TRUE(result.is_ok());
         rb_info = std::move(result.value());
@@ -1217,8 +1218,8 @@ TEST_F(CompositeTest, DeviceDroppedRingBuffer) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1259,8 +1260,8 @@ TEST_F(CompositeTest, RingBufferStartAndStop) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1318,8 +1319,8 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1389,8 +1390,8 @@ TEST_F(CompositeTest, SetActiveChannelsUnsupported) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1437,8 +1438,8 @@ TEST_F(CompositeTest, WatchDelayInfoInitial) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                                 Device::RingBufferInfo>& result) {
+        [&created_ring_buffer](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           created_ring_buffer = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1486,8 +1487,8 @@ TEST_F(CompositeTest, WatchDelayInfoUpdate) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                                 Device::RingBufferInfo>& result) {
+        [&created_ring_buffer](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           created_ring_buffer = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1983,7 +1984,7 @@ TEST_F(StreamConfigTest, Initialization) {
   EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kOutput);
+  EXPECT_EQ(device->device_type(), fad::DeviceType::kOutput);
 
   EXPECT_TRUE(device->has_stream_config_properties());
   EXPECT_TRUE(device->checked_for_signalprocessing());
@@ -2004,7 +2005,7 @@ TEST_F(StreamConfigTest, DeviceInfo) {
 
   EXPECT_TRUE(info.token_id());
   EXPECT_TRUE(info.device_type());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kOutput);
+  EXPECT_EQ(*info.device_type(), fad::DeviceType::kOutput);
   EXPECT_TRUE(info.device_name());
   // manufacturer is optional, but it can't be an empty string
   EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
@@ -2243,7 +2244,7 @@ TEST_F(StreamConfigTest, InitialPlugState) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time(0).get());
 }
 
@@ -2256,7 +2257,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time(0).get());
   notify()->plug_state().reset();
 
@@ -2265,7 +2266,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_FALSE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kUnplugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
@@ -2279,8 +2280,7 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
         auto& info = result.value();
         ASSERT_TRUE(info.ring_buffer.buffer());
@@ -2327,8 +2327,7 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
         ASSERT_TRUE(info.ring_buffer.buffer());
@@ -2356,8 +2355,8 @@ TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+      [&created_ring_buffer](
+          const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });
@@ -2386,8 +2385,8 @@ TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+      [&created_ring_buffer](
+          const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });
@@ -2429,8 +2428,7 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
         ASSERT_TRUE(info.ring_buffer.buffer());
@@ -2457,8 +2455,7 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
         ASSERT_TRUE(info.ring_buffer.buffer());
@@ -2489,7 +2486,6 @@ TEST_F(StreamConfigTest, SetActiveChannels) {
   SetInitialActiveChannelsAndExpect(device, ring_buffer_element_id(), 0x0002);
 }
 
-// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no set_time
-// change).
+// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no set_time change).
 
 }  // namespace media_audio

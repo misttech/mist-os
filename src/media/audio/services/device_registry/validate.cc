@@ -20,6 +20,8 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 namespace {
 
 /////////////////////////////////////////////////////
@@ -51,30 +53,29 @@ size_t CountUcharMatches(const std::vector<uint8_t>& uchars, size_t uchar_to_mat
 
 }  // namespace
 
-bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_type,
-                                const fuchsia_audio_device::DriverClient& driver_client) {
+bool ClientIsValidForDeviceType(const fad::DeviceType& device_type,
+                                const fad::DriverClient& driver_client) {
   switch (driver_client.Which()) {
-    case fuchsia_audio_device::DriverClient::Tag::kCodec:
-      return (device_type == fuchsia_audio_device::DeviceType::kCodec);
-    case fuchsia_audio_device::DriverClient::Tag::kComposite:
-      return (device_type == fuchsia_audio_device::DeviceType::kComposite);
-    case fuchsia_audio_device::DriverClient::Tag::kDai:
-      return (device_type == fuchsia_audio_device::DeviceType::kDai);
-    case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
-      return (device_type == fuchsia_audio_device::DeviceType::kInput ||
-              device_type == fuchsia_audio_device::DeviceType::kOutput);
+    case fad::DriverClient::Tag::kCodec:
+      return (device_type == fad::DeviceType::kCodec);
+    case fad::DriverClient::Tag::kComposite:
+      return (device_type == fad::DeviceType::kComposite);
+    case fad::DriverClient::Tag::kDai:
+      return (device_type == fad::DeviceType::kDai);
+    case fad::DriverClient::Tag::kStreamConfig:
+      return (device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput);
     default:
       return false;
   }
 }
 
-// Translate from fuchsia_hardware_audio::SupportedFormats to fuchsia_audio_device::PcmFormatSet.
-std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
+// Translate from fuchsia_hardware_audio::SupportedFormats to fad::PcmFormatSet.
+std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
-  // translated_ring_buffer_format_sets is more complex to copy, since fuchsia_audio_device defines
+  // translated_ring_buffer_format_sets is more complex to copy, since fad defines
   // its tables from scratch instead of reusing types from fuchsia_hardware_audio. We build from the
   // inside-out: populating attributes then channel_sets then translated_ring_buffer_format_sets.
-  std::vector<fuchsia_audio_device::PcmFormatSet> translated_ring_buffer_format_sets;
+  std::vector<fad::PcmFormatSet> translated_ring_buffer_format_sets;
   for (auto& ring_buffer_format_set : ring_buffer_format_sets) {
     auto& pcm_formats = *ring_buffer_format_set.pcm_supported_formats();
 
@@ -82,9 +83,9 @@ std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
         *std::max_element(pcm_formats.frame_rates()->begin(), pcm_formats.frame_rates()->end());
 
     // Construct channel_sets
-    std::vector<fuchsia_audio_device::ChannelSet> channel_sets;
+    std::vector<fad::ChannelSet> channel_sets;
     for (const auto& chan_set : *pcm_formats.channel_sets()) {
-      std::vector<fuchsia_audio_device::ChannelAttributes> attributes;
+      std::vector<fad::ChannelAttributes> attributes;
       for (const auto& attribs : *chan_set.attributes()) {
         std::optional<uint32_t> max_channel_frequency;
         if (attribs.max_frequency()) {
@@ -143,7 +144,7 @@ std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
     std::vector<uint32_t> frame_rates = *pcm_formats.frame_rates();
     std::sort(frame_rates.begin(), frame_rates.end());
 
-    fuchsia_audio_device::PcmFormatSet pcm_format_set = {{
+    fad::PcmFormatSet pcm_format_set = {{
         .channel_sets = channel_sets,
         .sample_types = sample_types,
         .frame_rates = frame_rates,
@@ -300,8 +301,8 @@ bool ValidateRingBufferFormatSets(
         if (attrib.min_frequency()) {
           if (*attrib.min_frequency() > max_allowed_frequency) {
             FX_LOGS(WARNING) << "GetSupportedFormats: ChannelAttributes.min_frequency ("
-                             << *attrib.min_frequency() << ") out of range: " << "[0, "
-                             << max_allowed_frequency << "]";
+                             << *attrib.min_frequency() << ") out of range: "
+                             << "[0, " << max_allowed_frequency << "]";
             return false;
           }
           if (attrib.max_frequency() && *attrib.min_frequency() > *attrib.max_frequency()) {
@@ -701,7 +702,7 @@ bool ValidatePlugState(
 }
 
 // Validate only DeviceInfo-specific aspects. For example, don't re-validate format correctness.
-bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
+bool ValidateDeviceInfo(const fad::Info& device_info) {
   LogDeviceInfo(device_info);
 
   // Validate top-level required members.
@@ -728,7 +729,7 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     return false;
   }
   switch (*device_info.device_type()) {
-    case fuchsia_audio_device::DeviceType::kCodec:
+    case fad::DeviceType::kCodec:
       if (!device_info.dai_format_sets().has_value() || device_info.dai_format_sets()->empty() ||
           !device_info.plug_detect_caps().has_value()) {
         FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
@@ -740,7 +741,7 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
         return false;
       }
       break;
-    case fuchsia_audio_device::DeviceType::kComposite:
+    case fad::DeviceType::kComposite:
       if (!device_info.clock_domain().has_value() ||
           !device_info.signal_processing_elements().has_value() ||
           !device_info.signal_processing_topologies().has_value()) {
@@ -753,8 +754,8 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
         return false;
       }
       break;
-    case fuchsia_audio_device::DeviceType::kInput:
-    case fuchsia_audio_device::DeviceType::kOutput:
+    case fad::DeviceType::kInput:
+    case fad::DeviceType::kOutput:
       if (!device_info.is_input().has_value() || !device_info.gain_caps().has_value() ||
           !device_info.ring_buffer_format_sets().has_value() ||
           device_info.ring_buffer_format_sets()->empty() ||
@@ -767,7 +768,7 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
         return false;
       }
       break;
-    case fuchsia_audio_device::DeviceType::kDai:
+    case fad::DeviceType::kDai:
     default:
       FX_LOGS(WARNING) << __func__ << ": unsupported DeviceType: " << device_info.device_type();
       return false;

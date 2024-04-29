@@ -16,12 +16,11 @@
 
 namespace media_audio {
 
-using DriverClient = fuchsia_audio_device::DriverClient;
+namespace fad = fuchsia_audio_device;
 
 // static
 std::shared_ptr<ProviderServer> ProviderServer::Create(
-    std::shared_ptr<const FidlThread> thread,
-    fidl::ServerEnd<fuchsia_audio_device::Provider> server_end,
+    std::shared_ptr<const FidlThread> thread, fidl::ServerEnd<fad::Provider> server_end,
     std::shared_ptr<AudioDeviceRegistry> parent) {
   ADR_LOG_STATIC(kLogProviderServerMethods);
 
@@ -46,38 +45,38 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
 
   if (!request.device_name() || request.device_name()->empty()) {
     ADR_WARN_METHOD() << "device_name was absent/empty";
-    completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidName));
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kInvalidName));
     return;
   }
 
   if (!request.device_type()) {
     ADR_WARN_METHOD() << "device_type was absent";
-    completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidType));
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kInvalidType));
     return;
   }
 
   if (!request.driver_client()) {
     ADR_WARN_METHOD() << "driver_client was absent";
-    completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidDriverClient));
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kInvalidDriverClient));
     return;
   }
 
-  if (*request.device_type() == fuchsia_audio_device::DeviceType::Unknown()) {
+  if (*request.device_type() == fad::DeviceType::Unknown()) {
     ADR_WARN_METHOD() << "unknown device_type";
-    completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidType));
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kInvalidType));
     return;
   }
 
   if (!ClientIsValidForDeviceType(*request.device_type(), *request.driver_client())) {
     ADR_WARN_METHOD() << "driver_client did not match the specified device_type";
-    completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kWrongClientType));
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kWrongClientType));
     return;
   }
 
   // Remove this, when ADR supports the other driver_client types
-  if (*request.device_type() == fuchsia_audio_device::DeviceType::kDai) {
+  if (*request.device_type() == fad::DeviceType::kDai) {
     ADR_WARN_METHOD() << "AudioDeviceRegistry does not yet support this client type";
-    completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kWrongClientType));
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kWrongClientType));
     return;
   }
 
@@ -87,7 +86,7 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   // This kicks off device initialization, which notifies the parent when it completes.
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
                                     *request.device_type(), std::move(*request.driver_client())));
-  completer.Reply(fit::success(fuchsia_audio_device::ProviderAddDeviceResponse{}));
+  completer.Reply(fit::success(fad::ProviderAddDeviceResponse{}));
 }
 
 }  // namespace media_audio

@@ -15,28 +15,30 @@
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
+namespace {
+
+namespace fad = fuchsia_audio_device;
 
 class CodecWarningTest : public CodecTest {};
 class CompositeWarningTest : public CompositeTest {
  protected:
   // Creating a RingBuffer should fail with `expected_error`.
-  void ExpectCreateRingBufferError(
-      const std::shared_ptr<Device>& device, ElementId element_id,
-      fuchsia_audio_device::ControlCreateRingBufferError expected_error,
-      const fuchsia_hardware_audio::Format& format, uint32_t requested_ring_buffer_bytes = 1024) {
+  void ExpectCreateRingBufferError(const std::shared_ptr<Device>& device, ElementId element_id,
+                                   fad::ControlCreateRingBufferError expected_error,
+                                   const fuchsia_hardware_audio::Format& format,
+                                   uint32_t requested_ring_buffer_bytes = 1024) {
     std::stringstream stream;
     stream << "Validating CreateRingBuffer on element_id " << element_id << " with format "
            << *format.pcm_format();
     SCOPED_TRACE(stream.str());
 
     auto response_received = false;
-    auto error_received = fuchsia_audio_device::ControlCreateRingBufferError(0);
+    auto error_received = fad::ControlCreateRingBufferError(0);
 
     EXPECT_FALSE(device->CreateRingBuffer(
         element_id, format, requested_ring_buffer_bytes,
         [&response_received, &error_received](
-            fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-                result) {
+            fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
           ASSERT_TRUE(result.is_error());
           error_received = result.error_value();
           response_received = true;
@@ -191,7 +193,7 @@ TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -219,7 +221,7 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -231,11 +233,9 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->dai_format());
-  auto error_notify =
-      notify()->dai_format_errors().find(fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+  auto error_notify = notify()->dai_format_errors().find(fad::kDefaultDaiInterconnectElementId);
   ASSERT_TRUE(error_notify != notify()->dai_format_errors().end());
-  EXPECT_EQ(error_notify->second,
-            fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
+  EXPECT_EQ(error_notify->second, fad::ControlSetDaiFormatError::kInvalidDaiFormat);
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -253,7 +253,7 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
       dai_element_id(),
       [&dai_formats](ElementId element_id,
                      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& format_sets) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         for (const auto& format_set : format_sets) {
           dai_formats.push_back(format_set);
         }
@@ -266,10 +266,9 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->dai_format());
-  auto error_notify =
-      notify()->dai_format_errors().find(fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+  auto error_notify = notify()->dai_format_errors().find(fad::kDefaultDaiInterconnectElementId);
   ASSERT_TRUE(error_notify != notify()->dai_format_errors().end());
-  EXPECT_EQ(error_notify->second, fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch);
+  EXPECT_EQ(error_notify->second, fad::ControlSetDaiFormatError::kFormatMismatch);
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -328,14 +327,13 @@ TEST_F(CodecWarningTest, CreateRingBufferWrongDeviceType) {
   }};
   int32_t min_bytes = 100;
   bool callback_received = false;
-  auto received_error = fuchsia_audio_device::ControlCreateRingBufferError(0);
+  auto received_error = fad::ControlCreateRingBufferError(0);
 
   // We expect this to fail, because the DaiFormat has not yet been set.
   EXPECT_FALSE(device->CreateRingBuffer(
-      fuchsia_audio_device::kDefaultRingBufferElementId, format, min_bytes,
+      fad::kDefaultRingBufferElementId, format, min_bytes,
       [&callback_received, &received_error](
-          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-              result) {
+          fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         callback_received = true;
         ASSERT_TRUE(result.is_error());
         received_error = result.error_value();
@@ -343,7 +341,7 @@ TEST_F(CodecWarningTest, CreateRingBufferWrongDeviceType) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(callback_received);
-  EXPECT_EQ(received_error, fuchsia_audio_device::ControlCreateRingBufferError::kWrongDeviceType);
+  EXPECT_EQ(received_error, fad::ControlCreateRingBufferError::kWrongDeviceType);
   // We do expect the device to remain healthy and usable.
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -527,15 +525,14 @@ TEST_F(CompositeWarningTest, MakeControlCallsWithoutControl) {
 
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     auto callback_received = false;
-    auto received_error = fuchsia_audio_device::ControlCreateRingBufferError(0);
+    auto received_error = fad::ControlCreateRingBufferError(0);
     EXPECT_FALSE(device->CreateRingBuffer(
         ring_buffer_element_id,
         SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
             ring_buffer_element_id, ElementDriverRingBufferFormatSets(device)),
         requested_ring_buffer_bytes,
         [&callback_received, &received_error](
-            fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-                result) {
+            fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
           callback_received = true;
           ASSERT_TRUE(result.is_error());
           received_error = result.error_value();
@@ -543,7 +540,7 @@ TEST_F(CompositeWarningTest, MakeControlCallsWithoutControl) {
 
     RunLoopUntilIdle();
     EXPECT_TRUE(callback_received);
-    EXPECT_EQ(received_error, fuchsia_audio_device::ControlCreateRingBufferError::kOther);
+    EXPECT_EQ(received_error, fad::ControlCreateRingBufferError::kOther);
   }
 }
 
@@ -563,8 +560,8 @@ TEST_F(CompositeWarningTest, SetDaiFormatWrongElementType) {
     RunLoopUntilIdle();
     EXPECT_TRUE(notify()->dai_formats().empty());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
-    EXPECT_TRUE(ExpectDaiFormatError(
-        ring_buffer_element_id, fuchsia_audio_device::ControlSetDaiFormatError::kInvalidElementId));
+    EXPECT_TRUE(ExpectDaiFormatError(ring_buffer_element_id,
+                                     fad::ControlSetDaiFormatError::kInvalidElementId));
   }
 }
 
@@ -586,8 +583,8 @@ TEST_F(CompositeWarningTest, SetDaiFormatInvalidFormat) {
     RunLoopUntilIdle();
     EXPECT_TRUE(notify()->dai_formats().empty());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
-    EXPECT_TRUE(ExpectDaiFormatError(
-        dai_element_id, fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat));
+    EXPECT_TRUE(
+        ExpectDaiFormatError(dai_element_id, fad::ControlSetDaiFormatError::kInvalidDaiFormat));
   }
 }
 
@@ -608,8 +605,8 @@ TEST_F(CompositeWarningTest, SetDaiFormatUnsupportedFormat) {
     RunLoopUntilIdle();
     EXPECT_TRUE(notify()->dai_formats().empty());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
-    EXPECT_TRUE(ExpectDaiFormatError(
-        dai_element_id, fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch));
+    EXPECT_TRUE(
+        ExpectDaiFormatError(dai_element_id, fad::ControlSetDaiFormatError::kFormatMismatch));
   }
 }
 
@@ -627,8 +624,7 @@ TEST_F(CompositeWarningTest, CreateRingBufferInvalidElementId) {
   auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
       ring_buffer_element_id, ring_buffer_format_sets_by_element);
 
-  ExpectCreateRingBufferError(device, -1,
-                              fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId,
+  ExpectCreateRingBufferError(device, -1, fad::ControlCreateRingBufferError::kInvalidElementId,
                               safe_format);
 }
 
@@ -647,9 +643,8 @@ TEST_F(CompositeWarningTest, CreateRingBufferWrongElementType) {
       ring_buffer_element_id, ring_buffer_format_sets_by_element);
 
   for (auto dai_element_id : device->dai_endpoint_ids()) {
-    ExpectCreateRingBufferError(
-        device, dai_element_id,
-        fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId, safe_format);
+    ExpectCreateRingBufferError(device, dai_element_id,
+                                fad::ControlCreateRingBufferError::kInvalidElementId, safe_format);
   }
 }
 
@@ -670,8 +665,7 @@ TEST_F(CompositeWarningTest, CreateRingBufferInvalidFormat) {
     invalid_format.pcm_format()->number_of_channels(0);
 
     ExpectCreateRingBufferError(device, ring_buffer_element_id,
-                                fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat,
-                                invalid_format);
+                                fad::ControlCreateRingBufferError::kInvalidFormat, invalid_format);
   }
 }
 
@@ -692,7 +686,7 @@ TEST_F(CompositeWarningTest, CreateRingBufferUnsupportedFormat) {
     unsupported_format.pcm_format()->frame_rate(unsupported_format.pcm_format()->frame_rate() - 1);
 
     ExpectCreateRingBufferError(device, ring_buffer_element_id,
-                                fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch,
+                                fad::ControlCreateRingBufferError::kFormatMismatch,
                                 unsupported_format);
   }
 }
@@ -942,8 +936,7 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
   ASSERT_TRUE(SetControl(device));
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-             result) {
+      [](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
         EXPECT_TRUE(info.ring_buffer.buffer());
@@ -965,8 +958,7 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
   ASSERT_TRUE(SetControl(device));
   auto reconnected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-             result) {
+      [](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
         EXPECT_TRUE(info.ring_buffer.buffer());
@@ -1015,4 +1007,5 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
 // SetElementState on error device
 // SetElementState (unsupported by driver)
 
+}  // namespace
 }  // namespace media_audio

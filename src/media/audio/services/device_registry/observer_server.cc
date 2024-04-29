@@ -16,11 +16,12 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 // static
-std::shared_ptr<ObserverServer> ObserverServer::Create(
-    std::shared_ptr<const FidlThread> thread,
-    fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
-    std::shared_ptr<const Device> device) {
+std::shared_ptr<ObserverServer> ObserverServer::Create(std::shared_ptr<const FidlThread> thread,
+                                                       fidl::ServerEnd<fad::Observer> server_end,
+                                                       std::shared_ptr<const Device> device) {
   ADR_LOG_STATIC(kLogObserverServerMethods);
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), std::move(device));
@@ -62,23 +63,23 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
 
   if (device_has_error_) {
     ADR_WARN_METHOD() << "Device encountered an error and will be removed";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
-        fuchsia_audio_device::ObserverWatchGainStateError::kDeviceError));
+    completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
+        fad::ObserverWatchGainStateError::kDeviceError));
     return;
   }
 
   FX_CHECK(device_);
   if (!device_->is_stream_config()) {
     ADR_WARN_METHOD() << "This method is not supported for this device type";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
-        fuchsia_audio_device::ObserverWatchGainStateError::kWrongDeviceType));
+    completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
+        fad::ObserverWatchGainStateError::kWrongDeviceType));
     return;
   }
 
   if (watch_gain_state_completer_) {
     ADR_WARN_METHOD() << "previous `WatchGainState` request has not yet completed";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
-        fuchsia_audio_device::ObserverWatchGainStateError::kAlreadyPending));
+    completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
+        fad::ObserverWatchGainStateError::kAlreadyPending));
     return;
   }
 
@@ -86,7 +87,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   MaybeCompleteWatchGainState();
 }
 
-void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) {
+void ObserverServer::GainStateChanged(const fad::GainState& new_gain_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
   FX_DCHECK(device_->is_stream_config());
@@ -100,8 +101,7 @@ void ObserverServer::MaybeCompleteWatchGainState() {
     auto completer = std::move(*watch_gain_state_completer_);
     watch_gain_state_completer_.reset();
 
-    fuchsia_audio_device::ObserverWatchGainStateResponse response{
-        {.state = std::move(*new_gain_state_to_notify_)}};
+    fad::ObserverWatchGainStateResponse response{{.state = std::move(*new_gain_state_to_notify_)}};
     new_gain_state_to_notify_.reset();
 
     completer.Reply(fit::success(response));
@@ -113,23 +113,23 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
 
   if (device_has_error_) {
     ADR_WARN_METHOD() << "Device encountered an error and will be removed";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
-        fuchsia_audio_device::ObserverWatchPlugStateError::kDeviceError));
+    completer.Reply(fit::error<fad::ObserverWatchPlugStateError>(
+        fad::ObserverWatchPlugStateError::kDeviceError));
     return;
   }
 
   FX_CHECK(device_);
   if (!device_->is_codec() && !device_->is_stream_config()) {
     ADR_WARN_METHOD() << "This method is not supported for this device type";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
-        fuchsia_audio_device::ObserverWatchPlugStateError::kWrongDeviceType));
+    completer.Reply(fit::error<fad::ObserverWatchPlugStateError>(
+        fad::ObserverWatchPlugStateError::kWrongDeviceType));
     return;
   }
 
   if (watch_plug_state_completer_) {
     ADR_WARN_METHOD() << "previous `WatchPlugState` request has not yet completed";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
-        fuchsia_audio_device::ObserverWatchPlugStateError::kAlreadyPending));
+    completer.Reply(fit::error<fad::ObserverWatchPlugStateError>(
+        fad::ObserverWatchPlugStateError::kAlreadyPending));
     return;
   }
 
@@ -137,12 +137,12 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   MaybeCompleteWatchPlugState();
 }
 
-void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
+void ObserverServer::PlugStateChanged(const fad::PlugState& new_plug_state,
                                       zx::time plug_change_time) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << new_plug_state << " @ " << plug_change_time.get();
 
-  new_plug_state_to_notify_ = fuchsia_audio_device::ObserverWatchPlugStateResponse{{
+  new_plug_state_to_notify_ = fad::ObserverWatchPlugStateResponse{{
       .state = new_plug_state,
       .plug_time = plug_change_time.get(),
   }};
@@ -166,27 +166,27 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
 
   if (device_has_error_) {
     ADR_WARN_METHOD() << "Device encountered an error and will be removed";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
-        fuchsia_audio_device::ObserverGetReferenceClockError::kDeviceError));
+    completer.Reply(fit::error<fad::ObserverGetReferenceClockError>(
+        fad::ObserverGetReferenceClockError::kDeviceError));
     return;
   }
 
   FX_CHECK(device_);
   if (!device_->is_composite() && !device_->is_stream_config()) {
     ADR_WARN_METHOD() << "This method is not supported for this device type";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
-        fuchsia_audio_device::ObserverGetReferenceClockError::kWrongDeviceType));
+    completer.Reply(fit::error<fad::ObserverGetReferenceClockError>(
+        fad::ObserverGetReferenceClockError::kWrongDeviceType));
     return;
   }
 
   auto clock_result = device_->GetReadOnlyClock();
   if (clock_result.is_error()) {
     ADR_WARN_METHOD() << "Device clock could not be created";
-    completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
-        fuchsia_audio_device::ObserverGetReferenceClockError::kDeviceClockUnavailable));
+    completer.Reply(fit::error<fad::ObserverGetReferenceClockError>(
+        fad::ObserverGetReferenceClockError::kDeviceClockUnavailable));
     return;
   }
-  fuchsia_audio_device::ObserverGetReferenceClockResponse response = {{
+  fad::ObserverGetReferenceClockResponse response = {{
       .reference_clock = std::move(clock_result.value()),
   }};
   completer.Reply(fit::success(std::move(response)));

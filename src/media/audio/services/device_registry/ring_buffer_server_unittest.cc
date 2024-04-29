@@ -25,40 +25,34 @@
 namespace media_audio {
 namespace {
 
-using Control = fuchsia_audio_device::Control;
-using RingBuffer = fuchsia_audio_device::RingBuffer;
-using DriverClient = fuchsia_audio_device::DriverClient;
+namespace fad = fuchsia_audio_device;
 
 class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
-                             public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
+                             public fidl::AsyncEventHandler<fad::RingBuffer> {
  protected:
-  static inline const fuchsia_audio_device::RingBufferOptions kDefaultRingBufferOptions{{
+  static inline const fad::RingBufferOptions kDefaultRingBufferOptions{{
       .format = fuchsia_audio::Format{{.sample_type = fuchsia_audio::SampleType::kInt16,
                                        .channel_count = 2,
                                        .frames_per_second = 48000}},
       .ring_buffer_min_bytes = 2000,
   }};
 
-  std::optional<TokenId> WaitForAddedDeviceTokenId(
-      fidl::Client<fuchsia_audio_device::Registry>& reg_client);
+  std::optional<TokenId> WaitForAddedDeviceTokenId(fidl::Client<fad::Registry>& reg_client);
 
-  std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
+  std::pair<fidl::Client<fad::RingBuffer>, fidl::ServerEnd<fad::RingBuffer>>
   CreateRingBufferClient();
 
   std::pair<std::unique_ptr<TestServerAndNaturalAsyncClient<ControlServer>>,
-            fidl::Client<fuchsia_audio_device::RingBuffer>>
-  SetupForCleanShutdownTesting(
-      ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId,
-      const fuchsia_audio_device::RingBufferOptions& options = kDefaultRingBufferOptions);
+            fidl::Client<fad::RingBuffer>>
+  SetupForCleanShutdownTesting(ElementId element_id = fad::kDefaultRingBufferElementId,
+                               const fad::RingBufferOptions& options = kDefaultRingBufferOptions);
 };
 
 std::optional<TokenId> RingBufferServerTest::WaitForAddedDeviceTokenId(
-    fidl::Client<fuchsia_audio_device::Registry>& reg_client) {
+    fidl::Client<fad::Registry>& reg_client) {
   std::optional<TokenId> added_device_id;
   reg_client->WatchDevicesAdded().Then(
-      [&added_device_id](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device_id](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -70,20 +64,19 @@ std::optional<TokenId> RingBufferServerTest::WaitForAddedDeviceTokenId(
   return added_device_id;
 }
 
-std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
-          fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
+std::pair<fidl::Client<fad::RingBuffer>, fidl::ServerEnd<fad::RingBuffer>>
 RingBufferServerTest::CreateRingBufferClient() {
   auto [ring_buffer_client_end, ring_buffer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-  auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      std::move(ring_buffer_client_end), dispatcher(), this);
+      CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
+  auto ring_buffer_client =
+      fidl::Client<fad::RingBuffer>(std::move(ring_buffer_client_end), dispatcher(), this);
   return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
 }
 
 std::pair<std::unique_ptr<TestServerAndNaturalAsyncClient<ControlServer>>,
-          fidl::Client<fuchsia_audio_device::RingBuffer>>
-RingBufferServerTest::SetupForCleanShutdownTesting(
-    ElementId element_id, const fuchsia_audio_device::RingBufferOptions& options) {
+          fidl::Client<fad::RingBuffer>>
+RingBufferServerTest::SetupForCleanShutdownTesting(ElementId element_id,
+                                                   const fad::RingBufferOptions& options) {
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   FX_CHECK(token_id);
@@ -96,7 +89,7 @@ RingBufferServerTest::SetupForCleanShutdownTesting(
 
   control->client()
       ->CreateRingBuffer({{element_id, options, std::move(ring_buffer_server_end)}})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -114,8 +107,8 @@ class RingBufferServerCompositeTest : public RingBufferServerTest {
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeComposite>& fake_driver) {
     auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                 fuchsia_audio_device::DeviceType::kComposite,
-                                 DriverClient::WithComposite(fake_driver->Enable()));
+                                 fad::DeviceType::kComposite,
+                                 fad::DriverClient::WithComposite(fake_driver->Enable()));
     adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();
@@ -132,8 +125,7 @@ TEST_F(RingBufferServerCompositeTest, CleanClientDrop) {
       element_id, device->ring_buffer_format_sets());
 
   auto [control, ring_buffer_client] = SetupForCleanShutdownTesting(
-      element_id,
-      fuchsia_audio_device::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}});
+      element_id, fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}});
 
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 
@@ -151,8 +143,7 @@ TEST_F(RingBufferServerCompositeTest, DriverRingBufferDropCausesCleanRingBufferS
       element_id, device->ring_buffer_format_sets());
 
   auto [control, ring_buffer_client] = SetupForCleanShutdownTesting(
-      element_id,
-      fuchsia_audio_device::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}});
+      element_id, fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}});
 
   fake_driver->DropRingBuffer(element_id);
 
@@ -170,8 +161,7 @@ TEST_F(RingBufferServerCompositeTest, DriverCompositeDropCausesCleanRingBufferSe
       element_id, device->ring_buffer_format_sets());
 
   auto [control, ring_buffer_client] = SetupForCleanShutdownTesting(
-      element_id,
-      fuchsia_audio_device::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}});
+      element_id, fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}});
 
   fake_driver->DropComposite();
 
@@ -181,10 +171,11 @@ TEST_F(RingBufferServerCompositeTest, DriverCompositeDropCausesCleanRingBufferSe
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// Verify that Control/CreateRingBuffer succeeds and returns the expected parameters.
+// Verify that fad::Control/CreateRingBuffer succeeds and returns the expected parameters.
 TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
   auto fake_driver = CreateFakeComposite();
-  auto element_id = FakeComposite::kMaxRingBufferElementId;  // Element is an Outgoing RingBuffer.
+  auto element_id =
+      FakeComposite::kMaxRingBufferElementId;  // Element is an Outgoing fad::RingBuffer.
   fake_driver->ReserveRingBufferSize(element_id, 8192);
   auto device = EnableDriverAndAddDevice(fake_driver);
   auto format = SafeRingBufferFormatFromElementRingBufferFormatSets(
@@ -203,12 +194,12 @@ TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
+          fad::RingBufferOptions{
               {.format = format, .ring_buffer_min_bytes = requested_ring_buffer_bytes}},
           std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback, format,
-             requested_ring_buffer_bytes](fidl::Result<Control::CreateRingBuffer>& result) {
+             requested_ring_buffer_bytes](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
 
         ASSERT_TRUE(result->properties());
@@ -266,11 +257,10 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -286,7 +276,7 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
           .channel_bitmask = 0x0,
       }})
       .Then([&received_callback,
-             before_set_active_channels](fidl::Result<RingBuffer::SetActiveChannels>& result) {
+             before_set_active_channels](fidl::Result<fad::RingBuffer::SetActiveChannels>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->set_time());
@@ -324,11 +314,10 @@ TEST_F(RingBufferServerCompositeTest, DriverDoesNotSupportSetActiveChannels) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -339,11 +328,11 @@ TEST_F(RingBufferServerCompositeTest, DriverDoesNotSupportSetActiveChannels) {
   received_callback = false;
 
   ring_buffer_client->SetActiveChannels({{0}}).Then(
-      [&received_callback](fidl::Result<RingBuffer::SetActiveChannels>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::SetActiveChannels>& result) {
         ASSERT_TRUE(result.is_error()) << result.error_value();
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported)
+                  fad::RingBufferSetActiveChannelsError::kMethodNotSupported)
             << result.error_value();
         received_callback = true;
       });
@@ -377,11 +366,10 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -393,7 +381,7 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
   auto before_start = zx::clock::get_monotonic();
 
   ring_buffer_client->Start({}).Then([&received_callback, before_start, &fake_driver,
-                                      element_id](fidl::Result<RingBuffer::Start>& result) {
+                                      element_id](fidl::Result<fad::RingBuffer::Start>& result) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result->start_time());
     EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time(element_id).get());
@@ -413,11 +401,11 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
       ->SetActiveChannels({{
           .channel_bitmask = 0x0,
       }})
-      .Then([&received_callback](fidl::Result<RingBuffer::SetActiveChannels>& result) {
+      .Then([&received_callback](fidl::Result<fad::RingBuffer::SetActiveChannels>& result) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported)
+                  fad::RingBufferSetActiveChannelsError::kMethodNotSupported)
             << result.error_value();
         received_callback = true;
       });
@@ -427,7 +415,7 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
   received_callback = false;
 
   ring_buffer_client->Stop({}).Then(
-      [&received_callback, &fake_driver, element_id](fidl::Result<RingBuffer::Stop>& result) {
+      [&received_callback, &fake_driver, element_id](fidl::Result<fad::RingBuffer::Stop>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         EXPECT_FALSE(fake_driver->started(element_id));
         received_callback = true;
@@ -464,11 +452,10 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoInitialValues) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->properties());
         ASSERT_TRUE(result->properties()->turn_on_delay());
@@ -482,7 +469,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoInitialValues) {
   received_callback = false;
 
   ring_buffer_client->WatchDelayInfo().Then(
-      [&received_callback](fidl::Result<RingBuffer::WatchDelayInfo>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::WatchDelayInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
@@ -519,11 +506,10 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoDynamicUpdates) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -534,7 +520,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoDynamicUpdates) {
   received_callback = false;
 
   ring_buffer_client->WatchDelayInfo().Then(
-      [&received_callback](fidl::Result<RingBuffer::WatchDelayInfo>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::WatchDelayInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
@@ -549,7 +535,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoDynamicUpdates) {
   received_callback = false;
 
   ring_buffer_client->WatchDelayInfo().Then(
-      [&received_callback](fidl::Result<RingBuffer::WatchDelayInfo>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::WatchDelayInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
@@ -590,11 +576,10 @@ TEST_F(RingBufferServerCompositeTest, ControlClientDropCausesRingBufferDrop) {
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -633,11 +618,10 @@ TEST_F(RingBufferServerCompositeTest, ControlServerShutdownCausesRingBufferDrop)
   control->client()
       ->CreateRingBuffer({{
           element_id,
-          fuchsia_audio_device::RingBufferOptions{
-              {.format = format, .ring_buffer_min_bytes = 2000}},
+          fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -680,11 +664,10 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
     control->client()
         ->CreateRingBuffer({{
             element_id,
-            fuchsia_audio_device::RingBufferOptions{
-                {.format = format, .ring_buffer_min_bytes = 2000}},
+            fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
             std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           EXPECT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -696,7 +679,7 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
     auto before_start = zx::clock::get_monotonic();
 
     ring_buffer_client->Start({}).Then([&received_callback, before_start, &fake_driver,
-                                        element_id](fidl::Result<RingBuffer::Start>& result) {
+                                        element_id](fidl::Result<fad::RingBuffer::Start>& result) {
       ASSERT_TRUE(result.is_ok()) << result.error_value();
       ASSERT_TRUE(result->start_time());
       EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time(element_id).get());
@@ -726,11 +709,10 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
     control->client()
         ->CreateRingBuffer({{
             element_id,
-            fuchsia_audio_device::RingBufferOptions{
-                {.format = format, .ring_buffer_min_bytes = 2000}},
+            fad::RingBufferOptions{{.format = format, .ring_buffer_min_bytes = 2000}},
             std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           EXPECT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -742,7 +724,7 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
     auto before_start = zx::clock::get_monotonic();
 
     ring_buffer_client->Start({}).Then([&received_callback, before_start, &fake_driver,
-                                        element_id](fidl::Result<RingBuffer::Start>& result) {
+                                        element_id](fidl::Result<fad::RingBuffer::Start>& result) {
       ASSERT_TRUE(result.is_ok()) << result.error_value();
       ASSERT_TRUE(result->start_time());
       EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time(element_id).get());
@@ -762,9 +744,9 @@ class RingBufferServerStreamConfigTest : public RingBufferServerTest {
  protected:
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeStreamConfig>& fake_driver) {
-    auto device = Device::Create(adr_service(), dispatcher(), "Test output name",
-                                 fuchsia_audio_device::DeviceType::kOutput,
-                                 DriverClient::WithStreamConfig(fake_driver->Enable()));
+    auto device =
+        Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                       fad::DriverClient::WithStreamConfig(fake_driver->Enable()));
     adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();
@@ -814,7 +796,7 @@ TEST_F(RingBufferServerStreamConfigTest,
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// Verify that Control/CreateRingBuffer succeeds and returns the expected parameters.
+// Verify that fad::Control/CreateRingBuffer succeeds and returns the expected parameters.
 TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -834,7 +816,7 @@ TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
 
         ASSERT_TRUE(result->properties());
@@ -888,7 +870,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -904,7 +886,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
           .channel_bitmask = 0x0,
       }})
       .Then([&received_callback,
-             before_set_active_channels](fidl::Result<RingBuffer::SetActiveChannels>& result) {
+             before_set_active_channels](fidl::Result<fad::RingBuffer::SetActiveChannels>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->set_time());
         EXPECT_GT(*result->set_time(), before_set_active_channels.get());
@@ -940,7 +922,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverDoesNotSupportSetActiveChannels) 
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -951,11 +933,11 @@ TEST_F(RingBufferServerStreamConfigTest, DriverDoesNotSupportSetActiveChannels) 
   received_callback = false;
 
   ring_buffer_client->SetActiveChannels({{0}}).Then(
-      [&received_callback](fidl::Result<RingBuffer::SetActiveChannels>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::SetActiveChannels>& result) {
         ASSERT_TRUE(result.is_error()) << result.error_value();
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported)
+                  fad::RingBufferSetActiveChannelsError::kMethodNotSupported)
             << result.error_value();
         received_callback = true;
       });
@@ -988,7 +970,7 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -999,15 +981,15 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
   received_callback = false;
   auto before_start = zx::clock::get_monotonic();
 
-  ring_buffer_client->Start({}).Then(
-      [&received_callback, before_start, &fake_driver](fidl::Result<RingBuffer::Start>& result) {
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->start_time());
-        EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time().get());
-        EXPECT_GT(*result->start_time(), before_start.get());
-        EXPECT_TRUE(fake_driver->started());
-        received_callback = true;
-      });
+  ring_buffer_client->Start({}).Then([&received_callback, before_start,
+                                      &fake_driver](fidl::Result<fad::RingBuffer::Start>& result) {
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    ASSERT_TRUE(result->start_time());
+    EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time().get());
+    EXPECT_GT(*result->start_time(), before_start.get());
+    EXPECT_TRUE(fake_driver->started());
+    received_callback = true;
+  });
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -1020,11 +1002,11 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
       ->SetActiveChannels({{
           .channel_bitmask = 0x0,
       }})
-      .Then([&received_callback](fidl::Result<RingBuffer::SetActiveChannels>& result) {
+      .Then([&received_callback](fidl::Result<fad::RingBuffer::SetActiveChannels>& result) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported)
+                  fad::RingBufferSetActiveChannelsError::kMethodNotSupported)
             << result.error_value();
         received_callback = true;
       });
@@ -1034,7 +1016,7 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
   received_callback = false;
 
   ring_buffer_client->Stop({}).Then(
-      [&received_callback, &fake_driver](fidl::Result<RingBuffer::Stop>& result) {
+      [&received_callback, &fake_driver](fidl::Result<fad::RingBuffer::Stop>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         EXPECT_FALSE(fake_driver->started());
         received_callback = true;
@@ -1069,7 +1051,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoInitialValues) {
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->properties());
         ASSERT_TRUE(result->properties()->turn_on_delay());
@@ -1083,7 +1065,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoInitialValues) {
   received_callback = false;
 
   ring_buffer_client->WatchDelayInfo().Then(
-      [&received_callback](fidl::Result<RingBuffer::WatchDelayInfo>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::WatchDelayInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
@@ -1119,7 +1101,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoDynamicUpdates) {
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -1130,7 +1112,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoDynamicUpdates) {
   received_callback = false;
 
   ring_buffer_client->WatchDelayInfo().Then(
-      [&received_callback](fidl::Result<RingBuffer::WatchDelayInfo>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::WatchDelayInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
@@ -1144,7 +1126,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoDynamicUpdates) {
   received_callback = false;
 
   ring_buffer_client->WatchDelayInfo().Then(
-      [&received_callback](fidl::Result<RingBuffer::WatchDelayInfo>& result) {
+      [&received_callback](fidl::Result<fad::RingBuffer::WatchDelayInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
@@ -1184,7 +1166,7 @@ TEST_F(RingBufferServerStreamConfigTest, ControlClientDropCausesRingBufferDrop) 
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -1222,7 +1204,7 @@ TEST_F(RingBufferServerStreamConfigTest, ControlServerShutdownCausesRingBufferDr
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
@@ -1264,7 +1246,7 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
             .options = kDefaultRingBufferOptions,
             .ring_buffer_server = std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           EXPECT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -1275,15 +1257,15 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
     received_callback = false;
     auto before_start = zx::clock::get_monotonic();
 
-    ring_buffer_client->Start({}).Then(
-        [&received_callback, before_start, &fake_driver](fidl::Result<RingBuffer::Start>& result) {
-          ASSERT_TRUE(result.is_ok()) << result.error_value();
-          ASSERT_TRUE(result->start_time());
-          EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time().get());
-          EXPECT_GT(*result->start_time(), before_start.get());
-          EXPECT_TRUE(fake_driver->started());
-          received_callback = true;
-        });
+    ring_buffer_client->Start({}).Then([&received_callback, before_start, &fake_driver](
+                                           fidl::Result<fad::RingBuffer::Start>& result) {
+      ASSERT_TRUE(result.is_ok()) << result.error_value();
+      ASSERT_TRUE(result->start_time());
+      EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time().get());
+      EXPECT_GT(*result->start_time(), before_start.get());
+      EXPECT_TRUE(fake_driver->started());
+      received_callback = true;
+    });
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
@@ -1308,7 +1290,7 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
             .options = kDefaultRingBufferOptions,
             .ring_buffer_server = std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           EXPECT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
@@ -1319,15 +1301,15 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
     received_callback = false;
     auto before_start = zx::clock::get_monotonic();
 
-    ring_buffer_client->Start({}).Then(
-        [&received_callback, before_start, &fake_driver](fidl::Result<RingBuffer::Start>& result) {
-          ASSERT_TRUE(result.is_ok()) << result.error_value();
-          ASSERT_TRUE(result->start_time());
-          EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time().get());
-          EXPECT_GT(*result->start_time(), before_start.get());
-          EXPECT_TRUE(fake_driver->started());
-          received_callback = true;
-        });
+    ring_buffer_client->Start({}).Then([&received_callback, before_start, &fake_driver](
+                                           fidl::Result<fad::RingBuffer::Start>& result) {
+      ASSERT_TRUE(result.is_ok()) << result.error_value();
+      ASSERT_TRUE(result->start_time());
+      EXPECT_EQ(*result->start_time(), fake_driver->mono_start_time().get());
+      EXPECT_GT(*result->start_time(), before_start.get());
+      EXPECT_TRUE(fake_driver->started());
+      received_callback = true;
+    });
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);

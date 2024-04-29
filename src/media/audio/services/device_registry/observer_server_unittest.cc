@@ -25,20 +25,17 @@
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
+namespace {
 
-using Control = fuchsia_audio_device::Control;
-using Observer = fuchsia_audio_device::Observer;
-using Registry = fuchsia_audio_device::Registry;
-using DriverClient = fuchsia_audio_device::DriverClient;
+namespace fad = fuchsia_audio_device;
 
 class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
-                           public fidl::AsyncEventHandler<fuchsia_audio_device::Observer> {
+                           public fidl::AsyncEventHandler<fad::Observer> {
  protected:
-  std::optional<TokenId> WaitForAddedDeviceTokenId(
-      fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
+  std::optional<TokenId> WaitForAddedDeviceTokenId(fidl::Client<fad::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
     registry_client->WatchDevicesAdded().Then(
-        [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        [&added_device_id](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
@@ -50,11 +47,10 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
     return added_device_id;
   }
 
-  std::optional<TokenId> WaitForRemovedDeviceTokenId(
-      fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
+  std::optional<TokenId> WaitForRemovedDeviceTokenId(fidl::Client<fad::Registry>& registry_client) {
     std::optional<TokenId> removed_device_id;
     registry_client->WatchDeviceRemoved().Then(
-        [&removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+        [&removed_device_id](fidl::Result<fad::Registry::WatchDeviceRemoved>& result) mutable {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           ASSERT_TRUE(result->token_id());
           removed_device_id = *result->token_id();
@@ -64,19 +60,19 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
     return removed_device_id;
   }
 
-  fidl::Client<fuchsia_audio_device::Observer> ConnectToObserver(
-      fidl::Client<fuchsia_audio_device::Registry>& registry_client, TokenId token_id) {
+  fidl::Client<fad::Observer> ConnectToObserver(fidl::Client<fad::Registry>& registry_client,
+                                                TokenId token_id) {
     auto [observer_client_end, observer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-    auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-        std::move(observer_client_end), dispatcher(), this);
+        CreateNaturalAsyncClientOrDie<fad::Observer>();
+    auto observer_client =
+        fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(), this);
     bool received_callback = false;
     registry_client
         ->CreateObserver({{
             .token_id = token_id,
             .observer_server = std::move(observer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+        .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -87,13 +83,12 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
     return observer_client;
   }
 
-  std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
+  std::pair<fidl::Client<fad::RingBuffer>, fidl::ServerEnd<fad::RingBuffer>>
   CreateRingBufferClient() {
     auto [ring_buffer_client_end, ring_buffer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher());
+        CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
+    auto ring_buffer_client =
+        fidl::Client<fad::RingBuffer>(std::move(ring_buffer_client_end), dispatcher());
     return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
   }
 };
@@ -106,9 +101,9 @@ class ObserverServerCodecTest : public ObserverServerTest {
     auto fake_driver = std::make_shared<FakeCodec>(
         codec_endpoints.server.TakeChannel(), codec_endpoints.client.TakeChannel(), dispatcher());
 
-    adr_service()->AddDevice(Device::Create(
-        adr_service(), dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-        fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                            fad::DeviceType::kCodec,
+                                            fad::DriverClient::WithCodec(fake_driver->Enable())));
 
     RunLoopUntilIdle();
     return fake_driver;
@@ -121,9 +116,8 @@ class ObserverServerCompositeTest : public ObserverServerTest {
     auto fake_driver = CreateFakeComposite();
 
     adr_service()->AddDevice(Device::Create(
-        adr_service(), dispatcher(), "Test composite name",
-        fuchsia_audio_device::DeviceType::kComposite,
-        DriverClient::WithComposite(
+        adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+        fad::DriverClient::WithComposite(
             fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable()))));
     RunLoopUntilIdle();
     return fake_driver;
@@ -141,9 +135,9 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
   std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
-                                            fuchsia_audio_device::DeviceType::kOutput,
-                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(
+        Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                       fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
 
     RunLoopUntilIdle();
     return fake_driver;
@@ -182,8 +176,8 @@ TEST_F(ObserverServerCodecTest, CleanServerShutdown) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
-// directly create an Observer server and client synthetically via CreateTestObserverServer.
+// Validate creation of an Observer via the fad::Registry/CreateObserver method. Most other test
+// cases directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerCodecTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -193,10 +187,9 @@ TEST_F(ObserverServerCodecTest, Creation) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [observer_client_end, observer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      std::move(observer_client_end), dispatcher(), observer_fidl_handler().get());
+  auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
+  auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
+                                                     observer_fidl_handler().get());
   bool received_callback = false;
 
   registry->client()
@@ -204,7 +197,7 @@ TEST_F(ObserverServerCodecTest, Creation) {
           .token_id = *added_device_id,
           .observer_server = std::move(observer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -215,7 +208,7 @@ TEST_F(ObserverServerCodecTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that when an observed device is removed, the Observer is dropped.
+// Verify that when an observed device is removed, the fad::Observer is dropped.
 TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -241,7 +234,7 @@ TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the Observer receives the initial plug state of the observed device.
+// Verify that the fad::Observer receives the initial plug state of the observed device.
 // To ensure we correctly receive this, change the default state we we are initially kUnplugged.
 TEST_F(ObserverServerCodecTest, InitialPlugState) {
   auto fake_driver = CreateFakeCodecOutput();
@@ -250,8 +243,8 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
 
   RunLoopUntilIdle();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fuchsia_audio_device::DeviceType::kCodec,
-                                          DriverClient::WithCodec(fake_driver->Enable())));
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -268,12 +261,12 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   zx::time reported_plug_time = zx::time::infinite_past();
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback, &reported_plug_time](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_callback,
+       &reported_plug_time](fidl::Result<fad::Observer::WatchPlugState>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
+        EXPECT_EQ(*result->state(), fad::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
         reported_plug_time = zx::time(*result->plug_time());
       });
@@ -285,7 +278,7 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the Observer receives changes in the plug state of the observed device.
+// Verify that the fad::Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerCodecTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -303,11 +296,12 @@ TEST_F(ObserverServerCodecTest, PlugChange) {
   bool received_callback = false;
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback, &received_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
+      [&received_callback,
+       &received_plug_time](fidl::Result<fad::Observer::WatchPlugState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kPlugged);  // default state
+        EXPECT_EQ(*result->state(), fad::PlugState::kPlugged);  // default state
         ASSERT_TRUE(result->plug_time());
         received_plug_time = zx::time(*result->plug_time());
       });
@@ -319,11 +313,12 @@ TEST_F(ObserverServerCodecTest, PlugChange) {
   received_callback = false;
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback, &received_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
+      [&received_callback,
+       &received_plug_time](fidl::Result<fad::Observer::WatchPlugState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);  // new state
+        EXPECT_EQ(*result->state(), fad::PlugState::kUnplugged);  // new state
         ASSERT_TRUE(result->plug_time());
         received_plug_time = zx::time(*result->plug_time());
       });
@@ -338,7 +333,7 @@ TEST_F(ObserverServerCodecTest, PlugChange) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that an Observer does not drop, if the observed device's Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's fad::Control client is dropped.
 TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -352,10 +347,11 @@ TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   {
     auto received_callback = false;
     auto control = CreateTestControlServer(device);
-    control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
-      received_callback = true;
-      EXPECT_TRUE(result.is_ok()) << result.error_value();
-    });
+    control->client()->Reset().Then(
+        [&received_callback](fidl::Result<fad::Control::Reset>& result) {
+          received_callback = true;
+          EXPECT_TRUE(result.is_ok()) << result.error_value();
+        });
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
@@ -389,7 +385,7 @@ TEST_F(ObserverServerCodecTest, GetTopologiesUnsupported) {
   auto received_callback = false;
 
   observer->client()->GetTopologies().Then([&received_callback](
-                                               fidl::Result<Observer::GetTopologies>& result) {
+                                               fidl::Result<fad::Observer::GetTopologies>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -418,7 +414,7 @@ TEST_F(ObserverServerCodecTest, GetElementsUnsupported) {
   auto received_callback = false;
 
   observer->client()->GetElements().Then([&received_callback](
-                                             fidl::Result<Observer::GetElements>& result) {
+                                             fidl::Result<fad::Observer::GetElements>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -461,8 +457,8 @@ TEST_F(ObserverServerCompositeTest, CleanServerShutdown) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
-// directly create an Observer server and client synthetically via CreateTestObserverServer.
+// Validate creation of an Observer via the fad::Registry/CreateObserver method. Most other test
+// cases directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerCompositeTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -472,10 +468,9 @@ TEST_F(ObserverServerCompositeTest, Creation) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [observer_client_end, observer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      std::move(observer_client_end), dispatcher(), observer_fidl_handler().get());
+  auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
+  auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
+                                                     observer_fidl_handler().get());
   bool received_callback = false;
 
   registry->client()
@@ -483,7 +478,7 @@ TEST_F(ObserverServerCompositeTest, Creation) {
           .token_id = *added_device_id,
           .observer_server = std::move(observer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -494,7 +489,7 @@ TEST_F(ObserverServerCompositeTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that when an observed device is removed, the Observer is dropped.
+// Verify that when an observed device is removed, the fad::Observer is dropped.
 TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -519,7 +514,8 @@ TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the Observer receives the observed device's reference clock, and that it is valid.
+// Verify that the fad::Observer receives the observed device's reference clock, and that it is
+// valid.
 TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -535,7 +531,7 @@ TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
   bool received_callback = false;
 
   observer->client()->GetReferenceClock().Then(
-      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
+      [&received_callback](fidl::Result<fad::Observer::GetReferenceClock>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->reference_clock());
@@ -570,10 +566,10 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
   control->client()
       ->CreateRingBuffer({{
           ring_buffer_element_id,
-          fuchsia_audio_device::RingBufferOptions{{format, 2000}},
+          fad::RingBufferOptions{{format, 2000}},
           std::move(ring_buffer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -612,10 +608,10 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
     control->client()
         ->CreateRingBuffer({{
             ring_buffer_element_id,
-            fuchsia_audio_device::RingBufferOptions{{format, 2000}},
+            fad::RingBufferOptions{{format, 2000}},
             std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -630,7 +626,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that an Observer does not drop, if the observed device's Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's fad::Control client is dropped.
 TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -645,10 +641,11 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
     auto control = CreateTestControlServer(device);
     bool received_callback = false;
 
-    control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
-      received_callback = true;
-      EXPECT_TRUE(result.is_ok()) << result.error_value();
-    });
+    control->client()->Reset().Then(
+        [&received_callback](fidl::Result<fad::Control::Reset>& result) {
+          received_callback = true;
+          EXPECT_TRUE(result.is_ok()) << result.error_value();
+        });
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
@@ -661,7 +658,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
 }
 
 // Retrieves the static list of Topologies and their properties.
-// Compare results from Observer/GetTopologies to the topologies returned in the Device info.
+// Compare results from fad::Observer/GetTopologies to the topologies returned in the Device info.
 TEST_F(ObserverServerCompositeTest, GetTopologies) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -677,13 +674,13 @@ TEST_F(ObserverServerCompositeTest, GetTopologies) {
   auto received_callback = false;
   std::vector<::fuchsia_hardware_audio_signalprocessing::Topology> received_topologies;
 
-  observer->client()->GetTopologies().Then(
-      [&received_callback, &received_topologies](fidl::Result<Observer::GetTopologies>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        received_topologies = result->topologies();
-        EXPECT_FALSE(received_topologies.empty());
-      });
+  observer->client()->GetTopologies().Then([&received_callback, &received_topologies](
+                                               fidl::Result<fad::Observer::GetTopologies>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    received_topologies = result->topologies();
+    EXPECT_FALSE(received_topologies.empty());
+  });
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -692,7 +689,7 @@ TEST_F(ObserverServerCompositeTest, GetTopologies) {
 }
 
 // Retrieves the static list of Elements and their properties.
-// Compare results from Observer/GetElements to the elements returned in the Device info.
+// Compare results from fad::Observer/GetElements to the elements returned in the Device info.
 TEST_F(ObserverServerCompositeTest, GetElements) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -709,7 +706,7 @@ TEST_F(ObserverServerCompositeTest, GetElements) {
   std::vector<::fuchsia_hardware_audio_signalprocessing::Element> received_elements;
 
   observer->client()->GetElements().Then(
-      [&received_callback, &received_elements](fidl::Result<Observer::GetElements>& result) {
+      [&received_callback, &received_elements](fidl::Result<fad::Observer::GetElements>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_elements = result->processing_elements();
@@ -737,7 +734,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyInitial) {
   std::optional<TopologyId> topology_id;
 
   observer->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Observer::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Observer::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -764,7 +761,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyNoChange) {
   std::optional<TopologyId> topology_id;
 
   observer->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Observer::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Observer::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -776,7 +773,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyNoChange) {
   received_callback = false;
 
   observer->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Observer::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Observer::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -801,7 +798,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyUpdate) {
   std::optional<TopologyId> topology_id;
 
   observer->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Observer::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Observer::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -825,7 +822,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyUpdate) {
   topology_id.reset();
 
   observer->client()->WatchTopology().Then(
-      [&received_callback, &topology_id](fidl::Result<Observer::WatchTopology>& result) {
+      [&received_callback, &topology_id](fidl::Result<fad::Observer::WatchTopology>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         topology_id = result->topology_id();
@@ -865,7 +862,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateInitial) {
     observer->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states](fidl::Result<Observer::WatchElementState>& result) {
+               &element_states](fidl::Result<fad::Observer::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states.insert_or_assign(element_id, result->state());
@@ -909,7 +906,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateNoChange) {
     observer->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states](fidl::Result<Observer::WatchElementState>& result) {
+               &element_states](fidl::Result<fad::Observer::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states.insert_or_assign(element_id, result->state());
@@ -925,7 +922,8 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateNoChange) {
     auto element_id = element_map_entry.first;
     observer->client()
         ->WatchElementState(element_id)
-        .Then([&received_callback, element_id](fidl::Result<Observer::WatchElementState>& result) {
+        .Then([&received_callback,
+               element_id](fidl::Result<fad::Observer::WatchElementState>& result) {
           received_callback = true;
           FAIL() << "Unexpected WatchElementState completion for element_id " << element_id;
         });
@@ -958,7 +956,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     observer->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states](fidl::Result<Observer::WatchElementState>& result) {
+               &element_states](fidl::Result<fad::Observer::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states.insert_or_assign(element_id, result->state());
@@ -1027,7 +1025,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     observer->client()
         ->WatchElementState(element_id)
         .Then([&received_callback, element_id,
-               &element_states_received](fidl::Result<Observer::WatchElementState>& result) {
+               &element_states_received](fidl::Result<fad::Observer::WatchElementState>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           element_states_received.insert_or_assign(element_id, result->state());
@@ -1106,8 +1104,8 @@ TEST_F(ObserverServerStreamConfigTest, CleanServerShutdown) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
-// directly create an Observer server and client synthetically via CreateTestObserverServer.
+// Validate creation of an Observer via the fad::Registry/CreateObserver method. Most other test
+// cases directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerStreamConfigTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1117,10 +1115,9 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [observer_client_end, observer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      std::move(observer_client_end), dispatcher(), observer_fidl_handler().get());
+  auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
+  auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
+                                                     observer_fidl_handler().get());
   bool received_callback = false;
 
   registry->client()
@@ -1128,7 +1125,7 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
           .token_id = *added_device_id,
           .observer_server = std::move(observer_server_end),
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -1139,7 +1136,7 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that when an observed device is removed, the Observer is dropped.
+// Verify that when an observed device is removed, the fad::Observer is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1164,7 +1161,7 @@ TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the Observer receives the initial gain state of the observed device.
+// Verify that the fad::Observer receives the initial gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   constexpr float kGainDb = -2.0f;
@@ -1175,9 +1172,9 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   }});
 
   RunLoopUntilIdle();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
-                                          fuchsia_audio_device::DeviceType::kOutput,
-                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1193,7 +1190,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   bool received_callback = false;
 
   observer->client()->WatchGainState().Then(
-      [&received_callback, kGainDb](fidl::Result<Observer::WatchGainState>& result) {
+      [&received_callback, kGainDb](fidl::Result<fad::Observer::WatchGainState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
@@ -1208,7 +1205,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the Observer receives changes in the gain state of the observed device.
+// Verify that the fad::Observer receives changes in the gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, GainChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1224,7 +1221,7 @@ TEST_F(ObserverServerStreamConfigTest, GainChange) {
   bool received_callback = false;
 
   observer->client()->WatchGainState().Then(
-      [&received_callback](fidl::Result<Observer::WatchGainState>& result) {
+      [&received_callback](fidl::Result<fad::Observer::WatchGainState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
@@ -1240,7 +1237,7 @@ TEST_F(ObserverServerStreamConfigTest, GainChange) {
   received_callback = false;
 
   observer->client()->WatchGainState().Then(
-      [&received_callback, kGainDb](fidl::Result<Observer::WatchGainState>& result) {
+      [&received_callback, kGainDb](fidl::Result<fad::Observer::WatchGainState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
@@ -1263,16 +1260,16 @@ TEST_F(ObserverServerStreamConfigTest, GainChange) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the Observer receives the initial plug state of the observed device.
+// Verify that the fad::Observer receives the initial plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   auto initial_plug_time = zx::clock::get_monotonic();
   fake_driver->InjectUnpluggedAt(initial_plug_time);
 
   RunLoopUntilIdle();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
-                                          fuchsia_audio_device::DeviceType::kOutput,
-                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1288,11 +1285,11 @@ TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   bool received_callback = false;
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback, initial_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
+      [&received_callback, initial_plug_time](fidl::Result<fad::Observer::WatchPlugState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
+        EXPECT_EQ(*result->state(), fad::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
         EXPECT_EQ(*result->plug_time(), initial_plug_time.get());
       });
@@ -1302,7 +1299,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the Observer receives changes in the plug state of the observed device.
+// Verify that the fad::Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1319,11 +1316,12 @@ TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   bool received_callback = false;
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback, time_of_plug_change](fidl::Result<Observer::WatchPlugState>& result) {
+      [&received_callback,
+       time_of_plug_change](fidl::Result<fad::Observer::WatchPlugState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kPlugged);
+        EXPECT_EQ(*result->state(), fad::PlugState::kPlugged);
         ASSERT_TRUE(result->plug_time());
         EXPECT_LT(*result->plug_time(), time_of_plug_change.get());
       });
@@ -1333,11 +1331,12 @@ TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   received_callback = false;
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback, time_of_plug_change](fidl::Result<Observer::WatchPlugState>& result) {
+      [&received_callback,
+       time_of_plug_change](fidl::Result<fad::Observer::WatchPlugState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
+        EXPECT_EQ(*result->state(), fad::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
         EXPECT_EQ(*result->plug_time(), time_of_plug_change.get());
       });
@@ -1351,7 +1350,8 @@ TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the Observer receives the observed device's reference clock, and that it is valid.
+// Verify that the fad::Observer receives the observed device's reference clock, and that it is
+// valid.
 TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1367,7 +1367,7 @@ TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
   bool received_callback = false;
 
   observer->client()->GetReferenceClock().Then(
-      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
+      [&received_callback](fidl::Result<fad::Observer::GetReferenceClock>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->reference_clock());
@@ -1396,11 +1396,10 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrop
   bool received_callback = false;
 
   control->client()
-      ->CreateRingBuffer(
-          {{.options = fuchsia_audio_device::RingBufferOptions{{.format = kDefaultRingBufferFormat,
-                                                                .ring_buffer_min_bytes = 2000}},
-            .ring_buffer_server = std::move(ring_buffer_server_end)}})
-      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+      ->CreateRingBuffer({{.options = fad::RingBufferOptions{{.format = kDefaultRingBufferFormat,
+                                                              .ring_buffer_min_bytes = 2000}},
+                           .ring_buffer_server = std::move(ring_buffer_server_end)}})
+      .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -1434,12 +1433,10 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
     bool received_callback = false;
 
     control->client()
-        ->CreateRingBuffer(
-            {{.options =
-                  fuchsia_audio_device::RingBufferOptions{
-                      {.format = kDefaultRingBufferFormat, .ring_buffer_min_bytes = 2000}},
-              .ring_buffer_server = std::move(ring_buffer_server_end)}})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        ->CreateRingBuffer({{.options = fad::RingBufferOptions{{.format = kDefaultRingBufferFormat,
+                                                                .ring_buffer_min_bytes = 2000}},
+                             .ring_buffer_server = std::move(ring_buffer_server_end)}})
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -1454,7 +1451,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that an Observer does not drop, if the observed device's Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's fad::Control client is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -1473,13 +1470,13 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) 
 
     control->client()
         ->CreateRingBuffer({{
-            .options = fuchsia_audio_device::RingBufferOptions{{
+            .options = fad::RingBufferOptions{{
                 .format = kDefaultRingBufferFormat,
                 .ring_buffer_min_bytes = 2000,
             }},
             .ring_buffer_server = std::move(ring_buffer_server_end),
         }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
         });
@@ -1516,7 +1513,7 @@ TEST_F(ObserverServerStreamConfigTest, GetTopologiesUnsupported) {
   auto received_callback = false;
 
   observer->client()->GetTopologies().Then([&received_callback](
-                                               fidl::Result<Observer::GetTopologies>& result) {
+                                               fidl::Result<fad::Observer::GetTopologies>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -1545,7 +1542,7 @@ TEST_F(ObserverServerStreamConfigTest, GetElementsUnsupported) {
   auto received_callback = false;
 
   observer->client()->GetElements().Then([&received_callback](
-                                             fidl::Result<Observer::GetElements>& result) {
+                                             fidl::Result<fad::Observer::GetElements>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
@@ -1556,4 +1553,5 @@ TEST_F(ObserverServerStreamConfigTest, GetElementsUnsupported) {
   EXPECT_TRUE(received_callback);
 }
 
+}  // namespace
 }  // namespace media_audio
