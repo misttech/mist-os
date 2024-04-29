@@ -38,6 +38,7 @@ const REPLAY_THREADS: usize = 2;
 // The number of messages to buffer before sending to record. They are chunked up to reduce the
 // number of allocations in the serving threads.
 const MESSAGE_CHUNK_SIZE: usize = 64;
+const IO_SIZE: usize = 1 << 17; // 128KiB. Needs to be a power of 2 and >= block size.
 
 /// Paired with a RecordingState, takes messages to be written into the current profile. This
 /// should be dropped before the recording is stopped to ensure that all messages have been
@@ -136,7 +137,8 @@ impl RecordingState {
 
             let block_size = handle.block_size() as usize;
             let mut offset = 0;
-            let mut io_buf = handle.allocate_buffer(block_size).await;
+            let mut io_buf = handle.allocate_buffer(IO_SIZE).await;
+            let mut next_block = block_size;
             for (message, _) in &recording {
                 // If this is a file opening marker or a file opening was never recorded, drop the
                 // message.
@@ -148,17 +150,24 @@ impl RecordingState {
                 }
 
                 let mut next_offset = offset + size_of::<Message>();
-                // The buffer is full.
-                if next_offset >= block_size {
-                    // Zero the remainder of the buffer.
-                    io_buf.as_mut_slice()[offset..block_size].fill(0);
-                    // Write it out.
-                    if let Err(e) = handle.write_or_append(None, io_buf.as_ref()).await {
-                        error!("Failed to write profile block: {:?}", e);
-                        return;
+                if next_offset > next_block {
+                    // Zero the remainder of the block. Stopping on block boundaries allows us to
+                    // resize the I/O without supporting reading/writing half messages to a buffer.
+                    io_buf.as_mut_slice()[offset..next_block].fill(0);
+                    if next_block >= IO_SIZE {
+                        // The buffer is full.  Write it out.
+                        if let Err(e) = handle.write_or_append(None, io_buf.as_ref()).await {
+                            error!("Failed to write profile block: {:?}", e);
+                            return;
+                        }
+                        offset = 0;
+                        next_offset = size_of::<Message>();
+                        next_block = block_size;
+                    } else {
+                        offset = next_block;
+                        next_offset = offset + size_of::<Message>();
+                        next_block += block_size;
                     }
-                    offset = 0;
-                    next_offset = size_of::<Message>();
                 }
                 message.encode_to(
                     (&mut io_buf.as_mut_slice()[offset..next_offset]).try_into().unwrap(),
@@ -166,8 +175,8 @@ impl RecordingState {
                 offset = next_offset;
             }
             if offset > 0 {
-                io_buf.as_mut_slice()[offset..block_size].fill(0);
-                if let Err(e) = handle.write_or_append(None, io_buf.as_ref()).await {
+                io_buf.as_mut_slice()[offset..next_block].fill(0);
+                if let Err(e) = handle.write_or_append(None, io_buf.subslice(0..next_block)).await {
                     error!("Failed to write profile block: {:?}", e);
                 }
             }
@@ -261,7 +270,8 @@ impl ReplayState {
             .into_any()
             .downcast::<BlobDirectory>()
             .map_err(|_| FxfsError::Inconsistent)?;
-        let mut io_buf = handle.allocate_buffer(handle.block_size() as usize).await;
+        let mut io_buf = handle.allocate_buffer(IO_SIZE).await;
+        let block_size = handle.block_size() as usize;
         let file_size = handle.get_size() as usize;
         let mut offset = 0;
         while offset < file_size {
@@ -269,19 +279,23 @@ impl ReplayState {
                 .read(offset as u64, io_buf.as_mut())
                 .await
                 .map_err(|e| e.context(format!("Failed to read at offset: {}", offset)))?;
-            if actual != io_buf.len() {
-                // This is unexpected due to how it's written, but recoverable.
-                warn!("Partial profile read at {} of length {}", offset, actual);
-            }
             offset += actual;
             let mut local_offset = 0;
-            for next_offset in std::ops::RangeInclusive::new(size_of::<Message>(), actual)
-                .step_by(size_of::<Message>())
-            {
+            let mut next_block = block_size;
+            let mut next_offset = size_of::<Message>();
+            while next_offset <= actual {
                 let msg = Message::decode_from(
                     io_buf.as_slice()[local_offset..next_offset].try_into().unwrap(),
                 );
+
                 local_offset = next_offset;
+                next_offset = local_offset + size_of::<Message>();
+                // Messages don't overlap block boundaries.
+                if next_offset > next_block {
+                    local_offset = next_block;
+                    next_offset = local_offset + size_of::<Message>();
+                    next_block += block_size;
+                }
 
                 // Ignore trailing zeroes. This is technically a valid entry but extremely unlikely
                 // and will only break an optimization.
@@ -375,7 +389,7 @@ impl Drop for ProfileState {
 #[cfg(test)]
 mod tests {
     use {
-        super::{Message, ProfileState, ReplayState, Request},
+        super::{Message, ProfileState, ReplayState, Request, IO_SIZE},
         crate::fuchsia::{
             fxblob::{
                 blob::FxBlob,
@@ -418,7 +432,7 @@ mod tests {
     impl FakeReaderWriter {
         fn new() -> Self {
             Self {
-                allocator: BufferAllocator::new(BLOCK_SIZE, BufferSource::new(BLOCK_SIZE * 8)),
+                allocator: BufferAllocator::new(BLOCK_SIZE, BufferSource::new(IO_SIZE * 2)),
                 inner: Arc::new(Mutex::new(FakeReaderWriterInner {
                     data: Vec::new(),
                     delays: Vec::new(),
@@ -560,6 +574,53 @@ mod tests {
         {
             let data = &inner.lock().unwrap().data;
             assert_eq!(data.len(), BLOCK_SIZE * 2);
+        }
+
+        let mut result = FakeReaderWriter::new();
+        result.inner = inner.clone();
+        let mut local_cache: BTreeMap<Hash, Arc<FxBlob>> = BTreeMap::new();
+        let (sender, receiver) = async_channel::unbounded::<Request>();
+
+        let volume = fixture.volume().volume().clone();
+        let task = fasync::Task::spawn(async move {
+            ReplayState::read_and_queue(result, volume, &sender, &mut local_cache).await.unwrap();
+        });
+
+        let mut recv_count = 0;
+        while let Ok(msg) = receiver.recv().await {
+            assert_eq!(msg.file.root(), hash);
+            assert_eq!(msg.offset, 4096 * recv_count);
+            recv_count += 1;
+        }
+        task.await;
+        assert_eq!(recv_count, message_count as u64);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_recording_more_than_io_size() {
+        let mut state = ProfileState::new();
+
+        let handle = FakeReaderWriter::new();
+        let inner = handle.inner.clone();
+        let fixture = testing::new_blob_fixture().await;
+        let message_count = (IO_SIZE as usize / size_of::<Message>()) + 1;
+        assert_eq!(inner.lock().unwrap().data.len(), 0);
+        let hash;
+        {
+            hash = fixture.write_blob(&[88u8], CompressionMode::Never).await;
+            // Drop recorder when finished writing to flush data.
+            let mut recorder = state.record_new(handle);
+            recorder.record_open(&hash).unwrap();
+            for i in 0..message_count {
+                recorder.record(&hash, 4096 * i as u64).unwrap();
+            }
+        }
+        state.stop_profiler();
+        {
+            let data = &inner.lock().unwrap().data;
+            assert_eq!(data.len(), IO_SIZE + BLOCK_SIZE);
         }
 
         let mut result = FakeReaderWriter::new();
