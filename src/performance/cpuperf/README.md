@@ -28,7 +28,8 @@ are described below. Several examples are provided by the cpuperf package.
 Example:
 
 ```shell
-$ cpuperf --spec-file=/pkgfs/packages/cpuperf/0/data/basic-cpu-memory.cpspec
+(on host) $ fx scp src/performance/cpuperf/cpspec/intel/basic-cpu-memory.cpspec "[$(fx get-device-addr)]:/tmp/basic-cpu-memory.cpspec"
+(on target) $ cpuperf --spec-file=/tmp/basic-cpu-memory.cpspec
 [INFO:main.cc(209)] cpuperf control program starting
 [INFO:main.cc(210)] 100 iteration(s), 1 second(s) per iteration
 ...
@@ -244,7 +245,7 @@ Some values have defaults.
  - `model_name`: obtained from `perfmon::GetDefaultModelName()`
  - `output_path_prefix`: "/tmp/cpuperf"
  - `session_result_spec_path`: "/tmp/cpuperf.cpsession"
- 
+
 ### Event flags
 
 Flags can be provided for each event to control how data for that event
