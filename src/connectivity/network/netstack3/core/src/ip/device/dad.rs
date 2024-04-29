@@ -47,7 +47,7 @@ pub(super) struct DadAddressStateRef<'a, CC> {
 
 /// Holds references to state associated with duplicate address detection.
 pub(super) struct DadStateRef<'a, CC> {
-    pub(super) state: Option<DadAddressStateRef<'a, CC>>,
+    pub(super) state: DadAddressStateRef<'a, CC>,
     /// The time between DAD message retransmissions.
     pub(super) retrans_timer: &'a NonZeroDuration,
     /// The maximum number of DAD messages to send.
@@ -93,6 +93,9 @@ pub(super) trait DadContext<BC>:
     >;
 
     /// Returns the address ID for the given address value.
+    // TODO(https://fxbug.dev/336291808): Replace this function with an upgrade
+    // on weak address IDs when they're available. As it stands, this is a panic
+    // opportunity when handling timers.
     fn get_address_id(
         &mut self,
         device_id: &Self::DeviceId,
@@ -189,8 +192,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
         device_id,
         addr,
         |DadStateRef { state, retrans_timer, max_dad_transmits }| {
-            let DadAddressStateRef { dad_state, core_ctx } =
-                state.unwrap_or_else(|| panic!("expected address to exist; addr: {addr:?}"));
+            let DadAddressStateRef { dad_state, core_ctx } = state;
 
             match variation {
                 DoDadVariation::Start => {
@@ -350,8 +352,7 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, 
             device_id,
             addr,
             |DadStateRef { state, retrans_timer: _, max_dad_transmits: _ }| {
-                let DadAddressStateRef { dad_state, core_ctx } =
-                    state.unwrap_or_else(|| panic!("expected address to exist; addr: {addr:?}"));
+                let DadAddressStateRef { dad_state, core_ctx } = state;
 
                 let leave_group = match dad_state {
                     Ipv6DadState::Assigned => true,
@@ -547,9 +548,14 @@ mod tests {
         ) -> O {
             let FakeDadContext { state, retrans_timer, max_dad_transmits, address_ctx } =
                 self.get_mut();
+            let ctx_addr = address_ctx.get_ref().addr;
+            let requested_addr = request_addr.addr().get();
+            assert!(
+                ctx_addr == requested_addr,
+                "invalid address {requested_addr} expected {ctx_addr}"
+            );
             cb(DadStateRef {
-                state: (address_ctx.get_ref().addr == request_addr.addr().get())
-                    .then(|| DadAddressStateRef { dad_state: state, core_ctx: address_ctx }),
+                state: DadAddressStateRef { dad_state: state, core_ctx: address_ctx },
                 retrans_timer,
                 max_dad_transmits,
             })
@@ -571,53 +577,6 @@ mod tests {
         unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
     const DAD_ADDRESS: UnicastAddr<Ipv6Addr> =
         unsafe { UnicastAddr::new_unchecked(Ipv6Addr::new([0xa, 0, 0, 0, 0, 0, 0, 1])) };
-    const OTHER_ADDRESS: UnicastAddr<Ipv6Addr> =
-        unsafe { UnicastAddr::new_unchecked(Ipv6Addr::new([0xa, 0, 0, 0, 0, 0, 0, 2])) };
-
-    #[test]
-    #[should_panic(expected = "expected address to exist")]
-    fn panic_unknown_address_start() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
-                state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
-                retrans_timer: RETRANS_TIMER,
-                max_dad_transmits: None,
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                    addr: DAD_ADDRESS,
-                    assigned: false,
-                    groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
-                }),
-            }));
-        DadHandler::start_duplicate_address_detection(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeDeviceId,
-            &get_address_id(OTHER_ADDRESS.get()),
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "expected address to exist")]
-    fn panic_unknown_address_handle_timer() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
-                state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
-                retrans_timer: RETRANS_TIMER,
-                max_dad_transmits: None,
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                    addr: DAD_ADDRESS,
-                    assigned: false,
-                    groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
-                }),
-            }));
-        TimerHandler::handle_timer(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            DadTimerId { device_id: FakeDeviceId, addr: OTHER_ADDRESS },
-        );
-    }
 
     #[test]
     #[should_panic(expected = "expected address to be tentative")]

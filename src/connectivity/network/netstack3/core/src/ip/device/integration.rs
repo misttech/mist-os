@@ -867,10 +867,7 @@ impl<
             CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
 
         cb(DadStateRef {
-            state: Some(DadAddressStateRef {
-                dad_state: dad_state.deref_mut(),
-                core_ctx: &mut core_ctx,
-            }),
+            state: DadAddressStateRef { dad_state: dad_state.deref_mut(), core_ctx: &mut core_ctx },
             retrans_timer: &retrans_timer,
             max_dad_transmits: &config.dad_transmits,
         })
