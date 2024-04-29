@@ -6,7 +6,7 @@
     children: [
         {
             name: "test",
-            url: "vkloop_test#meta/vkloop_test_child.cm",
+            url: "vkloop-test#meta/vkloop-test-child.cm",
         },
     ],
     offer: [

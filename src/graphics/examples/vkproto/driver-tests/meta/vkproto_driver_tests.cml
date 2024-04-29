@@ -9,7 +9,7 @@
     children: [
         {
             name: "test",
-            url: "vkproto-driver-tests#meta/vkproto-driver-tests-child.cm",
+            url: "vkproto-driver-test#meta/vkproto-driver-test-child.cm",
         },
     ],
     expose: [

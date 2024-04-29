@@ -9,7 +9,7 @@
     children: [
         {
             name: "test",
-            url: "vkext-test#meta/vkext-test.cm",
+            url: "vkext-test#meta/vkext-test-child.cm",
         },
     ],
     capabilities: [

@@ -22,7 +22,7 @@ packaged_shared_library("libvulkan") {
 
 fuchsia_component_manifest("cmd-buf-benchmark-child-manifest") {
   component_name = "cmd-buf-benchmark-test-child"
-  manifest = "meta/cmd-buf-benchmark-child.cml"
+  manifest = "meta/cmd-buf-benchmark-test-child.cml"
 }
 
 fuchsia_component("cmd-buf-benchmark-test-child-component") {
