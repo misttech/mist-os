@@ -3205,3 +3205,16 @@
   reviewers: ['adamperry@google.com', 'dworsham@google.com']
   submitted: '2024-03-19'
   reviewed: '2024-04-09'
+
+- name: 'RFC-0246'
+  title: 'API Levels are 32 bits'
+  short_description: 'Redefines API levels as 32-bit numbers, rather than 64-bits'
+  authors: ['hjfreyer@google.com']
+  file: '0246_api_levels_are_32_bits.md'
+  area: ['General']
+  issue: ['']
+  gerrit_change_id: ['1009253']
+  status: 'Accepted'
+  reviewers: ['ddorwin@google.com', 'mkember@google.com']
+  submitted: '2024-04-01'
+  reviewed: '2024-04-29'

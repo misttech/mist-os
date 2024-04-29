@@ -506,3 +506,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0244_raise_exception.md
   - title: "RFC-2045: VMO Prefetch"
     path: /docs/contribute/governance/rfcs/2045_vmo_prefetch.md
+  - title: "RFC-0246: API Levels are 32 bits"
+    path: /docs/contribute/governance/rfcs/0246_api_levels_are_32_bits.md

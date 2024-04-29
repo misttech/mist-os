@@ -132,6 +132,8 @@ and is treated specially.
 > *Amendment (Oct 2022).* To support [legacy methods](#legacy), we instead use
 > 2^64-2 for `HEAD` and 2^64-1 for `LEGACY`.
 
+> *Amendment (Apr 2024).* `HEAD` and `LEGACY` were redefined in [RFC-0246].
+
 Version identifiers are totally ordered by an "is newer than" relationship.
 Version _X_ is newer than version _Y_ when _X_ > _Y_.
 
@@ -831,6 +833,7 @@ i.e. without taking action to migrate.
 [rfc-0138]: /docs/contribute/governance/rfcs/0138_handling_unknown_interactions.md
 [rfc-0231]: /docs/contribute/governance/rfcs/0231_fidl_versioning_replacement_syntax.md
 [rfc-0232]: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md
+[RFC-0246]: /docs/contribute/governance/rfcs/0246_api_levels_are_32_bits.md
 [language]: /docs/reference/fidl/language/language.md
 [attrs]: /docs/reference/fidl/language/attributes.md
 [swift-attr]: https://docs.swift.org/swift-book/ReferenceManual/Attributes.html#ID583
