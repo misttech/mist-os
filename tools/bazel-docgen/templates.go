@@ -5,12 +5,12 @@
 package bazel_docgen
 
 import (
+	"strings"
 	"text/template"
 
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 )
 
-// TODO: this is just stubbed out for now
 const ruleTemplate = `
 [TOC]
 
@@ -26,8 +26,22 @@ const ruleTemplate = `
 {{end }}
 `
 
-// TODO: these are all just stubs, need actual implementation
-const providerTemplate = ""
+const providerTemplate = `
+[TOC]
+
+# {{ .ProviderName }}
+
+{{ .DocString }}
+
+{{if .FieldInfo }}## **FIELDS**
+
+
+| Name  | Description |
+| :------------- | :------------- |
+{{range .FieldInfo }}| {{ .Name }} | {{description .DocString }} |
+{{end}}{{end}}
+`
+
 const starlarkFunctionTemplate = `
 [TOC]
 
@@ -50,7 +64,28 @@ const starlarkFunctionTemplate = `
 {{end}}
 `
 
-const repositoryRuleTemplate = ""
+const repositoryRuleTemplate = `
+[TOC]
+
+# {{ .RuleName }}
+
+{{ .DocString }}
+
+## **ATTRIBUTES**
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+{{range .Attribute }}| {{ .Name }} | {{description .DocString }} | {{attributeTypeString .Type }} | {{isMandatory .Mandatory }} | {{defaultValue .DefaultValue }} |
+{{end }}
+
+{{if .Environ}}
+## **ENVIRONMENT VARIABLES**
+
+This repository rule depends on the following environment variables:
+
+{{range .Environ}}* {{codeBlock .}}{{end}}
+{{end}}
+`
 
 var (
 	attributeTypeURLMap = map[pb.AttributeType]string{
@@ -91,9 +126,33 @@ func defaultValue(value string) string {
 	return "`" + value + "`"
 }
 
+func codeBlock(value string) string {
+	return "`" + value + "`"
+}
+
+type stringReplacements struct {
+	input       string
+	replacement string
+}
+
+// Makes the description renderable inside of a markdown table.
+// TODO: properly support code blocks.
 func description(value string) string {
 	if value == "" {
 		return "-"
+	}
+
+	// Replace the values of the description that would cause problems rendering
+	// in a table context.
+	replacements := []stringReplacements{
+		{"<", "&lt;"},
+		{">", "&gt;"},
+		{"|", "\\|"},
+		{"\n\n", "<br><br>"},
+	}
+	value = strings.TrimSpace(value)
+	for _, r := range replacements {
+		value = strings.ReplaceAll(value, r.input, r.replacement)
 	}
 	return value
 }
@@ -139,6 +198,7 @@ func makeTemplate(name string, templateString string) (*template.Template, error
 			"description":         description,
 			"attributeTypeString": attributeTypeString,
 			"isMandatory":         isMandatory,
+			"codeBlock":           codeBlock,
 		},
 	)
 	return t.Parse(templateString)
