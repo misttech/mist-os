@@ -25,7 +25,7 @@ mod routes;
 mod socket;
 mod stack_fidl_worker;
 
-mod timers2;
+mod timers;
 mod util;
 mod verifier_worker;
 
@@ -262,7 +262,7 @@ const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 pub(crate) struct BindingsCtxInner {
-    timers: timers2::TimerDispatcher<TimerId<BindingsCtx>>,
+    timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
 }
@@ -423,7 +423,7 @@ impl RngContext for BindingsCtx {
 }
 
 impl TimerBindingsTypes for BindingsCtx {
-    type Timer = timers2::Timer<TimerId<BindingsCtx>>;
+    type Timer = timers::Timer<TimerId<BindingsCtx>>;
     type DispatchId = TimerId<BindingsCtx>;
 }
 
