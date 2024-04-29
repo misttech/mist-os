@@ -90,7 +90,7 @@ impl DebugLog {
 mod tests {
     use super::*;
     use crate::{cprng_draw, Signals, Time};
-    use fidl_fuchsia_boot as fboot;
+    use fidl_fuchsia_kernel as fkernel;
     use fuchsia_component::client::connect_channel_to_protocol;
 
     // expect_message_in_debuglog will read the last 10000 messages in zircon's debuglog, looking
@@ -99,10 +99,10 @@ mod tests {
     fn expect_message_in_debuglog(sent_msg: String) {
         use fuchsia_zircon::{Channel, HandleBased};
         let (client_end, server_end) = Channel::create();
-        connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
-        let service = fboot::RootResourceSynchronousProxy::new(client_end);
+        connect_channel_to_protocol::<fkernel::DebuglogResourceMarker>(server_end).unwrap();
+        let service = fkernel::DebuglogResourceSynchronousProxy::new(client_end);
         let resource =
-            service.get(fuchsia_zircon::Time::INFINITE).expect("couldn't get root resource");
+            service.get(fuchsia_zircon::Time::INFINITE).expect("couldn't get debuglog resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
         // See https://fxbug.dev/42173139 for details.

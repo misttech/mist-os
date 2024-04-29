@@ -13,8 +13,9 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.RootResource",
+                "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",
             ],

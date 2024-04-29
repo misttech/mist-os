@@ -40,7 +40,7 @@ impl Bti {
 mod tests {
     use super::*;
     use crate::{IommuDescDummy, ObjectType, Resource, Vmo};
-    use fidl_fuchsia_boot as fboot;
+    use fidl_fuchsia_kernel as fkernel;
     use fuchsia_component::client::connect_channel_to_protocol;
 
     #[test]
@@ -61,9 +61,9 @@ mod tests {
     fn create_iommu() -> Iommu {
         use fuchsia_zircon::{Channel, HandleBased, Time};
         let (client_end, server_end) = Channel::create();
-        connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
-        let service = fboot::RootResourceSynchronousProxy::new(client_end);
-        let resource = service.get(Time::INFINITE).expect("couldn't get root resource");
+        connect_channel_to_protocol::<fkernel::IommuResourceMarker>(server_end).unwrap();
+        let service = fkernel::IommuResourceSynchronousProxy::new(client_end);
+        let resource = service.get(Time::INFINITE).expect("couldn't get iommu resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
         // See https://fxbug.dev/42173139 for details.
