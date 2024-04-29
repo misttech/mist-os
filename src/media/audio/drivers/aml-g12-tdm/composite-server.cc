@@ -468,7 +468,7 @@ zx_status_t AudioCompositeServer::StartSocPower() {
   // TODO(b/309153055): Use this method when we integrate with Power Framework.
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
-  if (soc_power_started_ == true) {
+  if (soc_power_started_) {
     return ZX_OK;
   }
   fidl::WireResult clock_gate_result = clock_gate_->Enable();
@@ -510,7 +510,7 @@ zx_status_t AudioCompositeServer::StopSocPower() {
   // TODO(b/309153055): Use this method when we integrate with Power Framework.
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
-  if (soc_power_started_ == false) {
+  if (!soc_power_started_) {
     return ZX_OK;
   }
   for (auto& gpio_sclk_client : gpio_sclk_clients_) {
@@ -818,7 +818,8 @@ void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
     ring_buffer.id(kRingBufferIds[i])
         .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
         .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
-            std::move(ring_buffer_endpoint)));
+            std::move(ring_buffer_endpoint)))
+        .can_stop(false);
     elements.push_back(std::move(ring_buffer));
   }
   // One DAI per pipeline.
@@ -831,7 +832,8 @@ void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
     dai.id(kDaiIds[i])
         .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
         .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
-            std::move(dai_endpoint)));
+            std::move(dai_endpoint)))
+        .can_stop(false);
     elements.push_back(std::move(dai));
   }
 
@@ -859,6 +861,7 @@ void AudioCompositeServer::WatchElementState(WatchElementStateRequest& request,
     element_state.type_specific(
         fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
             std::move(endpoint_state)));
+    element_state.started(true);
     completer.Reply(std::move(element_state));
   } else if (element.completer) {
     // The client called WatchElementState when another hanging get was pending.
