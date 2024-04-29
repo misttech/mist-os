@@ -35,7 +35,7 @@ use shared_child::SharedChild;
 use std::{
     env,
     fs::{self, File},
-    io::{stderr, Write},
+    io::Write,
     net::Shutdown,
     os::unix::net::UnixStream,
     path::{Path, PathBuf},
@@ -389,7 +389,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             .map_err(|e| bug!("problem changing directory to instance dir: {e}"))?;
 
         emu_config.flags = process_flag_template(emu_config)
-            .map_err(|e| bug!("Failed to process the flags template file: {e}."))?;
+            .map_err(|e| bug!("Emulator engine failed to process the flags template file: {e}."))?;
 
         Ok(())
     }
@@ -438,7 +438,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         if self.emu_config().host.networking == NetworkingMode::User {
             // Capture the port mappings for user mode networking.
             let now = fuchsia_async::Time::now();
-            self.read_port_mappings().await?;
+            match self.read_port_mappings().await {
+                Ok(_) => (),
+                Err(e) => {
+                    if self.is_running().await {
+                        return Err(e);
+                    } else {
+                        let log_contents = fs::read_to_string(&self.emu_config().host.log)
+                            .map_err(|e| bug!("{e}"))?;
+                        return_user_error!("{e}: {log_contents}");
+                    }
+                }
+            };
             let elapsed_ms = now.elapsed().as_millis();
             tracing::debug!("reading port mappings took {elapsed_ms}ms");
         } else {
@@ -520,18 +531,13 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // Perform a check to make sure the process is still alive, otherwise report
                 // failure to launch.
                 if !self.is_running().await {
-                    tracing::error!(
-                        "Emulator process failed to launch, but we don't know the cause. \
-                        Check the emulator log, or look for a crash log."
-                    );
-                    eprintln!(
-                        "\nEmulator process failed to launch, but we don't know the cause. \
-                        Printing the contents of the emulator log...\n"
-                    );
-                    match dump_log_to_out(&self.emu_config().host.log, &mut stderr()) {
-                        Ok(_) => (),
-                        Err(e) => eprintln!("Couldn't print the log: {:?}", e),
+                    let log_contents = match fs::read_to_string(&self.emu_config().host.log) {
+                        Ok(s) => s,
+                        Err(e) => format!("could not read log: {e}"),
                     };
+                    let message = format!("Emulator process failed to launch.\n{log_contents}");
+                    tracing::error!("{message}");
+                    eprintln!("\n{message}");
                     self.set_engine_state(EngineState::Staged);
                     self.save_to_disk().await?;
 

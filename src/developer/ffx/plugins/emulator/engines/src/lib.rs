@@ -149,7 +149,7 @@ impl EngineBuilder {
         engine.load_emulator_binary().await?;
 
         engine.emu_config_mut().flags = process_flag_template(engine.emu_config())
-            .map_err(|e| bug!("Failed to process the flags template file: {e}"))?;
+            .map_err(|e| bug!("Engine builder failed to process the flags template file: {e}"))?;
         engine.save_to_disk().await?;
 
         Ok(engine)

@@ -420,7 +420,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
 
             // And regenerate the flags
             config.flags = process_flag_template(config)
-                .context("Failed to process the flags template file.")?;
+                .context("Failed to process the regenerated flags template file.")?;
 
             engine.save_to_disk().await?;
             return Ok((true, engine));

@@ -158,9 +158,17 @@ pub struct HostConfig {
 /// and behavior of Fuchsia running within the emulator instance.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct RuntimeConfig {
-    /// Additional arguments to pass directly to the emulator.
+    /// Additional arguments to pass directly to the guest kernel.
     #[serde(default)]
     pub addl_kernel_args: Vec<String>,
+
+    /// Additional arguments to pass directly to the emulator.
+    #[serde(default)]
+    pub addl_emu_args: Vec<String>,
+
+    /// Additional environment variables to use when starting the emulator
+    #[serde(default)]
+    pub addl_env: HashMap<String, String>,
 
     /// A flag to indicate that the --config flag was used to override the standard configuration.
     /// This matters because the contents of the EmulatorConfiguration no longer represent a

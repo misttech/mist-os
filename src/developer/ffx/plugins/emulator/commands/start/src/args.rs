@@ -39,6 +39,17 @@ pub struct StartCommand {
     #[argh(option)]
     pub config: Option<PathBuf>,
 
+    /// specify developer config file to append onto the configuration. This is a JSON file with the
+    /// object structure:
+    /// {{
+    ///   "args": [],
+    ///   "kernel_args": [],
+    ///   "env" : {{"key": "value"}}
+    ///  }}
+    ///
+    #[argh(option)]
+    pub dev_config: Option<PathBuf>,
+
     /// launch the emulator in serial console mode. This redirects the virtual serial port to the
     /// host's input/output streams, multi-plexed with the QEMU monitor console, then maintains a
     /// connection to those streams rather than returning control to the host terminal. This is
