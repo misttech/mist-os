@@ -38,6 +38,72 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.platform_bundle("kernel_contiguous_physical_pages");
         }
 
+        if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {
+            let kernek_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
+            builder.kernel_arg(kernek_arg);
+        }
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::subsystems::ConfigurationBuilderImpl;
+
+    #[test]
+    fn test_define_configuration() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Standard,
+            build_type: &BuildType::Eng,
+            board_info: &Default::default(),
+            ramdisk_image: false,
+            gendir: Default::default(),
+            resource_dir: Default::default(),
+        };
+        let platform_kernel_config: PlatformKernelConfig = Default::default();
+        let mut builder: ConfigurationBuilderImpl = Default::default();
+        let result =
+            KernelSubsystem::define_configuration(&context, &platform_kernel_config, &mut builder);
+        assert!(result.is_ok());
+        assert!(builder.build().kernel_args.is_empty());
+    }
+
+    #[test]
+    fn test_define_configuration_aslr() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Standard,
+            build_type: &BuildType::Eng,
+            board_info: &Default::default(),
+            ramdisk_image: false,
+            gendir: Default::default(),
+            resource_dir: Default::default(),
+        };
+        let platform_kernel_config =
+            PlatformKernelConfig { aslr_entropy_bits: Some(12), ..Default::default() };
+        let mut builder: ConfigurationBuilderImpl = Default::default();
+        let result =
+            KernelSubsystem::define_configuration(&context, &platform_kernel_config, &mut builder);
+        assert!(result.is_ok());
+        assert!(builder.build().kernel_args.contains("aslr.entropy_bits=12"));
+    }
+
+    #[test]
+    fn test_define_configuration_no_aslr() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Standard,
+            build_type: &BuildType::Eng,
+            board_info: &Default::default(),
+            ramdisk_image: false,
+            gendir: Default::default(),
+            resource_dir: Default::default(),
+        };
+        let platform_kernel_config = Default::default();
+        let mut builder: ConfigurationBuilderImpl = Default::default();
+        let result =
+            KernelSubsystem::define_configuration(&context, &platform_kernel_config, &mut builder);
+        assert!(result.is_ok());
+        assert!(!builder.build().kernel_args.iter().any(|s| s.starts_with("aslr.entropy_bits=12")));
     }
 }
