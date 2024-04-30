@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2099
+From //build/config/BUILDCONFIG.gn:2102
 
 ### allowed_test_device_types
 
@@ -3245,7 +3245,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1834
+From //build/config/BUILDCONFIG.gn:1837
 
 ### extra_vbmeta_descriptors
 
@@ -4376,7 +4376,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1635
+From //build/config/BUILDCONFIG.gn:1638
 
 ### legacy_base_package_labels
 
@@ -5446,6 +5446,14 @@ cacheline size of the target architecture.
 **Current value (from the default):** `128`
 
 From //zircon/kernel/params.gni:125
+
+### pgo_profile_path
+
+Profile data path that is used by PGO.
+
+**Current value (from the default):** `""`
+
+From //build/config/profile/config.gni:27
 
 ### platform_enable_user_pci
 
@@ -7534,7 +7542,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2089
+From //build/config/BUILDCONFIG.gn:2092
 
 ### select_variant_canonical
 
@@ -7544,7 +7552,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2094
+From //build/config/BUILDCONFIG.gn:2097
 
 ### select_variant_shortcuts
 
@@ -7602,7 +7610,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1880
+From //build/config/BUILDCONFIG.gn:1883
 
 ### size_checker_input
 
@@ -8077,7 +8085,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1864
+From //build/config/BUILDCONFIG.gn:1867
 
 ### universe_package_labels
 
