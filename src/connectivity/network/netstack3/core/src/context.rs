@@ -1361,13 +1361,13 @@ pub(crate) mod testutil {
                 // timer for the same or older FakeInstant.
                 let mut timers = Vec::<Ctx::TimerId>::new();
                 ctx.with_fake_timer_ctx_mut(|ctx| {
-                    while let Some(InstantAndData(t, id)) = ctx.timers.peek() {
+                    while let Some(InstantAndData(t, timer)) = ctx.timers.peek() {
                         // TODO(https://github.com/rust-lang/rust/issues/53667):
                         // Remove this break once let_chains is stable.
                         if *t > ctx.now() {
                             break;
                         }
-                        timers.push(id.clone());
+                        timers.push(timer.dispatch_id.clone());
                         assert_ne!(ctx.timers.pop(), None);
                     }
                 });

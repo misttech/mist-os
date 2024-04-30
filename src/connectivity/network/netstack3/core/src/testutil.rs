@@ -839,13 +839,9 @@ impl InstantContext for FakeBindingsCtx {
     }
 }
 
-// TODO(https://fxbug.dev/42083407): Improve the fake timer implementation
-// to not rely on hashing the dispatch IDs. This implementation gives us a
-// way to soft transition to the new world, but the new API is not asking
-// for DispatchId uniqueness between timers, even though that's how current
-// usage works.
 impl TimerBindingsTypes for FakeBindingsCtx {
-    type Timer = TimerId<Self>;
+    type Timer =
+        <crate::context::testutil::FakeTimerCtx<TimerId<Self>> as TimerBindingsTypes>::Timer;
     type DispatchId = TimerId<Self>;
 }
 

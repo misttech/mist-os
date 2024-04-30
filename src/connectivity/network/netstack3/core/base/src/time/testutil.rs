@@ -173,17 +173,30 @@ impl<D> PartialOrd for InstantAndData<D> {
     }
 }
 
+/// A fake timer vended by [`FakeTimerCtx`].
+#[derive(Debug, Clone)]
+pub struct FakeTimer<Id> {
+    timer_id: usize,
+    pub dispatch_id: Id,
+}
+
 /// A fake [`TimerContext`] which stores time as a [`FakeInstantCtx`].
 pub struct FakeTimerCtx<Id> {
     /// The instant context within this fake timer context.
     pub instant: FakeInstantCtx,
     /// The timer heap kept by the fake implementation.
-    pub timers: BinaryHeap<InstantAndData<Id>>,
+    pub timers: BinaryHeap<InstantAndData<FakeTimer<Id>>>,
+    /// Used to issue new [`FakeTimer`] ids.
+    next_timer_id: usize,
 }
 
 impl<Id> Default for FakeTimerCtx<Id> {
     fn default() -> FakeTimerCtx<Id> {
-        FakeTimerCtx { instant: FakeInstantCtx::default(), timers: BinaryHeap::default() }
+        FakeTimerCtx {
+            instant: FakeInstantCtx::default(),
+            timers: BinaryHeap::default(),
+            next_timer_id: 0,
+        }
     }
 }
 
@@ -194,7 +207,7 @@ impl<Id: Clone> FakeTimerCtx<Id> {
             .clone()
             .into_sorted_vec()
             .into_iter()
-            .map(|InstantAndData(i, id)| (i, id))
+            .map(|InstantAndData(i, FakeTimer { timer_id: _, dispatch_id })| (i, dispatch_id))
             .collect()
     }
 }
@@ -293,7 +306,9 @@ impl<Id: Debug + Clone + Hash + Eq> FakeTimerCtx<Id> {
 
         // Make sure that all installed timers were expected (present in
         // `timers`).
-        for InstantAndData(instant, id) in self.timers.iter().cloned() {
+        for InstantAndData(instant, FakeTimer { timer_id: _, dispatch_id: id }) in
+            self.timers.iter().cloned()
+        {
             match timers.remove(&id) {
                 None => {
                     if exact {
@@ -334,16 +349,13 @@ impl<Id: Debug + Clone + Hash + Eq> FakeTimerCtx<Id> {
 }
 
 impl<Id: PartialEq> FakeTimerCtx<Id> {
-    // Just like `TimerContext::cancel_timer`, but takes a reference to `Id`
-    // rather than a value. This allows us to implement
-    // `schedule_timer_instant`, which needs to retain ownership of the `Id`.
-    fn cancel_timer_inner(&mut self, id: &Id) -> Option<FakeInstant> {
+    fn cancel_timer_inner(&mut self, timer: &FakeTimer<Id>) -> Option<FakeInstant> {
         let mut r: Option<FakeInstant> = None;
         // NB: Cancelling timers can be made faster than this if we keep two
         // data structures and require that `Id: Hash`.
-        self.timers.retain(|t| {
-            if &t.1 == id {
-                r = Some(t.0);
+        self.timers.retain(|InstantAndData(instant, FakeTimer { timer_id, dispatch_id: _ })| {
+            if timer.timer_id == *timer_id {
+                r = Some(*instant);
                 false
             } else {
                 true
@@ -359,19 +371,16 @@ impl<Id> AsRef<FakeInstantCtx> for FakeTimerCtx<Id> {
     }
 }
 
-// TODO(https://fxbug.dev/42083407): Improve the fake timer implementation to
-// not rely on hashing the dispatch IDs. This implementation gives us a way to
-// soft transition to the new world, but the new API is not asking for
-// DispatchId uniqueness between timers, even though that's how current usage
-// works.
 impl<Id: Debug + Clone + Send + Sync> TimerBindingsTypes for FakeTimerCtx<Id> {
-    type Timer = Id;
+    type Timer = FakeTimer<Id>;
     type DispatchId = Id;
 }
 
 impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext for FakeTimerCtx<Id> {
-    fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-        id
+    fn new_timer(&mut self, dispatch_id: Self::DispatchId) -> Self::Timer {
+        let timer_id = self.next_timer_id;
+        self.next_timer_id += 1;
+        FakeTimer { timer_id, dispatch_id }
     }
 
     fn schedule_timer_instant(
@@ -389,7 +398,11 @@ impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext for FakeTimerCtx<
     }
 
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.timers.iter().find_map(|x| if x.1 == *timer { Some(x.0) } else { None })
+        self.timers.iter().find_map(
+            |InstantAndData(instant, FakeTimer { timer_id, dispatch_id: _ })| {
+                (timer.timer_id == *timer_id).then_some(*instant)
+            },
+        )
     }
 }
 
@@ -496,9 +509,9 @@ impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
                 id
             })
         })
-        .map(|id| {
-            handler.handle_timer(self, id.clone());
-            id
+        .map(|FakeTimer { timer_id: _, dispatch_id }| {
+            handler.handle_timer(self, dispatch_id.clone());
+            dispatch_id
         })
     }
 
