@@ -213,7 +213,8 @@ fn extend_dict_with_dictionary(
     declared_dictionaries: &Dict,
 ) {
     let dict = Dict::new();
-    let router = if let Some(source) = decl.source.as_ref() {
+    let router;
+    if let Some(source) = decl.source.as_ref() {
         let source_path = decl
             .source_dictionary
             .as_ref()
@@ -254,10 +255,10 @@ fn extend_dict_with_dictionary(
                 return;
             }
         };
-        make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router)
+        router = make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router);
     } else {
-        Router::new_ok(dict.clone())
-    };
+        router = Router::new_ok(dict.clone());
+    }
     match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
         Ok(()) => (),
         Err(e) => warn!("failed to add {} to declared dicts: {e:?}", decl.name),
@@ -319,51 +320,36 @@ fn build_environment(
     environment
 }
 
-/// Returns a [Router] that returns a [Dict].
-/// The first time this router is called, it calls `source_dict_router` to get another [Dict],
-/// and combines those entries with `dict``.
-/// Each time after, this router returns `dict`` that has the combined entries.
-/// NOTE: This function modifies `dict`!
+/// Returns a [Router] that returns a [Dict] whose contents are these union of `dict` and the
+/// [Dict] returned by `source_dict_router`.
+///
+/// This algorithm returns a new [Dict] each time, leaving `dict` unmodified.
 fn make_dict_extending_router(
     component: WeakComponentInstance,
     dict: Dict,
     source_dict_router: Router,
 ) -> Router {
-    let did_combine = Arc::new(std::sync::Mutex::new(false));
     let route_fn = move |_request: Request| {
         let source_dict_router = source_dict_router.clone();
-        let mut dict = dict.clone();
-        let did_combine = did_combine.clone();
+        let dict = dict.clone();
         let component = component.clone();
         async move {
-            // If we've already combined then return our dict.
-            if *did_combine.lock().unwrap() {
-                return Ok(dict.into());
-            }
-
-            // Otherwise combine the two.
             let source_request = Request {
                 availability: cm_types::Availability::Required,
                 target: WeakComponentToken::new(component),
             };
-            let source_dict = match source_dict_router.route(source_request).await? {
-                Capability::Dictionary(d) => d,
-                _ => panic!("source_dict_router must return a Dict"),
+            let Capability::Dictionary(source_dict) =
+                source_dict_router.route(source_request).await?
+            else {
+                unreachable!("source_dict_router must return a Dict");
             };
-            {
-                for source_key in source_dict.enumerate().map(|(k, _v)| k) {
-                    if let Some(_entry) = dict.get(&source_key) {
-                        return Err(RoutingError::BedrockSourceDictionaryCollision.into());
-                    }
-                }
-                for (source_key, source_value) in source_dict.enumerate() {
-                    if let Err(_e) = dict.insert(source_key.clone(), source_value.clone()) {
-                        return Err(RoutingError::BedrockSourceDictionaryCollision.into());
-                    }
+            let mut out_dict = dict.shallow_copy();
+            for (source_key, source_value) in source_dict.enumerate() {
+                if let Err(_) = out_dict.insert(source_key.clone(), source_value.clone()) {
+                    return Err(RoutingError::BedrockSourceDictionaryCollision.into());
                 }
             }
-            *did_combine.lock().unwrap() = true;
-            Ok(dict.into())
+            Ok(out_dict.into())
         }
         .boxed()
     };
