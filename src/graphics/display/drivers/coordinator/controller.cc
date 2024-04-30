@@ -890,7 +890,7 @@ zx::result<> Controller::Create(zx_device_t* parent) {
 }
 
 zx::result<> Controller::Bind() {
-  zx_status_t status = engine_driver_client_.Bind();
+  zx_status_t status = engine_driver_client_.Bind(parent());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind driver %d", status);
     return zx::error(status);
@@ -927,7 +927,10 @@ zx::result<> Controller::Bind() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_driver_client_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
+  engine_driver_client_.SetDisplayControllerInterface({
+      .ops = &display_controller_interface_protocol_ops_,
+      .ctx = this,
+  });
 
   status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
                       .set_flags(DEVICE_ADD_NON_BINDABLE)
@@ -979,8 +982,7 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
     : DeviceType(parent),
       inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
-      vsync_monitor_(root_.CreateChild("vsync_monitor")),
-      engine_driver_client_(EngineDriverClient(this, parent)) {
+      vsync_monitor_(root_.CreateChild("vsync_monitor")) {
   mtx_init(&mtx_, mtx_plain);
 
   last_valid_apply_config_timestamp_ns_property_ =

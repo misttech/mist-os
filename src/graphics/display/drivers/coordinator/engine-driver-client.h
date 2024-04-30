@@ -27,19 +27,18 @@ static constexpr fdf_arena_tag_t kArenaTag = 'DISP';
 class Controller;
 
 // C++ <-> Banjo/FIDL bridge for a connection to a display engine driver.
-class EngineDriverClient : public ddk::Device<EngineDriverClient> {
+class EngineDriverClient {
  public:
-  explicit EngineDriverClient(Controller* controller, zx_device_t* parent);
+  EngineDriverClient();
 
   EngineDriverClient(const EngineDriverClient&) = delete;
   EngineDriverClient& operator=(const EngineDriverClient&) = delete;
 
   ~EngineDriverClient();
 
-  zx_status_t Bind();
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-  zx_status_t Bind(std::unique_ptr<EngineDriverClient>* device_ptr);
+  // TODO(https://fxbug.dev/338002075): Replace the multi-step initialization
+  // with a factory function.
+  zx_status_t Bind(zx_device_t* parent);
 
   void ReleaseImage(DriverImageId driver_image_id);
   zx::result<> ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
@@ -55,7 +54,7 @@ class EngineDriverClient : public ddk::Device<EngineDriverClient> {
 
   // TODO(https://fxbug.dev/314126494): These methods are only used in the
   // banjo transport. Remove when all drivers are migrated to FIDL transport.
-  void SetDisplayControllerInterface(display_controller_interface_protocol_ops_t* ops);
+  void SetDisplayControllerInterface(const display_controller_interface_protocol_t& protocol);
   void ResetDisplayControllerInterface();
 
   zx::result<DriverImageId> ImportImage(const ImageMetadata& image_metadata,
@@ -80,10 +79,6 @@ class EngineDriverClient : public ddk::Device<EngineDriverClient> {
   // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
   // right approach.
   fdf::Arena arena_;
-  Controller* const controller_;
-
-  // DFV1 Parent
-  zx_device_t* parent_;
 
   // FIDL Client
   fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;

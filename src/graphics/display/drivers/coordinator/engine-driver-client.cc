@@ -23,24 +23,18 @@
 
 namespace display {
 
-EngineDriverClient::EngineDriverClient(Controller* controller, zx_device_t* parent)
-    : ddk::Device<EngineDriverClient>(parent),
-      arena_(fdf::Arena(kArenaTag)),
-      controller_(controller),
-      parent_(parent) {
-  ZX_DEBUG_ASSERT(controller);
-}
+EngineDriverClient::EngineDriverClient() : arena_(fdf::Arena(kArenaTag)) {}
 
 EngineDriverClient::~EngineDriverClient() {
   zxlogf(TRACE, "EngineDriverClient::~EngineDriverClient");
 }
 
-zx_status_t EngineDriverClient::Bind() {
+zx_status_t EngineDriverClient::Bind(zx_device_t* parent) {
   ZX_DEBUG_ASSERT(!is_bound_);
 
   // Attempt to connect to FIDL protocol.
-  zx::result display_fidl_client =
-      DdkConnectRuntimeProtocol<fuchsia_hardware_display_engine::Service::Engine>(parent_);
+  zx::result display_fidl_client = ddk::Device<void>::DdkConnectRuntimeProtocol<
+      fuchsia_hardware_display_engine::Service::Engine>(parent);
   if (display_fidl_client.is_ok()) {
     engine_ = fdf::WireSyncClient(std::move(*display_fidl_client));
     if (engine_.is_valid()) {
@@ -56,7 +50,7 @@ zx_status_t EngineDriverClient::Bind() {
   }
 
   // Fallback to Banjo protocol.
-  dc_ = ddk::DisplayControllerImplProtocolClient(parent_);
+  dc_ = ddk::DisplayControllerImplProtocolClient(parent);
   if (!dc_.is_valid()) {
     zxlogf(ERROR, "Failed to get Banjo or FIDL display controller protocol");
     return ZX_ERR_NOT_SUPPORTED;
@@ -129,13 +123,13 @@ void EngineDriverClient::SetEld(DisplayId display_id, cpp20::span<const uint8_t>
 }
 
 void EngineDriverClient::SetDisplayControllerInterface(
-    display_controller_interface_protocol_ops_t* ops) {
+    const display_controller_interface_protocol_t& protocol) {
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  dc_.SetDisplayControllerInterface(controller_, ops);
+  dc_.SetDisplayControllerInterface(protocol.ctx, protocol.ops);
 }
 
 void EngineDriverClient::ResetDisplayControllerInterface() {
