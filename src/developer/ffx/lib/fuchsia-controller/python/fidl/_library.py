@@ -836,7 +836,7 @@ def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
                 f"Method {snake_case_name} not implemented"
             )
 
-        return lambda self, request: server_lambda(self, request)
+        return server_lambda
     else:
 
         def server_lambda(self):
@@ -844,7 +844,7 @@ def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
                 f"Method {snake_case_name} not implemented"
             )
 
-        return lambda self: server_lamdba(self)
+        return server_lambda
 
 
 def normalize_identifier(identifier: str) -> str:
