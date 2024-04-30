@@ -26,7 +26,6 @@ struct Option {
 
 void GetOptions(std::initializer_list<std::reference_wrapper<Option>> opts);
 
-zx::unowned_resource GetRootResource();
 zx::unowned_resource GetIoportResource();
 zx::unowned_resource GetIrqResource();
 zx::unowned_resource GetMmioResource();

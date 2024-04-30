@@ -21,8 +21,6 @@
 static const size_t mmio_test_size = (zx_system_get_page_size() * 4);
 static uint64_t mmio_test_base;
 
-const zx::unowned_resource root() { return standalone::GetRootResource(); }
-
 const zx::unowned_resource get_ioport() { return standalone::GetIoportResource(); }
 
 const zx::unowned_resource get_mmio() { return standalone::GetMmioResource(); }
@@ -63,33 +61,32 @@ TEST(Resource, ProbeAddressSpace) {
 // This is a basic smoketest for creating resources and verifying the internals
 // returned by zx_object_get_info match what the caller passed for creation.
 TEST(Resource, BasicActions) {
-  zx::resource new_root;
+  zx::resource new_resource;
   zx_info_resource_t info;
-  char root_name[] = "root";
+  char resource_name[] = "resource";
 
-  // Create a root and verify the fields are still zero, but the name matches.
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_ROOT, 0, 0, root_name, sizeof(root_name),
-                                 &new_root),
+  // Create a resource and verify the fields are still zero, but the name matches.
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size,
+                                 resource_name, sizeof(resource_name), &new_resource),
             ZX_OK);
-  ASSERT_EQ(new_root.get_info(ZX_INFO_RESOURCE, &info, sizeof(info), NULL, NULL), ZX_OK);
-  EXPECT_EQ(info.kind, ZX_RSRC_KIND_ROOT);
-  EXPECT_EQ(info.base, 0u);
-  EXPECT_EQ(info.size, 0u);
+  ASSERT_EQ(new_resource.get_info(ZX_INFO_RESOURCE, &info, sizeof(info), NULL, NULL), ZX_OK);
+  EXPECT_EQ(info.kind, ZX_RSRC_KIND_MMIO);
+  EXPECT_EQ(info.base, mmio_test_base);
+  EXPECT_EQ(info.size, mmio_test_size);
   EXPECT_EQ(info.flags, 0u);
-  EXPECT_EQ(0, strncmp(root_name, info.name, ZX_MAX_NAME_LEN));
+  EXPECT_EQ(0, strncmp(resource_name, info.name, ZX_MAX_NAME_LEN));
 
   // Check that a resource is created with all the parameters passed to the syscall, and use
-  // the new root resource created for good measure.
+  // the new resource created for good measure.
   zx::resource mmio;
   uint32_t kind = ZX_RSRC_KIND_MMIO;
-  uint32_t flags = ZX_RSRC_FLAG_EXCLUSIVE;
   char mmio_name[] = "test_resource_name";
-  ASSERT_EQ(zx::resource::create(new_root, kind | flags, mmio_test_base, mmio_test_size, mmio_name,
+  ASSERT_EQ(zx::resource::create(new_resource, kind, mmio_test_base, mmio_test_size, mmio_name,
                                  sizeof(mmio_name), &mmio),
             ZX_OK);
   ASSERT_EQ(mmio.get_info(ZX_INFO_RESOURCE, &info, sizeof(info), NULL, NULL), ZX_OK);
   EXPECT_EQ(info.kind, kind);
-  EXPECT_EQ(info.flags, flags);
+  EXPECT_EQ(info.flags, 0u);
   EXPECT_EQ(info.base, mmio_test_base);
   EXPECT_EQ(info.size, mmio_test_size);
   EXPECT_EQ(0, strncmp(info.name, mmio_name, ZX_MAX_NAME_LEN));
