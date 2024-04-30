@@ -2358,6 +2358,7 @@ dependencies = [
  "log",
  "netlink-packet-core",
  "netlink-packet-utils",
+ "thiserror",
 ]
 
 [[package]]
