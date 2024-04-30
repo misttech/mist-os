@@ -1,0 +1,22 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "lib/mistos/starnix/kernel/arch/x64/syscalls.h"
+
+#include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/process_group.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/task/thread_group.h>
+
+namespace starnix {
+
+fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
+  auto tg = current_task->thread_group();
+
+  Guard<Mutex> lock(tg->tg_rw_lock());
+  return fit::ok(tg->process_group()->leader());
+}
+
+}  // namespace starnix
