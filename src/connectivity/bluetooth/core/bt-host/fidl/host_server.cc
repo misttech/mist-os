@@ -5,6 +5,7 @@
 #include "host_server.h"
 
 #include <lib/fpromise/result.h>
+#include <zircon/errors.h>
 
 #include <utility>
 
@@ -94,7 +95,6 @@ HostServer::HostServer(zx::channel channel, const bt::gap::Adapter::WeakPtr& ada
     : AdapterServerBase(adapter, this, std::move(channel)),
       pairing_delegate_(nullptr),
       gatt_(std::move(gatt)),
-      requesting_discovery_(false),
       requesting_background_scan_(false),
       requesting_discoverable_(false),
       io_capability_(IOCapability::kNoInputNoOutput),
@@ -216,31 +216,23 @@ void HostServer::SetDeviceClass(fbt::DeviceClass device_class, SetDeviceClassCal
       dev_class, [callback = std::move(callback)](auto status) { callback(ResultToFidl(status)); });
 }
 
-void HostServer::StartLEDiscovery(StartDiscoveryCallback callback) {
+void HostServer::StartLEDiscovery() {
   if (!adapter()->le()) {
-    callback(fpromise::error(fsys::Error::FAILED));
+    StopDiscovery(ZX_ERR_INTERNAL);
     return;
   }
+
   adapter()->le()->StartDiscovery(
-      /*active=*/true,
-      [self = weak_self_.GetWeakPtr(), callback = std::move(callback)](auto session) {
+      /*active=*/true, [self = weak_self_.GetWeakPtr()](auto session) {
         // End the new session if this AdapterServer got destroyed in the
         // meantime (e.g. because the client disconnected).
-        if (!self.is_alive()) {
-          callback(fpromise::error(fsys::Error::FAILED));
-          return;
-        }
-
-        if (!self->requesting_discovery_) {
-          callback(fpromise::error(fsys::Error::CANCELED));
+        if (!self.is_alive() || !self->discovery_) {
           return;
         }
 
         if (!session) {
           bt_log(ERROR, "fidl", "failed to start active LE discovery session");
-          callback(fpromise::error(fsys::Error::FAILED));
-          self->bredr_discovery_session_ = nullptr;
-          self->requesting_discovery_ = false;
+          self->StopDiscovery(ZX_ERR_INTERNAL);
           return;
         }
 
@@ -251,73 +243,62 @@ void HostServer::StartLEDiscovery(StartDiscoveryCallback callback) {
         session->filter()->SetGeneralDiscoveryFlags();
 
         self->le_discovery_session_ = std::move(session);
-        self->requesting_discovery_ = false;
 
         // Send the adapter state update.
         self->NotifyInfoChange();
-
-        callback(fpromise::ok());
       });
 }
 
-void HostServer::StartDiscovery(StartDiscoveryCallback callback) {
+void HostServer::StartDiscovery(::fuchsia::bluetooth::host::HostStartDiscoveryRequest request) {
   bt_log(DEBUG, "fidl", "%s", __FUNCTION__);
   BT_DEBUG_ASSERT(adapter().is_alive());
 
-  if (le_discovery_session_ || requesting_discovery_) {
-    bt_log(DEBUG, "fidl", "discovery already in progress");
-    callback(fpromise::error(fsys::Error::IN_PROGRESS));
+  if (!request.has_token()) {
+    bt_log(WARN, "fidl", "missing Discovery token");
     return;
   }
+  fidl::InterfaceRequest<fhost::DiscoverySession> token = std::move(*request.mutable_token());
 
-  requesting_discovery_ = true;
+  if (discovery_) {
+    bt_log(WARN, "fidl", "discovery already in progress");
+    token.Close(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  discovery_ = std::make_unique<DiscoverySessionServer>(std::move(token), this);
+
   if (!adapter()->bredr()) {
-    StartLEDiscovery(std::move(callback));
+    StartLEDiscovery();
     return;
   }
   // TODO(jamuraa): start these in parallel instead of sequence
-  adapter()->bredr()->RequestDiscovery(
-      [self = weak_self_.GetWeakPtr(), callback = std::move(callback), func = __FUNCTION__](
-          bt::hci::Result<> result, auto session) mutable {
-        if (!self.is_alive()) {
-          callback(fpromise::error(fsys::Error::FAILED));
-          return;
-        }
+  adapter()->bredr()->RequestDiscovery([self = weak_self_.GetWeakPtr(), func = __FUNCTION__](
+                                           bt::hci::Result<> result, auto session) mutable {
+    if (!self.is_alive() || !self->discovery_) {
+      return;
+    }
 
-        if (!self->requesting_discovery_) {
-          callback(fpromise::error(fsys::Error::CANCELED));
-          return;
-        }
+    if (result.is_error() || !session) {
+      bt_log(ERROR, "fidl", "%s: failed to start BR/EDR discovery session", func);
+      self->StopDiscovery(ZX_ERR_INTERNAL);
+      return;
+    }
 
-        if (result.is_error() || !session) {
-          bt_log(ERROR, "fidl", "%s: failed to start BR/EDR discovery session", func);
-
-          fpromise::result<void, fsys::Error> fidl_result = ResultToFidl(result);
-          if (result.is_ok()) {
-            BT_ASSERT(session == nullptr);
-            fidl_result = fpromise::error(fsys::Error::FAILED);
-          }
-          self->requesting_discovery_ = false;
-          callback(std::move(fidl_result));
-          return;
-        }
-
-        self->bredr_discovery_session_ = std::move(session);
-        self->StartLEDiscovery(std::move(callback));
-      });
+    self->bredr_discovery_session_ = std::move(session);
+    self->StartLEDiscovery();
+  });
 }
 
-void HostServer::StopDiscovery() {
-  bt_log(DEBUG, "fidl", "%s", __FUNCTION__);
-
+void HostServer::StopDiscovery(zx_status_t epitaph) {
   bool discovering = le_discovery_session_ || bredr_discovery_session_;
   bredr_discovery_session_ = nullptr;
   le_discovery_session_ = nullptr;
+  if (discovery_) {
+    discovery_->Close(epitaph);
+    discovery_ = nullptr;
+  }
 
   if (discovering) {
     NotifyInfoChange();
-  } else {
-    bt_log(DEBUG, "fidl", "no active discovery session");
   }
 }
 
@@ -764,7 +745,6 @@ void HostServer::Shutdown() {
   servers_.clear();
 
   // Cancel pending requests.
-  requesting_discovery_ = false;
   requesting_discoverable_ = false;
   requesting_background_scan_ = false;
 
@@ -772,6 +752,7 @@ void HostServer::Shutdown() {
   le_background_scan_ = nullptr;
   bredr_discovery_session_ = nullptr;
   bredr_discoverable_session_ = nullptr;
+  discovery_ = nullptr;
 
   // Drop all connections that are attached to this HostServer.
   le_connections_.clear();
@@ -796,6 +777,13 @@ void HostServer::Shutdown() {
 }
 
 void HostServer::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  bt_log(WARN, "fidl", "Received unknown method with ordinal: %lu", ordinal);
+}
+
+void HostServer::DiscoverySessionServer::Stop() { host_->StopDiscovery(ZX_ERR_CANCELED); }
+
+void HostServer::DiscoverySessionServer::handle_unknown_method(uint64_t ordinal,
+                                                               bool method_has_response) {
   bt_log(WARN, "fidl", "Received unknown method with ordinal: %lu", ordinal);
 }
 

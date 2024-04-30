@@ -11,7 +11,7 @@ use fidl_fuchsia_bluetooth_gatt::Server_Marker;
 use fidl_fuchsia_bluetooth_gatt2::{
     LocalServiceRequest, Server_Marker as Server_Marker2, Server_Proxy,
 };
-use fidl_fuchsia_bluetooth_host::{HostProxy, ProtocolRequest};
+use fidl_fuchsia_bluetooth_host::{DiscoverySessionProxy, HostProxy, ProtocolRequest};
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_bluetooth_sys::{
     self as sys, InputCapability, OutputCapability, PairingDelegateProxy,
@@ -27,17 +27,17 @@ use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use fuchsia_sync::RwLock;
 use fuchsia_zircon::{self as zx, AsHandleRef, Duration};
 use futures::channel::{mpsc, oneshot};
-use futures::future::{BoxFuture, Future};
+use futures::future::{self, BoxFuture, FusedFuture, Future, Shared};
 use futures::FutureExt;
 use slab::Slab;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     build_config, generic_access_service,
-    host_device::{HostDevice, HostDiscoverableSession, HostDiscoverySession, HostListener},
+    host_device::{HostDevice, HostDiscoverableSession, HostListener},
     services::pairing::pairing_dispatcher::{PairingDispatcher, PairingDispatcherHandle},
     store::stash::Stash,
     types,
@@ -70,43 +70,132 @@ pub enum HostService {
 /// When a client requests Discovery, we establish and store two distinct sessions; the dispatcher
 /// DiscoverySession, an Arc<> of which is returned to clients and represents the dispatcher's
 /// state of discovery that perists as long as one client maintains an Arc<> to the session, and
-/// the HostDiscoverySession, which is returned by the active host device on which discovery is
-/// physically ocurring and persists until the host disappears or the host session is dropped.
+/// the DiscoverySessionProxy, which is returned by the active host device on which discovery is
+/// physically occurring and persists until the host disappears or discovery is stopped.
 pub enum DiscoveryState {
     NotDiscovering,
-    Pending(Vec<oneshot::Sender<Arc<DiscoverySession>>>),
+    Pending {
+        // Additional client requests for discovery made while discovery is asynchronously
+        // starting.
+        session_receiver: Shared<oneshot::Receiver<Arc<DiscoverySession>>>,
+        session_sender: oneshot::Sender<Arc<DiscoverySession>>,
+        discovery_stopped_receiver: Shared<oneshot::Receiver<()>>,
+        discovery_stopped_sender: oneshot::Sender<()>,
+        start_discovery_task: fasync::Task<()>,
+    },
     Discovering {
         session: Weak<DiscoverySession>,
-        host_session: HostDiscoverySession,
+        discovery_proxy: DiscoverySessionProxy,
         started: fasync::Time,
+        discovery_on_closed_task: fasync::Task<()>,
+        discovery_stopped_receiver: Shared<oneshot::Receiver<()>>,
+        discovery_stopped_sender: oneshot::Sender<()>,
+    },
+    Stopping {
+        // DiscoverySessionProxy needs to be held while stopping so that peer closed signal can be received.
+        discovery_proxy: DiscoverySessionProxy,
+        // Contains requests for discovery made while discovery is stopping (edge case).
+        // This field is optional so we know if we don't need to restart discovery.
+        session_receiver: Option<Shared<oneshot::Receiver<Arc<DiscoverySession>>>>,
+        session_sender: Option<oneshot::Sender<Arc<DiscoverySession>>>,
+        discovery_on_closed_task: fasync::Task<()>,
+        discovery_stopped_receiver: Shared<oneshot::Receiver<()>>,
+        discovery_stopped_sender: oneshot::Sender<()>,
     },
 }
 
 impl DiscoveryState {
-    // If a dispatcher discovery session exists, return an Arc<> pointer to it.
-    fn get_discovery_session(&self) -> Option<Arc<DiscoverySession>> {
-        match self {
-            DiscoveryState::Discovering { session, .. } => session.upgrade(),
-            _ => None,
-        }
-    }
-
     // Idempotently end the discovery session.
     // Returns the duration of a session, if one was ended.
-    fn end_discovery_session(&mut self) -> Option<fasync::Duration> {
-        // If we are Discovering, HostDiscoverySession is dropped here
-        let prev = std::mem::replace(self, DiscoveryState::NotDiscovering);
-        if let DiscoveryState::Discovering { started, .. } = prev {
+    fn stop_discovery_session(&mut self) -> Option<fasync::Duration> {
+        if let DiscoveryState::Discovering {
+            discovery_proxy,
+            started,
+            discovery_on_closed_task,
+            discovery_stopped_receiver,
+            discovery_stopped_sender,
+            ..
+        } = std::mem::replace(self, DiscoveryState::NotDiscovering)
+        {
+            // stop() is synchronous, but stopping is an asynchronous procedure and will complete
+            // when the Discovery event stream terminates.
+            let _ = discovery_proxy.stop();
+            *self = DiscoveryState::Stopping {
+                discovery_proxy,
+                session_receiver: None,
+                session_sender: None,
+                discovery_on_closed_task,
+                discovery_stopped_receiver,
+                discovery_stopped_sender,
+            };
             return Some(fasync::Time::now() - started);
         }
         None
     }
 
-    // If possible, replace the current host session with a given new one. This does not affect
-    // the dispatcher session.
-    fn attach_new_host_session(&mut self, new_host_session: HostDiscoverySession) {
-        if let DiscoveryState::Discovering { host_session, .. } = self {
-            *host_session = new_host_session;
+    pub fn on_stopped(&mut self) -> impl FusedFuture<Output = ()> {
+        let rx = match self {
+            DiscoveryState::NotDiscovering => {
+                let (tx, rx) = oneshot::channel();
+                let _ = tx.send(());
+                rx.shared()
+            }
+            DiscoveryState::Pending { discovery_stopped_receiver, .. } => {
+                discovery_stopped_receiver.clone()
+            }
+            DiscoveryState::Discovering { discovery_stopped_receiver, .. } => {
+                discovery_stopped_receiver.clone()
+            }
+            DiscoveryState::Stopping { discovery_stopped_receiver, .. } => {
+                discovery_stopped_receiver.clone()
+            }
+        };
+        rx.map(|_| ())
+    }
+
+    fn get_active_session_future(
+        &mut self,
+    ) -> Option<BoxFuture<'static, Result<Arc<DiscoverySession>, oneshot::Canceled>>> {
+        match self {
+            DiscoveryState::NotDiscovering => None,
+            DiscoveryState::Pending { session_receiver, .. } => {
+                Some(session_receiver.clone().boxed())
+            }
+            DiscoveryState::Discovering { session, .. } => {
+                let session = session.upgrade().expect("session must exist in Discovering state");
+                Some(future::ready(Ok(session)).boxed())
+            }
+            DiscoveryState::Stopping { session_receiver, session_sender, .. } => {
+                match session_receiver {
+                    Some(recv) => Some(recv.clone().boxed()),
+                    None => {
+                        let (send, recv) = oneshot::channel();
+                        let recv = recv.shared();
+                        *session_receiver = Some(recv.clone());
+                        *session_sender = Some(send);
+                        Some(recv.boxed())
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for DiscoveryState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DiscoveryState::NotDiscovering => {
+                write!(f, "DiscoveryState::NotDiscovering")
+            }
+            DiscoveryState::Pending { .. } => {
+                write!(f, "DiscoveryState::Pending")
+            }
+            DiscoveryState::Discovering { .. } => {
+                write!(f, "DiscoveryState::Discovering")
+            }
+            DiscoveryState::Stopping { .. } => {
+                write!(f, "DiscoveryState::Stopping")
+            }
         }
     }
 }
@@ -117,10 +206,16 @@ pub struct DiscoverySession {
     dispatcher_state: Arc<RwLock<HostDispatcherState>>,
 }
 
+impl DiscoverySession {
+    pub fn on_discovery_end(&self) -> impl FusedFuture<Output = ()> {
+        self.dispatcher_state.write().discovery.on_stopped()
+    }
+}
+
 impl Drop for DiscoverySession {
     fn drop(&mut self) {
         let mut write = self.dispatcher_state.write();
-        if let Some(dur) = write.discovery.end_discovery_session() {
+        if let Some(dur) = write.discovery.stop_discovery_session() {
             inspect_log!(write.inspect.discovery_history, duration: dur.into_seconds_f64());
         }
     }
@@ -470,62 +565,132 @@ impl HostDispatcher {
         new_config
     }
 
-    async fn discover_on_active_host(&self) -> types::Result<HostDiscoverySession> {
+    async fn discover_on_active_host(&self) -> types::Result<DiscoverySessionProxy> {
         match self.active_host().await {
-            Some(host) => HostDevice::establish_discovery_session(&host).await,
+            Some(host) => HostDevice::start_discovery(&host),
             None => Err(types::Error::no_host()),
         }
     }
 
+    fn make_discovery_on_closed_task(&self, proxy: DiscoverySessionProxy) -> fasync::Task<()> {
+        fasync::Task::spawn(self.clone().process_discovery_on_closed(proxy))
+    }
+
+    async fn process_discovery_on_closed(self, proxy: DiscoverySessionProxy) {
+        // wait for DiscoverySession to close
+        let _ = proxy.on_closed().await;
+        debug!(
+            "process_discovery_event_stream: Discovery protocol closed (state: {:?})",
+            self.state.read().discovery
+        );
+
+        let old_state =
+            std::mem::replace(&mut self.state.write().discovery, DiscoveryState::NotDiscovering);
+        match old_state {
+            DiscoveryState::NotDiscovering | DiscoveryState::Pending { .. } => {
+                warn!("process_discovery_event_stream: Unexpected discovery event stream close in state {:?}", old_state);
+            }
+            DiscoveryState::Discovering { discovery_stopped_sender, .. } => {
+                let _ = discovery_stopped_sender.send(());
+            }
+            DiscoveryState::Stopping { discovery_stopped_sender, session_sender, .. } => {
+                let _ = discovery_stopped_sender.send(());
+
+                // Restart discovery if clients queued session watchers while stopping.
+                if let Some(sender) = session_sender {
+                    // On errors all session_watchers will be dropped, signaling receivers of
+                    // the error.
+                    if let Ok(session) = self.start_discovery().await {
+                        let _ = sender.send(session.clone());
+                    }
+                }
+            }
+        };
+        trace!("discovery_event_stream_task: completed");
+    }
+
+    fn make_start_discovery_task(
+        &self,
+        session: Arc<DiscoverySession>,
+        started: fasync::Time,
+    ) -> fasync::Task<()> {
+        let hd = self.clone();
+        fasync::Task::spawn(async move {
+            debug!("start_discovery_task: waiting for discover_on_active_host");
+            let Ok(discovery_proxy) = hd.discover_on_active_host().await else {
+                // On failure (host init timeout), revert state to NotDiscovering and drop Pending
+                // state to notify Receivers.
+                hd.state.write().discovery = DiscoveryState::NotDiscovering;
+                return;
+            };
+            debug!("start_discovery_task: started discovery successfully");
+            let _ = hd.state.read().inspect.discovery_sessions.add(1);
+
+            let discovery_on_closed_task =
+                hd.make_discovery_on_closed_task(discovery_proxy.clone());
+
+            // Replace Pending state with new session and send session token to waiters
+            let old_state =
+                std::mem::replace(&mut hd.state.write().discovery, DiscoveryState::NotDiscovering);
+            if let DiscoveryState::Pending {
+                session_receiver: _,
+                session_sender,
+                discovery_stopped_receiver,
+                discovery_stopped_sender,
+                start_discovery_task: _,
+            } = old_state
+            {
+                hd.state.write().discovery = DiscoveryState::Discovering {
+                    session: Arc::downgrade(&session),
+                    discovery_proxy,
+                    started,
+                    discovery_on_closed_task,
+                    discovery_stopped_receiver,
+                    discovery_stopped_sender,
+                };
+                let _ = session_sender.send(session.clone());
+            }
+            trace!("start_discovery_task: completed");
+        })
+    }
+
     pub async fn start_discovery(&self) -> types::Result<Arc<DiscoverySession>> {
-        // If a Discovery session already exists, return its session token
-        if let Some(existing_session) = self.state.read().discovery.get_discovery_session() {
-            return Ok(existing_session);
-        }
-
-        // If Discovery is pending, add ourself to queue of clients awaiting session token
-        let mut session_receiver = None;
-        if let DiscoveryState::Pending(client_queue) = &mut self.state.write().discovery {
-            let (send, recv) = oneshot::channel();
-            client_queue.push(send);
-            session_receiver = Some(recv);
-        }
-
-        // We cannot also .await on the channel in the previous if statement, since we
-        // acquire a lock on the dispatcher state there, i.e. self.state.write()
-        if let Some(recv) = session_receiver {
-            return recv
+        let session_fut = self.state.write().discovery.get_active_session_future();
+        if let Some(session_fut) = session_fut {
+            debug!(
+                "start_discovery: awaiting DiscoverySession (state: {:?})",
+                self.state.read().discovery
+            );
+            return session_fut
                 .await
                 .map_err(|_| format_err!("Pending discovery client channel closed").into());
         }
 
-        // If we don't have a discovery session and we're not pending, we must be
-        // NotDiscovering, so start a new discovery session
+        let session = Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
+        let started = fasync::Time::now();
+        let (session_sender, session_receiver) = oneshot::channel();
+        let session_receiver = session_receiver.shared();
+        let (discovery_stopped_sender, discovery_stopped_receiver) = oneshot::channel();
+        let discovery_stopped_receiver = discovery_stopped_receiver.shared();
+        let start_discovery_task = self.make_start_discovery_task(session, started);
 
         // Immediately mark the state as pending to indicate to other requests to wait on
         // this discovery session initialization
-        self.state.write().discovery = DiscoveryState::Pending(Vec::new());
-        let host_session = self.discover_on_active_host().await?;
-        let dispatcher_session =
-            Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
+        self.state.write().discovery = DiscoveryState::Pending {
+            session_receiver: session_receiver.clone(),
+            session_sender,
+            discovery_stopped_receiver: discovery_stopped_receiver.clone(),
+            discovery_stopped_sender,
+            start_discovery_task,
+        };
 
-        let _ = self.state.read().inspect.discovery_sessions.add(1);
-
-        // Replace Pending state with new session and send session token to waiters
-        if let DiscoveryState::Pending(client_queue) = std::mem::replace(
-            &mut self.state.write().discovery,
-            DiscoveryState::Discovering {
-                session: Arc::downgrade(&dispatcher_session),
-                host_session,
-                started: fasync::Time::now(),
-            },
-        ) {
-            for client in client_queue {
-                let _ = client.send(dispatcher_session.clone());
-            }
-        }
-
-        Ok(dispatcher_session)
+        debug!(
+            "start_discovery: awaiting DiscoverySession for first client (state: {:?})",
+            self.state.read().discovery
+        );
+        session_receiver
+            .await
+            .map_err(|_| format_err!("Pending discovery client channel closed").into())
     }
 
     // TODO(https://fxbug.dev/42139629) - This is susceptible to the same ToCtoToU race condition as
@@ -867,9 +1032,83 @@ impl HostDispatcher {
     /// Configure a newly active adapter with the correct behavior for an active adapter.
     async fn configure_newly_active_adapter(&self) -> types::Result<()> {
         // Migrate discovery state to new host
-        if self.state.read().discovery.get_discovery_session().is_some() {
-            let new_host_session = self.discover_on_active_host().await?;
-            self.state.write().discovery.attach_new_host_session(new_host_session);
+        let old_state =
+            std::mem::replace(&mut self.state.write().discovery, DiscoveryState::NotDiscovering);
+        match old_state {
+            DiscoveryState::NotDiscovering => {}
+            DiscoveryState::Pending {
+                session_receiver,
+                session_sender,
+                discovery_stopped_receiver,
+                discovery_stopped_sender,
+                start_discovery_task,
+            } => {
+                info!("migrating Pending discovery to new host");
+                // Stop the old discovery task, and restart discovery on the new host.
+                drop(start_discovery_task);
+                let session = Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
+                let started = fasync::Time::now();
+                let start_discovery_task = self.make_start_discovery_task(session, started);
+                self.state.write().discovery = DiscoveryState::Pending {
+                    session_receiver,
+                    session_sender,
+                    discovery_stopped_receiver,
+                    discovery_stopped_sender,
+                    start_discovery_task,
+                };
+            }
+            DiscoveryState::Discovering {
+                session,
+                discovery_proxy,
+                started,
+                discovery_on_closed_task,
+                discovery_stopped_receiver,
+                discovery_stopped_sender,
+            } => {
+                info!("migrating Discovering discovery to new host");
+                drop(discovery_on_closed_task);
+                drop(discovery_proxy);
+
+                let session = session.upgrade().ok_or(format_err!("failed to upgrade session"))?;
+
+                // Restart discovery.
+                let (session_sender, session_receiver) = oneshot::channel();
+                let session_receiver = session_receiver.shared();
+                let start_discovery_task = self.make_start_discovery_task(session, started);
+                self.state.write().discovery = DiscoveryState::Pending {
+                    session_receiver: session_receiver.clone(),
+                    session_sender,
+                    discovery_stopped_receiver,
+                    discovery_stopped_sender,
+                    start_discovery_task,
+                };
+                return session_receiver
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| format_err!("Pending discovery client channel closed").into());
+            }
+            DiscoveryState::Stopping {
+                discovery_proxy,
+                session_receiver: _,
+                session_sender,
+                discovery_on_closed_task: discovery_event_stream_task,
+                discovery_stopped_receiver: _,
+                discovery_stopped_sender,
+            } => {
+                info!("migrating Stopping discovery to new host");
+                drop(discovery_event_stream_task);
+                drop(discovery_proxy);
+                let _ = discovery_stopped_sender.send(());
+
+                // Restart discovery if clients queued session receiver while stopping.
+                if let Some(sender) = session_sender {
+                    // On errors, sender will be dropped, signaling receivers of
+                    // the error.
+                    if let Ok(session) = self.start_discovery().await {
+                        let _ = sender.send(session.clone());
+                    }
+                }
+            }
         }
 
         Ok(())

@@ -14,7 +14,6 @@
 
 #include "fuchsia/bluetooth/cpp/fidl.h"
 #include "fuchsia/bluetooth/sys/cpp/fidl.h"
-#include "lib/fidl/cpp/binding.h"
 #include "lib/fidl/cpp/interface_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
@@ -85,8 +84,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void SetDeviceClass(fuchsia::bluetooth::DeviceClass device_class,
                       SetDeviceClassCallback callback) override;
 
-  void StartDiscovery(StartDiscoveryCallback callback) override;
-  void StopDiscovery() override;
+  void StartDiscovery(::fuchsia::bluetooth::host::HostStartDiscoveryRequest request) override;
   void SetConnectable(bool connectable, SetConnectableCallback callback) override;
   void SetDiscoverable(bool discoverable, SetDiscoverableCallback callback) override;
   void EnableBackgroundScan(bool enabled) override;
@@ -106,6 +104,24 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
  private:
+  class DiscoverySessionServer : public ServerBase<::fuchsia::bluetooth::host::DiscoverySession> {
+   public:
+    explicit DiscoverySessionServer(
+        fidl::InterfaceRequest<::fuchsia::bluetooth::host::DiscoverySession> request,
+        HostServer* host)
+        : ServerBase(this, std::move(request)), host_(host) {}
+
+    void Close(zx_status_t epitaph) { binding()->Close(epitaph); }
+
+    // ::fuchsia::bluetooth::host::Discovery overrides:
+    void Stop() override;
+
+   private:
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
+    HostServer* host_;
+  };
+
   // bt::gap::PairingDelegate overrides:
   bt::sm::IOCapability io_capability() const override;
   void CompletePairing(bt::PeerId id, bt::sm::Result<> status) override;
@@ -143,7 +159,9 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void OnConnectionError(Server* server);
 
   // Helper to start LE Discovery (called by StartDiscovery)
-  void StartLEDiscovery(StartDiscoveryCallback callback);
+  void StartLEDiscovery();
+
+  void StopDiscovery(zx_status_t epitaph);
 
   // Resets the I/O capability of this server to no I/O and tells the GAP layer
   // to reject incoming pairing requests.
@@ -167,7 +185,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   // We hold a weak pointer to GATT for dispatching GATT FIDL requests.
   bt::gatt::GATT::WeakPtr gatt_;
 
-  bool requesting_discovery_;
+  std::unique_ptr<DiscoverySessionServer> discovery_;
   std::unique_ptr<bt::gap::LowEnergyDiscoverySession> le_discovery_session_;
   std::unique_ptr<bt::gap::BrEdrDiscoverySession> bredr_discovery_session_;
 
@@ -198,8 +216,8 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   // Used to drive the WatchPeers() method.
   WatchPeersGetter watch_peers_getter_;
 
-  // Id of the PeerCache::add_peer_updated_callback callback. Used to remove the callback when this
-  // server is closed.
+  // Id of the PeerCache::add_peer_updated_callback callback. Used to remove the callback when
+  // this server is closed.
   bt::gap::PeerCache::CallbackId peer_updated_callback_id_;
 
   // Keep this as the last member to make sure that all weak pointers are

@@ -4,7 +4,9 @@
 
 use anyhow::{format_err, Context};
 use fidl_fuchsia_bluetooth::{self as fbt, DeviceClass};
-use fidl_fuchsia_bluetooth_host::{HostEvent, HostProxy};
+use fidl_fuchsia_bluetooth_host::{
+    DiscoverySessionMarker, DiscoverySessionProxy, HostEvent, HostProxy, HostStartDiscoveryRequest,
+};
 use fidl_fuchsia_bluetooth_sys as sys;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::inspect::Inspectable;
@@ -13,7 +15,7 @@ use fuchsia_sync::RwLock;
 use futures::{future::try_join_all, Future, FutureExt, StreamExt, TryFutureExt};
 use std::pin::pin;
 use std::sync::{Arc, Weak};
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 #[cfg(test)]
 use fidl_fuchsia_bluetooth_sys::TechnologyType;
@@ -22,25 +24,6 @@ use crate::{
     build_config,
     types::{self, from_fidl_result, Error},
 };
-
-/// When the host dispatcher requests discovery on a host device, the host device starts discovery
-/// and returns a HostDiscoverySession. The state of discovery on the host device persists until
-/// this session is dropped.
-pub struct HostDiscoverySession {
-    host: Weak<HostDeviceState>,
-}
-
-impl Drop for HostDiscoverySession {
-    fn drop(&mut self) {
-        trace!("HostDiscoverySession ended");
-        if let Some(host) = self.host.upgrade() {
-            if let Err(err) = host.proxy.stop_discovery() {
-                // TODO(https://fxbug.dev/42121837) - we should close the host channel if an error is returned
-                warn!("Unexpected error response when stopping discovery: {:?}", err);
-            }
-        }
-    }
-}
 
 /// When the host dispatcher requests being discoverable on a host device, the host device enables
 /// discoverable and returns a HostDiscoverableSession. The discoverable state on the host device
@@ -140,11 +123,13 @@ impl HostDevice {
         self.0.proxy.set_device_class(&dc).map(from_fidl_result)
     }
 
-    pub fn establish_discovery_session(
-        &self,
-    ) -> impl Future<Output = types::Result<HostDiscoverySession>> {
-        let token = HostDiscoverySession { host: Arc::downgrade(&self.0) };
-        self.0.proxy.start_discovery().map(from_fidl_result).map_ok(|_| token)
+    pub fn start_discovery(&self) -> types::Result<DiscoverySessionProxy> {
+        let (proxy, server) = fidl::endpoints::create_proxy::<DiscoverySessionMarker>().unwrap();
+        let result = self.0.proxy.start_discovery(HostStartDiscoveryRequest {
+            token: Some(server),
+            ..Default::default()
+        });
+        result.map_err(Error::from).map(|_| proxy)
     }
 
     pub fn connect(&self, id: PeerId) -> impl Future<Output = types::Result<()>> {
@@ -345,6 +330,7 @@ impl HostDevice {
         let proxy = self.0.proxy.clone();
         let info = proxy.watch_state().await?;
         let info: HostInfo = info.try_into()?;
+        debug!("HostDevice::refresh_host_info: {:?}", info);
         self.0.info.write().update(info.clone());
         Ok(info)
     }
@@ -426,45 +412,77 @@ pub(crate) mod test {
     use super::*;
 
     use {
+        async_helpers::maybe_stream::MaybeStream,
         fidl::endpoints::Responder,
-        fidl_fuchsia_bluetooth_host::{HostRequest, HostRequestStream},
+        fidl_fuchsia_bluetooth_host::{
+            DiscoverySessionRequest, DiscoverySessionRequestStream, HostRequest, HostRequestStream,
+        },
         fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
-        futures::{future, TryStreamExt},
+        futures::select,
     };
 
-    /// Runs a HostRequestStream that handles StartDiscovery, StopDiscovery, & WatchState requests.
+    struct FakeHostServer {
+        host_stream: HostRequestStream,
+        host_info: Arc<RwLock<HostInfo>>,
+        discovery_stream: MaybeStream<DiscoverySessionRequestStream>,
+    }
+
+    impl FakeHostServer {
+        async fn run(&mut self) -> Result<(), anyhow::Error> {
+            loop {
+                select! {
+                    req = self.discovery_stream.next() => {
+                         info!("FakeHostServer: discovery_stream: {:?}", req);
+                         match req {
+                            Some(Ok(DiscoverySessionRequest::Stop { .. })) | None => {
+                                 assert!(self.host_info.read().discovering);
+                                 self.host_info.write().discovering = false;
+                                 self.discovery_stream = MaybeStream::default();
+                            }
+                            x => panic!("Unexpected request in fake host server: {:?}", x),
+                         }
+                    }
+                    req = self.host_stream.next() => {
+                         info!("FakeHostServer: {:?}", req);
+                         match req {
+                             Some(Ok(HostRequest::StartDiscovery { payload, .. })) => {
+                                 assert!(!self.host_info.read().discovering);
+                                 self.host_info.write().discovering = true;
+                                 self.discovery_stream.set(payload.token.unwrap().into_stream().unwrap());
+                             }
+                             Some(Ok(HostRequest::WatchState { responder })) => {
+                                 assert_matches::assert_matches!(
+                                     responder.send(
+                                         &FidlHostInfo::from(self.host_info.read().clone())
+                                     ),
+                                     Ok(())
+                                 );
+                             }
+                             Some(Ok(HostRequest::WatchPeers { responder, .. })) => {
+                                 info!("FakeHostServer: Got watch peers, never responding..");
+                                 responder.drop_without_shutdown();
+                             }
+                             None => {
+                                 return Ok(());
+                             }
+                             x => panic!("Unexpected request in fake host server: {:?}", x),
+                         }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Runs a HostRequestStream that handles StartDiscovery & WatchState requests.
     pub(crate) async fn run_discovery_host_server(
         server: HostRequestStream,
         host_info: Arc<RwLock<HostInfo>>,
     ) -> Result<(), anyhow::Error> {
-        server
-            .try_for_each(move |req| {
-                info!("Handling {:?} in discovery host server", req);
-                match req {
-                    HostRequest::StartDiscovery { responder } => {
-                        assert!(!host_info.read().discovering);
-                        host_info.write().discovering = true;
-                        assert_matches::assert_matches!(responder.send(Ok(())), Ok(()));
-                    }
-                    HostRequest::StopDiscovery { control_handle: _ } => {
-                        assert!(host_info.read().discovering);
-                        host_info.write().discovering = false;
-                    }
-                    HostRequest::WatchState { responder } => {
-                        assert_matches::assert_matches!(
-                            responder.send(&FidlHostInfo::from(host_info.read().clone())),
-                            Ok(())
-                        );
-                    }
-                    HostRequest::WatchPeers { responder, .. } => {
-                        info!("Got watch peers, never responding..");
-                        responder.drop_without_shutdown();
-                    }
-                    x => panic!("Unexpected request in discovery host server: {:?}", x),
-                }
-                future::ok(())
-            })
-            .await
-            .map_err(|e| e.into())
+        let mut host_server = FakeHostServer {
+            host_stream: server,
+            host_info,
+            discovery_stream: MaybeStream::default(),
+        };
+        host_server.run().await
     }
 }
