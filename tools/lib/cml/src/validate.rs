@@ -1337,7 +1337,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     // The source is valid and void
                     if availability != &Some(Availability::Optional) {
                         return Err(Error::validate(format!(
-                            "capabilities with a source of \"void\" must have an availability of \"optional\"",
+                            "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"{}\", from: \"{}\"",
+                            cap.names().iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", "),
+                            cap.from_(),
                         )));
                     }
                 }
@@ -1348,7 +1350,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     // The source is invalid, and will be rewritten to void
                     if availability != &Some(Availability::Optional) && availability != &None {
                         return Err(Error::validate(format!(
-                            "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\"",
+                            "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"{}\", from: \"{}\"",
+                            cap.names().iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", "),
+                            cap.from_(),
                         )));
                     }
                 }
@@ -6151,7 +6155,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_offer_source_void_availability_same_as_target(
             json!({
@@ -6170,7 +6174,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_offer_source_missing_availability_required(
             json!({
@@ -6190,7 +6194,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
         test_offer_source_missing_availability_same_as_target(
             json!({
@@ -6210,7 +6214,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
         test_expose_source_availability_unknown(
             json!({
@@ -6258,7 +6262,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_expose_source_void_availability_same_as_target(
             json!({
@@ -6270,7 +6274,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_expose_source_missing_availability_required(
             json!({
@@ -6283,7 +6287,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
         test_expose_source_missing_availability_same_as_target(
             json!({
@@ -6296,7 +6300,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
     }
 
