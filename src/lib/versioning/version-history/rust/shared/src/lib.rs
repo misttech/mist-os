@@ -280,20 +280,22 @@ impl VersionHistory {
     /// Check whether the platform supports building components that target the
     /// given API level, and if so, returns the ABI revision associated with
     /// that API level.
-    ///
-    /// TODO: https://fxbug.dev/326096347 - This doesn't actually check that the
-    /// API level is supported, merely that it exists. At time of writing, this
-    /// is the behavior implemented by ffx package, so I'm keeping it consistent
-    /// in the interest of no-op refactoring.
     pub fn check_api_level_for_build(
         &self,
         api_level: ApiLevel,
     ) -> Result<AbiRevision, ApiLevelError> {
-        if let Some(version) = self.version_from_api_level(api_level) {
+        let Some(version) = self.version_from_api_level(api_level) else {
+            return Err(ApiLevelError::Unknown {
+                api_level,
+                supported: self.supported_versions().map(|v| v.api_level).collect(),
+            });
+        };
+
+        if version.is_supported() {
             Ok(version.abi_revision)
         } else {
-            Err(ApiLevelError::Unknown {
-                api_level,
+            Err(ApiLevelError::Unsupported {
+                version,
                 supported: self.supported_versions().map(|v| v.api_level).collect(),
             })
         }
@@ -782,19 +784,13 @@ The following API levels are supported: 5, 6, 7, HEAD, LEGACY"
             Err(ApiLevelError::Unknown { api_level: 42.into(), supported: supported.clone() })
         );
 
-        // This currently says API 4 is supported, but it shouldn't.
-        //
-        // TODO: https://fxbug.dev/326096347 - Uncomment this once it passes.
-        //
-        // assert_eq!(
-        //     FAKE_VERSION_HISTORY.check_api_level_for_build(4.into()),
-        //     Err(ApiLevelError::Unsupported {
-        //         version: FAKE_VERSION_HISTORY.versions[0],
-
-        //         supported: supported.clone()
-        //     })
-        // );
-
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_api_level_for_build(4.into()),
+            Err(ApiLevelError::Unsupported {
+                version: FAKE_VERSION_HISTORY.versions[0].clone(),
+                supported: supported.clone()
+            })
+        );
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(6.into()),
             Ok(0x58ea445e942a0006.into())
