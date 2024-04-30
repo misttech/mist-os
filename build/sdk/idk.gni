@@ -184,7 +184,11 @@ template("idk") {
         sdk_collection = invoker.sdk_collection_label
         target_cpu = target_cpu
         api_level = "PLATFORM"
-        extra_deps = []
+
+        # Each subbuild depends on the `sdk_collection` in the main build, so
+        # that when a change happens that would cause the `sdk_collection` to be
+        # rebuilt, that also triggers the subbuilds to be rerun.
+        extra_deps = [ invoker.sdk_collection_label ]
 
         forward_variables_from(invoker,
                                [
@@ -202,29 +206,15 @@ template("idk") {
     foreach(target_cpu, _target_cpus) {
       _subbuild_name = "${target_name}.subbuild-api${api_level}-${target_cpu}"
 
-      # Not all that much changes between API levels, so if we build them all in
-      # parallel, we could miss out on caching opportunities. But if we do them
-      # all in series, constant costs associated with each build (e.g. gn gen,
-      # starting up ninja) are rough.
-      #
-      # As a compromise, have the subbuilds for the individual API levels depend
-      # on the one for the default API level. That way, the subbuilds for the
-      # individual API levels will largely be able to reuse cached build results
-      # from the first build we ran. In theory, at least.
-      _extra_deps = []
-      if (target_cpu == current_cpu) {
-        # The "default API level build" for the `current_cpu` is just the
-        # `sdk_collection` target from the current build.
-        _extra_deps += [ invoker.sdk_collection_label ]
-      } else {
-        _extra_deps += [ ":${target_name}.subbuild-${target_cpu}" ]
-      }
-
       _subbuild(_subbuild_name) {
         sdk_collection = invoker.sdk_collection_label
         target_cpu = target_cpu
         api_level = "$api_level"
-        extra_deps = _extra_deps
+
+        # Each subbuild depends on the `sdk_collection` in the main build, so
+        # that when a change happens that would cause the `sdk_collection` to be
+        # rebuilt, that also triggers the subbuilds to be rerun.
+        extra_deps = [ invoker.sdk_collection_label ]
 
         forward_variables_from(invoker,
                                [
