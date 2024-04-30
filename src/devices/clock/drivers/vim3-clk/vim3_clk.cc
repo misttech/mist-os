@@ -11,6 +11,7 @@
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/mmio/mmio-view.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -21,7 +22,6 @@
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <soc/aml-meson/aml-clk-common.h>
 #include <soc/aml-meson/g12b-clk.h>
-#include <src/devices/lib/mmio/include/lib/mmio/mmio-view.h>
 
 namespace vim3_clock {
 

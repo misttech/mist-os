@@ -22,8 +22,8 @@
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-s905d2/s905d2-hiu-regs.h>
 
-#include "../vim3_clk.h"
 #include "src/devices/lib/mmio/test-helper.h"
+#include "vim3_clk.h"
 
 namespace vim3_clock {
 

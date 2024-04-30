@@ -137,6 +137,7 @@ group("non_hermetic_deps") {
     "//build/bazel/tests/*",
     "//sdk/lib/driver/devicetree/*",
     "//src/devices/board/drivers/vim3-devicetree:*",
+    "//src/devices/clock/drivers/vim3-clk:*",
     "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/usb/drivers/aml-usb-phy:*",

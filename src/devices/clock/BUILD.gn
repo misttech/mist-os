@@ -6,7 +6,7 @@ group("drivers") {
   deps = [
     "drivers/amlogic-clk",
     "drivers/clock",
-    "drivers/vim3-clk",
+    "drivers/vim3-clk:bazel_package",
   ]
 }
 

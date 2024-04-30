@@ -133,7 +133,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/bootpart.cm" ]
     },
     {
-      package_target = "//src/devices/clock/drivers/vim3-clk:package"
+      package_target = "//src/devices/clock/drivers/vim3-clk:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-clk.cm" ]
     },
