@@ -7,7 +7,8 @@
 
 #include <cstdint>
 
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/data_buffer_info.h"
 
 namespace bt::gap {
 
@@ -50,6 +51,11 @@ class LowEnergyState final {
 
   // Local supported LE states reported by the controller.
   uint64_t supported_states_ = 0;
+
+  // Maximum length of data supported by the Controller for use as advertisement
+  // data or scan response data in an advertising event or as periodic
+  // advertisement data
+  uint16_t max_advertising_data_length_ = 0;
 };
 
 }  // namespace bt::gap

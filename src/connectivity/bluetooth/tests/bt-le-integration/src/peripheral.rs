@@ -76,6 +76,26 @@ fn default_parameters() -> AdvertisingParameters {
     }
 }
 
+fn default_address() -> Address {
+    Address::Public([1, 0, 0, 0, 0, 0])
+}
+
+async fn add_fake_peer(proxy: &HciEmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
+    let (local, remote) = fidl::endpoints::create_proxy()?;
+    let params = LowEnergyPeerParameters {
+        address: Some(address.into()),
+        connectable: Some(true),
+        advertisement: None,
+        scan_response: None,
+        ..Default::default()
+    };
+    let _ = proxy
+        .add_low_energy_peer(&params, remote)
+        .await?
+        .map_err(|e| format_err!("Failed to register fake peer: {:?}", e))?;
+    Ok(local)
+}
+
 #[test_harness::run_singlethreaded_test]
 async fn test_enable_advertising(harness: PeripheralHarness) {
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
@@ -200,7 +220,7 @@ async fn test_update_advertising(harness: PeripheralHarness) {
 }
 
 #[test_harness::run_singlethreaded_test]
-async fn test_advertising_types(harness: PeripheralHarness) {
+async fn test_advertising_type_adv_nonconn_ind(harness: PeripheralHarness) {
     // Non-connectable
     let params = AdvertisingParameters { connectable: Some(false), ..default_parameters() };
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
@@ -213,7 +233,10 @@ async fn test_advertising_types(harness: PeripheralHarness) {
         )
         .await
         .unwrap();
+}
 
+#[test_harness::run_singlethreaded_test]
+async fn test_advertising_type_adv_ind_connectable(harness: PeripheralHarness) {
     // Connectable
     let params = AdvertisingParameters { connectable: Some(true), ..default_parameters() };
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
@@ -226,7 +249,10 @@ async fn test_advertising_types(harness: PeripheralHarness) {
         )
         .await
         .unwrap();
+}
 
+#[test_harness::run_singlethreaded_test]
+async fn test_advertising_type_adv_scan_ind(harness: PeripheralHarness) {
     // Scannable
     let params = AdvertisingParameters {
         connectable: Some(false),
@@ -246,7 +272,10 @@ async fn test_advertising_types(harness: PeripheralHarness) {
         )
         .await
         .unwrap();
+}
 
+#[test_harness::run_singlethreaded_test]
+async fn test_advertising_type_adv_ind_connectable_scannable(harness: PeripheralHarness) {
     // Connectable and scannable
     let params = AdvertisingParameters {
         connectable: Some(true),
@@ -415,26 +444,6 @@ async fn test_scan_response(harness: PeripheralHarness) {
         )
         .await
         .unwrap();
-}
-
-fn default_address() -> Address {
-    Address::Public([1, 0, 0, 0, 0, 0])
-}
-
-async fn add_fake_peer(proxy: &HciEmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
-    let (local, remote) = fidl::endpoints::create_proxy()?;
-    let params = LowEnergyPeerParameters {
-        address: Some(address.into()),
-        connectable: Some(true),
-        advertisement: None,
-        scan_response: None,
-        ..Default::default()
-    };
-    let _ = proxy
-        .add_low_energy_peer(&params, remote)
-        .await?
-        .map_err(|e| format_err!("Failed to register fake peer: {:?}", e))?;
-    Ok(local)
 }
 
 #[test_harness::run_singlethreaded_test]

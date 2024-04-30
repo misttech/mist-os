@@ -15,7 +15,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
-#include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 #include <pw_bluetooth/hci_data.emb.h>
 #include <pw_bluetooth/hci_vendor.emb.h>
@@ -2052,11 +2051,32 @@ void FakeController::OnLESetAdvertisingParameters(
     }
   }
 
+  legacy_advertising_state_.own_address_type = params.own_address_type().Read();
   legacy_advertising_state_.interval_min = interval_min;
   legacy_advertising_state_.interval_max = interval_max;
-  legacy_advertising_state_.adv_type =
-      static_cast<pwemb::LEAdvertisingType>(params.adv_type().Read());
-  legacy_advertising_state_.own_address_type = params.own_address_type().Read();
+
+  pwemb::LEAdvertisingType adv_type = params.adv_type().Read();
+  switch (adv_type) {
+    case pwemb::LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED:
+      legacy_advertising_state_.properties.scannable = true;
+      legacy_advertising_state_.properties.connectable = true;
+      break;
+    case pwemb::LEAdvertisingType::CONNECTABLE_LOW_DUTY_CYCLE_DIRECTED:
+      legacy_advertising_state_.properties.directed = true;
+      legacy_advertising_state_.properties.connectable = true;
+      break;
+    case pwemb::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED:
+      legacy_advertising_state_.properties
+          .high_duty_cycle_directed_connectable = true;
+      legacy_advertising_state_.properties.directed = true;
+      legacy_advertising_state_.properties.connectable = true;
+      break;
+    case pwemb::LEAdvertisingType::SCANNABLE_UNDIRECTED:
+      legacy_advertising_state_.properties.scannable = true;
+      break;
+    case pwemb::LEAdvertisingType::NOT_CONNECTABLE_UNDIRECTED:
+      break;
+  }
 
   bt_log(INFO,
          "fake-hci",
@@ -2562,7 +2582,7 @@ void FakeController::OnLESetAdvertisingSetRandomAddress(
   }
 
   LEAdvertisingState& state = extended_advertising_states_[handle];
-  if (state.IsConnectableAdvertising() && state.enabled) {
+  if (state.properties.connectable && state.enabled) {
     bt_log(
         INFO,
         "fake-hci",
@@ -2601,6 +2621,18 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
+  // we cannot set parameters while an advertising set is currently enabled
+  if (extended_advertising_states_.count(handle) != 0) {
+    if (extended_advertising_states_[handle].enabled) {
+      bt_log(INFO,
+             "fake-hci",
+             "cannot set parameters while advertising set is enabled");
+      RespondWithCommandComplete(hci_spec::kLESetExtendedAdvertisingParameters,
+                                 pwemb::StatusCode::COMMAND_DISALLOWED);
+      return;
+    }
+  }
+
   // ensure we can allocate memory for this advertising set if not already
   // present
   if (extended_advertising_states_.count(handle) == 0 &&
@@ -2614,61 +2646,105 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
-  // for backwards compatibility, we only support legacy pdus
-  if (!params.advertising_event_properties().use_legacy_pdus().Read()) {
-    bt_log(
-        INFO,
-        "fake-hci",
-        "only legacy PDUs are supported, extended PDUs are not supported yet");
-    RespondWithCommandComplete(
-        hci_spec::kLESetExtendedAdvertisingParameters,
-        pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
-    return;
-  }
-
   // ensure we have a valid bit combination in the advertising event properties
-  constexpr uint16_t legacy_pdu = hci_spec::kLEAdvEventPropBitUseLegacyPDUs;
-  constexpr uint16_t prop_bits_adv_ind =
-      legacy_pdu | hci_spec::kLEAdvEventPropBitConnectable |
-      hci_spec::kLEAdvEventPropBitScannable;
-  constexpr uint16_t prop_bits_adv_direct_ind_low_duty_cycle =
-      legacy_pdu | hci_spec::kLEAdvEventPropBitConnectable |
-      hci_spec::kLEAdvEventPropBitDirected;
-  constexpr uint16_t prop_bits_adv_direct_ind_high_duty_cycle =
-      prop_bits_adv_direct_ind_low_duty_cycle |
-      hci_spec::kLEAdvEventPropBitHighDutyCycleDirectedConnectable;
-  constexpr uint16_t prop_bits_adv_scan_ind =
-      legacy_pdu | hci_spec::kLEAdvEventPropBitScannable;
-  constexpr uint16_t prop_bits_adv_nonconn_ind = legacy_pdu;
+  bool connectable = params.advertising_event_properties().connectable().Read();
+  bool scannable = params.advertising_event_properties().scannable().Read();
+  bool directed = params.advertising_event_properties().directed().Read();
+  bool high_duty_cycle_directed_connectable =
+      params.advertising_event_properties()
+          .high_duty_cycle_directed_connectable()
+          .Read();
+  bool use_legacy_pdus =
+      params.advertising_event_properties().use_legacy_pdus().Read();
+  bool anonymous_advertising =
+      params.advertising_event_properties().anonymous_advertising().Read();
+  bool include_tx_power =
+      params.advertising_event_properties().include_tx_power().Read();
 
-  pwemb::LEAdvertisingType adv_type;
-  uint16_t advertising_event_properties =
-      params.advertising_event_properties().BackingStorage().ReadUInt();
-  switch (advertising_event_properties) {
-    case prop_bits_adv_ind:
+  std::optional<pwemb::LEAdvertisingType> adv_type;
+  if (use_legacy_pdus) {
+    // ADV_IND
+    if (!high_duty_cycle_directed_connectable && !directed && scannable &&
+        connectable) {
       adv_type = pwemb::LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED;
-      break;
-    case prop_bits_adv_direct_ind_high_duty_cycle:
-      adv_type = pwemb::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED;
-      break;
-    case prop_bits_adv_direct_ind_low_duty_cycle:
+    }
+
+    // ADV_DIRECT_IND
+    if (!high_duty_cycle_directed_connectable && directed && !scannable &&
+        connectable) {
       adv_type = pwemb::LEAdvertisingType::CONNECTABLE_LOW_DUTY_CYCLE_DIRECTED;
-      break;
-    case prop_bits_adv_scan_ind:
+    }
+
+    // ADV_DIRECT_IND
+    if (high_duty_cycle_directed_connectable && directed && !scannable &&
+        connectable) {
+      adv_type = pwemb::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED;
+    }
+
+    // ADV_SCAN_IND
+    if (!high_duty_cycle_directed_connectable && !directed && scannable &&
+        !connectable) {
       adv_type = pwemb::LEAdvertisingType::SCANNABLE_UNDIRECTED;
-      break;
-    case prop_bits_adv_nonconn_ind:
+    }
+
+    // ADV_NONCONN_IND
+    if (!high_duty_cycle_directed_connectable && !directed && !scannable &&
+        !connectable) {
       adv_type = pwemb::LEAdvertisingType::NOT_CONNECTABLE_UNDIRECTED;
-      break;
-    default:
+    }
+
+    if (!adv_type) {
       bt_log(INFO,
              "fake-hci",
              "invalid bit combination: %d",
-             advertising_event_properties);
+             params.advertising_event_properties().BackingStorage().ReadUInt());
       RespondWithCommandComplete(
           hci_spec::kLESetExtendedAdvertisingParameters,
           pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
       return;
+    }
+
+    // Core spec Volume 4, Part E, Section 7.8.53: if legacy advertising PDUs
+    // are being used, the Primary_Advertising_PHY shall indicate the LE 1M PHY.
+    if (params.primary_advertising_phy().Read() !=
+        pwemb::LEPrimaryAdvertisingPHY::LE_1M) {
+      bt_log(INFO,
+             "fake-hci",
+             "only legacy pdus are supported, requires advertising on 1M PHY");
+      RespondWithCommandComplete(
+          hci_spec::kLESetExtendedAdvertisingParameters,
+          pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
+      return;
+    }
+  } else {
+    // Core spec Volume 4, Part E, Section 7.8.53: If extended advertising PDU
+    // types are being used (bit 4 = 0) then: The advertisement shall not be
+    // both connectable and scannable.
+    if (connectable && scannable) {
+      bt_log(
+          INFO,
+          "fake-hci",
+          "extended advertising pdus can't be both connectable and scannable");
+      RespondWithCommandComplete(
+          hci_spec::kLESetExtendedAdvertisingParameters,
+          pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+      return;
+    }
+
+    // Core spec Volume 4, Part E, Section 7.8.53: If extended advertising PDU
+    // types are being used (bit 4 = 0) then: High duty cycle directed
+    // connectable advertising (≤ 3.75 ms advertising interval) shall not be
+    // used (bit 3 = 0).
+    if (high_duty_cycle_directed_connectable) {
+      bt_log(INFO,
+             "fake-hci",
+             "extended advertising pdus can't use the high duty cycle directed "
+             "connectable type");
+      RespondWithCommandComplete(
+          hci_spec::kLESetExtendedAdvertisingParameters,
+          pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+      return;
+    }
   }
 
   // In case there is an error below, we want to reject all parameters instead
@@ -2676,30 +2752,36 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
   // the LEAdvertisingState directly in the map and add it in only once we have
   // made sure all is good.
   LEAdvertisingState state;
-  if (extended_advertising_states_.count(handle) != 0) {
-    state = extended_advertising_states_[handle];
-  }
+  state.properties.connectable = connectable;
+  state.properties.scannable = scannable;
+  state.properties.directed = directed;
+  state.properties.high_duty_cycle_directed_connectable =
+      high_duty_cycle_directed_connectable;
+  state.properties.use_legacy_pdus = use_legacy_pdus;
+  state.properties.anonymous_advertising = anonymous_advertising;
+  state.properties.include_tx_power = include_tx_power;
 
-  uint32_t interval_min = params.primary_advertising_interval_min().Read();
-  uint32_t interval_max = params.primary_advertising_interval_max().Read();
+  state.own_address_type = params.own_address_type().Read();
+  state.interval_min = params.primary_advertising_interval_min().Read();
+  state.interval_max = params.primary_advertising_interval_max().Read();
 
-  if (interval_min >= interval_max) {
+  if (state.interval_min >= state.interval_max) {
     bt_log(INFO,
            "fake-hci",
            "advertising interval min (%d) not strictly less than max (%d)",
-           interval_min,
-           interval_max);
+           state.interval_min,
+           state.interval_max);
     RespondWithCommandComplete(
         hci_spec::kLESetExtendedAdvertisingParameters,
         pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
     return;
   }
 
-  if (interval_min < hci_spec::kLEExtendedAdvertisingIntervalMin) {
+  if (state.interval_min < hci_spec::kLEExtendedAdvertisingIntervalMin) {
     bt_log(INFO,
            "fake-hci",
-           "advertising interval min (%d) less than spec min (%d)",
-           interval_min,
+           "advertising interval min (%d) less than spec min (%dstate.)",
+           state.interval_min,
            hci_spec::kLEAdvertisingIntervalMin);
     RespondWithCommandComplete(
         hci_spec::kLESetExtendedAdvertisingParameters,
@@ -2707,11 +2789,11 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
-  if (interval_max > hci_spec::kLEExtendedAdvertisingIntervalMax) {
+  if (state.interval_max > hci_spec::kLEExtendedAdvertisingIntervalMax) {
     bt_log(INFO,
            "fake-hci",
            "advertising interval max (%d) greater than spec max (%d)",
-           interval_max,
+           state.interval_max,
            hci_spec::kLEAdvertisingIntervalMax);
     RespondWithCommandComplete(
         hci_spec::kLESetExtendedAdvertisingParameters,
@@ -2746,44 +2828,6 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
-  // TODO(https://fxbug.dev/42160350): Core spec Volume 4, Part E,
-  // Section 7.8.53: if legacy advertising PDUs are being used, the
-  // Primary_Advertising_PHY shall indicate the LE 1M PHY.
-  if (params.primary_advertising_phy().Read() !=
-      pwemb::LEPrimaryAdvertisingPHY::LE_1M) {
-    bt_log(INFO,
-           "fake-hci",
-           "only legacy pdus are supported, requires advertising on 1M PHY");
-    RespondWithCommandComplete(
-        hci_spec::kLESetExtendedAdvertisingParameters,
-        pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
-    return;
-  }
-
-  if (params.secondary_advertising_phy().Read() !=
-      pwemb::LESecondaryAdvertisingPHY::LE_1M) {
-    bt_log(INFO, "fake-hci", "secondary advertising PHY must be selected");
-    RespondWithCommandComplete(
-        hci_spec::kLESetExtendedAdvertisingParameters,
-        pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
-    return;
-  }
-
-  if (state.enabled) {
-    bt_log(INFO,
-           "fake-hci",
-           "cannot set parameters while advertising set is enabled");
-    RespondWithCommandComplete(hci_spec::kLESetExtendedAdvertisingParameters,
-                               pwemb::StatusCode::COMMAND_DISALLOWED);
-    return;
-  }
-
-  // all errors checked, set parameters that we care about
-  state.adv_type = adv_type;
-  state.own_address_type = params.own_address_type().Read();
-  state.interval_min = interval_min;
-  state.interval_max = interval_max;
-
   // write full state back only at the end (we don't have a reference because we
   // only want to write if there are no errors)
   extended_advertising_states_[handle] = state;
@@ -2798,14 +2842,6 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
 
 void FakeController::OnLESetExtendedAdvertisingData(
     const pwemb::LESetExtendedAdvertisingDataCommandView& params) {
-  // controller currently doesn't support fragmented advertising, assert so we
-  // fail if we ever use it in host code without updating the controller for
-  // tests
-  BT_ASSERT(params.operation().Read() ==
-            pwemb::LESetExtendedAdvDataOp::COMPLETE);
-  BT_ASSERT(params.fragment_preference().Read() ==
-            pwemb::LEExtendedAdvFragmentPreference::SHOULD_NOT_FRAGMENT);
-
   if (!EnableExtendedAdvertising()) {
     bt_log(
         INFO,
@@ -2862,10 +2898,17 @@ void FakeController::OnLESetExtendedAdvertisingData(
     return;
   }
 
-  // For backwards compatibility with older devices, the host currently uses
-  // legacy advertising PDUs. The advertising data cannot exceed the legacy
-  // advertising PDU limit.
-  if (advertising_data_length > hci_spec::kMaxLEAdvertisingDataLength) {
+  if (params.operation().Read() ==
+      pwemb::LESetExtendedAdvDataOp::UNCHANGED_DATA) {
+    RespondWithCommandComplete(hci_spec::kLESetExtendedAdvertisingData,
+                               pwemb::StatusCode::SUCCESS);
+    return;
+  }
+
+  // For backwards compatibility with older devices, we support both legacy and
+  // extended advertising pdus. Each pdu type has its own size limits.
+  if (state.properties.use_legacy_pdus &&
+      advertising_data_length > hci_spec::kMaxLEAdvertisingDataLength) {
     bt_log(INFO,
            "fake-hci",
            "data length (%zu bytes) larger than legacy PDU size limit",
@@ -2876,10 +2919,48 @@ void FakeController::OnLESetExtendedAdvertisingData(
     return;
   }
 
-  state.data_length = advertising_data_length;
-  std::memcpy(state.data,
-              params.advertising_data().BackingStorage().data(),
-              advertising_data_length);
+  if (!state.properties.use_legacy_pdus &&
+      advertising_data_length > pwemb::LESetExtendedAdvertisingDataCommand::
+                                    advertising_data_length_max()) {
+    bt_log(
+        INFO,
+        "fake-hci",
+        "data length (%zu bytes) larger than individual extended PDU size limit",
+        advertising_data_length);
+    RespondWithCommandComplete(
+        hci_spec::kLESetExtendedAdvertisingData,
+        pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+    return;
+  }
+
+  if (!state.properties.use_legacy_pdus &&
+      state.data_length + advertising_data_length >
+          max_advertising_data_length_) {
+    bt_log(INFO,
+           "fake-hci",
+           "data length (%zu bytes) larger than total extended PDU size limit",
+           advertising_data_length);
+    RespondWithCommandComplete(
+        hci_spec::kLESetExtendedAdvertisingData,
+        pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+    return;
+  }
+
+  if (state.properties.use_legacy_pdus ||
+      params.operation().Read() == pwemb::LESetExtendedAdvDataOp::COMPLETE ||
+      params.operation().Read() ==
+          pwemb::LESetExtendedAdvDataOp::FIRST_FRAGMENT) {
+    std::memcpy(state.data,
+                params.advertising_data().BackingStorage().data(),
+                advertising_data_length);
+    state.data_length = advertising_data_length;
+  } else {
+    std::memcpy(state.data + state.data_length,
+                params.advertising_data().BackingStorage().data(),
+                advertising_data_length);
+    state.data_length += advertising_data_length;
+  }
+
   RespondWithCommandComplete(hci_spec::kLESetExtendedAdvertisingData,
                              pwemb::StatusCode::SUCCESS);
   NotifyAdvertisingState();
@@ -2887,14 +2968,6 @@ void FakeController::OnLESetExtendedAdvertisingData(
 
 void FakeController::OnLESetExtendedScanResponseData(
     const pwemb::LESetExtendedScanResponseDataCommandView& params) {
-  // controller currently doesn't support fragmented advertising, assert so we
-  // fail if we ever use it in host code without updating the controller for
-  // tests
-  BT_ASSERT(params.operation().Read() ==
-            pwemb::LESetExtendedAdvDataOp::COMPLETE);
-  BT_ASSERT(params.fragment_preference().Read() ==
-            pwemb::LEExtendedAdvFragmentPreference::SHOULD_NOT_FRAGMENT);
-
   if (!EnableExtendedAdvertising()) {
     bt_log(
         INFO,
@@ -2930,7 +3003,8 @@ void FakeController::OnLESetExtendedScanResponseData(
 
   // removing scan response data entirely doesn't require us to check for error
   // conditions
-  if (params.scan_response_data_length().Read() == 0) {
+  size_t scan_response_data_length = params.scan_response_data_length().Read();
+  if (scan_response_data_length == 0) {
     state.scan_rsp_length = 0;
     std::memset(state.scan_rsp_data, 0, sizeof(state.scan_rsp_data));
     RespondWithCommandComplete(hci_spec::kLESetExtendedScanResponseData,
@@ -2940,7 +3014,7 @@ void FakeController::OnLESetExtendedScanResponseData(
   }
 
   // adding or changing scan response data, check for error conditions
-  if (!state.IsScannableAdvertising()) {
+  if (!state.properties.scannable) {
     bt_log(
         INFO,
         "fake-hci",
@@ -2951,25 +3025,68 @@ void FakeController::OnLESetExtendedScanResponseData(
     return;
   }
 
-  // For backwards compatibility with older devices, the host currently uses
-  // legacy advertising PDUs. The scan response data cannot exceed the legacy
-  // advertising PDU limit.
-  if (params.scan_response_data_length().Read() >
-      hci_spec::kMaxLEAdvertisingDataLength) {
+  if (params.operation().Read() ==
+      pwemb::LESetExtendedAdvDataOp::UNCHANGED_DATA) {
+    RespondWithCommandComplete(hci_spec::kLESetExtendedScanResponseData,
+                               pwemb::StatusCode::SUCCESS);
+    return;
+  }
+
+  // For backwards compatibility with older devices, we support both legacy and
+  // extended advertising pdus. Each pdu type has its own size limits.
+  if (state.properties.use_legacy_pdus &&
+      scan_response_data_length > hci_spec::kMaxLEAdvertisingDataLength) {
     bt_log(INFO,
            "fake-hci",
-           "data length (%d bytes) larger than legacy PDU size limit",
-           params.scan_response_data_length().Read());
+           "data length (%zu bytes) larger than legacy PDU size limit",
+           scan_response_data_length);
     RespondWithCommandComplete(
         hci_spec::kLESetExtendedScanResponseData,
         pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
     return;
   }
 
-  state.scan_rsp_length = params.scan_response_data_length().Read();
-  std::memcpy(state.scan_rsp_data,
-              params.scan_response_data().BackingStorage().data(),
-              params.scan_response_data_length().Read());
+  if (!state.properties.use_legacy_pdus &&
+      scan_response_data_length > pwemb::LESetExtendedAdvertisingDataCommand::
+                                      advertising_data_length_max()) {
+    bt_log(
+        INFO,
+        "fake-hci",
+        "data length (%zu bytes) larger than individual extended PDU size limit",
+        scan_response_data_length);
+    RespondWithCommandComplete(
+        hci_spec::kLESetExtendedScanResponseData,
+        pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+    return;
+  }
+
+  if (!state.properties.use_legacy_pdus &&
+      state.scan_rsp_length + scan_response_data_length >
+          max_advertising_data_length_) {
+    bt_log(INFO,
+           "fake-hci",
+           "data length (%zu bytes) larger than total extended PDU size limit",
+           scan_response_data_length);
+    RespondWithCommandComplete(
+        hci_spec::kLESetExtendedScanResponseData,
+        pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+    return;
+  }
+
+  if (state.properties.use_legacy_pdus ||
+      params.operation().Read() == pwemb::LESetExtendedAdvDataOp::COMPLETE ||
+      params.operation().Read() ==
+          pwemb::LESetExtendedAdvDataOp::FIRST_FRAGMENT) {
+    std::memcpy(state.scan_rsp_data,
+                params.scan_response_data().BackingStorage().data(),
+                scan_response_data_length);
+    state.scan_rsp_length = scan_response_data_length;
+  } else {
+    std::memcpy(state.scan_rsp_data + state.scan_rsp_length,
+                params.scan_response_data().BackingStorage().data(),
+                scan_response_data_length);
+    state.scan_rsp_length += scan_response_data_length;
+  }
 
   RespondWithCommandComplete(hci_spec::kLESetExtendedScanResponseData,
                              pwemb::StatusCode::SUCCESS);
@@ -3089,7 +3206,7 @@ void FakeController::OnLESetExtendedAdvertisingEnable(
       return;
     }
 
-    if (state.IsScannableAdvertising() && state.scan_rsp_length == 0) {
+    if (state.properties.scannable && state.scan_rsp_length == 0) {
       bt_log(INFO,
              "fake-hci",
              "cannot enable, requires scan response data but hasn't been set");
@@ -3109,17 +3226,14 @@ void FakeController::OnLESetExtendedAdvertisingEnable(
 }
 
 void FakeController::OnLEReadMaximumAdvertisingDataLength() {
-  hci_spec::LEReadMaxAdvertisingDataLengthReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-
-  // TODO(https://fxbug.dev/42157495): Extended advertising supports sending
-  // larger amounts of data, but they have to be fragmented across multiple
-  // commands to the controller. This is not yet supported in this
-  // implementation. We should support larger than
-  // kMaxLEExtendedAdvertisingDataLength advertising data with fragmentation.
-  params.max_adv_data_length = htole16(hci_spec::kMaxLEAdvertisingDataLength);
-  RespondWithCommandComplete(hci_spec::kLEReadMaxAdvertisingDataLength,
-                             BufferView(&params, sizeof(params)));
+  auto response = hci::EmbossEventPacket::New<
+      pwemb::LEReadMaximumAdvertisingDataLengthCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = response.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.max_advertising_data_length().Write(max_advertising_data_length_);
+  RespondWithCommandComplete(hci_spec::kLEReadMaximumAdvertisingDataLength,
+                             &response);
 }
 
 void FakeController::OnLEReadNumberOfSupportedAdvertisingSets() {
@@ -3449,51 +3563,66 @@ void FakeController::OnAndroidLEMultiAdvtSetAdvtParam(
   // the LEAdvertisingState directly in the map and add it in only once we have
   // made sure all is good.
   LEAdvertisingState state;
-  if (extended_advertising_states_.count(handle) != 0) {
-    state = extended_advertising_states_[handle];
+  state.own_address_type = params.own_addr_type().Read();
+
+  pwemb::LEAdvertisingType adv_type = params.adv_type().Read();
+  switch (adv_type) {
+    case pwemb::LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED:
+      state.properties.connectable = true;
+      state.properties.scannable = true;
+      break;
+    case pwemb::LEAdvertisingType::CONNECTABLE_LOW_DUTY_CYCLE_DIRECTED:
+      state.properties.directed = true;
+      state.properties.connectable = true;
+      break;
+    case pwemb::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED:
+      state.properties.high_duty_cycle_directed_connectable = true;
+      state.properties.directed = true;
+      state.properties.connectable = true;
+      break;
+    case pwemb::LEAdvertisingType::SCANNABLE_UNDIRECTED:
+      state.properties.scannable = true;
+      break;
+    case pwemb::LEAdvertisingType::NOT_CONNECTABLE_UNDIRECTED:
+      break;
   }
 
-  uint16_t interval_min = params.adv_interval_min().Read();
-  uint16_t interval_max = params.adv_interval_max().Read();
+  state.interval_min = params.adv_interval_min().Read();
+  state.interval_max = params.adv_interval_max().Read();
 
-  if (interval_min >= interval_max) {
+  if (state.interval_min >= state.interval_max) {
     bt_log(INFO,
            "fake-hci",
            "advertising interval min (%d) not strictly less than max (%d)",
-           interval_min,
-           interval_max);
+           state.interval_min,
+           state.interval_max);
 
     view.status().Write(pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
     RespondWithCommandComplete(hci_android::kLEMultiAdvt, &packet);
     return;
   }
 
-  if (interval_min < hci_spec::kLEAdvertisingIntervalMin) {
+  if (state.interval_min < hci_spec::kLEAdvertisingIntervalMin) {
     bt_log(INFO,
            "fake-hci",
            "advertising interval min (%d) less than spec min (%d)",
-           interval_min,
+           state.interval_min,
            hci_spec::kLEAdvertisingIntervalMin);
     view.status().Write(pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
     RespondWithCommandComplete(hci_android::kLEMultiAdvt, &packet);
     return;
   }
 
-  if (interval_max > hci_spec::kLEAdvertisingIntervalMax) {
+  if (state.interval_max > hci_spec::kLEAdvertisingIntervalMax) {
     bt_log(INFO,
            "fake-hci",
            "advertising interval max (%d) greater than spec max (%d)",
-           interval_max,
+           state.interval_max,
            hci_spec::kLEAdvertisingIntervalMax);
     view.status().Write(pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
     RespondWithCommandComplete(hci_android::kLEMultiAdvt, &packet);
     return;
   }
-
-  state.interval_min = interval_min;
-  state.interval_max = interval_max;
-  state.adv_type = params.adv_type().Read();
-  state.own_address_type = params.own_addr_type().Read();
 
   // write full state back only at the end (we don't have a reference because we
   // only want to write if there are no errors)
@@ -3622,7 +3751,7 @@ void FakeController::OnAndroidLEMultiAdvtSetScanResp(
   }
 
   // adding or changing scan response data, check for error conditions
-  if (!state.IsScannableAdvertising()) {
+  if (!state.properties.scannable) {
     bt_log(
         INFO,
         "fake-hci",
@@ -3685,7 +3814,7 @@ void FakeController::OnAndroidLEMultiAdvtSetRandomAddr(
   }
 
   LEAdvertisingState& state = extended_advertising_states_[handle];
-  if (state.IsConnectableAdvertising() && state.enabled) {
+  if (state.properties.connectable && state.enabled) {
     bt_log(
         INFO,
         "fake-hci",
@@ -3903,25 +4032,7 @@ void FakeController::ClearDataCallback() {
 }
 
 bool FakeController::LEAdvertisingState::IsDirectedAdvertising() const {
-  return adv_type ==
-             pwemb::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED ||
-         adv_type ==
-             pwemb::LEAdvertisingType::CONNECTABLE_LOW_DUTY_CYCLE_DIRECTED;
-}
-
-bool FakeController::LEAdvertisingState::IsScannableAdvertising() const {
-  return adv_type ==
-             pwemb::LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED ||
-         adv_type == pwemb::LEAdvertisingType::SCANNABLE_UNDIRECTED;
-}
-
-bool FakeController::LEAdvertisingState::IsConnectableAdvertising() const {
-  return adv_type ==
-             pwemb::LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED ||
-         adv_type ==
-             pwemb::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED ||
-         adv_type ==
-             pwemb::LEAdvertisingType::CONNECTABLE_LOW_DUTY_CYCLE_DIRECTED;
+  return properties.directed || properties.high_duty_cycle_directed_connectable;
 }
 
 bool FakeController::EnableLegacyAdvertising() {
@@ -4069,7 +4180,7 @@ void FakeController::HandleReceivedCommandPacket(
     case hci_spec::kLEConnectionUpdate:
     case hci_spec::kLECreateConnection:
     case hci_spec::kLEExtendedCreateConnection:
-    case hci_spec::kLEReadMaxAdvertisingDataLength:
+    case hci_spec::kLEReadMaximumAdvertisingDataLength:
     case hci_spec::kLEReadNumSupportedAdvertisingSets:
     case hci_spec::kLESetAdvertisingData:
     case hci_spec::kLESetAdvertisingEnable:
@@ -4436,7 +4547,7 @@ void FakeController::HandleReceivedCommandPacket(
       OnLESetExtendedScanResponseData(params);
       break;
     }
-    case hci_spec::kLEReadMaxAdvertisingDataLength: {
+    case hci_spec::kLEReadMaximumAdvertisingDataLength: {
       OnLEReadMaximumAdvertisingDataLength();
       break;
     }

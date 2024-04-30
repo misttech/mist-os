@@ -15,16 +15,12 @@ class SequentialCommandRunner;
 class LegacyLowEnergyAdvertiser final : public LowEnergyAdvertiser {
  public:
   explicit LegacyLowEnergyAdvertiser(hci::Transport::WeakPtr hci)
-      : LowEnergyAdvertiser(std::move(hci)) {}
+      : LowEnergyAdvertiser(std::move(hci),
+                            hci_spec::kMaxLEAdvertisingDataLength) {}
   ~LegacyLowEnergyAdvertiser() override;
 
   // LowEnergyAdvertiser overrides:
   size_t MaxAdvertisements() const override { return 1; }
-  size_t GetSizeLimit(bool extended_pdu) const override {
-    // LegacyLowEnergyAdvertiser is unable to take advantage of extended
-    // advertising PDUs. Return the legacy advertising PDU size limit.
-    return hci_spec::kMaxLEAdvertisingDataLength;
-  }
   bool AllowsRandomAddressChange() const override {
     return !starting_ && !IsAdvertising();
   }
@@ -65,7 +61,7 @@ class LegacyLowEnergyAdvertiser final : public LowEnergyAdvertiser {
 
   std::optional<EmbossCommandPacket> BuildSetAdvertisingParams(
       const DeviceAddress& address,
-      pw::bluetooth::emboss::LEAdvertisingType type,
+      const AdvertisingEventProperties& properties,
       pw::bluetooth::emboss::LEOwnAddressType own_address_type,
       const AdvertisingIntervalRange& interval,
       bool extended_pdu) override;

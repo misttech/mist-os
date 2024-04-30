@@ -494,7 +494,9 @@ void EmulatorDevice::OnLegacyAdvertisingStateChanged() {
   fidl_state.enabled(adv_state.enabled);
 
   // Populate the rest only if advertising is enabled.
-  fidl_state.type(static_cast<ftest::LegacyAdvertisingType>(adv_state.adv_type));
+  fidl_state.type(static_cast<ftest::LegacyAdvertisingType>(
+      bt::hci::LowEnergyAdvertiser::AdvertisingEventPropertiesToLEAdvertisingType(
+          adv_state.properties)));
   fidl_state.address_type(LeOwnAddressTypeToFidl(adv_state.own_address_type));
 
   if (adv_state.interval_min) {
