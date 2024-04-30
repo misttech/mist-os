@@ -12,6 +12,8 @@
 #include <lib/mistos/zx/vmo.h>
 #include <lib/zbitl/storage-traits.h>
 
+#include <ktl/byte.h>
+
 namespace zbitl {
 
 // zbitl::MapUnownedVmo is handled as a storage type that works like
@@ -26,7 +28,7 @@ class MapUnownedVmo {
  public:
   explicit MapUnownedVmo(zx::unowned_vmo vmo, bool writable = false,
                          zx::unowned_vmar vmar = zx::vmar::root_self())
-      : vmo_(std::move(vmo)), vmar_(std::move(vmar)), writable_(writable) {}
+      : vmo_(ktl::move(vmo)), vmar_(ktl::move(vmar)), writable_(writable) {}
 
   MapUnownedVmo() = default;
   MapUnownedVmo(MapUnownedVmo&&) = default;
@@ -59,15 +61,15 @@ class MapUnownedVmo {
 
     // These are almost the default move constructor and assignment operator,
     // but they ensure the values are never copied.
-    Mapping(Mapping&& other) { *this = std::move(other); }
+    Mapping(Mapping&& other) { *this = ktl::move(other); }
     Mapping& operator=(Mapping&& other) {
-      std::swap(offset_, other.offset_);
-      std::swap(address_, other.address_);
-      std::swap(size_, other.size_);
+      ktl::swap(offset_, other.offset_);
+      ktl::swap(address_, other.address_);
+      ktl::swap(size_, other.size_);
       return *this;
     }
 
-    std::byte* data() const { return reinterpret_cast<std::byte*>(address_); }
+    ktl::byte* data() const { return reinterpret_cast<ktl::byte*>(address_); }
 
     ByteView bytes() const { return {data(), size_}; }
 
@@ -90,7 +92,7 @@ class MapOwnedVmo : public MapUnownedVmo {
   explicit MapOwnedVmo(zx::vmo vmo, bool writable = false,
                        zx::unowned_vmar vmar = zx::vmar::root_self())
       : MapUnownedVmo(zx::unowned_vmo{vmo}, writable, zx::unowned_vmar{vmar}),
-        owned_vmo_(std::move(vmo)) {}
+        owned_vmo_(ktl::move(vmo)) {}
 
   MapOwnedVmo() = default;
   MapOwnedVmo(const MapOwnedVmo&) = delete;
@@ -99,7 +101,7 @@ class MapOwnedVmo : public MapUnownedVmo {
   MapOwnedVmo& operator=(const MapOwnedVmo&) = delete;
   MapOwnedVmo& operator=(MapOwnedVmo&& other) = default;
 
-  zx::vmo release() { return std::move(owned_vmo_); }
+  zx::vmo release() { return ktl::move(owned_vmo_); }
 
  private:
   zx::vmo owned_vmo_;
@@ -117,7 +119,7 @@ struct StorageTraits<zx::vmo> {
   // Exposed for testing.
   static constexpr size_t kBufferedReadChunkSize = 8192;
 
-  static std::string_view error_string(error_type error) { return zx_status_get_string(error); }
+  static ktl::string_view error_string(error_type error) { return zx_status_get_string(error); }
 
   // Returns ZX_PROP_VMO_CONTENT_SIZE, if set - or else the page-rounded VMO
   // size.
@@ -138,7 +140,7 @@ struct StorageTraits<zx::vmo> {
   template <typename Callback>
   static auto Read(const zx::vmo& zbi, payload_type payload, uint32_t length,
                    Callback&& callback) -> fit::result<error_type, decltype(callback(ByteView{}))> {
-    std::optional<decltype(callback(ByteView{}))> result;
+    ktl::optional<decltype(callback(ByteView{}))> result;
     auto cb = [&](ByteView chunk) -> bool {
       result = callback(chunk);
       return result->is_ok();
@@ -161,20 +163,20 @@ struct StorageTraits<zx::vmo> {
                                                  uint32_t initial_zero_size);
 
   template <typename SlopCheck>
-  static fit::result<error_type, std::optional<std::pair<zx::vmo, uint32_t>>> Clone(
+  static fit::result<error_type, ktl::optional<ktl::pair<zx::vmo, uint32_t>>> Clone(
       const zx::vmo& zbi, uint32_t offset, uint32_t length, uint32_t to_offset,
       SlopCheck&& slopcheck) {
     if (slopcheck(offset % ZX_PAGE_SIZE)) {
       return DoClone(zbi, offset, length);
     }
-    return fit::ok(std::nullopt);
+    return fit::ok(ktl::nullopt);
   }
 
  private:
   static fit::result<error_type> DoRead(const zx::vmo& zbi, uint64_t offset, uint32_t length,
                                         bool (*)(void*, ByteView), void*);
 
-  static fit::result<error_type, std::optional<std::pair<zx::vmo, uint32_t>>> DoClone(
+  static fit::result<error_type, ktl::optional<ktl::pair<zx::vmo, uint32_t>>> DoClone(
       const zx::vmo& zbi, uint32_t offset, uint32_t length);
 };
 
@@ -205,7 +207,7 @@ struct StorageTraits<zx::unowned_vmo> {
   template <typename Callback>
   static auto Read(const zx::unowned_vmo& vmo, payload_type payload, uint32_t length,
                    Callback&& callback) {
-    return Owned::Read(*vmo, payload, length, std::forward<Callback>(callback));
+    return Owned::Read(*vmo, payload, length, ktl::forward<Callback>(callback));
   }
 
   static auto Write(const zx::unowned_vmo& vmo, uint32_t offset, ByteView data) {
@@ -219,7 +221,7 @@ struct StorageTraits<zx::unowned_vmo> {
   template <typename SlopCheck>
   static auto Clone(const zx::unowned_vmo& zbi, uint32_t offset, uint32_t length,
                     uint32_t to_offset, SlopCheck&& slopcheck) {
-    return Owned::Clone(*zbi, offset, length, to_offset, std::forward<SlopCheck>(slopcheck));
+    return Owned::Clone(*zbi, offset, length, to_offset, ktl::forward<SlopCheck>(slopcheck));
   }
 };
 
@@ -248,14 +250,14 @@ class StorageTraits<MapUnownedVmo> {
   // is deemed too high a cost and this method is left unimplemented. In that
   // case, the unbuffered `Read()` is recommended instead.
   template <typename T, bool LowLocality>
-  static std::enable_if_t<(alignof(T) <= kStorageAlignment) && !LowLocality,
+  static ktl::enable_if_t<(alignof(T) <= kStorageAlignment) && !LowLocality,
                           fit::result<error_type, cpp20::span<const T>>>
   Read(MapUnownedVmo& zbi, payload_type payload, uint32_t length) {
     auto result = Map(zbi, payload, length, false);
     if (result.is_error()) {
       return result.take_error();
     }
-    return fit::ok(AsSpan<const T>(static_cast<const std::byte*>(result.value()), length));
+    return fit::ok(AsSpan<const T>(static_cast<const ktl::byte*>(result.value()), length));
   }
 
   static fit::result<error_type> Read(const MapUnownedVmo& zbi, payload_type payload, void* buffer,
@@ -279,24 +281,24 @@ class StorageTraits<MapUnownedVmo> {
       return result.take_error();
     }
     return fit::ok(
-        MapOwnedVmo{std::move(result).value(), proto.writable_, zx::unowned_vmar{proto.vmar()}});
+        MapOwnedVmo{ktl::move(result).value(), proto.writable_, zx::unowned_vmar{proto.vmar()}});
   }
 
   template <typename SlopCheck>
-  static fit::result<error_type, std::optional<std::pair<MapOwnedVmo, uint32_t>>> Clone(
+  static fit::result<error_type, ktl::optional<ktl::pair<MapOwnedVmo, uint32_t>>> Clone(
       const MapUnownedVmo& zbi, uint32_t offset, uint32_t length, uint32_t to_offset,
       SlopCheck&& slopcheck) {
     auto result =
-        Owned::Clone(zbi.vmo(), offset, length, to_offset, std::forward<SlopCheck>(slopcheck));
+        Owned::Clone(zbi.vmo(), offset, length, to_offset, ktl::forward<SlopCheck>(slopcheck));
     if (result.is_error()) {
       return result.take_error();
     }
     if (result.value()) {
-      auto [vmo, slop] = std::move(*std::move(result).value());
-      return fit::ok(std::make_pair(
-          MapOwnedVmo{std::move(vmo), zbi.writable_, zx::unowned_vmar{zbi.vmar()}}, slop));
+      auto [vmo, slop] = ktl::move(*ktl::move(result).value());
+      return fit::ok(ktl::pair(
+          MapOwnedVmo{ktl::move(vmo), zbi.writable_, zx::unowned_vmar{zbi.vmar()}}, slop));
     }
-    return fit::ok(std::nullopt);
+    return fit::ok(ktl::nullopt);
   }
 
  private:
