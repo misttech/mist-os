@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/zx/clock.h>
@@ -1141,10 +1142,61 @@ TEST(ValidateWarningTest, BadTopologyList) {
   EXPECT_FALSE(ValidateTopologies(kTopologies, kEmptyElementMap));
 }
 
-TEST(ValidateWarningTest, BadElementState) {
+TEST(ValidateWarningTest, ElementStateWithMissingFields) {
   EXPECT_FALSE(ValidateElementState(kElementStateEmpty, kElement1));
 
-  // Add more negative-test cases here
+  ASSERT_TRUE(ValidateElementState(kElementState1, kElement1));  // Baseline
+
+  // The `started` field is required.
+  fuchsia_hardware_audio_signalprocessing::ElementState state_without_started = kElementState1;
+  state_without_started.started(std::nullopt);
+  EXPECT_FALSE(ValidateElementState(state_without_started, kElement1));
+
+  // For kElement1's ElementType (endpoint), `type_specific` is required.
+  fuchsia_hardware_audio_signalprocessing::ElementState state_without_type_specific =
+      kElementState1;
+  state_without_type_specific.type_specific(std::nullopt);
+  EXPECT_FALSE(ValidateElementState(state_without_type_specific, kElement1));
+}
+
+// ElementState's type_specific union must match its Element's type.
+TEST(ValidateWarningTest, ElementStateWithIncorrectTypeSpecificState) {
+  ASSERT_TRUE(ValidateElementState(kElementState1, kElement1));  // Baseline
+
+  // Element is an Endpoint, but the state has an Equalizer type_specific table.
+  fuchsia_hardware_audio_signalprocessing::ElementState state_with_incorrect_type_specific =
+      kElementState1;
+  state_with_incorrect_type_specific.type_specific(
+      fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEqualizer(
+          {{.band_states = {{{{.id = 0}}}}}}));
+  EXPECT_FALSE(ValidateElementState(state_with_incorrect_type_specific, kElement1));
+}
+
+// ElementState that violates the capabilities of that element.
+TEST(ValidateWarningTest, InconsistentElementState) {
+  // According to Element properties it cannot stop, but ElementState says it is stopped.
+  EXPECT_FALSE(ValidateElementState(kElementStateStopped, kElementCannotStop));
+
+  // According to Element properties it cannot bypass, but ElementState says it is bypassed.
+  EXPECT_FALSE(ValidateElementState(kElementStateBypassed, kElementCannotBypass));
+
+  // More negative tests here that are type-specific.
+}
+
+TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
+  ASSERT_TRUE(ValidateElementState(kElementState1, kElement1));  // Baseline
+
+  // `turn_on_delay` is optional, but if present then it cannot be negative.
+  fuchsia_hardware_audio_signalprocessing::ElementState state_with_negative_turn_on_delay =
+      kElementState1;
+  state_with_negative_turn_on_delay.turn_on_delay(ZX_NSEC(-1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_on_delay, kElement1));
+
+  // `turn_off_delay` is optional, but if present then it cannot be negative.
+  fuchsia_hardware_audio_signalprocessing::ElementState state_with_negative_turn_off_delay =
+      kElementState1;
+  state_with_negative_turn_off_delay.turn_on_delay(ZX_NSEC(-1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_off_delay, kElement1));
 }
 
 }  // namespace

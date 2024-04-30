@@ -28,8 +28,31 @@ const fuchsia_hardware_audio_signalprocessing::ElementState kElementState1{{
                 .plug_state_time = 0,
             }},
         }}),
+    // .enabled (deprecated) is unspecified
+    // .latency (optional) is unspecified
+    // .vendor_specific_data (optional) is unspecified
+    .started = true,
+    // .bypassed (optional) is unspecified
 }};
-const fuchsia_hardware_audio_signalprocessing::ElementState kElementStateEmpty{};
+const fuchsia_hardware_audio_signalprocessing::ElementState kElementStateStopped{{
+    // .type_specific (not required for Mute element type) is unspecified
+    // .enabled (deprecated) is unspecified
+    // .latency (optional) is unspecified
+    // .vendor_specific_data (optional) is unspecified
+    .started = false,
+    // .bypassed (optional) is unspecified
+}};
+const fuchsia_hardware_audio_signalprocessing::ElementState kElementStateBypassed{{
+    // .type_specific (not required for Mute element type) is unspecified
+    // .enabled (deprecated) is unspecified
+    // .latency (optional) is unspecified
+    // .vendor_specific_data (optional) is unspecified
+    .started = true,
+    .bypassed = true,
+}};
+const fuchsia_hardware_audio_signalprocessing::ElementState kElementStateEmpty{
+    // .started (required) is unspecified
+};
 
 const fuchsia_hardware_audio_signalprocessing::Element kElement1{{
     .id = kElementId1,
@@ -39,15 +62,17 @@ const fuchsia_hardware_audio_signalprocessing::Element kElement1{{
         .plug_detect_capabilities =
             fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .can_disable = false,
     .description = " ",
+    .can_stop = true,
+    .can_bypass = false,
 }};
 const fuchsia_hardware_audio_signalprocessing::Element kElement2{{
     .id = kElementId2,
     .type = fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainControl,
     // .type_specific is missing
-    // .can_disable is missing
     // .description is missing
+    .can_stop = false,
+    // .can_bypass is missing
 }};
 const fuchsia_hardware_audio_signalprocessing::Element kElement3{{
     .id = kElementId3,
@@ -59,11 +84,12 @@ const fuchsia_hardware_audio_signalprocessing::Element kElement3{{
         .supported_controls =
             fuchsia_hardware_audio_signalprocessing::DynamicsSupportedControls::kKneeWidth,
     }}),
-    .can_disable = true,
     .description = std::string("Test signalprocessing element description                       ") +
-                   std::string("                   At this point, we are nearing the end of the ") +
-                   std::string("          maximal-length 256-char string. Note that this string ") +
-                   std::string("           has an upper-case 'x' as the last character.   54321X"),
+                   std::string("                                      As intentionally defined, ") +
+                   std::string("this description is a maximal-length 256-char string. Note that ") +
+                   std::string("this string has an upper-case 'x' as the last character.  54321X"),
+    // .can_stop is missing
+    .can_bypass = true,
 }};
 const fuchsia_hardware_audio_signalprocessing::Element kElement4{{
     .id = kElementId4,
@@ -73,8 +99,9 @@ const fuchsia_hardware_audio_signalprocessing::Element kElement4{{
         .plug_detect_capabilities =
             fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
     }}),
-    // .can_disable is missing
     // .description is missing
+    // .can_stop is missing
+    // .can_bypass is missing
 }};
 const fuchsia_hardware_audio_signalprocessing::Element kElementNoId{{
     .type = fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainControl,
@@ -99,6 +126,16 @@ const fuchsia_hardware_audio_signalprocessing::Element kElementEmptyDescription{
     .id = kOtherElementId,
     .type = fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainControl,
     .description = "",
+}};
+const fuchsia_hardware_audio_signalprocessing::Element kElementCannotStop{{
+    .id = kOtherElementId,
+    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainControl,
+    .can_stop = false,
+}};
+const fuchsia_hardware_audio_signalprocessing::Element kElementCannotBypass{{
+    .id = kOtherElementId,
+    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kAutomaticGainControl,
+    .can_bypass = false,
 }};
 
 const std::vector<fuchsia_hardware_audio_signalprocessing::Element> kElements{kElement1, kElement2,

@@ -176,8 +176,8 @@ TEST_F(ObserverServerCodecTest, CleanServerShutdown) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate creation of an Observer via the fad::Registry/CreateObserver method. Most other test
-// cases directly create an Observer server and client synthetically via CreateTestObserverServer.
+// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
+// directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerCodecTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -208,7 +208,7 @@ TEST_F(ObserverServerCodecTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that when an observed device is removed, the fad::Observer is dropped.
+// Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -234,7 +234,7 @@ TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the fad::Observer receives the initial plug state of the observed device.
+// Verify that the Observer receives the initial plug state of the observed device.
 // To ensure we correctly receive this, change the default state we we are initially kUnplugged.
 TEST_F(ObserverServerCodecTest, InitialPlugState) {
   auto fake_driver = CreateFakeCodecOutput();
@@ -278,7 +278,7 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the fad::Observer receives changes in the plug state of the observed device.
+// Verify that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerCodecTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -457,8 +457,8 @@ TEST_F(ObserverServerCompositeTest, CleanServerShutdown) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate creation of an Observer via the fad::Registry/CreateObserver method. Most other test
-// cases directly create an Observer server and client synthetically via CreateTestObserverServer.
+// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
+// directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerCompositeTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -489,7 +489,7 @@ TEST_F(ObserverServerCompositeTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that when an observed device is removed, the fad::Observer is dropped.
+// Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -514,8 +514,7 @@ TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the fad::Observer receives the observed device's reference clock, and that it is
-// valid.
+// Verify that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -991,10 +990,11 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
                 plug_change_time_to_inject.get(),
             }},
         }}),
-        .enabled = true,
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
+        .started = false,
+        .bypassed = false,
     }};
     ASSERT_EQ(new_state.vendor_specific_data()->size(), 17u) << "Test configuration error";
     element_states_to_inject.insert_or_assign(element_id, new_state);
@@ -1039,8 +1039,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
               plug_change_time_to_inject.get());
 
-    ASSERT_TRUE(state_received.enabled().has_value());
-    EXPECT_EQ(state_received.enabled(), true);
+    EXPECT_FALSE(state_received.enabled().has_value());
 
     ASSERT_TRUE(state_received.latency().has_value());
     ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
@@ -1049,6 +1048,12 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     ASSERT_TRUE(state_received.vendor_specific_data().has_value());
     ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
     EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+
+    ASSERT_TRUE(state_received.started().has_value());
+    EXPECT_FALSE(*state_received.started());
+
+    ASSERT_TRUE(state_received.bypassed().has_value());
+    EXPECT_FALSE(*state_received.bypassed());
 
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())
@@ -1095,8 +1100,8 @@ TEST_F(ObserverServerStreamConfigTest, CleanServerShutdown) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate creation of an Observer via the fad::Registry/CreateObserver method. Most other test
-// cases directly create an Observer server and client synthetically via CreateTestObserverServer.
+// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
+// directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerStreamConfigTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1127,7 +1132,7 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that when an observed device is removed, the fad::Observer is dropped.
+// Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1152,7 +1157,7 @@ TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the fad::Observer receives the initial gain state of the observed device.
+// Verify that the Observer receives the initial gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   constexpr float kGainDb = -2.0f;
@@ -1196,7 +1201,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the fad::Observer receives changes in the gain state of the observed device.
+// Verify that the Observer receives changes in the gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, GainChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1251,7 +1256,7 @@ TEST_F(ObserverServerStreamConfigTest, GainChange) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the fad::Observer receives the initial plug state of the observed device.
+// Verify that the Observer receives the initial plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   auto initial_plug_time = zx::clock::get_monotonic();
@@ -1290,7 +1295,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the fad::Observer receives changes in the plug state of the observed device.
+// Verify that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -1341,8 +1346,7 @@ TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that the fad::Observer receives the observed device's reference clock, and that it is
-// valid.
+// Verify that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service()->devices().size(), 1u);

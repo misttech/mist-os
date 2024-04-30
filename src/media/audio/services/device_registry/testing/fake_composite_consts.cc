@@ -195,8 +195,9 @@ const fhasp::Element FakeComposite::kSourceDaiElement{{
         .type = fhasp::EndpointType::kDaiInterconnect,
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .can_disable = false,
     .description = "Endpoint::DaiInterconnect source element description",
+    .can_stop = true,
+    .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kDestDaiElement{{
     .id = kDestDaiElementId,
@@ -205,8 +206,9 @@ const fhasp::Element FakeComposite::kDestDaiElement{{
         .type = fhasp::EndpointType::kDaiInterconnect,
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .can_disable = false,
     .description = "Endpoint::DaiInterconnect destination element description",
+    .can_stop = true,
+    .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kSourceRbElement{{
     .id = kSourceRbElementId,
@@ -215,8 +217,9 @@ const fhasp::Element FakeComposite::kSourceRbElement{{
         .type = fhasp::EndpointType::kRingBuffer,
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
     }}),
-    .can_disable = false,
     .description = "Endpoint::RingBuffer source element description",
+    .can_stop = false,
+    .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kDestRbElement{{
     .id = kDestRbElementId,
@@ -225,14 +228,16 @@ const fhasp::Element FakeComposite::kDestRbElement{{
         .type = fhasp::EndpointType::kRingBuffer,
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
     }}),
-    .can_disable = false,
     .description = "Endpoint::RingBuffer destination element description",
+    .can_stop = false,
+    .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kMuteElement{{
     .id = kMuteElementId,
     .type = fhasp::ElementType::kMute,
-    .can_disable = true,
     .description = "Mute element description",
+    .can_stop = false,
+    .can_bypass = true,
 }};
 
 // ElementStates - note that the two Dai endpoints have vendor_specific_data that can be queried.
@@ -244,46 +249,51 @@ const fhasp::ElementState FakeComposite::kSourceDaiElementInitState{{
     .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
-            .plug_state_time = ZX_TIME_INFINITE_PAST,
+            .plug_state_time = 0,
         }},
     }}),
-    .enabled = true,
     .latency = kSourceDaiElementLatency,
     .vendor_specific_data = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8},
+    .started = false,
+    .bypassed = false,
 }};
 const fhasp::ElementState FakeComposite::kDestDaiElementInitState{{
     .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
-            .plug_state_time = ZX_TIME_INFINITE_PAST,
+            .plug_state_time = 0,
         }},
     }}),
-    .enabled = true,
     .latency = kDestDaiElementLatency,
     .vendor_specific_data = std::vector<uint8_t>{8, 7, 6, 5, 4, 3, 2, 1, 0},
+    .started = false,
+    .bypassed = false,
 }};
 const fhasp::ElementState FakeComposite::kSourceRbElementInitState{{
     .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
-            .plug_state_time = ZX_TIME_INFINITE_PAST,
+            .plug_state_time = 0,
         }},
     }}),
-    .enabled = true,
     .latency = kSourceRbElementLatency,
+    .started = true,
+    .bypassed = false,
 }};
 const fhasp::ElementState FakeComposite::kDestRbElementInitState{{
     .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
-            .plug_state_time = ZX_TIME_INFINITE_PAST,
+            .plug_state_time = 0,
         }},
     }}),
-    .enabled = true,
     .latency = kDestRbElementLatency,
+    .started = true,
+    .bypassed = false,
 }};
 const fhasp::ElementState FakeComposite::kMuteElementInitState{{
-    .enabled = false,
+    .started = true,
+    .bypassed = true,
 }};
 
 // Element set

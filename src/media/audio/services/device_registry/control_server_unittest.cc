@@ -126,8 +126,7 @@ TEST_F(ControlServerCodecTest, CleanClientDrop) {
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
-  // If fad::Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a
-  // failure.
+  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
@@ -145,7 +144,7 @@ TEST_F(ControlServerCodecTest, CleanServerShutdown) {
 
 // When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 //
-// (Same as "CleanClientDrop" test case, but the fad::Control is created "properly" through a
+// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerCodecTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -504,8 +503,7 @@ TEST_F(ControlServerCompositeTest, CleanClientDrop) {
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
-  // If fad::Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a
-  // failure.
+  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
@@ -523,7 +521,7 @@ TEST_F(ControlServerCompositeTest, CleanServerShutdown) {
 
 // When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 //
-// (Same as "CleanClientDrop" test case, but the fad::Control is created "properly" through a
+// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerCompositeTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -700,7 +698,7 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// Verify that the fad::Control lives, even if the client drops its child RingBuffer.
+// Verify that the Control lives, even if the client drops its child RingBuffer.
 TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -756,7 +754,7 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// Verify that the fad::Control lives, even if the driver drops its RingBuffer connection.
+// Verify that the Control lives, even if the driver drops its RingBuffer connection.
 TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -1266,10 +1264,11 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
                 plug_change_time_to_inject.get(),
             }},
         }}),
-        .enabled = true,
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
+        .started = false,
+        .bypassed = false,
     }};
     ASSERT_EQ(new_state.vendor_specific_data()->size(), 17u) << "Test configuration error";
     element_states_to_inject.insert_or_assign(element_id, new_state);
@@ -1314,8 +1313,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
               plug_change_time_to_inject.get());
 
-    ASSERT_TRUE(state_received.enabled().has_value());
-    EXPECT_EQ(state_received.enabled(), true);
+    EXPECT_FALSE(state_received.enabled().has_value());
 
     ASSERT_TRUE(state_received.latency().has_value());
     ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
@@ -1324,6 +1322,12 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     ASSERT_TRUE(state_received.vendor_specific_data().has_value());
     ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
     EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+
+    ASSERT_TRUE(state_received.started().has_value());
+    EXPECT_FALSE(*state_received.started());
+
+    ASSERT_TRUE(state_received.bypassed().has_value());
+    EXPECT_FALSE(*state_received.bypassed());
 
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())
@@ -1422,8 +1426,7 @@ TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
-  // If fad::Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a
-  // failure.
+  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
@@ -1441,7 +1444,7 @@ TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
 
 // When client drops their fad::Control, the server should cleanly unwind without hang or WARNING.
 //
-// (Same as "CleanClientDrop" test case, but the fad::Control is created "properly" through a
+// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerStreamConfigTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -1539,7 +1542,7 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
   EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
-// Verify that the fad::Control lives, even if the client drops its child RingBuffer.
+// Verify that the Control lives, even if the client drops its child RingBuffer.
 TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -1597,7 +1600,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// Verify that the fad::Control lives, even if the driver drops its RingBuffer connection.
+// Verify that the Control lives, even if the driver drops its RingBuffer connection.
 TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);

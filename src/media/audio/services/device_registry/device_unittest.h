@@ -386,7 +386,7 @@ class CodecTest : public DeviceTestBase {
     EXPECT_TRUE(codec_client_end.is_valid());
     auto device =
         Device::Create(std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()),
-                       dispatcher(), "Device name", fuchsia_audio_device::DeviceType::kCodec,
+                       dispatcher(), "Codec device name", fuchsia_audio_device::DeviceType::kCodec,
                        fuchsia_audio_device::DriverClient::WithCodec(std::move(codec_client_end)));
 
     RunLoopUntilIdle();
@@ -435,7 +435,7 @@ class CompositeTest : public DeviceTestBase {
     EXPECT_TRUE(composite_client_end.is_valid());
     auto device = Device::Create(
         std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
-        "Device name", fuchsia_audio_device::DeviceType::kComposite,
+        "Composite device name", fuchsia_audio_device::DeviceType::kComposite,
         fuchsia_audio_device::DriverClient::WithComposite(std::move(composite_client_end)));
 
     RunLoopUntilIdle();
@@ -508,7 +508,7 @@ class StreamConfigTest : public DeviceTestBase {
     auto stream_config_client_end = driver->Enable();
     auto device = Device::Create(
         std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
-        "Device name", device_type,
+        "StreamConfig device name", device_type,
         fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client_end)));
 
     RunLoopUntilIdle();
@@ -590,14 +590,14 @@ class StreamConfigTest : public DeviceTestBase {
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
     bool callback_received = false;
 
-    auto succeeded = device->SetActiveChannels(
-        element_id, expected_bitmask,
-        [&ring_buffer, &callback_received](zx::result<zx::time> result) {
-          EXPECT_TRUE(result.is_ok()) << result.status_string();
-          ASSERT_TRUE(ring_buffer.active_channels_set_time);
-          EXPECT_EQ(result.value(), *ring_buffer.active_channels_set_time);
-          callback_received = true;
-        });
+    auto succeeded =
+        device->SetActiveChannels(element_id, expected_bitmask,
+                                  [&ring_buffer, &callback_received](zx::result<zx::time> result) {
+                                    EXPECT_TRUE(result.is_ok()) << result.status_string();
+                                    ASSERT_TRUE(ring_buffer.active_channels_set_time);
+                                    EXPECT_EQ(*result, *ring_buffer.active_channels_set_time);
+                                    callback_received = true;
+                                  });
 
     RunLoopUntilIdle();
     ASSERT_TRUE(succeeded);
@@ -627,7 +627,7 @@ class StreamConfigTest : public DeviceTestBase {
     device->StartRingBuffer(element_id, [&ring_buffer](zx::result<zx::time> result) {
       EXPECT_TRUE(result.is_ok()) << result.status_string();
       ASSERT_TRUE(ring_buffer.start_time);
-      EXPECT_EQ(result.value(), *ring_buffer.start_time);
+      EXPECT_EQ(*result, *ring_buffer.start_time);
     });
 
     RunLoopUntilIdle();

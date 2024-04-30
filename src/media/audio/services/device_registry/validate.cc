@@ -174,15 +174,15 @@ bool ValidateStreamProperties(const fha::StreamProperties& stream_props,
 
   // Eliminate NaN or infinity values
   if (!std::isfinite(*stream_props.min_gain_db())) {
-    FX_LOGS(WARNING) << "Reported min_gain_db is NaN or infinity";
+    FX_LOGS(WARNING) << "min_gain_db is NaN or infinity";
     return false;
   }
   if (!std::isfinite(*stream_props.max_gain_db())) {
-    FX_LOGS(WARNING) << "Reported max_gain_db is NaN or infinity";
+    FX_LOGS(WARNING) << "max_gain_db is NaN or infinity";
     return false;
   }
   if (!std::isfinite(*stream_props.gain_step_db())) {
-    FX_LOGS(WARNING) << "Reported gain_step_db is NaN or infinity";
+    FX_LOGS(WARNING) << "gain_step_db is NaN or infinity";
     return false;
   }
 
@@ -592,15 +592,15 @@ bool ValidateCodecFormatInfo(const fha::CodecFormatInfo& format_info) {
   ADR_LOG(kLogDeviceMethods);
   LogCodecFormatInfo(format_info);
 
-  if (format_info.external_delay() && *format_info.external_delay() < 0) {
+  if (format_info.external_delay().value_or(0) < 0) {
     FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - external_delay cannot be negative";
     return false;
   }
-  if (format_info.turn_on_delay() && *format_info.turn_on_delay() < 0) {
+  if (format_info.turn_on_delay().value_or(0) < 0) {
     FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - turn_on_delay cannot be negative";
     return false;
   }
-  if (format_info.turn_off_delay() && *format_info.turn_off_delay() < 0) {
+  if (format_info.turn_off_delay().value_or(0) < 0) {
     FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - turn_off_delay cannot be negative";
     return false;
   }
@@ -637,7 +637,7 @@ bool ValidateGainState(const fha::GainState& gain_state,
 
   // Eliminate NaN or infinity values
   if (!std::isfinite(*gain_state.gain_db())) {
-    FX_LOGS(WARNING) << "Reported gain_db is NaN or infinity";
+    FX_LOGS(WARNING) << "gain_db is NaN or infinity";
     return false;
   }
 
@@ -645,17 +645,17 @@ bool ValidateGainState(const fha::GainState& gain_state,
   if (stream_props) {
     if (*gain_state.gain_db() < *stream_props->min_gain_db() ||
         *gain_state.gain_db() > *stream_props->max_gain_db()) {
-      FX_LOGS(WARNING) << "Reported gain_db is out of range: " << *gain_state.gain_db();
+      FX_LOGS(WARNING) << "gain_db is out of range: " << *gain_state.gain_db();
       return false;
     }
     // Device reports it can't mute (or doesn't say it can), then DOES say that it is muted....
     if (!stream_props->can_mute().value_or(false) && gain_state.muted().value_or(false)) {
-      FX_LOGS(WARNING) << "Reported 'muted' state (TRUE) is unsupported";
+      FX_LOGS(WARNING) << "StreamProperties.can_mute is false, but gain_state.muted is true";
       return false;
     }
     // Device reports it can't AGC (or doesn't say it can), then DOES say that AGC is enabled....
     if (!stream_props->can_agc().value_or(false) && gain_state.agc_enabled().value_or(false)) {
-      FX_LOGS(WARNING) << "Reported 'agc_enabled' state (TRUE) is unsupported";
+      FX_LOGS(WARNING) << "StreamProperties.can_agc is false, but gain_state.agc_enabled is true";
       return false;
     }
   }
@@ -674,7 +674,8 @@ bool ValidatePlugState(const fha::PlugState& plug_state,
 
   int64_t now = zx::clock::get_monotonic().get();
   if (*plug_state.plug_state_time() > now) {
-    FX_LOGS(WARNING) << "Reported plug_time is in the future: " << *plug_state.plug_state_time();
+    FX_LOGS(WARNING) << "PlugState.plug_state_time (" << *plug_state.plug_state_time()
+                     << ") is in the future";
     return false;
   }
 
@@ -682,7 +683,7 @@ bool ValidatePlugState(const fha::PlugState& plug_state,
   if (plug_detect_capabilities) {
     if (*plug_detect_capabilities == fha::PlugDetectCapabilities::kHardwired &&
         !plug_state.plugged().value_or(true)) {
-      FX_LOGS(WARNING) << "Reported 'plug_state' (UNPLUGGED) is unsupported (HARDWIRED)";
+      FX_LOGS(WARNING) << "Device reports as HARDWIRED, but PlugState.plugged is false";
       return false;
     }
   }
@@ -771,15 +772,16 @@ bool ValidateRingBufferProperties(const fha::RingBufferProperties& rb_props) {
   LogRingBufferProperties(rb_props);
 
   if (!rb_props.needs_cache_flush_or_invalidate()) {
-    FX_LOGS(WARNING) << "Reported RingBufferProperties.needs_cache_flush_or_invalidate is missing";
+    FX_LOGS(WARNING) << "RingBufferProperties.needs_cache_flush_or_invalidate is missing";
     return false;
   }
-  if (rb_props.turn_on_delay() && *rb_props.turn_on_delay() < 0) {
-    FX_LOGS(WARNING) << "Reported RingBufferProperties.turn_on_delay is negative";
+  if (rb_props.turn_on_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "RingBufferProperties.turn_on_delay (" << *rb_props.turn_on_delay()
+                     << ") is negative";
     return false;
   }
   if (!rb_props.driver_transfer_bytes()) {
-    FX_LOGS(WARNING) << "Reported RingBufferProperties.driver_transfer_bytes is missing";
+    FX_LOGS(WARNING) << "RingBufferProperties.driver_transfer_bytes is missing";
     return false;
   }
   return true;
@@ -792,7 +794,7 @@ bool ValidateRingBufferFormat(const fha::Format& ring_buffer_format) {
     FX_LOGS(WARNING) << "ring_buffer_format must set pcm_format";
     return false;
   }
-  auto& pcm_format = ring_buffer_format.pcm_format().value();
+  auto& pcm_format = *ring_buffer_format.pcm_format();
   if (pcm_format.number_of_channels() == 0) {
     FX_LOGS(WARNING) << "RingBuffer number_of_channels is too low";
     return false;
@@ -878,7 +880,10 @@ bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, const fha::F
   }
   if (size < static_cast<uint64_t>(num_frames) * rb_format.pcm_format()->number_of_channels() *
                  rb_format.pcm_format()->bytes_per_sample()) {
-    FX_LOGS(WARNING) << "Reported RingBuffer.GetVmo num_frames does not match VMO size";
+    FX_LOGS(WARNING) << "RingBuffer.GetVmo num_frames (" << num_frames << ", "
+                     << rb_format.pcm_format()->number_of_channels() << " channels, "
+                     << rb_format.pcm_format()->bytes_per_sample()
+                     << " bytes_per_sample) does not match VMO size (" << size << " bytes)";
     return false;
   }
   return true;
@@ -889,19 +894,19 @@ bool ValidateDelayInfo(const fha::DelayInfo& delay_info) {
   LogDelayInfo(delay_info);
 
   if (!delay_info.internal_delay()) {
-    FX_LOGS(WARNING) << "Reported DelayInfo.internal_delay is missing";
+    FX_LOGS(WARNING) << "DelayInfo.internal_delay is missing";
     return false;
   }
   const auto internal_delay = *delay_info.internal_delay();
   if (internal_delay < 0) {
-    FX_LOGS(WARNING) << "WatchDelayInfo: reported 'internal_delay' (" << internal_delay
+    FX_LOGS(WARNING) << "WatchDelayInfo: DelayInfo.internal_delay (" << internal_delay
                      << " ns) cannot be negative";
     return false;
   }
 
-  if (delay_info.external_delay() && *delay_info.external_delay() < 0) {
-    FX_LOGS(WARNING) << "WatchDelayInfo: reported 'external_delay' ("
-                     << *delay_info.external_delay() << " ns) cannot be negative";
+  if (delay_info.external_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchDelayInfo: DelayInfo.external_delay (" << *delay_info.external_delay()
+                     << " ns) cannot be negative";
     return false;
   }
 
@@ -979,30 +984,59 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
 
   if (!type_specific_matches_element_type) {
     FX_LOGS(WARNING)
-        << "WatchElementState: type_specific is missing or does not match element_type "
+        << "WatchElementState: ElementState.type_specific is missing or does not match element_type "
         << element.type();
     return false;
   }
 
+  // For now, don't fail a driver/client if they include the `enabled` field. Just log a WARNING.
   if (element_state.enabled().has_value()) {
-    if (!element.can_disable().value_or(false) && !element_state.enabled().value_or(true)) {
-      FX_LOGS(WARNING)
-          << "WatchElementState: element_state is disabled, but element.can_disable is false";
-      return false;
-    }
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.enabled is deprecated. Use `bypassed`";
   }
+
   if (element_state.latency().has_value()) {
     if (element_state.latency()->Which() == fhasp::Latency::Tag::kLatencyTime &&
         element_state.latency()->latency_time().value() < 0) {
-      FX_LOGS(WARNING) << "WatchElementState: latency, if a duration, must not be negative";
+      FX_LOGS(WARNING)
+          << "WatchElementState: ElementState.latency, if a duration, must not be negative";
+      return false;
     }
   }
 
   if (element_state.vendor_specific_data().has_value()) {
     if (element_state.vendor_specific_data()->empty()) {
-      FX_LOGS(WARNING) << "WatchElementState: vendor_specific_data, if present, must not be empty";
+      FX_LOGS(WARNING)
+          << "WatchElementState: ElementState.vendor_specific_data, if present, must not be empty";
       return false;
     }
+  }
+
+  if (!element_state.started().has_value()) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.started is required but missing";
+    return false;
+  }
+
+  if (!element.can_stop().value_or(false) && !*element_state.started()) {
+    FX_LOGS(WARNING) << "WatchElementState: Element.can_stop is false, but ElementState is stopped";
+    return false;
+  }
+
+  if (!element.can_bypass().value_or(false) && element_state.bypassed().value_or(false)) {
+    FX_LOGS(WARNING)
+        << "WatchElementState: Element.can_bypass is false, but ElementState is bypassed";
+    return false;
+  }
+
+  if (element_state.turn_on_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.turn_on_delay ("
+                     << *element_state.turn_on_delay() << " ns) cannot be negative";
+    return false;
+  }
+
+  if (element_state.turn_off_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.turn_off_delay ("
+                     << *element_state.turn_off_delay() << " ns) cannot be negative";
+    return false;
   }
 
   return true;
@@ -1052,6 +1086,10 @@ bool ValidateElement(const fhasp::Element& element) {
       return false;
     }
   }
+  // can_disable is deprecated. Show a warning, but don't cause a driver error in the meantime.
+  if (element.can_disable().has_value()) {
+    FX_LOGS(WARNING) << "SignalProcessing.element.can_disable is deprecated and should be removed";
+  }
   if (element.description().has_value() && element.description()->empty()) {
     FX_LOGS(WARNING) << "SignalProcessing.element.description cannot be empty, if present";
     return false;
@@ -1064,7 +1102,7 @@ bool ValidateElements(const std::vector<fhasp::Element>& elements) {
   LogElements(elements);
 
   if (elements.empty()) {
-    FX_LOGS(WARNING) << "Reported SignalProcessing.elements[] is empty";
+    FX_LOGS(WARNING) << "SignalProcessing.elements[] is empty";
     return false;
   }
 
@@ -1081,17 +1119,15 @@ bool ValidateTopology(const fhasp::Topology& topology,
                       const std::unordered_map<ElementId, ElementRecord>& element_map) {
   LogTopology(topology);
   if (!topology.id().has_value()) {
-    FX_LOGS(WARNING) << "Reported SignalProcessing.topology.id is missing";
+    FX_LOGS(WARNING) << "SignalProcessing.topology.id is missing";
     return false;
   }
   if (!topology.processing_elements_edge_pairs().has_value()) {
-    FX_LOGS(WARNING)
-        << "Reported SignalProcessing.topology.processing_elements_edge_pairs is missing";
+    FX_LOGS(WARNING) << "SignalProcessing.topology.processing_elements_edge_pairs is missing";
     return false;
   }
   if (topology.processing_elements_edge_pairs()->empty()) {
-    FX_LOGS(WARNING)
-        << "Reported SignalProcessing.topology.processing_elements_edge_pairs[] is empty";
+    FX_LOGS(WARNING) << "SignalProcessing.topology.processing_elements_edge_pairs[] is empty";
     return false;
   }
 
@@ -1147,11 +1183,11 @@ bool ValidateTopologies(const std::vector<fhasp::Topology>& topologies,
   LogTopologies(topologies);
 
   if (topologies.empty()) {
-    FX_LOGS(WARNING) << "Reported SignalProcessing.topologies[] is empty";
+    FX_LOGS(WARNING) << "SignalProcessing.topologies[] is empty";
     return false;
   }
   if (element_map.empty()) {
-    FX_LOGS(WARNING) << "Reported SignalProcessing.elements[] is empty";
+    FX_LOGS(WARNING) << "SignalProcessing.elements[] is empty";
     return false;
   }
 

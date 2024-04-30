@@ -105,7 +105,7 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_EQ(*info.unique_instance_id(), FakeCodec::kDefaultUniqueInstanceId);
 
   ASSERT_TRUE(info.is_input().has_value());
-  EXPECT_FALSE(info.is_input().value());
+  EXPECT_FALSE(*info.is_input());
 
   EXPECT_FALSE(info.ring_buffer_format_sets().has_value());
 
@@ -1009,7 +1009,7 @@ TEST_F(CompositeTest, SetDaiFormatChange) {
     auto format_match = notify()->dai_formats().find(dai_element_id);
     ASSERT_NE(format_match, notify()->dai_formats().end());
     ASSERT_TRUE(format_match->second.has_value());
-    EXPECT_TRUE(ValidateDaiFormat(format_match->second.value()));
+    EXPECT_TRUE(ValidateDaiFormat(*format_match->second));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
     EXPECT_TRUE(notify()->dai_format_errors().empty());
     notify()->clear_dai_format(dai_element_id);
@@ -1116,7 +1116,7 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
        &rb_info](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         callback_received = true;
         ASSERT_TRUE(result.is_ok());
-        rb_info = std::move(result.value());
+        rb_info = std::move(*result);
       }));
 
   RunLoopUntilIdle();
@@ -1266,7 +1266,7 @@ TEST_F(CompositeTest, RingBufferStartAndStop) {
                             [&callback_received, &start_time](zx::result<zx::time> result) {
                               callback_received = true;
                               EXPECT_TRUE(result.is_ok());
-                              start_time = result.value();
+                              start_time = *result;
                               EXPECT_LT(start_time.get(), zx::clock::get_monotonic().get());
                             });
 
@@ -1326,7 +1326,7 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
         element_id, channel_bitmask, [&callback_received, &set_time](zx::result<zx::time> result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
-          set_time = result.value();
+          set_time = *result;
           EXPECT_LT(set_time.get(), zx::clock::get_monotonic().get());
         });
 
@@ -1343,7 +1343,7 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
         element_id, channel_bitmask, [&callback_received, &set_time2](zx::result<zx::time> result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
-          set_time2 = result.value();
+          set_time2 = *result;
         });
 
     RunLoopUntilIdle();
@@ -1543,7 +1543,9 @@ TEST_F(CompositeTest, GetElements) {
     ASSERT_TRUE(element.id().has_value());
     ASSERT_TRUE(elements->at(0).type().has_value());
     ASSERT_TRUE(element.description().has_value());
-    ASSERT_TRUE(element.can_disable().has_value());
+    ASSERT_FALSE(element.can_disable().has_value());
+    ASSERT_TRUE(element.can_stop().has_value());
+    ASSERT_TRUE(element.can_bypass().has_value());
     if (element.type() == fhasp::ElementType::kEndpoint) {
       ASSERT_TRUE(element.type_specific().has_value());
       ASSERT_TRUE(element.type_specific()->endpoint().has_value());
@@ -1556,8 +1558,10 @@ TEST_F(CompositeTest, GetElements) {
   EXPECT_EQ(elements->at(1).id(), FakeComposite::kDestDaiElementId);
   EXPECT_EQ(elements->at(0).type(), fhasp::ElementType::kEndpoint);
   EXPECT_EQ(elements->at(1).type(), fhasp::ElementType::kEndpoint);
-  EXPECT_FALSE(elements->at(0).can_disable().value());
-  EXPECT_FALSE(elements->at(1).can_disable().value());
+  EXPECT_FALSE(*elements->at(0).can_bypass());
+  EXPECT_FALSE(*elements->at(1).can_bypass());
+  EXPECT_TRUE(*elements->at(0).can_stop());
+  EXPECT_TRUE(*elements->at(1).can_stop());
   EXPECT_EQ(*elements->at(0).description(), *FakeComposite::kSourceDaiElement.description());
   EXPECT_EQ(*elements->at(1).description(), *FakeComposite::kDestDaiElement.description());
   EXPECT_EQ(*elements->at(0).type_specific()->endpoint()->type(),
@@ -1573,8 +1577,10 @@ TEST_F(CompositeTest, GetElements) {
   EXPECT_EQ(elements->at(3).id(), FakeComposite::kDestRbElementId);
   EXPECT_EQ(elements->at(2).type(), fhasp::ElementType::kEndpoint);
   EXPECT_EQ(elements->at(3).type(), fhasp::ElementType::kEndpoint);
-  EXPECT_FALSE(elements->at(2).can_disable().value());
-  EXPECT_FALSE(elements->at(3).can_disable().value());
+  EXPECT_FALSE(*elements->at(2).can_bypass());
+  EXPECT_FALSE(*elements->at(3).can_bypass());
+  EXPECT_FALSE(*elements->at(2).can_stop());
+  EXPECT_FALSE(*elements->at(3).can_stop());
   EXPECT_EQ(*elements->at(2).description(), *FakeComposite::kSourceRbElement.description());
   EXPECT_EQ(*elements->at(3).description(), *FakeComposite::kDestRbElement.description());
   EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
@@ -1586,7 +1592,8 @@ TEST_F(CompositeTest, GetElements) {
 
   EXPECT_EQ(elements->at(4).id(), FakeComposite::kMuteElementId);
   EXPECT_EQ(elements->at(4).type(), fhasp::ElementType::kMute);
-  EXPECT_TRUE(elements->at(4).can_disable().value());
+  EXPECT_TRUE(*elements->at(4).can_bypass());
+  EXPECT_FALSE(*elements->at(4).can_stop());
   EXPECT_EQ(*elements->at(4).description(), *FakeComposite::kMuteElement.description());
   EXPECT_FALSE(elements->at(4).type_specific().has_value());
 }
@@ -1647,12 +1654,12 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
   auto state = states.find(FakeComposite::kSourceDaiElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
   ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
@@ -1663,18 +1670,19 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(endpt_state1->plug_state().has_value());
   ASSERT_TRUE(endpt_state1->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state1->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state1->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state1->plug_state()->plug_state_time(), 0);
   ASSERT_EQ(state.vendor_specific_data()->size(), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 1u);
   EXPECT_EQ(state.vendor_specific_data()->at(7), 8u);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestDaiElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
   ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
@@ -1685,18 +1693,19 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(endpt_state2->plug_state().has_value());
   ASSERT_TRUE(endpt_state2->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state2->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state2->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state2->plug_state()->plug_state_time(), 0);
   ASSERT_EQ(state.vendor_specific_data()->size(), 9u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(8), 0u);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
   ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)
                   ->second.latency()
@@ -1710,15 +1719,16 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(endpt_state3->plug_state().has_value());
   ASSERT_TRUE(endpt_state3->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state3->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state3->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state3->plug_state()->plug_state_time(), 0);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestRbElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
   ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(state.latency()->latency_frames().has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
@@ -1729,15 +1739,17 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(endpt_state4->plug_state().has_value());
   ASSERT_TRUE(endpt_state4->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state4->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state4->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state4->plug_state()->plug_state_time(), 0);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kMuteElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_FALSE(*state.enabled());
+  EXPECT_TRUE(*state.bypassed());
 }
 
 TEST_F(CompositeTest, WatchElementStateUpdate) {
@@ -1760,11 +1772,15 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     auto state = match_state->second;
 
     // Handle the Mute node
-    if (element.type() == fhasp::ElementType::kMute && element.can_disable().value_or(false)) {
-      // By configuration, our Mute starts disabled (we enable it as our ElementState change).
-      ASSERT_TRUE(state.enabled().has_value());
-      EXPECT_FALSE(*state.enabled());
-      element_states_to_inject.insert_or_assign(element_id, fhasp::ElementState{{.enabled = true}});
+    if (element.type() == fhasp::ElementType::kMute && element.can_bypass().value_or(false)) {
+      // By configuration, our Mute starts bypassed (we activate it as our ElementState change).
+      EXPECT_FALSE(state.enabled().has_value());
+      ASSERT_TRUE(state.started().has_value());
+      EXPECT_TRUE(*state.started());
+      ASSERT_TRUE(state.bypassed().has_value());
+      EXPECT_TRUE(*state.bypassed());
+      element_states_to_inject.insert_or_assign(
+          element_id, fhasp::ElementState{{.started = true, .bypassed = false}});
       continue;
     }
 
@@ -1789,10 +1805,11 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
                 plug_change_time_to_inject.get(),
             }},
         }}),
-        .enabled = true,
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
+        .started = true,
+        .bypassed = false,
     }};
     ASSERT_EQ(new_state.vendor_specific_data()->size(), 17u) << "Test configuration error";
     element_states_to_inject.insert_or_assign(element_id, new_state);
@@ -1816,11 +1833,14 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     // Compare to actual static values we know.
     if (element_id == FakeComposite::kMuteElementId) {
       EXPECT_FALSE(state_received.type_specific().has_value());
-      ASSERT_TRUE(state_received.enabled().has_value());
       EXPECT_FALSE(state_received.latency().has_value());
       EXPECT_FALSE(state_received.vendor_specific_data().has_value());
 
-      EXPECT_EQ(state_received.enabled(), true);
+      EXPECT_FALSE(state_received.enabled().has_value());
+      ASSERT_TRUE(state_received.started().has_value());
+      EXPECT_TRUE(*state_received.started());
+      ASSERT_TRUE(state_received.bypassed().has_value());
+      EXPECT_FALSE(*state_received.bypassed());
     } else {
       ASSERT_TRUE(state_received.type_specific().has_value());
       ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
@@ -1831,9 +1851,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
                 plug_change_time_to_inject.get());
 
-      ASSERT_TRUE(state_received.enabled().has_value());
-      EXPECT_EQ(state_received.enabled(), true);
-
       ASSERT_TRUE(state_received.latency().has_value());
       ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
       EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
@@ -1841,6 +1858,12 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       ASSERT_TRUE(state_received.vendor_specific_data().has_value());
       ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
       EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+
+      EXPECT_FALSE(state_received.enabled().has_value());
+      ASSERT_TRUE(state_received.started().has_value());
+      EXPECT_TRUE(state_received.started());
+      ASSERT_TRUE(state_received.bypassed().has_value());
+      EXPECT_FALSE(*state_received.bypassed());
     }
 
     // Compare to what we injected.
@@ -1923,7 +1946,7 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
               notify()->element_states().end());
   notify()->clear_element_states();
-  fhasp::ElementState state{{.enabled = true}};
+  fhasp::ElementState state{{.started = true, .bypassed = false}};
 
   EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
 
@@ -1931,11 +1954,16 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_FALSE(notify()->element_states().find(FakeComposite::kMuteElementId) ==
                notify()->element_states().end());
   auto new_state = notify()->element_states().find(FakeComposite::kMuteElementId)->second;
-  ASSERT_TRUE(new_state.enabled().has_value());
-  EXPECT_EQ(*new_state.enabled(), true);
-  EXPECT_FALSE(new_state.latency().has_value());
+
   EXPECT_FALSE(new_state.type_specific().has_value());
+  EXPECT_FALSE(new_state.latency().has_value());
   EXPECT_FALSE(new_state.vendor_specific_data().has_value());
+
+  EXPECT_FALSE(new_state.enabled().has_value());
+  ASSERT_TRUE(new_state.started().has_value());
+  EXPECT_TRUE(*new_state.started());
+  ASSERT_TRUE(new_state.bypassed().has_value());
+  EXPECT_FALSE(*new_state.bypassed());
 }
 
 /////////////////////
@@ -2251,7 +2279,7 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2298,7 +2326,7 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2399,7 +2427,7 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2426,7 +2454,7 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 

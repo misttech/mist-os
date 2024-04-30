@@ -21,11 +21,13 @@ TEST(SignalProcessingUtilsTest, MapElements) {
   EXPECT_EQ(*map.at(*kElement1.id()).element.type(), *kElement1.type());
   EXPECT_EQ(*map.at(*kElement1.id()).element.type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+  EXPECT_TRUE(map.at(*kElement1.id()).element.can_stop().value_or(false));
 
   EXPECT_EQ(*map.at(*kElement2.id()).element.type(), *kElement2.type());
+  EXPECT_FALSE(map.at(*kElement2.id()).element.can_stop().value_or(true));
 
   EXPECT_EQ(*map.at(*kElement3.id()).element.type(), *kElement3.type());
-  EXPECT_TRUE(map.at(*kElement3.id()).element.can_disable().value_or(false));
+  EXPECT_TRUE(map.at(*kElement3.id()).element.can_bypass().value_or(false));
   EXPECT_EQ(map.at(*kElement3.id()).element.description()->at(255), 'X');
 
   EXPECT_EQ(*map.at(*kElement4.id()).element.type(), *kElement4.type());

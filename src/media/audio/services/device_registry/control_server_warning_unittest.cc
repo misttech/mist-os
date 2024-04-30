@@ -855,7 +855,7 @@ TEST_F(ControlServerCodecWarningTest, SetElementStateUnsupported) {
   auto received_callback = false;
 
   control->client()
-      ->SetElementState({fad::kDefaultDaiInterconnectElementId, {}})
+      ->SetElementState({fad::kDefaultDaiInterconnectElementId, {{.started = false}}})
       .Then([&received_callback](fidl::Result<fad::Control::SetElementState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
@@ -1497,7 +1497,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferServe
       << *control_creator_fidl_error_status();
 }
 
-// If the ServerEnd<RingBuffer> passed to CreateRingBuffer is invalid, the fad::Control will
+// If the ServerEnd<RingBuffer> passed to CreateRingBuffer is invalid, the Control will
 // disconnect. We recreate it for each RING_BUFFER element so we can probe each one.
 TEST_F(ControlServerCompositeWarningTest, CreateRingBufferBadRingBufferServerEnd) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
@@ -2461,7 +2461,7 @@ TEST_F(ControlServerStreamConfigWarningTest, SetElementStateUnsupported) {
   auto received_callback = false;
 
   control->client()
-      ->SetElementState({fad::kDefaultDaiInterconnectElementId, {}})
+      ->SetElementState({fad::kDefaultDaiInterconnectElementId, {{.started = false}}})
       .Then([&received_callback](fidl::Result<fad::Control::SetElementState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
