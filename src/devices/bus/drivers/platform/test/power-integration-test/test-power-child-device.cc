@@ -7,6 +7,8 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/element-description.h>
 #include <lib/driver/power/cpp/power-support.h>
 
 namespace fake_child_device {
@@ -39,33 +41,22 @@ zx::result<> FakeChild::Start() {
     }
     fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(pb_open.value());
 
-    // Prepare a bunch of stuff we need for the element.
-    fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level =
-        fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
-    fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level =
-        fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
-    fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
-        fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
-    zx_handle_t active, passive;
-    zx_event_create(0, &active);
-    zx_event_create(0, &passive);
-    zx::event active_event(active);
-    zx::event passive_event(passive);
+    fdf_power::ElementDesc description =
+        fdf_power::ElementDescBuilder(power_config->value()->config[0], std::move(tokens)).Build();
 
     fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
         fdf_power::AddElement(
-            broker, power_config->value()->config[0], std::move(tokens), active_event.borrow(),
-            passive_event.borrow(),
-            std::pair{std::move(current_level.server), std::move(required_level.server)},
-            std::move(lessor.server));
+            broker, description.element_config_, std::move(description.tokens_),
+            description.active_token_.borrow(), description.passive_token_.borrow(),
+            std::move(description.level_control_servers_), std::move(description.lessor_server_));
     if (!add_result.is_ok()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
     // That worked, so store the channels we'll need to work with the element.
-    required_level_ = std::move(required_level.client);
-    current_level_ = std::move(current_level.client);
-    lessor_ = std::move(lessor.client);
+    required_level_ = std::move(description.required_level_client_.value());
+    current_level_ = std::move(description.current_level_client_.value());
+    lessor_ = std::move(description.lessor_client_.value());
   }
   return zx::ok();
 }

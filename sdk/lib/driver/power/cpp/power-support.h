@@ -133,6 +133,7 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor);
+
 }  // namespace fdf_power
 
 #endif  // LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_

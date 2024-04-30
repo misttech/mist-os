@@ -13,6 +13,9 @@ group("tests") {
 
 source_set("cpp") {
   sources = [
+    "element-description-builder.cc",
+    "element-description-builder.h",
+    "element-description.h",
     "power-support.cc",
     "power-support.h",
   ]
@@ -34,7 +37,10 @@ source_set("cpp") {
 }
 
 test("power-test") {
-  sources = [ "power-support-tests.cc" ]
+  sources = [
+    "element-description-builder-tests.cc",
+    "power-support-tests.cc",
+  ]
   deps = [
     ":cpp",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",

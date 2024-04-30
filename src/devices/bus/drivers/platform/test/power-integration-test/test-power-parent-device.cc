@@ -7,6 +7,8 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/element-description.h>
 #include <lib/driver/power/cpp/power-support.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -36,16 +38,6 @@ zx::result<> FakeParent::Start() {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level =
-        fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
-    fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level =
-        fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
-    fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
-        fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
-    zx::event active, passive;
-
-    fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(power_broker_req.value());
-
     fit::result<fdf_power::Error, fdf_power::TokenMap> token_result =
         fdf_power::GetDependencyTokens(*incoming(), power_config[0]);
     if (token_result.is_error()) {
@@ -53,11 +45,16 @@ zx::result<> FakeParent::Start() {
     }
 
     fdf_power::TokenMap tokens = std::move(token_result.value());
+
+    fdf_power::ElementDesc description =
+        fdf_power::ElementDescBuilder(*power_config, std::move(tokens)).Build();
+
+    fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(power_broker_req.value());
     fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
         fdf_power::AddElement(
-            broker, power_config[0], std::move(tokens), active.borrow(), passive.borrow(),
-            std::pair{std::move(current_level.server), std::move(required_level.server)},
-            std::move(lessor.server));
+            broker, power_config[0], std::move(description.tokens_),
+            description.active_token_.borrow(), description.passive_token_.borrow(),
+            std::move(description.level_control_servers_), std::move(description.lessor_server_));
 
     topology_client_ =
         fidl::WireClient<fuchsia_power_broker::Topology>(std::move(broker), dispatcher());
