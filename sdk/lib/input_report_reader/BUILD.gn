@@ -11,6 +11,7 @@ sdk_source_set("input_report_reader") {
   sdk_name = "input_report_reader"
 
   include_base = "//sdk"
+  stable = true
 
   sources = [
     "reader.cc",

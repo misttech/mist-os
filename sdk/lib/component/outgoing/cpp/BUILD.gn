@@ -10,6 +10,7 @@ sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "component_outgoing_cpp"
   include_base = "//sdk"
+  stable = true
 
   sources = [
     "globals.cc",

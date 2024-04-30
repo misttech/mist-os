@@ -18,6 +18,7 @@ sdk_source_set("cpp_library") {
   sdk_name = "sys_component_cpp_testing"
 
   include_base = "//sdk"
+  stable = true
 
   sources = [
     "execution_controller.h",

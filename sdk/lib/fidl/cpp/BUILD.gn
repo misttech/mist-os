@@ -51,6 +51,7 @@ sdk_source_set("cpp") {
   ]
 
   include_base = "//sdk"
+  stable = true
 
   public_deps = [
     ":cpp_sync",

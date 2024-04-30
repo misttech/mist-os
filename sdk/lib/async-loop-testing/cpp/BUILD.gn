@@ -13,6 +13,7 @@ config("include") {
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "async-loop-testing"
+  stable = true
 
   public = [ "include/lib/async-loop/testing/cpp/real_loop.h" ]
 

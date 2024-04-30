@@ -12,6 +12,7 @@ sdk_source_set("zbi-format") {
   category = "partner"
   sdk_name = "zbi-format"
   api = "zbi-format.api"
+  stable = true
 
   public = [
     "include/lib/zbi-format/board.h",

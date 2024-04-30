@@ -69,6 +69,13 @@ import("//build/sdk/sdk_atom.gni")
 #     be excluded. See /build/sdk/plasa/plasa_fragment_cc.gni.
 #
 #     See https://fxbug.dev/42068255 for more details about this field.
+#
+#   stable (optional)
+#     Whether this library is stabilized. If false, there will not be
+#     .api file generated, and the atom will be marked as unstable in the final
+#     IDK.
+#     Defaults to false.
+#
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
   is_internal = invoker.category == "internal"
@@ -128,6 +135,7 @@ template("sdk_source_set") {
                              "sdk_headers_for_internal_use",
                              "source_dir",
                              "testonly",
+                             "stable",
                            ])
 
     if (defined(visibility)) {
@@ -297,6 +305,11 @@ template("sdk_source_set") {
   metadata_target_name = "${target_name}_sdk_metadata"
   metadata_file = "$target_gen_dir/$target_name.sdk_meta.json"
 
+  _stable = false
+  if (defined(invoker.stable)) {
+    _stable = invoker.stable
+  }
+
   action(metadata_target_name) {
     forward_variables_from(invoker, [ "testonly" ])
     script = "//build/cpp/gen_sdk_sources_meta_file.py"
@@ -319,6 +332,10 @@ template("sdk_source_set") {
     args += [ "--dep_names" ] + dep_names
     args += [ "--sources" ] + sdk_metadata_sources
     args += [ "--headers" ] + sdk_metadata_headers
+
+    if (_stable) {
+      args += [ "--stable" ]
+    }
     deps = sdk_deps
   }
 
@@ -343,6 +360,7 @@ template("sdk_source_set") {
       source = metadata_file
       dest = "$sdk_root_path/meta.json"
       schema = "cc_source_library"
+      stable = _stable
     }
 
     files = sdk_files

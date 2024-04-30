@@ -10,6 +10,7 @@ sdk_source_set("testing") {
   sdk_name = "scenic_cpp_testing"
 
   include_base = "//sdk"
+  stable = true
 
   public_configs = [ "//sdk/config" ]
 

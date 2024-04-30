@@ -7,6 +7,7 @@ import("//build/zircon/zx_library.gni")
 zx_library("fit-promise") {
   sdk = "source"
   sdk_publishable = "partner"
+  stable = true
 
   sdk_headers = [
     "lib/fpromise/barrier.h",

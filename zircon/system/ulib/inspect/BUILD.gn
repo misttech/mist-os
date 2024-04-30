@@ -7,6 +7,7 @@ import("//build/zircon/zx_library.gni")
 zx_library("inspect") {
   sdk = "source"
   sdk_publishable = "partner"
+  stable = true
   sdk_headers = [
     "lib/inspect/cpp/inspect.h",
     "lib/inspect/cpp/inspector.h",

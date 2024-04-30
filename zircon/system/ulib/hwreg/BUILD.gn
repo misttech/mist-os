@@ -63,6 +63,7 @@ source_set("hwreg-mock") {
 sdk_source_set("hwreg_sdk") {
   category = "partner"
   sdk_name = "hwreg"
+  stable = true
 
   include_dirs = [ "include" ]
 

@@ -11,6 +11,7 @@ config("magma_include") {
 sdk_source_set("magma_common") {
   category = "partner"
   sdk_name = "magma_common"
+  stable = true
   public = [ "include/lib/magma/magma_common_defs.h" ]
   public_configs = [ ":magma_include" ]
 }
