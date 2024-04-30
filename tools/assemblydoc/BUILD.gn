@@ -16,6 +16,8 @@ rustc_binary("assemblydoc_bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:tar",
+    "//third_party/rust_crates:tempfile",
     "//tools/lib/serdedoc",
   ]
 }
