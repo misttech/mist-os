@@ -54,6 +54,12 @@ void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
     return;
   }
 
+  if (config_result->value()->config.period_ns == 0) {
+    FDF_LOG(ERROR, "PWM period config of 0ns is invalid.");
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
   aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   fuchsia_hardware_pwm::wire::PwmConfig cfg = {
       .polarity = config_result->value()->config.polarity,

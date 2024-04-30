@@ -38,8 +38,8 @@ class AmlPwm {
     for (size_t i = 0; i < kPwmPairCount; i++) {
       mode_configs_[i].mode = Mode::kOff;
       mode_configs_[i].regular = {};
-      configs_[i] = {.polarity = false,
-                     .period_ns = 0,
+      configs_[i] = {.polarity = channels_[i].polarity().value_or(false),
+                     .period_ns = channels_[i].period_ns().value_or(0),
                      .duty_cycle = 0.0,
                      .mode_config_buffer = reinterpret_cast<uint8_t*>(&mode_configs_[i]),
                      .mode_config_size = sizeof(mode_config)};
