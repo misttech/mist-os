@@ -623,7 +623,7 @@ pub(crate) async fn run_single_suite(
 
     if let Some(instance) = maybe_instance.take() {
         diagnostics.set_property(EXECUTION_PROPERTY, "tear_down");
-        info!(?diagnostics, "Try destroying the test");
+        info!(?diagnostics, "Test suite has finished, destroying instance...");
         if let Err(err) = instance.destroy(diagnostics.child("destroy")).await {
             // Failure to destroy an instance could mean that some component events fail to send.
             error!(?diagnostics, ?err, "Failed to destroy instance. Debug data may be lost.");
