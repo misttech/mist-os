@@ -625,6 +625,15 @@ func TestGenArgs(t *testing.T) {
 			skipLocalArgs:  true,
 			unexpectedArgs: []string{"\n\n# Local args from $CHECKOUT_DIR/local/args.gn:"},
 		},
+		{
+			name: "pgo profile path",
+			contextSpec: &fintpb.Context{
+				PgoProfilePath: "/tmp/pgo_profile_path",
+			},
+			expectedArgs: []string{
+				`pgo_profile_path="/tmp/pgo_profile_path"`,
+			},
+		},
 	}
 
 	for _, tc := range testCases {

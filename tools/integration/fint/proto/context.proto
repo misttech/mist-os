@@ -58,4 +58,7 @@ message Context {
   // after an incremental builds with the same static spec but a different
   // version of the code, which perfcompare builders do.
   bool skip_ninja_noop_check = 13;
+
+  // Absolute path to PGO profile data file.
+  string pgo_profile_path = 14;
 }
