@@ -1049,7 +1049,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 }
 
 void Client::ApplyConfig() {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig");
 
   bool config_missing_image = false;
@@ -1114,7 +1114,7 @@ void Client::ApplyConfig() {
 }
 
 void Client::SetOwnership(bool is_owner) {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
   is_owner_ = is_owner;
 
   fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
@@ -1132,7 +1132,7 @@ void Client::SetOwnership(bool is_owner) {
 
 void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                                cpp20::span<const DisplayId> removed_display_ids) {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
 
   controller_->AssertMtxAliasHeld(controller_->mtx());
   for (DisplayId added_display_id : added_display_ids) {
@@ -1314,7 +1314,7 @@ void Client::CaptureCompleted() {
 }
 
 void Client::TearDown() {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
   pending_config_valid_ = false;
 
   // Teardown stops events from the channel, but not from the ddk, so we
@@ -1478,8 +1478,8 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
     client->proxy_->OnClientDead();
   };
 
-  auto binding = fidl::BindServer(controller_->loop().dispatcher(), std::move(server_end), this,
-                                  std::move(cb));
+  auto binding =
+      fidl::BindServer(controller_->async_dispatcher(), std::move(server_end), this, std::move(cb));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_state_.SetBound(binding);
 
@@ -1492,7 +1492,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       proxy_(proxy),
       priority_(priority),
       id_(client_id),
-      fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {
+      fences_(controller->async_dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
@@ -1503,7 +1503,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       priority_(priority),
       id_(client_id),
       running_(true),
-      fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
+      fences_(controller->async_dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
       binding_state_(std::move(server_end)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
@@ -1533,7 +1533,7 @@ void ClientProxy::SetOwnership(bool is_owner) {
     mtx_unlock(&this->task_mtx_);
   });
   mtx_lock(&task_mtx_);
-  if (task->Post(controller_->loop().dispatcher()) == ZX_OK) {
+  if (task->Post(controller_->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
   mtx_unlock(&task_mtx_);
@@ -1577,7 +1577,7 @@ void ClientProxy::ReapplyConfig() {
     mtx_unlock(&this->task_mtx_);
   });
   mtx_lock(&task_mtx_);
-  if (task->Post(controller_->loop().dispatcher()) == ZX_OK) {
+  if (task->Post(controller_->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
   mtx_unlock(&task_mtx_);
@@ -1751,7 +1751,7 @@ void ClientProxy::CloseOnControllerLoop() {
     client_handler->TearDown();
     delete task;
   });
-  if (task->Post(controller_->loop().dispatcher()) != ZX_OK) {
+  if (task->Post(controller_->async_dispatcher()) != ZX_OK) {
     // Tasks only fail to post if the looper is dead. That can happen if the controller is unbinding
     // and shutting down active clients, but if it does then it's safe to call Reset on this thread
     // anyway.

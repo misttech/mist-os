@@ -81,6 +81,7 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",
     "//src/devices/lib/driver:driver_runtime",
@@ -101,6 +102,7 @@ source_set("shared") {
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]

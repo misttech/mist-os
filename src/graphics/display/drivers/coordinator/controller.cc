@@ -12,6 +12,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
 #include <lib/trace/event.h>
@@ -63,6 +64,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/graphics/display/lib/edid/timings.h"
+#include "src/lib/async-watchdog/watchdog.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
@@ -275,7 +277,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
     delete task;
   });
-  task.release()->Post(loop_.dispatcher());
+  task.release()->Post(dispatcher_.async_dispatcher());
 }
 
 void Controller::DisplayControllerInterfaceOnCaptureComplete() {
@@ -310,7 +312,7 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
     }
     delete task;
   });
-  task.release()->Post(loop_.dispatcher());
+  task.release()->Post(dispatcher_.async_dispatcher());
 }
 
 void Controller::DisplayControllerInterfaceOnDisplayVsync(
@@ -842,7 +844,7 @@ zx_status_t Controller::CreateClient(
         delete task;
       });
 
-  return task.release()->Post(loop_.dispatcher());
+  return task.release()->Post(dispatcher_.async_dispatcher());
 }
 
 display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() {
@@ -894,20 +896,25 @@ zx::result<> Controller::Bind() {
     return zx::error(status);
   }
 
-  status = loop_.StartThread("display-client-loop", &loop_thread_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start loop %d", status);
-    return zx::error(status);
+  const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",
+          [this](fdf_dispatcher*) { dispatcher_shutdown_completion_.Signal(); },
+          kSchedulerRoleName);
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create dispatcher: %s", create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
   }
+  dispatcher_ = std::move(create_dispatcher_result).value();
 
-  // Set the display controller looper thread to use a scheduler role.
-  {
-    const char kRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
-    status = device_set_profile_by_role(parent(), thrd_get_zx_handle(loop_thread_), kRoleName,
-                                        strlen(kRoleName));
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
-    }
+  fbl::AllocChecker alloc_checker;
+  watchdog_ = fbl::make_unique_checked<async_watchdog::Watchdog>(
+      &alloc_checker, "display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
+      dispatcher_.async_dispatcher());
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for Watchdog");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   supports_capture_ = engine_driver_client_.IsCaptureSupported();
@@ -949,8 +956,10 @@ void Controller::DdkUnbind(ddk::UnbindTxn txn) {
 
 void Controller::DdkRelease() {
   vsync_monitor_.Deinitialize();
-  // Clients may have active work holding mtx_ in loop_.dispatcher(), so shut it down without mtx_.
-  loop_.Shutdown();
+
+  // Clients may have active work holding mtx_ in dispatcher_, so shut it down without mtx_.
+  dispatcher_.ShutdownAsync();
+  dispatcher_shutdown_completion_.Wait();
 
   // Set an empty config so that the display driver releases resources.
   display_config_t empty_config;
@@ -971,9 +980,6 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
       inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
       vsync_monitor_(root_.CreateChild("vsync_monitor")),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-                loop_.dispatcher()),
       engine_driver_client_(EngineDriverClient(this, parent)) {
   mtx_init(&mtx_, mtx_plain);
 

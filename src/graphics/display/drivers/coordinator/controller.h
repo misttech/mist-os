@@ -11,8 +11,10 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/device.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
@@ -128,8 +130,8 @@ class Controller : public DeviceType,
 
   bool supports_capture() { return supports_capture_; }
 
-  async::Loop& loop() { return loop_; }
-  bool current_thread_is_loop() { return thrd_current() == loop_thread_; }
+  async_dispatcher_t* async_dispatcher() { return dispatcher_.async_dispatcher(); }
+  bool IsRunningOnDispatcher() { return fdf::Dispatcher::GetCurrent()->get() == dispatcher_.get(); }
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
   // places where we believe a mutex aliases mtx()
   void AssertMtxAliasHeld(mtx_t* m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(m == mtx()); }
@@ -138,6 +140,10 @@ class Controller : public DeviceType,
   // Test helpers
   size_t TEST_imported_images_count() const;
   ConfigStamp TEST_controller_stamp() const;
+  void SetDispatcherForTesting(fdf::SynchronizedDispatcher dispatcher) {
+    dispatcher_ = std::move(dispatcher);
+  }
+  void ShutdownDispatcherForTesting() { dispatcher_.ShutdownAsync(); }
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -199,9 +205,10 @@ class Controller : public DeviceType,
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
 
-  async::Loop loop_;
-  thrd_t loop_thread_;
-  async_watchdog::Watchdog watchdog_;
+  fdf::SynchronizedDispatcher dispatcher_;
+  libsync::Completion dispatcher_shutdown_completion_;
+
+  std::unique_ptr<async_watchdog::Watchdog> watchdog_;
   EngineDriverClient engine_driver_client_;
 
   zx_time_t last_valid_apply_config_timestamp_{};
