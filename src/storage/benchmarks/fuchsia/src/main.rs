@@ -8,7 +8,7 @@ use {
         OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
         PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
     },
-    fuchia_storage_benchmarks_lib::{
+    fuchsia_storage_benchmarks_lib::{
         block_devices::FvmVolumeFactory,
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
     },
