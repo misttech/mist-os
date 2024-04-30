@@ -1870,7 +1870,7 @@ mod tests {
 
         volumes_directory
             .clone()
-            .record_or_replay_profile("foo".to_owned(), 0)
+            .record_or_replay_profile("foo".to_owned(), 600)
             .await
             .expect("Recording");
 
