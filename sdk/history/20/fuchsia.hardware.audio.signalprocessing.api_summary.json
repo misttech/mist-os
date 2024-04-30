@@ -190,7 +190,7 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/DynamicsSupportedControls.THREDSHOLD_TYPE",
+        "name": "fuchsia.hardware.audio.signalprocessing/DynamicsSupportedControls.THRESHOLD_TYPE",
         "value": "256"
     },
     {
