@@ -139,7 +139,9 @@ experimental_python_e2e_test://python/rtc_conformance_test
 ffx_tool://tools/arm64/ffx_tools/ffx-agis
 ffx_tool://tools/arm64/ffx_tools/ffx-assembly
 ffx_tool://tools/arm64/ffx_tools/ffx-audio
+ffx_tool://tools/arm64/ffx_tools/ffx-component
 ffx_tool://tools/arm64/ffx_tools/ffx-coverage
+ffx_tool://tools/arm64/ffx_tools/ffx-debug
 ffx_tool://tools/arm64/ffx_tools/ffx-driver
 ffx_tool://tools/arm64/ffx_tools/ffx-emu
 ffx_tool://tools/arm64/ffx_tools/ffx-fuzz
@@ -149,7 +151,9 @@ ffx_tool://tools/arm64/ffx_tools/ffx-package
 ffx_tool://tools/arm64/ffx_tools/ffx-process
 ffx_tool://tools/arm64/ffx_tools/ffx-product
 ffx_tool://tools/arm64/ffx_tools/ffx-profile
+ffx_tool://tools/arm64/ffx_tools/ffx-repository
 ffx_tool://tools/arm64/ffx_tools/ffx-scrutiny
+ffx_tool://tools/arm64/ffx_tools/ffx-session
 ffx_tool://tools/arm64/ffx_tools/ffx-setui
 ffx_tool://tools/arm64/ffx_tools/ffx-starnix
 ffx_tool://tools/arm64/ffx_tools/ffx-test
@@ -158,7 +162,9 @@ ffx_tool://tools/arm64/ffx_tools/ffx-wlan
 ffx_tool://tools/x64/ffx_tools/ffx-agis
 ffx_tool://tools/x64/ffx_tools/ffx-assembly
 ffx_tool://tools/x64/ffx_tools/ffx-audio
+ffx_tool://tools/x64/ffx_tools/ffx-component
 ffx_tool://tools/x64/ffx_tools/ffx-coverage
+ffx_tool://tools/x64/ffx_tools/ffx-debug
 ffx_tool://tools/x64/ffx_tools/ffx-driver
 ffx_tool://tools/x64/ffx_tools/ffx-emu
 ffx_tool://tools/x64/ffx_tools/ffx-fuzz
@@ -168,7 +174,9 @@ ffx_tool://tools/x64/ffx_tools/ffx-package
 ffx_tool://tools/x64/ffx_tools/ffx-process
 ffx_tool://tools/x64/ffx_tools/ffx-product
 ffx_tool://tools/x64/ffx_tools/ffx-profile
+ffx_tool://tools/x64/ffx_tools/ffx-repository
 ffx_tool://tools/x64/ffx_tools/ffx-scrutiny
+ffx_tool://tools/x64/ffx_tools/ffx-session
 ffx_tool://tools/x64/ffx_tools/ffx-setui
 ffx_tool://tools/x64/ffx_tools/ffx-starnix
 ffx_tool://tools/x64/ffx_tools/ffx-test
