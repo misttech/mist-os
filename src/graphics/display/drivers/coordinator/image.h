@@ -5,8 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_IMAGE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_IMAGE_H_
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
