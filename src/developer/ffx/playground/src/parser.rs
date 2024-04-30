@@ -918,13 +918,26 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         )(input)
     }
 
-    map(
-        pair(
-            opt(ws_after(preceded(chr('@'), identifier))),
-            delimited(chr('{'), ws_around(object_body), ex_tag("}")),
-        ),
-        |(name, body)| Node::Object(name.map(|x| x.strip_parse_state()), body),
-    )(input)
+    flat_map(opt(ws_after(preceded(chr('@'), identifier))), |name| {
+        move |input| {
+            let res = {
+                let name = name.clone();
+                map(delimited(chr('{'), ws_around(object_body), ex_tag("}")), move |body| {
+                    Node::Object(name.clone().map(|x| x.strip_parse_state()), body)
+                })(input.clone())
+            };
+
+            if res.is_ok() {
+                return res;
+            }
+
+            let Some(name) = &name else {
+                return res;
+            };
+
+            err_insert(format!("Expected object body after @{}", name.fragment()))(input)
+        }
+    })(input)
 }
 
 /// List literals are defined as follows:
@@ -1505,6 +1518,15 @@ mod test {
     #[test]
     fn labeled_empty_object() {
         test_parse(r#"@Foo {}"#, Node::Program(vec![Node::Object(Some(sp("Foo")), vec![])]));
+    }
+
+    #[test]
+    fn label_but_no_object() {
+        test_parse_err(
+            r#"@Foo"#,
+            Node::Program(vec![Node::Error]),
+            vec![(4, "Expected object body after @Foo", "")],
+        );
     }
 
     #[test]
