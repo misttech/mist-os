@@ -514,19 +514,25 @@ pub struct OfferEventStreamDecl {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameMapping {
-    pub source_name: String,
-    pub target_name: String,
+    pub source_name: Name,
+    pub target_name: Name,
 }
 
 impl NativeIntoFidl<fdecl::NameMapping> for NameMapping {
     fn native_into_fidl(self) -> fdecl::NameMapping {
-        fdecl::NameMapping { source_name: self.source_name, target_name: self.target_name }
+        fdecl::NameMapping {
+            source_name: self.source_name.native_into_fidl(),
+            target_name: self.target_name.native_into_fidl(),
+        }
     }
 }
 
 impl FidlIntoNative<NameMapping> for fdecl::NameMapping {
     fn fidl_into_native(self) -> NameMapping {
-        NameMapping { source_name: self.source_name, target_name: self.target_name }
+        NameMapping {
+            source_name: self.source_name.fidl_into_native(),
+            target_name: self.target_name.fidl_into_native(),
+        }
     }
 }
 
@@ -541,7 +547,7 @@ pub struct OfferServiceDecl {
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
-    pub source_instance_filter: Option<Vec<String>>,
+    pub source_instance_filter: Option<Vec<Name>>,
     pub renamed_instances: Option<Vec<NameMapping>>,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -3517,8 +3523,8 @@ mod tests {
                             source: OfferSource::Parent,
                             source_name: "netstack3".parse().unwrap(),
                             source_dictionary: ".".parse().unwrap(),
-                            source_instance_filter: Some(vec!["allowedinstance".to_string()]),
-                            renamed_instances: Some(vec![NameMapping{source_name: "default".to_string(), target_name: "allowedinstance".to_string()}]),
+                            source_instance_filter: Some(vec!["allowedinstance".parse().unwrap()]),
+                            renamed_instances: Some(vec![NameMapping{source_name: "default".parse().unwrap(), target_name: "allowedinstance".parse().unwrap()}]),
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,

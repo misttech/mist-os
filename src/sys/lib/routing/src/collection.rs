@@ -321,7 +321,7 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
             .source_instance_filter
             .as_ref()
             .unwrap_or_else(|| {
-                static EMPTY_VEC: Vec<String> = vec![];
+                static EMPTY_VEC: Vec<Name> = vec![];
                 &EMPTY_VEC
             })
             .iter()
@@ -432,47 +432,57 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cm_rust::{Availability, OfferSource};
     use cm_rust_testing::*;
 
     #[test]
     fn test_get_instance_filter() {
         fn get_instance_filter(
-            source_instance_filter: Option<Vec<String>>,
+            source_instance_filter: Option<Vec<Name>>,
             renamed_instances: Option<Vec<NameMapping>>,
         ) -> Vec<NameMapping> {
-            super::get_instance_filter(&OfferServiceDecl {
-                source: OfferSource::Parent,
-                source_name: "foo".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target: offer_target_static_child("a"),
-                target_name: "bar".parse().unwrap(),
-                source_instance_filter,
-                renamed_instances,
-                availability: Availability::Required,
-            })
+            let offer = OfferBuilder::service()
+                .name("foo")
+                .target_name("bar")
+                .source(cm_rust::OfferSource::Parent)
+                .target_static_child("a")
+                .build();
+            let OfferDecl::Service(mut offer) = offer else {
+                unreachable!();
+            };
+            offer.source_instance_filter = source_instance_filter;
+            offer.renamed_instances = renamed_instances;
+            super::get_instance_filter(&offer)
         }
 
         assert_eq!(get_instance_filter(None, None), vec![]);
         assert_eq!(get_instance_filter(Some(vec![]), Some(vec![])), vec![]);
         let same_name_map = vec![
-            NameMapping { source_name: "a".into(), target_name: "a".into() },
-            NameMapping { source_name: "b".into(), target_name: "b".into() },
+            NameMapping { source_name: "a".parse().unwrap(), target_name: "a".parse().unwrap() },
+            NameMapping { source_name: "b".parse().unwrap(), target_name: "b".parse().unwrap() },
         ];
-        assert_eq!(get_instance_filter(Some(vec!["a".into(), "b".into()]), None), same_name_map);
         assert_eq!(
-            get_instance_filter(Some(vec!["a".into(), "b".into()]), Some(vec![])),
+            get_instance_filter(Some(vec!["a".parse().unwrap(), "b".parse().unwrap()]), None),
+            same_name_map
+        );
+        assert_eq!(
+            get_instance_filter(
+                Some(vec!["a".parse().unwrap(), "b".parse().unwrap()]),
+                Some(vec![])
+            ),
             same_name_map
         );
         let renamed_map = vec![
-            NameMapping { source_name: "one".into(), target_name: "a".into() },
-            NameMapping { source_name: "two".into(), target_name: "b".into() },
+            NameMapping { source_name: "one".parse().unwrap(), target_name: "a".parse().unwrap() },
+            NameMapping { source_name: "two".parse().unwrap(), target_name: "b".parse().unwrap() },
         ];
         assert_eq!(get_instance_filter(None, Some(renamed_map.clone())), renamed_map);
         assert_eq!(get_instance_filter(Some(vec![]), Some(renamed_map.clone())), renamed_map);
         assert_eq!(
-            get_instance_filter(Some(vec!["b".into()]), Some(renamed_map.clone())),
-            vec![NameMapping { source_name: "two".into(), target_name: "b".into() }]
+            get_instance_filter(Some(vec!["b".parse().unwrap()]), Some(renamed_map.clone())),
+            vec![NameMapping {
+                source_name: "two".parse().unwrap(),
+                target_name: "b".parse().unwrap()
+            }]
         );
     }
 }

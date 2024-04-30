@@ -3017,17 +3017,14 @@ async fn use_filtered_service_from_sibling() {
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("c")
-                        .source_instance_filter(vec!["variantinstance".to_string()]),
+                        .source_instance_filter(["variantinstance"]),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("d")
-                        .renamed_instances(vec![NameMapping {
-                            source_name: "default".to_string(),
-                            target_name: "renamed_default".to_string(),
-                        }]),
+                        .renamed_instances([("default", "renamed_default")]),
                 )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))
@@ -3155,18 +3152,15 @@ async fn use_filtered_aggregate_service_from_sibling() {
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("c")
-                        .source_instance_filter(vec!["variantinstance".to_string()]),
+                        .source_instance_filter(["variantinstance"]),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("c")
-                        .source_instance_filter(vec!["renamed_default".to_string()])
-                        .renamed_instances(vec![NameMapping {
-                            source_name: "default".to_string(),
-                            target_name: "renamed_default".to_string(),
-                        }]),
+                        .source_instance_filter(["renamed_default"])
+                        .renamed_instances([("default", "renamed_default")]),
                 )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))

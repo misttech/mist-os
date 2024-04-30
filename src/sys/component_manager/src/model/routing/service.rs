@@ -127,10 +127,10 @@ impl FilteredAggregateServiceDir {
                     .into_iter()
                     .map(|mapping| {
                         Arc::new(ServiceInstanceDirectoryEntry::<FlyStr> {
-                            name: mapping.target_name,
+                            name: mapping.target_name.into(),
                             capability_source: capability_source.clone(),
                             source_id: mapping.source_name.clone().into(),
-                            service_instance: mapping.source_name.clone().into(),
+                            service_instance: mapping.source_name.into(),
                         })
                     })
                     .collect();
@@ -661,7 +661,7 @@ impl AnonymizedAggregateServiceDir {
                         }
                         let name = Self::generate_instance_id(&mut rand::thread_rng());
                         let entry = Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
-                            name: name.clone(),
+                            name: name.clone().into(),
                             capability_source: source_borrow.clone(),
                             source_id: instance_key.source_id.clone(),
                             service_instance: instance_key.service_instance.clone(),
@@ -843,7 +843,10 @@ impl Hook for AnonymizedAggregateServiceDir {
 /// Upon opening, performs capability routing and opens the instance at its source.
 pub struct ServiceInstanceDirectoryEntry<T> {
     /// The name of the entry in its parent directory.
-    pub name: String,
+    ///
+    /// This is not a [Name] because, in the case of aggregated service instances, the instance
+    /// name can be any valid [fuchsia.io] filename.
+    pub name: FlyStr,
 
     /// The source of the service capability instance to route.
     capability_source: Arc<CapabilitySource>,
@@ -1238,7 +1241,7 @@ mod tests {
         // internal state.
         let instance_names = {
             let instance_names: HashSet<_> =
-                dir_arc.entries().await.into_iter().map(|e| e.name.clone()).collect();
+                dir_arc.entries().await.into_iter().map(|e| e.name.to_string()).collect();
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
                 .await
                 .expect("failed to read directory entries");
@@ -1865,7 +1868,7 @@ mod tests {
         // internal state.
         let instance_names = {
             let instance_names: HashSet<_> =
-                dir.entries().await.into_iter().map(|e| e.name.clone()).collect();
+                dir.entries().await.into_iter().map(|e| e.name.to_string()).collect();
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
             let dir_instance_names: HashSet<_> = dir_contents.into_iter().map(|d| d.name).collect();
             assert_eq!(instance_names.len(), 4);
@@ -2180,9 +2183,18 @@ mod tests {
         let provider = MockOfferCapabilityProvider {
             component: foo_component.as_weak(),
             instance_filter: vec![
-                NameMapping { source_name: "default".into(), target_name: "a".into() },
-                NameMapping { source_name: "default".into(), target_name: "b".into() },
-                NameMapping { source_name: "one".into(), target_name: "two".into() },
+                NameMapping {
+                    source_name: "default".parse().unwrap(),
+                    target_name: "a".parse().unwrap(),
+                },
+                NameMapping {
+                    source_name: "default".parse().unwrap(),
+                    target_name: "b".parse().unwrap(),
+                },
+                NameMapping {
+                    source_name: "one".parse().unwrap(),
+                    target_name: "two".parse().unwrap(),
+                },
             ],
         };
 

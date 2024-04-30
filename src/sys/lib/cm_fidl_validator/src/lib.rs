@@ -1589,11 +1589,26 @@ impl<'a> ValidationContext<'a> {
                 // which means the offer shouldn't have been created at all.
                 self.errors.push(Error::invalid_field(decl_type, "source_instance_filter"));
             }
+            for name in source_instance_filter {
+                check_name(Some(name), decl_type, "source_instance_filter", &mut self.errors);
+            }
         }
         if let Some(renamed_instances) = renamed_instances {
             // Multiple sources shouldn't map to the same target name
             let mut seen_target_names = HashSet::<String>::new();
             for mapping in renamed_instances {
+                check_name(
+                    Some(&mapping.source_name),
+                    decl_type,
+                    "renamed_instances.source_name",
+                    &mut self.errors,
+                );
+                check_name(
+                    Some(&mapping.target_name),
+                    decl_type,
+                    "renamed_instances.target_name",
+                    &mut self.errors,
+                );
                 if !seen_target_names.insert(mapping.target_name.clone()) {
                     self.errors.push(Error::invalid_field(decl_type, "renamed_instances"));
                     break;
@@ -6559,8 +6574,39 @@ mod tests {
                                 collection: None,
                             }
                         )),
+                        target_name: Some("fuchsia.logger.Log2".to_string()),
+                        source_instance_filter: Some(vec!["^badname".to_string()]),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(
+                            fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            }
+                        )),
                         target_name: Some("fuchsia.logger.Log1".to_string()),
                         renamed_instances: Some(vec![fdecl::NameMapping{source_name: "a".to_string(), target_name: "b".to_string()}, fdecl::NameMapping{source_name: "c".to_string(), target_name: "b".to_string()}]),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(
+                            fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            }
+                        )),
+                        target_name: Some("fuchsia.logger.Log3".to_string()),
+                        renamed_instances: Some(vec![
+                            fdecl::NameMapping {
+                                source_name: "^badname".to_string(),
+                                target_name: "^badname".to_string(),
+                            }
+                        ]),
                         ..Default::default()
                     })
                 ]);
@@ -6578,7 +6624,10 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 Error::invalid_field(DeclType::OfferService, "source_instance_filter"),
+                Error::invalid_field(DeclType::OfferService, "source_instance_filter"),
                 Error::invalid_field(DeclType::OfferService, "renamed_instances"),
+                Error::invalid_field(DeclType::OfferService, "renamed_instances.source_name"),
+                Error::invalid_field(DeclType::OfferService, "renamed_instances.target_name"),
             ])),
         },
         test_validate_offers_invalid_identifiers => {

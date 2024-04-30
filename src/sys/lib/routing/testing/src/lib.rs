@@ -1707,20 +1707,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .source_static_child("b")
                             .target_static_child("d")
-                            .source_instance_filter(vec![
-                                "instance_0".to_string(),
-                                "instance_1".to_string(),
-                            ]),
+                            .source_instance_filter(["instance_0", "instance_1"]),
                     )
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
                             .source_static_child("c")
                             .target_static_child("d")
-                            .source_instance_filter(vec![
-                                "instance_2".to_string(),
-                                "instance_3".to_string(),
-                            ]),
+                            .source_instance_filter(["instance_2", "instance_3"]),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -1901,20 +1895,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .source_static_child("b")
                             .target_static_child("d")
-                            .source_instance_filter(vec![
-                                "default".to_string(),
-                                "other_a".to_string(),
-                            ]),
+                            .source_instance_filter(["default", "other_a"]),
                     )
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
                             .source_static_child("c")
                             .target_static_child("d")
-                            .source_instance_filter(vec![
-                                "default".to_string(),
-                                "other_b".to_string(),
-                            ]),
+                            .source_instance_filter(["default", "other_b"]),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -3305,8 +3293,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: expose from self
     pub async fn test_route_filtered_service_from_sibling(&self) {
         let use_decl = UseBuilder::service().name("foo").build();
-        let source_instance_filter = vec!["service_instance_0".to_string()];
-        let renamed_instances = vec![];
         let components = vec![
             (
                 "a",
@@ -3316,8 +3302,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .source_static_child("c")
                             .target_static_child("b")
-                            .source_instance_filter(source_instance_filter)
-                            .renamed_instances(renamed_instances),
+                            .source_instance_filter(["service_instance_0"])
+                            .renamed_instances([]),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -3397,12 +3383,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: expose from self
     pub async fn test_route_renamed_service_instance_from_sibling(&self) {
         let use_decl = UseBuilder::service().name("foo").build();
-        let source_instance_filter = vec![];
-        let renamed_instances = vec![NameMapping {
-            source_name: "instance_0".to_string(),
-            target_name: "renamed_instance_0".to_string(),
-        }];
-
         let components = vec![
             (
                 "a",
@@ -3412,8 +3392,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .source_static_child("c")
                             .target_static_child("b")
-                            .source_instance_filter(source_instance_filter)
-                            .renamed_instances(renamed_instances),
+                            .source_instance_filter([])
+                            .renamed_instances([("instance_0", "renamed_instance_0")]),
                     )
                     .child_default("b")
                     .child_default("c")

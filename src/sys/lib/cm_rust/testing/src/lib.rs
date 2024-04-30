@@ -1064,7 +1064,7 @@ pub struct OfferBuilder {
     source: Option<cm_rust::OfferSource>,
     target: Option<cm_rust::OfferTarget>,
     target_name: Option<Name>,
-    source_instance_filter: Option<Vec<String>>,
+    source_instance_filter: Option<Vec<Name>>,
     renamed_instances: Option<Vec<cm_rust::NameMapping>>,
     rights: Option<fio::Operations>,
     subdir: RelativePath,
@@ -1200,15 +1200,27 @@ impl OfferBuilder {
         self
     }
 
-    pub fn source_instance_filter(mut self, filter: Vec<String>) -> Self {
+    pub fn source_instance_filter<'a>(mut self, filter: impl IntoIterator<Item = &'a str>) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Service);
-        self.source_instance_filter = Some(filter);
+        self.source_instance_filter =
+            Some(filter.into_iter().map(|s| s.parse().unwrap()).collect());
         self
     }
 
-    pub fn renamed_instances(mut self, mapping: Vec<cm_rust::NameMapping>) -> Self {
+    pub fn renamed_instances<'a, 'b>(
+        mut self,
+        mapping: impl IntoIterator<Item = (&'a str, &'b str)>,
+    ) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Service);
-        self.renamed_instances = Some(mapping);
+        self.renamed_instances = Some(
+            mapping
+                .into_iter()
+                .map(|(s, t)| cm_rust::NameMapping {
+                    source_name: s.parse().unwrap(),
+                    target_name: t.parse().unwrap(),
+                })
+                .collect(),
+        );
         self
     }
 

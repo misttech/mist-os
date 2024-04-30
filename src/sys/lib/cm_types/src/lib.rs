@@ -183,6 +183,12 @@ impl<const N: usize> Borrow<FlyStr> for BoundedName<N> {
     }
 }
 
+impl<'a, const N: usize> From<BoundedName<N>> for FlyStr {
+    fn from(o: BoundedName<N>) -> Self {
+        o.0
+    }
+}
+
 impl<'a, const N: usize> From<&'a BoundedName<N>> for &'a FlyStr {
     fn from(o: &'a BoundedName<N>) -> Self {
         &o.0

@@ -298,9 +298,9 @@ impl RouteValidator {
                     .map(|e| {
                         let child_name = format!("{}", e.source_id);
                         fsys::ServiceInstance {
-                            instance_name: Some(e.name.clone()),
+                            instance_name: Some(e.name.clone().into()),
                             child_name: Some(child_name),
-                            child_instance_name: Some(e.service_instance.to_string()),
+                            child_instance_name: Some(e.service_instance.clone().into()),
                             ..Default::default()
                         }
                     })
