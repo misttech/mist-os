@@ -12,9 +12,9 @@
 #include <lib/mistos/zx/thread.h>
 #include <lib/mistos/zx/vmar.h>
 
-#include <vector>
-
 #include <fbl/string.h>
+#include <fbl/vector.h>
+#include <ktl/string_view.h>
 #include <object/handle.h>
 #include <object/vm_address_region_dispatcher.h>
 
@@ -29,12 +29,12 @@ struct ChildContext {
   zx::thread thread;
 };
 
-ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name);
+ChildContext CreateChildContext(const zx::debuglog& log, ktl::string_view name);
 zx_status_t StartChildProcess(const zx::debuglog& log,
                               const zbi_parser::Options::ProgramInfo& elf_entry,
                               ChildContext& child, zbi_parser::Bootfs& bootfs,
-                              const std::vector<fbl::String>& argv,
-                              const std::vector<fbl::String>& envp);
+                              const fbl::Vector<fbl::String>& argv,
+                              const fbl::Vector<fbl::String>& envp);
 int64_t WaitForProcessExit(const zx::debuglog& log, const zbi_parser::Options::ProgramInfo& entry,
                            const ChildContext& child);
 

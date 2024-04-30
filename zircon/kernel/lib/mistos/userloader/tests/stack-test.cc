@@ -20,9 +20,9 @@ TEST(StackTest, TrivialInitialStack) {
   zx_vaddr_t original_stack_start_addr = kTestStackAddr + 0x1000;
 
   fbl::String path("");
-  std::vector<fbl::String> argv;
-  std::vector<fbl::String> environ;
-  std::vector<std::pair<uint32_t, uint64_t>> auxv;
+  fbl::Vector<fbl::String> argv;
+  fbl::Vector<fbl::String> environ;
+  fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
 
   auto stack_start_addr = populate_initial_stack(zx::debuglog(), stack_vmo, path, argv, environ,
                                                  auxv, kTestStackAddr, original_stack_start_addr);

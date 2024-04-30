@@ -22,7 +22,7 @@ void vprintl(const zx::debuglog& log, const char* fmt, va_list ap);
 // fail() combines printl() with process exit
 [[noreturn, gnu::format(printf, 2, 3)]] void fail(const zx::debuglog& log, const char* fmt, ...);
 
-#define check(log, status, fmt, ...)                                      \
+#define CHECK(log, status, fmt, ...)                                      \
   do {                                                                    \
     if (status != ZX_OK)                                                  \
       fail(log, "%s: " fmt, zx_status_get_string(status), ##__VA_ARGS__); \

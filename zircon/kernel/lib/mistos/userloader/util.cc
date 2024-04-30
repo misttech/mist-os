@@ -202,7 +202,8 @@ template <typename T>
 T DuplicateOrDie(const zx::debuglog& log, const T& typed_handle, cpp20::source_location src_loc) {
   T dup;
   auto status = typed_handle.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
-  check(log, status, "[%s:%d]: Failed to duplicate handle.", src_loc.file_name(), src_loc.line());
+  CHECK(log, status, "[%s:%d]: Failed to duplicate handle.", src_loc.file_name(),
+               src_loc.line());
   return dup;
 }
 

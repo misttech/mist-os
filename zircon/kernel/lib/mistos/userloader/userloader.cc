@@ -23,6 +23,8 @@
 #include <platform/crashlog.h>
 #include <vm/vm_object_paged.h>
 
+#include <ktl/enforce.h>
+
 namespace userloader {
 ktl::array<zx::vmo, userloader::kHandleCount> gVmos;
 }
@@ -101,7 +103,7 @@ zx_status_t get_vmo(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_s
 
   fbl::AllocChecker ac;
   auto storage = fbl::MakeRefCountedChecked<zx::VmoStorage>(
-      &ac, std::move(vmo), std::move(content_size_manager),
+      &ac, ktl::move(vmo), ktl::move(content_size_manager),
       zx::VmoStorage::InitialMutability::kMutable);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
@@ -110,7 +112,7 @@ zx_status_t get_vmo(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_s
   // if (readonly)
   //   rights &= ~ZX_RIGHT_WRITE;
 
-  vmo_out->reset(std::move(storage));
+  vmo_out->reset(ktl::move(storage));
 
   return result;
 }

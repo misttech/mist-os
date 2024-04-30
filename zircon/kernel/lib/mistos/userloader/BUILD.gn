@@ -33,6 +33,7 @@ zx_library("userloader") {
     "//zircon/kernel/lib/debuglog",
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/mistos/elfldltl",
+    "//zircon/kernel/lib/mistos/linux_uapi",
     "//zircon/kernel/lib/mistos/util",
     "//zircon/kernel/lib/mistos/zbitl",
     "//zircon/kernel/lib/persistent-debuglog",

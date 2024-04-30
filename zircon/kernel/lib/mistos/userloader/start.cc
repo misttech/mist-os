@@ -18,8 +18,10 @@
 #include <lib/mistos/zx/thread.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/zircon-internal/default_stack_size.h>
+#include <zircon/assert.h>
 #include <zircon/types.h>
 
+#include <fbl/alloc_checker.h>
 #include <lk/init.h>
 #include <object/job_dispatcher.h>
 #include <object/process_dispatcher.h>
@@ -27,11 +29,17 @@
 
 #include "util.h"
 
+#include <ktl/enforce.h>
+
+// clang-format off
+#include <linux/auxvec.h>
+// clang-format on
+
 constexpr const char kStackVmoName[] = "userboot-initial-stack";
 
 using namespace userloader;
 
-void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next, uint32_t& argc,
+void ParseNextProcessArguments(const zx::debuglog& log, ktl::string_view next, uint32_t& argc,
                                char* argv) {
   // Extra byte for null terminator.
   size_t required_size = next.size() + 1;
@@ -58,28 +66,30 @@ void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next, u
   argv[index] = '\0';
 }
 
-static zx_status_t unpack_strings(char* buffer, uint32_t num, std::vector<fbl::String>& result) {
+static zx_status_t unpack_strings(char* buffer, uint32_t num, fbl::Vector<fbl::String>& result) {
   char* p = buffer;
+  fbl::AllocChecker ac;
   for (uint32_t i = 0; i < num; ++i) {
-    result.push_back(p);
+    result.push_back(p, &ac);
+    ZX_ASSERT(ac.check());
     while (*p++ != '\0')
       ;
   }
   return ZX_OK;
 }
 
-ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name) {
+ChildContext CreateChildContext(const zx::debuglog& log, ktl::string_view name) {
   ChildContext child;
   auto status =
       zx::process::create(*zx::unowned_job{zx::job::default_job()}, name.data(),
                           static_cast<uint32_t>(name.size()), 0, &child.process, &child.vmar);
-  check(log, status, "Failed to create child process(%.*s).", static_cast<int>(name.length()),
+  CHECK(log, status, "Failed to create child process(%.*s).", static_cast<int>(name.length()),
         name.data());
 
   // Create the initial thread in the new process
   status = zx::thread::create(child.process, name.data(), static_cast<uint32_t>(name.size()), 0,
                               &child.thread);
-  check(log, status, "Failed to create main thread for child process(%.*s).",
+  CHECK(log, status, "Failed to create main thread for child process(%.*s).",
         static_cast<int>(name.length()), name.data());
 
   return child;
@@ -88,8 +98,8 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name) 
 zx_status_t StartChildProcess(const zx::debuglog& log,
                               const zbi_parser::Options::ProgramInfo& elf_entry,
                               ChildContext& child, zbi_parser::Bootfs& bootfs,
-                              const std::vector<fbl::String>& argv,
-                              const std::vector<fbl::String>& envp) {
+                              const fbl::Vector<fbl::String>& argv,
+                              const fbl::Vector<fbl::String>& envp) {
   size_t stack_size = ZIRCON_DEFAULT_STACK_SIZE;
   ElfInfo info;
   zx_status_t status;
@@ -126,15 +136,24 @@ zx_status_t StartChildProcess(const zx::debuglog& log,
   printl(log, "stack [%p, %p) sp=%p", reinterpret_cast<void*>(stack_base),
          reinterpret_cast<void*>(stack_base + stack_size), reinterpret_cast<void*>(sp));
 
-  std::vector<std::pair<uint32_t, uint64_t>> auxv;
-  // auxv.push_back(std::make_pair(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE)));
-  // auxv.push_back(std::make_pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0));
-  // auxv.push_back(std::make_pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff));
-  // auxv.push_back(std::make_pair(AT_PHENT, info.main_elf.header.phentsize));
-  // auxv.push_back(std::make_pair(AT_PHNUM, info.main_elf.header.phnum));
-  // auxv.push_back(std::make_pair(AT_ENTRY, info.main_elf.load_bias + info.main_elf.header.entry));
-  //  auxv.push_back(std::make_pair(AT_SYSINFO_EHDR, vdso_base));
-  // auxv.push_back(std::make_pair(AT_SECURE, 0));
+  fbl::AllocChecker ac;
+  fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
+  auxv.push_back(ktl::pair(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE)), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_PHENT, info.main_elf.header.phentsize), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_PHNUM, info.main_elf.header.phnum), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_ENTRY, info.main_elf.load_bias + info.main_elf.header.entry), &ac);
+  ZX_ASSERT(ac.check());
+  // auxv.push_back(ktl::pair(AT_SYSINFO_EHDR, vdso_base));
+  // ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_SECURE, 0), &ac);
+  ZX_ASSERT(ac.check());
 
   auto result = populate_initial_stack(log, stack_vmo, elf_entry.filename(), argv, envp, auxv,
                                        stack_base, sp);
@@ -148,7 +167,7 @@ zx_status_t StartChildProcess(const zx::debuglog& log,
 
     // Start the process going.
     status = child.process.start(child.thread, entry, stack_result.stack_pointer, 0, 0);
-    check(log, status, "zx_process_start failed");
+    CHECK(log, status, "zx_process_start failed");
     child.thread.reset();
     return ZX_OK;
   }
@@ -159,17 +178,17 @@ int64_t WaitForProcessExit(const zx::debuglog& log, const zbi_parser::Options::P
   printl(log, "Waiting for %.*s to exit...", static_cast<int>(entry.filename().size()),
          entry.filename().data());
   zx_status_t status = child.process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr);
-  check(log, status, "zx_object_wait_one on process failed");
+  CHECK(log, status, "zx_object_wait_one on process failed");
   zx_info_process_t info;
   status = child.process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr);
-  check(log, status, "zx_object_get_info on process failed");
+  CHECK(log, status, "zx_object_get_info on process failed");
   printl(log, "*** Exit status %zd ***\n", info.return_code);
   return info.return_code;
 }
 
 struct TerminationInfo {
   // Depending on test mode and result, this might be the return code of boot or test elf.
-  std::optional<int64_t> test_return_code;
+  ktl::optional<int64_t> test_return_code;
 
   // Whether we should continue or shutdown.
   bool should_shutdown = false;
@@ -219,7 +238,7 @@ void Bootstrap(uint) {
     return;
   }
 
-  zx::vmo bootfs_vmo = std::move(result.value());
+  zx::vmo bootfs_vmo = ktl::move(result.value());
   if (!bootfs_vmo.is_valid()) {
     printl(log, "failed to load bootfs from zbi");
     return;
@@ -237,17 +256,18 @@ void Bootstrap(uint) {
 
   {
     // auto borrowed_bootfs = bootfs_vmo.borrow();
-    zbi_parser::Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo)};
+    zbi_parser::Bootfs bootfs{vmar_self.borrow(), ktl::move(bootfs_vmo)};
     auto launch_process = [&](auto& elf_entry) -> ChildContext {
       ChildContext child = CreateChildContext(log, elf_entry.filename());
       uint32_t argc = 0;
-      std::array<char, kProcessArgsMaxBytes> args;
-      std::vector<fbl::String> argv;
-
-      std::vector<fbl::String> envp{
-          "HOME=/",
-          "TERM=linux",
-      };
+      fbl::AllocChecker ac;
+      ktl::array<char, kProcessArgsMaxBytes> args;
+      fbl::Vector<fbl::String> argv;
+      fbl::Vector<fbl::String> envp;
+      envp.push_back("HOME=/", &ac);
+      ZX_ASSERT(ac.check());
+      envp.push_back("TERM=linux", &ac);
+      ZX_ASSERT(ac.check());
 
       // Fill in any '+' separated arguments provided by `userboot.next`. If arguments are longer
       // than kProcessArgsMaxBytes, this function will fail process creation.
@@ -259,9 +279,8 @@ void Bootstrap(uint) {
                elf_entry.filename().data());
       } else {
         ChildContext empty;
-        return std::move(empty);
+        return ktl::move(empty);
       }
-
       return child;
     };
 

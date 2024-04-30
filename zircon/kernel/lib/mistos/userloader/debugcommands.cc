@@ -13,7 +13,11 @@
 #include <lib/mistos/zx/vmar.h>
 #include <lib/zircon-internal/default_stack_size.h>
 
+#include <fbl/alloc_checker.h>
+
 #include "util.h"
+
+#include <ktl/enforce.h>
 
 static int elf_main(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -52,29 +56,32 @@ static int elf_main(int argc, const cmd_args* argv, uint32_t flags) {
       return -1;
     }
 
-    zx::vmo bootfs_vmo = std::move(result.value());
+    zx::vmo bootfs_vmo = ktl::move(result.value());
     if (!bootfs_vmo.is_valid()) {
       printl(log, "failed to load from zbi");
       return -1;
     }
 
     auto borrowed_bootfs = bootfs_vmo.borrow();
-    zbi_parser::Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo)};
+    zbi_parser::Bootfs bootfs{vmar_self.borrow(), ktl::move(bootfs_vmo)};
 
     ChildContext child = CreateChildContext(log, argv[2].str);
 
     zbi_parser::Options::ProgramInfo elf_entry{"", argv[2].str};
 
-    std::vector<fbl::String> envp{
-        "HOME=/",
-        "TERM=linux",
-    };
+    fbl::AllocChecker ac;
+    fbl::Vector<fbl::String> envp;
+    envp.push_back("HOME=/", &ac);
+    ZX_ASSERT(ac.check());
+    envp.push_back("TERM=linux", &ac);
+    ZX_ASSERT(ac.check());
 
-    std::vector<fbl::String> argv_vector;
+    fbl::Vector<fbl::String> argv_vector;
     int idx = 2;
     int remain = argc - idx;
     while (remain-- > 0) {
-      argv_vector.push_back(argv[idx++].str);
+      argv_vector.push_back(argv[idx++].str, &ac);
+      ZX_ASSERT(ac.check());
     }
 
     if (StartChildProcess(log, elf_entry, child, bootfs, argv_vector, envp) == ZX_OK) {
