@@ -11,6 +11,7 @@
 
 #include <utility>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/zxtest.h>
 
 #include "helpers.h"
@@ -51,11 +52,14 @@ void CallPermutationsHelper(T fn, uint32_t count, uint32_t perm[], bool elts[], 
 // Function which invokes |fn| with all the permutations of [0...count-1].
 template <typename T>
 void CallPermutations(T fn, uint32_t count) {
-  uint32_t* perm = new uint32_t[count];
-  bool* elts = new bool[count];
+  fbl::AllocChecker ac;
+  uint32_t* perm = new (ac) uint32_t[count];
+  ZX_ASSERT(ac.check());
+  bool* elts = new (ac) bool[count];
+  ZX_ASSERT(ac.check());
   auto defer = fit::defer([&] {
-    delete[] perm;
     delete[] elts;
+    delete[] perm;
   });
 
   for (unsigned i = 0; i < count; i++) {
