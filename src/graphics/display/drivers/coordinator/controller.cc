@@ -137,9 +137,9 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     uint32_t display_cfg_result;
     client_composition_opcode_t layer_result = 0;
     size_t display_layer_results_count;
-    display_cfg_result = driver_.CheckConfiguration(test_configs, 1, &layer_result,
-                                                    /*client_composition_opcodes_count=*/1,
-                                                    &display_layer_results_count);
+    display_cfg_result = engine_driver_client_.CheckConfiguration(
+        test_configs, 1, &layer_result,
+        /*client_composition_opcodes_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(timing, &ac);
@@ -219,7 +219,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
       // The array is empty if memory allocation failed. We prefer using an
       // empty ELD to dropping the display altogether.
-      driver_.SetEld(display_id, eld);
+      engine_driver_client_.SetEld(display_id, eld);
     }
 
     fbl::AutoLock lock(mtx());
@@ -620,11 +620,11 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   }
 
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
-  driver_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
+  engine_driver_client_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
 void Controller::ReleaseImage(DriverImageId driver_image_id) {
-  driver_.ReleaseImage(driver_image_id);
+  engine_driver_client_.ReleaseImage(driver_image_id);
 }
 
 void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
@@ -635,7 +635,7 @@ void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_i
     return;
   }
 
-  const zx::result<> result = driver_.ReleaseCapture(driver_capture_image_id);
+  const zx::result<> result = engine_driver_client_.ReleaseCapture(driver_capture_image_id);
   if (result.is_error() && result.error_value() == ZX_ERR_SHOULD_WAIT) {
     ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
@@ -868,7 +868,7 @@ ConfigStamp Controller::TEST_controller_stamp() const {
 zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
   ZX_DEBUG_ASSERT_MSG(device_ptr && device_ptr->get() == this, "Wrong controller passed to Bind()");
 
-  zx_status_t status = driver_.Bind();
+  zx_status_t status = engine_driver_client_.Bind();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind driver %d", status);
     return status;
@@ -900,9 +900,9 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
 
   [[maybe_unused]] auto ptr = device_ptr->release();
 
-  driver_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
+  engine_driver_client_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
 
-  supports_capture_ = driver_.IsCaptureSupported();
+  supports_capture_ = engine_driver_client_.IsCaptureSupported();
   zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
          zx_status_get_string(status));
 
@@ -939,9 +939,9 @@ void Controller::DdkRelease() {
     fbl::AutoLock lock(mtx());
     ++controller_stamp_;
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-    driver_.ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+    engine_driver_client_.ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
   }
-  driver_.ResetDisplayControllerInterface();
+  engine_driver_client_.ResetDisplayControllerInterface();
   delete this;
 }
 
@@ -955,7 +955,7 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
                 loop_.dispatcher()),
-      driver_(Driver(this, parent)) {
+      engine_driver_client_(EngineDriverClient(this, parent)) {
   mtx_init(&mtx_, mtx_plain);
 
   last_valid_apply_config_timestamp_ns_property_ =

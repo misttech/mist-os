@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ENGINE_DRIVER_CLIENT_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ENGINE_DRIVER_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -26,20 +26,20 @@ static constexpr fdf_arena_tag_t kArenaTag = 'DISP';
 
 class Controller;
 
-// Manages the state associated with a display coordinator driver connection.
-class Driver : public ddk::Device<Driver> {
+// C++ <-> Banjo/FIDL bridge for a connection to a display engine driver.
+class EngineDriverClient : public ddk::Device<EngineDriverClient> {
  public:
-  explicit Driver(Controller* controller, zx_device_t* parent);
+  explicit EngineDriverClient(Controller* controller, zx_device_t* parent);
 
-  Driver(const Driver&) = delete;
-  Driver& operator=(const Driver&) = delete;
+  EngineDriverClient(const EngineDriverClient&) = delete;
+  EngineDriverClient& operator=(const EngineDriverClient&) = delete;
 
-  ~Driver();
+  ~EngineDriverClient();
 
   zx_status_t Bind();
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
-  zx_status_t Bind(std::unique_ptr<Driver>* device_ptr);
+  zx_status_t Bind(std::unique_ptr<EngineDriverClient>* device_ptr);
 
   void ReleaseImage(DriverImageId driver_image_id);
   zx::result<> ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
@@ -95,4 +95,4 @@ class Driver : public ddk::Device<Driver> {
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ENGINE_DRIVER_CLIENT_H_

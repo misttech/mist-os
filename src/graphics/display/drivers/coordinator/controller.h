@@ -40,7 +40,7 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
-#include "src/graphics/display/drivers/coordinator/driver.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -121,7 +121,7 @@ class Controller : public DeviceType,
   template <typename Callback>
   bool FindDisplayInfo(DisplayId display_id, Callback callback) __TA_REQUIRES(mtx());
 
-  Driver* driver() { return &driver_; }
+  EngineDriverClient* engine_driver_client() { return &engine_driver_client_; }
 
   bool supports_capture() { return supports_capture_; }
 
@@ -196,7 +196,7 @@ class Controller : public DeviceType,
   async::Loop loop_;
   thrd_t loop_thread_;
   async_watchdog::Watchdog watchdog_;
-  Driver driver_;
+  EngineDriverClient engine_driver_client_;
 
   zx_time_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;
