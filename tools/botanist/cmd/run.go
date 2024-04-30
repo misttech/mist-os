@@ -69,10 +69,6 @@ type RunCommand struct {
 	// syslogDir, if nonempty, is the directory in which system syslogs will be written.
 	syslogDir string
 
-	// SshKey is the path to a private SSH user key.
-	// TODO(ihuh): Remove once we're no longer passing ssh keys through this flag.
-	sshKey string
-
 	// serialLogDir, if nonempty, is the directory in which system serial logs will be written.
 	serialLogDir string
 
@@ -139,7 +135,6 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.Var(&r.zirconArgs, "zircon-args", "kernel command-line arguments")
 	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
 	f.StringVar(&r.syslogDir, "syslog-dir", "", "the directory to write all system logs to.")
-	f.StringVar(&r.sshKey, "ssh", "", "file containing a private SSH user key; if not provided, a private key will be generated.")
 	f.StringVar(&r.serialLogDir, "serial-log-dir", "", "the directory to write all serial logs to.")
 	f.StringVar(&r.repoURL, "repo", "", "URL at which to configure a package repository; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
 	f.StringVar(&r.blobURL, "blobs", "", "URL at which to serve a package repository's blobs; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
