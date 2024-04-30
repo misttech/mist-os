@@ -1263,8 +1263,9 @@ assembly_input_bundle("core_realm_eng") {
     # Always include 'ls'
     "ls",
 
-    # This is used by Chromium test infrastructure, and needs to always be
+    # These are used by Chromium test infrastructure, and needs to always be
     # available.
+    "cat",
     "sha1sum",
   ]
   on_demand = []
