@@ -206,7 +206,17 @@ impl LogFilterCriteria {
         }
 
         if !self.tags.is_empty()
-            && !self.tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false))
+            && !self.tags.iter().any(|query_tag| {
+                let has_tag = data.tags().map(|t| t.contains(query_tag)).unwrap_or(false);
+                let moniker_has_tag = data.tags().map(|tags| tags.is_empty()).unwrap_or(true)
+                    && data
+                        .moniker
+                        .split("/")
+                        .last()
+                        .map(|segment| segment.contains(query_tag))
+                        .unwrap_or(false);
+                has_tag || moniker_has_tag
+            })
         {
             if data.moniker == "klog" {
                 return self.match_synthetic_klog_tags(data.msg().unwrap_or(""));
@@ -823,5 +833,24 @@ mod test {
         );
 
         assert!(!criteria.matches(&entry));
+    }
+
+    #[test]
+    fn tag_matches_moniker_last_segment() {
+        // When the tags are empty, the last segment of the moniker is treated as the tag.
+        let cmd = LogCommand { tag: vec!["last_segment".to_string()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "core/last_segment".into(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("hello world")
+            .build()
+            .into()
+        )));
     }
 }
