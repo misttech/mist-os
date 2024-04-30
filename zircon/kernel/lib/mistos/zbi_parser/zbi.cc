@@ -17,11 +17,13 @@
 #include <stdarg.h>
 #include <trace.h>
 
+#include <ktl/string_view.h>
+
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE 0
 
 namespace {
-
-using namespace std::string_view_literals;
 
 using ZbiView = zbitl::View<zbitl::MapUnownedVmo>;
 using ZbiError = ZbiView::Error;
@@ -62,14 +64,14 @@ class ScratchAllocator {
     // ensure that exactly one destructor cleans up the mapping.
 
     Holder(Holder&& other) {
-      *this = std::move(other);
+      *this = ktl::move(other);
       ZX_ASSERT(*vmar_);
     }
 
     Holder& operator=(Holder&& other) {
-      std::swap(vmar_, other.vmar_);
-      std::swap(mapping_, other.mapping_);
-      std::swap(size_, other.size_);
+      ktl::swap(vmar_, other.vmar_);
+      ktl::swap(mapping_, other.mapping_);
+      ktl::swap(size_, other.size_);
       ZX_ASSERT(*vmar_);
       return *this;
     }
@@ -111,7 +113,7 @@ class ScratchAllocator {
   }
 
   // zbitl::View::CopyStorageItem calls this to allocate scratch space.
-  fit::result<std::string_view, Holder> operator()(size_t size) const {
+  fit::result<ktl::string_view, Holder> operator()(size_t size) const {
     return fit::ok(Holder{*vmar_, size});
   }
 
@@ -144,7 +146,7 @@ fit::result<zx_status_t, zx::vmo> GetBootfsFromZbi(const zx::vmar& vmar_self,
         FailFromZbiCopyError(result.error_value());
       }
 
-      zx::vmo bootfs_vmo = std::move(result).value().release();
+      zx::vmo bootfs_vmo = ktl::move(result).value().release();
       check(log, bootfs_vmo.set_property(ZX_PROP_NAME, kBootfsVmoName, sizeof(kBootfsVmoName) - 1),
             "cannot set name of uncompressed BOOTFS VMO\n");
 
@@ -161,7 +163,7 @@ fit::result<zx_status_t, zx::vmo> GetBootfsFromZbi(const zx::vmar& vmar_self,
 
       // Cancel error-checking since we're ending the iteration on purpose.
       zbi.ignore_error();
-      return fit::ok(std::move(bootfs_vmo));
+      return fit::ok(ktl::move(bootfs_vmo));
     }
   }
 
@@ -200,7 +202,7 @@ fit::result<zx_status_t, Options> GetOptionsFromZbi(const zx::vmar& vmar_self, c
     }
 
     const uintptr_t mapped_payload = mapping + (payload % ZX_PAGE_SIZE);
-    std::string_view cmdline{reinterpret_cast<const char*>(mapped_payload), header->length};
+    ktl::string_view cmdline{reinterpret_cast<const char*>(mapped_payload), header->length};
     LTRACEF_LEVEL(2, "CMDLINE %.*s\n", static_cast<int>(cmdline.size()), cmdline.data());
     ParseCmdline(cmdline, opts);
   }

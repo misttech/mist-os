@@ -14,15 +14,19 @@
 #include <lib/stdcompat/string_view.h>
 #include <trace.h>
 
+#include <ktl/string_view.h>
+
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE 0
 
 namespace {
 
-constexpr std::string_view kOptPrefix = "userboot";
-constexpr std::string_view kRootOpt = "userboot.root";
-constexpr std::string_view kNextOpt = "userboot.next";
-constexpr std::string_view kTestRootOpt = "userboot.test.root";
-constexpr std::string_view kTestNextOpt = "userboot.test.next";
+constexpr ktl::string_view kOptPrefix = "userboot";
+constexpr ktl::string_view kRootOpt = "userboot.root";
+constexpr ktl::string_view kNextOpt = "userboot.next";
+constexpr ktl::string_view kTestRootOpt = "userboot.test.root";
+constexpr ktl::string_view kTestNextOpt = "userboot.test.next";
 
 // TODO(joshuaseaton): This should really be defined as a default value of
 // `Options::next` and expressed as a std::string_view; however, that can
@@ -32,23 +36,23 @@ constexpr std::string_view kTestNextOpt = "userboot.test.next";
 constexpr const char kNextDefault[] = "bin/init";
 
 struct KeyAndValue {
-  std::string_view key, value;
+  ktl::string_view key, value;
 };
 
-KeyAndValue SplitOpt(std::string_view opt) {
-  std::string_view key = opt.substr(0, opt.find('='));
-  opt.remove_prefix(std::min(opt.size(), key.size() + 1));
+KeyAndValue SplitOpt(ktl::string_view opt) {
+  ktl::string_view key = opt.substr(0, opt.find('='));
+  opt.remove_prefix(ktl::min(opt.size(), key.size() + 1));
   return {key, opt};
 }
 
-constexpr std::string_view NormalizePath(std::string_view view) {
+constexpr ktl::string_view NormalizePath(ktl::string_view view) {
   if (view.empty() || view.back() != '/') {
     return view;
   }
   return view.substr(0, view.length() - 1);
 }
 
-constexpr bool ParseOption(std::string_view key, std::string_view value,
+constexpr bool ParseOption(ktl::string_view key, ktl::string_view value,
                            zbi_parser::Options& opts) {
   if (key == kNextOpt) {
     opts.boot.next = value;
@@ -77,9 +81,9 @@ constexpr bool ParseOption(std::string_view key, std::string_view value,
 
 namespace zbi_parser {
 
-void ParseCmdline(std::string_view cmdline, Options& opts) {
-  for (std::string_view opt : WordView(cmdline)) {
-    if (!cpp20::starts_with(opt, kOptPrefix)) {
+void ParseCmdline(ktl::string_view cmdline, Options& opts) {
+  for (ktl::string_view opt : WordView(cmdline)) {
+    if (!ktl::starts_with(opt, kOptPrefix)) {
       continue;
     }
 

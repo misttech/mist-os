@@ -17,15 +17,15 @@
 #include <lib/zbitl/items/bootfs.h>
 #include <zircon/types.h>
 
-#include <string_view>
+#include <ktl/string_view.h>
 
 namespace zbi_parser {
 
 class Bootfs {
  public:
   Bootfs(zx::unowned_vmar vmar, zx::vmo vmo);
-  fit::result<zx_status_t, zx::vmo> Open(std::string_view root, std::string_view filename,
-                                         std::string_view purpose);
+  fit::result<zx_status_t, zx::vmo> Open(ktl::string_view root, ktl::string_view filename,
+                                         ktl::string_view purpose);
 
   bool is_valid() { return is_valid_; }
 

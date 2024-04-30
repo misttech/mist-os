@@ -15,7 +15,9 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#define LOCAL_TRACE 2
+#include <ktl/enforce.h>
+
+#define LOCAL_TRACE 0
 
 #define check(log, status, fmt, ...)                                   \
   do {                                                                 \
@@ -37,17 +39,17 @@ void PrintBootfsError(const Bootfs::BootfsView::Error& error) {
 }
 
 Bootfs::Bootfs(zx::unowned_vmar vmar, zx::vmo vmo) {
-  zbitl::MapOwnedVmo mapvmo{std::move(vmo), /*writable=*/false, std::move(vmar)};
-  if (auto result = BootfsReader::Create(std::move(mapvmo)); result.is_error()) {
+  zbitl::MapOwnedVmo mapvmo{ktl::move(vmo), /*writable=*/false, ktl::move(vmar)};
+  if (auto result = BootfsReader::Create(ktl::move(mapvmo)); result.is_error()) {
     PrintBootfsError(result.error_value());
   } else {
-    bootfs_reader_ = std::move(result.value());
+    bootfs_reader_ = ktl::move(result.value());
     is_valid_ = true;
   }
 }
 
-fit::result<zx_status_t, zx::vmo> Bootfs::Open(std::string_view root, std::string_view filename,
-                                               std::string_view purpose) {
+fit::result<zx_status_t, zx::vmo> Bootfs::Open(ktl::string_view root, ktl::string_view filename,
+                                               ktl::string_view purpose) {
   LTRACEF_LEVEL(2, "searching BOOTFS for '%.*s%s%.*s' (%.*s)\n", static_cast<int>(root.size()),
                 root.data(), root.empty() ? "" : "/", static_cast<int>(filename.size()),
                 filename.data(), static_cast<int>(purpose.size()), purpose.data());
@@ -85,7 +87,7 @@ fit::result<zx_status_t, zx::vmo> Bootfs::Open(std::string_view root, std::strin
   status = file_vmo.set_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
   check(log_, status, "failed to set ZX_PROP_VMO_CONTENT_SIZE\n");
 
-  return fit::ok(std::move(file_vmo));
+  return fit::ok(ktl::move(file_vmo));
 }
 
 }  // namespace zbi_parser
