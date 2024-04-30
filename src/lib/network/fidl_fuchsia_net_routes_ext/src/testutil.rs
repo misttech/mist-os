@@ -143,6 +143,7 @@ pub fn empty_watch_event_stream<'a, I: FidlRouteIpExt>(
 /// Provides testutils for testing implementations of clients and servers of
 /// fuchsia.net.routes.admin.
 pub mod admin {
+    use async_utils::stream::FlattenUnorderedExt as _;
     use fidl::endpoints::ProtocolMarker;
     use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
     use futures::{Stream, StreamExt as _};
@@ -203,6 +204,58 @@ pub mod admin {
                 route_set_server_end.into_stream().expect("into stream")
             })
             .flatten()
+    }
+
+    /// TODO(https://fxbug.dev/337298251): Change this to return a RouteSet
+    /// index beside the RouteSet item to make it easier to determine which
+    /// RouteSet pertains to the transmitted requests.
+    ///
+    /// Provides a RouteTable implementation that consolidates all RouteSets into
+    /// a single RouteSet stream. Returns a request stream that vends items as
+    /// they arrive in any RouteSet.
+    pub fn serve_all_route_sets<I: FidlRouteAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
+    ) -> impl Stream<
+            Item = <
+                    <<I as FidlRouteAdminIpExt>::RouteSetMarker as ProtocolMarker>
+                        ::RequestStream as Stream
+                >::Item
+    >{
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct In<I: FidlRouteAdminIpExt>(
+            <<<I as FidlRouteAdminIpExt>::RouteTableMarker as ProtocolMarker>
+                ::RequestStream as Stream
+            >::Item,
+        );
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
+
+        let stream = server_end.into_stream().expect("into stream");
+        stream
+            .map(|item| {
+                let Out(route_set_server_end) = I::map_ip(
+                    In(item),
+                    |In(item)| match item.expect("set provider FIDL error") {
+                        fnet_routes_admin::RouteTableV4Request::NewRouteSet {
+                            route_set,
+                            control_handle: _,
+                        } => Out(route_set),
+                        req => unreachable!("unexpected request: {:?}", req),
+                    },
+                    |In(item)| match item.expect("set provider FIDL error") {
+                        fnet_routes_admin::RouteTableV6Request::NewRouteSet {
+                            route_set,
+                            control_handle: _,
+                        } => Out(route_set),
+                        req => unreachable!("unexpected request: {:?}", req),
+                    },
+                );
+                route_set_server_end.into_stream().expect("into stream")
+            })
+            .fuse()
+            .flatten_unordered()
     }
 
     /// Provides a RouteTable implementation that serves no-op RouteSets.

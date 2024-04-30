@@ -456,7 +456,7 @@ pub mod route {
                         "`RTA_TABLE` is expected only when table in header is `RT_TABLE_COMPAT`, \
                         but it was {}. Using provided value of {} in the NLA",
                         message.header.table,
-                        table
+                        num
                     );
                 }
                 table = *num

@@ -195,14 +195,36 @@ impl<
             futures::select! {
                 event = unified_event_stream.next() => {
                     match event.expect("event stream cannot end without error")? {
-                        UnifiedEvent::RoutesV4Event(event) => routes_v4_worker
-                            .handle_route_watcher_event(&route_clients, event)
+                        // The Routes worker needs access to the intended table id
+                        // from the PendingRouteRequest.
+                        UnifiedEvent::RoutesV4Event(event) => {
+                            let pending_request_args = match unified_pending_request {
+                                Some(UnifiedPendingRequest::RoutesV4(ref req)) => Some(req.args()),
+                                _ => None,
+                            };
+
+                            routes_v4_worker
+                            .handle_route_watcher_event(
+                                &route_clients,
+                                event,
+                                pending_request_args.cloned())
                             .map_err(Error::new)
-                            .context("handle v4 routes event")?,
-                        UnifiedEvent::RoutesV6Event(event) => routes_v6_worker
-                            .handle_route_watcher_event(&route_clients, event)
+                            .context("handle v4 routes event")?
+                        },
+                        UnifiedEvent::RoutesV6Event(event) => {
+                            let pending_request_args = match unified_pending_request {
+                                Some(UnifiedPendingRequest::RoutesV6(ref req)) => Some(req.args()),
+                                _ => None,
+                            };
+
+                            routes_v6_worker
+                            .handle_route_watcher_event(
+                                &route_clients,
+                                event,
+                                pending_request_args.cloned()
+                            )
                             .map_err(Error::new)
-                            .context("handle v6 routes event")?,
+                            .context("handle v6 routes event")?},
                         UnifiedEvent::InterfacesEvent(event) => interfaces_worker
                             .handle_interface_watcher_event(event).await
                             .map_err(Error::new)
@@ -218,19 +240,19 @@ impl<
 
                     match request.expect("request stream cannot end") {
                         UnifiedRequest::InterfacesRequest(request) => {
-                            unified_pending_request = interfaces_worker
-                                .handle_request(request).await
-                                .map(UnifiedPendingRequest::Interfaces);
+                            let request = interfaces_worker
+                                .handle_request(request).await;
+                            unified_pending_request = request.map(UnifiedPendingRequest::Interfaces);
                         }
                         UnifiedRequest::RoutesV4Request(request) => {
-                            unified_pending_request = routes_v4_worker
-                                .handle_request(&interfaces_proxy, request).await
-                                .map(UnifiedPendingRequest::RoutesV4);
+                            let request = routes_v4_worker
+                                .handle_request(&interfaces_proxy, &v4_routes_set_provider, request).await;
+                            unified_pending_request = request.map(UnifiedPendingRequest::RoutesV4);
                         }
                         UnifiedRequest::RoutesV6Request(request) => {
-                            unified_pending_request = routes_v6_worker
-                                .handle_request(&interfaces_proxy, request).await
-                                .map(UnifiedPendingRequest::RoutesV6);
+                            let request = routes_v6_worker
+                                .handle_request(&interfaces_proxy, &v6_routes_set_provider, request).await;
+                            unified_pending_request = request.map(UnifiedPendingRequest::RoutesV6);
                         }
                         UnifiedRequest::RuleRequest(request, completer) => {
                             completer.send(rule_table.handle_request(request))

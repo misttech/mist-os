@@ -6,7 +6,7 @@
 //! Netlink messages and maintaining route table state from Netstack.
 
 use std::{
-    collections::HashSet,
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     hash::{Hash, Hasher},
     num::{NonZeroU32, NonZeroU64},
@@ -24,8 +24,9 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
 use derivative::Derivative;
 use futures::{channel::oneshot, StreamExt as _};
+use itertools::Itertools as _;
 use linux_uapi::{
-    rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
+    rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
     rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
 };
 use net_types::{
@@ -53,6 +54,11 @@ use crate::{
     util::respond_to_completer,
 };
 
+// TODO(https://fxbug.dev/336382905): Remove special constant and rely on table
+// ids provided by the Netstack.
+/// The table id that holds routes not managed by Netlink.
+const UNMANAGED_ROUTE_TABLE: u32 = rt_class_t_RT_TABLE_MAIN;
+
 /// Arguments for an RTM_GETROUTE [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetRouteArgs {
@@ -70,8 +76,6 @@ pub(crate) struct UnicastNewRouteArgs<I: Ip> {
     // The metric used to weigh the importance of the route.
     pub priority: u32,
     // The routing table.
-    // TODO(https://issues.fuchsia.dev/289582515): Use this to add routes to
-    // a RouteSet based on the table value.
     pub table: u32,
 }
 
@@ -95,8 +99,6 @@ pub(crate) struct UnicastDelRouteArgs<I: Ip> {
     // The metric used to weigh the importance of the route.
     pub(crate) priority: Option<NonZeroU32>,
     // The routing table.
-    // TODO(https://issues.fuchsia.dev/289582515): Use this to remove routes from
-    // a RouteSet based on the table value.
     pub(crate) table: NonZeroU32,
 }
 
@@ -230,10 +232,43 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
 pub(crate) struct RoutesWorkerState<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
-    /// TODO(https://issues.fuchsia.dev/289582515): Create a new `RouteSet`
-    /// when a request with a new table is received.
-    /// A `RouteSetProxy` to provide isolated administrative access
-    /// to this worker's `RouteSet`.
+    route_tables: HashMap<RouteTableKey, RouteTable<I>>,
+}
+
+// A `RouteTable` identifier.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum RouteTableKey {
+    // Routing tables that are created and managed by Netlink.
+    NetlinkManaged { table_id: u32 },
+    // Routing tables that are not managed by Netlink, but exist on the system.
+    Unmanaged,
+}
+
+// TODO(https://fxbug.dev/336382905): Remove converter below once table
+// ids are provided by Netstack.
+impl From<RouteTableKey> for u32 {
+    fn from(key: RouteTableKey) -> Self {
+        match key {
+            RouteTableKey::NetlinkManaged { table_id } => table_id,
+            RouteTableKey::Unmanaged => UNMANAGED_ROUTE_TABLE,
+        }
+    }
+}
+
+fn get_table_u8_and_nla_from_key(table: RouteTableKey) -> (u8, Option<RouteAttribute>) {
+    let table_id: u32 = table.into();
+    // When the table's value is >255, the value should be specified
+    // by an NLA and the header value should be RT_TABLE_COMPAT.
+    match u8::try_from(table_id) {
+        Ok(t) => (t, None),
+        // RT_TABLE_COMPAT (252) can be downcasted without loss into u8.
+        Err(_) => (rt_class_t_RT_TABLE_COMPAT as u8, Some(RouteAttribute::Table(table_id))),
+    }
+}
+
+pub(crate) struct RouteTable<
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+> {
     route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
     route_messages: HashSet<NetlinkRouteMessage>,
 }
@@ -283,6 +318,12 @@ pub(crate) struct PendingRouteRequest<
     completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
+impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> PendingRouteRequest<S, I> {
+    pub(crate) fn args(&self) -> &PendingRouteRequestArgs<I> {
+        &self.request_args
+    }
+}
+
 impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
     RoutesWorkerState<I>
 {
@@ -318,9 +359,15 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             }
         })?;
         let route_messages = new_set_with_existing_routes(installed_routes);
-        let route_set_proxy = fnet_routes_ext::admin::new_route_set::<I>(&set_provider_proxy)
-            .map_err(|e| WorkerInitializationError::Fidl(RoutesFidlError::RouteSetCreation(e)))?;
-        Ok((Self { route_set_proxy, route_messages }, route_event_stream))
+        let route_set_proxy = create_route_set_proxy(set_provider_proxy)?;
+        Ok((
+            Self {
+                route_tables: HashMap::from([(RouteTableKey::Unmanaged, {
+                    RouteTable { route_set_proxy, route_messages }
+                })]),
+            },
+            route_event_stream,
+        ))
     }
 
     /// Handles events observed by the route watchers by adding/removing routes
@@ -333,21 +380,25 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         &mut self,
         route_clients: &ClientTable<NetlinkRoute, S>,
         event: fnet_routes_ext::Event<I>,
+        pending_request_args: Option<PendingRouteRequestArgs<I>>,
     ) -> Result<(), RouteEventHandlerError<I>> {
-        handle_route_watcher_event::<I, S>(&mut self.route_messages, route_clients, event)
+        handle_route_watcher_event::<I, S>(
+            &mut self.route_tables,
+            route_clients,
+            event,
+            pending_request_args,
+        )
     }
 
-    // TODO(https://issues.fuchsia.dev/289518265): Once `authenticate_for_interface` call is
-    // forwarded to `Control`, update to use `fnet_interfaces_ext::admin::Control`.
     fn get_interface_control(
         interfaces_proxy: &fnet_root::InterfacesProxy,
         interface_id: u64,
-    ) -> fnet_interfaces_admin::ControlProxy {
+    ) -> fnet_interfaces_ext::admin::Control {
         let (control, server_end) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
                 .expect("create Control proxy");
         interfaces_proxy.get_admin(interface_id, server_end).expect("send get admin request");
-        control
+        fnet_interfaces_ext::admin::Control::new(control)
     }
 
     async fn authenticate_for_interface(
@@ -359,7 +410,9 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
 
         let grant = match control.get_authorization_for_interface().await {
             Ok(grant) => grant,
-            Err(fidl::Error::ClientChannelClosed { status, protocol_name }) => {
+            Err(fnet_interfaces_ext::admin::TerminalError::Fidl(
+                fidl::Error::ClientChannelClosed { status, protocol_name },
+            )) => {
                 log_debug!(
                     "{}: netstack dropped the {} channel, interface {} does not exist",
                     status,
@@ -406,12 +459,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         interfaces_proxy: &fnet_root::InterfacesProxy,
         route_set_proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
         new_route_args: NewRouteArgs<I>,
-        existing_routes: &HashSet<NetlinkRouteMessage>,
     ) -> Result<NewRouteArgs<I>, RequestError> {
-        if new_route_matches_existing(&new_route_args, existing_routes) {
-            return Err(RequestError::AlreadyExists);
-        }
-
         let interface_id = match new_route_args {
             NewRouteArgs::Unicast(args) => args.target.outbound_interface,
         };
@@ -536,70 +584,134 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
 
     /// Handles a [`Request`].
     ///
-    /// Returns a [`PendingRouteRequest`] if a route was updated and the
-    /// caller needs to make sure the update has been propagated to the local
-    /// state (the routes watcher has sent an event for our update).
+    /// Returns a [`PendingRouteRequest`] if a route was updated and the caller
+    /// needs to make sure the update has been propagated to the local state
+    /// (the routes watcher has sent an event for our update).
     pub(crate) async fn handle_request<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     >(
         &mut self,
         interfaces_proxy: &fnet_root::InterfacesProxy,
+        set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
         Request { args, sequence_number, mut client, completer }: Request<S, I>,
     ) -> Option<PendingRouteRequest<S, I>> {
-        let Self { route_set_proxy, route_messages } = self;
+        let Self { route_tables } = self;
         log_debug!("handling request {args:?} from {client}");
 
         let result = match args {
             RequestArgs::Route(args) => match args {
                 RouteRequestArgs::Get(args) => match args {
                     GetRouteArgs::Dump => {
-                        route_messages.clone().into_iter().for_each(|message| {
-                            client.send_unicast(message.into_rtnl_new_route(sequence_number, true))
-                        });
+                        route_tables.values().for_each(
+                            |RouteTable { route_set_proxy: _, route_messages }| {
+                                route_messages.iter().for_each(|message| {
+                                    client.send_unicast(
+                                        message.clone().into_rtnl_new_route(sequence_number, true),
+                                    )
+                                })
+                            },
+                        );
                         Ok(())
                     }
                 },
                 RouteRequestArgs::New(args) => {
-                    match Self::handle_new_route_request(
-                        interfaces_proxy,
-                        route_set_proxy,
-                        args,
-                        route_messages,
-                    )
-                    .await
-                    {
-                        Ok(new_route_args) => {
-                            // Route additions must be confirmed via a message from the Routes
-                            // watcher with the same Route struct.
-                            return Some(PendingRouteRequest {
-                                request_args: PendingRouteRequestArgs::New(new_route_args),
-                                client,
-                                completer,
-                            });
+                    let table: RouteTableKey = match args {
+                        NewRouteArgs::Unicast(args) => {
+                            RouteTableKey::NetlinkManaged { table_id: args.table }
                         }
-                        Err(e) => Err(e),
+                    };
+
+                    // Populate and insert the RouteTable if not already present.
+                    if let Entry::Vacant(entry) = route_tables.entry(table) {
+                        let route_set_proxy = create_route_set_proxy::<I>(set_provider_proxy)
+                            .expect("create RouteSet proxy");
+                        let _ = entry
+                            .insert(RouteTable { route_set_proxy, route_messages: HashSet::new() });
+                    }
+
+                    // Take a new reference to the fields.
+                    let RouteTable { route_set_proxy, route_messages: _ } =
+                        match route_tables.get(&table) {
+                            Some(route_table) => route_table,
+                            None => unreachable!("table should be present as it was just inserted"),
+                        };
+
+                    // TODO(https://fxbug.dev/336382905): Once Netstack can
+                    // support the same routes in differing tables, check
+                    // for conflicts against routes in the current table
+                    // instead of checking for conflicts against
+                    // all observed routes.
+                    // NB: A subnet route for the interface will be added in
+                    // its own route set. If the caller attempts to add it
+                    // separately, we will fail to see that it already exists,
+                    // so that's why we need to collect all of the existing
+                    // routing state across route tables.
+                    let all_route_messages = get_all_route_messages(route_tables.values());
+                    match new_route_matches_existing(&args, all_route_messages) {
+                        NewRouteConflict::ConflictInSameTable => Err(RequestError::AlreadyExists),
+                        // TODO(https://fxbug.dev/336382905): Add the route to the Netstack
+                        // once it can support installing otherwise-identical routes via
+                        // Policy-Based routing.
+                        NewRouteConflict::ConflictInDifferentTable => Ok(()),
+                        NewRouteConflict::NoConflict => {
+                            match Self::handle_new_route_request(
+                                interfaces_proxy,
+                                route_set_proxy,
+                                args,
+                            )
+                            .await
+                            {
+                                Ok(new_route_args) => {
+                                    // Route additions must be confirmed via a message from
+                                    // the Routes watcher with the same Route struct.
+                                    return Some(PendingRouteRequest {
+                                        request_args: PendingRouteRequestArgs::New(new_route_args),
+                                        client,
+                                        completer,
+                                    });
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
                     }
                 }
                 RouteRequestArgs::Del(args) => {
-                    match Self::handle_del_route_request(
-                        interfaces_proxy,
-                        route_set_proxy,
-                        args,
-                        route_messages,
-                    )
-                    .await
-                    {
-                        Ok(del_route) => {
-                            // Route deletions must be confirmed via a message from the Routes
-                            // watcher with the same Route struct - using the route
-                            // matched for deletion.
-                            return Some(PendingRouteRequest {
-                                request_args: PendingRouteRequestArgs::Del(del_route),
-                                client,
-                                completer,
-                            });
+                    let table: RouteTableKey = match args {
+                        DelRouteArgs::Unicast(args) => {
+                            RouteTableKey::NetlinkManaged { table_id: args.table.get() }
                         }
-                        Err(e) => Err(e),
+                    };
+
+                    if let Some(RouteTable { route_set_proxy, route_messages }) =
+                        route_tables.get(&table)
+                    {
+                        match Self::handle_del_route_request(
+                            interfaces_proxy,
+                            &route_set_proxy,
+                            args,
+                            &route_messages,
+                        )
+                        .await
+                        {
+                            Ok(del_route) => {
+                                // Route deletions must be confirmed via a message from the Routes
+                                // watcher with the same Route struct - using the route
+                                // matched for deletion.
+                                return Some(PendingRouteRequest {
+                                    request_args: PendingRouteRequestArgs::Del(del_route),
+                                    client,
+                                    completer,
+                                });
+                            }
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        // RouteSet did not exist for the provided route. This can occur if a
+                        // Netlink client learns about the existence of a Route in the
+                        // `UNMANAGED_ROUTE_TABLE` and attempts to remove it using its table id.
+                        // Netlink clients are not currently expected to need to remove routes
+                        // installed by Fuchsia components such as Netstack.
+                        Err(RequestError::NotFound)
                     }
                 }
             },
@@ -624,11 +736,46 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
 
         let done = match request_args {
             PendingRouteRequestArgs::New(route) => {
-                new_route_matches_existing(&route, &self.route_messages)
+                // TODO(https://fxbug.dev/336382905): Once Netstack can
+                // support the same routes in differing tables, check
+                // for conflicts against routes in the current table
+                // instead of checking for conflicts against
+                // all observed routes.
+                let all_route_messages = get_all_route_messages(self.route_tables.values());
+                let conflict = new_route_matches_existing(&route, all_route_messages);
+                match conflict {
+                    NewRouteConflict::ConflictInSameTable
+                    | NewRouteConflict::ConflictInDifferentTable => true,
+                    NewRouteConflict::NoConflict => false,
+                }
             }
             // For `Del` messages, we expect the exact `NetlinkRouteMessage` to match,
             // which was received as part of the `select_route_for_deletion` flow.
-            PendingRouteRequestArgs::Del(route_msg) => !self.route_messages.contains(route_msg),
+            PendingRouteRequestArgs::Del(route_msg) => {
+                // Get the table from the NLA (if present), otherwise choose
+                // the value from the message header.
+                let table_id = {
+                    let NetlinkRouteMessage(inner_route_msg) = route_msg;
+                    let RouteNlaView { table, .. } = view_existing_route_nlas(inner_route_msg);
+                    match table {
+                        Some(t) => *t,
+                        None => inner_route_msg.header.table.into(),
+                    }
+                };
+                let table = RouteTableKey::NetlinkManaged { table_id };
+                match &self.route_tables.get(&table) {
+                    Some(RouteTable { route_set_proxy: _, route_messages }) => {
+                        !route_messages.contains(route_msg)
+                    }
+                    None => {
+                        log_error!(
+                            "unreachable: if there is a pending del request, \
+                            the route table should be present for table {table:?}"
+                        );
+                        false
+                    }
+                }
+            }
         };
 
         if done {
@@ -656,30 +803,108 @@ pub(crate) enum RouteEventHandlerError<I: Ip> {
     NonAddOrRemoveEventReceived(fnet_routes_ext::Event<I>),
 }
 
-fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
-    route_messages: &mut HashSet<NetlinkRouteMessage>,
+fn create_route_set_proxy<I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt>(
+    set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
+) -> Result<
+    <I::RouteSetMarker as ProtocolMarker>::Proxy,
+    WorkerInitializationError<RoutesFidlError, RoutesNetstackError<I>>,
+> {
+    fnet_routes_ext::admin::new_route_set::<I>(&set_provider_proxy)
+        .map_err(|e| WorkerInitializationError::Fidl(RoutesFidlError::RouteSetCreation(e)))
+}
+
+fn handle_route_watcher_event<
+    I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
+    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+>(
+    route_tables: &mut HashMap<RouteTableKey, RouteTable<I>>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_routes_ext::Event<I>,
+    pending_request: Option<PendingRouteRequestArgs<I>>,
 ) -> Result<(), RouteEventHandlerError<I>> {
+    // Determine if the observed Route is the same Route that
+    // exists in the NewRouteArgs, extracting the table number.
+    // If the observed Route is not known, it must be from an
+    // Unmanaged routing table.
+    fn get_table_key_from_pending_request<I: Ip>(
+        route: fnet_routes_ext::InstalledRoute<I>,
+        new_route_args: &NewRouteArgs<I>,
+    ) -> RouteTableKey {
+        if new_route_matches_new_route_args(&route, &new_route_args) {
+            match new_route_args {
+                NewRouteArgs::Unicast(route) => {
+                    return RouteTableKey::NetlinkManaged { table_id: route.table }
+                }
+            };
+        }
+        RouteTableKey::Unmanaged
+    }
+
     let message_for_clients = match event {
         fnet_routes_ext::Event::Added(route) => {
-            if let Some(route_message) = NetlinkRouteMessage::optionally_from(route) {
+            let table = match pending_request {
+                Some(PendingRouteRequestArgs::New(new_route_args)) => {
+                    get_table_key_from_pending_request(route, &new_route_args)
+                }
+                _ => RouteTableKey::Unmanaged,
+            };
+            if let Some(route_message) = NetlinkRouteMessage::optionally_from(route, table) {
+                // The Unmanaged table is initialized eagerly, so even
+                // without a `PendingRouteRequest` it will be present.
+                let RouteTable { route_set_proxy: _, route_messages } = route_tables
+                    .get_mut(&table)
+                    .expect("route table should have been initialized when handling request");
                 if !route_messages.insert(route_message.clone()) {
                     return Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route));
                 }
+
                 Some(route_message.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false))
             } else {
                 None
             }
         }
         fnet_routes_ext::Event::Removed(route) => {
-            if let Some(route_message) = NetlinkRouteMessage::optionally_from(route) {
-                if !route_messages.remove(&route_message) {
-                    return Err(RouteEventHandlerError::NonExistentRouteDeletion(route));
+            // TODO(336382905): Update once tables are included in `Route`s.
+            //
+            // When a route deletion is initiated from the Fuchsia-side, the
+            // table is not known. Search through the present routes across
+            // `RouteSet`s to see which route matches all fields and
+            // remove the route. Only a single route is expected to match
+            // `installed_route_matches_netlink_message` due to the matching
+            // fn checking against all identifiable fields.
+            let table_with_route = route_tables
+                .iter()
+                .filter_map(|(table, RouteTable { route_set_proxy: _, route_messages })| {
+                    route_messages
+                        .iter()
+                        .any(|msg| installed_route_matches_netlink_message(&route, msg))
+                        .then_some(table)
+                })
+                .at_most_one();
+
+            let table_with_route = match table_with_route {
+                Ok(table) => table.copied(),
+                Err(_) => {
+                    unreachable!("two routes cannot exist in the Netstack with the same fields")
                 }
-                Some(route_message.into_rtnl_del_route())
+            };
+
+            if let Some(table) = table_with_route {
+                if let Some(route_message) = NetlinkRouteMessage::optionally_from(route, table) {
+                    // The Unmanaged table is initialized eagerly, so even
+                    // without a `PendingRouteRequest` it will be present.
+                    let RouteTable { route_set_proxy: _, route_messages } = route_tables
+                        .get_mut(&table)
+                        .expect("route table should have been initialized when handling request");
+                    if !route_messages.remove(&route_message) {
+                        return Err(RouteEventHandlerError::NonExistentRouteDeletion(route));
+                    }
+                    Some(route_message.into_rtnl_del_route())
+                } else {
+                    None
+                }
             } else {
-                None
+                return Err(RouteEventHandlerError::NonExistentRouteDeletion(route));
             }
         }
         // We don't expect to observe any existing events, because the route watchers were drained
@@ -701,6 +926,83 @@ fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>:
     Ok(())
 }
 
+// Check if the new route matches the `NewRouteArgs`.
+//
+// Similar to `new_route_matches_existing`, but checks
+// new routes observed from the Routes Watcher against
+// a `NewRouteArgs`.
+fn new_route_matches_new_route_args<I: Ip>(
+    new_route: &fnet_routes_ext::InstalledRoute<I>,
+    pending_route: &NewRouteArgs<I>,
+) -> bool {
+    let UnicastNewRouteArgs { subnet, target: _, priority, table: _ } = match pending_route {
+        NewRouteArgs::Unicast(args) => args,
+    };
+
+    let fnet_routes_ext::InstalledRoute {
+        route: fnet_routes_ext::Route { destination, action: _, properties: _ },
+        effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+    } = new_route;
+
+    let subnet_matches = subnet == destination;
+    let metric_matches = priority == metric;
+
+    subnet_matches && metric_matches
+}
+
+// Check if the deleted route matches a `NetlinkRouteMessage`.
+//
+// Similar to `select_route_for_deletion`, but checks that all fields
+// in `InstalledRoute` match `NetlinkRouteMessage`.
+fn installed_route_matches_netlink_message<I: Ip>(
+    del_route: &fnet_routes_ext::InstalledRoute<I>,
+    pending_route: &NetlinkRouteMessage,
+) -> bool {
+    let NetlinkRouteMessage(route_message) = pending_route;
+    let fnet_routes_ext::InstalledRoute {
+        route: fnet_routes_ext::Route { destination: subnet, action, properties: _ },
+        effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: priority },
+    } = del_route;
+
+    let (outbound_interface, next_hop) = match action {
+        fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+            outbound_interface,
+            next_hop,
+        }) => (outbound_interface, next_hop),
+        // We don't support non-forwarding `RouteAction`s.
+        fnet_routes_ext::RouteAction::Unknown => return false,
+    };
+
+    if subnet.prefix() != route_message.header.destination_prefix_length {
+        return false;
+    }
+    let RouteNlaView {
+        subnet: pending_subnet,
+        metric: pending_metric,
+        interface_id: pending_interface,
+        next_hop: pending_next_hop,
+        table: _,
+    } = view_existing_route_nlas(route_message);
+    let subnet_matches = pending_subnet
+        .map(|dst| crate::netlink_packet::ip_addr_from_route::<I>(&dst))
+        .unwrap_or(Ok(I::UNSPECIFIED_ADDRESS))
+        .is_ok_and(|dst: I::Addr| dst == subnet.network());
+    let metric_matches = priority == pending_metric;
+    let interface_matches = *outbound_interface == (*pending_interface).into();
+
+    // We consider the next hop to match if it is not present, because it
+    // indicates the unspecified address.
+    let next_hop_matches = next_hop.map_or(true, |next_hop| {
+        pending_next_hop
+            .clone()
+            .map(|e| crate::netlink_packet::ip_addr_from_route::<I>(&e))
+            .unwrap_or(Ok(I::UNSPECIFIED_ADDRESS))
+            .is_ok_and(|e: I::Addr| e == next_hop.get())
+    });
+
+    subnet_matches && metric_matches && interface_matches && next_hop_matches
+}
+
 /// A wrapper type for the netlink_packet_route `RouteMessage` to enable conversions
 /// from [`fnet_routes_ext::InstalledRoute`] and implement hashing.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -715,17 +1017,19 @@ fn new_set_with_existing_routes<I: Ip>(
 ) -> HashSet<NetlinkRouteMessage> {
     return routes
         .iter()
-        .filter_map(|route| NetlinkRouteMessage::optionally_from(*route))
+        .filter_map(|route| NetlinkRouteMessage::optionally_from(*route, RouteTableKey::Unmanaged))
         .collect::<HashSet<_>>();
 }
 
 impl NetlinkRouteMessage {
-    /// Implement optional conversions from `InstalledRoute` to `NetlinkRouteMessage`.
-    /// `Ok` becomes `Some`, while `Err` is logged and becomes `None`.
+    /// Implement optional conversions from `InstalledRoute` and `table`
+    /// to `NetlinkRouteMessage`. `Ok` becomes `Some`, while `Err` is
+    /// logged and becomes `None`.
     fn optionally_from<I: Ip>(
         route: fnet_routes_ext::InstalledRoute<I>,
+        table: RouteTableKey,
     ) -> Option<NetlinkRouteMessage> {
-        match route.try_into() {
+        match NetlinkRouteMessage::try_from_installed_route::<I>(route, table) {
             Ok(route) => Some(route),
             Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding) => {
                 log_warn!("Unexpected non-forwarding route in routing table: {:?}", route);
@@ -767,58 +1071,18 @@ impl NetlinkRouteMessage {
         msg.finalize();
         msg
     }
-}
 
-impl Hash for NetlinkRouteMessage {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let NetlinkRouteMessage(message) = self;
-        message.header.hash(state);
-        message.attributes.iter().for_each(|nla| {
-            let mut buffer = vec![0u8; nla.value_len() as usize];
-            nla.emit_value(&mut buffer);
-            buffer.hash(state);
-        });
-    }
-}
-
-// NetlinkRouteMessage conversion related errors.
-#[derive(Debug, PartialEq)]
-pub(crate) enum NetlinkRouteMessageConversionError {
-    // Route with non-forward action received from Netstack.
-    RouteActionNotForwarding,
-    // Interface id could not be downcasted to fit into the expected u32.
-    InvalidInterfaceId(u64),
-    // Failed to decode route address
-    FailedToDecode(DecodeErrorWrapper),
-}
-
-#[derive(Debug)]
-pub(crate) struct DecodeErrorWrapper(DecodeError);
-
-impl PartialEq for DecodeErrorWrapper {
-    fn eq(&self, other: &Self) -> bool {
-        // DecodeError contains anyhow::Error which unfortunately
-        // can't be compared without a call to format!;
-        return format!("{:?}", self.0) == format!("{:?}", other.0);
-    }
-}
-
-impl From<DecodeError> for NetlinkRouteMessageConversionError {
-    fn from(err: DecodeError) -> Self {
-        NetlinkRouteMessageConversionError::FailedToDecode(DecodeErrorWrapper(err))
-    }
-}
-
-// Implement conversions from `InstalledRoute` to `NetlinkRouteMessage`
-// which is fallible iff, the route's action is not `Forward`.
-impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage {
-    type Error = NetlinkRouteMessageConversionError;
-    fn try_from(
+    // TODO(https://fxbug.dev/336382905): Refactor this as a TryFrom
+    // impl once tables are present in `InstalledRoute`.
+    // Implement conversions from `InstalledRoute` to `NetlinkRouteMessage`
+    // which is fallible iff, the route's action is not `Forward`.
+    fn try_from_installed_route<I: Ip>(
         fnet_routes_ext::InstalledRoute {
             route: fnet_routes_ext::Route { destination, action, properties: _ },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
         }: fnet_routes_ext::InstalledRoute<I>,
-    ) -> Result<Self, Self::Error> {
+        table: RouteTableKey,
+    ) -> Result<Self, NetlinkRouteMessageConversionError> {
         let fnet_routes_ext::RouteTarget { outbound_interface, next_hop } = match action {
             fnet_routes_ext::RouteAction::Unknown => {
                 return Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding)
@@ -837,6 +1101,9 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         .expect("should fit into u8");
         route_header.destination_prefix_length = destination.prefix();
 
+        let (table_u8, table_nla) = get_table_u8_and_nla_from_key(table);
+        route_header.table = table_u8;
+
         // The following fields are used in the header, but they do not have any
         // corresponding values in `InstalledRoute`. The fields explicitly
         // defined below  are expected to be needed at some point, but the
@@ -844,9 +1111,6 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         //
         // length of source prefix
         // tos filter (type of service)
-        // This downcast is safe as rt_class_t_RT_TABLE_MAIN has a value of
-        // 254 which is less than 255, and safely fits in a u8.
-        route_header.table = rt_class_t_RT_TABLE_MAIN as u8;
         route_header.protocol = RouteProtocol::Unspec;
         // Universe for routes with next_hop. Valid as long as route action
         // is forwarding.
@@ -906,10 +1170,57 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         let priority_nla = RouteAttribute::Priority(metric);
         nlas.push(priority_nla);
 
+        // Only include the table NLA when `table` does not fit into the u8 range.
+        if let Some(nla) = table_nla {
+            nlas.push(nla);
+        }
+
         let mut route_message = RouteMessage::default();
         route_message.header = route_header;
         route_message.attributes = nlas;
         Ok(NetlinkRouteMessage(route_message))
+    }
+}
+
+impl Hash for NetlinkRouteMessage {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let NetlinkRouteMessage(message) = self;
+        message.header.hash(state);
+
+        let mut buffer = vec![];
+        message.attributes.iter().for_each(|nla| {
+            buffer.resize(nla.value_len(), 0u8);
+            nla.emit_value(&mut buffer);
+            buffer.hash(state);
+        });
+    }
+}
+
+// NetlinkRouteMessage conversion related errors.
+#[derive(Debug, PartialEq)]
+pub(crate) enum NetlinkRouteMessageConversionError {
+    // Route with non-forward action received from Netstack.
+    RouteActionNotForwarding,
+    // Interface id could not be downcasted to fit into the expected u32.
+    InvalidInterfaceId(u64),
+    // Failed to decode route address.
+    FailedToDecode(DecodeErrorWrapper),
+}
+
+#[derive(Debug)]
+pub(crate) struct DecodeErrorWrapper(DecodeError);
+
+impl PartialEq for DecodeErrorWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        // DecodeError contains anyhow::Error which unfortunately
+        // can't be compared without a call to format!;
+        return format!("{:?}", self.0) == format!("{:?}", other.0);
+    }
+}
+
+impl From<DecodeError> for NetlinkRouteMessageConversionError {
+    fn from(err: DecodeError) -> Self {
+        NetlinkRouteMessageConversionError::FailedToDecode(DecodeErrorWrapper(err))
     }
 }
 
@@ -941,7 +1252,7 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
 impl<I: Ip> From<NetlinkRouteMessage> for fnet_routes_ext::Route<I> {
     fn from(netlink_route_message: NetlinkRouteMessage) -> Self {
         let NetlinkRouteMessage(route_message) = netlink_route_message;
-        let RouteNlaView { subnet, metric, interface_id, next_hop } =
+        let RouteNlaView { subnet, metric, interface_id, next_hop, table: _ } =
             view_existing_route_nlas(&route_message);
         let subnet = match subnet {
             Some(subnet) => crate::netlink_packet::ip_addr_from_route::<I>(&subnet)
@@ -980,6 +1291,7 @@ struct RouteNlaView<'a> {
     metric: &'a u32,
     interface_id: &'a u32,
     next_hop: Option<&'a RouteAddress>,
+    table: Option<&'a u32>,
 }
 
 /// Extract and return a view of the Nlas from the given route.
@@ -989,7 +1301,8 @@ struct RouteNlaView<'a> {
 /// Panics if:
 ///   * The route is missing any of the following Nlas: `Oif`, `Priority`,
 ///     or `Destination` (only when the destination_prefix_len is non-zero).
-///   * Any Nla besides `Oif`, `Priority`, `Gateway`, `Destination` is provided.
+///   * Any Nla besides `Oif`, `Priority`, `Gateway`, `Destination`, `Table`
+///     is provided.
 ///   * Any Nla is provided multiple times.
 /// Note that this fn is so opinionated about the provided NLAs because it is
 /// intended to be used on existing routes, which are constructed by the module
@@ -999,6 +1312,7 @@ fn view_existing_route_nlas(route: &RouteMessage) -> RouteNlaView<'_> {
     let mut metric = None;
     let mut interface_id = None;
     let mut next_hop = None;
+    let mut table = None;
     route.attributes.iter().for_each(|nla| match nla {
         RouteAttribute::Destination(dst) => {
             assert_eq!(subnet, None, "existing route has multiple `Destination` NLAs");
@@ -1016,6 +1330,10 @@ fn view_existing_route_nlas(route: &RouteMessage) -> RouteNlaView<'_> {
             assert_eq!(next_hop, None, "existing route has multiple `Gateway` NLAs");
             next_hop = Some(gateway)
         }
+        RouteAttribute::Table(t) => {
+            assert_eq!(table, None, "existing route has multiple `Table` NLAs");
+            table = Some(t)
+        }
         nla => panic!("existing route has unexpected NLA: {:?}", nla),
     });
     if subnet.is_none() {
@@ -1024,47 +1342,91 @@ fn view_existing_route_nlas(route: &RouteMessage) -> RouteNlaView<'_> {
             "existing route without `Destination` NLA must be a default route"
         );
     }
+
     RouteNlaView {
         subnet,
-        metric: metric.expect("existing route must have a `Priority` NLA"),
+        metric: metric.expect("existing routes must have a `Priority` NLA"),
         interface_id: interface_id.expect("existing routes must have an `Oif` NLA"),
         next_hop,
+        table,
     }
+}
+
+#[derive(Debug, PartialEq)]
+enum NewRouteConflict {
+    // The new route does not match any existing routes.
+    NoConflict,
+    // The new route matches an existing route with all fields.
+    ConflictInSameTable,
+    // The new route matches an existing route with all fields, except
+    // for its table id.
+    ConflictInDifferentTable,
 }
 
 // Check if the new route conflicts with an existing route.
 //
 // Note that Linux and Fuchsia differ on what constitutes a conflicting route.
 // Linux is stricter than Fuchsia and requires that all routes have a unique
-// [destination subnet, metric] pair. Here we replicate the check that Linux
+// (destination subnet, metric, table) tuple. Here we replicate the check that Linux
 // performs, so that Netlink can reject requests before handing them off to the
 // more flexible Netstack routing APIs.
-fn new_route_matches_existing<I: Ip>(
+fn new_route_matches_existing<'a, I: Ip>(
     route: &NewRouteArgs<I>,
-    existing_routes: &HashSet<NetlinkRouteMessage>,
-) -> bool {
-    existing_routes.iter().any(|NetlinkRouteMessage(existing_route)| {
-        let UnicastNewRouteArgs { subnet, target: _, priority, table: _ } = match route {
-            NewRouteArgs::Unicast(args) => args,
-        };
-        if subnet.prefix() != existing_route.header.destination_prefix_length {
-            return false;
-        }
-        let RouteNlaView {
-            subnet: existing_subnet,
-            metric: existing_metric,
-            interface_id: _,
-            next_hop: _,
-        } = view_existing_route_nlas(existing_route);
-        let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
-            crate::netlink_packet::ip_addr_from_route::<I>(&dst)
-                .is_ok_and(|dst: I::Addr| dst == subnet.network())
-        });
-        let metric_matches = existing_metric == priority;
-        subnet_matches && metric_matches
-    })
+    existing_routes: impl Iterator<Item = &'a NetlinkRouteMessage>,
+) -> NewRouteConflict {
+    existing_routes.fold(
+        NewRouteConflict::NoConflict,
+        |conflict, NetlinkRouteMessage(existing_route)| {
+            let UnicastNewRouteArgs { subnet, target: _, priority, table } = match route {
+                NewRouteArgs::Unicast(args) => args,
+            };
+            let RouteNlaView {
+                subnet: existing_subnet,
+                metric: existing_metric,
+                interface_id: _,
+                next_hop: _,
+                table: existing_table,
+            } = view_existing_route_nlas(&existing_route);
+            let table_matches =
+                existing_table.unwrap_or(&(existing_route.header.table.into())) == table;
+            let subnet_matches = {
+                if subnet.prefix() != existing_route.header.destination_prefix_length {
+                    false
+                } else {
+                    existing_subnet
+                        .map(|dst| crate::netlink_packet::ip_addr_from_route::<I>(&dst))
+                        .unwrap_or(Ok(I::UNSPECIFIED_ADDRESS))
+                        .is_ok_and(|dst: I::Addr| dst == subnet.network())
+                }
+            };
+            let metric_matches = existing_metric == priority;
+
+            let current_conflict = match (table_matches, subnet_matches, metric_matches) {
+                (true, true, true) => NewRouteConflict::ConflictInSameTable,
+                (false, true, true) => NewRouteConflict::ConflictInDifferentTable,
+                (_, _, _) => NewRouteConflict::NoConflict,
+            };
+            // Prioritize returning the NewRouteConflict with the most conflicts.
+            match (conflict, current_conflict) {
+                (NewRouteConflict::ConflictInSameTable, _)
+                | (_, NewRouteConflict::ConflictInSameTable) => {
+                    NewRouteConflict::ConflictInSameTable
+                }
+                (NewRouteConflict::ConflictInDifferentTable, _)
+                | (_, NewRouteConflict::ConflictInDifferentTable) => {
+                    NewRouteConflict::ConflictInDifferentTable
+                }
+                (NewRouteConflict::NoConflict, NewRouteConflict::NoConflict) => {
+                    NewRouteConflict::NoConflict
+                }
+            }
+        },
+    )
 }
 
+/// TODO(https://fxbug.dev/336382905): Use table as a condition for deleting
+/// existing routes once Netstack can support installing otherwise-identical
+/// routes via Policy-Based Routing.
 /// Select a route for deletion, based on the given deletion arguments.
 ///
 /// Note that Linux and Fuchsia differ on how to specify a route for deletion.
@@ -1095,6 +1457,7 @@ fn select_route_for_deletion<I: Ip>(
                 metric: existing_metric,
                 interface_id: existing_interface,
                 next_hop: existing_next_hop,
+                table: _,
             } = view_existing_route_nlas(existing_route);
             let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
                 crate::netlink_packet::ip_addr_from_route::<I>(&dst)
@@ -1118,6 +1481,17 @@ fn select_route_for_deletion<I: Ip>(
         // Select the route with the lowest metric
         .min_by(|(_route1, metric1), (_route2, metric2)| metric1.cmp(metric2))
         .map(|(route, _metric)| route)
+}
+
+fn get_all_route_messages<
+    'a,
+    I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+>(
+    route_tables: impl Iterator<Item = &'a RouteTable<I>>,
+) -> impl Iterator<Item = &'a NetlinkRouteMessage> {
+    route_tables
+        .map(|RouteTable { route_set_proxy: _, route_messages }| route_messages.iter())
+        .flatten()
 }
 
 #[cfg(test)]
@@ -1171,10 +1545,13 @@ mod tests {
     const METRIC2: u32 = 100;
     const METRIC3: u32 = 9999;
     const TEST_SEQUENCE_NUMBER: u32 = 1234;
+    const MANAGED_ROUTE_TABLE_ID: u32 = 5678;
+    const MANAGED_ROUTE_TABLE: RouteTableKey =
+        RouteTableKey::NetlinkManaged { table_id: MANAGED_ROUTE_TABLE_ID };
 
     fn create_installed_route<I: Ip>(
         subnet: Subnet<I::Addr>,
-        next_hop: I::Addr,
+        next_hop: Option<I::Addr>,
         interface_id: u64,
         metric: u32,
     ) -> fnet_routes_ext::InstalledRoute<I> {
@@ -1183,7 +1560,7 @@ mod tests {
                 destination: subnet,
                 action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget::<I> {
                     outbound_interface: interface_id,
-                    next_hop: SpecifiedAddr::new(next_hop),
+                    next_hop: next_hop.map(|next_hop| SpecifiedAddr::new(next_hop)).flatten(),
                 }),
                 properties: fnet_routes_ext::RouteProperties {
                     specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
@@ -1197,6 +1574,7 @@ mod tests {
 
     fn create_netlink_route_message<I: Ip>(
         destination_prefix_length: u8,
+        table: RouteTableKey,
         nlas: Vec<RouteAttribute>,
     ) -> NetlinkRouteMessage {
         let mut route_header = RouteHeader::default();
@@ -1209,9 +1587,9 @@ mod tests {
         route_header.address_family = address_family;
         route_header.destination_prefix_length = destination_prefix_length;
         route_header.kind = RouteType::Unicast;
-        // Conversion is safe as rt_class_t_RT_TABLE_MAIN has a value of 254
-        // which safely fits into a u8.
-        route_header.table = rt_class_t_RT_TABLE_MAIN as u8;
+
+        let (table_u8, _) = get_table_u8_and_nla_from_key(table);
+        route_header.table = table_u8;
 
         let mut route_message = RouteMessage::default();
         route_message.header = route_header;
@@ -1225,6 +1603,7 @@ mod tests {
         next_hop: Option<I::Addr>,
         outgoing_interface_id: u32,
         metric: u32,
+        table: Option<u32>,
     ) -> Vec<RouteAttribute> {
         let mut nlas = vec![];
 
@@ -1251,35 +1630,82 @@ mod tests {
 
         let priority_nla = RouteAttribute::Priority(metric);
         nlas.push(priority_nla);
+
+        if let Some(t) = table {
+            let table_nla = RouteAttribute::Table(t);
+            nlas.push(table_nla);
+        }
         nlas
     }
 
+    // TODO(https://g-issues.fuchsia.dev/issues/42084902): Update to use
+    // `ip_test` when async is supported.
+    #[test_case(RouteTableKey::Unmanaged)]
+    #[test_case(MANAGED_ROUTE_TABLE)]
     #[fuchsia::test]
-    fn test_handle_route_watcher_event_v4() {
-        handle_route_watcher_event_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1);
+    async fn test_handle_route_watcher_event_v4(table: RouteTableKey) {
+        handle_route_watcher_event_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1, table).await;
     }
 
+    #[test_case(RouteTableKey::Unmanaged)]
+    #[test_case(MANAGED_ROUTE_TABLE)]
     #[fuchsia::test]
-    fn test_handle_route_watcher_event_v6() {
-        handle_route_watcher_event_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1);
+    async fn test_handle_route_watcher_event_v6(table: RouteTableKey) {
+        handle_route_watcher_event_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1, table).await;
     }
 
-    fn handle_route_watcher_event_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
+    async fn handle_route_watcher_event_helper<
+        I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >(
+        subnet: Subnet<I::Addr>,
+        next_hop: I::Addr,
+        table: RouteTableKey,
+    ) {
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, DEV1.into(), METRIC1);
+            create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, DEV2.into(), METRIC2);
+            create_installed_route(subnet, Some(next_hop), DEV2.into(), METRIC2);
 
         let add_event1 = fnet_routes_ext::Event::Added(installed_route1);
         let add_event2 = fnet_routes_ext::Event::Added(installed_route2);
         let remove_event = fnet_routes_ext::Event::Removed(installed_route1);
         let unknown_event: fnet_routes_ext::Event<I> = fnet_routes_ext::Event::Unknown;
 
-        let mut route_messages: HashSet<NetlinkRouteMessage> = HashSet::new();
-        let expected_route_message1: NetlinkRouteMessage = installed_route1.try_into().unwrap();
-        let expected_route_message2: NetlinkRouteMessage = installed_route2.try_into().unwrap();
+        let expected_route_message1: NetlinkRouteMessage =
+            NetlinkRouteMessage::try_from_installed_route(installed_route1, table).unwrap();
+        let expected_route_message2: NetlinkRouteMessage =
+            NetlinkRouteMessage::try_from_installed_route(installed_route2, table).unwrap();
 
-        // Setup two fake clients: one is a member of the route multicast group.
+        // An Unmanaged table should never be used in a PendingRouteRequest, because
+        // any routes inserted through Netlink will be NetlinkManaged.
+        let (add_event1_pending_request, add_event2_pending_request, remove_event_pending_request) = {
+            match table {
+                RouteTableKey::Unmanaged => (None, None, None),
+                RouteTableKey::NetlinkManaged { .. } => (
+                    Some(PendingRouteRequestArgs::New(NewRouteArgs::Unicast(
+                        create_unicast_new_route_args(
+                            subnet,
+                            next_hop,
+                            DEV1.into(),
+                            METRIC1,
+                            table,
+                        ),
+                    ))),
+                    Some(PendingRouteRequestArgs::New(NewRouteArgs::Unicast(
+                        create_unicast_new_route_args(
+                            subnet,
+                            next_hop,
+                            DEV2.into(),
+                            METRIC2,
+                            table,
+                        ),
+                    ))),
+                    Some(PendingRouteRequestArgs::<I>::Del(expected_route_message2.clone())),
+                ),
+            }
+        };
+
+        // Set up two fake clients: one is a member of the route multicast group.
         let (right_group, wrong_group) = match I::VERSION {
             IpVersion::V4 => (
                 ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
@@ -1302,20 +1728,36 @@ mod tests {
         route_clients.add_client(right_client);
         route_clients.add_client(wrong_client);
 
+        let (route_set_proxy, _route_set_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+
+        let mut route_table = HashMap::from([(
+            table,
+            RouteTable { route_set_proxy, route_messages: HashSet::new() },
+        )]);
+
         // An event that is not an add or remove should result in an error.
         assert_matches!(
-            handle_route_watcher_event(&mut route_messages, &route_clients, unknown_event),
+            handle_route_watcher_event(&mut route_table, &route_clients, unknown_event, None),
             Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(_))
         );
-        assert_eq!(route_messages.len(), 0);
+        assert_eq!(route_table[&table].route_messages.len(), 0);
         assert_eq!(&right_sink.take_messages()[..], &[]);
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         assert_eq!(
-            handle_route_watcher_event(&mut route_messages, &route_clients, add_event1),
+            handle_route_watcher_event(
+                &mut route_table,
+                &route_clients,
+                add_event1,
+                add_event1_pending_request.clone(),
+            ),
             Ok(())
         );
-        assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
+        assert_eq!(
+            route_table[&table].route_messages,
+            HashSet::from_iter([expected_route_message1.clone()])
+        );
         assert_eq!(
             &right_sink.take_messages()[..],
             &[SentMessage::multicast(
@@ -1329,20 +1771,33 @@ mod tests {
 
         // Adding the same route again should result in an error.
         assert_matches!(
-            handle_route_watcher_event(&mut route_messages, &route_clients, add_event1),
+            handle_route_watcher_event(
+                &mut route_table,
+                &route_clients,
+                add_event1,
+                add_event1_pending_request.clone(),
+            ),
             Err(RouteEventHandlerError::AlreadyExistingRouteAddition(_))
         );
-        assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
+        assert_eq!(
+            route_table[&table].route_messages,
+            HashSet::from_iter([expected_route_message1.clone()])
+        );
         assert_eq!(&right_sink.take_messages()[..], &[]);
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         // Adding a different route should result in an addition.
         assert_eq!(
-            handle_route_watcher_event(&mut route_messages, &route_clients, add_event2),
+            handle_route_watcher_event(
+                &mut route_table,
+                &route_clients,
+                add_event2,
+                add_event2_pending_request.clone(),
+            ),
             Ok(())
         );
         assert_eq!(
-            route_messages,
+            route_table[&table].route_messages,
             HashSet::from_iter([expected_route_message1.clone(), expected_route_message2.clone()])
         );
         assert_eq!(
@@ -1357,10 +1812,18 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
         assert_eq!(
-            handle_route_watcher_event(&mut route_messages, &route_clients, remove_event),
+            handle_route_watcher_event(
+                &mut route_table,
+                &route_clients,
+                remove_event,
+                remove_event_pending_request.clone(),
+            ),
             Ok(())
         );
-        assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
+        assert_eq!(
+            route_table[&table].route_messages,
+            HashSet::from_iter([expected_route_message2.clone()])
+        );
         assert_eq!(
             &right_sink.take_messages()[..],
             &[SentMessage::multicast(
@@ -1372,11 +1835,178 @@ mod tests {
 
         // Removing a route that doesn't exist should result in an error.
         assert_matches!(
-            handle_route_watcher_event(&mut route_messages, &route_clients, remove_event),
+            handle_route_watcher_event(
+                &mut route_table,
+                &route_clients,
+                remove_event,
+                remove_event_pending_request,
+            ),
             Err(RouteEventHandlerError::NonExistentRouteDeletion(_))
         );
-        assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
+        assert_eq!(
+            route_table[&table].route_messages,
+            HashSet::from_iter([expected_route_message2.clone()])
+        );
         assert_eq!(&right_sink.take_messages()[..], &[]);
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
+    }
+
+    // TODO(https://g-issues.fuchsia.dev/issues/42084902): Update to use
+    // `ip_test` when async is supported.
+    #[fuchsia::test]
+    async fn test_handle_route_watcher_event_two_routesets_v4() {
+        handle_route_watcher_event_two_routesets_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1).await;
+    }
+
+    #[fuchsia::test]
+    async fn test_handle_route_watcher_event_two_routesets_v6() {
+        handle_route_watcher_event_two_routesets_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1).await;
+    }
+
+    async fn handle_route_watcher_event_two_routesets_helper<
+        I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >(
+        subnet: Subnet<I::Addr>,
+        next_hop: I::Addr,
+    ) {
+        let installed_route1: fnet_routes_ext::InstalledRoute<I> =
+            create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
+        let installed_route2: fnet_routes_ext::InstalledRoute<I> =
+            create_installed_route(subnet, Some(next_hop), DEV2.into(), METRIC2);
+
+        let add_event1 = fnet_routes_ext::Event::Added(installed_route1);
+        let add_event1_pending_request =
+            PendingRouteRequestArgs::New(NewRouteArgs::Unicast(create_unicast_new_route_args(
+                subnet,
+                next_hop,
+                DEV1.into(),
+                METRIC1,
+                MANAGED_ROUTE_TABLE,
+            )));
+        let add_event2 = fnet_routes_ext::Event::Added(installed_route2);
+        let remove_event = fnet_routes_ext::Event::Removed(installed_route1);
+
+        let expected_route_message1: NetlinkRouteMessage =
+            NetlinkRouteMessage::try_from_installed_route(installed_route1, MANAGED_ROUTE_TABLE)
+                .unwrap();
+        let expected_route_message2: NetlinkRouteMessage =
+            NetlinkRouteMessage::try_from_installed_route(
+                installed_route2,
+                RouteTableKey::Unmanaged,
+            )
+            .unwrap();
+
+        // Set up two fake clients: one is a member of the route multicast group.
+        let (right_group, wrong_group) = match I::VERSION {
+            IpVersion::V4 => (
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
+            ),
+            IpVersion::V6 => (
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
+                ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+            ),
+        };
+        let (mut right_sink, right_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[right_group],
+        );
+        let (mut wrong_sink, wrong_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_2,
+            &[wrong_group],
+        );
+        let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
+        route_clients.add_client(right_client);
+        route_clients.add_client(wrong_client);
+
+        let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+        let (managed_route_set_proxy, _managed_route_set_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+
+        let mut route_table = HashMap::from([
+            (
+                RouteTableKey::Unmanaged,
+                RouteTable {
+                    route_set_proxy: unmanaged_route_set_proxy,
+                    route_messages: HashSet::new(),
+                },
+            ),
+            (
+                MANAGED_ROUTE_TABLE,
+                RouteTable {
+                    route_set_proxy: managed_route_set_proxy,
+                    route_messages: HashSet::new(),
+                },
+            ),
+        ]);
+
+        // Ensure that the route gets added to the table managed by Netlink.
+        assert_eq!(
+            handle_route_watcher_event(
+                &mut route_table,
+                &route_clients,
+                add_event1,
+                Some(add_event1_pending_request.clone())
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            route_table[&MANAGED_ROUTE_TABLE].route_messages,
+            HashSet::from_iter([expected_route_message1.clone()])
+        );
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[SentMessage::multicast(
+                expected_route_message1
+                    .clone()
+                    .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                right_group
+            )]
+        );
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
+
+        // Ensure that an unmanaged Route can be observed and added to the
+        // unmanaged route set (signified by no pending request).
+        assert_eq!(
+            handle_route_watcher_event(&mut route_table, &route_clients, add_event2, None),
+            Ok(())
+        );
+        assert_eq!(
+            route_table[&RouteTableKey::Unmanaged].route_messages,
+            HashSet::from_iter([expected_route_message2.clone()])
+        );
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[SentMessage::multicast(
+                expected_route_message2
+                    .clone()
+                    .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                right_group
+            )]
+        );
+        assert_eq!(&wrong_sink.take_messages()[..], &[]);
+
+        // TODO(https://fxbug.dev/336382905): Update this assertion to enable specifying
+        // the table to select a route to delete between two otherwise equivalent routes.
+        // Ensure that the route gets removed properly from the managed route set
+        // even when there is no pending request.
+        assert_eq!(
+            handle_route_watcher_event(&mut route_table, &route_clients, remove_event, None),
+            Ok(())
+        );
+        assert_eq!(
+            route_table[&RouteTableKey::Unmanaged].route_messages,
+            HashSet::from_iter([expected_route_message2.clone()])
+        );
+        assert!(route_table[&MANAGED_ROUTE_TABLE].route_messages.is_empty());
+        assert_eq!(
+            &right_sink.take_messages()[..],
+            &[SentMessage::multicast(
+                expected_route_message1.clone().into_rtnl_del_route(),
+                right_group
+            )]
+        );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 
@@ -1392,13 +2022,15 @@ mod tests {
     }
 
     fn netlink_route_message_conversion_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
-        let installed_route = create_installed_route::<I>(subnet, next_hop, DEV1.into(), METRIC1);
+        let installed_route =
+            create_installed_route::<I>(subnet, Some(next_hop), DEV1.into(), METRIC1);
         let prefix_length = subnet.prefix();
         let subnet = if prefix_length > 0 { Some(subnet) } else { None };
-        let nlas = create_nlas::<I>(subnet, Some(next_hop), DEV1, METRIC1);
-        let expected = create_netlink_route_message::<I>(prefix_length, nlas);
+        let nlas = create_nlas::<I>(subnet, Some(next_hop), DEV1, METRIC1, None);
+        let table = RouteTableKey::Unmanaged;
+        let expected = create_netlink_route_message::<I>(prefix_length, table, nlas);
 
-        let actual: NetlinkRouteMessage = installed_route.try_into().unwrap();
+        let actual = NetlinkRouteMessage::try_from_installed_route(installed_route, table).unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -1419,18 +2051,28 @@ mod tests {
         };
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
-            installed_route.try_into();
+            NetlinkRouteMessage::try_from_installed_route(
+                installed_route,
+                RouteTableKey::Unmanaged,
+            );
         assert_eq!(actual, Err(NetlinkRouteMessageConversionError::RouteActionNotForwarding));
     }
 
     #[fuchsia::test]
     fn test_oversized_interface_id_route_conversion() {
         let invalid_interface_id = (u32::MAX as u64) + 1;
-        let installed_route: fnet_routes_ext::InstalledRoute<Ipv4> =
-            create_installed_route(V4_SUB1, V4_NEXTHOP1, invalid_interface_id, Default::default());
+        let installed_route: fnet_routes_ext::InstalledRoute<Ipv4> = create_installed_route(
+            V4_SUB1,
+            Some(V4_NEXTHOP1),
+            invalid_interface_id,
+            Default::default(),
+        );
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
-            installed_route.try_into();
+            NetlinkRouteMessage::try_from_installed_route(
+                installed_route,
+                RouteTableKey::Unmanaged,
+            );
         assert_eq!(
             actual,
             Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(invalid_interface_id))
@@ -1439,7 +2081,7 @@ mod tests {
 
     #[test]
     fn test_into_rtnl_new_route_is_serializable() {
-        let route = create_netlink_route_message::<Ipv4>(0, vec![]);
+        let route = create_netlink_route_message::<Ipv4>(0, RouteTableKey::Unmanaged, vec![]);
         let new_route_message = route.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let mut buf = vec![0; new_route_message.buffer_len()];
         // Serialize will panic if `new_route_message` is malformed.
@@ -1448,7 +2090,7 @@ mod tests {
 
     #[test]
     fn test_into_rtnl_del_route_is_serializable() {
-        let route = create_netlink_route_message::<Ipv6>(0, vec![]);
+        let route = create_netlink_route_message::<Ipv6>(0, RouteTableKey::Unmanaged, vec![]);
         let del_route_message = route.into_rtnl_del_route();
         let mut buf = vec![0; del_route_message.buffer_len()];
         // Serialize will panic if `del_route_message` is malformed.
@@ -1465,9 +2107,9 @@ mod tests {
         let interface_id = u32::MAX;
 
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, interface_id as u64, METRIC1);
+            create_installed_route(subnet, Some(next_hop), interface_id as u64, METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, (interface_id as u64) + 1, METRIC2);
+            create_installed_route(subnet, Some(next_hop), (interface_id as u64) + 1, METRIC2);
         let routes: HashSet<fnet_routes_ext::InstalledRoute<I>> =
             vec![installed_route1, installed_route2].into_iter().collect::<_>();
 
@@ -1476,8 +2118,9 @@ mod tests {
         let actual = new_set_with_existing_routes::<I>(routes);
         assert_eq!(actual.len(), 1);
 
-        let nlas = create_nlas::<I>(Some(subnet), Some(next_hop), interface_id, METRIC1);
-        let netlink_route_message = create_netlink_route_message::<I>(subnet.prefix(), nlas);
+        let nlas = create_nlas::<I>(Some(subnet), Some(next_hop), interface_id, METRIC1, None);
+        let netlink_route_message =
+            create_netlink_route_message::<I>(subnet.prefix(), RouteTableKey::Unmanaged, nlas);
         let expected: HashSet<NetlinkRouteMessage> =
             vec![netlink_route_message].into_iter().collect::<_>();
         assert_eq!(actual, expected);
@@ -1570,7 +2213,7 @@ mod tests {
             I::map_ip(
                 IpInvariant((v4_routes_set_provider, v6_routes_set_provider)),
                 |IpInvariant((main_set_provider, other_set_provider))| {
-                    let main_stream = fnet_routes_ext::testutil::admin::serve_one_route_set::<Ipv4>(
+                    let main_stream = fnet_routes_ext::testutil::admin::serve_all_route_sets::<Ipv4>(
                         main_set_provider,
                     );
                     (
@@ -1584,7 +2227,7 @@ mod tests {
                     )
                 },
                 |IpInvariant((other_set_provider, main_set_provider))| {
-                    let main_stream = fnet_routes_ext::testutil::admin::serve_one_route_set::<Ipv6>(
+                    let main_stream = fnet_routes_ext::testutil::admin::serve_all_route_sets::<Ipv6>(
                         main_set_provider,
                     );
                     (
@@ -1734,7 +2377,7 @@ mod tests {
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        let route = create_installed_route(subnet, next_hop, DEV1.into(), METRIC1);
+        let route = create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
 
         event_loop_errors_stream_ended_helper::<A::Version>(route).await;
         event_loop_errors_existing_after_add_helper::<A::Version>(route).await;
@@ -1856,32 +2499,33 @@ mod tests {
         );
     }
 
-    fn get_test_route_events<A: IpAddress>(
+    fn get_test_route_events_new_route_args<A: IpAddress>(
         subnet: Subnet<A>,
         next_hop1: A,
         next_hop2: A,
-    ) -> impl IntoIterator<Item = <A::Version as fnet_routes_ext::FidlRouteIpExt>::WatchEvent>
+    ) -> impl IntoIterator<Item = RequestArgs<A::Version>>
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt,
     {
         vec![
-            fnet_routes_ext::Event::<A::Version>::Existing(create_installed_route(
-                subnet,
-                next_hop1,
-                DEV1.into(),
-                METRIC1,
-            ))
-            .try_into()
-            .unwrap(),
-            fnet_routes_ext::Event::<A::Version>::Existing(create_installed_route(
-                subnet,
-                next_hop2,
-                DEV2.into(),
-                METRIC2,
-            ))
-            .try_into()
-            .unwrap(),
-            fnet_routes_ext::Event::<A::Version>::Idle.try_into().unwrap(),
+            RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
+                create_unicast_new_route_args(
+                    subnet,
+                    next_hop1,
+                    DEV1.into(),
+                    METRIC1,
+                    MANAGED_ROUTE_TABLE,
+                ),
+            ))),
+            RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
+                create_unicast_new_route_args(
+                    subnet,
+                    next_hop2,
+                    DEV2.into(),
+                    METRIC2,
+                    MANAGED_ROUTE_TABLE,
+                ),
+            ))),
         ]
     }
 
@@ -1890,6 +2534,7 @@ mod tests {
         next_hop: A,
         interface_id: u64,
         priority: u32,
+        table: RouteTableKey,
     ) -> UnicastNewRouteArgs<A::Version> {
         UnicastNewRouteArgs {
             subnet,
@@ -1898,7 +2543,7 @@ mod tests {
                 next_hop: SpecifiedAddr::new(next_hop),
             },
             priority,
-            table: Default::default(),
+            table: table.into(),
         }
     }
 
@@ -1907,13 +2552,14 @@ mod tests {
         next_hop: Option<A>,
         interface_id: Option<u64>,
         priority: Option<u32>,
+        table: RouteTableKey,
     ) -> UnicastDelRouteArgs<A::Version> {
         UnicastDelRouteArgs {
             subnet,
             outbound_interface: interface_id.map(NonZeroU64::new).flatten(),
             next_hop: next_hop.map(SpecifiedAddr::new).flatten(),
             priority: priority.map(NonZeroU32::new).flatten(),
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(table.into()).unwrap(),
         }
     }
 
@@ -1982,7 +2628,7 @@ mod tests {
 
         let watcher_stream_fut = respond_to_watcher::<A::Version, _>(
             watcher_stream.by_ref(),
-            get_test_route_events(subnet, next_hop1, next_hop2),
+            std::iter::once(fnet_routes_ext::Event::<A::Version>::Idle.try_into().unwrap()),
         );
         futures::select! {
             () = watcher_stream_fut.fuse() => {},
@@ -1994,6 +2640,36 @@ mod tests {
 
         let route_client = &route_client;
         let fut = async {
+            // Add some initial route state by sending through PendingRequests.
+            let request_sink = futures::stream::iter(get_test_route_events_new_route_args(
+                subnet, next_hop1, next_hop2,
+            ))
+            .fold(request_sink, |mut request_sink, args| async move {
+                let (completer, waiter) = oneshot::channel();
+                request_sink
+                    .send(
+                        Request {
+                            args,
+                            sequence_number: TEST_SEQUENCE_NUMBER,
+                            client: route_client.clone(),
+                            completer,
+                        }
+                        .into(),
+                    )
+                    .await
+                    .unwrap();
+                assert_matches!(waiter.await.unwrap(), Ok(()));
+                request_sink
+            })
+            .await;
+
+            // Ensure these messages to load the initial route state are
+            // received prior to handling the next requests. The messages for
+            // these requests are not needed by the callers, so drop them.
+            let _ = route_sink.next_message().await;
+            let _ = route_sink.next_message().await;
+            assert_eq!(route_sink.next_message().now_or_never(), None);
+
             let (results, _request_sink) = futures::stream::iter(args)
                 .fold(
                     (Vec::new(), request_sink),
@@ -2065,14 +2741,28 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC1,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop2),
+                        DEV2,
+                        METRIC2,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
@@ -2108,7 +2798,8 @@ mod tests {
                                         Some((m.header.address_family, interface_id)),
                                     RouteAttribute::Destination(_)
                                     | RouteAttribute::Gateway(_)
-                                    | RouteAttribute::Priority(_) => None,
+                                    | RouteAttribute::Priority(_)
+                                    | RouteAttribute::Table(_) => None,
                                     _ => panic!("unexpected NLA {nla:?} present in payload"),
                                 }
                             ).next()
@@ -2177,7 +2868,15 @@ mod tests {
         }
 
         route_stream
-            .zip(futures::stream::iter(route_set_results))
+            .zip(futures::stream::iter(
+                // TODO(https://fxbug.dev/337297829): Cleanup - add these `RouteSetResult`s to the
+                // `RouteSetResult` iterator instead of prepending them here.
+                // Handle the add requests for the initial two routes added to the route stream
+                // from `get_test_route_events_new_route_args`.
+                vec![RouteSetResult::AddResult(Ok(true)), RouteSetResult::AddResult(Ok(true))]
+                    .into_iter()
+                    .chain(route_set_results),
+            ))
             // Chain a pending so that the sink in the `forward` call below remains open and can be
             // used each time there is an item in the Stream.
             .chain(futures::stream::pending())
@@ -2412,7 +3111,8 @@ mod tests {
                     let sequence_number = message.message.header.sequence_number;
                     assert_matches!(
                         &message.message.payload,
-                        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(m)) | NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelRoute(m)) => {
+                        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(m))
+                        | NetlinkPayload::InnerMessage(RouteNetlinkMessage::DelRoute(m)) => {
                             // We expect there to be exactly one Priority NLA present
                             // for the given inputs.
                             m.attributes.clone().into_iter().filter_map(|nla|
@@ -2421,7 +3121,8 @@ mod tests {
                                         Some((sequence_number, priority)),
                                     RouteAttribute::Destination(_)
                                     | RouteAttribute::Gateway(_)
-                                    | RouteAttribute::Oif(_) => None,
+                                    | RouteAttribute::Oif(_)
+                                    | RouteAttribute::Table(_) => None,
                                     _ => panic!("unexpected NLA {nla:?} present in payload"),
                                 }
                             ).next()
@@ -2702,8 +3403,8 @@ mod tests {
         let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
 
         // There are two pre-set routes in `test_route_requests`.
-        // * subnet, next_hop1, DEV1, METRIC1
-        // * subnet, next_hop2, DEV2, METRIC2
+        // * subnet, next_hop1, DEV1, METRIC1, MANAGED_ROUTE_TABLE
+        // * subnet, next_hop2, DEV2, METRIC2, MANAGED_ROUTE_TABLE
         let route_req_args = match kind {
             RouteRequestKind::New => {
                 // Add a route that is not already present.
@@ -2712,12 +3413,17 @@ mod tests {
                     next_hop,
                     DEV1.into(),
                     metric.expect("add cases should be Some"),
+                    MANAGED_ROUTE_TABLE,
                 )))
             }
             RouteRequestKind::Del => {
                 // Remove an existing route.
                 RouteRequestArgs::Del(DelRouteArgs::Unicast(create_unicast_del_route_args(
-                    subnet, None, None, metric,
+                    subnet,
+                    None,
+                    None,
+                    metric,
+                    MANAGED_ROUTE_TABLE,
                 )))
             }
         };
@@ -2728,6 +3434,7 @@ mod tests {
             Ok(()) => {
                 let route_message = create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
+                    MANAGED_ROUTE_TABLE,
                     create_nlas::<A::Version>(
                         Some(subnet),
                         Some(next_hop),
@@ -2740,6 +3447,7 @@ mod tests {
                             // the lowest metric.
                             RouteRequestKind::Del => METRIC1,
                         },
+                        Some(MANAGED_ROUTE_TABLE_ID),
                     ),
                 );
 
@@ -2826,12 +3534,17 @@ mod tests {
                     next_hop,
                     DEV1.into(),
                     METRIC3,
+                    MANAGED_ROUTE_TABLE,
                 )))
             }
             RouteRequestKind::Del => {
                 // Remove an existing route.
                 RouteRequestArgs::Del(DelRouteArgs::Unicast(create_unicast_del_route_args(
-                    subnet, None, None, None,
+                    subnet,
+                    None,
+                    None,
+                    None,
+                    MANAGED_ROUTE_TABLE,
                 )))
             }
         };
@@ -2845,14 +3558,67 @@ mod tests {
         .await;
     }
 
+    #[test_case(
+        Err(RequestError::NotFound),
+        V4_SUB1; "v4_del")]
+    #[test_case(
+        Err(RequestError::NotFound),
+        V6_SUB1; "v6_del")]
+    #[fuchsia::test]
+    async fn test_del_route_nonexistent_table<A: IpAddress>(
+        waiter_result: Result<(), RequestError>,
+        subnet: Subnet<A>,
+    ) where
+        A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    {
+        // Remove a route from a table that doesn't exist yet.
+        let route_req_args =
+            RouteRequestArgs::Del(DelRouteArgs::Unicast(create_unicast_del_route_args(
+                subnet,
+                None,
+                None,
+                None,
+                RouteTableKey::NetlinkManaged { table_id: 1234 },
+            )));
+        test_route_requests_helper(
+            [RequestArgs::Route(route_req_args)],
+            Vec::new(),
+            vec![],
+            vec![waiter_result],
+            subnet,
+        )
+        .await;
+    }
+
     /// A test to exercise a `RTM_NEWROUTE` followed by a `RTM_GETROUTE`
     /// route request, ensuring that the new route is included in the
     /// dump request.
-    #[test_case(V4_SUB1, ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE); "v4_new_dump")]
-    #[test_case(V6_SUB1, ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE); "v6_new_dump")]
+    #[test_case(
+        V4_SUB1,
+        ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+        MANAGED_ROUTE_TABLE;
+        "v4_new_same_table_dump")]
+    #[test_case(
+        V6_SUB1,
+        ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
+        MANAGED_ROUTE_TABLE;
+        "v6_new_same_table_dump")]
+    #[test_case(
+        V4_SUB1,
+        ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
+        RouteTableKey::NetlinkManaged { table_id: 1234 };
+        "v4_new_different_table_dump")]
+    #[test_case(
+        V6_SUB1,
+        ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_ROUTE),
+        RouteTableKey::NetlinkManaged { table_id: 1234 };
+        "v6_new_different_table_dump")]
     #[fuchsia::test]
-    async fn test_new_then_get_dump_request<A: IpAddress>(subnet: Subnet<A>, group: ModernGroup)
-    where
+    async fn test_new_then_get_dump_request<A: IpAddress>(
+        subnet: Subnet<A>,
+        group: ModernGroup,
+        table: RouteTableKey,
+    ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
         let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
@@ -2862,12 +3628,12 @@ mod tests {
         );
 
         // There are two pre-set routes in `test_route_requests`.
-        // * subnet, next_hop1, DEV1, METRIC1
-        // * subnet, next_hop2, DEV2, METRIC2
+        // * subnet, next_hop1, DEV1, METRIC1, MANAGED_ROUTE_TABLE
+        // * subnet, next_hop2, DEV2, METRIC2, MANAGED_ROUTE_TABLE
         // To add a new route that does not get rejected by the handler due to it
         // already existing, we use a route that has METRIC3.
         let unicast_route_args =
-            create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
+            create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3, table);
 
         // We expect to see one multicast message, representing the route that was added.
         // Then, three unicast messages, representing the two routes that existed already in the
@@ -2876,7 +3642,14 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                    table,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC3,
+                        Some(table.into()),
+                    ),
                 )
                 .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
                 group,
@@ -2884,21 +3657,42 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC1,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop2),
+                        DEV2,
+                        METRIC2,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                    table,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC3,
+                        Some(table.into()),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
@@ -2913,6 +3707,89 @@ mod tests {
             ],
             messages,
             vec![RouteSetResult::AddResult(Ok(true))],
+            vec![Ok(()), Ok(())],
+            subnet,
+        )
+        .await;
+    }
+
+    /// TODO(https://fxbug.dev/336382905): Once otherwise equivalent
+    /// routes can be inserted into different tables, update the
+    /// assertions to recognize the route as being added successfully.
+    ///
+    /// A test to exercise a `RTM_NEWROUTE` with a route that already
+    /// exists, but in a different routing table, followed by a `RTM_GETROUTE`
+    /// route request, ensuring that the new route does not initiate a
+    /// multicast message and is not included in the dump request.
+    #[test_case(V4_SUB1; "v4_new_dump")]
+    #[test_case(V6_SUB1; "v6_new_dump")]
+    #[fuchsia::test]
+    async fn test_new_route_different_table_then_get_dump_request<A: IpAddress>(subnet: Subnet<A>)
+    where
+        A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    {
+        let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
+            (),
+            |()| (V4_NEXTHOP1, V4_NEXTHOP2),
+            |()| (V6_NEXTHOP1, V6_NEXTHOP2),
+        );
+
+        // There are two pre-set routes in `test_route_requests`.
+        // * subnet, next_hop1, DEV1, METRIC1, MANAGED_ROUTE_TABLE
+        // * subnet, next_hop2, DEV2, METRIC2, MANAGED_ROUTE_TABLE
+        // Attempt to install the same first route, but with a different table.
+        // Table id isn't important, as long as it is different
+        // than MANAGED_ROUTE_TABLE.
+        let unicast_route_args = create_unicast_new_route_args(
+            subnet,
+            next_hop1,
+            DEV1.into(),
+            METRIC1,
+            RouteTableKey::NetlinkManaged { table_id: 1 },
+        );
+
+        // We expect to see two unicast messages, representing the routes that
+        // existed already in the route set.
+        let messages = vec![
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC1,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop2),
+                        DEV2,
+                        METRIC2,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+        ];
+
+        test_route_requests_helper(
+            [
+                RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
+                    unicast_route_args,
+                ))),
+                RequestArgs::Route(RouteRequestArgs::Get(GetRouteArgs::Dump)),
+            ],
+            messages,
+            vec![],
             vec![Ok(()), Ok(())],
             subnet,
         )
@@ -2938,14 +3815,21 @@ mod tests {
         );
 
         // There are two pre-set routes in `test_route_requests`.
-        // * subnet, next_hop1, DEV1, METRIC1
-        // * subnet, next_hop2, DEV2, METRIC2
+        // * subnet, next_hop1, DEV1, METRIC1, MANAGED_ROUTE_TABLE
+        // * subnet, next_hop2, DEV2, METRIC2, MANAGED_ROUTE_TABLE
         // To add a new route that does not get rejected by the handler due to it
         // already existing, we use a route that has METRIC3.
-        let new_route_args = create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
+        let new_route_args = create_unicast_new_route_args(
+            subnet,
+            next_hop1,
+            DEV1.into(),
+            METRIC3,
+            MANAGED_ROUTE_TABLE,
+        );
 
         // The subnet and metric are enough to uniquely identify the above route.
-        let del_route_args = create_unicast_del_route_args(subnet, None, None, Some(METRIC3));
+        let del_route_args =
+            create_unicast_del_route_args(subnet, None, None, Some(METRIC3), MANAGED_ROUTE_TABLE);
 
         // We expect to see two multicast messages, one representing the route that was added,
         // and the other representing the same route being removed. Then, two unicast messages,
@@ -2954,7 +3838,14 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC3,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
                 group,
@@ -2962,7 +3853,14 @@ mod tests {
             SentMessage::multicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC3,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_del_route(),
                 group,
@@ -2970,14 +3868,28 @@ mod tests {
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop1),
+                        DEV1,
+                        METRIC1,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
             SentMessage::unicast(
                 create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop2),
+                        DEV2,
+                        METRIC2,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
@@ -3019,21 +3931,26 @@ mod tests {
         );
 
         // There are two pre-set routes in `test_route_requests`.
-        // * subnet, next_hop1, DEV1, METRIC1
-        // * subnet, next_hop2, DEV2, METRIC2
+        // * subnet, next_hop1, DEV1, METRIC1, MANAGED_ROUTE_TABLE
+        // * subnet, next_hop2, DEV2, METRIC2, MANAGED_ROUTE_TABLE
         let (route_req_args, route_set_result) = match kind {
             RouteRequestKind::New => {
                 // Add a route that is not already present.
-                let args = RouteRequestArgs::New(NewRouteArgs::Unicast(
-                    create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3),
-                ));
+                let args =
+                    RouteRequestArgs::New(NewRouteArgs::Unicast(create_unicast_new_route_args(
+                        subnet,
+                        next_hop1,
+                        DEV1.into(),
+                        METRIC3,
+                        MANAGED_ROUTE_TABLE,
+                    )));
                 let res = RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated));
                 (args, res)
             }
             RouteRequestKind::Del => {
                 // Remove an existing route.
                 let args = RouteRequestArgs::Del(DelRouteArgs::Unicast(
-                    create_unicast_del_route_args(subnet, None, None, None),
+                    create_unicast_del_route_args(subnet, None, None, None, MANAGED_ROUTE_TABLE),
                 ));
                 let res = RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated));
                 (args, res)
@@ -3080,11 +3997,159 @@ mod tests {
     }
 
     // A flattened view of Route, convenient for holding testdata.
+    #[derive(Clone)]
     struct Route<I: Ip> {
         subnet: Subnet<I::Addr>,
         device: u32,
         nexthop: Option<I::Addr>,
         metric: u32,
+    }
+
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "all_fields_the_same_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "all_fields_the_same_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_DFLT, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_DFLT, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "default_route_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_DFLT, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_DFLT, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "default_route_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "different_device_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "different_device_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "different_nexthop_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "different_nexthop_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "different_device_and_nexthop_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "different_device_and_nexthop_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "nexthop_newly_unset_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "nexthop_newly_unset_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "nexthop_previously_unset_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        NewRouteConflict::ConflictInSameTable; "nexthop_previously_unset_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC2, },
+        NewRouteConflict::NoConflict; "different_metric_v4_should_not_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC2, },
+        NewRouteConflict::NoConflict; "different_metric_v6_should_not_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB2, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::NoConflict; "different_subnet_v4_should_not_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB2, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::NoConflict; "different_subnet_v6_should_not_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB3, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::NoConflict; "different_subnet_prefixlen_v4_should_not_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB3, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        NewRouteConflict::NoConflict; "different_subnet_prefixlen_v6_should_not_match")]
+    fn test_new_route_matchers<I: Ip>(
+        route1: Route<I>,
+        route2: Route<I>,
+        expected_conflict: NewRouteConflict,
+    ) {
+        // Route1 is converted into a NewRouteArgs, which is used as:
+        // * a pending route request to compare against in `new_route_matches_new_route_args`, and
+        // * an existing route to compare against in `route_matches_exsting`
+        let new_route_args = {
+            let Route { subnet, device, nexthop, metric } = route1;
+            NewRouteArgs::Unicast(UnicastNewRouteArgs {
+                subnet,
+                target: fnet_routes_ext::RouteTarget::<I> {
+                    outbound_interface: device.into(),
+                    next_hop: nexthop
+                        .map(|a| SpecifiedAddr::new(a).expect("nexthop should be specified")),
+                },
+                priority: metric,
+                table: MANAGED_ROUTE_TABLE_ID,
+            })
+        };
+
+        test_new_route_matches_new_route_args(
+            route2.clone(),
+            new_route_args,
+            match expected_conflict {
+                NewRouteConflict::NoConflict => false,
+                NewRouteConflict::ConflictInSameTable
+                | NewRouteConflict::ConflictInDifferentTable => true,
+            },
+        );
+        test_new_route_matches_existing(new_route_args, route2, expected_conflict);
+    }
+
+    fn test_new_route_matches_new_route_args<I: Ip>(
+        new: Route<I>,
+        pending_route: NewRouteArgs<I>,
+        expect_match: bool,
+    ) {
+        let new_route = {
+            let Route { subnet, device, nexthop, metric } = new;
+            create_installed_route::<I>(subnet, nexthop, device.into(), metric)
+        };
+
+        assert_eq!(new_route_matches_new_route_args(&new_route, &pending_route), expect_match)
+    }
+
+    fn test_new_route_matches_existing<I: Ip>(
+        new_route_args: NewRouteArgs<I>,
+        existing: Route<I>,
+        expected_conflict: NewRouteConflict,
+    ) {
+        let Route { subnet, device, nexthop, metric } = existing;
+        // Don't populate the Destination NLA if this is the default route.
+        let destination = (subnet.prefix() != 0).then_some(subnet);
+        let existing_route = create_netlink_route_message::<I>(
+            subnet.prefix(),
+            MANAGED_ROUTE_TABLE,
+            create_nlas::<I>(destination, nexthop, device, metric, Some(MANAGED_ROUTE_TABLE_ID)),
+        );
+        let existing_routes = std::iter::once(&existing_route);
+        assert_eq!(
+            new_route_matches_existing(&new_route_args, existing_routes.into_iter()),
+            expected_conflict
+        );
     }
 
     #[test_case(
@@ -3106,27 +4171,27 @@ mod tests {
     #[test_case(
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
-        true; "different_device_v4_should_match")]
+        false; "different_device_v4_should_not_match")]
     #[test_case(
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
-        true; "different_device_v6_should_match")]
+        false; "different_device_v6_should_not_match")]
     #[test_case(
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
-        true; "different_nexthop_v4_should_match")]
+        false; "different_nexthop_v4_should_not_match")]
     #[test_case(
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
-        true; "different_nexthop_v6_should_match")]
+        false; "different_nexthop_v6_should_not_match")]
     #[test_case(
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
-        true; "different_device_and_nexthop_v4_should_match")]
+        false; "different_device_and_nexthop_v4_should_not_match")]
     #[test_case(
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
-        true; "different_device_and_nexthop_v6_should_match")]
+        false; "different_device_and_nexthop_v6_should_not_match")]
     #[test_case(
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
@@ -3138,11 +4203,11 @@ mod tests {
     #[test_case(
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
-        true; "nexthop_previously_unset_v4_should_match")]
+        false; "nexthop_previously_unset_v4_should_not_match")]
     #[test_case(
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
-        true; "nexthop_previously_unset_v6_should_match")]
+        false; "nexthop_previously_unset_v6_should_not_match")]
     #[test_case(
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC2, },
@@ -3167,34 +4232,29 @@ mod tests {
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         Route::<Ipv6>{subnet: V6_SUB3, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "different_subnet_prefixlen_v6_should_not_match")]
-    fn test_new_route_matches_existing<I: Ip>(
-        new: Route<I>,
-        existing: Route<I>,
+    fn test_installed_route_matches_netlink_message<I: Ip>(
+        route1: Route<I>,
+        route2: Route<I>,
         expect_match: bool,
     ) {
-        let new_route_args = {
-            let Route { subnet, device, nexthop, metric } = new;
-            NewRouteArgs::Unicast(UnicastNewRouteArgs {
-                subnet,
-                target: fnet_routes_ext::RouteTarget::<I> {
-                    outbound_interface: device.into(),
-                    next_hop: nexthop
-                        .map(|a| SpecifiedAddr::new(a).expect("nexthop should be specified")),
-                },
-                priority: metric,
-                table: Default::default(),
-            })
+        let installed_route = {
+            let Route { subnet, device, nexthop, metric } = route1;
+            create_installed_route::<I>(subnet, nexthop, device.into(), metric)
         };
-        let existing_routes = {
-            let Route { subnet, device, nexthop, metric } = existing;
-            // Don't populate the Destination NLA if this is the default route.
-            let destination = (subnet.prefix() != 0).then_some(subnet);
-            HashSet::from([create_netlink_route_message::<I>(
-                subnet.prefix(),
-                create_nlas::<I>(destination, nexthop, device, metric),
-            )])
+        let netlink_message = {
+            let Route { subnet, device, nexthop, metric } = route2;
+            let installed_route =
+                create_installed_route::<I>(subnet, nexthop, device.into(), metric);
+            // TODO(https://fxbug.dev/336382905): Pass in table as a
+            // parameter once tables are provided by Netstack routes.
+            NetlinkRouteMessage::try_from_installed_route(installed_route, RouteTableKey::Unmanaged)
+                .unwrap()
         };
-        assert_eq!(new_route_matches_existing(&new_route_args, &existing_routes), expect_match);
+
+        assert_eq!(
+            installed_route_matches_netlink_message(&installed_route, &netlink_message),
+            expect_match
+        );
     }
 
     // Calls `select_route_for_deletion` with the given args & existing_routes.
@@ -3214,7 +4274,14 @@ mod tests {
                 let destination = (subnet.prefix() != 0).then_some(*subnet);
                 create_netlink_route_message::<I>(
                     subnet.prefix(),
-                    create_nlas::<I>(destination, nexthop.to_owned(), *device, *metric),
+                    MANAGED_ROUTE_TABLE,
+                    create_nlas::<I>(
+                        destination,
+                        nexthop.to_owned(),
+                        *device,
+                        *metric,
+                        Some(MANAGED_ROUTE_TABLE_ID),
+                    ),
                 )
             })
             .collect::<Vec<_>>();
@@ -3237,35 +4304,35 @@ mod tests {
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB2, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         false; "subnet_does_not_match_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB3, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         false; "subnet_prefix_len_does_not_match_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         true; "subnet_matches_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         false; "interface_does_not_match_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         true; "interface_matches_v4")]
@@ -3273,7 +4340,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         false; "nexthop_absent_v4")]
@@ -3281,7 +4348,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
         false; "nexthop_does_not_match_v4")]
@@ -3289,7 +4356,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
         true; "nexthop_matches_v4")]
@@ -3297,7 +4364,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC2, },
         false; "metric_does_not_match_v4")]
@@ -3305,42 +4372,42 @@ mod tests {
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         true; "metric_matches_v4")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB2, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "subnet_does_not_match_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB3, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "subnet_prefix_len_does_not_match_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         true; "subnet_matches_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         false; "interface_does_not_match_v6")]
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
-            next_hop: None, priority: None, table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            next_hop: None, priority: None, table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         true; "interface_matches_v6")]
@@ -3348,7 +4415,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         false; "nexthop_absent_v6")]
@@ -3356,7 +4423,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
         false; "nexthop_does_not_match_v6")]
@@ -3364,7 +4431,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
         true; "nexthop_matches_v6")]
@@ -3372,7 +4439,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC2, },
         false; "metric_does_not_match_v6")]
@@ -3380,7 +4447,7 @@ mod tests {
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None,
             next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
         true; "metric_matches_v6")]
@@ -3395,7 +4462,7 @@ mod tests {
     #[test_case(
         UnicastDelRouteArgs::<Ipv4> {
             subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         &[
         Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC2, },
@@ -3406,7 +4473,7 @@ mod tests {
     #[test_case(
         UnicastDelRouteArgs::<Ipv6> {
             subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
-            table: NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            table: NonZeroU32::new(MANAGED_ROUTE_TABLE.into()).unwrap(),
         },
         &[
         Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC2, },
