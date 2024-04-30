@@ -18,6 +18,7 @@
 #include <wlan/drivers/log.h>
 
 #include "device_interface.h"
+#include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
@@ -42,6 +43,7 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) final;
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) final;
+  void Start(StartRequest& request, StartCompleter::Sync& completer) final;
   void SetChannel(SetChannelRequest& request, SetChannelCompleter::Sync& completer) final;
   void JoinBss(JoinBssRequest& request, JoinBssCompleter::Sync& completer) final;
   void EnableBeaconing(EnableBeaconingRequest& request,
@@ -59,6 +61,7 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   void CancelScan(CancelScanRequest& request, CancelScanCompleter::Sync& completer) final;
   void UpdateWmmParameters(UpdateWmmParametersRequest& request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
+  zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
   static zx_status_t WlanTx(void* ctx, const uint8_t* payload, size_t payload_size);
   static zx_status_t EthernetRx(void* ctx, const uint8_t* payload, size_t payload_size);
 
@@ -76,6 +79,11 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   std::unique_ptr<fidl::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacBridge>>
       softmac_bridge_server_;
   fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> softmac_client_;
+
+  // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
+  // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
+  // again until its reset upon the framework calling the unbind hook.
+  mutable std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   DeviceInterface* device_interface_;
   wlansoftmac_handle_t* rust_handle_;

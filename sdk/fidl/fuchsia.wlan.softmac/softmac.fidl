@@ -297,12 +297,10 @@ type WlanTxPacket = struct {
 /// Protocol containing methods common to both `WlanSoftmacIfc` and `WlanSoftmacIfcBridge`.
 ///
 /// The `WlanSoftmacIfc` and `WlanSoftmacIfcBridge` protocols have common methods, as the latter
-/// generally transforms `WlanSoftmacIfc` requests received in the C++ portion of the wlansoftmac driver
-/// to `WlanSoftmacIfcBridge` requests in the Rust portion of the wlansoftmac driver. Composing this
+/// generally forwards `WlanSoftmacIfc` requests received in the wlansoftmac driver
+/// to `WlanSoftmacIfcBridge` requests in the bridged driver. Composing this
 /// protocol into `WlanSoftmacIfc` and `WlanSoftmacIfcBridge` minimizes the duplication of method
 /// definitions (and associated request conversions that would be caused by such duplication).
-/// This level of indirection enables flexibility to use different methods definitions in the transport
-/// between the Rust and C++ portions.
 ///
 /// **This protocol is not implemented directly by any component.** It is composed into `WlanSoftmacIfc`
 /// and `WlanSoftmacIfcBridge`.
@@ -337,12 +335,12 @@ closed protocol WlanSoftmacIfcBase {
     }) -> ();
 };
 
-/// Protocol that transports `WlanSoftmacIfc` requests from the C++ portion of the wlansoftmac driver to
-/// the Rust portion of the wlansoftmac driver.
+/// Protocol that transports `WlanSoftmacIfc` requests from the wlansoftmac driver to
+/// the bridged driver.
 ///
 /// This protocol should always be available at HEAD since it's intended to be an in-tree only protocol.
 /// This protocol only exists because wlansoftmac cannot be implemented in Rust and must interact with
-/// the wlansoftmac-c, wlansoftmac-rust, and wlan-mlme crates.
+/// the wlansoftmac-c, wlansoftmac-rust, and wlan-mlme Rust crates.
 @available(added=HEAD)
 closed protocol WlanSoftmacIfcBridge {
     compose WlanSoftmacIfcBase;
@@ -355,9 +353,8 @@ closed protocol WlanSoftmacIfcBridge {
 /// # Experimental
 ///
 /// This protocol is implemented as a foreign function interface (FFI)
-/// between the C++ wlansoftmac driver and the Rust bridged wlansoftmac
-/// driver solely to improve the performance of processing data frames
-/// through the wlan-mlme Rust crate.
+/// between the wlansoftmac driver and the bridged driver solely to improve
+/// the performance of processing data frames through the wlan-mlme library.
 ///
 /// By using an FFI, messages through this protocol never enter a FIDL
 /// channel and thus do not incur the cost of the associated system calls
@@ -385,9 +382,8 @@ closed protocol FrameProcessor {
 /// # Experimental
 ///
 /// This protocol is implemented as a foreign function interface (FFI)
-/// between the C++ wlansoftmac driver and the Rust bridged wlansoftmac
-/// driver solely to improve the performance of processing data frames
-/// through the wlan-mlme Rust crate.
+/// between the wlansoftmac driver and the bridged driver solely to improve
+/// the performance of processing data frames through the wlan-mlme library.
 ///
 /// By using an FFI, messages through this protocol never enter a FIDL
 /// channel and thus do not incur the cost of the associated system calls
@@ -794,17 +790,57 @@ closed protocol WlanSoftmacBase {
 //                         transported protocols.
 // TODO(https://fxbug.dev/42085148): Revisit documentation about safety and when methods
 //                         can be called for clarity. See for example `Query`.
-/// `WlanSoftmacBridge` is the protocol that the `wlansoftmac` C++ driver serves
-/// to the the `wlan-mlme` Rust library. The `WlanSoftmacBridge` protocol is the
-/// same as `WlanSoftmac` with the exception of the `Start()` method.
-/// `WlanSoftmacBridge` has a distinct `Start()` because `wlansofmac` serves
-/// `WlanSoftmacBridge` over the Zircon transport instead of the Driver
-/// transport. A Zircon transport `client_end:WlanSoftmacIfc` is not compatible
-/// with an Driver transported protocol.
+/// `WlanSoftmacBridge` is the protocol the `wlansoftmac` driver serves
+/// to the bridged driver. This protocol **should not** be implemented
+/// by a vendor driver.
 @available(added=15)
 closed protocol WlanSoftmacBridge {
     @available(added=HEAD)
     compose WlanSoftmacBase;
+
+    /// Signal to the server that the MLME for the iface is ready to send and receive
+    /// frames.
+    ///
+    /// The client provides the following arguments:
+    ///
+    ///   - `ifc_bridge`: The client end of a `WlanSoftmacIfcBridge` server which the
+    ///     `wlansoftmac` driver will use to forward `WlanSoftmacIfc` events to
+    ///     the bridged driver.
+    ///   - `frame_processor`: A `frame_processor_t*` casted to a `uint64`. The
+    ///     `frame_processor_t` is defined in
+    ///     `//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h`.
+    ///
+    /// The server must copy the contents of the `frame_processor_t` before
+    /// returning from this method. The lifetime of the `frame_processor_t*` is only as
+    /// long as this method call, but the contents of the `frame_processor_t` will
+    /// live until the server stops the MLME.
+    ///
+    /// The server returns a server end of a `fuchsia.wlan.mlme/MLME` protocol. The SME
+    /// for the iface owns the client end. Thus, this channel is used for SME <-> MLME
+    /// communication.
+    ///
+    /// The `WlanSoftmacBridge.Start` method is different from `WlanSoftmac.Start`
+    /// for two reasons. First, Rust bindings do not exist for Driver transported
+    /// protocols, so `WlanSoftmacIfcBridge` protocol must be Zircon transported to be
+    /// usable by the bridged driver. Second, the Zircon transport adds
+    /// significant latency compared to the Driver transport. As a result, the
+    /// `frame_processor` argument provides an FFI for the wlansoftmac driver
+    /// to send Ethernet and WLAN packets to the bridged driver with
+    /// latency comparable or better than a Driver transported protocol.
+    ///
+    /// Except where noted, `WlanSoftmacBridge` methods must only be called after
+    /// a successful call to `WlanSoftmacBridge.Start`.
+    ///
+    /// Common errors include:
+    ///
+    ///   - `ZX_ERR_ALREADY_BOUND`: `Start` was already called on this softmac.
+    @available(added=HEAD)
+    strict Start(resource struct {
+        ifc_bridge client_end:WlanSoftmacIfcBridge;
+        frame_processor uint64;
+    }) -> (resource struct {
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
 
     /// Notifies the device of a successful association and configures
     /// additional parameters necessary to participate in that association.
@@ -826,19 +862,24 @@ closed protocol WlanSoftmacBridge {
 @transport("Driver")
 @available(added=15)
 closed protocol WlanSoftmac {
-    /// Start a softmac on the underlying device, using the given ifc to pass
-    /// events upwards. Callbacks on ifc may be invoked from now until Stop()
-    /// is called.
+    /// Signal to the server that the MLME for the iface is ready to send and receive
+    /// frames.
     ///
-    /// The returned sme_channel is the server endpoint of a wlan_mlme.fidl:MLME
-    /// protocol, the client end of which is held by SME. This channel is used for
-    /// SME <-> MLME communication.
+    /// The client provides the following arguments:
     ///
-    /// Except where noted, WlanSoftmac APIs may only be called while the softmac
-    /// is running after a successful call to Start().
+    ///   - `ifc`: The client end of a `WlanSoftmaIfc` server which the
+    ///     server will use to send events to the client.
     ///
-    /// Common errors include: \
-    ///   ZX_ERR_ALREADY_BOUND: `Start` was already called on this softmac.
+    /// The server returns a server end of a `fuchsia.wlan.mlme/MLME` protocol. The SME
+    /// for the iface owns the client end. Thus, this channel is used for SME <-> MLME
+    /// communication.
+    ///
+    /// Except where noted, `WlanSoftmac` methods must only be called after
+    /// a successful call to `WlanSoftmac.Start`.
+    ///
+    /// Common errors include:
+    ///
+    ///   - `ZX_ERR_ALREADY_BOUND`: `Start` was already called on this softmac.
     @available(added=15)
     strict Start(resource struct {
         ifc client_end:WlanSoftmacIfc;

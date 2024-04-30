@@ -10,7 +10,7 @@ use {
     fuchsia_async::{Duration, Task},
     fuchsia_inspect::{Inspector, Node as InspectNode},
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_zircon as zx,
     futures::{
         channel::{
             mpsc,
@@ -25,7 +25,7 @@ use {
         buffer::CBufferProvider,
         device::{
             completers::{InitCompleter, StopCompleter},
-            DeviceOps,
+            DeviceOps, FrameProcessor,
         },
         DriverEvent, DriverEventSink,
     },
@@ -59,7 +59,7 @@ impl WlanSoftmacHandle {
     }
 }
 
-/// Run the Rust portion of wlansoftmac which includes the following three futures:
+/// Run the bridged wlansoftmac driver composed of the following servers:
 ///
 ///   - WlanSoftmacIfcBridge server
 ///   - MLME server
@@ -449,33 +449,28 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
 ) -> Result<BootstrappedGenericSme, zx::Status> {
     wtrace::duration!(c"rust_driver::bootstrap_generic_sme");
 
-    let wlan_softmac_ifc_bridge_client_handle = zx::Handle::from(
-        softmac_ifc_bridge_proxy
-            .into_channel()
-            .map_err(|_| {
-                error!(
-                    "Failed to convert {} into channel.",
-                    fidl_softmac::WlanSoftmacIfcBridgeMarker::DEBUG_NAME
-                );
-                zx::Status::INTERNAL
-            })?
-            .into_zx_channel(),
-    )
-    .into_raw();
+    let ifc_bridge = softmac_ifc_bridge_proxy.into_client_end().map_err(|_| {
+        error!(
+            "Failed to convert {} into client end.",
+            fidl_softmac::WlanSoftmacIfcBridgeMarker::DEBUG_NAME
+        );
+        zx::Status::INTERNAL
+    })?;
 
     // Calling WlanSoftmac.Start() indicates to the vendor driver that this driver (wlansoftmac) is
     // ready to receive WlanSoftmacIfc messages. wlansoftmac will buffer all WlanSoftmacIfc messages
     // in an mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them.
-    let usme_bootstrap_handle_via_iface_creation =
-        match device.start(driver_event_sink, wlan_softmac_ifc_bridge_client_handle) {
-            Ok(handle) => handle,
+    let usme_bootstrap_channel_via_iface_creation =
+        match device.start(ifc_bridge, FrameProcessor::new(driver_event_sink)).await {
+            Ok(channel) => channel,
             Err(status) => {
                 error!("Failed to receive a UsmeBootstrap handle: {}", status);
                 return Err(status);
             }
         };
-    let channel = zx::Channel::from(usme_bootstrap_handle_via_iface_creation);
-    let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(channel);
+    let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
+        usme_bootstrap_channel_via_iface_creation,
+    );
     let mut usme_bootstrap_stream = match server.into_stream() {
         Ok(res) => res,
         Err(e) => {

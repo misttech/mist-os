@@ -29,7 +29,6 @@
 
 #include "device_interface.h"
 #include "softmac_bridge.h"
-#include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
@@ -44,9 +43,6 @@ class SoftmacBinding : public DeviceInterface {
   }
 
   // DeviceInterface methods
-  zx_status_t Start(zx_handle_t softmac_ifc_bridge_client_handle,
-                    const frame_processor_t* frame_processor,
-                    zx::channel* out_sme_channel) const final;
   zx_status_t SetEthernetStatus(uint32_t status) const final __TA_EXCLUDES(ethernet_proxy_lock_);
 
  private:
@@ -137,11 +133,6 @@ class SoftmacBinding : public DeviceInterface {
 
   // The FIDL client to communicate with iwlwifi
   fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
-
-  // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
-  // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
-  // again until its reset upon the framework calling the unbind hook.
-  mutable std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   // Record when the framework calls the unbind hook to prevent sta_shutdown_handler() from calling
   // device_async_remove() when an unbind is already in progress.

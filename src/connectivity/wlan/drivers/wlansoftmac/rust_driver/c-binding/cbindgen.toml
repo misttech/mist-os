@@ -13,16 +13,17 @@ include_guard = "SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING
 language = "C"
 style = "type"
 
-sys_includes = [
-    "zircon/types.h",
-    "lib/trace/event.h",
-]
+sys_includes = [ "zircon/types.h" ]
 
 [parse]
 parse_deps = true
-include = ["wlan_mlme", "wlan_span", "wlansoftmac_rust"]
+include = ["wlan_mlme", "wlansoftmac_rust"]
 
 [export]
+include = [
+    "CFrameProcessor",
+    "CFrameProcessorOps",
+]
 exclude = [
     # Unused types
     "LinkStatus",
@@ -42,12 +43,6 @@ exclude = [
 "CFrameProcessor" = "frame_processor_t"
 "CFrameProcessorOps" = "frame_processor_ops_t"
 "CFrameSender" = "frame_sender_t"
-
-# wlan-span types
-"CSpan" = "wlan_span_t"
-
-# fuchsia-trace types
-"TraceId" = "trace_async_id_t"
 
 # This struct is used for void* context fields in protocol ops.
 "DriverEventSink" = "void"

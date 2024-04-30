@@ -226,11 +226,6 @@ const PEER_ADDR_OFFSET: usize = 4;
 /// can then implement trait methods instead of mocking an underlying DeviceInterface
 /// and FIDL proxy.
 pub trait DeviceOps {
-    fn start(
-        &mut self,
-        driver_event_sink: DriverEventSink,
-        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
-    ) -> Result<zx::Handle, zx::Status>;
     fn wlan_softmac_query_response(
         &mut self,
     ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>>;
@@ -246,6 +241,11 @@ pub trait DeviceOps {
     fn spectrum_management_support(
         &mut self,
     ) -> impl Future<Output = Result<fidl_common::SpectrumManagementSupport, zx::Status>>;
+    fn start(
+        &mut self,
+        ifc_bridge: fidl::endpoints::ClientEnd<fidl_softmac::WlanSoftmacIfcBridgeMarker>,
+        frame_processor: Pin<Box<FrameProcessor>>,
+    ) -> impl Future<Output = Result<fidl::Channel, zx::Status>>;
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
     /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
     /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
@@ -395,40 +395,6 @@ pub async fn try_query_spectrum_management_support(
 }
 
 impl DeviceOps for Device {
-    fn start(
-        &mut self,
-        driver_event_sink: DriverEventSink,
-        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
-    ) -> Result<zx::Handle, zx::Status> {
-        self.frame_processor = Some(FrameProcessor::new(driver_event_sink));
-        let frame_processor = self.frame_processor.as_mut().unwrap().as_mut();
-        // Safety: This call is safe because `self.frame_processor` will outlive all uses of the
-        // constructed `CFrameProcessor` across the FFI boundary. This includes during unbind when
-        // the C++ portion of wlansoftmac will ensure no additional calls will be made through
-        // `CFrameProcessor` after unbind begins.
-        let frame_processor = unsafe { frame_processor.to_c_binding() };
-
-        let mut out_channel = 0;
-
-        // Safety: This call to `self.raw_device.start` is safe because `frame_processor` was
-        // constructed in accordance with the safety documentation of
-        // `FrameProcessor::to_c_binding`.
-        let status = unsafe {
-            (self.raw_device.start)(
-                self.raw_device.device,
-                wlan_softmac_ifc_bridge_client_handle,
-                &frame_processor,
-                &mut out_channel as *mut u32,
-            )
-        };
-        // Safety: Constructing a `zx::Handle` from the returned `out_channel` is safe
-        // because returning an invalid handle violates the FFI.
-        //
-        // An unsafe block is necessary because a `zx::Handle` cannot be passed across
-        // the FFI boundary.
-        zx::ok(status).map(|_| unsafe { zx::Handle::from_raw(out_channel) })
-    }
-
     async fn wlan_softmac_query_response(
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
@@ -465,6 +431,35 @@ impl DeviceOps for Device {
             "QuerySpectrumManagementSupport",
             self.wlan_softmac_bridge_proxy.query_spectrum_management_support().await,
         )
+    }
+
+    async fn start(
+        &mut self,
+        ifc_bridge: fidl::endpoints::ClientEnd<fidl_softmac::WlanSoftmacIfcBridgeMarker>,
+        frame_processor: Pin<Box<FrameProcessor>>,
+    ) -> Result<fidl::Channel, zx::Status> {
+        self.frame_processor = Some(frame_processor);
+
+        // Safety: This call is safe because `self.frame_processor` will outlive all uses of the
+        // constructed `CFrameProcessor` across the FFI boundary. This includes during unbind when
+        // the C++ portion of wlansoftmac will ensure no additional calls will be made through
+        // `CFrameProcessor` after unbind begins.
+        let mut frame_processor =
+            unsafe { self.frame_processor.as_mut().unwrap().as_mut().to_c_binding() };
+
+        // Re-bind `frame_processor` to an exclusive reference that stays in scope across the
+        // await. The exclusive reference guarantees the consumer of the reference across the FIDL
+        // hop is the only accessor and that the reference is valid during the await.
+        let frame_processor = &mut frame_processor;
+
+        self.wlan_softmac_bridge_proxy
+            .start(ifc_bridge, frame_processor as *const CFrameProcessor as u64)
+            .await
+            .map_err(|error| {
+                error!("Start failed with FIDL error: {:?}", error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(zx::Status::from_raw)
     }
 
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status> {
@@ -854,7 +849,7 @@ unsafe extern "C" fn ethernet_tx(
 
 const FRAME_PROCESSOR_OPS: CFrameProcessorOps = CFrameProcessorOps { wlan_rx, ethernet_tx };
 
-struct FrameProcessor {
+pub struct FrameProcessor {
     sink: DriverEventSink,
     _pin: PhantomPinned,
 }
@@ -864,7 +859,7 @@ impl FrameProcessor {
     ///
     /// Pinning the returned value is imperative to ensure future `to_c_binding()` calls will return
     /// pointers that are valid for the lifetime of the returned value.
-    fn new(sink: DriverEventSink) -> Pin<Box<Self>> {
+    pub fn new(sink: DriverEventSink) -> Pin<Box<Self>> {
         Box::pin(Self { sink, _pin: PhantomPinned })
     }
 
@@ -1024,13 +1019,6 @@ impl FrameSender {
 #[repr(C)]
 pub struct CDeviceInterface {
     device: *mut c_void,
-    /// Start operations on the underlying device and return the SME channel.
-    start: extern "C" fn(
-        device: *mut c_void,
-        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
-        frame_processor: *const CFrameProcessor,
-        out_sme_channel: *mut zx::sys::zx_handle_t,
-    ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
 }
@@ -1041,26 +1029,6 @@ pub struct CDeviceInterface {
 /// safe to call concurrently, i.e., they can only be called one at a time.
 pub struct DeviceInterface {
     device: *mut c_void,
-    /// Start operations on the underlying device and return the SME channel.
-    ///
-    /// # Lifetime
-    ///
-    /// The lifetime of `ifc` ends when the corresponding `Device` is destroyed.
-    ///
-    /// # Safety
-    ///
-    /// This function is unsafe because this function cannot guarantee `ifc` will remain valid
-    /// for the lifetime of the bridged wlansoftmac driver.
-    ///
-    /// By calling this function, the caller promises `ifc` will remain valid for the lifetime
-    /// of the bridged wlansoftmac driver. Otherwise, `ifc` might cause a `DriverEvent` to be
-    /// written to a dropped `DriverEventSink`.
-    start: unsafe extern "C" fn(
-        device: *mut c_void,
-        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
-        frame_processor: *const CFrameProcessor,
-        out_sme_channel: *mut zx::sys::zx_handle_t,
-    ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
 }
@@ -1069,7 +1037,6 @@ impl From<CDeviceInterface> for DeviceInterface {
     fn from(device_interface: CDeviceInterface) -> Self {
         Self {
             device: device_interface.device,
-            start: device_interface.start,
             set_ethernet_status: device_interface.set_ethernet_status,
         }
     }
@@ -1085,7 +1052,6 @@ pub mod test_utils {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_sync::Mutex,
-        fuchsia_zircon::HandleBased,
         paste::paste,
         std::collections::VecDeque,
     };
@@ -1181,13 +1147,13 @@ pub mod test_utils {
     }
 
     pub struct FakeDeviceConfig {
-        mock_start_result: Option<Result<zx::Handle, zx::Status>>,
         mock_query_response: Option<Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>>,
         mock_discovery_support: Option<Result<fidl_common::DiscoverySupport, zx::Status>>,
         mock_mac_sublayer_support: Option<Result<fidl_common::MacSublayerSupport, zx::Status>>,
         mock_security_support: Option<Result<fidl_common::SecuritySupport, zx::Status>>,
         mock_spectrum_management_support:
             Option<Result<fidl_common::SpectrumManagementSupport, zx::Status>>,
+        mock_start_result: Option<Result<fidl::Channel, zx::Status>>,
         pub start_passive_scan_fails: bool,
         pub start_active_scan_fails: bool,
         pub send_wlan_frame_fails: bool,
@@ -1227,12 +1193,12 @@ pub mod test_utils {
     }
 
     impl FakeDeviceConfig {
-        with_mock_func!(start_result, zx::Handle);
         with_mock_func!(query_response, fidl_softmac::WlanSoftmacQueryResponse);
         with_mock_func!(discovery_support, fidl_common::DiscoverySupport);
         with_mock_func!(mac_sublayer_support, fidl_common::MacSublayerSupport);
         with_mock_func!(security_support, fidl_common::SecuritySupport);
         with_mock_func!(spectrum_management_support, fidl_common::SpectrumManagementSupport);
+        with_mock_func!(start_result, fidl::Channel);
 
         pub fn with_mock_sta_addr(mut self, mock_field: [u8; 6]) -> Self {
             if let None = self.mock_query_response {
@@ -1467,29 +1433,6 @@ pub mod test_utils {
     }
 
     impl DeviceOps for FakeDevice {
-        fn start(
-            &mut self,
-            _driver_event_sink: DriverEventSink,
-            wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
-        ) -> Result<zx::Handle, zx::Status> {
-            let mut state = self.state.lock();
-
-            if let Some(mock_start_result) = state.config.mock_start_result.take() {
-                return mock_start_result;
-            }
-
-            state.wlan_softmac_ifc_bridge_proxy =
-                Some(fidl_softmac::WlanSoftmacIfcBridgeProxy::new(
-                    fidl::AsyncChannel::from_channel(fidl::Channel::from(unsafe {
-                        fidl::Handle::from_raw(wlan_softmac_ifc_bridge_client_handle)
-                    })),
-                ));
-            let usme_bootstrap_server_end_handle =
-                state.usme_bootstrap_server_end.take().unwrap().into_channel().into_handle();
-            // TODO(https://fxbug.dev/42121991): Capture _ifc and provide a testing surface.
-            Ok(usme_bootstrap_server_end_handle)
-        }
-
         async fn wlan_softmac_query_response(
             &mut self,
         ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
@@ -1542,6 +1485,21 @@ pub mod test_utils {
                     dfs: fidl_common::DfsFeature { supported: true },
                 }),
             }
+        }
+
+        async fn start(
+            &mut self,
+            ifc_bridge: fidl::endpoints::ClientEnd<fidl_softmac::WlanSoftmacIfcBridgeMarker>,
+            _frame_processor: Pin<Box<FrameProcessor>>,
+        ) -> Result<fidl::Channel, zx::Status> {
+            let mut state = self.state.lock();
+
+            if let Some(mock_start_result) = state.config.mock_start_result.take() {
+                return mock_start_result;
+            }
+
+            state.wlan_softmac_ifc_bridge_proxy = Some(ifc_bridge.into_proxy().unwrap());
+            Ok(state.usme_bootstrap_server_end.take().unwrap().into_channel())
         }
 
         fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status> {

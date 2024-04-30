@@ -17,6 +17,7 @@
 #include <wlan/drivers/fidl_bridge.h>
 #include <wlan/drivers/log.h>
 
+#include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
@@ -69,17 +70,6 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   // from any thread as long they are never called concurrently.
   rust_device_interface_t wlansoftmac_rust_ops = {
       .device = static_cast<void*>(softmac_bridge->device_interface_),
-      .start = [](void* device_interface, zx_handle_t softmac_ifc_bridge_client_handle,
-                  const frame_processor_t* frame_processor,
-                  zx_handle_t* out_sme_channel) -> zx_status_t {
-        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.start");
-        zx::channel channel;
-        zx_status_t result =
-            DeviceInterface::from(device_interface)
-                ->Start(softmac_ifc_bridge_client_handle, frame_processor, &channel);
-        *out_sme_channel = channel.release();
-        return result;
-      },
       .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
         return DeviceInterface::from(device_interface)->SetEthernetStatus(status);
@@ -216,6 +206,59 @@ void SoftmacBridge::QuerySpectrumManagementSupport(
           completer.ToAsync()));
 }
 
+void SoftmacBridge::Start(StartRequest& request, StartCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
+  debugf("Start");
+
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    lerror("Arena creation failed: %s", arena.status_string());
+    completer.Reply(fit::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
+  if (endpoints.is_error()) {
+    lerror("Creating end point error: %s", endpoints.status_string());
+    completer.Reply(fit::error(endpoints.status_value()));
+    return;
+  }
+
+  auto softmac_ifc_bridge_client_endpoint = std::move(request.ifc_bridge());
+
+  // See the `fuchsia.wlan.mlme/WlanSoftmacBridge.Start` documentation about the FFI
+  // provided by the `frame_processor` field.
+  auto frame_processor =
+      reinterpret_cast<const frame_processor_t*>(  // NOLINT(performance-no-int-to-ptr)
+          request.frame_processor());
+
+  auto softmac_ifc_bridge = SoftmacIfcBridge::New(frame_processor, std::move(endpoints->server),
+                                                  std::move(softmac_ifc_bridge_client_endpoint));
+
+  if (softmac_ifc_bridge.is_error()) {
+    lerror("Failed to create SoftmacIfcBridge: %s", softmac_ifc_bridge.status_string());
+    completer.Reply(fit::error(softmac_ifc_bridge.status_value()));
+    return;
+  }
+  softmac_ifc_bridge_ = *std::move(softmac_ifc_bridge);
+
+  fidl::Request<fuchsia_wlan_softmac::WlanSoftmac::Start> fdf_request;
+  fdf_request.ifc(std::move(endpoints->client));
+  softmac_client_->Start(std::move(fdf_request))
+      .Then([completer = completer.ToAsync()](
+                fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::Start>& result) mutable {
+        if (result.is_error()) {
+          auto error = result.error_value();
+          lerror("Failed getting start result (FIDL error %s)", error);
+          completer.Reply(fit::error(FidlErrorToStatus(error)));
+        } else {
+          fuchsia_wlan_softmac::WlanSoftmacBridgeStartResponse fidl_response(
+              std::move(result.value().sme_channel()));
+          completer.Reply(fit::ok(std::move(fidl_response)));
+        }
+      });
+}
+
 void SoftmacBridge::SetChannel(SetChannelRequest& request, SetChannelCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
   softmac_client_->SetChannel(request).Then(
@@ -287,6 +330,11 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequest& request,
   WLAN_TRACE_DURATION();
   softmac_client_->UpdateWmmParameters(request).Then(
       ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::UpdateWmmParameters>(completer.ToAsync()));
+}
+
+zx::result<> SoftmacBridge::EthernetTx(eth::BorrowedOperation<>* op,
+                                       trace_async_id_t async_id) const {
+  return softmac_ifc_bridge_->EthernetTx(op, async_id);
 }
 
 // Queues a packet for transmission.
