@@ -7,11 +7,12 @@ use {
     anyhow::{anyhow, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     chrono::{DateTime, Duration, Utc},
+    delivery_blob::DeliveryBlobType,
     fuchsia_merkle::Hash,
     fuchsia_pkg::{BlobInfo, PackageManifest, PackageManifestList, PackagePath, SubpackageInfo},
     futures::stream::{StreamExt as _, TryStreamExt as _},
     std::{
-        collections::{hash_map, BTreeMap, HashMap, HashSet},
+        collections::{hash_map, BTreeMap, BTreeSet, HashMap, HashSet},
         fs::{self, File},
         future::Future,
         os::unix::fs::MetadataExt,
@@ -60,6 +61,12 @@ impl ToBeStagedPackage {
     }
 }
 
+#[derive(Debug)]
+struct StagedBlob {
+    info: BlobInfo,
+    delivery_blob_type: Option<DeliveryBlobType>,
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error(
     "blob {hash} at {path:?} is {file_size} bytes in size, \
@@ -94,7 +101,7 @@ pub struct RepoBuilder<'a, R: RepoStorageProvider> {
     inherit_from_trusted_targets: bool,
     named_packages: HashMap<PackagePath, Hash>,
     staged_packages: HashMap<Hash, ToBeStagedPackage>,
-    staged_blobs: HashMap<Hash, BlobInfo>,
+    staged_blobs: HashMap<Hash, StagedBlob>,
     deps: HashSet<Utf8PathBuf>,
 }
 
@@ -349,7 +356,7 @@ where
         &self,
         package: ToBeStagedPackage,
         to_be_staged_packages: &mut HashMap<Hash, ToBeStagedPackage>,
-        to_be_staged_blobs: &mut HashMap<Hash, BlobInfo>,
+        to_be_staged_blobs: &mut HashMap<Hash, StagedBlob>,
         deps: &mut HashSet<Utf8PathBuf>,
     ) -> Result<bool> {
         if let Some(path) = &package.manifest_path {
@@ -423,7 +430,9 @@ where
                             }
                         }
 
-                        if blob.size != metadata.len() {
+                        if package.manifest().delivery_blob_type().is_none()
+                            && blob.size != metadata.len()
+                        {
                             if self.ignore_missing_packages {
                                 return Ok(false);
                             } else {
@@ -460,7 +469,13 @@ where
         // can filter our already staged blobs.
         for blob in blobs {
             deps.insert(Utf8PathBuf::from(&blob.source_path));
-            to_be_staged_blobs.insert(blob.merkle, blob.clone());
+            to_be_staged_blobs.insert(
+                blob.merkle,
+                StagedBlob {
+                    info: blob.clone(),
+                    delivery_blob_type: package.manifest().delivery_blob_type(),
+                },
+            );
         }
 
         // Stage all subpackages.
@@ -496,7 +511,7 @@ where
         &self,
         path: Utf8PathBuf,
         to_be_staged_packages: &mut HashMap<Hash, ToBeStagedPackage>,
-        to_be_staged_blobs: &mut HashMap<Hash, BlobInfo>,
+        to_be_staged_blobs: &mut HashMap<Hash, StagedBlob>,
         deps: &mut HashSet<Utf8PathBuf>,
     ) -> Result<bool> {
         let contents = match fs::read(path.as_std_path()) {
@@ -558,7 +573,7 @@ where
     /// repository.
     ///
     /// Returns the list of the files that were read and the staged blobs.
-    pub async fn commit(self) -> Result<(HashSet<Utf8PathBuf>, HashMap<Hash, BlobInfo>)> {
+    pub async fn commit(self) -> Result<(HashSet<Utf8PathBuf>, BTreeSet<BlobInfo>)> {
         let repo_builder = if let Some(database) = self.database.as_ref() {
             TufRepoBuilder::from_database(&self.repo, database)
         } else {
@@ -632,14 +647,40 @@ where
             let target_path = TargetPath::new(package_path.to_string())?;
             let mut custom = HashMap::new();
 
-            custom.insert("merkle".into(), serde_json::to_value(meta_far_blob.merkle)?);
-            custom.insert("size".into(), serde_json::to_value(meta_far_blob.size)?);
+            custom.insert("merkle".into(), serde_json::to_value(meta_far_blob.info.merkle)?);
+            custom.insert("size".into(), serde_json::to_value(meta_far_blob.info.size)?);
 
-            let f = File::open(&meta_far_blob.source_path)?;
+            match meta_far_blob.delivery_blob_type {
+                Some(_) => {
+                    let delivery_blob = std::fs::read(&meta_far_blob.info.source_path)?;
+                    let meta_far_blob =
+                        delivery_blob::decompress(&delivery_blob).with_context(|| {
+                            format!(
+                                "decompressing delivery blob {}",
+                                meta_far_blob.info.source_path
+                            )
+                        })?;
 
-            repo_builder = repo_builder
-                .add_target_with_custom(target_path, futures::io::AllowStdIo::new(f), custom)
-                .await?;
+                    repo_builder = repo_builder
+                        .add_target_with_custom(
+                            target_path,
+                            futures::io::Cursor::new(meta_far_blob),
+                            custom,
+                        )
+                        .await?;
+                }
+                None => {
+                    let f = File::open(&meta_far_blob.info.source_path)?;
+
+                    repo_builder = repo_builder
+                        .add_target_with_custom(
+                            target_path,
+                            futures::io::AllowStdIo::new(f),
+                            custom,
+                        )
+                        .await?;
+                }
+            }
         }
 
         // Stage the targets metadata. If we're forcing a metadata refresh, force a new targets,
@@ -677,13 +718,22 @@ where
             .map(Ok)
             .try_for_each_concurrent(
                 std::thread::available_parallelism()?.get(),
-                |(blob_hash, blob)| {
-                    self.repo.store_blob(blob_hash, blob.size, Utf8Path::new(&blob.source_path))
+                |(blob_hash, blob)| match blob.delivery_blob_type {
+                    Some(delivery_blob_type) => self.repo.store_delivery_blob(
+                        blob_hash,
+                        Utf8Path::new(&blob.info.source_path),
+                        delivery_blob_type,
+                    ),
+                    None => self.repo.store_blob(
+                        blob_hash,
+                        blob.info.size,
+                        Utf8Path::new(&blob.info.source_path),
+                    ),
                 },
             )
             .await?;
 
-        Ok((self.deps, self.staged_blobs))
+        Ok((self.deps, self.staged_blobs.into_values().map(|blob| blob.info).collect()))
     }
 }
 
@@ -821,7 +871,7 @@ mod tests {
         assert_matches::assert_matches,
         fuchsia_pkg::PackageBuilder,
         pretty_assertions::{assert_eq, assert_ne},
-        std::{collections::BTreeSet, io::Write as _, os::unix::fs::PermissionsExt as _},
+        std::{io::Write as _, os::unix::fs::PermissionsExt as _},
         tuf::{
             crypto::Ed25519PrivateKey,
             metadata::{Metadata as _, MetadataPath},
@@ -1232,7 +1282,7 @@ mod tests {
 
         // However we shouldn't have tried to write anything to the repository.
         assert_eq!(actual_deps, HashSet::new());
-        assert_eq!(committed_blobs, HashMap::new());
+        assert_eq!(committed_blobs, BTreeSet::new());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1333,7 +1383,7 @@ mod tests {
 
         // However we shouldn't have tried to write anything to the repository.
         assert_eq!(actual_deps, HashSet::new());
-        assert_eq!(committed_blobs, HashMap::new());
+        assert_eq!(committed_blobs, BTreeSet::new());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1386,7 +1436,7 @@ mod tests {
 
         // However we shouldn't have tried to write anything to the repository.
         assert_eq!(actual_deps, HashSet::new());
-        assert_eq!(committed_blobs, HashMap::new());
+        assert_eq!(committed_blobs, BTreeSet::new());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

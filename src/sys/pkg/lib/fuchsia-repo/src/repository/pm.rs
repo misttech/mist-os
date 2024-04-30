@@ -201,4 +201,12 @@ impl RepoStorage for PmRepository {
     ) -> BoxFuture<'a, Result<()>> {
         self.repo.store_blob(hash, len, path)
     }
+    fn store_delivery_blob<'a>(
+        &'a self,
+        hash: &Hash,
+        path: &Utf8Path,
+        delivery_blob_type: DeliveryBlobType,
+    ) -> BoxFuture<'a, Result<()>> {
+        self.repo.store_delivery_blob(hash, path, delivery_blob_type)
+    }
 }
