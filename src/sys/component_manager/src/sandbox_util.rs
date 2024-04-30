@@ -71,15 +71,13 @@ impl DictExt for Dict {
             match segments.next() {
                 Some(next_name) => {
                     // Lifetimes are weird here with the MutexGuard, so we do this in two steps
-                    let sub_dict = current_dict
-                        .lock_entries()
-                        .get(current_name)
-                        .and_then(|value| value.clone().to_dictionary())?;
+                    let sub_dict =
+                        current_dict.get(current_name).and_then(|value| value.to_dictionary())?;
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
-                None => return current_dict.lock_entries().get(current_name).cloned(),
+                None => return current_dict.get(current_name),
             }
         }
     }
@@ -95,14 +93,12 @@ impl DictExt for Dict {
         loop {
             match segments.next() {
                 Some(next_name) => {
-                    // Lifetimes are weird here with the MutexGuard, so we do this in two steps
                     let sub_dict = {
-                        let mut entries = current_dict.lock_entries();
-                        match entries.get(current_name) {
-                            Some(cap) => cap.clone().to_dictionary().unwrap(),
+                        match current_dict.get(current_name) {
+                            Some(cap) => cap.to_dictionary().unwrap(),
                             None => {
                                 let cap = Capability::Dictionary(Dict::new());
-                                entries.insert(current_name.clone(), cap.clone())?;
+                                current_dict.insert(current_name.clone(), cap.clone())?;
                                 cap.to_dictionary().unwrap()
                             }
                         }
@@ -112,7 +108,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    return current_dict.lock_entries().insert(current_name.clone(), capability);
+                    return current_dict.insert(current_name.clone(), capability);
                 }
             }
         }
@@ -126,7 +122,6 @@ impl DictExt for Dict {
             match segments.next() {
                 Some(next_name) => {
                     let sub_dict = current_dict
-                        .lock_entries()
                         .get(current_name)
                         .and_then(|value| value.clone().to_dictionary());
                     if sub_dict.is_none() {
@@ -137,7 +132,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.lock_entries().remove(current_name);
+                    current_dict.remove(current_name);
                     return;
                 }
             }
@@ -155,7 +150,7 @@ impl DictExt for Dict {
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
             // Get the capability.
-            let capability = current_dict.lock_entries().get(next_name).cloned();
+            let capability = current_dict.get(next_name);
 
             // The capability doesn't exist.
             let Some(capability) = capability else { return Ok(None) };
@@ -456,20 +451,15 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_capability() {
-        let sub_dict = Dict::new();
+        let mut sub_dict = Dict::new();
         sub_dict
-            .lock_entries()
             .insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()))
             .expect("dict entry already exists");
         let (_, sender) = Receiver::new();
-        sub_dict
-            .lock_entries()
-            .insert("baz".parse().unwrap(), sender.into())
-            .expect("dict entry already exists");
+        sub_dict.insert("baz".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
-        let test_dict = Dict::new();
+        let mut test_dict = Dict::new();
         test_dict
-            .lock_entries()
             .insert("foo".parse().unwrap(), Capability::Dictionary(sub_dict))
             .expect("dict entry already exists");
 
@@ -745,11 +735,8 @@ pub mod tests {
     #[fuchsia::test]
     async fn lazy_get() {
         let source = Capability::Data(Data::String("hello".to_string()));
-        let dict1 = Dict::new();
-        dict1
-            .lock_entries()
-            .insert("source".parse().unwrap(), source)
-            .expect("dict entry already exists");
+        let mut dict1 = Dict::new();
+        dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
 
         let base_router = Router::new_ok(dict1);
         let downscoped_router = base_router.lazy_get(
@@ -774,24 +761,18 @@ pub mod tests {
     #[fuchsia::test]
     async fn lazy_get_deep() {
         let source = Capability::Data(Data::String("hello".to_string()));
-        let dict1 = Dict::new();
-        dict1
-            .lock_entries()
-            .insert("source".parse().unwrap(), source)
-            .expect("dict entry already exists");
-        let dict2 = Dict::new();
+        let mut dict1 = Dict::new();
+        dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
+        let mut dict2 = Dict::new();
         dict2
-            .lock_entries()
             .insert("dict1".parse().unwrap(), Capability::Dictionary(dict1))
             .expect("dict entry already exists");
-        let dict3 = Dict::new();
+        let mut dict3 = Dict::new();
         dict3
-            .lock_entries()
             .insert("dict2".parse().unwrap(), Capability::Dictionary(dict2))
             .expect("dict entry already exists");
-        let dict4 = Dict::new();
+        let mut dict4 = Dict::new();
         dict4
-            .lock_entries()
             .insert("dict3".parse().unwrap(), Capability::Dictionary(dict3))
             .expect("dict entry already exists");
 

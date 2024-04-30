@@ -49,7 +49,7 @@ pub fn build_component_sandbox(
     collection_inputs: &mut StructuredDictMap<ComponentInput>,
     environments: &mut StructuredDictMap<ComponentEnvironment>,
 ) {
-    let declared_dictionaries = Dict::new();
+    let mut declared_dictionaries = Dict::new();
 
     for environment_decl in &decl.environments {
         environments
@@ -130,12 +130,11 @@ pub fn build_component_sandbox(
                 collection_inputs.get(name).expect("collection input was just added").capabilities()
             }
             cm_rust::OfferTarget::Capability(name) => {
-                let mut entries = declared_dictionaries.lock_entries();
-                let dict = match entries.get(name) {
-                    Some(dict) => dict.clone(),
+                let dict = match declared_dictionaries.get(name) {
+                    Some(dict) => dict,
                     None => {
                         let dict = Capability::Dictionary(Dict::new());
-                        entries.insert(name.clone(), dict.clone()).ok();
+                        declared_dictionaries.insert(name.clone(), dict.clone()).ok();
                         dict
                     }
                 };
@@ -333,7 +332,7 @@ fn make_dict_extending_router(
     let did_combine = Arc::new(std::sync::Mutex::new(false));
     let route_fn = move |_request: Request| {
         let source_dict_router = source_dict_router.clone();
-        let dict = dict.clone();
+        let mut dict = dict.clone();
         let did_combine = did_combine.clone();
         let component = component.clone();
         async move {
@@ -352,15 +351,13 @@ fn make_dict_extending_router(
                 _ => panic!("source_dict_router must return a Dict"),
             };
             {
-                let mut entries = dict.lock_entries();
-                let source_entries = source_dict.lock_entries();
-                for source_key in source_entries.iter().map(|(k, _v)| k) {
-                    if let Some(_entry) = entries.get(source_key) {
+                for source_key in source_dict.enumerate().map(|(k, _v)| k) {
+                    if let Some(_entry) = dict.get(&source_key) {
                         return Err(RoutingError::BedrockSourceDictionaryCollision.into());
                     }
                 }
-                for (source_key, source_value) in source_entries.iter() {
-                    if let Err(_e) = entries.insert(source_key.clone(), source_value.clone()) {
+                for (source_key, source_value) in source_dict.enumerate() {
+                    if let Err(_e) = dict.insert(source_key.clone(), source_value.clone()) {
                         return Err(RoutingError::BedrockSourceDictionaryCollision.into());
                     }
                 }

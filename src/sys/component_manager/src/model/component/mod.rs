@@ -57,7 +57,7 @@ use {
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, DictEntries, Open, Request, Routable, Router},
+    sandbox::{Capability, Dict, Open, Request, Routable, Router},
     std::{
         clone::Clone,
         collections::{HashMap, HashSet},
@@ -489,17 +489,12 @@ impl ComponentInstance {
             let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
             let any: Capability =
                 fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
-            let dict = match any {
+            let mut dict = match any {
                 Capability::Dictionary(d) => d,
                 _ => return Err(AddDynamicChildError::InvalidDictionary),
             };
-            let dict_entries = {
-                let mut entries = dict.lock_entries();
-                std::mem::replace(&mut *entries, DictEntries::new())
-            };
-            let capabilities = child_input.capabilities();
-            let mut child_dict_entries = capabilities.lock_entries();
-            for (key, value) in dict_entries.into_iter() {
+            let mut child_dict_entries = child_input.capabilities();
+            for (key, value) in dict.drain() {
                 // The child/collection Dict normally contains Routers created by component manager.
                 // ChildArgs.dict may contain capabilities created by an external client.
                 //

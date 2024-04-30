@@ -106,13 +106,11 @@ impl RouterExt for Router {
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict {
-        let entries = dict.lock_entries();
-        let out = Dict::new();
-        let mut out_entries = out.lock_entries();
-        for (key, value) in entries.iter() {
+        let mut out = Dict::new();
+        for (key, value) in dict.enumerate() {
             let value = match value {
                 Capability::Dictionary(dict) => {
-                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, dict))
+                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, &dict))
                 }
                 Capability::Router(r) => {
                     let router = r.clone();
@@ -133,9 +131,8 @@ impl RouterExt for Router {
                 }
                 other => other.clone(),
             };
-            out_entries.insert(key.clone(), value.clone()).ok();
+            out.insert(key, value).ok();
         }
-        drop(out_entries);
         out
     }
 

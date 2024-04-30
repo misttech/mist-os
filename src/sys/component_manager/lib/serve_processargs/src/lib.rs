@@ -142,12 +142,11 @@ fn translate_handle(cap: Capability, info: &HandleInfo) -> Result<StartupHandle,
 
 fn visit_map(
     map: &DeliveryMap,
-    dict: Dict,
+    mut dict: Dict,
     f: &mut impl FnMut(Capability, &Delivery) -> Result<(), DeliveryError>,
 ) -> Result<(), DeliveryError> {
-    let mut entries = dict.lock_entries();
     for (key, entry) in map {
-        match entries.remove(key) {
+        match dict.remove(key) {
             Some(value) => match entry {
                 DeliveryMapEntry::Delivery(delivery) => f(value, delivery)?,
                 DeliveryMapEntry::Dict(sub_map) => {
@@ -161,8 +160,8 @@ fn visit_map(
             None => return Err(DeliveryError::NotInDict(key.to_owned())),
         }
     }
-    if entries.iter().count() > 0 {
-        let keys = entries.iter().map(|(key, _)| key).cloned().collect();
+    if dict.enumerate().count() > 0 {
+        let keys = dict.enumerate().map(|(key, _)| key).collect();
         return Err(DeliveryError::UnusedCapabilities(keys));
     }
     Ok(())
@@ -276,13 +275,12 @@ mod tests {
         let (sock0, sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(
-                "stdin".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle().into_handle())),
-            )
-            .map_err(|e| anyhow!("{e:?}"))?;
+        let mut dict = Dict::new();
+        dict.insert(
+            "stdin".parse().unwrap(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle().into_handle())),
+        )
+        .map_err(|e| anyhow!("{e:?}"))?;
         let delivery_map = hashmap! {
             "stdin".parse().unwrap() => DeliveryMapEntry::Delivery(
                 Delivery::Handle(HandleInfo::new(HandleType::FileDescriptor, 0))
@@ -318,17 +316,15 @@ mod tests {
         let mut processargs = ProcessArgs::new();
 
         // Put a socket at "/handles/stdin". This implements a capability bundling pattern.
-        let handles = Dict::new();
+        let mut handles = Dict::new();
         handles
-            .lock_entries()
             .insert(
                 "stdin".parse().unwrap(),
                 Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
             )
             .map_err(|e| anyhow!("{e:?}"))?;
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert("handles".parse().unwrap(), Capability::Dictionary(handles))
+        let mut dict = Dict::new();
+        dict.insert("handles".parse().unwrap(), Capability::Dictionary(handles))
             .map_err(|e| anyhow!("{e:?}"))?;
 
         let delivery_map = hashmap! {
@@ -359,17 +355,15 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
 
-        let handles = Dict::new();
+        let mut handles = Dict::new();
         handles
-            .lock_entries()
             .insert(
                 "stdin".parse().unwrap(),
                 Capability::OneShotHandle(OneShotHandle::from(ep0.into_handle())),
             )
             .map_err(|e| anyhow!("{e:?}"))?;
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert("handles".parse().unwrap(), Capability::Dictionary(handles))
+        let mut dict = Dict::new();
+        dict.insert("handles".parse().unwrap(), Capability::Dictionary(handles))
             .map_err(|e| anyhow!("{e:?}"))?;
 
         let delivery_map = hashmap! {
@@ -406,13 +400,12 @@ mod tests {
 
         // The type of "/handles" is a socket capability but we try to open it as a dict and extract
         // a "stdin" inside. This should fail.
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(
-                "handles".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
-            )
-            .expect("dict entry already exists");
+        let mut dict = Dict::new();
+        dict.insert(
+            "handles".parse().unwrap(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        )
+        .expect("dict entry already exists");
 
         let delivery_map = hashmap! {
             "handles".parse().unwrap() => DeliveryMapEntry::Dict(hashmap! {
@@ -434,13 +427,12 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(
-                "stdin".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
-            )
-            .expect("dict entry already exists");
+        let mut dict = Dict::new();
+        dict.insert(
+            "stdin".parse().unwrap(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        )
+        .expect("dict entry already exists");
         let delivery_map = DeliveryMap::new();
 
         assert_matches!(
@@ -455,13 +447,12 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(
-                "stdin".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
-            )
-            .expect("dict entry already exists");
+        let mut dict = Dict::new();
+        dict.insert(
+            "stdin".parse().unwrap(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        )
+        .expect("dict entry already exists");
         let delivery_map = hashmap! {
             "stdin".parse().unwrap() => DeliveryMapEntry::Delivery(
                 Delivery::Handle(HandleInfo::new(HandleType::DirectoryRequest, 0))
@@ -501,16 +492,14 @@ mod tests {
         let peer_closed_open = multishot().0;
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        {
-            let mut entries = dict.lock_entries();
-            entries
-                .insert("normal".parse().unwrap(), sender.into())
+        let dict = {
+            let mut dict = Dict::new();
+            dict.insert("normal".parse().unwrap(), sender.into())
                 .expect("dict entry already exists");
-            entries
-                .insert("closed".parse().unwrap(), peer_closed_open.into())
+            dict.insert("closed".parse().unwrap(), peer_closed_open.into())
                 .expect("dict entry already exists");
-        }
+            dict
+        };
         let delivery_map = hashmap! {
             "normal".parse().unwrap() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
@@ -566,13 +555,12 @@ mod tests {
         let (sender, receiver) = multishot();
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        {
-            let mut entries = dict.lock_entries();
-            entries
-                .insert("normal".parse().unwrap(), sender.into())
+        let dict = {
+            let mut dict = Dict::new();
+            dict.insert("normal".parse().unwrap(), sender.into())
                 .expect("dict entry already exists");
-        }
+            dict
+        };
         let delivery_map = hashmap! {
             "normal".parse().unwrap() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
@@ -626,13 +614,12 @@ mod tests {
         let dir_proxy = serve_directory(dir, &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(
-                "data".parse().unwrap(),
-                Capability::Directory(sandbox::Directory::new(dir_proxy)),
-            )
-            .map_err(|e| anyhow!("{e:?}"))?;
+        let mut dict = Dict::new();
+        dict.insert(
+            "data".parse().unwrap(),
+            Capability::Directory(sandbox::Directory::new(dir_proxy)),
+        )
+        .map_err(|e| anyhow!("{e:?}"))?;
         let delivery_map = hashmap! {
             "data".parse().unwrap() => DeliveryMapEntry::Delivery(
                 Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())
@@ -689,13 +676,12 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(
-                "stdin".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
-            )
-            .expect("dict entry already exists");
+        let mut dict = Dict::new();
+        dict.insert(
+            "stdin".parse().unwrap(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        )
+        .expect("dict entry already exists");
         let delivery_map = hashmap! {
             "stdin".parse().unwrap() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())

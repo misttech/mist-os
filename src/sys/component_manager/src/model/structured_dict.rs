@@ -51,14 +51,12 @@ impl<T: StructuredDict> StructuredDict for StructuredDictMap<T> {
 #[allow(private_bounds)]
 impl<T: StructuredDict> StructuredDictMap<T> {
     pub fn insert(&mut self, key: Name, value: T) -> Result<(), fsandbox::DictionaryError> {
-        let mut entries = self.inner.lock_entries();
         let dict: Dict = value.into();
-        entries.insert(key, dict.into())
+        self.inner.insert(key, dict.into())
     }
 
     pub fn get(&self, key: &Name) -> Option<T> {
-        let entries = self.inner.lock_entries();
-        entries.get(key).map(|cap| {
+        self.inner.get(key).map(|cap| {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };
@@ -67,8 +65,7 @@ impl<T: StructuredDict> StructuredDictMap<T> {
     }
 
     pub fn remove(&mut self, key: &Name) -> Option<T> {
-        let mut entries = self.inner.lock_entries();
-        entries.remove(key).map(|cap| {
+        self.inner.remove(key).map(|cap| {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };
@@ -114,11 +111,9 @@ impl StructuredDict for ComponentInput {
 
 impl ComponentInput {
     pub fn new(environment: ComponentEnvironment) -> Self {
-        let dict = Dict::new();
-        let mut entries = dict.lock_entries();
-        entries.insert(PARENT.clone(), Dict::new().into()).ok();
-        entries.insert(ENVIRONMENT.clone(), Dict::from(environment).into()).ok();
-        drop(entries);
+        let mut dict = Dict::new();
+        dict.insert(PARENT.clone(), Dict::new().into()).ok();
+        dict.insert(ENVIRONMENT.clone(), Dict::from(environment).into()).ok();
         Self(dict)
     }
 
@@ -130,34 +125,28 @@ impl ComponentInput {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let dict = Dict::new();
-        let mut entries = dict.lock_entries();
-        entries.insert(PARENT.clone(), self.capabilities().shallow_copy().into()).ok();
-        entries
-            .insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into())
-            .ok();
-        drop(entries);
+        let mut dict = Dict::new();
+        dict.insert(PARENT.clone(), self.capabilities().shallow_copy().into()).ok();
+        dict.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into()).ok();
         Self(dict)
     }
 
     /// Returns the sub-dictionary containing capabilities routed by the component's parent.
     pub fn capabilities(&self) -> Dict {
-        let entries = self.0.lock_entries();
-        let cap = entries.get(&*PARENT).unwrap();
+        let cap = self.0.get(&*PARENT).unwrap();
         let Capability::Dictionary(dict) = cap else {
             unreachable!("parent entry must be a dict: {cap:?}");
         };
-        dict.clone()
+        dict
     }
 
     /// Returns the sub-dictionary containing capabilities routed by the component's environment.
     pub fn environment(&self) -> ComponentEnvironment {
-        let entries = self.0.lock_entries();
-        let cap = entries.get(&*ENVIRONMENT).unwrap();
+        let cap = self.0.get(&*ENVIRONMENT).unwrap();
         let Capability::Dictionary(dict) = cap else {
             unreachable!("environment entry must be a dict: {cap:?}");
         };
-        ComponentEnvironment(dict.clone())
+        ComponentEnvironment(dict)
     }
 
     pub fn insert_capability(
@@ -182,10 +171,8 @@ pub struct ComponentEnvironment(Dict);
 
 impl Default for ComponentEnvironment {
     fn default() -> Self {
-        let dict = Dict::new();
-        let mut entries = dict.lock_entries();
-        entries.insert(DEBUG.clone(), Dict::new().into()).ok();
-        drop(entries);
+        let mut dict = Dict::new();
+        dict.insert(DEBUG.clone(), Dict::new().into()).ok();
         Self(dict)
     }
 }
@@ -203,8 +190,7 @@ impl ComponentEnvironment {
 
     /// Capabilities listed in the `debug_capabilities` portion of its environment.
     pub fn debug(&self) -> Dict {
-        let entries = self.0.lock_entries();
-        let cap = entries.get(&*DEBUG).unwrap();
+        let cap = self.0.get(&*DEBUG).unwrap();
         let Capability::Dictionary(dict) = cap else {
             unreachable!("debug entry must be a dict: {cap:?}");
         };
@@ -215,10 +201,8 @@ impl ComponentEnvironment {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let dict = Dict::new();
-        let mut entries = dict.lock_entries();
-        entries.insert(DEBUG.clone(), self.debug().shallow_copy().into()).ok();
-        drop(entries);
+        let mut dict = Dict::new();
+        dict.insert(DEBUG.clone(), self.debug().shallow_copy().into()).ok();
         Self(dict)
     }
 }
@@ -243,27 +227,24 @@ mod tests {
 
     #[fuchsia::test]
     async fn structured_dict_map() {
-        let dict1 = Dict::new();
-        {
-            let mut entries = dict1.lock_entries();
-            entries
-                .insert("a".parse().unwrap(), Dict::new().into())
+        let dict1 = {
+            let mut dict = Dict::new();
+            dict.insert("a".parse().unwrap(), Dict::new().into())
                 .expect("dict entry already exists");
-        }
-        let dict2 = Dict::new();
-        {
-            let mut entries = dict2.lock_entries();
-            entries
-                .insert("b".parse().unwrap(), Dict::new().into())
+            dict
+        };
+        let dict2 = {
+            let mut dict = Dict::new();
+            dict.insert("b".parse().unwrap(), Dict::new().into())
                 .expect("dict entry already exists");
-        }
-        let dict2_alt = Dict::new();
-        {
-            let mut entries = dict2_alt.lock_entries();
-            entries
-                .insert("c".parse().unwrap(), Dict::new().into())
+            dict
+        };
+        let dict2_alt = {
+            let mut dict = Dict::new();
+            dict.insert("c".parse().unwrap(), Dict::new().into())
                 .expect("dict entry already exists");
-        }
+            dict
+        };
         let name1 = Name::new("1").unwrap();
         let name2 = Name::new("2").unwrap();
 
@@ -271,27 +252,18 @@ mod tests {
         assert_matches!(map.get(&name1), None);
         assert!(map.insert(name1.clone(), dict1).is_ok());
         let d = map.get(&name1).unwrap();
-        {
-            let entries = d.lock_entries();
-            let key = DictKey::new("a").unwrap();
-            assert!(entries.get(&key).is_some());
-        }
+        let key = DictKey::new("a").unwrap();
+        assert!(d.get(&key).is_some());
 
         assert!(map.insert(name2.clone(), dict2).is_ok());
         let d = map.remove(&name2).unwrap();
         assert_matches!(map.remove(&name2), None);
-        {
-            let entries = d.lock_entries();
-            let key = DictKey::new("b").unwrap();
-            assert!(entries.get(&key).is_some());
-        }
+        let key = DictKey::new("b").unwrap();
+        assert!(d.get(&key).is_some());
 
         assert!(map.insert(name2.clone(), dict2_alt).is_ok());
         let d = map.get(&name2).unwrap();
-        {
-            let entries = d.lock_entries();
-            let key = DictKey::new("c").unwrap();
-            assert!(entries.get(&key).is_some());
-        }
+        let key = DictKey::new("c").unwrap();
+        assert!(d.get(&key).is_some());
     }
 }
