@@ -277,6 +277,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "core_realm_development_access",
                          "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
+                         "core_realm_development_access_userdebug",
                          "standard_userdebug",
                          "standard_userdebug_and_eng",
                          "mdns_fuchsia_device_wired_service",
@@ -296,6 +297,9 @@ eng_only_platform_aib_names =
     bootstrap_eng_platform_aib_names + [
       # the core realm additions for eng build-type assemblies
       "core_realm_eng",
+
+      # SSH Config for eng only
+      "core_realm_development_access_eng",
 
       # The minimal additions for eng build-type assemblies
       "standard_eng",

@@ -1399,7 +1399,6 @@ assembly_input_bundle("core_realm_development_access") {
     # log_listener shell tool.
     "//src/diagnostics/log_listener:log_listener_shell_pkg",
   ]
-  config_data_labels = [ "//src/developer/sshd-host:config" ]
   compiled_packages = [
     {
       name = "core"
@@ -1449,6 +1448,18 @@ assembly_input_bundle("core_realm_development_access") {
       components = [ "log_listener" ]
     },
   ]
+}
+
+# Configuration that goes along with core_realm_development_access which is
+# suitable for userdebug builds.
+assembly_input_bundle("core_realm_development_access_userdebug") {
+  config_data_labels = [ "//src/developer/sshd-host:config" ]
+}
+
+# Configuration that goes along with core_realm_development_access which is
+# suitable for eng builds.
+assembly_input_bundle("core_realm_development_access_eng") {
+  config_data_labels = [ "//src/developer/sshd-host:config_eng" ]
 }
 
 assembly_input_bundle("bootstrap_realm_vsock_development_access") {

@@ -146,6 +146,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_eng",
                     "core_realm",
                     "core_realm_development_access",
+                    "core_realm_development_access_eng",
                     "core_realm_eng",
                 ]
             }
@@ -157,6 +158,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_userdebug",
                     "core_realm",
                     "core_realm_development_access",
+                    "core_realm_development_access_userdebug",
                     "core_realm_user_and_userdebug",
                 ]
             }
@@ -174,6 +176,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm",
                     "core_realm_eng",
                     "core_realm_development_access",
+                    "core_realm_development_access_eng",
                     "common_standard",
                     "standard_eng",
                     "standard_userdebug_and_eng",
@@ -188,6 +191,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_userdebug",
                     "core_realm",
                     "core_realm_development_access",
+                    "core_realm_development_access_userdebug",
                     "core_realm_user_and_userdebug",
                     "common_standard",
                     "standard_userdebug",

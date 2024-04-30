@@ -91,6 +91,12 @@ config_data_for_assembly("config") {
   outputs = [ "sshd_config" ]
 }
 
+config_data_for_assembly("config_eng") {
+  for_pkg = "sshd-host"
+  sources = [ "//third_party/openssh-portable/fuchsia/sshd_config_eng" ]
+  outputs = [ "sshd_config" ]
+}
+
 executable("test") {
   testonly = true
   output_name = "sshd-host-test"
