@@ -49,9 +49,16 @@ TEST_F(UartInterruptTest, KernelEchoTest) {
   zx::nanosleep(zx::deadline_after(zx::sec(2)));
   size_t total = 0;
   size_t empty_count = 0;
+
+  auto system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debug_resource = std::move(result.value());
+
   while (total < max_message_size()) {
     size_t read = 0;
-    ASSERT_OK(zx_debug_read(standalone::GetRootResource()->get(), message().data() + total,
+    ASSERT_OK(zx_debug_read(debug_resource.get(), message().data() + total,
                             max_message_size() - total, &read));
     total += read;
 
