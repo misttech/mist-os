@@ -6,7 +6,7 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -270,6 +270,97 @@ inline std::ostream& operator<<(
   }
   return (out << "<none> (non-compliant)");
 }
+
+inline std::ostream& operator<<(
+    std::ostream& out,
+    const std::optional<fuchsia_hardware_audio_signalprocessing::ThresholdType>& threshold_type) {
+  if (threshold_type.has_value()) {
+    switch (*threshold_type) {
+      case fuchsia_hardware_audio_signalprocessing::ThresholdType::kAbove:
+        return (out << "ABOVE");
+      case fuchsia_hardware_audio_signalprocessing::ThresholdType::kBelow:
+        return (out << "BELOW");
+      default:
+        return (out << "OTHER (unknown enum)");
+    }
+  }
+  return (out << "<none> (non-compliant)");
+}
+
+inline std::ostream& operator<<(
+    std::ostream& out,
+    const std::optional<fuchsia_hardware_audio_signalprocessing::LevelType>& level_type) {
+  if (level_type.has_value()) {
+    switch (*level_type) {
+      case fuchsia_hardware_audio_signalprocessing::LevelType::kPeak:
+        return (out << "PEAK");
+      case fuchsia_hardware_audio_signalprocessing::LevelType::kRms:
+        return (out << "RMS");
+      default:
+        return (out << "OTHER (unknown enum)");
+    }
+  }
+  return (out << "<none>");
+}
+
+inline std::ostream& operator<<(
+    std::ostream& out,
+    const std::optional<fuchsia_hardware_audio_signalprocessing::EqualizerBandType>& eq_band_type) {
+  if (eq_band_type.has_value()) {
+    switch (*eq_band_type) {
+      case fuchsia_hardware_audio_signalprocessing::EqualizerBandType::kPeak:
+        return (out << "PEAK");
+      case fuchsia_hardware_audio_signalprocessing::EqualizerBandType::kNotch:
+        return (out << "NOTCH");
+      case fuchsia_hardware_audio_signalprocessing::EqualizerBandType::kHighShelf:
+        return (out << "HIGH_SHELF");
+      case fuchsia_hardware_audio_signalprocessing::EqualizerBandType::kLowShelf:
+        return (out << "LOW_SHELF");
+      case fuchsia_hardware_audio_signalprocessing::EqualizerBandType::kHighCut:
+        return (out << "HIGH_CUT");
+      case fuchsia_hardware_audio_signalprocessing::EqualizerBandType::kLowCut:
+        return (out << "LOW_CUT");
+      default:
+        return (out << "OTHER (unknown enum)");
+    }
+  }
+  return (out << "<none>");
+}
+
+inline std::ostream& operator<<(
+    std::ostream& out,
+    const std::optional<fuchsia_hardware_audio_signalprocessing::GainType>& gain_type) {
+  if (gain_type.has_value()) {
+    switch (*gain_type) {
+      case fuchsia_hardware_audio_signalprocessing::GainType::kDecibels:
+        return (out << "DECIBELS");
+      case fuchsia_hardware_audio_signalprocessing::GainType::kPercent:
+        return (out << "PERCENT");
+      default:
+        return (out << "OTHER (unknown enum)");
+    }
+  }
+  return (out << "<none>");
+}
+
+inline std::ostream& operator<<(
+    std::ostream& out,
+    const std::optional<fuchsia_hardware_audio_signalprocessing::GainDomain>& gain_domain) {
+  if (gain_domain.has_value()) {
+    switch (*gain_domain) {
+      case fuchsia_hardware_audio_signalprocessing::GainDomain::kDigital:
+        return (out << "DIGITAL");
+      case fuchsia_hardware_audio_signalprocessing::GainDomain::kAnalog:
+        return (out << "ANALOG");
+      case fuchsia_hardware_audio_signalprocessing::GainDomain::kMixed:
+        return (out << "MIXED");
+      default:
+        return (out << "OTHER (unknown enum)");
+    }
+  }
+  return (out << "<none>");
+}
+
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia_hardware_audio_signalprocessing::Endpoint>& endpoint) {

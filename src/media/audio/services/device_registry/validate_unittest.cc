@@ -23,7 +23,6 @@ namespace media_audio {
 namespace {
 
 namespace fha = fuchsia_hardware_audio;
-namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 // These cases unittest the Validate... functions with inputs that cause INFO logging (if any).
 
@@ -573,68 +572,88 @@ TEST(ValidateTest, ValidateCodecFormatInfo) {
 }
 
 // signalprocessing functions
-TEST(ValidateTest, ValidateElements) { EXPECT_TRUE(ValidateElements(kElements)); }
-
-TEST(ValidateTest, ValidateElement) {
-  EXPECT_TRUE(ValidateElement(kElement1));
-  EXPECT_TRUE(ValidateElement(kElement2));
-  EXPECT_TRUE(ValidateElement(kElement3));
-  EXPECT_TRUE(ValidateElement(kElement4));
-}
-
-TEST(ValidateTest, MapElements) {
-  auto map = MapElements(kElements);
-  EXPECT_EQ(map.size(), kElements.size());
-
-  EXPECT_EQ(*map.at(*kElement1.id()).element.type(), *kElement1.type());
-  EXPECT_EQ(*map.at(*kElement1.id()).element.type_specific()->endpoint()->type(),
-            fhasp::EndpointType::kDaiInterconnect);
-  EXPECT_TRUE(map.at(*kElement1.id()).element.can_stop().value_or(false));
-
-  EXPECT_EQ(*map.at(*kElement2.id()).element.type(), *kElement2.type());
-  EXPECT_FALSE(map.at(*kElement2.id()).element.can_stop().value_or(true));
-
-  EXPECT_EQ(*map.at(*kElement3.id()).element.type(), *kElement3.type());
-  EXPECT_TRUE(map.at(*kElement3.id()).element.can_bypass().value_or(false));
-  EXPECT_EQ(map.at(*kElement3.id()).element.description()->at(255), 'X');
-
-  EXPECT_EQ(*map.at(*kElement4.id()).element.type(), *kElement4.type());
-  EXPECT_EQ(*map.at(*kElement4.id()).element.type_specific()->endpoint()->type(),
-            fhasp::EndpointType::kRingBuffer);
-}
-
 TEST(ValidateTest, ValidateTopologies) {
   EXPECT_TRUE(ValidateTopologies(kTopologies, MapElements(kElements)));
 }
 
 TEST(ValidateTest, ValidateTopology) {
-  EXPECT_TRUE(ValidateTopology(kTopology1234, MapElements(kElements)));
-  EXPECT_TRUE(ValidateTopology(kTopology14, MapElements(kElements)));
-  EXPECT_TRUE(ValidateTopology(kTopology41, MapElements(kElements)));
+  EXPECT_TRUE(ValidateTopology(kTopologyDaiAgcDynRb, MapElements(kElements)));
+  EXPECT_TRUE(ValidateTopology(kTopologyDaiRb, MapElements(kElements)));
+  EXPECT_TRUE(ValidateTopology(kTopologyRbDai, MapElements(kElements)));
 }
 
-TEST(ValidateTest, MapTopologies) {
-  auto map = MapTopologies(kTopologies);
-  EXPECT_EQ(map.size(), 3u);
+TEST(ValidateTest, ValidateElements) { EXPECT_TRUE(ValidateElements(kElements)); }
 
-  EXPECT_EQ(map.at(kTopologyId1234).size(), 3u);
-  EXPECT_EQ(map.at(kTopologyId1234).at(0).processing_element_id_from(), kElementId1);
-  EXPECT_EQ(map.at(kTopologyId1234).at(0).processing_element_id_to(), kElementId2);
+TEST(ValidateTest, ValidateElement) { EXPECT_TRUE(ValidateElement(kAgcElement)); }
 
-  EXPECT_EQ(map.at(kTopologyId14).size(), 1u);
-  EXPECT_EQ(map.at(kTopologyId14).front().processing_element_id_from(), kElementId1);
-  EXPECT_EQ(map.at(kTopologyId14).front().processing_element_id_to(), kElementId4);
+TEST(ValidateTest, ValidateDynamicsElement) {
+  EXPECT_TRUE(ValidateDynamicsElement(kDynamicsElement));
 
-  EXPECT_EQ(map.at(kTopologyId41).size(), 1u);
-  EXPECT_EQ(map.at(kTopologyId41).front().processing_element_id_from(), kElementId4);
-  EXPECT_EQ(map.at(kTopologyId41).front().processing_element_id_to(), kElementId1);
+  EXPECT_TRUE(ValidateElement(kDynamicsElement));
+}
+
+TEST(ValidateTest, ValidateEndpointElement) {
+  EXPECT_TRUE(ValidateEndpointElement(kDaiEndpointElement));
+  EXPECT_TRUE(ValidateEndpointElement(kRingBufferEndpointElement));
+
+  EXPECT_TRUE(ValidateElement(kDaiEndpointElement));
+  EXPECT_TRUE(ValidateElement(kRingBufferEndpointElement));
+}
+
+TEST(ValidateTest, ValidateEqualizerElement) {
+  EXPECT_TRUE(ValidateEqualizerElement(kEqualizerElement));
+
+  EXPECT_TRUE(ValidateElement(kEqualizerElement));
+}
+
+TEST(ValidateTest, ValidateGainElement) {
+  EXPECT_TRUE(ValidateGainElement(kGainElement));
+
+  EXPECT_TRUE(ValidateElement(kGainElement));
+}
+
+TEST(ValidateTest, ValidateVendorSpecificElement) {
+  EXPECT_TRUE(ValidateVendorSpecificElement(kVendorSpecificElement));
+
+  EXPECT_TRUE(ValidateElement(kVendorSpecificElement));
 }
 
 // ValidateElementState
 TEST(ValidateTest, ValidateElementState) {
-  EXPECT_TRUE(ValidateElementState(kElementState1, kElement1));
+  EXPECT_TRUE(ValidateElementState(kGenericElementState, kAgcElement));
+}
 
-  // Add more cases here
+TEST(ValidateTest, ValidateDynamicsElementState) {
+  EXPECT_TRUE(ValidateDynamicsElementState(kDynamicsElementState, kDynamicsElement));
+
+  EXPECT_TRUE(ValidateElementState(kDynamicsElementState, kDynamicsElement));
+}
+
+TEST(ValidateTest, ValidateEndpointElementState) {
+  EXPECT_TRUE(ValidateEndpointElementState(kEndpointElementState, kDaiEndpointElement));
+  EXPECT_TRUE(ValidateEndpointElementState(kEndpointElementState, kRingBufferEndpointElement));
+
+  EXPECT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));
+  EXPECT_TRUE(ValidateElementState(kEndpointElementState, kRingBufferEndpointElement));
+}
+
+TEST(ValidateTest, ValidateEqualizerElementState) {
+  EXPECT_TRUE(ValidateEqualizerElementState(kEqualizerElementState, kEqualizerElement));
+
+  EXPECT_TRUE(ValidateElementState(kEqualizerElementState, kEqualizerElement));
+}
+
+TEST(ValidateTest, ValidateGainElementState) {
+  EXPECT_TRUE(ValidateGainElementState(kGainElementState, kGainElement));
+
+  EXPECT_TRUE(ValidateElementState(kGainElementState, kGainElement));
+}
+
+TEST(ValidateTest, ValidateVendorSpecificElementState) {
+  EXPECT_TRUE(
+      ValidateVendorSpecificElementState(kVendorSpecificElementState, kVendorSpecificElement));
+
+  EXPECT_TRUE(ValidateElementState(kVendorSpecificElementState, kVendorSpecificElement));
 }
 
 }  // namespace

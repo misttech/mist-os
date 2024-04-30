@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
@@ -27,6 +28,7 @@ namespace media_audio {
 namespace {
 
 namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 // Negative-test ValidateStreamProperties
 fha::StreamProperties ValidStreamProperties() {
@@ -39,7 +41,7 @@ fha::StreamProperties ValidStreamProperties() {
       .clock_domain = fha::kClockDomainMonotonic,
   }};
 }
-TEST(ValidateWarningTest, BadStreamProperties) {
+TEST(ValidateWarningTest, StreamPropertiesInvalid) {
   auto stream_properties = ValidStreamProperties();
   ASSERT_TRUE(ValidateStreamProperties(stream_properties)) << "Baseline setup unsuccessful";
 
@@ -153,7 +155,7 @@ fha::SupportedFormats CompliantFormatSet() {
       }},
   }};
 }
-TEST(ValidateWarningTest, BadSupportedFormats) {
+TEST(ValidateWarningTest, SupportedFormatsInvalid) {
   std::vector<fha::SupportedFormats> supported_formats;
 
   // Empty top-level vector
@@ -167,7 +169,7 @@ TEST(ValidateWarningTest, BadSupportedFormats) {
 }
 
 // Negative-test ValidateRingBufferFormatSets for frame_rates
-TEST(ValidateWarningTest, BadSupportedFormatsFrameRates) {
+TEST(ValidateWarningTest, SupportedFormatsFrameRatesInvalid) {
   std::vector<fha::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing frame_rates
@@ -192,7 +194,7 @@ TEST(ValidateWarningTest, BadSupportedFormatsFrameRates) {
 }
 
 // Negative-test ValidateRingBufferFormatSets for channel_sets
-TEST(ValidateWarningTest, BadSupportedFormatsChannelSets) {
+TEST(ValidateWarningTest, SupportedFormatsChannelSetsInvalid) {
   std::vector<fha::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing channel_sets
@@ -261,7 +263,7 @@ TEST(ValidateWarningTest, BadSupportedFormatsChannelSets) {
 }
 
 // Negative-test ValidateRingBufferFormatSets for sample_formats
-TEST(ValidateWarningTest, BadSupportedFormatsSampleFormats) {
+TEST(ValidateWarningTest, SupportedFormatsSampleFormatsInvalid) {
   std::vector<fha::SupportedFormats> supported_formats{CompliantFormatSet()};
   // Missing sample_formats
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = std::nullopt;
@@ -280,7 +282,7 @@ TEST(ValidateWarningTest, BadSupportedFormatsSampleFormats) {
 }
 
 // Negative-test ValidateRingBufferFormatSets for bytes_per_sample
-TEST(ValidateWarningTest, BadSupportedFormatsBytesPerSample) {
+TEST(ValidateWarningTest, SupportedFormatsBytesPerSampleInvalid) {
   std::vector<fha::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing bytes_per_sample
@@ -325,7 +327,7 @@ TEST(ValidateWarningTest, BadSupportedFormatsBytesPerSample) {
 }
 
 // Negative-test ValidateRingBufferFormatSets for valid_bits_per_sample
-TEST(ValidateWarningTest, BadSupportedFormatsValidBitsPerSample) {
+TEST(ValidateWarningTest, SupportedFormatsValidBitsPerSampleInvalid) {
   std::vector<fha::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing valid_bits_per_sample
@@ -350,7 +352,7 @@ TEST(ValidateWarningTest, BadSupportedFormatsValidBitsPerSample) {
 }
 
 // Negative-test ValidateGainState
-TEST(ValidateWarningTest, BadGainState) {
+TEST(ValidateWarningTest, GainStateInvalid) {
   // empty
   EXPECT_FALSE(ValidateGainState(fha::GainState{}));
 
@@ -503,7 +505,7 @@ TEST(ValidateWarningTest, BadGainState) {
 }
 
 // Negative-test ValidatePlugState
-TEST(ValidateWarningTest, BadPlugState) {
+TEST(ValidateWarningTest, PlugStateInvalid) {
   // empty
   EXPECT_FALSE(ValidatePlugState(fha::PlugState{}));
 
@@ -538,10 +540,10 @@ TEST(ValidateWarningTest, BadPlugState) {
 }
 
 // TODO(https://fxbug.dev/42069012): Negative-test ValidateDeviceInfo
-// TEST(ValidateWarningTest, BadDeviceInfo) {}
+// TEST(ValidateWarningTest, DeviceInfoInvalid) {}
 
 // Negative-test ValidateRingBufferProperties
-TEST(ValidateWarningTest, BadRingBufferProperties) {
+TEST(ValidateWarningTest, RingBufferPropertiesInvalid) {
   // empty
   EXPECT_FALSE(ValidateRingBufferProperties(fha::RingBufferProperties{}));
 
@@ -584,7 +586,7 @@ TEST(ValidateWarningTest, BadRingBufferProperties) {
 }
 
 // Negative-test ValidateRingBufferFormat
-TEST(ValidateWarningTest, BadRingBufferFormat) {
+TEST(ValidateWarningTest, RingBufferFormatInvalid) {
   // missing pcm_format
   EXPECT_FALSE(ValidateRingBufferFormat(fha::Format{}));
 
@@ -698,7 +700,7 @@ TEST(ValidateWarningTest, BadRingBufferFormat) {
 }
 
 // Negative-test ValidateSampleFormatCompatibility
-TEST(ValidateWarningTest, BadFormatCompatibility) {
+TEST(ValidateWarningTest, FormatIncompatibility) {
   const std::set<std::pair<uint8_t, fha::SampleFormat>> kAllowedFormats{
       {1, fha::SampleFormat::kPcmUnsigned}, {2, fha::SampleFormat::kPcmSigned},
       {4, fha::SampleFormat::kPcmSigned},   {4, fha::SampleFormat::kPcmFloat},
@@ -723,7 +725,7 @@ TEST(ValidateWarningTest, BadFormatCompatibility) {
 }
 
 // Negative-test ValidateRingBufferVmo
-TEST(ValidateWarningTest, BadRingBufferVmo) {
+TEST(ValidateWarningTest, RingBufferVmoInvalid) {
   constexpr uint64_t kVmoContentSize = 8192;
   zx::vmo vmo;
   auto status = zx::vmo::create(kVmoContentSize, 0, &vmo);
@@ -761,7 +763,7 @@ TEST(ValidateWarningTest, BadRingBufferVmo) {
 }
 
 // Negative-test ValidateDelayInfo for internal_delay
-TEST(ValidateWarningTest, BadInternalDelayInfo) {
+TEST(ValidateWarningTest, InternalDelayInfoInvalid) {
   // empty
   EXPECT_FALSE(ValidateDelayInfo(fha::DelayInfo{}));
 
@@ -777,7 +779,7 @@ TEST(ValidateWarningTest, BadInternalDelayInfo) {
 }
 
 // Negative-test ValidateDelayInfo for external_delay
-TEST(ValidateWarningTest, BadExternalDelayInfo) {
+TEST(ValidateWarningTest, ExternalDelayInfoInvalid) {
   // bad external_delay
   EXPECT_FALSE(ValidateDelayInfo(fha::DelayInfo{{
       .internal_delay = 0,
@@ -786,7 +788,7 @@ TEST(ValidateWarningTest, BadExternalDelayInfo) {
 }
 
 // Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
-TEST(ValidateWarningTest, BadCodecProperties) {
+TEST(ValidateWarningTest, CodecPropertiesInvalid) {
   EXPECT_FALSE(ValidateCodecProperties(fha::CodecProperties{{
       .is_input = false, .manufacturer = "manufacturer", .product = "product", .unique_id = {{}},
       // plug_detect_capabilities missing
@@ -794,7 +796,7 @@ TEST(ValidateWarningTest, BadCodecProperties) {
 }
 
 // Unittest ValidateDaiFormatSets
-TEST(ValidateWarningTest, BadDaiSupportedFormats) {
+TEST(ValidateWarningTest, DaiSupportedFormatsInvalid) {
   // Entirely empty
   EXPECT_FALSE(ValidateDaiFormatSets(std::vector<fha::DaiSupportedFormats>{}));
 
@@ -932,7 +934,7 @@ TEST(ValidateWarningTest, BadDaiSupportedFormats) {
 }
 
 // Unittest ValidateDaiFormat
-TEST(ValidateWarningTest, BadDaiFormat) {
+TEST(ValidateWarningTest, DaiFormatInvalid) {
   // empty
   EXPECT_FALSE(ValidateDaiFormat({{}}));
 
@@ -1039,7 +1041,7 @@ TEST(ValidateWarningTest, BadDaiFormat) {
 }
 
 // Unittest ValidateCodecFormatInfo
-TEST(ValidateWarningTest, BadCodecFormatInfo) {
+TEST(ValidateWarningTest, CodecFormatInfoInvalid) {
   // These durations cannot be negative.
   EXPECT_FALSE(ValidateCodecFormatInfo(fha::CodecFormatInfo{{
       .external_delay = -1,
@@ -1064,64 +1066,7 @@ TEST(ValidateWarningTest, BadCodecFormatInfo) {
 
 // signalprocessing functions
 //
-TEST(ValidateWarningTest, BadElement) {
-  // This element has no 'id'.
-  EXPECT_FALSE(ValidateElement(kElementNoId));
-
-  // This element has no 'type'.
-  EXPECT_FALSE(ValidateElement(kElementNoType));
-
-  // This element has no 'type_specific', but its 'type' requires one.
-  EXPECT_FALSE(ValidateElement(kElementNoRequiredTypeSpecific));
-
-  // This element contains a 'type_specific' that does not match its 'type'.
-  EXPECT_FALSE(ValidateElement(kElementWrongTypeSpecific));
-
-  // This element contains a 'description' that is an empty string.
-  EXPECT_FALSE(ValidateElement(kElementEmptyDescription));
-
-  // Test inconsistencies in certain type_specifics
-  // TODO(https://fxbug.dev/42069012): Negative-test ValidateElement
-}
-
-TEST(ValidateWarningTest, BadElementList) {
-  EXPECT_FALSE(ValidateElements(kEmptyElements));
-
-  // List contains two elements with the same id.
-  EXPECT_FALSE(ValidateElements(kElementsDuplicateId));
-
-  // bad Elements: all the ValidateElement negative cases
-  EXPECT_FALSE(ValidateElements(kElementsWithNoId));
-  EXPECT_FALSE(ValidateElements(kElementsWithNoType));
-  EXPECT_FALSE(ValidateElements(kElementsWithNoRequiredTypeSpecific));
-  EXPECT_FALSE(ValidateElements(kElementsWithWrongTypeSpecific));
-  EXPECT_FALSE(ValidateElements(kElementsWithEmptyDescription));
-}
-
-TEST(ValidateWarningTest, BadTopology) {
-  // This topology has no 'id'.
-  EXPECT_FALSE(ValidateTopology(kTopologyMissingId, MapElements(kElements)));
-
-  // This topology has no 'processing_elements_edge_pairs'.
-  EXPECT_FALSE(ValidateTopology(kTopologyMissingEdgePairs, MapElements(kElements)));
-
-  // This topology has an 'processing_elements_edge_pairs' vector that is empty.
-  EXPECT_FALSE(ValidateTopology(kTopologyEmptyEdgePairs, MapElements(kElements)));
-
-  // This topology references an element_id that is not included in the element_map.
-  EXPECT_FALSE(ValidateTopology(kTopologyUnknownElementId, MapElements(kElements)));
-
-  // This topology includes an edge that connects one element_id to itself.
-  EXPECT_FALSE(ValidateTopology(kTopologyEdgePairLoop, MapElements(kElements)));
-
-  // This topology has a terminal (source or destination) element that is not an Endpoint.
-  EXPECT_FALSE(ValidateTopology(kTopologyTerminalNotEndpoint, MapElements(kElements)));
-
-  // empty element_map
-  EXPECT_FALSE(ValidateTopology(kTopology14, kEmptyElementMap));
-}
-
-TEST(ValidateWarningTest, BadTopologyList) {
+TEST(ValidateWarningTest, TopologyListInvalid) {
   EXPECT_FALSE(ValidateTopologies(kEmptyTopologies, MapElements(kElements)));
 
   // List contains two topologies with the same id.
@@ -1142,38 +1087,302 @@ TEST(ValidateWarningTest, BadTopologyList) {
   EXPECT_FALSE(ValidateTopologies(kTopologies, kEmptyElementMap));
 }
 
-TEST(ValidateWarningTest, ElementStateWithMissingFields) {
-  EXPECT_FALSE(ValidateElementState(kElementStateEmpty, kElement1));
+TEST(ValidateWarningTest, TopologyInvalid) {
+  // This topology has no 'id'.
+  EXPECT_FALSE(ValidateTopology(kTopologyMissingId, MapElements(kElements)));
 
-  ASSERT_TRUE(ValidateElementState(kElementState1, kElement1));  // Baseline
+  // This topology has no 'processing_elements_edge_pairs'.
+  EXPECT_FALSE(ValidateTopology(kTopologyMissingEdgePairs, MapElements(kElements)));
+
+  // This topology has an 'processing_elements_edge_pairs' vector that is empty.
+  EXPECT_FALSE(ValidateTopology(kTopologyEmptyEdgePairs, MapElements(kElements)));
+
+  // This topology references an element_id that is not included in the element_map.
+  EXPECT_FALSE(ValidateTopology(kTopologyUnknownElementId, MapElements(kElements)));
+
+  // This topology includes an edge that connects one element_id to itself.
+  EXPECT_FALSE(ValidateTopology(kTopologyEdgePairLoop, MapElements(kElements)));
+
+  // This topology has a terminal (source or destination) element that is not an Endpoint.
+  EXPECT_FALSE(ValidateTopology(kTopologyTerminalNotEndpoint, MapElements(kElements)));
+
+  // empty element_map
+  EXPECT_FALSE(ValidateTopology(kTopologyDaiRb, kEmptyElementMap));
+}
+
+TEST(ValidateWarningTest, ElementListInvalid) {
+  EXPECT_FALSE(ValidateElements(kEmptyElements));
+
+  // List contains two elements with the same id.
+  EXPECT_FALSE(ValidateElements(kElementsDuplicateId));
+
+  // bad Elements: all the ValidateElement negative cases
+  EXPECT_FALSE(ValidateElements(kElementsWithNoId));
+  EXPECT_FALSE(ValidateElements(kElementsWithNoType));
+  EXPECT_FALSE(ValidateElements(kElementsWithNoRequiredTypeSpecific));
+  EXPECT_FALSE(ValidateElements(kElementsWithWrongTypeSpecific));
+  EXPECT_FALSE(ValidateElements(kElementsWithEmptyDescription));
+}
+
+TEST(ValidateWarningTest, ElementInvalid) {
+  // This element has no 'id'.
+  EXPECT_FALSE(ValidateElement(kElementNoId));
+
+  // This element has no 'type'.
+  EXPECT_FALSE(ValidateElement(kElementNoType));
+
+  // This element has no 'type_specific', but its 'type' requires one.
+  EXPECT_FALSE(ValidateElement(kElementNoRequiredTypeSpecific));
+
+  // This element contains a 'type_specific' that does not match its 'type'.
+  EXPECT_FALSE(ValidateElement(kElementWrongTypeSpecific));
+
+  // This element contains a 'description' that is an empty string.
+  EXPECT_FALSE(ValidateElement(kElementEmptyDescription));
+}
+
+// Test inconsistencies in certain type_specifics
+// TODO(https://fxbug.dev/42069012): Negative-test ValidateElement
+TEST(ValidateWarningTest, DynamicsElementInvalid) {
+  {
+    auto dyn_no_bands = kDynamicsElement;
+    dyn_no_bands.type_specific()->dynamics()->bands(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElement(dyn_no_bands));
+    EXPECT_FALSE(ValidateElement(dyn_no_bands));
+  }
+  {
+    auto dyn_empty_bands = kDynamicsElement;
+    dyn_empty_bands.type_specific()->dynamics()->bands({{}});
+    EXPECT_FALSE(ValidateDynamicsElement(dyn_empty_bands));
+    EXPECT_FALSE(ValidateElement(dyn_empty_bands));
+  }
+  {
+    auto dyn_band_no_id = kDynamicsElement;
+    dyn_band_no_id.type_specific()->dynamics()->bands()->at(0).id(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElement(dyn_band_no_id));
+    EXPECT_FALSE(ValidateElement(dyn_band_no_id));
+  }
+}
+
+TEST(ValidateWarningTest, EndpointElementInvalid) {
+  {
+    auto endp_no_type = kDaiEndpointElement;
+    endp_no_type.type_specific()->endpoint()->type(std::nullopt);
+    EXPECT_FALSE(ValidateEndpointElement(endp_no_type));
+    EXPECT_FALSE(ValidateElement(endp_no_type));
+  }
+  {
+    auto endp_no_plug_caps = kDaiEndpointElement;
+    endp_no_plug_caps.type_specific()->endpoint()->plug_detect_capabilities(std::nullopt);
+    EXPECT_FALSE(ValidateEndpointElement(endp_no_plug_caps));
+    EXPECT_FALSE(ValidateElement(endp_no_plug_caps));
+  }
+}
+
+// All the EQ-specific ways that an Element can be non-compliant
+TEST(ValidateWarningTest, EqualizerElementInvalid) {
+  {
+    auto eq_no_bands = kEqualizerElement;
+    eq_no_bands.type_specific()->equalizer()->bands(std::nullopt);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_no_bands));
+    EXPECT_FALSE(ValidateElement(eq_no_bands));
+  }
+  {
+    auto eq_empty_bands = kEqualizerElement;
+    eq_empty_bands.type_specific()->equalizer()->bands({{}});
+    EXPECT_FALSE(ValidateEqualizerElement(eq_empty_bands));
+    EXPECT_FALSE(ValidateElement(eq_empty_bands));
+  }
+  {
+    auto eq_no_min_freq = kEqualizerElement;
+    eq_no_min_freq.type_specific()->equalizer()->min_frequency(std::nullopt);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_no_min_freq));
+    EXPECT_FALSE(ValidateElement(eq_no_min_freq));
+  }
+  {
+    auto eq_no_max_freq = kEqualizerElement;
+    eq_no_max_freq.type_specific()->equalizer()->max_frequency(std::nullopt);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_no_max_freq));
+    EXPECT_FALSE(ValidateElement(eq_no_max_freq));
+  }
+  {
+    auto eq_max_freq_too_low = kEqualizerElement;
+    eq_max_freq_too_low.type_specific()->equalizer()->min_frequency(
+        *kEqualizerElement.type_specific()->equalizer()->max_frequency() + 1);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_max_freq_too_low));
+    EXPECT_FALSE(ValidateElement(eq_max_freq_too_low));
+  }
+  {
+    auto eq_negative_q = kEqualizerElement;
+    eq_negative_q.type_specific()->equalizer()->max_q(-1.0f);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_negative_q));
+    EXPECT_FALSE(ValidateElement(eq_negative_q));
+  }
+  {
+    auto eq_inf_q = kEqualizerElement;
+    eq_inf_q.type_specific()->equalizer()->max_q(INFINITY);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_inf_q));
+    EXPECT_FALSE(ValidateElement(eq_inf_q));
+  }
+  {
+    auto eq_nan_q = kEqualizerElement;
+    eq_nan_q.type_specific()->equalizer()->max_q(NAN);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_nan_q));
+    EXPECT_FALSE(ValidateElement(eq_nan_q));
+  }
+  {
+    auto eq_no_min_gain = kEqualizerElement;
+    eq_no_min_gain.type_specific()->equalizer()->min_gain_db(std::nullopt);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_no_min_gain));
+    EXPECT_FALSE(ValidateElement(eq_no_min_gain));
+  }
+  {
+    auto eq_inf_min_gain = kEqualizerElement;
+    eq_inf_min_gain.type_specific()->equalizer()->min_gain_db(-INFINITY);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_inf_min_gain));
+    EXPECT_FALSE(ValidateElement(eq_inf_min_gain));
+  }
+  {
+    auto eq_nan_min_gain = kEqualizerElement;
+    eq_nan_min_gain.type_specific()->equalizer()->min_gain_db(NAN);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_nan_min_gain));
+    EXPECT_FALSE(ValidateElement(eq_nan_min_gain));
+  }
+  {
+    auto eq_no_max_gain = kEqualizerElement;
+    eq_no_max_gain.type_specific()->equalizer()->max_gain_db(std::nullopt);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_no_max_gain));
+    EXPECT_FALSE(ValidateElement(eq_no_max_gain));
+  }
+  {
+    auto eq_max_gain_too_low = kEqualizerElement;
+    eq_max_gain_too_low.type_specific()->equalizer()->max_gain_db(
+        *kEqualizerElement.type_specific()->equalizer()->min_gain_db() - 1.0f);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_max_gain_too_low));
+    EXPECT_FALSE(ValidateElement(eq_max_gain_too_low));
+  }
+  {
+    auto eq_inf_max_gain = kEqualizerElement;
+    eq_inf_max_gain.type_specific()->equalizer()->max_gain_db(INFINITY);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_inf_max_gain));
+    EXPECT_FALSE(ValidateElement(eq_inf_max_gain));
+  }
+  {
+    auto eq_nan_max_gain = kEqualizerElement;
+    eq_nan_max_gain.type_specific()->equalizer()->max_gain_db(NAN);
+    EXPECT_FALSE(ValidateEqualizerElement(eq_nan_max_gain));
+    EXPECT_FALSE(ValidateElement(eq_nan_max_gain));
+  }
+}
+
+TEST(ValidateWarningTest, GainElementInvalid) {
+  {
+    auto gain_no_type = kGainElement;
+    gain_no_type.type_specific()->gain()->type(std::nullopt);
+    EXPECT_FALSE(ValidateGainElement(gain_no_type));
+    EXPECT_FALSE(ValidateElement(gain_no_type));
+  }
+  {
+    auto gain_no_min = kGainElement;
+    gain_no_min.type_specific()->gain()->min_gain(std::nullopt);
+    EXPECT_FALSE(ValidateGainElement(gain_no_min));
+    EXPECT_FALSE(ValidateElement(gain_no_min));
+  }
+  {
+    auto gain_inf_min = kGainElement;
+    gain_inf_min.type_specific()->gain()->min_gain(-INFINITY);
+    EXPECT_FALSE(ValidateGainElement(gain_inf_min));
+    EXPECT_FALSE(ValidateElement(gain_inf_min));
+  }
+  {
+    auto gain_nan_min = kGainElement;
+    gain_nan_min.type_specific()->gain()->min_gain(NAN);
+    EXPECT_FALSE(ValidateGainElement(gain_nan_min));
+    EXPECT_FALSE(ValidateElement(gain_nan_min));
+  }
+  {
+    auto gain_no_max = kGainElement;
+    gain_no_max.type_specific()->gain()->max_gain(std::nullopt);
+    EXPECT_FALSE(ValidateGainElement(gain_no_max));
+    EXPECT_FALSE(ValidateElement(gain_no_max));
+  }
+  {
+    auto gain_max_too_low = kGainElement;
+    gain_max_too_low.type_specific()->gain()->max_gain(
+        *kGainElement.type_specific()->gain()->min_gain() - 1.0f);
+    EXPECT_FALSE(ValidateGainElement(gain_max_too_low));
+    EXPECT_FALSE(ValidateElement(gain_max_too_low));
+  }
+  {
+    auto gain_inf_max = kGainElement;
+    gain_inf_max.type_specific()->gain()->max_gain(INFINITY);
+    EXPECT_FALSE(ValidateGainElement(gain_inf_max));
+    EXPECT_FALSE(ValidateElement(gain_inf_max));
+  }
+  {
+    auto gain_nan_max = kGainElement;
+    gain_nan_max.type_specific()->gain()->max_gain(NAN);
+    EXPECT_FALSE(ValidateGainElement(gain_nan_max));
+    EXPECT_FALSE(ValidateElement(gain_nan_max));
+  }
+  {
+    auto gain_no_step = kGainElement;
+    gain_no_step.type_specific()->gain()->min_gain_step(std::nullopt);
+    EXPECT_FALSE(ValidateGainElement(gain_no_step));
+    EXPECT_FALSE(ValidateElement(gain_no_step));
+  }
+  {
+    auto gain_neg_step = kGainElement;
+    gain_neg_step.type_specific()->gain()->min_gain_step(-1.0f);
+    EXPECT_FALSE(ValidateGainElement(gain_neg_step));
+    EXPECT_FALSE(ValidateElement(gain_neg_step));
+  }
+  {
+    auto gain_step_too_large = kGainElement;
+    gain_step_too_large.type_specific()->gain()->min_gain_step(
+        *kGainElement.type_specific()->gain()->max_gain() -
+        *kGainElement.type_specific()->gain()->min_gain() + 1.0f);
+    EXPECT_FALSE(ValidateGainElement(gain_step_too_large));
+    EXPECT_FALSE(ValidateElement(gain_step_too_large));
+  }
+  {
+    auto gain_nan_step = kGainElement;
+    gain_nan_step.type_specific()->gain()->min_gain_step(NAN);
+    EXPECT_FALSE(ValidateGainElement(gain_nan_step));
+    EXPECT_FALSE(ValidateElement(gain_nan_step));
+  }
+}
+
+// ElementState tests
+TEST(ValidateWarningTest, ElementStateWithMissingFields) {
+  EXPECT_FALSE(ValidateElementState(kElementStateEmpty, kDaiEndpointElement));
+
+  ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
 
   // The `started` field is required.
-  fuchsia_hardware_audio_signalprocessing::ElementState state_without_started = kElementState1;
+  fhasp::ElementState state_without_started = kEndpointElementState;
   state_without_started.started(std::nullopt);
-  EXPECT_FALSE(ValidateElementState(state_without_started, kElement1));
+  EXPECT_FALSE(ValidateElementState(state_without_started, kDaiEndpointElement));
 
-  // For kElement1's ElementType (endpoint), `type_specific` is required.
-  fuchsia_hardware_audio_signalprocessing::ElementState state_without_type_specific =
-      kElementState1;
+  // For this ElementType (endpoint), `type_specific` is required.
+  fhasp::ElementState state_without_type_specific = kEndpointElementState;
   state_without_type_specific.type_specific(std::nullopt);
-  EXPECT_FALSE(ValidateElementState(state_without_type_specific, kElement1));
+  EXPECT_FALSE(ValidateElementState(state_without_type_specific, kDaiEndpointElement));
 }
 
 // ElementState's type_specific union must match its Element's type.
 TEST(ValidateWarningTest, ElementStateWithIncorrectTypeSpecificState) {
-  ASSERT_TRUE(ValidateElementState(kElementState1, kElement1));  // Baseline
+  ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
 
   // Element is an Endpoint, but the state has an Equalizer type_specific table.
-  fuchsia_hardware_audio_signalprocessing::ElementState state_with_incorrect_type_specific =
-      kElementState1;
+  fhasp::ElementState state_with_incorrect_type_specific = kEndpointElementState;
   state_with_incorrect_type_specific.type_specific(
-      fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEqualizer(
-          {{.band_states = {{{{.id = 0}}}}}}));
-  EXPECT_FALSE(ValidateElementState(state_with_incorrect_type_specific, kElement1));
+      fhasp::TypeSpecificElementState::WithEqualizer({{.band_states = {{{{.id = 0}}}}}}));
+  EXPECT_FALSE(ValidateElementState(state_with_incorrect_type_specific, kDaiEndpointElement));
 }
 
 // ElementState that violates the capabilities of that element.
-TEST(ValidateWarningTest, InconsistentElementState) {
+TEST(ValidateWarningTest, ElementStateInconsistent) {
   // According to Element properties it cannot stop, but ElementState says it is stopped.
   EXPECT_FALSE(ValidateElementState(kElementStateStopped, kElementCannotStop));
 
@@ -1184,19 +1393,459 @@ TEST(ValidateWarningTest, InconsistentElementState) {
 }
 
 TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
-  ASSERT_TRUE(ValidateElementState(kElementState1, kElement1));  // Baseline
+  ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
 
   // `turn_on_delay` is optional, but if present then it cannot be negative.
-  fuchsia_hardware_audio_signalprocessing::ElementState state_with_negative_turn_on_delay =
-      kElementState1;
+  fhasp::ElementState state_with_negative_turn_on_delay = kEndpointElementState;
   state_with_negative_turn_on_delay.turn_on_delay(ZX_NSEC(-1));
-  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_on_delay, kElement1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_on_delay, kDaiEndpointElement));
 
   // `turn_off_delay` is optional, but if present then it cannot be negative.
-  fuchsia_hardware_audio_signalprocessing::ElementState state_with_negative_turn_off_delay =
-      kElementState1;
-  state_with_negative_turn_off_delay.turn_on_delay(ZX_NSEC(-1));
-  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_off_delay, kElement1));
+  fhasp::ElementState state_with_negative_turn_off_delay = kEndpointElementState;
+  state_with_negative_turn_off_delay.turn_off_delay(ZX_NSEC(-1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_off_delay, kDaiEndpointElement));
+}
+
+// All the ways that a Dynamics-specific ElementState can be invalid.
+TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
+  {
+    auto dyn_state_band_states_none = kDynamicsElementState;
+    dyn_state_band_states_none.type_specific()->dynamics()->band_states(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_band_states_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_band_states_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_band_states_empty = kDynamicsElementState;
+    dyn_state_band_states_empty.type_specific()->dynamics()->band_states({{}});
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_band_states_empty, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_band_states_empty, kDynamicsElement));
+  }
+  {
+    auto dyn_state_id_none = kDynamicsElementState;
+    dyn_state_id_none.type_specific()->dynamics()->band_states()->at(0).id(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_id_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_id_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_id_unknown = kDynamicsElementState;
+    dyn_state_id_unknown.type_specific()->dynamics()->band_states()->at(0).id(-1);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_id_unknown, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_id_unknown, kDynamicsElement));
+  }
+  {
+    auto dyn_state_min_freq_none = kDynamicsElementState;
+    dyn_state_min_freq_none.type_specific()->dynamics()->band_states()->at(0).min_frequency(
+        std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_min_freq_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_min_freq_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_max_freq_none = kDynamicsElementState;
+    dyn_state_max_freq_none.type_specific()->dynamics()->band_states()->at(0).max_frequency(
+        std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_max_freq_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_max_freq_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_max_freq_too_low = kDynamicsElementState;
+    dyn_state_max_freq_too_low.type_specific()->dynamics()->band_states()->at(0).min_frequency(
+        *kDynamicsElementState.type_specific()->dynamics()->band_states()->at(0).max_frequency() +
+        1);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_max_freq_too_low, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_max_freq_too_low, kDynamicsElement));
+  }
+  {
+    auto dyn_state_threshold_db_inf = kDynamicsElementState;
+    dyn_state_threshold_db_inf.type_specific()->dynamics()->band_states()->at(0).threshold_db(
+        INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+    dyn_state_threshold_db_inf.type_specific()->dynamics()->band_states()->at(0).threshold_db(
+        -INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_threshold_db_nan = kDynamicsElementState;
+    dyn_state_threshold_db_nan.type_specific()->dynamics()->band_states()->at(0).threshold_db(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_threshold_db_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_threshold_db_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_state_threshold_type_none = kDynamicsElementState;
+    dyn_state_threshold_type_none.type_specific()->dynamics()->band_states()->at(0).threshold_type(
+        std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_threshold_type_none, kDynamicsElement,
+                                              /* from_client */ false));
+    EXPECT_FALSE(ValidateElementState(dyn_state_threshold_type_none, kDynamicsElement,
+                                      /* from_client */ false));
+  }
+  {
+    auto dyn_element_threshold_type_unsupported = kDynamicsElement;
+    dyn_element_threshold_type_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_threshold_type_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kThresholdType);
+    EXPECT_FALSE(ValidateDynamicsElementState(kDynamicsElementState,
+                                              dyn_element_threshold_type_unsupported));
+    EXPECT_FALSE(
+        ValidateElementState(kDynamicsElementState, dyn_element_threshold_type_unsupported));
+  }
+  {
+    auto dyn_state_ratio_none = kDynamicsElementState;
+    dyn_state_ratio_none.type_specific()->dynamics()->band_states()->at(0).ratio(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_ratio_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_ratio_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_ratio_inf = kDynamicsElementState;
+    dyn_state_ratio_inf.type_specific()->dynamics()->band_states()->at(0).ratio(INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_ratio_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_ratio_inf, kDynamicsElement));
+    dyn_state_ratio_inf.type_specific()->dynamics()->band_states()->at(0).ratio(-INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_ratio_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_ratio_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_ratio_nan = kDynamicsElementState;
+    dyn_state_ratio_nan.type_specific()->dynamics()->band_states()->at(0).ratio(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_ratio_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_ratio_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_knee_width_unsupported = kDynamicsElement;
+    dyn_element_knee_width_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_knee_width_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kKneeWidth);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_knee_width_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_knee_width_unsupported));
+  }
+  {
+    auto dyn_state_knee_neg = kDynamicsElementState;
+    dyn_state_knee_neg.type_specific()->dynamics()->band_states()->at(0).knee_width_db(-1.0f);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_knee_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_knee_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_state_knee_inf = kDynamicsElementState;
+    dyn_state_knee_inf.type_specific()->dynamics()->band_states()->at(0).knee_width_db(INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_knee_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_knee_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_knee_nan = kDynamicsElementState;
+    dyn_state_knee_nan.type_specific()->dynamics()->band_states()->at(0).knee_width_db(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_knee_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_knee_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_attack_unsupported = kDynamicsElement;
+    dyn_element_attack_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_attack_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kAttack);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_attack_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_attack_unsupported));
+  }
+  {
+    auto dyn_state_attack_neg = kDynamicsElementState;
+    dyn_state_attack_neg.type_specific()->dynamics()->band_states()->at(0).attack(ZX_USEC(-1));
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_attack_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_attack_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_element_release_unsupported = kDynamicsElement;
+    dyn_element_release_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_release_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kRelease);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_release_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_release_unsupported));
+  }
+  {
+    auto dyn_state_release_neg = kDynamicsElementState;
+    dyn_state_release_neg.type_specific()->dynamics()->band_states()->at(0).release(ZX_USEC(-1));
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_release_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_release_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_element_output_gain_unsupported = kDynamicsElement;
+    dyn_element_output_gain_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_output_gain_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kOutputGain);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_output_gain_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_output_gain_unsupported));
+  }
+  {
+    auto dyn_state_output_gain_inf = kDynamicsElementState;
+    dyn_state_output_gain_inf.type_specific()->dynamics()->band_states()->at(0).output_gain_db(
+        INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_output_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_output_gain_inf, kDynamicsElement));
+    dyn_state_output_gain_inf.type_specific()->dynamics()->band_states()->at(0).output_gain_db(
+        -INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_output_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_output_gain_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_output_gain_nan = kDynamicsElementState;
+    dyn_state_output_gain_nan.type_specific()->dynamics()->band_states()->at(0).output_gain_db(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_output_gain_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_output_gain_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_input_gain_unsupported = kDynamicsElement;
+    dyn_element_input_gain_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_input_gain_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kInputGain);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_input_gain_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_input_gain_unsupported));
+  }
+  {
+    auto dyn_state_input_gain_inf = kDynamicsElementState;
+    dyn_state_input_gain_inf.type_specific()->dynamics()->band_states()->at(0).input_gain_db(
+        INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_input_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_input_gain_inf, kDynamicsElement));
+    dyn_state_input_gain_inf.type_specific()->dynamics()->band_states()->at(0).input_gain_db(
+        -INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_input_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_input_gain_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_input_gain_nan = kDynamicsElementState;
+    dyn_state_input_gain_nan.type_specific()->dynamics()->band_states()->at(0).input_gain_db(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_input_gain_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_input_gain_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_level_type_unsupported = kDynamicsElement;
+    dyn_element_level_type_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_level_type_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kLevelType);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_level_type_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_level_type_unsupported));
+  }
+  {
+    auto dyn_element_lookahead_unsupported = kDynamicsElement;
+    dyn_element_lookahead_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_lookahead_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kLookahead);
+    EXPECT_FALSE(
+        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_lookahead_unsupported));
+    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_lookahead_unsupported));
+  }
+  {
+    auto dyn_state_lookahead_neg = kDynamicsElementState;
+    dyn_state_lookahead_neg.type_specific()->dynamics()->band_states()->at(0).lookahead(
+        ZX_USEC(-1));
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_lookahead_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_lookahead_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_element_linked_channels_unsupported = kDynamicsElement;
+    dyn_element_linked_channels_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_linked_channels_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kLinkedChannels);
+    EXPECT_FALSE(ValidateDynamicsElementState(kDynamicsElementState,
+                                              dyn_element_linked_channels_unsupported));
+    EXPECT_FALSE(
+        ValidateElementState(kDynamicsElementState, dyn_element_linked_channels_unsupported));
+  }
+}
+
+// All the ways that an Endpoint ElementState can be invalid.
+TEST(ValidateWarningTest, EndpointElementStateInvalid) {
+  {
+    auto endp_state_plug_state_none = kEndpointElementState;
+    endp_state_plug_state_none.type_specific()->endpoint()->plug_state(std::nullopt);
+    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plug_state_none, kDaiEndpointElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plug_state_none, kDaiEndpointElement));
+  }
+  {
+    auto endp_state_plugged_none = kEndpointElementState;
+    endp_state_plugged_none.type_specific()->endpoint()->plug_state()->plugged(std::nullopt);
+    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plugged_none, kDaiEndpointElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plugged_none, kDaiEndpointElement));
+  }
+  {
+    auto endp_state_plugged_unsupported = kEndpointElementState;
+    endp_state_plugged_unsupported.type_specific()->endpoint()->plug_state()->plugged(false);
+    EXPECT_FALSE(
+        ValidateEndpointElementState(endp_state_plugged_unsupported, kRingBufferEndpointElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plugged_unsupported, kRingBufferEndpointElement));
+  }
+  {
+    auto endp_state_plug_time_none = kEndpointElementState;
+    endp_state_plug_time_none.type_specific()->endpoint()->plug_state()->plug_state_time(
+        std::nullopt);
+    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plug_time_none, kDaiEndpointElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plug_time_none, kDaiEndpointElement));
+  }
+}
+
+// All the ways that an Equalizer ElementState can be invalid.
+TEST(ValidateWarningTest, EqualizerElementStateInvalid) {
+  {
+    auto eq_state_band_states_none = kEqualizerElementState;
+    eq_state_band_states_none.type_specific()->equalizer()->band_states(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_band_states_none, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_band_states_none, kEqualizerElement));
+  }
+  {
+    auto eq_state_band_states_empty = kEqualizerElementState;
+    eq_state_band_states_empty.type_specific()->equalizer()->band_states({{}});
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_band_states_empty, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_band_states_empty, kEqualizerElement));
+  }
+  {
+    auto eq_state_id_none = kEqualizerElementState;
+    eq_state_id_none.type_specific()->equalizer()->band_states()->at(0).id(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_id_none, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_id_none, kEqualizerElement));
+  }
+  {
+    auto eq_state_id_unknown = kEqualizerElementState;
+    eq_state_id_unknown.type_specific()->equalizer()->band_states()->at(0).id(-1);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_id_unknown, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_id_unknown, kEqualizerElement));
+  }
+  // Is BandState.EqualizerBandType ever required?
+  // Is BandState.frequency ever required, depending on the EqualizerBandType?
+  {
+    auto eq_state_freq_too_low = kEqualizerElementState;
+    eq_state_freq_too_low.type_specific()->equalizer()->band_states()->at(0).frequency(
+        *kEqualizerElement.type_specific()->equalizer()->min_frequency());
+    auto eq_element = kEqualizerElement;
+    eq_element.type_specific()->equalizer()->min_frequency(
+        *eq_element.type_specific()->equalizer()->min_frequency() + 1);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_freq_too_low, eq_element));
+    EXPECT_FALSE(ValidateElementState(eq_state_freq_too_low, eq_element));
+  }
+  {
+    auto eq_state_freq_too_high = kEqualizerElementState;
+    eq_state_freq_too_high.type_specific()->equalizer()->band_states()->at(0).frequency(
+        *kEqualizerElement.type_specific()->equalizer()->max_frequency());
+    auto eq_element = kEqualizerElement;
+    eq_element.type_specific()->equalizer()->max_frequency(
+        *eq_element.type_specific()->equalizer()->max_frequency() - 1);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_freq_too_high, eq_element));
+    EXPECT_FALSE(ValidateElementState(eq_state_freq_too_high, eq_element));
+  }
+  {
+    auto eq_state_q_zero = kEqualizerElementState;
+    eq_state_q_zero.type_specific()->equalizer()->band_states()->at(0).q(0.0f);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_q_zero, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_q_zero, kEqualizerElement));
+  }
+  {
+    auto eq_state_q_inf = kEqualizerElementState;
+    eq_state_q_inf.type_specific()->equalizer()->band_states()->at(0).q(INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_q_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_q_inf, kEqualizerElement));
+    eq_state_q_inf.type_specific()->equalizer()->band_states()->at(0).q(-INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_q_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_q_inf, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_nan = kEqualizerElementState;
+    eq_state_gain_nan.type_specific()->equalizer()->band_states()->at(0).gain_db(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_gain_nan, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_gain_nan, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_inf = kEqualizerElementState;
+    eq_state_gain_inf.type_specific()->equalizer()->band_states()->at(0).gain_db(INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_gain_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_gain_inf, kEqualizerElement));
+    eq_state_gain_inf.type_specific()->equalizer()->band_states()->at(0).gain_db(-INFINITY);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_gain_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_gain_inf, kEqualizerElement));
+  }
+  {
+    auto eq_state_q_nan = kEqualizerElementState;
+    eq_state_q_nan.type_specific()->equalizer()->band_states()->at(0).q(NAN);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_q_nan, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_q_nan, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_unexpected = kEqualizerElementState;
+    eq_state_gain_unexpected.type_specific()->equalizer()->band_states()->at(1).type(
+        fhasp::EqualizerBandType::kNotch);
+    eq_state_gain_unexpected.type_specific()->equalizer()->band_states()->at(1).gain_db(0.0f);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_gain_unexpected, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_gain_unexpected, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_expected = kEqualizerElementState;
+    eq_state_gain_expected.type_specific()->equalizer()->band_states()->at(0).type(
+        fhasp::EqualizerBandType::kPeak);
+    eq_state_gain_expected.type_specific()->equalizer()->band_states()->at(0).gain_db(std::nullopt);
+    EXPECT_FALSE(ValidateDynamicsElementState(eq_state_gain_expected, kEqualizerElement));
+    EXPECT_FALSE(ValidateElementState(eq_state_gain_expected, kEqualizerElement));
+  }
+}
+
+// All the ways that a Gain ElementState can be invalid.
+TEST(ValidateWarningTest, GainElementStateInvalid) {
+  {
+    auto gain_state_gain_none = kGainElementState;
+    gain_state_gain_none.type_specific()->gain()->gain(std::nullopt);
+    EXPECT_FALSE(ValidateGainElementState(gain_state_gain_none, kGainElement));
+    EXPECT_FALSE(ValidateElementState(gain_state_gain_none, kGainElement));
+  }
+  {
+    auto gain_state_gain_too_low = kGainElementState;
+    gain_state_gain_too_low.type_specific()->gain()->gain(
+        *kGainElement.type_specific()->gain()->min_gain() - 1.0f);
+    EXPECT_FALSE(ValidateGainElementState(gain_state_gain_too_low, kGainElement));
+    EXPECT_FALSE(ValidateElementState(gain_state_gain_too_low, kGainElement));
+  }
+  {
+    auto gain_state_gain_too_high = kGainElementState;
+    gain_state_gain_too_high.type_specific()->gain()->gain(
+        *kGainElement.type_specific()->gain()->max_gain() + 1.0f);
+    EXPECT_FALSE(ValidateGainElementState(gain_state_gain_too_high, kGainElement));
+    EXPECT_FALSE(ValidateElementState(gain_state_gain_too_high, kGainElement));
+  }
+  {
+    auto gain_state_gain_inf = kGainElementState;
+    gain_state_gain_inf.type_specific()->gain()->gain(INFINITY);
+    EXPECT_FALSE(ValidateGainElementState(gain_state_gain_inf, kGainElement));
+    EXPECT_FALSE(ValidateElementState(gain_state_gain_inf, kGainElement));
+    gain_state_gain_inf.type_specific()->gain()->gain(-INFINITY);
+    EXPECT_FALSE(ValidateGainElementState(gain_state_gain_inf, kGainElement));
+    EXPECT_FALSE(ValidateElementState(gain_state_gain_inf, kGainElement));
+  }
+  {
+    auto gain_state_gain_nan = kGainElementState;
+    gain_state_gain_nan.type_specific()->gain()->gain(NAN);
+    EXPECT_FALSE(ValidateGainElementState(gain_state_gain_nan, kGainElement));
+    EXPECT_FALSE(ValidateElementState(gain_state_gain_nan, kGainElement));
+  }
+}
+
+// All the ways that a VendorSpecific ElementState can be invalid.
+TEST(ValidateWarningTest, VendorSpecificElementStateInvalid) {
+  {
+    auto vendor_specific_vendor_specific_data_none = kVendorSpecificElementState;
+    vendor_specific_vendor_specific_data_none.vendor_specific_data(std::nullopt);
+    EXPECT_FALSE(ValidateVendorSpecificElementState(vendor_specific_vendor_specific_data_none,
+                                                    kVendorSpecificElement));
+    EXPECT_FALSE(
+        ValidateElementState(vendor_specific_vendor_specific_data_none, kVendorSpecificElement));
+  }
+  {
+    auto vendor_specific_vendor_specific_data_empty = kVendorSpecificElementState;
+    vendor_specific_vendor_specific_data_empty.vendor_specific_data({{}});
+    EXPECT_FALSE(ValidateVendorSpecificElementState(vendor_specific_vendor_specific_data_empty,
+                                                    kVendorSpecificElement));
+    EXPECT_FALSE(
+        ValidateElementState(vendor_specific_vendor_specific_data_empty, kVendorSpecificElement));
+  }
 }
 
 }  // namespace

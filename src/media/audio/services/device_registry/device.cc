@@ -1101,7 +1101,7 @@ void Device::RetrieveElementState(ElementId element_id) {
         // Either (a) sig_proc_topology_map_.at(element_id).element is incorrect, or (b) the driver
         // is behaving incorrectly.
         auto element_state = result->state();
-        if (!ValidateElementState(element_state, element)) {
+        if (!ValidateElementState(element_state, element, /* from_client */ false)) {
           FX_LOGS(ERROR) << context << ": not found";
           OnError(ZX_ERR_INVALID_ARGS);
           return;

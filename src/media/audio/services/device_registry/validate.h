@@ -54,18 +54,39 @@ bool ValidateCompositeProperties(
 
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
-bool ValidateElements(
-    const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
-bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
-bool ValidateElementState(
-    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
-    const fuchsia_hardware_audio_signalprocessing::Element& element);
-
 bool ValidateTopologies(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
     const std::unordered_map<ElementId, ElementRecord>& element_map);
 bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
                       const std::unordered_map<ElementId, ElementRecord>& element_map);
+
+bool ValidateElements(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
+bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateDynamicsElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateEndpointElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateEqualizerElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateGainElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateVendorSpecificElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+
+bool ValidateElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element, bool from_client = true);
+bool ValidateDynamicsElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element, bool from_client = true);
+bool ValidateEndpointElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateEqualizerElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateGainElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateVendorSpecificElementState(
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
 
 bool ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);

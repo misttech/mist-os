@@ -333,7 +333,7 @@ TEST_F(ObserverServerCodecTest, PlugChange) {
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that an Observer does not drop, if the observed device's fad::Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -625,7 +625,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that an Observer does not drop, if the observed device's fad::Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -1446,7 +1446,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
   EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
-// Verify that an Observer does not drop, if the observed device's fad::Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);

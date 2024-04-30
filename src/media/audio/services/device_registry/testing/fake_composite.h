@@ -199,8 +199,9 @@ class FakeComposite
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // This returns a fidl::client_end<Composite>. The driver will not start serving requests until
-  // Enable is called, which is why the construction/Enable separation exists.
+  // This returns a fidl::client_end<fuchsia_hardware_audio::Composite>. The driver will not start
+  // serving requests until Enable is called, which is why the construction/Enable separation
+  // exists.
   fidl::ClientEnd<fuchsia_hardware_audio::Composite> Enable();
   void DropComposite();
   void DropChildren();
