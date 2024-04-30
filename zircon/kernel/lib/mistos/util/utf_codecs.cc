@@ -7,9 +7,11 @@
 
 #include "third_party/icu/icu_utf.h"
 
+#include <ktl/enforce.h>
+
 namespace util {
 
-bool IsStringUTF8(std::string_view str) {
+bool IsStringUTF8(ktl::string_view str) {
   const char* src = str.data();
   size_t src_len = str.size();
   size_t char_index = 0;
@@ -23,6 +25,7 @@ bool IsStringUTF8(std::string_view str) {
   return true;
 }
 
+#if 0
 // ReadUnicodeCharacter --------------------------------------------------------
 
 bool ReadUnicodeCharacter(const char* src, size_t src_len, size_t* char_index,
@@ -63,5 +66,6 @@ size_t WriteUnicodeCharacter(uint32_t code_point, std::string* output) {
   output->resize(char_offset);
   return char_offset - original_char_offset;
 }
+#endif
 
 }  // namespace util

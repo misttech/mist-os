@@ -6,10 +6,9 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_SPLIT_STRING_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_SPLIT_STRING_H_
 
-#include <string_view>
-#include <vector>
-
 #include <fbl/string.h>
+#include <fbl/vector.h>
+#include <ktl/string_view.h>
 
 namespace util {
 
@@ -28,12 +27,12 @@ enum SplitResult {
 
 // Split the given string on ANY of the given separators, returning copies of
 // the result
-std::vector<fbl::String> SplitStringCopy(std::string_view input, std::string_view separators,
+fbl::Vector<fbl::String> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
                                          WhiteSpaceHandling whitespace, SplitResult result_type);
 
 // Like SplitStringCopy above except it returns a vector of std::string_views which
 // reference the original buffer without copying.
-std::vector<std::string_view> SplitString(std::string_view input, std::string_view separators,
+fbl::Vector<std::string_view> SplitString(ktl::string_view input, ktl::string_view separators,
                                           WhiteSpaceHandling whitespace, SplitResult result_type);
 
 }  // namespace util

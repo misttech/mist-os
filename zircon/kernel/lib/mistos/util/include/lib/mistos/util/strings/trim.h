@@ -6,13 +6,13 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_TRIM_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_TRIM_H_
 
-#include <string_view>
+#include <ktl/string_view.h>
 
 namespace util {
 
-// Returns a std::string_view over str, where chars_to_trim are removed from the
-// beginning and end of the std::string_view.
-std::string_view TrimString(std::string_view str, std::string_view chars_to_trim);
+// Returns a ktl::string_view over str, where chars_to_trim are removed from the
+// beginning and end of the ktl::string_view.
+ktl::string_view TrimString(ktl::string_view str, ktl::string_view chars_to_trim);
 
 }  // namespace util
 

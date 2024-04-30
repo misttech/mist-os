@@ -9,7 +9,8 @@
 #include <stdint.h>
 
 #include <string>
-#include <string_view>
+
+#include <ktl/string_view.h>
 
 namespace util {
 
@@ -27,8 +28,9 @@ inline bool IsValidCharacter(uint32_t code_point) {
          (code_point > 0xFDEFu && code_point <= 0x10FFFFu && (code_point & 0xFFFEu) != 0xFFFEu);
 }
 
-bool IsStringUTF8(std::string_view str);
+bool IsStringUTF8(ktl::string_view str);
 
+#if 0
 // ReadUnicodeCharacter --------------------------------------------------------
 
 // Reads a UTF-8 stream, placing the next code point into the given output
@@ -46,7 +48,7 @@ bool ReadUnicodeCharacter(const char* src, size_t src_len, size_t* char_index,
 // Appends a UTF-8 character to the given 8-bit string.  Returns the number of
 // bytes written.
 size_t WriteUnicodeCharacter(uint32_t code_point, std::string* output);
-
+#endif
 }  // namespace util
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_UTF_CODECS_H_

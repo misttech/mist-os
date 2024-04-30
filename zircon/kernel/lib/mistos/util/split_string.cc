@@ -6,34 +6,36 @@
 #include "lib/mistos/util/strings/split_string.h"
 
 #include <lib/mistos/util/strings/trim.h>
+#include <zircon/assert.h>
 
-#include <string_view>
-
+#include <fbl/alloc_checker.h>
 #include <fbl/string.h>
+
+#include <ktl/enforce.h>
 
 namespace util {
 namespace {
 
 template <typename OutputType>
-OutputType PieceToOutputType(std::string_view view) {
+OutputType PieceToOutputType(ktl::string_view view) {
   return view;
 }
 
 template <>
-fbl::String PieceToOutputType<fbl::String>(std::string_view view) {
+fbl::String PieceToOutputType<fbl::String>(ktl::string_view view) {
   return fbl::String(view);
 }
 
-size_t FindFirstOf(std::string_view view, char c, size_t pos) { return view.find(c, pos); }
+size_t FindFirstOf(ktl::string_view view, char c, size_t pos) { return view.find(c, pos); }
 
-size_t FindFirstOf(std::string_view view, std::string_view one_of, size_t pos) {
+size_t FindFirstOf(ktl::string_view view, ktl::string_view one_of, size_t pos) {
   return view.find_first_of(one_of, pos);
 }
 
 template <typename Str, typename OutputStringType, typename DelimiterType>
-std::vector<OutputStringType> SplitStringT(Str src, DelimiterType delimiter,
+fbl::Vector<OutputStringType> SplitStringT(Str src, DelimiterType delimiter,
                                            WhiteSpaceHandling whitespace, SplitResult result_type) {
-  std::vector<OutputStringType> result;
+  fbl::Vector<OutputStringType> result;
   if (src.empty())
     return result;
 
@@ -41,7 +43,7 @@ std::vector<OutputStringType> SplitStringT(Str src, DelimiterType delimiter,
   while (start != Str::npos) {
     size_t end = FindFirstOf(src, delimiter, start);
 
-    std::string_view view;
+    ktl::string_view view;
     if (end == Str::npos) {
       view = src.substr(start);
       start = Str::npos;
@@ -53,7 +55,9 @@ std::vector<OutputStringType> SplitStringT(Str src, DelimiterType delimiter,
       view = TrimString(view, " \t\r\n");
     }
     if (result_type == kSplitWantAll || !view.empty()) {
-      result.push_back(PieceToOutputType<OutputStringType>(view));
+      fbl::AllocChecker ac;
+      result.push_back(PieceToOutputType<OutputStringType>(view), &ac);
+      ZX_ASSERT(ac.check());
     }
   }
   return result;
@@ -61,22 +65,22 @@ std::vector<OutputStringType> SplitStringT(Str src, DelimiterType delimiter,
 
 }  // namespace
 
-std::vector<fbl::String> SplitStringCopy(std::string_view input, std::string_view separators,
+fbl::Vector<fbl::String> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
                                          WhiteSpaceHandling whitespace, SplitResult result_type) {
   if (separators.size() == 1) {
-    return SplitStringT<std::string_view, fbl::String, char>(input, separators[0], whitespace,
+    return SplitStringT<ktl::string_view, fbl::String, char>(input, separators[0], whitespace,
                                                              result_type);
   }
-  return SplitStringT<std::string_view, fbl::String, std::string_view>(input, separators,
+  return SplitStringT<ktl::string_view, fbl::String, ktl::string_view>(input, separators,
                                                                        whitespace, result_type);
 }
-std::vector<std::string_view> SplitString(std::string_view input, std::string_view separators,
+fbl::Vector<ktl::string_view> SplitString(ktl::string_view input, ktl::string_view separators,
                                           WhiteSpaceHandling whitespace, SplitResult result_type) {
   if (separators.size() == 1) {
-    return SplitStringT<std::string_view, std::string_view, char>(input, separators[0], whitespace,
+    return SplitStringT<ktl::string_view, ktl::string_view, char>(input, separators[0], whitespace,
                                                                   result_type);
   }
-  return SplitStringT<std::string_view, std::string_view, std::string_view>(
+  return SplitStringT<ktl::string_view, ktl::string_view, ktl::string_view>(
       input, separators, whitespace, result_type);
 }
 

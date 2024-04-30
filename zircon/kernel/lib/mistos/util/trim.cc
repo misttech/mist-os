@@ -5,12 +5,14 @@
 
 #include "lib/mistos/util/strings/trim.h"
 
+#include <ktl/enforce.h>
+
 namespace util {
 
-std::string_view TrimString(std::string_view str, std::string_view chars_to_trim) {
+ktl::string_view TrimString(ktl::string_view str, ktl::string_view chars_to_trim) {
   size_t start_index = str.find_first_not_of(chars_to_trim);
-  if (start_index == std::string_view::npos) {
-    return std::string_view();
+  if (start_index == ktl::string_view::npos) {
+    return ktl::string_view();
   }
   size_t end_index = str.find_last_not_of(chars_to_trim);
   return str.substr(start_index, end_index - start_index + 1);
