@@ -12,6 +12,10 @@
 
 #include <fbl/string_printf.h>
 
+#if _KERNEL_MISTOS
+#include <ktl/unique_ptr.h>
+#endif
+
 namespace fbl {
 
 String StringPrintf(const char* format, ...) {
@@ -55,8 +59,15 @@ String StringVPrintf(const char* format, va_list ap) {
   // (Add 1 because |vsnprintf()| will always null-terminate.)
   size_t heap_buf_size = output_size + 1U;
 
+// Allocate a buffer to print into.
+#if _KERNEL_MISTOS
+  AllocChecker ac;
+  ktl::unique_ptr<char[]> heap_buf(new (ac) char[heap_buf_size]);
+  ZX_ASSERT(ac.check());
+#else
   // Allocate a buffer to print into.
   std::unique_ptr<char[]> heap_buf(new char[heap_buf_size]);
+#endif
   result = vsnprintf(heap_buf.get(), heap_buf_size, format, ap);
   ZX_ASSERT(result >= 0 && static_cast<size_t>(result) == output_size);
   return String(heap_buf.get(), static_cast<size_t>(result));

@@ -10,6 +10,9 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/string.h>
+#if _KERNEL_MISTOS
+#include <fbl/alloc_checker.h>
+#endif
 
 namespace fbl {
 namespace {
@@ -130,7 +133,13 @@ void String::InitWithEmpty() {
 }
 
 char* String::AllocData(size_t length) {
+#if _KERNEL_MISTOS
+  AllocChecker ac;
+  void* buffer = operator new(buffer_size(length), ac);
+  ZX_ASSERT(ac.check());
+#else
   void* buffer = operator new(buffer_size(length));
+#endif
   return InitData(buffer, length);
 }
 
