@@ -866,6 +866,7 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
                             .expect("must contain at least one segment");
                         Some(ComponentRef::Capability(dictionary.clone()))
                     }
+                    DictionarySource::Program => Some(ComponentRef::Self_),
                 };
                 if let Some(source) = source {
                     edges.insert(source, ComponentRef::Capability(name.clone()));

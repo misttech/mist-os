@@ -248,6 +248,10 @@ fn extend_dict_with_dictionary(
                     )),
                 }
             }
+            cm_rust::DictionarySource::Program => {
+                warn!("TODO(https://fxbug.dev/336363726): Implement DictionarySource::Program");
+                return;
+            }
         };
         make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router)
     } else {

@@ -168,6 +168,7 @@ macro_rules! fidl_translations_symmetrical_enums {
         }
     };
 }
+
 #[derive(FidlDecl, Debug, Clone, PartialEq, Default)]
 #[fidl_decl(fidl_table = "fdecl::Component")]
 pub struct ComponentDecl {
@@ -2548,6 +2549,7 @@ pub enum DictionarySource {
     Parent,
     Self_,
     Child(ChildRef),
+    Program,
 }
 
 impl FidlIntoNative<DictionarySource> for fdecl::Ref {
@@ -2556,7 +2558,9 @@ impl FidlIntoNative<DictionarySource> for fdecl::Ref {
             Self::Parent(_) => DictionarySource::Parent,
             Self::Self_(_) => DictionarySource::Self_,
             Self::Child(c) => DictionarySource::Child(c.fidl_into_native()),
-            _ => panic!("invalid OfferDictionarySource variant"),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            Self::Program(_) => DictionarySource::Program,
+            _ => panic!("invalid DictionarySource variant"),
         }
     }
 }
@@ -2567,6 +2571,8 @@ impl NativeIntoFidl<fdecl::Ref> for DictionarySource {
             Self::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
             Self::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
             Self::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            Self::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         }
     }
 }
@@ -2860,7 +2866,7 @@ mod tests {
                     }),
                     fdecl::Use::Directory(fdecl::UseDirectory {
                         dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                         source_name: Some("dir".to_string()),
                         source_dictionary: Some("in/dict".to_string()),
                         target_path: Some("/data".to_string()),
@@ -2901,7 +2907,7 @@ mod tests {
                     fdecl::Use::Runner(fdecl::UseRunner {
                         source: Some(fdecl::Ref::Environment(fdecl::EnvironmentRef {})),
                         source_name: Some("elf".to_string()),
-                        source_dictionary: Some("in/dict".to_string()),
+                        source_dictionary: None,
                         ..Default::default()
                     }),
                     fdecl::Use::Config(fdecl::UseConfiguration {
@@ -2967,8 +2973,9 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
-                            name: "modular".to_string(),
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "netstack".to_string(),
+                            collection: None,
                         })),
                         source_name: Some("netstack1".to_string()),
                         source_dictionary: Some("in/dict".to_string()),
@@ -3171,6 +3178,12 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict2".to_string()),
+                        source: Some(fdecl::Ref::Program(fdecl::ProgramRef {})),
+                        source_dictionary: Some("in/other".to_string()),
+                        ..Default::default()
+                    }),
+                    fdecl::Capability::Dictionary(fdecl::Dictionary {
+                        name: Some("dict3".to_string()),
                         source: None,
                         source_dictionary: None,
                         ..Default::default()
@@ -3341,7 +3354,7 @@ mod tests {
                         }),
                         UseDecl::Directory(UseDirectoryDecl {
                             dependency_type: DependencyType::Strong,
-                            source: UseSource::Framework,
+                            source: UseSource::Self_,
                             source_name: "dir".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/data".parse().unwrap(),
@@ -3370,7 +3383,7 @@ mod tests {
                         UseDecl::Runner(UseRunnerDecl {
                             source: UseSource::Environment,
                             source_name: "elf".parse().unwrap(),
-                            source_dictionary: "in/dict".parse().unwrap(),
+                            source_dictionary: ".".parse().unwrap(),
                         }),
                         UseDecl::Config(UseConfigurationDecl {
                             source: UseSource::Parent,
@@ -3414,7 +3427,7 @@ mod tests {
                             target_name: "pkg".parse().unwrap(),
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Collection("modular".parse().unwrap()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "netstack1".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "mynetstack".parse().unwrap(),
@@ -3557,6 +3570,11 @@ mod tests {
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict2".parse().unwrap(),
+                            source: Some(DictionarySource::Program),
+                            source_dictionary: Some("in/other".parse().unwrap()),
+                        }),
+                        CapabilityDecl::Dictionary(DictionaryDecl {
+                            name: "dict3".parse().unwrap(),
                             source: None,
                             source_dictionary: None,
                         }),

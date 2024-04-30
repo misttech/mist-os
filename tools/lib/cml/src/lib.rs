@@ -616,6 +616,8 @@ pub enum AnyRef<'a> {
     Debug,
     /// A reference to this component. Parsed as `self`.
     Self_,
+    /// A reference to this component's program. Parsed as `program`.
+    Program,
     /// An intentionally omitted reference.
     Void,
     /// A reference to a dictionary. Parsed as a dictionary path.
@@ -634,6 +636,7 @@ impl fmt::Display for AnyRef<'_> {
             Self::Framework => write!(f, "framework"),
             Self::Debug => write!(f, "debug"),
             Self::Self_ => write!(f, "self"),
+            Self::Program => write!(f, "program"),
             Self::Void => write!(f, "void"),
             Self::Dictionary(d) => write!(f, "{}", d),
             Self::OwnDictionary(name) => write!(f, "self/{}", name),
@@ -873,6 +876,8 @@ pub enum RootDictionaryRef {
     Parent,
     /// A reference to this component.
     Self_,
+    /// A reference to this component's program.
+    Program,
 }
 
 /// A reference in an environment registration.
@@ -2563,6 +2568,9 @@ pub struct Capability {
     /// - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
     /// - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
     /// - `self/<relative_path>`: A path to a dictionary defined by this component.
+    /// - `program/<relative_path>`: A path to a dictionary served by this component's program.
+    ///   <relative_path> is a path in the program's outgoing directory to a
+    ///   fuchsia.component.sandbox/DictionaryGetter protocol.
     /// `<relative_path>` may be either a name, identifying a dictionary capability), or
     /// a path with multiple parts, identifying a nested dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
