@@ -1,4 +1,4 @@
-# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -6,6 +6,11 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":blackout-target-test" ]
+}
 
 rustc_library("blackout-target") {
   edition = "2021"
@@ -102,9 +107,4 @@ fuchsia_test_package("blackout-target-test") {
       max_severity = "ERROR"
     }
   }
-}
-
-group("tests") {
-  testonly = true
-  public_deps = [ ":blackout-target-test" ]
 }

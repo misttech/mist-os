@@ -65,7 +65,7 @@ pub struct TestServer<'a, T> {
 
 impl<'a, T> TestServer<'a, T>
 where
-    T: Test + Copy + 'static,
+    T: Test + 'static,
 {
     /// Create a new test server for this test.
     pub fn new(test: T) -> Result<TestServer<'a, T>> {

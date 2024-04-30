@@ -14,6 +14,7 @@ group("tests") {
   deps = [
     "benchmarks:tests",
     "bin:tests",
+    "blackout:tests",
     "blobfs:tests",
     "conformance:tests",
     "ext4:tests",

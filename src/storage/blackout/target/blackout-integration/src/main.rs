@@ -6,21 +6,37 @@ use {
     anyhow::Result,
     async_trait::async_trait,
     blackout_target::{Test, TestServer},
-    std::sync::Arc,
+    std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
-#[derive(Copy, Clone)]
-struct IntegrationTest;
+struct IntegrationTest {
+    setup_called: AtomicBool,
+    test_called: AtomicBool,
+}
+
+impl IntegrationTest {
+    fn new() -> Self {
+        Self { setup_called: AtomicBool::new(false), test_called: AtomicBool::new(false) }
+    }
+}
 
 #[async_trait]
 impl Test for IntegrationTest {
     async fn setup(
         self: Arc<Self>,
-        _device_label: String,
-        _device_path: Option<String>,
-        _seed: u64,
+        device_label: String,
+        device_path: Option<String>,
+        seed: u64,
     ) -> Result<()> {
-        tracing::info!("setup called");
+        tracing::info!(device_label, device_path, seed, "setup called");
+
+        if self.setup_called.swap(true, Ordering::Relaxed) {
+            tracing::error!("setup should only be called once!");
+            return Err(anyhow::anyhow!("setup should only be called once!"));
+        }
 
         // Make sure we have access to /dev
         let proxy =
@@ -35,9 +51,14 @@ impl Test for IntegrationTest {
         self: Arc<Self>,
         device_label: String,
         device_path: Option<String>,
-        _seed: u64,
+        seed: u64,
     ) -> Result<()> {
-        tracing::info!("test called");
+        tracing::info!(device_label, device_path, seed, "test called");
+
+        if self.test_called.swap(true, Ordering::Relaxed) {
+            tracing::error!("test should only be called once!");
+            return Err(anyhow::anyhow!("test should only be called once!"));
+        }
 
         // We use the block device path to pass an indicator to loop the test forever, to test
         // returning after the specified duration.
@@ -53,9 +74,9 @@ impl Test for IntegrationTest {
         self: Arc<Self>,
         device_label: String,
         device_path: Option<String>,
-        _seed: u64,
+        seed: u64,
     ) -> Result<()> {
-        tracing::info!("verify called with {}", device_label);
+        tracing::info!(device_label, device_path, seed, "verify called");
 
         // We use the block device path to pass an indicator to fail verification, to test the
         // error propagation.
@@ -70,7 +91,7 @@ impl Test for IntegrationTest {
 
 #[fuchsia::main]
 async fn main() -> Result<()> {
-    let server = TestServer::new(IntegrationTest)?;
+    let server = TestServer::new(IntegrationTest::new())?;
     server.serve().await;
 
     Ok(())

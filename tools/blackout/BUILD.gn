@@ -20,7 +20,6 @@ ffx_plugin("ffx_storage_blackout") {
 
   plugin_deps = [
     "blackout-host/ffx:ffx_storage_blackout_step",
-    "blackout-integration:ffx_storage_blackout_integration",
     "blobfs-checkerboard:ffx_storage_blackout_blobfs_checkerboard",
     "fs-tree:ffx_storage_blackout_fs_tree",
   ]
@@ -28,11 +27,7 @@ ffx_plugin("ffx_storage_blackout") {
 
 group("tests") {
   testonly = true
-  deps = [
-    "blackout-host:tests",
-    "blackout-integration:tests",
-    "blackout-target:tests",
-  ]
+  deps = [ "blackout-host:tests" ]
 }
 
 # the integration group enables the rust test harness version of the power failure tests. this group
@@ -41,7 +36,7 @@ group("tests") {
 group("integration") {
   testonly = true
   deps = [
-    "blackout-integration:integration",
+    # "blackout-integration:integration",
     "blobfs-checkerboard:integration",
     "fs-tree:integration",
   ]

@@ -1,0 +1,33 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("blackout-integration-bin") {
+  output_name = "blackout_integration_bin"
+  testonly = true
+  edition = "2021"
+  deps = [
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
+    "//src/storage/blackout/target/lib:blackout-target",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+  sources = [ "src/main.rs" ]
+}
+
+fuchsia_component("blackout-integration-component") {
+  testonly = true
+  deps = [ ":blackout-integration-bin" ]
+  manifest = "meta/blackout_integration.cml"
+}
+
+fuchsia_package("blackout-integration") {
+  testonly = true
+  deps = [ ":blackout-integration-component" ]
+}
