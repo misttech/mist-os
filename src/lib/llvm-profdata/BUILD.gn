@@ -83,6 +83,8 @@ if (!is_kernel) {
     # combination is not supported.
     configs += [ "//build/config/profile" ]
     configs -= [ "//build/config/profile" ]
+    configs += [ "//build/config/profile:profile-use" ]
+    configs -= [ "//build/config/profile:profile-use" ]
   }
 
   # When an instrumented variant might be using selective instrumentation, this

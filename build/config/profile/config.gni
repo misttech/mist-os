@@ -22,6 +22,9 @@ declare_args() {
   # List GN path to files in Clang's `-fprofile-list` format describing files
   # and functions to be instrumented by `profile` variants.
   profile_source_files_list_files = []
+
+  # Profile data path that is used by PGO.
+  pgo_profile_path = ""
 }
 
 # This helps build code discern whether all code is being instrumented by
