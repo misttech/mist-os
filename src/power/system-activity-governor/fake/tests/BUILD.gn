@@ -31,7 +31,7 @@ rustc_test("bin") {
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_unittest_package("fake-system-activity-governor-test") {
+fuchsia_unittest_package("fake-ystem-activity-governor-test") {
   manifest = "meta/test.cml"
   deps = [ ":bin" ]
   test_specs = {
@@ -41,5 +41,5 @@ fuchsia_unittest_package("fake-system-activity-governor-test") {
 
 group("tests") {
   testonly = true
-  deps = [ ":fake-system-activity-governor-test" ]
+  deps = [ ":fake-ystem-activity-governor-test" ]
 }
