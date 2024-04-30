@@ -4,9 +4,10 @@
 
 use {
     anyhow::{format_err, Context as _, Error},
+    fidl::endpoints::ClientEnd,
     fidl_fuchsia_media::*,
     fidl_fuchsia_mediacodec::*,
-    fidl_fuchsia_sysmem::*,
+    fidl_fuchsia_sysmem2::*,
     fuchsia_stream_processors::*,
     fuchsia_sync::{Mutex, RwLock},
     futures::{
@@ -27,7 +28,7 @@ use {
 };
 
 use crate::{
-    buffer_collection_constraints::*,
+    buffer_collection_constraints::buffer_collection_constraints_default,
     sysmem_allocator::{BufferName, SysmemAllocatedBuffers, SysmemAllocation},
 };
 
@@ -192,8 +193,13 @@ impl StreamProcessorInner {
                     Self::buffer_constraints_from_min_size(MIN_INPUT_BUFFER_SIZE);
                 let processor = self.processor.clone();
                 let mut partial_settings = Self::partial_settings();
-                let token_fn = move |token| {
-                    partial_settings.sysmem_token = Some(token);
+                let token_fn = move |token: ClientEnd<BufferCollectionTokenMarker>| {
+                    // A sysmem token channel serves both sysmem(1) and sysmem2 token protocols, so
+                    // we can convert here until StreamProcessor has a sysmem2 token field.
+                    partial_settings.sysmem_token =
+                        Some(ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                            token.into_channel(),
+                        ));
                     // FIDL failures will be caught via the request stream.
                     if let Err(e) = processor.set_input_buffer_partial_settings(partial_settings) {
                         warn!("Couldn't set input buffer settings: {:?}", e);
@@ -216,8 +222,13 @@ impl StreamProcessorInner {
                     Self::buffer_constraints_from_min_size(MIN_OUTPUT_BUFFER_SIZE);
                 let processor = self.processor.clone();
                 let mut partial_settings = Self::partial_settings();
-                let token_fn = move |token| {
-                    partial_settings.sysmem_token = Some(token);
+                let token_fn = move |token: ClientEnd<BufferCollectionTokenMarker>| {
+                    // A sysmem token channel serves both sysmem(1) and sysmem2 token protocols, so
+                    // we can convert here until StreamProcessor has a sysmem2 token field.
+                    partial_settings.sysmem_token =
+                        Some(ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                            token.into_channel(),
+                        ));
                     // FIDL failures will be caught via the request stream.
                     if let Err(e) = processor.set_output_buffer_partial_settings(partial_settings) {
                         warn!("Couldn't set output buffer settings: {:?}", e);
@@ -266,10 +277,13 @@ impl StreamProcessorInner {
     }
 
     fn buffer_constraints_from_min_size(min_buffer_size: u32) -> BufferCollectionConstraints {
-        let mut collection_constraints = BUFFER_COLLECTION_CONSTRAINTS_DEFAULT;
-        collection_constraints.has_buffer_memory_constraints = true;
-        collection_constraints.buffer_memory_constraints.min_size_bytes = min_buffer_size;
-        collection_constraints
+        BufferCollectionConstraints {
+            buffer_memory_constraints: Some(BufferMemoryConstraints {
+                min_size_bytes: Some(min_buffer_size as u64),
+                ..Default::default()
+            }),
+            ..buffer_collection_constraints_default()
+        }
     }
 
     fn partial_settings() -> StreamBufferPartialSettings {
@@ -305,7 +319,7 @@ impl StreamProcessorInner {
             .ok_or(format_err!("allocation isn't complete"))?;
 
         let settings = self.input_buffers().settings();
-        self.input_packet_size = settings.size_bytes.try_into()?;
+        self.input_packet_size = (*settings.size_bytes.as_ref().unwrap()).try_into()?;
         let buffer_count = self.input_buffers().len();
         for i in 0..buffer_count {
             let _ = self.client_owned.insert(InputBufferIndex(i.try_into()?));

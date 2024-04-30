@@ -6,7 +6,7 @@ use fidl_fuchsia_bluetooth_bredr::PeerObserverRequest;
 use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, SessionAudioConsumerFactoryMarker};
 use fidl_fuchsia_mediacodec::CodecFactoryMarker;
 use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;
-use fidl_fuchsia_sysmem::AllocatorMarker;
+use fidl_fuchsia_sysmem2::AllocatorMarker;
 use fidl_fuchsia_tracing_provider::RegistryMarker;
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, RealmInstance};

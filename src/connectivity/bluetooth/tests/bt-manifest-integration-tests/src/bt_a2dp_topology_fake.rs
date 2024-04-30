@@ -16,7 +16,7 @@ use {
     fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     fidl_fuchsia_power_battery::BatteryManagerMarker,
     fidl_fuchsia_settings::AudioMarker,
-    fidl_fuchsia_sysmem::AllocatorMarker,
+    fidl_fuchsia_sysmem2::AllocatorMarker,
     fidl_fuchsia_tracing_provider::RegistryMarker,
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},

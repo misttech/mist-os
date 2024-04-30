@@ -8,12 +8,15 @@ use {
         client::QueryResponseFut,
         endpoints::{ClientEnd, Proxy},
     },
-    fidl_fuchsia_sysmem::{
-        AllocatorProxy, BufferCollectionConstraints, BufferCollectionInfo2, BufferCollectionMarker,
-        BufferCollectionProxy, BufferCollectionTokenMarker, BufferMemorySettings,
+    fidl_fuchsia_sysmem2::{
+        AllocatorAllocateSharedCollectionRequest, AllocatorBindSharedCollectionRequest,
+        AllocatorProxy, AllocatorSetDebugClientInfoRequest, BufferCollectionConstraints,
+        BufferCollectionMarker, BufferCollectionProxy, BufferCollectionSetConstraintsRequest,
+        BufferCollectionTokenDuplicateRequest, BufferCollectionTokenMarker,
+        BufferCollectionWaitForAllBuffersAllocatedResponse,
+        BufferCollectionWaitForAllBuffersAllocatedResult, BufferMemorySettings, NodeSetNameRequest,
     },
-    fuchsia_zircon as zx,
-    fuchsia_zircon::AsHandleRef,
+    fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{
         future::{FusedFuture, Future},
         ready,
@@ -58,7 +61,11 @@ fn set_allocator_name(
         Some(x) => x,
         None => default_allocator_name()?,
     };
-    Ok(sysmem_client.set_debug_client_info(&unwrapped_debug_info.name, unwrapped_debug_info.id)?)
+    Ok(sysmem_client.set_debug_client_info(&AllocatorSetDebugClientInfoRequest {
+        name: Some(unwrapped_debug_info.name),
+        id: Some(unwrapped_debug_info.id),
+        ..Default::default()
+    })?)
 }
 
 impl SysmemAllocatedBuffers {
@@ -81,7 +88,7 @@ impl SysmemAllocatedBuffers {
     }
 }
 
-/// A Future that communicates with the `fuchsia.sysmem.Allocator` service to allocate shared
+/// A Future that communicates with the `fuchsia.sysmem2.Allocator` service to allocate shared
 /// buffers.
 pub enum SysmemAllocation {
     Pending,
@@ -93,11 +100,12 @@ pub enum SysmemAllocation {
     },
     /// Waiting for the buffers to be allocated, which should eventually happen after delivering the token.
     WaitingForAllocation(
-        QueryResponseFut<(zx::zx_status_t, BufferCollectionInfo2)>,
+        QueryResponseFut<BufferCollectionWaitForAllBuffersAllocatedResult>,
         BufferCollectionProxy,
     ),
-    /// Allocation is completed. The status here represents whether it completed successfully (ZX_OK) or an error.
-    Done(zx::Status),
+    /// Allocation is completed. The result here represents whether it completed successfully or an
+    /// error.
+    Done(Result<(), fidl_fuchsia_sysmem2::Error>),
 }
 
 impl SysmemAllocation {
@@ -126,19 +134,29 @@ impl SysmemAllocation {
         let (client_token, client_token_request) =
             fidl::endpoints::create_proxy::<BufferCollectionTokenMarker>()?;
         allocator
-            .allocate_shared_collection(client_token_request)
+            .allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
+                token_request: Some(client_token_request),
+                ..Default::default()
+            })
             .context("Allocating shared collection")?;
 
         // Duplicate to get another BufferCollectionToken to the same collection.
         let (token, token_request) = fidl::endpoints::create_endpoints();
-        client_token.duplicate(std::u32::MAX, token_request)?;
+        client_token.duplicate(BufferCollectionTokenDuplicateRequest {
+            rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+            token_request: Some(token_request),
+            ..Default::default()
+        })?;
 
         client_token
-            .set_name(name.priority, name.name)
+            .set_name(&NodeSetNameRequest {
+                priority: Some(name.priority),
+                name: Some(name.name.to_string()),
+                ..Default::default()
+            })
             .context("set_name on BufferCollectionToken")?;
 
-        let client_end_token =
-            ClientEnd::new(client_token.into_channel().unwrap().into_zx_channel());
+        let client_end_token = client_token.into_client_end().unwrap();
 
         let mut res = Self::bind(allocator, client_end_token, constraints)?;
 
@@ -159,10 +177,17 @@ impl SysmemAllocation {
     ) -> Result<Self, Error> {
         let (buffer_collection, collection_request) =
             fidl::endpoints::create_proxy::<BufferCollectionMarker>()?;
-        allocator.bind_shared_collection(token, collection_request)?;
+        allocator.bind_shared_collection(AllocatorBindSharedCollectionRequest {
+            token: Some(token),
+            buffer_collection_request: Some(collection_request),
+            ..Default::default()
+        })?;
 
         buffer_collection
-            .set_constraints(true, &constraints)
+            .set_constraints(BufferCollectionSetConstraintsRequest {
+                constraints: Some(constraints),
+                ..Default::default()
+            })
             .context("sending constraints to sysmem")?;
 
         Ok(Self::WaitingForSync {
@@ -176,20 +201,21 @@ impl SysmemAllocation {
     /// Delivers the token to the target as the collection is aware of it now and can reliably
     /// detect when all tokens have been turned in and constraints have been set.
     fn synced(&mut self) -> Result<(), Error> {
-        *self = match std::mem::replace(self, Self::Done(zx::Status::BAD_STATE)) {
+        *self = match std::mem::replace(self, Self::Done(Err(fidl_fuchsia_sysmem2::Error::Invalid)))
+        {
             Self::WaitingForSync { future: _, token_fn, buffer_collection } => {
                 if let Some(deliver_token_fn) = token_fn {
                     deliver_token_fn();
                 }
                 Self::WaitingForAllocation(
-                    buffer_collection.wait_for_buffers_allocated(),
+                    buffer_collection.wait_for_all_buffers_allocated(),
                     buffer_collection,
                 )
             }
-            _ => Self::Done(zx::Status::BAD_STATE),
+            _ => Self::Done(Err(fidl_fuchsia_sysmem2::Error::Invalid)),
         };
-        if let Self::Done(e) = self {
-            return Err(e.into_io_error().into());
+        if let Self::Done(_) = self {
+            return Err(format_err!("bad state in synced"));
         }
         Ok(())
     }
@@ -198,20 +224,27 @@ impl SysmemAllocation {
     /// complete.
     fn allocated(
         &mut self,
-        status: zx::zx_status_t,
-        mut buffer_info: BufferCollectionInfo2,
+        response_result: Result<
+            BufferCollectionWaitForAllBuffersAllocatedResponse,
+            fidl_fuchsia_sysmem2::Error,
+        >,
     ) -> Result<SysmemAllocatedBuffers, Error> {
-        match std::mem::replace(self, Self::Done(zx::Status::from_raw(status))) {
+        let done_result = response_result.as_ref().map(|_| ()).map_err(|err| *err);
+        match std::mem::replace(self, Self::Done(done_result)) {
             Self::WaitingForAllocation(_, buffer_collection) => {
-                let num_buffers = buffer_info.buffer_count.try_into()?;
-                let mut buffers = Vec::new();
-                for buffer in buffer_info.buffers[0..num_buffers].iter_mut() {
-                    buffers.push(buffer.vmo.take().ok_or(format_err!("missing buffer"))?);
-                }
-
+                let response =
+                    response_result.map_err(|err| format_err!("allocation failed: {:?}", err))?;
+                let buffer_info = response.buffer_collection_info.unwrap();
+                let buffers = buffer_info
+                    .buffers
+                    .unwrap()
+                    .iter_mut()
+                    .map(|buffer| buffer.vmo.take().expect("missing buffer"))
+                    .collect();
+                let settings = buffer_info.settings.unwrap().buffer_settings.unwrap();
                 Ok(SysmemAllocatedBuffers {
                     buffers,
-                    settings: buffer_info.settings.buffer_settings,
+                    settings,
                     _buffer_collection: buffer_collection,
                 })
             }
@@ -249,9 +282,7 @@ impl Future for SysmemAllocation {
         }
         if let Self::WaitingForAllocation(future, _) = s {
             match ready!(future.poll_unpin(cx)) {
-                Ok((status, buffer_collection)) => {
-                    return Poll::Ready(s.allocated(status, buffer_collection))
-                }
+                Ok(response_result) => return Poll::Ready(s.allocated(response_result)),
                 Err(e) => {
                     error!("SysmemAllocator waiting error: {:?}", e);
                     Poll::Ready(Err(e.into()))
@@ -267,18 +298,17 @@ impl Future for SysmemAllocation {
 mod tests {
     use super::*;
 
-    use fidl_fuchsia_sysmem::{
-        AllocatorMarker, AllocatorRequest, BufferCollectionRequest, BufferCollectionTokenProxy,
-        BufferCollectionTokenRequest, BufferCollectionTokenRequestStream, CoherencyDomain,
-        HeapType, SingleBufferSettings, VmoBuffer,
+    use fidl_fuchsia_sysmem2::{
+        AllocatorMarker, AllocatorRequest, BufferCollectionInfo, BufferCollectionRequest,
+        BufferCollectionTokenProxy, BufferCollectionTokenRequest,
+        BufferCollectionTokenRequestStream, BufferMemoryConstraints, BufferUsage, CoherencyDomain,
+        Heap, SingleBufferSettings, VmoBuffer, CPU_USAGE_READ, VIDEO_USAGE_HW_DECODER,
     };
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use std::pin::pin;
 
-    use crate::buffer_collection_constraints::{
-        BUFFER_COLLECTION_CONSTRAINTS_DEFAULT, IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
-    };
+    use crate::buffer_collection_constraints::buffer_collection_constraints_default;
 
     fn assert_tokens_connected(
         exec: &mut fasync::TestExecutor,
@@ -315,7 +345,15 @@ mod tests {
             proxy,
             BufferName { name: "audio-codec.allocate_future", priority: 100 },
             None,
-            BUFFER_COLLECTION_CONSTRAINTS_DEFAULT,
+            BufferCollectionConstraints {
+                usage: Some(BufferUsage {
+                    cpu: Some(CPU_USAGE_READ),
+                    video: Some(VIDEO_USAGE_HW_DECODER),
+                    ..Default::default()
+                }),
+                min_buffer_count_for_camping: Some(1),
+                ..Default::default()
+            },
             token_fn,
         )
         .expect("starting should work");
@@ -326,31 +364,28 @@ mod tests {
 
         let mut token_requests_1 = match exec.run_until_stalled(&mut allocator_requests.next()) {
             Poll::Ready(Some(Ok(AllocatorRequest::AllocateSharedCollection {
-                token_request,
-                ..
-            }))) => token_request.into_stream().expect("request into stream"),
+                payload, ..
+            }))) => payload.token_request.unwrap().into_stream().expect("request into stream"),
             x => panic!("Expected a shared allocation request, got {:?}", x),
         };
 
         let mut token_requests_2 = match exec.run_until_stalled(&mut token_requests_1.next()) {
-            Poll::Ready(Some(Ok(BufferCollectionTokenRequest::Duplicate {
-                rights_attenuation_mask: _,
-                token_request,
-                ..
-            }))) => token_request.into_stream().expect("duplicate request into stream"),
+            Poll::Ready(Some(Ok(BufferCollectionTokenRequest::Duplicate { payload, .. }))) => {
+                payload.token_request.unwrap().into_stream().expect("duplicate request into stream")
+            }
             x => panic!("Expected a duplication request, got {:?}", x),
         };
 
         let (token_client_1, mut collection_requests_1) = match exec
             .run_until_stalled(&mut allocator_requests.next())
         {
-            Poll::Ready(Some(Ok(AllocatorRequest::BindSharedCollection {
-                token,
-                buffer_collection_request,
-                ..
-            }))) => (
-                token.into_proxy().unwrap(),
-                buffer_collection_request.into_stream().expect("collection request into stream"),
+            Poll::Ready(Some(Ok(AllocatorRequest::BindSharedCollection { payload, .. }))) => (
+                payload.token.unwrap().into_proxy().unwrap(),
+                payload
+                    .buffer_collection_request
+                    .unwrap()
+                    .into_stream()
+                    .expect("collection request into stream"),
             ),
             x => panic!("Expected Bind Shared Collection, got: {:?}", x),
         };
@@ -392,38 +427,41 @@ mod tests {
         assert_tokens_connected(&mut exec, &token_client_2, &mut token_requests_2);
 
         // We should have received a wait for the buffers to be allocated in our collection
-        const SIZE_BYTES: u32 = 1024;
+        const SIZE_BYTES: u64 = 1024;
         let buffer_settings = BufferMemorySettings {
-            size_bytes: SIZE_BYTES,
-            is_physically_contiguous: true,
-            is_secure: false,
-            coherency_domain: CoherencyDomain::Ram,
-            heap: HeapType::SystemRam,
+            size_bytes: Some(SIZE_BYTES),
+            is_physically_contiguous: Some(true),
+            is_secure: Some(false),
+            coherency_domain: Some(CoherencyDomain::Ram),
+            heap: Some(Heap {
+                heap_type: Some(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM.into()),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
 
         match exec.run_until_stalled(&mut collection_requests_1.next()) {
-            Poll::Ready(Some(Ok(BufferCollectionRequest::WaitForBuffersAllocated {
+            Poll::Ready(Some(Ok(BufferCollectionRequest::WaitForAllBuffersAllocated {
                 responder,
             }))) => {
                 let single_buffer_settings = SingleBufferSettings {
-                    buffer_settings,
-                    has_image_format_constraints: false,
-                    image_format_constraints: IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
+                    buffer_settings: Some(buffer_settings.clone()),
+                    ..Default::default()
                 };
-                const ABSENT_BUFFER: VmoBuffer = VmoBuffer { vmo: None, vmo_usable_start: 0 };
-                let mut buffer_collection_info = BufferCollectionInfo2 {
-                    buffer_count: 1,
-                    settings: single_buffer_settings,
-                    buffers: [ABSENT_BUFFER; 64],
+                let buffer_collection_info = BufferCollectionInfo {
+                    settings: Some(single_buffer_settings),
+                    buffers: Some(vec![VmoBuffer {
+                        vmo: Some(zx::Vmo::create(SIZE_BYTES.into()).expect("vmo creation")),
+                        vmo_usable_start: Some(0),
+                        ..Default::default()
+                    }]),
+                    ..Default::default()
                 };
-
-                buffer_collection_info.buffers[0] = VmoBuffer {
-                    vmo: Some(zx::Vmo::create(SIZE_BYTES.into()).expect("vmo creation")),
-                    vmo_usable_start: 0,
+                let response = BufferCollectionWaitForAllBuffersAllocatedResponse {
+                    buffer_collection_info: Some(buffer_collection_info),
+                    ..Default::default()
                 };
-                responder
-                    .send(zx::Status::OK.into_raw(), buffer_collection_info)
-                    .expect("send collection response")
+                responder.send(Ok(response)).expect("send collection response")
             }
             x => panic!("Expected WaitForBuffersAllocated, got {:?}", x),
         };
@@ -445,12 +483,14 @@ mod tests {
         let sysmem_client = fuchsia_component::client::connect_to_protocol::<AllocatorMarker>()
             .expect("connect to allocator");
 
-        let mut buffer_constraints = BufferCollectionConstraints {
-            min_buffer_count: 2,
-            has_buffer_memory_constraints: true,
-            ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
+        let buffer_constraints = BufferCollectionConstraints {
+            min_buffer_count: Some(2),
+            buffer_memory_constraints: Some(BufferMemoryConstraints {
+                min_size_bytes: Some(4096),
+                ..Default::default()
+            }),
+            ..buffer_collection_constraints_default()
         };
-        buffer_constraints.buffer_memory_constraints.min_size_bytes = 4096;
 
         let (sender, mut receiver) = futures::channel::oneshot::channel();
         let token_fn = move |token| {
@@ -461,7 +501,7 @@ mod tests {
             sysmem_client.clone(),
             BufferName { name: "audio-codec.allocate_future", priority: 100 },
             None,
-            buffer_constraints,
+            buffer_constraints.clone(),
             token_fn,
         )
         .expect("start allocator");
@@ -478,18 +518,27 @@ mod tests {
 
         let (buffer_collection_client, buffer_collection_requests) =
             fidl::endpoints::create_proxy::<BufferCollectionMarker>().expect("proxy creation");
-        sysmem_client.bind_shared_collection(token, buffer_collection_requests).expect("bind okay");
+        sysmem_client
+            .bind_shared_collection(AllocatorBindSharedCollectionRequest {
+                token: Some(token),
+                buffer_collection_request: Some(buffer_collection_requests),
+                ..Default::default()
+            })
+            .expect("bind okay");
 
         buffer_collection_client
-            .set_constraints(true, &buffer_constraints)
+            .set_constraints(BufferCollectionSetConstraintsRequest {
+                constraints: Some(buffer_constraints),
+                ..Default::default()
+            })
             .expect("constraints should send okay");
 
-        let mut allocation_fut = pin!(buffer_collection_client.wait_for_buffers_allocated());
+        let mut allocation_fut = pin!(buffer_collection_client.wait_for_all_buffers_allocated());
 
-        let (status, buffers) =
+        let allocation_result =
             exec.run_singlethreaded(&mut allocation_fut).expect("allocation success");
 
-        assert_eq!(zx::Status::OK.into_raw(), status);
+        assert!(allocation_result.is_ok());
 
         // Allocator should be ready now.
         let allocated_buffers = match exec.run_until_stalled(&mut allocation) {
@@ -499,6 +548,8 @@ mod tests {
 
         let _allocator_settings = allocated_buffers.settings();
 
-        assert_eq!(buffers.buffer_count, allocated_buffers.len());
+        let buffers = allocation_result.unwrap().buffer_collection_info.unwrap().buffers.unwrap();
+
+        assert_eq!(buffers.len(), allocated_buffers.len() as usize);
     }
 }

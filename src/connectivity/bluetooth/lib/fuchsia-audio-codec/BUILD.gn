@@ -13,6 +13,7 @@ rustc_library("fuchsia-audio-codec") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
@@ -26,6 +27,7 @@ rustc_library("fuchsia-audio-codec") {
 
   test_deps = [
     "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/testing/fixture",
