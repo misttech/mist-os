@@ -45,18 +45,4 @@ void* operator new(size_t size, std::align_val_t align) {
   return ptr;
 }
 
-void* operator new[](size_t size) {
-  fbl::AllocChecker ac;
-  auto ptr = fbl::internal::checked(size, ac, malloc(size));
-  ZX_ASSERT(ac.check());
-  return ptr;
-}
-
-void* operator new[](size_t size, std::align_val_t align) {
-  fbl::AllocChecker ac;
-  auto ptr = fbl::internal::checked(size, ac, memalign(static_cast<size_t>(align), size));
-  ZX_ASSERT(ac.check());
-  return ptr;
-}
-
 #endif
