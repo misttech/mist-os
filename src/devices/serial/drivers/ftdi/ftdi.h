@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
 
@@ -141,6 +142,14 @@ class FtdiDevice : public DeviceType,
                            uint16_t* integer_div, uint16_t* fraction_div);
   void WriteComplete(usb_request_t* request);
   void ReadComplete(usb_request_t* request);
+  // Copies starting at request_offset bytes into request, and returns the number of bytes copied.
+  static size_t CopyFromRequest(usb::Request<>& request, size_t request_offset,
+                                cpp20::span<uint8_t> buffer);
+  size_t ReadAtMost(uint8_t* buffer, size_t len) __TA_REQUIRES(mutex_);
+  // Writes as much data as possible with a single USB request, and returns a subspan pointing to
+  // the remaining data that did not fit into the request.
+  cpp20::span<const uint8_t> QueueWriteRequest(cpp20::span<const uint8_t> data, usb::Request<> req)
+      __TA_REQUIRES(mutex_);
 
   // Notifies the callback if the state is updated (|need_to_notify_cb| is true), and
   // resets |need_to_notify_cb| to false.
@@ -157,7 +166,6 @@ class FtdiDevice : public DeviceType,
   uint16_t ftditype_ = 0;
   uint32_t baudrate_ = 0;
 
-  bool enabled_ = false;
   uint32_t state_ = 0;
 
   size_t read_offset_ = 0;

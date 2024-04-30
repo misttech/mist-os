@@ -60,11 +60,6 @@ void FtdiDevice::NotifyCallback() {
     notify_cb_.callback(notify_cb_.ctx, state_);
   }
 
-  if (state_ & SERIAL_STATE_READABLE) {
-    sync_completion_signal(&serial_readable_);
-  } else {
-    sync_completion_reset(&serial_readable_);
-  }
   if (state_ & SERIAL_STATE_WRITABLE) {
     sync_completion_signal(&serial_writable_);
   } else {
@@ -92,22 +87,37 @@ void FtdiDevice::ReadComplete(usb_request_t* request) {
     return;
   }
 
-  fbl::AutoLock lock(&mutex_);
+  bool signal_readable = false;
 
-  if ((req.request()->response.status == ZX_OK) && (req.request()->response.actual > 2)) {
-    completed_reads_queue_.push(std::move(req));
-    CheckStateLocked();
-  } else {
-    usb_request_complete_callback_t complete = {
-        .callback =
-            [](void* ctx, usb_request_t* request) {
-              static_cast<FtdiDevice*>(ctx)->ReadComplete(request);
-            },
-        .ctx = this,
-    };
-    usb_client_.RequestQueue(req.take(), &complete);
+  zx_status_t status = req.request()->response.status;
+  // Check that we read at least the FTDI status bytes.
+  if (status == ZX_OK && req.request()->response.actual < FTDI_STATUS_SIZE) {
+    status = ZX_ERR_IO_INVALID;
   }
-  lock.release();
+
+  {
+    fbl::AutoLock lock(&mutex_);
+
+    if (status == ZX_OK) {
+      completed_reads_queue_.push(std::move(req));
+      signal_readable = true;
+      CheckStateLocked();
+    } else {
+      usb_request_complete_callback_t complete = {
+          .callback =
+              [](void* ctx, usb_request_t* request) {
+                static_cast<FtdiDevice*>(ctx)->ReadComplete(request);
+              },
+          .ctx = this,
+      };
+      usb_client_.RequestQueue(req.take(), &complete);
+    }
+  }
+
+  if (signal_readable) {
+    sync_completion_signal(&serial_readable_);
+  }
+
   NotifyCallback();
 }
 
@@ -117,12 +127,13 @@ void FtdiDevice::WriteComplete(usb_request_t* request) {
     return;
   }
 
-  fbl::AutoLock lock(&mutex_);
+  {
+    fbl::AutoLock lock(&mutex_);
 
-  free_write_queue_.push(std::move(req));
-  CheckStateLocked();
+    free_write_queue_.push(std::move(req));
+    CheckStateLocked();
+  }
 
-  lock.release();
   NotifyCallback();
 }
 
@@ -158,20 +169,10 @@ zx_status_t FtdiDevice::CalcDividers(uint32_t* baudrate, uint32_t clock, uint32_
   return ZX_OK;
 }
 
-zx_status_t FtdiDevice::SerialImplWrite(const uint8_t* buf, size_t length, size_t* actual) {
-  zx_status_t status = ZX_OK;
-
-  fbl::AutoLock lock(&mutex_);
-
-  std::optional<usb::Request<>> req = free_write_queue_.pop();
-  if (!req) {
-    status = ZX_ERR_SHOULD_WAIT;
-    *actual = 0;
-    return status;
-  }
-
-  *actual = req->CopyTo(buf, length, 0);
-  req->request()->header.length = length;
+cpp20::span<const uint8_t> FtdiDevice::QueueWriteRequest(cpp20::span<const uint8_t> data,
+                                                         usb::Request<> req) {
+  const ssize_t actual = req.CopyTo(data.data(), data.size(), 0);
+  req.request()->header.length = data.size();
 
   usb_request_complete_callback_t complete = {
       .callback =
@@ -180,19 +181,48 @@ zx_status_t FtdiDevice::SerialImplWrite(const uint8_t* buf, size_t length, size_
           },
       .ctx = this,
   };
-  usb_client_.RequestQueue(req->take(), &complete);
-  CheckStateLocked();
+  usb_client_.RequestQueue(req.take(), &complete);
 
-  lock.release();
+  return data.subspan(actual);
+}
+
+zx_status_t FtdiDevice::SerialImplWrite(const uint8_t* buf, size_t length, size_t* actual) {
+  zx_status_t status = ZX_OK;
+
+  {
+    fbl::AutoLock lock(&mutex_);
+
+    std::optional<usb::Request<>> req = free_write_queue_.pop();
+    if (!req) {
+      status = ZX_ERR_SHOULD_WAIT;
+      *actual = 0;
+      return status;
+    }
+
+    *actual = length - QueueWriteRequest({buf, length}, *std::move(req)).size();
+
+    CheckStateLocked();
+  }
+
   NotifyCallback();
 
   return status;
 }
 
-zx_status_t FtdiDevice::SerialImplRead(uint8_t* data, size_t len, size_t* actual) {
+size_t FtdiDevice::CopyFromRequest(usb::Request<>& request, size_t request_offset,
+                                   cpp20::span<uint8_t> buffer) {
+  ZX_ASSERT(request.request()->response.actual >= request_offset + FTDI_STATUS_SIZE);
+  const size_t to_copy = std::min(
+      request.request()->response.actual - request_offset - FTDI_STATUS_SIZE, buffer.size());
+
+  const size_t result = request.CopyFrom(buffer.data(), to_copy, request_offset + FTDI_STATUS_SIZE);
+  ZX_ASSERT(result == to_copy);
+  return to_copy;
+}
+
+size_t FtdiDevice::ReadAtMost(uint8_t* buffer, size_t len) {
   size_t bytes_copied = 0;
   size_t offset = read_offset_;
-  uint8_t* buffer = static_cast<uint8_t*>(data);
 
   usb_request_complete_callback_t complete = {
       .callback =
@@ -202,23 +232,15 @@ zx_status_t FtdiDevice::SerialImplRead(uint8_t* data, size_t len, size_t* actual
       .ctx = this,
   };
 
-  fbl::AutoLock lock(&mutex_);
-
   while (bytes_copied < len) {
     std::optional<usb::Request<>> req = completed_reads_queue_.pop();
 
     if (!req) {
+      sync_completion_reset(&serial_readable_);
       break;
     }
 
-    size_t to_copy = req->request()->response.actual - offset - FTDI_STATUS_SIZE;
-
-    if ((to_copy + bytes_copied) > len) {
-      to_copy = len - bytes_copied;
-    }
-
-    size_t result = req->CopyFrom(&buffer[bytes_copied], to_copy, offset + FTDI_STATUS_SIZE);
-    ZX_ASSERT(result == to_copy);
+    size_t to_copy = CopyFromRequest(*req, offset, {&buffer[bytes_copied], len - bytes_copied});
     bytes_copied = bytes_copied + to_copy;
 
     // If we aren't reading the whole request then put it in the front of the queue
@@ -234,12 +256,19 @@ zx_status_t FtdiDevice::SerialImplRead(uint8_t* data, size_t len, size_t* actual
     offset = 0;
   }
 
-  CheckStateLocked();
-
   read_offset_ = offset;
-  *actual = bytes_copied;
+  return bytes_copied;
+}
 
-  lock.release();
+zx_status_t FtdiDevice::SerialImplRead(uint8_t* data, size_t len, size_t* actual) {
+  {
+    fbl::AutoLock lock(&mutex_);
+
+    *actual = ReadAtMost(data, len);
+
+    CheckStateLocked();
+  }
+
   NotifyCallback();
 
   return ZX_OK;
@@ -303,15 +332,10 @@ zx_status_t FtdiDevice::SerialImplGetInfo(serial_port_info_t* info) {
 }
 
 zx_status_t FtdiDevice::SerialImplEnable(bool enable) {
-  enabled_ = enable;
   return ZX_OK;
 }
 
 zx_status_t FtdiDevice::SerialImplSetNotifyCallback(const serial_notify_t* cb) {
-  if (enabled_) {
-    return ZX_ERR_BAD_STATE;
-  }
-
   notify_cb_ = *cb;
 
   fbl::AutoLock lock(&mutex_);
@@ -326,23 +350,24 @@ zx_status_t FtdiDevice::SerialImplSetNotifyCallback(const serial_notify_t* cb) {
 
 zx_status_t FtdiDevice::Read(uint8_t* buf, size_t len) {
   size_t read_len = 0;
-  zx_status_t status;
   uint8_t* buf_index = buf;
 
   while (read_len < len) {
     size_t actual;
-    status = SerialImplRead(buf_index, len - read_len, &actual);
-    if (status == ZX_ERR_SHOULD_WAIT || (actual == 0)) {
-      status = sync_completion_wait_deadline(&serial_readable_,
-                                             zx::deadline_after(kSerialReadWriteTimeout).get());
+
+    {
+      fbl::AutoLock lock(&mutex_);
+      actual = ReadAtMost(buf_index, len - read_len);
+    }
+
+    if (actual == 0) {
+      zx_status_t status = sync_completion_wait_deadline(
+          &serial_readable_, zx::deadline_after(kSerialReadWriteTimeout).get());
       if (status != ZX_OK) {
         return status;
       }
-      continue;
     }
-    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
-      return status;
-    }
+
     read_len += actual;
     buf_index += actual;
   }

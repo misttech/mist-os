@@ -35,6 +35,7 @@ fuchsia_driver("ftdi-driver") {
     "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/lib/driver/outgoing/cpp",
+    "//sdk/lib/stdcompat",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
