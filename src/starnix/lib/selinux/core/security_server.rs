@@ -248,7 +248,7 @@ impl SecurityServer {
             // Replace the "initial" SID's associated Contexts.
             let initial_sids = InitialSid::all_variants();
             let mut initial_contexts = Vec::with_capacity(initial_sids.len());
-            for id in InitialSid::all_variants() {
+            for id in initial_sids {
                 let security_context = policy.parsed.initial_context(id);
                 initial_contexts.push((SecurityId::initial(id), security_context));
             }
@@ -560,7 +560,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sid_to_security_context() {
-        let security_context = b"user0:unconfined_r:unconfined_t:s0";
+        let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
         let sid = security_server
             .security_context_to_sid(security_context)
@@ -578,14 +578,14 @@ mod tests {
             .security_context_to_sid(b"user0:object_r:type0:s0")
             .expect("creating SID from security context should succeed");
         let sid2 = security_server
-            .security_context_to_sid(b"user0:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0")
             .expect("creating SID from security context should succeed");
         assert_ne!(sid1, sid2);
     }
 
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
-        let security_context = b"user0:unconfined_r:unconfined_t:s0";
+        let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
         let sid_count_before = security_server.state.lock().sids.len();
         let sid1 = security_server
@@ -600,7 +600,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_allocated_outside_initial_range() {
-        let security_context = b"user0:unconfined_r:unconfined_t:s0";
+        let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
         let sid_count_before = security_server.state.lock().sids.len();
         let sid = security_server
@@ -780,7 +780,7 @@ mod tests {
     fn parse_security_context_no_policy() {
         let security_server = SecurityServer::new(Mode::Enable);
         let error = security_server
-            .security_context_to_sid(b"user0:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0")
             .expect_err("expected error");
         let error_string = format!("{:?}", error);
         assert!(error_string.contains("no policy"));

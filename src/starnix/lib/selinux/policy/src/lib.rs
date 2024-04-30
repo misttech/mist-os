@@ -44,11 +44,11 @@ pub struct RoleId(NonZeroU32);
 pub struct TypeId(NonZeroU32);
 
 /// Identifies a sensitivity level within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct SensitivityId(NonZeroU32);
 
 /// Identifies a security category within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct CategoryId(NonZeroU32);
 
 /// The set of permissions that may be granted to sources accessing targets of a particular class,
@@ -166,30 +166,8 @@ impl<PS: ParseStrategy> Policy<PS> {
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified
     /// well-known (or "initial") Id.
-    ///
-    /// # Panics
-    ///
-    /// If the policy is not internally consistent, such that e.g. the Context refers to
-    /// user, role, etc Ids that the policy does not define. This indicates that there is
-    /// some missing validation of policy fields.
     pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
-        let id = le::U32::from(id as u32);
-
-        // Policy validation is assumed to have ensured that all `InitialSid` values exist
-        // and have valid & consistent content.
-        let context = self.0.parsed_policy().initial_context(id).unwrap();
-        let low_level = self.0.security_level(context.low_level());
-        let high_level = context.high_level().as_ref().map(|x| self.0.security_level(x));
-
-        security_context::SecurityContext::new(
-            &self.0,
-            context.user_id(),
-            context.role_id(),
-            context.type_id(),
-            low_level,
-            high_level,
-        )
-        .unwrap()
+        self.0.initial_context(id).unwrap()
     }
 
     /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.
