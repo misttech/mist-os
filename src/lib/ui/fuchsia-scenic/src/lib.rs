@@ -17,7 +17,7 @@ use fidl_fuchsia_images::{
     ImageInfo, ImagePipe2Marker, MemoryType, PixelFormat, PresentationInfo, Tiling,
 };
 use fidl_fuchsia_scenic_scheduling::FuturePresentationTimes;
-use fidl_fuchsia_sysmem::BufferCollectionTokenMarker;
+use fidl_fuchsia_sysmem2::BufferCollectionTokenMarker;
 use fidl_fuchsia_ui_composition::BufferCollectionImportToken;
 use fidl_fuchsia_ui_gfx::{
     AmbientLightArgs, CameraArgs, CircleArgs, ColorRgb, ColorRgba, DirectionalLightArgs,
@@ -140,7 +140,14 @@ impl Session {
         buffer_id: u32,
         token: ClientEnd<BufferCollectionTokenMarker>,
     ) -> Result<(), fidl::Error> {
-        self.session.register_buffer_collection(buffer_id, token)
+        // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here until
+        // scenic has a register_buffer_collection that takes a sysmem2 token.
+        self.session.register_buffer_collection(
+            buffer_id,
+            ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                token.into_channel(),
+            ),
+        )
     }
 
     pub fn deregister_buffer_collection(&self, buffer_id: u32) -> Result<(), fidl::Error> {

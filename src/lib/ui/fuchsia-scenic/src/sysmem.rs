@@ -5,7 +5,8 @@
 use {
     anyhow::Error,
     fidl::endpoints::{create_endpoints, ClientEnd},
-    fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_ui_composition as fland,
+    fidl_fuchsia_sysmem2 as fsysmem2, fidl_fuchsia_ui_composition as fland,
+    fsysmem2::BufferCollectionTokenDuplicateRequest,
     fuchsia_zircon::{self as zx, AsHandleRef},
 };
 
@@ -38,12 +39,16 @@ pub fn duplicate_buffer_collection_import_token(
 /// token is safe to use immediately (i.e. the server has acknowledged that the duplication has
 /// occurred).
 pub async fn duplicate_buffer_collection_token(
-    token: &mut fsysmem::BufferCollectionTokenProxy,
-) -> Result<ClientEnd<fsysmem::BufferCollectionTokenMarker>, Error> {
+    token: &mut fsysmem2::BufferCollectionTokenProxy,
+) -> Result<ClientEnd<fsysmem2::BufferCollectionTokenMarker>, Error> {
     let (duplicate_token, duplicate_token_server_end) =
-        create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
+        create_endpoints::<fsysmem2::BufferCollectionTokenMarker>();
 
-    token.duplicate(std::u32::MAX, duplicate_token_server_end)?;
+    token.duplicate(BufferCollectionTokenDuplicateRequest {
+        rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+        token_request: Some(duplicate_token_server_end),
+        ..Default::default()
+    })?;
     token.sync().await?;
 
     Ok(duplicate_token)

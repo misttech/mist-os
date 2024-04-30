@@ -4,10 +4,12 @@
 
 use {
     crate::render::Renderer,
-    fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_ui_composition as fland,
+    fidl::endpoints::ClientEnd,
+    fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
+    fidl_fuchsia_ui_composition as fland,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_framebuffer::{
-        sysmem::{minimum_row_bytes, BufferCollectionAllocator},
+        sysmem2::{minimum_row_bytes, BufferCollectionAllocator},
         FrameUsage,
     },
     fuchsia_scenic::{duplicate_buffer_collection_import_token, BufferCollectionTokenPair},
@@ -16,7 +18,7 @@ use {
 
 pub struct CpuRenderer {
     import_token: fland::BufferCollectionImportToken,
-    buffer_info: fsysmem::BufferCollectionInfo2,
+    buffer_info: fsysmem2::BufferCollectionInfo,
     row_pitch: usize,
     page_size: usize,
 }
@@ -24,7 +26,7 @@ pub struct CpuRenderer {
 const IMAGE_WIDTH: u32 = 2;
 const IMAGE_HEIGHT: u32 = 2;
 // TODO(https://fxbug.dev/42055867): it would be better to let sysmem choose between several pixel formats.
-const PIXEL_FORMAT: fsysmem::PixelFormatType = fsysmem::PixelFormatType::Bgra32;
+const PIXEL_FORMAT: fimages2::PixelFormat = fimages2::PixelFormat::B8G8R8A8;
 
 impl Renderer for CpuRenderer {
     fn duplicate_buffer_collection_import_token(&self) -> fland::BufferCollectionImportToken {
@@ -32,8 +34,8 @@ impl Renderer for CpuRenderer {
     }
 
     fn render_rgba(&self, buffer_index: usize, colors: [[u8; 4]; 4]) {
-        let single_buffer_settings = &self.buffer_info.settings;
-        let vmo_info = &self.buffer_info.buffers[buffer_index];
+        let single_buffer_settings = self.buffer_info.settings.as_ref().unwrap();
+        let vmo_info = &self.buffer_info.buffers.as_ref().unwrap()[buffer_index];
 
         if let Some(vmo) = &vmo_info.vmo {
             // The size used to map a VMO must be a multiple of the page size.  Ensure that the
@@ -42,15 +44,22 @@ impl Renderer for CpuRenderer {
             {
                 let vmo_size: usize =
                     vmo.get_size().expect("failed to obtain VMO size").try_into().unwrap();
-                let sysmem_size: usize =
-                    single_buffer_settings.buffer_settings.size_bytes.try_into().unwrap();
+                let sysmem_size: usize = (*single_buffer_settings
+                    .buffer_settings
+                    .as_ref()
+                    .unwrap()
+                    .size_bytes
+                    .as_ref()
+                    .unwrap())
+                .try_into()
+                .unwrap();
                 assert!(self.page_size <= vmo_size);
                 assert!(self.page_size >= sysmem_size);
             }
 
             // create_from_vmo() uses an offset of 0 when mapping the VMO; verify that this
             // matches the sysmem allocation.
-            let offset: usize = vmo_info.vmo_usable_start.try_into().unwrap();
+            let offset: usize = (*vmo_info.vmo_usable_start.as_ref().unwrap()).try_into().unwrap();
             assert_eq!(offset, 0);
 
             // These mappings could be cached if profiling showed a benefit.
@@ -76,11 +85,11 @@ impl Renderer for CpuRenderer {
 
 impl CpuRenderer {
     async fn allocate_buffers(
-        pixel_format: fsysmem::PixelFormatType,
+        pixel_format: fimages2::PixelFormat,
         width: u32,
         height: u32,
         image_count: usize,
-    ) -> (fsysmem::BufferCollectionInfo2, fland::BufferCollectionImportToken) {
+    ) -> (fsysmem2::BufferCollectionInfo, fland::BufferCollectionImportToken) {
         // BufferAllocator is a helper which makes it easier to obtain and set constraints on a
         // sysmem::BufferCollectionToken.  This token can then be registered with Scenic, which will
         // set its own constraints; see below.
@@ -107,7 +116,13 @@ impl CpuRenderer {
         let buffer_tokens = BufferCollectionTokenPair::new();
         let args = fland::RegisterBufferCollectionArgs {
             export_token: Some(buffer_tokens.export_token),
-            buffer_collection_token: Some(sysmem_buffer_collection_token),
+            // A token channel serves both sysmem(1) and sysmem2 token protocols, so we can convert
+            // here until flatland has a field for a sysmem2 token.
+            buffer_collection_token: Some(ClientEnd::<
+                fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
+            >::new(
+                sysmem_buffer_collection_token.into_channel()
+            )),
             ..Default::default()
         };
 
@@ -136,15 +151,17 @@ impl CpuRenderer {
         let (buffer_collection_info, import_token) =
             CpuRenderer::allocate_buffers(PIXEL_FORMAT, width, height, image_count).await;
 
-        let single_buffer_settings = &buffer_collection_info.settings;
+        let single_buffer_settings = buffer_collection_info.settings.as_ref().expect("settings");
 
         // Compute the same row-pitch as Flatland will compute internally.
-        assert!(single_buffer_settings.has_image_format_constraints);
-        let row_pitch: usize =
-            minimum_row_bytes(single_buffer_settings.image_format_constraints, width)
-                .expect("failed to compute row-pitch")
-                .try_into()
-                .unwrap();
+        assert!(single_buffer_settings.image_format_constraints.is_some());
+        let row_pitch: usize = minimum_row_bytes(
+            single_buffer_settings.image_format_constraints.as_ref().unwrap(),
+            width,
+        )
+        .expect("failed to compute row-pitch")
+        .try_into()
+        .unwrap();
 
         let page_size = zx::system_get_page_size().try_into().unwrap();
 
