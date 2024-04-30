@@ -203,7 +203,8 @@ pub mod admin {
                 );
                 route_set_server_end.into_stream().expect("into stream")
             })
-            .flatten()
+            .fuse()
+            .flatten_unordered()
     }
 
     /// TODO(https://fxbug.dev/337298251): Change this to return a RouteSet
@@ -411,7 +412,9 @@ pub(crate) mod internal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{get_watcher, testutil::internal as internal_testutil, watch};
+    use crate::{
+        admin::FidlRouteAdminIpExt, get_watcher, testutil::internal as internal_testutil, watch,
+    };
     use assert_matches::assert_matches;
     use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
@@ -480,5 +483,27 @@ mod tests {
             watch::<I>(&watcher).await,
             Err(fidl::Error::ClientChannelClosed { status: zx_status::Status::PEER_CLOSED, .. })
         );
+    }
+
+    // `serve_one_route_set` should panic if the caller makes a call
+    // to `new_route_set` more than once.
+    #[netstack_test]
+    #[should_panic(expected = "received multiple RouteTable requests")]
+    async fn test_serve_one_route_set_panic<I: net_types::ip::Ip + FidlRouteAdminIpExt>(
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
+        _test_name: &str,
+    ) {
+        let (routes_set_provider_proxy, routes_set_provider_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+        let mut provider = admin::serve_one_route_set::<I>(routes_set_provider_server_end);
+        let _rs1 = crate::admin::new_route_set::<I>(&routes_set_provider_proxy)
+            .expect("created first RouteSet");
+        let _rs2 = crate::admin::new_route_set::<I>(&routes_set_provider_proxy)
+            .expect("created second RouteSet");
+
+        // This should panic, as the route set provider pushes `RouteSet` server
+        // ends through by handling the `new_route_set` requests, which will
+        // cause a panic on the second iteration.
+        let _ = provider.next().await;
     }
 }
