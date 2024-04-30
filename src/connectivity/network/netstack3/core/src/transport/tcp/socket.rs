@@ -5217,6 +5217,7 @@ mod tests {
                         Ipv4::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
+                        None,
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5228,6 +5229,7 @@ mod tests {
                         Ipv6::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
+                        None,
                     )
                     .expect("failed to deliver bytes");
                 }

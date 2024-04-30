@@ -6,10 +6,9 @@
 //! state machine.
 
 use alloc::collections::hash_map;
-use assert_matches::assert_matches;
 use core::{fmt::Debug, num::NonZeroU16};
-use tracing::{debug, error};
 
+use assert_matches::assert_matches;
 use net_types::{ip::IpAddress, SpecifiedAddr};
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
@@ -21,6 +20,7 @@ use packet_formats::{
     },
 };
 use thiserror::Error;
+use tracing::{debug, error, warn};
 
 use crate::{
     context::{CounterContext, CtxPair},
@@ -29,8 +29,8 @@ use crate::{
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
-        socket::MmsError, EitherDeviceId, IpSockCreationError, IpTransportContext,
-        TransportIpContext, TransportReceiveError,
+        base::TransparentLocalDelivery, socket::MmsError, EitherDeviceId, IpSockCreationError,
+        IpTransportContext, TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
@@ -122,7 +122,15 @@ where
         remote_ip: I::RecvSrcAddr,
         local_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            warn!(
+                "TODO(https://fxbug.dev/337009139): transparent proxy not supported for TCP \
+                sockets; will not override dispatch to perform local delivery to {delivery:?}"
+            );
+        }
+
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
                 core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);

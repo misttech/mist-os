@@ -19,6 +19,7 @@ group("tests") {
     "iperf:tests",
     "multi_nic:tests",
     "socket:tests",
+    "tproxy:tests",
     "//third_party/gvisor_syscall_tests:tests",
   ]
 }

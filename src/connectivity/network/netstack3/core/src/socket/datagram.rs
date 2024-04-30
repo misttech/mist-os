@@ -506,6 +506,10 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> IpOptions<I, D, S> {
     pub(crate) fn other_stack(&self) -> &S::OtherStackIpOptions<I, D> {
         &self.other_stack
     }
+
+    pub(crate) fn transparent(&self) -> bool {
+        self.transparent
+    }
 }
 
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SendOptions<I, D> for IpOptions<I, D, S> {

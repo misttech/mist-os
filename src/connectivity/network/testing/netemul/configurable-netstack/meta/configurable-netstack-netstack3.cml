@@ -12,4 +12,10 @@
             url: "#meta/netstack3-debug.cm",
         },
     ],
+    expose: [
+        {
+            protocol: "fuchsia.net.filter.Control",
+            from: "#netstack",
+        },
+    ],
 }

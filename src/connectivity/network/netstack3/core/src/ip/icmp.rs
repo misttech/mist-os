@@ -54,6 +54,7 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext, FrameDestination, StrongId as _, WeakId as _},
     filter::{MaybeTransportPacket, TransportPacketSerializer},
     ip::{
+        base::TransparentLocalDelivery,
         device::{
             nud::{ConfirmationFlags, NudIpHandler},
             route_discovery::Ipv6DiscoveredRoute,
@@ -1009,7 +1010,15 @@ impl<
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            unreachable!(
+                "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
+                transparent proxy rules can only be configured for TCP and UDP packets"
+            );
+        }
+
         trace!(
             "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet({}, {})",
             src_ip,
@@ -1789,7 +1798,15 @@ impl<
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            unreachable!(
+                "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
+                transparent proxy rules can only be configured for TCP and UDP packets"
+            );
+        }
+
         trace!(
             "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet({:?}, {})",
             src_ip,
@@ -4229,6 +4246,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
+                None,
             )
             .unwrap();
 
@@ -4514,6 +4532,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
+                None,
             )
             .unwrap();
 

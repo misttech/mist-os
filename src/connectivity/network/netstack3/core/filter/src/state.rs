@@ -50,11 +50,19 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// Redirect the packet to a local socket without changing the packet header
     /// in any way.
     ///
-    /// This is a terminal action, i.e. no further rules will be evaluated for
-    /// this packet, even in other routines on the same hook. This action is
-    /// only valid in the INGRESS hook. This action is also only valid in a rule
-    /// that ensures the presence of a TCP or UDP header by matching on the
-    /// transport protocol, so that the packet can be properly dispatched.
+    /// This is a terminal action for the current hook, i.e. no further rules
+    /// will be evaluated for this packet, even in other routines on the same
+    /// hook. However, note that this does not preclude actions on *other* hooks
+    /// from having an effect on this packet; for example, a packet that hits
+    /// TransparentProxy in INGRESS could still be dropped in LOCAL_INGRESS.
+    ///
+    /// This action is only valid in the INGRESS hook. This action is also only
+    /// valid in a rule that ensures the presence of a TCP or UDP header by
+    /// matching on the transport protocol, so that the packet can be properly
+    /// dispatched.
+    ///
+    /// Also note that transparently proxied packets will only be delivered to
+    /// sockets with the transparent socket option enabled.
     TransparentProxy(TransparentProxy<I>),
 }
 

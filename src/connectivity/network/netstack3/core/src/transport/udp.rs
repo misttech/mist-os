@@ -46,6 +46,7 @@ use crate::{
     error::{LocalAddressError, SocketError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
+        base::TransparentLocalDelivery,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SendOptions},
         HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
         TransportReceiveError,
@@ -1294,6 +1295,12 @@ pub(crate) trait NonDualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<
 /// An implementation of [`IpTransportContext`] for UDP.
 pub(crate) enum UdpIpTransportContext {}
 
+#[derive(Clone)]
+struct OriginalDestination<I: IpExt> {
+    addr: SpecifiedAddr<I::Addr>,
+    port: NonZeroU16,
+}
+
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
@@ -1306,6 +1313,7 @@ fn receive_ip_packet<
     src_ip: I::RecvSrcAddr,
     dst_ip: SpecifiedAddr<I::Addr>,
     mut buffer: B,
+    transport_override: Option<TransparentLocalDelivery<I>>,
 ) -> Result<(), (B, TransportReceiveError)> {
     trace_duration!(bindings_ctx, c"udp::receive_ip_packet");
     core_ctx.increment(|counters| &counters.rx);
@@ -1335,6 +1343,14 @@ fn receive_ip_packet<
     } else {
         None
     };
+
+    let (original_destination, dst_ip, dst_port) = match transport_override {
+        Some(TransparentLocalDelivery { addr, port }) => {
+            (Some(OriginalDestination { addr: dst_ip, port: packet.dst_port() }), addr, port)
+        }
+        None => (None, dst_ip, packet.dst_port()),
+    };
+
     let dst_ip = match dst_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
@@ -1361,7 +1377,6 @@ fn receive_ip_packet<
     /// [`MAX_EXPECTED_IDS`], this will spill and allocate on the heap.
     type Recipients<Id> = smallvec::SmallVec<[Id; MAX_EXPECTED_IDS]>;
 
-    let dst_port = packet.dst_port();
     let recipients = StateContext::<I, _>::with_bound_state_context(core_ctx, |core_ctx| {
         let device_weak = device.downgrade();
         DatagramBoundStateContext::with_bound_sockets(core_ctx, |_core_ctx, bound_sockets| {
@@ -1382,6 +1397,7 @@ fn receive_ip_packet<
             device,
             (dst_ip.addr(), dst_port),
             (src_ip.map_or(I::UNSPECIFIED_ADDRESS, SocketIpAddr::addr), src_port),
+            original_destination.clone(),
             &buffer,
         );
         was_delivered | delivered
@@ -1409,6 +1425,7 @@ fn try_deliver<
     device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
+    transparent_original_dst: Option<OriginalDestination<I>>,
     buffer: &B,
 ) -> bool {
     core_ctx.with_socket_state(&id, |core_ctx, state| {
@@ -1434,8 +1451,22 @@ fn try_deliver<
             },
             DatagramSocketState::Unbound(_) => true,
         };
+
         if should_deliver {
-            bindings_ctx.receive_udp(id, device, (dst_ip, dst_port), (src_ip, src_port), buffer);
+            let dst = match transparent_original_dst {
+                Some(OriginalDestination { addr, port }) => {
+                    let (ip_options, _device) = datagram::get_options_device(core_ctx, state);
+
+                    // This packet has been transparently proxied, and such packets are only
+                    // delivered to transparent sockets.
+                    if !ip_options.transparent() {
+                        return false;
+                    }
+                    (addr.get(), port)
+                }
+                None => (dst_ip, dst_port),
+            };
+            bindings_ctx.receive_udp(id, device, dst, (src_ip, src_port), buffer);
         }
         should_deliver
     })
@@ -1454,6 +1485,7 @@ fn try_dual_stack_deliver<
     device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
+    transparent_original_dst: Option<OriginalDestination<I>>,
     buffer: &B,
 ) -> bool {
     #[derive(GenericOverIp)]
@@ -1462,12 +1494,14 @@ fn try_dual_stack_deliver<
         src_ip: I::Addr,
         dst_ip: I::Addr,
         socket: I::DualStackBoundSocketId<D, Udp<BT>>,
+        original_dst: Option<OriginalDestination<I>>,
     }
 
     struct Outputs<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
         socket: UdpSocketId<I, D, BT>,
+        original_dst: Option<OriginalDestination<I>>,
     }
 
     #[derive(GenericOverIp)]
@@ -1478,41 +1512,50 @@ fn try_dual_stack_deliver<
     }
 
     let dual_stack_outputs = I::map_ip(
-        Inputs { src_ip, dst_ip, socket },
-        |Inputs { src_ip, dst_ip, socket }| match socket {
+        Inputs { src_ip, dst_ip, socket, original_dst: transparent_original_dst },
+        |Inputs { src_ip, dst_ip, socket, original_dst }| match socket {
             EitherIpSocket::V4(socket) => {
-                DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket })
+                DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket, original_dst })
             }
             EitherIpSocket::V6(socket) => DualStackOutputs::OtherStack(Outputs {
                 src_ip: src_ip.to_ipv6_mapped().get(),
                 dst_ip: dst_ip.to_ipv6_mapped().get(),
+                original_dst: original_dst.map(|OriginalDestination { addr, port }| {
+                    OriginalDestination { addr: addr.to_ipv6_mapped(), port }
+                }),
                 socket,
             }),
         },
-        |Inputs { src_ip, dst_ip, socket }| {
-            DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket })
+        |Inputs { src_ip, dst_ip, socket, original_dst }| {
+            DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket, original_dst })
         },
     );
 
     match dual_stack_outputs {
-        DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket }) => try_deliver(
-            core_ctx,
-            bindings_ctx,
-            &socket,
-            device,
-            (dst_ip, dst_port),
-            (src_ip, src_port),
-            buffer,
-        ),
-        DualStackOutputs::OtherStack(Outputs { src_ip, dst_ip, socket }) => try_deliver(
-            core_ctx,
-            bindings_ctx,
-            &socket,
-            device,
-            (dst_ip, dst_port),
-            (src_ip, src_port),
-            buffer,
-        ),
+        DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket, original_dst }) => {
+            try_deliver(
+                core_ctx,
+                bindings_ctx,
+                &socket,
+                device,
+                (dst_ip, dst_port),
+                (src_ip, src_port),
+                original_dst,
+                buffer,
+            )
+        }
+        DualStackOutputs::OtherStack(Outputs { src_ip, dst_ip, socket, original_dst }) => {
+            try_deliver(
+                core_ctx,
+                bindings_ctx,
+                &socket,
+                device,
+                (dst_ip, dst_port),
+                (src_ip, src_port),
+                original_dst,
+                buffer,
+            )
+        }
     }
 }
 
@@ -1551,8 +1594,17 @@ impl<
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
+        transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        receive_ip_packet::<I, _, _, _>(core_ctx, bindings_ctx, device, src_ip, dst_ip, buffer)
+        receive_ip_packet::<I, _, _, _>(
+            core_ctx,
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            buffer,
+            transport_override,
+        )
     }
 }
 
@@ -2954,6 +3006,7 @@ mod tests {
             src_ip: I::RecvSrcAddr,
             dst_ip: SpecifiedAddr<I::Addr>,
             buffer: B,
+            transport_override: Option<TransparentLocalDelivery<I>>,
         ) -> Result<(), (B, TransportReceiveError)> {
             // NB: The compiler can't deduce that `I::OtherVersion`` implements
             // `TestIpExt`, so use `map_ip` to transform the associated types
@@ -2963,11 +3016,17 @@ mod tests {
             struct SrcWrapper<I: IpExt>(I::RecvSrcAddr);
             let IpInvariant(result) = net_types::map_ip_twice!(
                 I,
-                (IpInvariant((core_ctx, bindings_ctx, device, buffer)), SrcWrapper(src_ip), dst_ip),
+                (
+                    IpInvariant((core_ctx, bindings_ctx, device, buffer)),
+                    SrcWrapper(src_ip),
+                    dst_ip,
+                    transport_override,
+                ),
                 |(
                     IpInvariant((core_ctx, bindings_ctx, device, buffer)),
                     SrcWrapper(src_ip),
                     dst_ip,
+                    transport_override,
                 )| {
                     IpInvariant(receive_ip_packet::<I, _, _, _>(
                         core_ctx,
@@ -2976,6 +3035,7 @@ mod tests {
                         src_ip,
                         dst_ip,
                         buffer,
+                        transport_override,
                     ))
                 }
             );
@@ -3101,6 +3161,7 @@ mod tests {
             <A::Version as TestIpExt>::try_into_recv_src_addr(src_ip).unwrap(),
             SpecifiedAddr::new(dst_ip).unwrap(),
             buffer,
+            None,
         )
         .expect("Receive IP packet succeeds");
     }

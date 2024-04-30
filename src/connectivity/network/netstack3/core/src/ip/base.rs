@@ -8,7 +8,7 @@ use core::{
     cmp::Ordering,
     fmt::Debug,
     hash::Hash,
-    num::{NonZeroU32, NonZeroU8},
+    num::{NonZeroU16, NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
 
@@ -222,6 +222,13 @@ impl IpExt for Ipv6 {
     const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 = const_unwrap_option(NonZeroU32::new(u16::MAX as u32));
 }
 
+#[derive(Debug, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub(crate) struct TransparentLocalDelivery<I: IpExt> {
+    pub addr: SpecifiedAddr<I::Addr>,
+    pub port: NonZeroU16,
+}
+
 /// The execution context provided by a transport layer protocol to the IP
 /// layer.
 ///
@@ -263,6 +270,7 @@ pub(crate) trait IpTransportContext<I: IpExt, BC, CC: DeviceIdContext<AnyDevice>
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
+        transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
@@ -286,6 +294,7 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
         _src_ip: I::RecvSrcAddr,
         _dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
+        _transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)> {
         Err((
             buffer,
@@ -1043,6 +1052,7 @@ pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, BC>:
         dst_ip: SpecifiedAddr<I::Addr>,
         proto: I::Proto,
         body: B,
+        transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
@@ -1122,6 +1132,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         proto: Ipv4Proto,
         body: B,
+        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
     ) -> Result<(), (B, TransportReceiveError)> {
         // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
@@ -1135,26 +1146,35 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
+                    transport_override,
                 )
             }
             Ipv4Proto::Igmp => {
                 device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body);
                 Ok(())
             }
-            Ipv4Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as IpTransportContext<
-                Ipv4,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, bindings_ctx, device, src_ip, dst_ip, body
-            ),
-            Ipv4Proto::Proto(IpProto::Tcp) => <TcpIpTransportContext as IpTransportContext<
-                Ipv4,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, bindings_ctx, device, src_ip, dst_ip, body
-            ),
+            Ipv4Proto::Proto(IpProto::Udp) => {
+                <UdpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
+                    self,
+                    bindings_ctx,
+                    device,
+                    src_ip,
+                    dst_ip,
+                    body,
+                    transport_override,
+                )
+            }
+            Ipv4Proto::Proto(IpProto::Tcp) => {
+                <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
+                    self,
+                    bindings_ctx,
+                    device,
+                    src_ip,
+                    dst_ip,
+                    body,
+                    transport_override,
+                )
+            }
             // TODO(joshlf): Once all IP protocol numbers are covered, remove
             // this default case.
             _ => Err((
@@ -1176,6 +1196,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         proto: Ipv6Proto,
         body: B,
+        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
     ) -> Result<(), (B, TransportReceiveError)> {
         // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
@@ -1189,26 +1210,35 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
+                    transport_override,
                 )
             }
             // A value of `Ipv6Proto::NoNextHeader` tells us that there is no
             // header whatsoever following the last lower-level header so we stop
             // processing here.
             Ipv6Proto::NoNextHeader => Ok(()),
-            Ipv6Proto::Proto(IpProto::Tcp) => <TcpIpTransportContext as IpTransportContext<
-                Ipv6,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, bindings_ctx, device, src_ip, dst_ip, body
-            ),
-            Ipv6Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as IpTransportContext<
-                Ipv6,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, bindings_ctx, device, src_ip, dst_ip, body
-            ),
+            Ipv6Proto::Proto(IpProto::Tcp) => {
+                <TcpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
+                    self,
+                    bindings_ctx,
+                    device,
+                    src_ip,
+                    dst_ip,
+                    body,
+                    transport_override,
+                )
+            }
+            Ipv6Proto::Proto(IpProto::Udp) => {
+                <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
+                    self,
+                    bindings_ctx,
+                    device,
+                    src_ip,
+                    dst_ip,
+                    body,
+                    transport_override,
+                )
+            }
             // TODO(joshlf): Once all IP Next Header numbers are covered, remove
             // this default case.
             _ => Err((
@@ -1691,6 +1721,7 @@ fn dispatch_receive_ipv4_packet<
     body: B,
     parse_metadata: Option<ParseMetadata>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
+    transport_override: Option<TransparentLocalDelivery<Ipv4>>,
 ) {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
@@ -1724,6 +1755,7 @@ fn dispatch_receive_ipv4_packet<
         dst_ip,
         proto,
         body,
+        transport_override,
     ) {
         Ok(()) => return,
         Err(e) => e,
@@ -1795,6 +1827,7 @@ fn dispatch_receive_ipv6_packet<
     body: B,
     parse_metadata: Option<ParseMetadata>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
+    transport_override: Option<TransparentLocalDelivery<Ipv6>>,
 ) {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
@@ -1833,6 +1866,7 @@ fn dispatch_receive_ipv6_packet<
         dst_ip,
         proto,
         body,
+        transport_override,
     ) {
         Ok(()) => {
             packet_metadata.acknowledge_drop();
@@ -1960,6 +1994,7 @@ macro_rules! process_fragment {
                     $buffer,
                     Some(meta),
                     $packet_metadata,
+                    None,
                 );
             }
             // Ready to reassemble a packet.
@@ -2002,6 +2037,7 @@ macro_rules! process_fragment {
                             buffer,
                             Some(meta),
                             packet_metadata,
+                            None,
                         );
                     }
                     // TODO(ghanan): Handle reassembly errors, remove
@@ -2181,20 +2217,48 @@ pub(crate) fn receive_ipv4_packet<
     // TODO(ghanan): Act upon options.
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
-    match core_ctx.filter_handler().ingress_hook(&mut packet, device, &mut packet_metadata) {
+    let mut filter = core_ctx.filter_handler();
+    match filter.ingress_hook(&mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(crate::filter::Verdict::Accept) => {}
         IngressVerdict::Verdict(crate::filter::Verdict::Drop) => {
             packet_metadata.acknowledge_drop();
             return;
         }
-        IngressVerdict::ImmediateLocalDelivery { addr, port } => {
-            error!(
-                "TODO(https://fxbug.dev/331819771): short circuit normal packet processing and \
-                immediately deliver packet to any socket bound to {addr}:{port} based on filtering \
-                rule"
+        IngressVerdict::TransparentLocalDelivery { addr, port } => {
+            // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
+            // we need to provide to the packet dispatch function.
+            drop(filter);
+
+            let Some(addr) = SpecifiedAddr::new(addr) else {
+                core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+                debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
+                return;
+            };
+
+            // Short-circuit the routing process and override local demux, providing a local
+            // address and port to which the packet should be transparently delivered at the
+            // transport layer.
+            let src_ip = packet.src_ip();
+            let (_, _, proto, meta) = packet.into_metadata();
+            dispatch_receive_ipv4_packet(
+                core_ctx,
+                bindings_ctx,
+                device,
+                frame_dst,
+                src_ip,
+                dst_ip,
+                proto,
+                buffer,
+                Some(meta),
+                packet_metadata,
+                Some(TransparentLocalDelivery { addr, port }),
             );
+            return;
         }
     }
+    // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
+    // we need below.
+    drop(filter);
 
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
@@ -2449,20 +2513,47 @@ pub(crate) fn receive_ipv6_packet<
     };
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
-    match core_ctx.filter_handler().ingress_hook(&mut packet, device, &mut packet_metadata) {
+    let mut filter = core_ctx.filter_handler();
+    match filter.ingress_hook(&mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(crate::filter::Verdict::Accept) => {}
         IngressVerdict::Verdict(crate::filter::Verdict::Drop) => {
             packet_metadata.acknowledge_drop();
             return;
         }
-        IngressVerdict::ImmediateLocalDelivery { addr, port } => {
-            error!(
-                "TODO(https://fxbug.dev/331819771): short circuit normal packet processing and \
-                immediately deliver packet to any socket bound to {addr}:{port} based on filtering \
-                rule"
+        IngressVerdict::TransparentLocalDelivery { addr, port } => {
+            // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
+            // we need to provide to the packet dispatch function.
+            drop(filter);
+
+            let Some(addr) = SpecifiedAddr::new(addr) else {
+                core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+                debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
+                return;
+            };
+
+            // Short-circuit the routing process and override local demux, providing a local
+            // address and port to which the packet should be transparently delivered at the
+            // transport layer.
+            let (_, _, proto, meta) = packet.into_metadata();
+            dispatch_receive_ipv6_packet(
+                core_ctx,
+                bindings_ctx,
+                device,
+                frame_dst,
+                src_ip,
+                dst_ip,
+                proto,
+                buffer,
+                Some(meta),
+                packet_metadata,
+                Some(TransparentLocalDelivery { addr, port }),
             );
+            return;
         }
     }
+    // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
+    // we need below.
+    drop(filter);
 
     match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
@@ -2512,6 +2603,7 @@ pub(crate) fn receive_ipv6_packet<
                         buffer,
                         Some(meta),
                         packet_metadata,
+                        None,
                     );
                 }
                 Ipv6PacketAction::ProcessFragment => {
@@ -3559,7 +3651,7 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec;
     use assert_matches::assert_matches;
-    use core::{num::NonZeroU16, time::Duration};
+    use core::time::Duration;
 
     use ip_test_macro::ip_test;
     use net_types::{

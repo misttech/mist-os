@@ -30,7 +30,7 @@ pub enum IngressVerdict<I: IpExt> {
     Verdict(Verdict),
     /// The packet should be immediately redirected to a local socket without its
     /// header being changed in any way.
-    ImmediateLocalDelivery {
+    TransparentLocalDelivery {
         /// The bound address of the local socket to redirect the packet to.
         addr: I::Addr,
         /// The bound port of the local socket to redirect the packet to.
@@ -68,7 +68,7 @@ enum RoutineResult<I: IpExt> {
     Drop,
     /// The packet should be immediately redirected to a local socket without its
     /// header being changed in any way.
-    ImmediateLocalDelivery {
+    TransparentLocalDelivery {
         /// The bound address of the local socket to redirect the packet to.
         addr: I::Addr,
         /// The bound port of the local socket to redirect the packet to.
@@ -97,7 +97,7 @@ where
                 Action::Jump(target) => match check_routine(target.get(), packet, interfaces) {
                     result @ (RoutineResult::Accept
                     | RoutineResult::Drop
-                    | RoutineResult::ImmediateLocalDelivery { .. }) => return result,
+                    | RoutineResult::TransparentLocalDelivery { .. }) => return result,
                     RoutineResult::Return => continue,
                 },
                 Action::TransparentProxy(proxy) => {
@@ -124,7 +124,7 @@ where
                         }
                         TransparentProxy::LocalAddrAndPort(addr, port) => (*addr, *port),
                     };
-                    return RoutineResult::ImmediateLocalDelivery { addr, port };
+                    return RoutineResult::TransparentLocalDelivery { addr, port };
                 }
             }
         }
@@ -147,7 +147,7 @@ where
         match check_routine(&routine, packet, &interfaces) {
             RoutineResult::Accept | RoutineResult::Return => {}
             RoutineResult::Drop => return Verdict::Drop,
-            result @ RoutineResult::ImmediateLocalDelivery { .. } => {
+            result @ RoutineResult::TransparentLocalDelivery { .. } => {
                 unreachable!(
                     "immediate local delivery is only valid in INGRESS hook; got {result:?}"
                 )
@@ -172,8 +172,8 @@ where
         match check_routine(&routine, packet, &interfaces) {
             RoutineResult::Accept | RoutineResult::Return => {}
             RoutineResult::Drop => return Verdict::Drop.into(),
-            RoutineResult::ImmediateLocalDelivery { addr, port } => {
-                return IngressVerdict::ImmediateLocalDelivery { addr, port };
+            RoutineResult::TransparentLocalDelivery { addr, port } => {
+                return IngressVerdict::TransparentLocalDelivery { addr, port };
             }
         }
     }
@@ -675,7 +675,7 @@ mod tests {
                 &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            IngressVerdict::ImmediateLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
+            IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
         );
     }
 
