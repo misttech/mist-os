@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -61,6 +62,63 @@ static const std::vector<fpbus::BootMetadata> bt_uart_boot_metadata{
     }},
 };
 
+constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff =
+    static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
+constexpr fuchsia_power_broker::PowerLevel kPowerLevelHandling =
+    static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+
+// Construct the PowerElementConfiguration for "wake-on-request" power element. This power element
+// has an active dependency on SAG's "WakeHandling" power element, which allows aml-uart driver to
+// wake the system up or prevent it from suspension when an interrupt comes.
+fuchsia_hardware_power::PowerElementConfiguration wake_on_interrupt_power_config() {
+  constexpr char kPowerElementName[] = "aml-uart-wake-on-interrupt";
+
+  auto transitions_from_off =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelHandling,
+          .latency_us = 0,
+      }}};
+
+  auto transitions_from_handling =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = kPowerLevelOff,
+          .latency_us = 0,
+      }}};
+
+  fuchsia_hardware_power::PowerLevel off = {
+      {.level = kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
+  fuchsia_hardware_power::PowerLevel handling = {
+      {.level = kPowerLevelHandling, .name = "handling", .transitions = transitions_from_handling}};
+
+  fuchsia_hardware_power::PowerElement wake_on_interrupt = {{
+      .name = kPowerElementName,
+      .levels = {{off, handling}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple handling_to_active = {{
+      .child_level = kPowerLevelHandling,
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+  }};
+
+  fuchsia_hardware_power::PowerDependency active_on_wake_handling_active = {{
+      .child = kPowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kWakeHandling),
+      .level_deps = {{handling_to_active}},
+      .strength = fuchsia_hardware_power::RequirementType::kActive,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration wake_on_interrupt_config = {
+      {.element = wake_on_interrupt, .dependencies = {{active_on_wake_handling_active}}}};
+
+  return wake_on_interrupt_config;
+}
+
+std::vector<fuchsia_hardware_power::PowerElementConfiguration> bt_uart_power_configs() {
+  return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{
+      wake_on_interrupt_power_config()};
+}
+
 static const fpbus::Node bt_uart_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "bt-uart";
@@ -71,6 +129,7 @@ static const fpbus::Node bt_uart_dev = []() {
   dev.irq() = bt_uart_irqs;
   dev.metadata() = bt_uart_metadata;
   dev.boot_metadata() = bt_uart_boot_metadata;
+  dev.power_config() = bt_uart_power_configs();
   return dev;
 }();
 
