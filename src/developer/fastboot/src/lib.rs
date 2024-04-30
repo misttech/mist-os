@@ -211,7 +211,7 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
 }
 
 pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
-    size: usize,
+    size: u32,
     buf: &mut R,
     interface: &mut T,
     listener: &impl UploadProgressListener,
@@ -228,7 +228,7 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
 
 #[tracing::instrument(skip(interface, listener, buf))]
 pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
-    size: usize,
+    size: u32,
     buf: &mut R,
     interface: &mut T,
     listener: &impl UploadProgressListener,
@@ -237,7 +237,6 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
     let _lock = TRANSFER_LOCK.lock().await;
     // We are sending "Download" in our "upload" function because we are the
     // host -- from the device's point of view, it is a download
-    let size = u32::try_from(size)?;
     let reply = send(Command::Download(size), interface).await?;
     match reply {
         Reply::Data(s) => {
@@ -418,8 +417,9 @@ mod test {
         let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
         let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
 
+        let data_len = u32::try_from(data.len()).unwrap();
         let response =
-            upload(data.len(), &mut Cursor::new(data), &mut test_transport, &listener).await;
+            upload(data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(!response.is_err());
         assert_eq!(response.unwrap(), Reply::Okay("Done Writing".to_string()));
 
@@ -445,8 +445,9 @@ mod test {
 
         let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
         let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
+        let data_len = u32::try_from(data.len()).unwrap();
         let response =
-            upload(data.len(), &mut Cursor::new(data), &mut test_transport, &listener).await;
+            upload(data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(response.is_err());
         let queue = events.lock().await;
         assert_eq!(*queue, vec![]);
@@ -460,8 +461,9 @@ mod test {
 
         let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
         let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
+        let data_len = u32::try_from(data.len()).unwrap();
         let response =
-            upload(data.len(), &mut Cursor::new(data), &mut test_transport, &listener).await;
+            upload(data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(response.is_err());
         let queue = events.lock().await;
         assert_eq!(

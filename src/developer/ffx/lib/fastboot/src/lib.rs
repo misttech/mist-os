@@ -17,10 +17,10 @@ pub mod test {
         common::fastboot::{FastbootConnectionFactory, FastbootConnectionKind},
         file_resolver::FileResolver,
     };
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
     use async_trait::async_trait;
     use ffx_fastboot_interface::fastboot_interface::{
-        Fastboot, FastbootInterface, RebootEvent, UploadProgress, Variable,
+        Fastboot, FastbootError, FastbootInterface, RebootEvent, UploadProgress, Variable,
     };
     use std::{
         collections::HashMap,
@@ -88,11 +88,11 @@ pub mod test {
 
     #[async_trait(?Send)]
     impl Fastboot for TestFastbootInterface {
-        async fn prepare(&mut self, _listener: Sender<RebootEvent>) -> Result<()> {
+        async fn prepare(&mut self, _listener: Sender<RebootEvent>) -> Result<(), FastbootError> {
             Ok(())
         }
 
-        async fn get_var(&mut self, name: &str) -> Result<String> {
+        async fn get_var(&mut self, name: &str) -> Result<String, FastbootError> {
             let mut state = self.state.lock().unwrap();
             match state.variables.get_mut(name) {
                 Some(var) => {
@@ -105,7 +105,7 @@ pub mod test {
             }
         }
 
-        async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<()> {
+        async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<(), FastbootError> {
             listener
                 .send(Variable { name: "test".to_string(), value: "test".to_string() })
                 .await
@@ -118,52 +118,63 @@ pub mod test {
             _partition_name: &str,
             _path: &str,
             listener: Sender<UploadProgress>,
-        ) -> Result<()> {
-            listener.send(UploadProgress::OnStarted { size: 1 }).await?;
-            listener.send(UploadProgress::OnProgress { bytes_written: 1 }).await?;
-            listener.send(UploadProgress::OnFinished).await?;
+        ) -> Result<(), FastbootError> {
+            listener.send(UploadProgress::OnStarted { size: 1 }).await.map_err(|e| anyhow!(e))?;
+            listener
+                .send(UploadProgress::OnProgress { bytes_written: 1 })
+                .await
+                .map_err(|e| anyhow!(e))?;
+            listener.send(UploadProgress::OnFinished).await.map_err(|e| anyhow!(e))?;
             Ok(())
         }
 
-        async fn erase(&mut self, _partition_name: &str) -> Result<()> {
+        async fn erase(&mut self, _partition_name: &str) -> Result<(), FastbootError> {
             Ok(())
         }
 
-        async fn boot(&mut self) -> Result<()> {
+        async fn boot(&mut self) -> Result<(), FastbootError> {
             let mut state = self.state.lock().unwrap();
             state.boots += 1;
             Ok(())
         }
 
-        async fn reboot(&mut self) -> Result<()> {
+        async fn reboot(&mut self) -> Result<(), FastbootError> {
             Ok(())
         }
 
-        async fn reboot_bootloader(&mut self, listener: Sender<RebootEvent>) -> Result<()> {
-            listener.send(RebootEvent::OnReboot).await?;
+        async fn reboot_bootloader(
+            &mut self,
+            listener: Sender<RebootEvent>,
+        ) -> Result<(), FastbootError> {
+            listener.send(RebootEvent::OnReboot).await.unwrap();
             let mut state = self.state.lock().unwrap();
             state.bootloader_reboots += 1;
             Ok(())
         }
-        async fn continue_boot(&mut self) -> Result<()> {
+
+        async fn continue_boot(&mut self) -> Result<(), FastbootError> {
             Ok(())
         }
 
-        async fn get_staged(&mut self, _path: &str) -> Result<()> {
+        async fn get_staged(&mut self, _path: &str) -> Result<(), FastbootError> {
             Ok(())
         }
 
-        async fn stage(&mut self, path: &str, _listener: Sender<UploadProgress>) -> Result<()> {
+        async fn stage(
+            &mut self,
+            path: &str,
+            _listener: Sender<UploadProgress>,
+        ) -> Result<(), FastbootError> {
             let mut state = self.state.lock().unwrap();
             state.staged_files.push(path.to_string());
             Ok(())
         }
 
-        async fn set_active(&mut self, _slot: &str) -> Result<()> {
+        async fn set_active(&mut self, _slot: &str) -> Result<(), FastbootError> {
             Ok(())
         }
 
-        async fn oem(&mut self, command: &str) -> Result<()> {
+        async fn oem(&mut self, command: &str) -> Result<(), FastbootError> {
             let mut state = self.state.lock().unwrap();
             state.oem_commands.push(command.to_string());
             Ok(())
