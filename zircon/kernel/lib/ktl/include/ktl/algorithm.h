@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA
 // Copyright 2020 The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
@@ -31,6 +32,7 @@ using std::search_n;
 // "Modifying sequence operations" (subset)
 using std::copy;
 using std::copy_if;
+using std::copy_n;
 using std::exchange;
 using std::fill;
 using std::fill_n;
