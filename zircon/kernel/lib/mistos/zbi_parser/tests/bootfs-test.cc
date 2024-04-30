@@ -6,11 +6,13 @@
 #include <lib/mistos/zbi_parser/zbi.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
+#include <zircon/assert.h>
 
+#include <fbl/alloc_checker.h>
+#include <fbl/string.h>
 #include <zxtest/zxtest.h>
 
 #include "data/bootfs.zbi.h"
-#include "fbl/string.h"
 
 namespace {
 
@@ -70,7 +72,9 @@ TEST_F(BootFs, Open) {
 
   ASSERT_EQ(strlen(kA_TxTContent), content_size);
 
-  char* payload = new char[content_size];
+  fbl::AllocChecker ac;
+  char* payload = new (ac) char[content_size];
+  ZX_ASSERT(ac.check());
   auto defer = fit::defer([&payload] { delete[] payload; });
 
   ASSERT_EQ(file_vmo.read(payload, 0, content_size), ZX_OK);
