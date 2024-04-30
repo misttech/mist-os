@@ -329,6 +329,11 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
+    // Wait until SAG state changes to [2, 1, 0, 0].
+    current_state.full_wake_handling_level.replace(FullWakeHandlingLevel::Inactive);
+    current_state.application_activity_level.replace(ApplicationActivityLevel::Active);
+    assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
+
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
             execution_state_level: Some(ExecutionStateLevel::WakeHandling),
@@ -342,6 +347,8 @@ async fn test_set_valid_sag_states() -> Result<()> {
 
     // Wait until SAG state changes to [1, 0, 1, 0].
     current_state.execution_state_level.replace(ExecutionStateLevel::WakeHandling);
+    current_state.full_wake_handling_level.replace(FullWakeHandlingLevel::Active);
+    current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
     let _ = sag_ctrl_state
