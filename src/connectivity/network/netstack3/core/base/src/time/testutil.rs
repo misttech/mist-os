@@ -416,6 +416,19 @@ pub trait WithFakeTimerContext<TimerId> {
         -> O;
 }
 
+impl<TimerId> WithFakeTimerContext<TimerId> for FakeTimerCtx<TimerId> {
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
+        f(self)
+    }
+
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        f(self)
+    }
+}
+
 /// Adds methods for interacting with [`FakeTimerCtx`] and its wrappers.
 pub trait FakeTimerCtxExt<Id>: Sized {
     /// Triggers the next timer, if any, by using the provided `handler`.
@@ -650,5 +663,168 @@ impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
     {
         let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
         self.trigger_timers_until_and_expect_unordered(instant, timers, handler);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::HandleableTimer;
+
+    use alloc::vec;
+
+    const ONE_SEC: Duration = Duration::from_secs(1);
+    const ONE_SEC_INSTANT: FakeInstant = FakeInstant { offset: ONE_SEC };
+
+    #[derive(Debug, Eq, PartialEq, Clone, Hash)]
+    struct TimerId(usize);
+    #[derive(Default)]
+    struct CoreCtx(Vec<(TimerId, FakeInstant)>);
+
+    impl CoreCtx {
+        fn take(&mut self) -> Vec<(TimerId, FakeInstant)> {
+            core::mem::take(&mut self.0)
+        }
+    }
+
+    impl HandleableTimer<CoreCtx, FakeTimerCtx<Self>> for TimerId {
+        fn handle(self, CoreCtx(expired): &mut CoreCtx, bindings_ctx: &mut FakeTimerCtx<Self>) {
+            expired.push((self, bindings_ctx.now()))
+        }
+    }
+
+    #[test]
+    fn instant_and_data() {
+        // Verify implementation of InstantAndData to be used as a complex
+        // type in a BinaryHeap.
+        let mut heap = BinaryHeap::<InstantAndData<usize>>::new();
+        let now = FakeInstant::default();
+
+        fn new_data(time: FakeInstant, id: usize) -> InstantAndData<usize> {
+            InstantAndData::new(time, id)
+        }
+
+        heap.push(new_data(now + Duration::from_secs(1), 1));
+        heap.push(new_data(now + Duration::from_secs(2), 2));
+
+        // Earlier timer is popped first.
+        assert_eq!(heap.pop().unwrap().1, 1);
+        assert_eq!(heap.pop().unwrap().1, 2);
+        assert_eq!(heap.pop(), None);
+
+        heap.push(new_data(now + Duration::from_secs(1), 1));
+        heap.push(new_data(now + Duration::from_secs(1), 1));
+
+        // Can pop twice with identical data.
+        assert_eq!(heap.pop().unwrap().1, 1);
+        assert_eq!(heap.pop().unwrap().1, 1);
+        assert_eq!(heap.pop(), None);
+    }
+
+    #[test]
+    fn fake_timer_context() {
+        let mut core_ctx = CoreCtx::default();
+        let mut bindings_ctx = FakeTimerCtx::<TimerId>::default();
+
+        // When no timers are installed, `trigger_next_timer` should return
+        // `false`.
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
+        assert_eq!(core_ctx.take(), vec![]);
+
+        let mut timer0 = bindings_ctx.new_timer(TimerId(0));
+        let mut timer1 = bindings_ctx.new_timer(TimerId(1));
+        let mut timer2 = bindings_ctx.new_timer(TimerId(2));
+
+        // No timer with id `0` exists yet.
+        assert_eq!(bindings_ctx.scheduled_instant(&mut timer0), None);
+
+        assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, &mut timer0), None);
+
+        // Timer with id `0` scheduled to execute at `ONE_SEC_INSTANT`.
+        assert_eq!(bindings_ctx.scheduled_instant(&mut timer0).unwrap(), ONE_SEC_INSTANT);
+
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TimerId(0)));
+        assert_eq!(core_ctx.take(), vec![(TimerId(0), ONE_SEC_INSTANT)]);
+
+        // After the timer fires, it should not still be scheduled at some
+        // instant.
+        assert_eq!(bindings_ctx.scheduled_instant(&mut timer0), None);
+
+        // The time should have been advanced.
+        assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
+
+        // Once it's been triggered, it should be canceled and not
+        // triggerable again.
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
+        assert_eq!(core_ctx.take(), vec![]);
+
+        // Unwind back time.
+        bindings_ctx.instant.time = Default::default();
+
+        // If we schedule a timer but then cancel it, it shouldn't fire.
+        assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, &mut timer0), None);
+        assert_eq!(bindings_ctx.cancel_timer(&mut timer0), Some(ONE_SEC_INSTANT));
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
+        assert_eq!(core_ctx.take(), vec![]);
+
+        // If we schedule a timer but then schedule the same ID again, the
+        // second timer should overwrite the first one.
+        assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), &mut timer0), None);
+        assert_eq!(
+            bindings_ctx.schedule_timer(ONE_SEC, &mut timer0),
+            Some(Duration::from_secs(0).into())
+        );
+        assert_eq!(bindings_ctx.cancel_timer(&mut timer0), Some(ONE_SEC_INSTANT));
+
+        // If we schedule three timers and then run `trigger_timers_until`
+        // with the appropriate value, only two of them should fire.
+        assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), &mut timer0), None);
+        assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(1), &mut timer1), None);
+        assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), &mut timer2), None);
+        assert_eq!(
+            bindings_ctx.trigger_timers_until_instant(ONE_SEC_INSTANT, &mut core_ctx),
+            vec![TimerId(0), TimerId(1)],
+        );
+
+        // The first two timers should have fired.
+        assert_eq!(
+            core_ctx.take(),
+            vec![
+                (TimerId(0), FakeInstant::from(Duration::from_secs(0))),
+                (TimerId(1), ONE_SEC_INSTANT)
+            ]
+        );
+
+        // They should be canceled now.
+        assert_eq!(bindings_ctx.cancel_timer(&mut timer0), None);
+        assert_eq!(bindings_ctx.cancel_timer(&mut timer1), None);
+
+        // The clock should have been updated.
+        assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
+
+        // The last timer should not have fired.
+        assert_eq!(
+            bindings_ctx.cancel_timer(&mut timer2),
+            Some(FakeInstant::from(Duration::from_secs(2)))
+        );
+    }
+
+    #[test]
+    fn trigger_timers_until_and_expect_unordered() {
+        // If the requested instant does not coincide with a timer trigger
+        // point, the time should still be advanced.
+        let mut core_ctx = CoreCtx::default();
+        let mut bindings_ctx = FakeTimerCtx::default();
+        let mut timer0 = bindings_ctx.new_timer(TimerId(0));
+        let mut timer1 = bindings_ctx.new_timer(TimerId(1));
+        assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), &mut timer0), None);
+        assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), &mut timer1), None);
+        bindings_ctx.trigger_timers_until_and_expect_unordered(
+            ONE_SEC_INSTANT,
+            vec![TimerId(0)],
+            &mut core_ctx,
+        );
+        assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
     }
 }
