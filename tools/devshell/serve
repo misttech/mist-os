@@ -389,12 +389,13 @@ while true; do
 
       # Start repository server in foreground, wait until it
       # voluntarily exits
-      fx-command-exec ffx ${ffx_flags[@]} repository serve \
+      fx-command-run ffx ${ffx_flags[@]} repository serve \
         --address [::]:${port} \
         --repository "${source_name}" \
         --repo-path "${repo_dir}" \
         --alias "fuchsia.com" \
         --alias "chromium.org"
+
       exit 0
     else
       add_update_source_args=( "${persist}" --port "${port}" --server-mode "${server_mode}" )
