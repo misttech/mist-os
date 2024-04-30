@@ -6,12 +6,11 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_ZBITL_INCLUDE_LIB_MISTOS_ZBITL_VMO_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_ZBITL_INCLUDE_LIB_MISTOS_ZBITL_VMO_H_
 
+#include <lib/fit/result.h>
 #include <lib/mistos/util/status.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
 #include <lib/zbitl/storage-traits.h>
-
-#include "lib/fit/result.h"
 
 namespace zbitl {
 

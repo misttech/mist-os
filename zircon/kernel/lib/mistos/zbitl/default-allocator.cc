@@ -5,14 +5,20 @@
 
 #include <lib/zbitl/decompress.h>
 
+#include <fbl/alloc_checker.h>
 #include <ktl/byte.h>
 #include <ktl/move.h>
+#include <ktl/unique_ptr.h>
+
+#include <ktl/enforce.h>
 
 namespace zbitl {
 namespace decompress {
 
-fit::result<std::string_view, std::unique_ptr<ktl::byte[]>> DefaultAllocator(size_t bytes) {
-  if (auto ptr = std::make_unique<ktl::byte[]>(bytes)) {
+fit::result<ktl::string_view, ktl::unique_ptr<ktl::byte[]>> DefaultAllocator(size_t bytes) {
+  fbl::AllocChecker ac;
+  auto ptr = ktl::make_unique<ktl::byte[]>(&ac, bytes);
+  if (ac.check()) {
     return fit::ok(ktl::move(ptr));
   }
   return fit::error{"out of memory"};

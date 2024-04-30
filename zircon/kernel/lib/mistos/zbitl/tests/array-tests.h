@@ -9,6 +9,7 @@
 #include <lib/zbitl/memory.h>
 #include <string.h>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/string.h>
 
 #include "span-tests.h"
@@ -35,7 +36,9 @@ struct FblArrayTestTraits {
 
   static void Create(size_t size, Context* context) {
     const size_t n = (size + sizeof(T) - 1) / sizeof(T);
-    storage_type storage{new T[n], n};
+    fbl::AllocChecker ac;
+    storage_type storage{new (ac) T[n], n};
+    ZX_ASSERT(ac.check());
     *context = {std::move(storage)};
   }
 

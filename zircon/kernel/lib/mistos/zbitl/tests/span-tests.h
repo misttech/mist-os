@@ -9,15 +9,19 @@
 #include <lib/mistos/zx/vmo.h>
 #include <lib/stdcompat/cstddef.h>
 #include <lib/stdcompat/span.h>
+#include <zircon/assert.h>
 
 #include <memory>
 #include <string_view>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/string.h>
+#include <ktl/byte.h>
 #include <ktl/span.h>
+#include <ktl/unique_ptr.h>
+#include <zxtest/zxtest.h>
 
 #include "tests.h"
-#include "zxtest/zxtest.h"
 
 template <typename T>
 struct BasicStringViewTestTraits {
@@ -35,13 +39,15 @@ struct BasicStringViewTestTraits {
       return {reinterpret_cast<const T*>(buff_.get()), size_ / sizeof(T)};
     }
 
-    std::unique_ptr<std::byte[]> buff_;
+    ktl::unique_ptr<ktl::byte[]> buff_;
     size_t size_ = 0;
   };
 
   static void Create(ktl::span<const char> data, size_t size, Context* context) {
     const size_t n = (size + sizeof(T) - 1) / sizeof(T);
-    std::unique_ptr<std::byte[]> buff{new std::byte[n]};
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<ktl::byte[]> buff{new (ac) ktl::byte[n]};
+    ZX_ASSERT(ac.check());
     memcpy(buff.get(), data.data(), n);
     *context = {std::move(buff), n};
   }
@@ -49,7 +55,9 @@ struct BasicStringViewTestTraits {
   static void Create(zx::vmo vmo, size_t size, Context* context) {
     ASSERT_TRUE(vmo.is_valid());
     const size_t n = (size + sizeof(T) - 1) / sizeof(T);
-    std::unique_ptr<std::byte[]> buff{new std::byte[n]};
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<ktl::byte[]> buff{new (ac) std::byte[n]};
+    ZX_ASSERT(ac.check());
     ASSERT_EQ(vmo.read(buff.get(), 0, size), ZX_OK);
     *context = {std::move(buff), n};
   }
@@ -78,13 +86,15 @@ struct SpanTestTraits {
       return {reinterpret_cast<T*>(buff_.get()), size_ / sizeof(T)};
     }
 
-    std::unique_ptr<std::byte[]> buff_;
+    ktl::unique_ptr<std::byte[]> buff_;
     size_t size_ = 0;
   };
 
   static void Create(size_t size, Context* context) {
     const size_t n = (size + sizeof(T) - 1) / sizeof(T);
-    std::unique_ptr<std::byte[]> buff{new std::byte[n]};
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<std::byte[]> buff{new (ac) std::byte[n]};
+    ZX_ASSERT(ac.check());
     *context = {std::move(buff), n};
   }
 

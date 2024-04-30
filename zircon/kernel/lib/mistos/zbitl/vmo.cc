@@ -6,6 +6,8 @@
 #include <lib/mistos/zbitl/vmo.h>
 #include <zircon/errors.h>
 
+#include <ktl/enforce.h>
+
 namespace zbitl {
 
 namespace {
@@ -35,7 +37,7 @@ fit::result<zx_status_t, uint32_t> StorageTraits<zx::vmo>::Capacity(const zx::vm
     return fit::error{status};
   }
   return fit::ok(static_cast<uint32_t>(
-      std::min(static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()), size)));
+      ktl::min(static_cast<uint64_t>(ktl::numeric_limits<uint32_t>::max()), size)));
 }
 
 fit::result<zx_status_t> StorageTraits<zx::vmo>::EnsureCapacity(const zx::vmo& vmo,
@@ -90,10 +92,10 @@ fit::result<zx_status_t, zx::vmo> StorageTraits<zx::vmo>::Create(const zx::vmo& 
   if (zx_status_t status = zx::vmo::create(size, options, &vmo); status != ZX_OK) {
     return fit::error{status};
   }
-  return fit::ok(std::move(vmo));
+  return fit::ok(ktl::move(vmo));
 }
 
-fit::result<zx_status_t, std::optional<std::pair<zx::vmo, uint32_t>>>
+fit::result<zx_status_t, ktl::optional<ktl::pair<zx::vmo, uint32_t>>>
 StorageTraits<zx::vmo>::DoClone(const zx::vmo& original, uint32_t offset, uint32_t length) {
   const uint32_t slop = offset % uint32_t{ZX_PAGE_SIZE};
   const uint32_t clone_start = offset & -uint32_t{ZX_PAGE_SIZE};
@@ -122,7 +124,7 @@ StorageTraits<zx::vmo>::DoClone(const zx::vmo& original, uint32_t offset, uint32
     return fit::error{status};
   }
 
-  return fit::ok(std::make_pair(std::move(clone), slop));
+  return fit::ok(ktl::pair(ktl::move(clone), slop));
 }
 
 }  // namespace zbitl

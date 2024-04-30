@@ -8,6 +8,11 @@
 #include <memory>
 #include <new>
 
+#include <ktl/byte.h>
+#include <ktl/unique_ptr.h>
+
+#include <ktl/enforce.h>
+
 // The DoRead method goes into a separate translation unit that need not be
 // linked in if it's not used.  Callers not using Read checking don't need to
 // link in the allocator code at all.
@@ -25,8 +30,10 @@ fit::result<zx_status_t> StorageTraits<zx::vmo>::DoRead(const zx::vmo& vmo, uint
   // This always copies, when mapping might be better for large sizes.  But
   // address space is cheap, so users concerned with large sizes should just
   // map the whole ZBI in and use View<std::span> instead.
-  auto size = [&]() { return std::min(static_cast<uint32_t>(kBufferedReadChunkSize), length); };
-  std::unique_ptr<std::byte[]> buf{new std::byte[size()]};
+  auto size = [&]() { return ktl::min(static_cast<uint32_t>(kBufferedReadChunkSize), length); };
+  fbl::AllocChecker ac;
+  ktl::unique_ptr<ktl::byte[]> buf{new (ac) ktl::byte[size()]};
+  ZX_ASSERT(ac.check());
 
   while (length > 0) {
     const uint32_t n = size();

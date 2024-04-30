@@ -6,6 +6,10 @@
 #include <lib/mistos/zbitl/vmo.h>
 #include <lib/zircon-internal/align.h>
 
+#include <ktl/byte.h>
+
+#include <ktl/enforce.h>
+
 namespace zbitl {
 
 fit::result<zx_status_t, void*> StorageTraits<MapUnownedVmo>::Map(MapUnownedVmo& zbi,
@@ -18,7 +22,7 @@ fit::result<zx_status_t, void*> StorageTraits<MapUnownedVmo>::Map(MapUnownedVmo&
   }
 
   auto mapped = [&zbi](uint64_t offset_in_mapping, uint32_t length) {
-    std::byte* data = zbi.mapping_.data();
+    ktl::byte* data = zbi.mapping_.data();
     return fit::ok(data + static_cast<size_t>(offset_in_mapping));
   };
 
