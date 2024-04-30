@@ -490,16 +490,6 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
 
   last_valid_apply_config_config_stamp_property_.Set(config_stamp.value());
 
-  // Release the bootloader framebuffer referenced by the kernel. This only
-  // needs to be done once on the first ApplyConfig().
-  if (!kernel_framebuffer_released_) {
-    zx_framebuffer_set_range(get_framebuffer_resource(parent()), /*vmo=*/ZX_HANDLE_INVALID,
-                             /*len=*/0,
-                             /*format=*/ZBI_PIXEL_FORMAT_NONE, /*width=*/0, /*height=*/0,
-                             /*stride=*/0);
-    kernel_framebuffer_released_ = true;
-  }
-
   // TODO(https://fxbug.dev/42080631): Replace VLA with fixed-size array once we have a
   // limit on the number of connected displays.
   const int32_t display_configs_size = std::max(1, count);

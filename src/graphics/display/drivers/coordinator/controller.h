@@ -178,8 +178,6 @@ class Controller : public DeviceType,
   mutable mtx_t mtx_;
   bool unbinding_ __TA_GUARDED(mtx()) = false;
 
-  bool kernel_framebuffer_released_ = false;
-
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
   uint32_t applied_layer_stamp_ = UINT32_MAX;
   ClientId applied_client_id_ = kInvalidClientId;
