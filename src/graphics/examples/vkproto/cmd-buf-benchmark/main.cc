@@ -32,8 +32,11 @@ int main(int argc, char* argv[]) {
 #else
   const bool kEnableValidation = false;
 #endif
-  vkp::Instance vkp_instance(kEnableValidation);
-  RTN_IF_MSG(1, !vkp_instance.Init(), "Instance Initialization Failed.\n");
+  vkp::Instance vkp_instance(vkp::Instance::Builder()
+                                 .set_validation_layers_enabled(kEnableValidation)
+                                 .set_swapchain_enabled(false)
+                                 .Build());
+  RTN_IF_MSG(1, !vkp_instance.initialized(), "Instance Initialization Failed.\n");
 
   // DEBUG UTILS MESSENGER
   if (kEnableValidation) {
@@ -43,10 +46,12 @@ int main(int argc, char* argv[]) {
 
   // PHYSICAL DEVICE
   vkp::PhysicalDevice vkp_physical_device(vkp_instance.shared());
+  vkp_physical_device.set_swapchain_enabled(false);
   RTN_IF_MSG(1, !vkp_physical_device.Init(), "Phys Device Initialization Failed.\n");
 
   // LOGICAL DEVICE
   vkp::Device vkp_device(vkp_physical_device.get());
+  vkp_device.set_swapchain_enabled(false);
   RTN_IF_MSG(1, !vkp_device.Init(), "Logical Device Initialization Failed.\n");
   std::shared_ptr<vk::Device> device = vkp_device.shared();
 

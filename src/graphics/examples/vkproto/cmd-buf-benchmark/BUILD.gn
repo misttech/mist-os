@@ -33,7 +33,6 @@ fuchsia_component("cmd-buf-benchmark-test-child-component") {
     ":bin",
     ":libvulkan",
     ":shaders",
-    "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
 }

@@ -16,7 +16,6 @@ fuchsia_component("vkproto_driver_test_child_component") {
   deps = [
     ":bin",
     "//src/graphics/examples/vkproto:shaders",
-    "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
   cm_label = ":vkproto_driver_tests_manifest"
