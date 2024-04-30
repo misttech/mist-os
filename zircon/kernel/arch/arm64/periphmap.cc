@@ -8,12 +8,16 @@
 #include <align.h>
 #include <lib/console.h>
 #include <lib/instrumentation/asan.h>
+#include <stdint.h>
 
 #include <arch/arm64/mmu.h>
 #include <ktl/optional.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
+
+#include "arch/defines.h"
+#include "ktl/bit.h"
 
 #include <ktl/enforce.h>
 
@@ -302,14 +306,23 @@ zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(base_phys));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(length));
 
+  // Periph ranges is fixed size stack, where the first non allocated range
+  // is represented by having 0 length.
   for (auto& range : periph_ranges) {
-    if (range.length == 0) {
+    // Finihsed iterating all allocated ranges, with no range already
+    // containing this range.
+    if (range.length == 0) {  // No range containing.
       base_virt -= length;
 
       // Round down to try to align the mappings to maximize usage of large pages
-      uint64_t phys_log = log2_floor(base_phys);
+      uint64_t phys_log = ktl::countr_zero(base_phys);
       uint64_t len_log = log2_floor(length);
+
+      // This is clamped to the minimal supported page size.
       uint64_t log2_align = ktl::min(ktl::min(phys_log, len_log), 30UL);  // No point aligning > 1GB
+      if (log2_align < PAGE_SIZE_SHIFT) {
+        log2_align = PAGE_SIZE_SHIFT;
+      }
       base_virt = ROUNDDOWN(base_virt, 1UL << log2_align);
 
       auto status = arm64_boot_map_v(base_virt, base_phys, length, MMU_INITIAL_MAP_DEVICE, true);
@@ -319,9 +332,9 @@ zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
         range.length = length;
       }
       return status;
-    } else {
-      base_virt = range.base_virt;
     }
+
+    base_virt = range.base_virt;
   }
   return ZX_ERR_OUT_OF_RANGE;
 }
