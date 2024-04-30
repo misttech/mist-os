@@ -47,18 +47,12 @@ impl Validation {
     async fn make_missing_contents(&self) -> Vec<u8> {
         info!("checking if any of the {} base package blobs are missing", self.base_blobs.len());
 
-        let mut missing = match self.blobfs.filter_to_missing_blobs(&self.base_blobs).await {
-            Ok(missing) => missing,
-            Err(e) => {
-                error!(
-                    "failed to determine blobfs contents, behaving as if empty: {:#}",
-                    anyhow::anyhow!(e)
-                );
-                self.base_blobs.clone()
-            }
-        }
-        .into_iter()
-        .collect::<Vec<_>>();
+        let mut missing = self
+            .blobfs
+            .filter_to_missing_blobs(&self.base_blobs, None)
+            .await
+            .into_iter()
+            .collect::<Vec<_>>();
         missing.sort();
 
         if missing.is_empty() {
