@@ -5,6 +5,7 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_RANGE_MAP_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_RANGE_MAP_H_
 
+#include <lib/heap.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
@@ -15,7 +16,30 @@
 #include <utility>
 #include <vector>
 
+#include <fbl/vector.h>
+
 namespace util {
+
+template <typename T>
+struct Allocator {
+  typedef T value_type;
+
+  Allocator() noexcept = default;
+
+  template <class U>
+  Allocator(const Allocator<U>&) noexcept {}
+
+  T* allocate(std::size_t n) {
+    if (n > std::size_t(-1) / sizeof(T)) {
+      PANIC("allocate");
+    }
+    auto p = static_cast<T*>(malloc(n * sizeof(T)));
+    ASSERT(p != nullptr);
+    return p;
+  }
+
+  void deallocate(T* p, std::size_t) noexcept { free(p); }
+};
 
 template <typename T>
 struct Range {
@@ -34,7 +58,7 @@ class RangeStart {
   using Type = _Type;
   Range<Type> range;
 
-  explicit RangeStart(Range<Type> range) : range(range) {}
+  explicit RangeStart(const Range<Type>& range) : range(range) {}
   static RangeStart FromPoint(Type point) { return RangeStart({point, point}); }
 
   bool operator<(const RangeStart& other) const { return range.start < other.range.start; }
@@ -64,9 +88,13 @@ class RangeMap {
   using KeyType = _KeyType;
   using ValueType = _ValueType;
   using RangeType = Range<KeyType>;
-  using MapType = std::map<RangeStart<KeyType>, ValueType>;
+  using MapType = std::map<RangeStart<KeyType>, ValueType, std::less<RangeStart<KeyType>>,
+                           Allocator<std::pair<const RangeStart<KeyType>, ValueType>>>;
   using IterType = typename MapType::iterator;
   using ConstIterType = typename MapType::const_iterator;
+
+  using IterMapType = std::map<RangeType, ValueType, std::less<RangeType>,
+                               Allocator<std::pair<const RangeType, ValueType>>>;
 
   RangeMap() = default;
 
@@ -95,10 +123,9 @@ class RangeMap {
     // Checks if the current element's key range contains point. If so, it
     // returns a pair of pointers to the key and value.
     if (it != map_.end()) {
-      const auto& [range_start, value] = *it;
-      const auto& range = range_start.range;
-      if (range.contains(point)) {
-        return std::make_pair(range, value);
+      const auto [range_start, value] = *it;
+      if (range_start.range.contains(point)) {
+        return std::make_pair(range_start.range, value);
       }
     }
     return std::nullopt;
@@ -126,7 +153,7 @@ class RangeMap {
     // start < range.start.
     auto it = map_.lower_bound(RangeStart<KeyType>::FromPoint(range.start));
     if (it != map_.begin()) {
-      const auto& [prev_key, prev_value] = *std::prev(it);
+      const auto [prev_key, prev_value] = *std::prev(it);
       auto prev_range = prev_key.range;
       if (prev_range.end == range.start && prev_value == value) {
         range.start = prev_range.start;
@@ -137,7 +164,7 @@ class RangeMap {
     // Check for a range directly after. If it exists, we can look it up by exact start value
     // of range.end.
     if (auto found = map_.find(RangeStart<KeyType>::FromPoint(range.end)); found != map_.end()) {
-      const auto& [next_key, next_value] = *found;
+      const auto [next_key, next_value] = *found;
       auto next_range = next_key.range;
       if (next_range.start == range.end && next_value == value) {
         range.end = next_range.end;
@@ -157,12 +184,12 @@ class RangeMap {
   // associated with those values are contained within the given range.
   //
   // Returns any removed values.
-  std::vector<ValueType> remove(const Range<KeyType>& range) {
-    std::vector<ValueType> removed_values;
+  fbl::Vector<ValueType> remove(const Range<KeyType>& range) {
+    fbl::Vector<ValueType> removed_values;
 
     // If the given range is empty, there is nothing to do.
     if (range.end <= range.start) {
-      return removed_values;
+      return std::move(removed_values);
     }
 
     // Find the range (if any) that intersects the start of range.
@@ -171,7 +198,9 @@ class RangeMap {
       if (old_range.contains(range.start)) {
         // Remove that range from the map.
         if (auto value = remove_exact_range(old_range); value.has_value()) {
-          removed_values.push_back(value.value());
+          fbl::AllocChecker ac;
+          removed_values.push_back(value.value(), &ac);
+          ZX_ASSERT(ac.check());
         }
 
         // If the removed range extends after the end of the given range,
@@ -204,7 +233,9 @@ class RangeMap {
       if (old_range.range.contains(range.end)) {
         // Remove that range from the map.
         if (auto value = remove_exact_range(old_range.range); value.has_value()) {
-          removed_values.push_back(value.value());
+          fbl::AllocChecker ac;
+          removed_values.push_back(value.value(), &ac);
+          ZX_ASSERT(ac.check());
         }
 
         // If the removed range extends after the end of the given range,
@@ -225,21 +256,24 @@ class RangeMap {
     // during the iteration.
     for (auto it = map_.lower_bound(RangeStart<KeyType>::FromPoint(range.start));
          it != map_.end() && it->first.range.start < range.end;) {
-      auto& [old_range, old_value] = *it;
+      auto [old_range, old_value] = *it;
       if (old_range.range.end <= range.start) {
         break;
       }
-      removed_values.push_back(std::move(old_value));
+      fbl::AllocChecker ac;
+      removed_values.push_back(old_value, &ac);
+      ZX_ASSERT(ac.check());
       it = map_.erase(it);
     }
-    return removed_values;
+
+    return std::move(removed_values);
   }
 
   // Return a new map to iterate over the ranges in the RangeMap.
-  std::map<RangeType, ValueType> iter() const {
-    std::map<RangeType, ValueType> result;
-    for (const auto& pair : map_) {
-      const auto& [range_start, value] = pair;
+  IterMapType iter() const {
+    IterMapType result;
+    for (const auto pair : map_) {
+      const auto [range_start, value] = pair;
       result[range_start.range] = value;
     }
     return result;
@@ -247,19 +281,19 @@ class RangeMap {
 
   // Return a new map to iterate over the ranges in the RangeMap, starting at the first range
   // starting after or at the given point.
-  std::map<RangeType, ValueType> iter_starting_at(const KeyType& point) const {
-    std::map<RangeType, ValueType> result;
+  IterMapType iter_starting_at(const KeyType& point) const {
+    IterMapType result;
     auto begin = map_.lower_bound(RangeStart<KeyType>::FromPoint(point));
     for (auto it = begin; it != map_.end(); ++it) {
-      const auto& [range_start, value] = *it;
+      const auto [range_start, value] = *it;
       result[range_start.range] = value;
     }
     return result;
   }
 
-  // Return a new map to tterate over the ranges in the RangeMap that intersect the requested range.
+  // Return a new map to iterate over the ranges in the RangeMap that intersect the requested range.
   template <typename RangeType_>
-  std::map<RangeType, ValueType> intersection(const RangeType_& range) const {
+  IterMapType intersection(const RangeType_& range) const {
     KeyType start = range.start;
     if (auto opt = get(range.start); opt) {
       start = opt->first.start;
@@ -267,9 +301,11 @@ class RangeMap {
     auto begin = map_.lower_bound(RangeStart<KeyType>::FromPoint(start));
     auto end = map_.upper_bound(RangeStart<KeyType>::FromPoint(range.end));
 
-    std::map<RangeType_, ValueType> result;
+    std::map<RangeType_, ValueType, std::less<RangeType_>,
+             Allocator<std::pair<const RangeType_, ValueType>>>
+        result;
     for (auto it = begin; it != end; ++it) {
-      const auto& [range_start, value] = *it;
+      const auto [range_start, value] = *it;
       result[range_start.range] = value;
     }
     return result;
