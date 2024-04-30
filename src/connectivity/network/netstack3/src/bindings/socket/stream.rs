@@ -1163,7 +1163,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTimestamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
-                // When we support NAT, we should return the original address.
+                // TODO(https://fxbug.dev/338042280): when we support destination NAT, we should
+                // return the original address.
                 responder
                     .send(Err(fposix::Errno::Enoent))
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
