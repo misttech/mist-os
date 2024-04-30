@@ -209,20 +209,18 @@ def _gn_targets_repository_impl(repo_ctx):
     all_files = []
     all_dir_links = []
 
-    # Build a { gn_dir -> { gn_target_name -> entry } } map.
-    gn_dir_map = {}
+    # Build a { bazel_package -> { gn_target_name -> entry } } map.
+    package_map = {}
     for entry in json.decode(repo_ctx.read(inputs_manifest_path)):
-        gn_label = entry["generator_label"]
-        gn_dir, gn_name = _gn_label_decompose(gn_label)
-        bazel_name = entry.get("bazel_name", gn_name)
-        dir_entries = gn_dir_map.setdefault(gn_dir, {})
-        dir_entries[bazel_name] = entry
+        bazel_package = entry["bazel_package"]
+        bazel_name = entry["bazel_name"]
+        name_map = package_map.setdefault(bazel_package, {})
+        name_map[bazel_name] = entry
 
     # Create the //targets/{gn_dir}/BUILD.bazel file for each GN directory.
     # Every target defined in {gn_dir}/BUILD.gn that is part of the manifest
     # will have its own filegroup() entry with the corresponding target name.
-    for gn_dir, name_map in gn_dir_map.items():
-        package_path = gn_dir.removeprefix("//")
+    for bazel_package, name_map in package_map.items():
         content = """# AUTO-GENERATED - DO NOT EDIT
 
 package(
@@ -270,11 +268,10 @@ filegroup(
 '''.format(label = entry["generator_label"], name = bazel_name, ninja_path = link_path)
 
                 # Create //_files/{ninja_path} as a symlink to the real path.
-                # This will be exposed through the exports_files() in //BUILD.bazel.
                 repo_ctx.symlink(target_path, link_path)
 
                 # Create //{gn_dir}/{bazel_name}.directory as a symlink to //_files/{ninja_path}
-                repo_ctx.symlink(link_path, "%s/%s.directory" % (package_path, bazel_name))
+                repo_ctx.symlink(link_path, "%s/%s.directory" % (bazel_package, bazel_name))
                 dir_names.append(bazel_name + ".directory")
 
         if dir_names:
@@ -283,8 +280,8 @@ filegroup(
                 content += "   \"%s\",\n" % dir
             content += "])\n"
 
-        repo_ctx.file("%s/BUILD.bazel" % package_path, content, executable = False)
-        repo_ctx.symlink(build_dir_name, "%s/_files" % package_path)
+        repo_ctx.file("%s/BUILD.bazel" % bazel_package, content, executable = False)
+        repo_ctx.symlink(build_dir_name, "%s/_files" % bazel_package)
 
     # The symlink for the special all_licenses_spdx.json file.
     # IMPORTANT: This must end in `.spdx.json` for license classification to work correctly!
@@ -293,17 +290,6 @@ filegroup(
     # The content of BUILD.bazel
     build_content = '''# AUTO-GENERATED - DO NOT EDIT
 load("@rules_license//rules:license.bzl", "license")
-
-package(
-    default_applicable_licenses = [ ":all_licenses_spdx_json" ]
-)
-
-exports_files(
-    glob(
-        ["_files/**"],
-        exclude_directories=0,
-    ),
-)
 
 # This contains information about all the licenses of all
 # Ninja outputs exposed in this repository.

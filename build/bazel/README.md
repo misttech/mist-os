@@ -132,92 +132,364 @@ the user's home directory (e.g. `$HOME/.cache/bazel/`) are:
 
 # NINJA OUTPUTS AS BAZEL INPUTS
 
-The `@legacy_ninja_build_outputs` external repository is used by the Bazel
-workspace to expose Ninja build outputs as Bazel input files. This works
-in the following way:
+GN target outputs (i.e. Ninja build artifacts) can be exposed to the Bazel
+graph as inputs through two distinct mechanisms.
 
-- Fuchsia platform `BUILD.gn` files must use `bazel_input_xxx()` templates
-  (see `//build/bazel/bazel_inputs.gni` for documentation) to expose Ninja
-  output files as Bazel top-level `filegroup()` targets in the
-  `@legacy_ninja_build_outputs` repository (note that this name is long to
-  discourage its use out of specific requirements).
+- The best scheme (simpler and more scalable) relies on `bazel_input_file()`
+  and `bazel_input_directory()` GN target definitions to expose the outputs
+  of other GN targets as filegroups in the special `@gn_targets` external
+  repository.
 
-  For example, the following GN target definition:
+- The older, and deprecated scheme, relies on `bazel_input_resource()` and
+  `bazel_input_resource_directory()` to do the same in the special
+  `@legacy_ninja_build_outputs` external repository.
+
+In both cases, a GN `bazel_action()` target must be defined to invoke
+Bazel, through a script, and must list the `bazel_input_xxx()` in its dependencies
+to ensure that the right Ninja outputs are exposed to the Bazel graph before the
+Bazel command runs.
+
+## Ninja outputs in the `@gn_targets` repository
+
+### Example
+
+Here's a simple example that uses the first scheme. It allows a Bazel target to
+process the output of a GN action, and copy the result back to the Ninja build
+directory through the `//src/lib:process_foo` GN target.
+
+On the GN side:
 
 ```py
-  # An action that generates two files.
-  action("generator") {
-    ...
-    outputs = [
-      "$target_gen_dir/foo",
-      "$target_gen_dir/bar/zoo",
-    ]
-  }
+# From //src/lib/BUILD.gn, evaluated in the default toolchain context:
 
-  # A target that exposes these outputs files to Bazel
-  # as @legacy_ninja_build_outputs//:generated_files.
-  bazel_inputs_resource("bazel_inputs") {
-    name = "generated_files"
-    sources = get_target_outputs(":generated")
-    outputs = [ "generated/{{source_file_part}}" ]
+# An action that generates one or more output files.
+action("foo") {
+  outputs = [ ... ]
+}
+
+# A target that exposes the outputs of :foo as
+# as the @gn_targets//src/lib:foo filegroup()
+bazel_input_file("foo.bazel_input") {
+  generator = ":foo"
+}
+
+# A target that invokes a Bazel target to process the
+# foo outputs. The result is copied to $BUILD_DIR/obj/src/lib/foo.final
+bazel_action("process_foo") {
+  command = "build"
+  deps = [ ":foo.bazel_input" ]
+  bazel_targets = [ ":foo_processor" ]
+  copy_outputs = {
+    bazel = "{{BAZEL_TARGET_OUT_DIR}}/foo.processed_by_bazel"
+    ninja = "foo.final"
   }
+}
 ```
 
-  Will end up generating the following Bazel target declaration that
-  will appear in the auto-generated `@legacy_ninja_build_outputs//BUILD.bazel`
-  file:
+And on the Bazel side.
 
 ```py
-  # From //....../...:bazel_inputs
+# From //src/lib/BUILD.bazel
+genrule(
+  name = "foo_processor",
+  srcs = [ "@gn_targets//src/lib:foo" ],
+  outs = [ "foo.processed_by_bazel" ],
+  command = "process.sh $< $@",
+)
+```
+
+Notice the `//src/lib:foo.bazel_input` GN target definition. This does not build
+anything, but records information about the outputs of the *generator* target
+`//src/lib:foo`.
+
+The `//src/lib:process_foo` GN target depends on it, which will force the content
+of the special `@gn_targets` repository to be *automatically updated before
+invoking Bazel* to reflect the target's dependencies.
+
+In this case, because `//src/lib:process_foo` depends on `//src/lib:foo.bazel_input`
+in the GN graph, the Bazel `@gn_targets//src/lib:foo` filegroup will be defined,
+grouping the outputs of the GN `//src/lib:foo` target, built or updated by Ninja
+before Bazel is invoked.
+
+Note that all Ninja outputs are accessed in Bazel through filegroups named from the GN
+target label that exposes it. I.e. one cannot access files using a Ninja artifact
+path such as `@gn_targets//obj/src/lib/foo.out`.
+
+
+### bazel_input_file() filegroup naming
+
+The `bazel_input_file()` template requires a `generator` argument that must point
+to a GN target that generates Ninja output files.
+
+The corresponding Bazel filegroup will be defined as `@gn_targets//{package_name}:{bazel_name}`
+where:
+
+- `{bazel_name}` matches the name of the `generator` target itself, but this value
+  can be overridden using the optional `gn_targets_name` argument.
+
+- `{bazel_package}` matches the directory of the `generator` target itself, if it is
+  defined in the default GN toolchain context. Otherwise, it will include
+  a `toolchain_{toolchain_name}/` prefix as well.
+
+Note that the directory and names of the `bazel_input_file()` target itself does not impact
+the content of `@gn_targets` at all.
+
+Hence the following examples:
+
+```py
+# From //src/lib/BUILD.gn
+action("foo") {
+  ...
+}
+
+# This creates `@gn_targets//src/lib:foo`
+bazel_input_file("foo_outputs") {
+  generator = ":foo"
+}
+
+# This creates `@gn_targets//src/lib:foo_alt`, by overriding the
+# name explicitly.
+bazel_input_file("foo_outputs_alt") {
+  generator = ":foo"
+  gn_targets_name = "foo_alt"
+}
+
+if (current_toolchain == default_toolchain) {
+  # This creates @gn_targets//toolchain_host_x64/src/lib:foo
+  bazel_input_file("foo_host_outputs") {
+    generator = ":foo($host_toolchain)"
+
+    # Because the generator is in a different toolchain context,
+    # its `outputs` argument must be provided (see next section).
+    outputs = [ get_label_info(generator, "target_out_dir") + "/foo.out" ]
+  }
+}
+```
+
+If one defines several `bazel_input_file()` with the same filegroup package and name,
+Bazel will complain about multiply defined targets in the corresponding `BUILD.bazel`
+file (which can be inspected, as comments indicate which exact GN target defined them).
+
+### bazel_input_file() outputs selection
+
+By default, `bazel_input_file()` exposes all outputs of the generator target,
+but this can only work if the following conditions apply:
+
+- The generator target is a GN `action()` (i.e. not a `group()` or an `executable()`).
+- The target and the generator are defined in the same `BUILD.gn` file.
+- The target and the generator are evaluated in the same toolchain context.
+
+Otherwise, specifying the list of outputs using the `outputs` argument is required.
+GN will try to print a user-friendly error message explaining the situation. An
+example of explicit outputs:
+
+```py
+# From //src/lib/BUILD.gn
+action("foo") {
+  ...
+}
+
+# From //src/lib/bar/BUILD.gn
+
+# Only expose the (first) output of //src/lib:foo as @gn_targets//src/lib:foo
+# The fact that this target is defined under //src/lib/bar/ does not matter.
+bazel_input_file("foo.bazel_input") {
+  generator = "//src/lib:foo"
+  _foo_output_dir = get_label_info(generator, "target_out_dir")
+  outputs = [
+      "${_foo_output_dir}/output",
+  ]
+}
+```
+
+Note that this generates the filegroup as `@gn_targets//src/lib:foo`, and not
+as `@gn_targets//src/lib/bar:foo`.
+
+This is why defining `bazel_input_file()` targets *in the same BUILD.gn file as the
+generator target* is recommended, though not required.
+
+### bazel_input_directory()
+
+It is an error to list a directory as an output in a `bazel_input_file()`, as this
+will may result in incremental build errors. There is no easy way to detect this from
+GN / Ninja, but one can use the `bazel_input_directory()` GN template to expose
+directory Ninja outputs to Bazel.
+
+This creates a Bazel filegroup that uses a `glob()` statement, under the hood, to
+ensure that all files from the directory are visible from the Bazel sandbox / command
+execution environment, and carry dependency information properly across the GN / Bazel
+graph boundaries.
+
+## DEPRECATED: Ninja outputs in the `@legacy_ninja_build_outputs` repository
+
+For historical reasons, it is also possible to use `bazel_input_resource()` instead
+or `bazel_input_file()`, but this use is now strongly discouraged. They differ in the
+following way (see next section for migration instructions):
+
+- `bazel_input_resource()` populates both the `@gn_targets` and the
+  `@legacy_ninja_build_outputs` repositories.
+
+- `bazel_input_resource()` can specify an arbitrary filegroup() package and name
+  inside `@legacy_ninja_build_outputs`, which can lead to conflicts if several
+  different GN targets use the same one.
+
+  By contrast, `bazel_input_file()` mandates the filegroup package and name from
+  the GN target path to prevent them.
+
+  NOTE: The `sources` argument of `bazel_input_resource()` corresponds to the
+  `outputs` argument of `bazel_input_file()`. The `outputs` argument of
+  `bazel_input_resource()` has no equivalent in `bazel_input_file()` since
+  the filegroup locations are mandated from the GN target label itself.
+
+- `bazel_input_resource()` dependencies must be listed with the `bazel_inputs`
+  argument of the `bazel_action()` GN template, while `bazel_input_file()` can
+  just be part of its `deps`.
+
+- Bazel targets access Ninja outputs using their file path in `@legacy_ninja_build_outputs`
+  repository (e.g. `@legacy_ninja_build_outputs//:build_version_info.txt`), and it is
+  often difficult to determine how these paths are defined on the GN side.
+
+  By contrast, `@gn_targets` filegroup labels always reflect the GN target path that
+  defined them, making debugging easier (e.g. `@gn_targets//build/info:version`, which
+  clearly shows that the files were exposed by a GN target in `//build/info/BUILD.gn`).
+
+- To facilitate migration, `bazel_input_resource()` also defines a target in the
+  `@gn_targets` repository, with a label like `@gn_targets//{dir}:{name}` where
+  `{gn_dir}` matches the current `BUILD.gn` directory path, and `{name}` is, by
+  default the current target name, with any optional `_bazel_inputs` suffix removed.
+
+  NOTE: This `_bazel_inputs` suffix is different from the `.bazel_input` one supported
+  by `bazel_input_file()`.
+
+  Using the `gn_targets_name` argument can be used to override the value of `{name}`.
+
+- `bazel_input_resource_directory()` is used to expose a directory as a filegroup, and
+  serves a similar purpose as `bazel_input_directory()` with a different (and slightly
+  more complicated) interface.
+
+  It also populates both `@legacy_ninja_build_outputs` and `@gn_targets`, and supports
+  the `gn_targets_name` argument to override the filegroup name in `@gn_targets` only.
+
+- Much more annoyingly, all `bazel_input_resource()` and `bazel_input_resource_directory()`
+  used by _any_ `bazel_action()` target much be reachable from the global target lists
+  defined in `//build/bazel/legacy_ninja_build_outputs.gni`.
+
+In practice, the last point is a major pain, prevents parallel development, and is the
+main reason why this scheme is now deprecated.
+
+## Critical differences, and a note on `fx bazel`:
+
+One benefit of the deprecated scheme is that the content of `@legacy_ninja_build_outputs`
+is only setup *once and for all* when the platform build's Bazel workspace is setup.
+By contrast, the content of `@gn_targets` will change *every time* a `bazel_action()`
+command is run from Ninja.
+
+Keep this in mind when invoking `fx bazel` directly. This command is only useful
+to debug Bazel invocations in the platform build, but it does not update Ninja outputs
+that your Bazel targets depend on. In other words:
+
+- If you invoke `fx bazel build //some:target`, a target which references
+  files from the `@legacy_ninja_build_outputs` repository, you must first ensure
+  that all outputs in the Ninja build directory it may access are up-to-date,
+  otherwise you may build the wrong thing.
+
+- If you invoke `fx bazel build //other:target`, a target which references
+  filegroups from the `@gn_targets` repository, you must ensure that the Ninja
+  build artifacts are up-to-date as well, but *also* ensure that the content
+  of `@gn_targets` is updated. Otherwise, its state will reflect a previous
+  bazel_action() invocation that built something completely different. This
+  will likely result in errors about
+
+Hence the best way to rebuild things is to invoke the Ninja target that matches
+the GN `bazel_action()` target that invokes Bazel, e.g. with `fx build //some:target`.
+
+## Migrating from `@legacy_ninja_build_outputs` to `@gn_targets`:
+
+Migrating Bazel targets from the deprecated to the new scheme can be done in the
+following steps:
+
+- First, replace `@legacy_ninja_build_outputs//:<file_path>` labels in your
+  `BUILD.bazel` files with the equivalent `@gn_targets//<dir>:<name>` label.
+
+  Here `<dir>` should match the directory path of the `BUILD.gn` file that
+  defines the `bazel_input_resource()` or `bazel_input_resource_directory()`
+  target for `<file_path>`.
+
+  If you don't know where this is, peek into the following file which
+  defines the legacy filegroups, and contains comments providing the new
+  target to use:
+
+  ```none
+  out/default/gen/build/bazel/output_base/external/legacy_ninja_build_outputs/BUILD.bazel
+  ```
+
+  For example:
+
+  ```
+  # From GN target: //src/devices/bus/drivers/platform:platform-bus-package-bazel(//build/toolchain/fuchsia:arm64)
+  # Migration target: @gn_targets//src/devices/bus/drivers/platform:platform-bus
   filegroup(
-      name = "generated_files",
+      name = "platform-bus-package-bazel",
       srcs = [
-        "generated/foo",
-        "generated/zoo",
-      ]
+          "platform-bus.far",
+      ],
   )
-```
+  ```
 
-  Note that the `bar` path segment has disappeared due to the way
-  `{{source_file_part}}` works in GN.
+  Tells you to use `@gn_targets//src/devices/bus/drivers/platform:platform-bus` instead
+  of `@legacy_ninja_build_outputs//:platform-bus.far` or
+  `@legacy_ninja_build_outputs//:platform-bus-package-bazel`.
 
-- All `bazel_input_xxx()` GN targets *MUST* be reachable from the special GN
-  target `//build/bazel:legacy_ninja_build_outputs`. More specifically
-  from the transitive dependencies of its `inputs_deps` list.
+  NOTE: Remove all references from all repositories, i.e. including the ones that may exist
+  under `//vendor/...`. This may require multiple CLs to do properly (In this case, add a
+  build fence as suggested in the last step below).
 
-  If not, these targets will not generate a `filegroup()` in the generated
-  repository `BUILD.bazel` file, and the corresponding Ninja outputs will be
-  invisible to the Bazel workspace.
+- As a special case, replace `@legacy_ninja_build_outputs//:license` labels with
+  `@gn_targets//:all_licenses.spdx.json`. These are the SPDX files that carry licensing
+  information for all Ninja outputs exposed by each repository.
 
-- The `bazel_build_action()` template defines a GN action that invokes a
-  Bazel build command (passing a list of Bazel target patterns). Some of
-  these commands do not depend on Ninja outputs and can be run directly.
+- Second, remove the GN target reference from `//build/bazel/legacy_ninja_build_outputs.gni`or
+  its dependencies. If the target label does not appear in this file, use the following GN query
+  to print a dependency path to determine where it is added:
 
-  Those that depend on Ninja outputs should depend on the corresponding
-  `bazel_input_xxx()` target, and ensure they invoke a Bazel target that
-  references them through the appropriate label (as in
-  `@legacy_ninja_build_outputs//:<name>`).
+  ```sh
+  fx gn path out/default //build/bazel:legacy_ninja_build_outputs <your_bazel_input_resource_target_label>
+  ```
 
-  See `//build/bazel/tests/build_action` for a concrete example of how
-  this works.
+  For example:
 
-- It is possible to perform Bazel queries directly after setting up the
-  Bazel workspace (i.e. after running `fx build bazel_workspace`), without
-  the need to generate all Ninja outputs before that. This can be handy
-  to inspect changes during development.
+  ```none
+  $ fx gn path out/default //build/bazel:legacy_ninja_build_outputs //src/devices/bus/drivers/platform:platform-bus-package-bazel
+  //build/bazel:legacy_ninja_build_outputs --[private]-->
+  //sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs --[private]-->
+  //src/devices/bus/drivers/platform:platform-bus-package-bazel
+  ```
 
-  Technically, the content of the legacy repository is mostly symlinks,
-  which points to locations in the Ninja output path, the repository rule
-  ensures that empty files or directories are created on demand if the
-  link target paths do not exist yet (otherwise Bazel would complain).
+  Tells you that the dependency was added by `//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs`,
+  and that you should probably migrate this definition and the corresponding Bazel references as well.
 
-  Since Bazel queries are not concerned by the content of such files, only
-  by their presence, they can return adequate results. The empty files will
-  otherwise be over-written by Ninja build commands if needed.
+- Verify that everything builds correctly.
 
-- The 'testonly' property is not preserved across the Ninja / Bazel boundary,
-  but a non-testonly `bazel_build_action()` cannot depend on a testonly
-  `bazel_input_xxx()` target, as per usual with GN.
+- Replace the `bazel_input_resource()` target definition with a `bazel_input_file()`
+  one.
+
+  Similarly, use `bazel_input_directory()` instead of `bazel_input_resource_directory()`.
+
+- Verify that everything builds correctly.
+
+- Add a build fence to your CL to work-around Ninja getting confused by the changes in the dependency
+  graph. Due to the way Ninja works, it will inject stale depfile dependencies from a previous build
+  into the next incremental build graph, which can result in flaky build failures.
+
+  To do this, add a new `print()` statement to `//build/force_clean/get_fences.py` if you modify
+  `fuchsia.git`, or to `//vendor/<name>/build/force_clean/get_fences.py`if you are modifying the
+  content of the `//vendor/<name>/` git repository (if the file does not exist, create a new one
+  with a single `print()` statement in it, it will be picked up automatically).
+
+  NOTE: This forces the next build that includes your change to be a clean build, either locally or
+  on CQ/CI.
+
+- Upload your CL to Gerrit, and verify that all CQ builds pass.
 
 # BAZEL BUILD ACTION
 
