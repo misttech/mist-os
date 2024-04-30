@@ -289,9 +289,9 @@ if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; the
   # Check for erroneously running instances of package-tool
   package_tool_pids=$(pgrep -f "package-tool repository publish $(fx get-build-dir)/amber-files --watch")
   if [[ -n $package_tool_pids ]]; then
-    fx-error "Incremental auto-publisher for this build config is/are already running under pid(s): $(echo $package_tool_pids)"
-    fx-error "This is probably an error. Please terminate the auto-publisher process(es) and restart."
-    exit 1
+    fx-info "Incremental auto-publisher for this build config is/are already running under pid(s): $(echo $package_tool_pids)"
+    fx-info "This is likely a side effect from a previous run. Restarting."
+    kill -TERM $package_tool_pids
   fi
 
   # the manifest list file has relative paths and package manifest watcher looks for them
