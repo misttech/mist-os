@@ -960,7 +960,7 @@ def merge_power_data(
 
         print(f"Delaying CPU trace by {offset_ns/1000/1000}ms")
         starting_ticks = int(
-            (earliest_ts + trace_time.TimeDelta(-offset_ns))
+            (earliest_ts - trace_time.TimeDelta(offset_ns))
             .to_epoch_delta()
             .to_nanoseconds()
             * TICKS_PER_NS

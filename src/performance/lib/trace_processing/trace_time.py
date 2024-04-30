@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 """Nanonsecond-resolution time values for trace models."""
 
-from typing import Any, Self
+from typing import Any, Self, overload
 
 
 class TimeDelta:
@@ -72,6 +72,9 @@ class TimeDelta:
             return NotImplemented
         return TimeDelta(self._delta - other._delta)
 
+    def __neg__(self) -> "TimeDelta":
+        return TimeDelta(-self._delta)
+
     def __mul__(self, factor: int) -> "TimeDelta":
         return TimeDelta(self._delta * factor)
 
@@ -130,10 +133,20 @@ class TimePoint:
     def __add__(self, time_delta: TimeDelta) -> "TimePoint":
         return TimePoint(self._ticks + time_delta.to_nanoseconds())
 
-    def __sub__(self, other: Any) -> TimeDelta:
-        if not isinstance(other, TimePoint):
-            return NotImplemented
-        return TimeDelta.from_nanoseconds(self._ticks - other._ticks)
+    @overload
+    def __sub__(self, other: "TimePoint") -> TimeDelta:
+        pass
+
+    @overload
+    def __sub__(self, other: TimeDelta) -> "TimePoint":
+        pass
+
+    def __sub__(self, other: Any) -> "TimeDelta | TimePoint":
+        if isinstance(other, TimePoint):
+            return TimeDelta.from_nanoseconds(self._ticks - other._ticks)
+        if isinstance(other, TimeDelta):
+            return self + (-other)
+        return NotImplemented
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, TimePoint):
