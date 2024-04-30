@@ -29,8 +29,12 @@ void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
     case ZBI_KERNEL_DRIVER_AMLOGIC_UART:
       AmlogicS905UartInitEarly(config);
       break;
+    case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
+      Dw8250UartInitEarly(config, 1);
+      break;
+    case ZBI_KERNEL_DRIVER_I8250_MMIO32_UART:
     case ZBI_KERNEL_DRIVER_DW8250_UART:
-      Dw8250UartInitEarly(config);
+      Dw8250UartInitEarly(config, 4);
       break;
     case ZBI_KERNEL_DRIVER_MOTMOT_UART:
       MotmotUartInitEarly(config);
@@ -49,6 +53,8 @@ void UartInitLate(uint32_t extra) {
     case ZBI_KERNEL_DRIVER_AMLOGIC_UART:
       AmlogicS905UartInitLate();
       break;
+    case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
+    case ZBI_KERNEL_DRIVER_I8250_MMIO32_UART:
     case ZBI_KERNEL_DRIVER_DW8250_UART:
       Dw8250UartInitLate();
       break;
