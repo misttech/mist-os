@@ -336,7 +336,12 @@ void TestCaseShuffle() {
   ZX_ASSERT_MSG(run_order[2] == run_order[5], "Shuffle failed.");
 
   test_case.UnShuffle();
+#if _KERNEL_MISTOS
+  // using kernel rand_r is differente form musl implementation
+  test_case.Shuffle(25);
+#else
   test_case.Shuffle(5);
+#endif
   test_case.Run(&observer, &driver);
 
   // Different seeds different order.

@@ -6,7 +6,11 @@
 #include <lib/fit/defer.h>
 #include <zircon/assert.h>
 
+#ifdef _KERNEL_MISTOS
+#include <ktl/algorithm.h>
+#else
 #include <algorithm>
+#endif
 #include <cstdlib>
 #include <memory>
 #include <utility>
@@ -55,7 +59,7 @@ void TestCase::Filter(TestCase::FilterFn filter) {
 void TestCase::Shuffle(uint32_t random_seed) {
   for (unsigned long i = 1; i < selected_indexes_.size(); ++i) {
 #ifdef _KERNEL_MISTOS
-    uint64_t seed = random_seed;
+    uintptr_t seed = random_seed;
     unsigned long j = rand_r(&seed) % (i + 1);
 #else
     unsigned long j = rand_r(&random_seed) % (i + 1);
@@ -69,7 +73,7 @@ void TestCase::Shuffle(uint32_t random_seed) {
 void TestCase::UnShuffle() {
   // Put the, possibly filtered, list back in order.
 #ifdef _KERNEL_MISTOS
-  // Sort not (yet) supported in MistOS Kernel
+  ktl::stable_sort(selected_indexes_.begin(), selected_indexes_.end());
 #else
   std::sort(selected_indexes_.begin(), selected_indexes_.end());
 #endif

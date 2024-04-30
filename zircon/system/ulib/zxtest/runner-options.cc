@@ -5,6 +5,8 @@
 
 #if !_KERNEL_MISTOS
 #include <getopt.h>
+#else
+#include <lib/mistos/util/time.h>
 #endif
 
 #include <lib/fit/defer.h>
@@ -80,6 +82,9 @@ void Options::Usage(char* bin, LogSink* sink) {
 Options Options::FromArgs(int argc, char** argv, fbl::Vector<fbl::String>* errors) {
 #ifdef _KERNEL_MISTOS
   Runner::Options options;
+
+  // Pick a random seed by default. Overwrite it if a value was explicitly set.
+  options.seed = static_cast<int>(zx_clock_get_monotonic());
 #else
   // Reset index of parsed arguments.
   optind = 0;

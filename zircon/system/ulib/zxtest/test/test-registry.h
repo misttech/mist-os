@@ -194,11 +194,9 @@ static constexpr RegisteredTest kRegisteredTests[] = {
     RUN_TEST(TestCaseFilterAllMatching),
     RUN_TEST(TestCaseFilterNullMatchesAll),
     RUN_TEST(TestCaseFilterDoNotAccumulate),
-#if !_KERNEL_MISTOS
     RUN_TEST(TestCaseShuffle),
     RUN_TEST(TestCaseUnShuffle),
     RUN_TEST(TestCaseUnShuffleFiltered),
-#endif
     RUN_TEST(AssertionHasValues),
     RUN_TEST(AssertionHasNoValues),
     RUN_TEST(EventBroadcasterOnProgramStart),
