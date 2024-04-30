@@ -7,7 +7,6 @@
 #include <cstddef>
 
 #include <gmock/gmock.h>
-#include <measure_tape/hlcpp/hlcpp_measure_tape_for_peer.h>
 
 #include "adapter_test_fixture.h"
 #include "fuchsia/bluetooth/gatt/cpp/fidl.h"
@@ -15,6 +14,7 @@
 #include "lib/fidl/cpp/interface_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_adapter_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/measure_tape/hlcpp_measure_tape_for_peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"

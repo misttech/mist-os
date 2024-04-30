@@ -35,8 +35,8 @@ static_library("fidl") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.bluetooth.gatt2:hlcpp_measure_tape_for_read_by_type_result",
-    "//sdk/fidl/fuchsia.bluetooth.le:hlcpp_measure_tape_for_peer",
+    "measure_tape:peer_hlcpp",
+    "measure_tape:read_by_type_result_hlcpp",
   ]
 
   public_deps = [
@@ -157,7 +157,7 @@ source_set("tests") {
     ":fake_adapter_test_fixture",
     ":fake_gatt_test_fixture",
     ":fidl",
-    "//sdk/fidl/fuchsia.bluetooth.le:hlcpp_measure_tape_for_peer",
+    "measure_tape:peer_hlcpp",
     "//src/connectivity/bluetooth/core/bt-host/gap:testing",
     "//src/connectivity/bluetooth/core/bt-host/gatt:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",

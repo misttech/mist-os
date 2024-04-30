@@ -1,0 +1,23 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("peer_hlcpp") {
+  sources = [
+    "hlcpp_measure_tape_for_peer.cc",
+    "hlcpp_measure_tape_for_peer.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_hlcpp",
+    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_hlcpp",
+  ]
+}
+
+source_set("read_by_type_result_hlcpp") {
+  sources = [
+    "hlcpp_measure_tape_for_read_by_type_result.cc",
+    "hlcpp_measure_tape_for_read_by_type_result.h",
+  ]
+  public_deps =
+      [ "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_hlcpp" ]
+}
