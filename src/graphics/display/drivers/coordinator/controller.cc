@@ -881,8 +881,6 @@ zx::result<> Controller::Create(zx_device_t* parent) {
     return bind_result.take_error();
   }
 
-  controller->PostBind();
-
   // `controller` is now managed by the driver manager.
   [[maybe_unused]] Controller* controller_released = controller.release();
 
@@ -922,6 +920,8 @@ zx::result<> Controller::Bind() {
     return vsync_monitor_init_result.take_error();
   }
 
+  engine_driver_client_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
+
   status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
                       .set_flags(DEVICE_ADD_NON_BINDABLE)
                       .set_inspect_vmo(inspector_.DuplicateVmo()));
@@ -931,12 +931,6 @@ zx::result<> Controller::Bind() {
   }
 
   return zx::ok();
-}
-
-void Controller::PostBind() {
-  // Now that the driver is bound successfully, it's safe to link the display
-  // coordinator to the engine driver.
-  engine_driver_client_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
 }
 
 void Controller::DdkUnbind(ddk::UnbindTxn txn) {
@@ -966,7 +960,7 @@ void Controller::DdkRelease() {
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
     engine_driver_client_.ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
   }
-  engine_driver_client_.ResetDisplayControllerInterface();
+
   delete this;
 }
 
@@ -991,7 +985,12 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
       root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStamp.value());
 }
 
-Controller::~Controller() { zxlogf(INFO, "Controller::~Controller"); }
+Controller::~Controller() {
+  zxlogf(INFO, "Controller::~Controller");
+  if (engine_driver_client_.is_bound()) {
+    engine_driver_client_.ResetDisplayControllerInterface();
+  }
+}
 
 size_t Controller::TEST_imported_images_count() const {
   fbl::AutoLock lock(mtx());

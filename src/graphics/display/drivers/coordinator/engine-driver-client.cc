@@ -36,6 +36,8 @@ EngineDriverClient::~EngineDriverClient() {
 }
 
 zx_status_t EngineDriverClient::Bind() {
+  ZX_DEBUG_ASSERT(!is_bound_);
+
   // Attempt to connect to FIDL protocol.
   zx::result display_fidl_client =
       DdkConnectRuntimeProtocol<fuchsia_hardware_display_engine::Service::Engine>(parent_);
@@ -47,6 +49,7 @@ zx_status_t EngineDriverClient::Bind() {
         zxlogf(INFO, "Using FIDL display controller protocol");
         // If the server responds, use it exclusively.
         use_engine_ = true;
+        is_bound_ = true;
         return ZX_OK;
       }
     }
@@ -60,6 +63,7 @@ zx_status_t EngineDriverClient::Bind() {
   }
 
   zxlogf(INFO, "Using Banjo display controller protocol");
+  is_bound_ = true;
   return ZX_OK;
 }
 

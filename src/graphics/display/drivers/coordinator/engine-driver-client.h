@@ -74,6 +74,8 @@ class EngineDriverClient : public ddk::Device<EngineDriverClient> {
   zx::result<> SetDisplayPower(DisplayId display_id, bool power_on);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
+  bool is_bound() const { return is_bound_; }
+
  private:
   // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
   // right approach.
@@ -91,6 +93,8 @@ class EngineDriverClient : public ddk::Device<EngineDriverClient> {
 
   // Banjo Client
   ddk::DisplayControllerImplProtocolClient dc_;
+
+  bool is_bound_ = false;
 };
 
 }  // namespace display

@@ -154,12 +154,6 @@ class Controller : public DeviceType,
   // Initializes the driver and binds it to the driver manager.
   zx::result<> Bind();
 
-  // Initialization logic that occurs after the driver is bound to the driver
-  // manager.
-  //
-  // Must be called after a successful Bind().
-  void PostBind();
-
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
