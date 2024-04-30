@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use std::{
+    cmp,
     collections::BinaryHeap,
     fmt::Debug,
     sync::{
-        atomic::{self, AtomicI64},
+        atomic::{self, AtomicI64, AtomicUsize},
         Arc,
     },
     task::Poll,
@@ -33,7 +34,7 @@ const UNSCHEDULED_SENTINEL: fasync::Time = fasync::Time::INFINITE;
 const YIELD_TIMER_COUNT: usize = 10;
 
 pub(crate) struct TimerDispatcher<T> {
-    inner: Arc<CoreMutex<TimerDispatcherInner<T>>>,
+    inner: Arc<TimerDispatcherInner<T>>,
 }
 
 impl<T> Default for TimerDispatcher<T> {
@@ -41,11 +42,14 @@ impl<T> Default for TimerDispatcher<T> {
         let notifier = NeedsDataNotifier::default();
         let watcher = notifier.watcher();
         Self {
-            inner: Arc::new(CoreMutex::new(TimerDispatcherInner {
-                heap: BinaryHeap::new(),
-                notifier: Some(notifier),
-                watcher: Some(watcher),
-            })),
+            inner: Arc::new(TimerDispatcherInner {
+                timer_count: AtomicUsize::new(0),
+                state: CoreMutex::new(TimerDispatcherState {
+                    heap: BinaryHeap::new(),
+                    notifier: Some(notifier),
+                    watcher: Some(watcher),
+                }),
+            }),
         }
     }
 }
@@ -65,17 +69,20 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
         &self,
         handler: H,
     ) -> fasync::Task<()> {
-        let watcher = self.inner.lock().watcher.take().expect("timer dispatcher already spawned");
+        let watcher =
+            self.inner.state.lock().watcher.take().expect("timer dispatcher already spawned");
         fasync::Task::spawn(Self::worker(handler, watcher, Arc::clone(&self.inner)))
     }
 
     /// Creates a new timer with identifier `dispatch` on this `dispatcher`.
     pub(crate) fn new_timer(&self, dispatch: T) -> Timer<T> {
+        let _: usize = self.inner.timer_count.fetch_add(1, atomic::Ordering::SeqCst);
         Timer {
             heap: Arc::clone(&self.inner),
             state: Arc::new(TimerState {
                 dispatch,
                 scheduled: AtomicI64::new(UNSCHEDULED_SENTINEL.into_nanos()),
+                gc_generation: AtomicUsize::new(0),
             }),
             _no_clone: NoCloneGuard,
         }
@@ -90,15 +97,16 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     ///
     /// If `stop` was already called.
     pub(crate) fn stop(&self) {
-        assert!(self.inner.lock().notifier.take().is_some(), "dispatcher already closed");
+        assert!(self.inner.state.lock().notifier.take().is_some(), "dispatcher already closed");
     }
 
     async fn worker<H: FnMut(T)>(
         mut handler: H,
         mut watcher: NeedsDataWatcher,
-        inner: Arc<CoreMutex<TimerDispatcherInner<T>>>,
+        inner: Arc<TimerDispatcherInner<T>>,
     ) {
         let mut timer = TimerWaiter::new();
+        let mut gc_generation = 0;
         loop {
             let mut watcher_next = watcher.next().fuse();
             futures::select! {
@@ -112,40 +120,83 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
                 }
             }
 
-            let next_wakeup = Self::check_timer_heap(&mut handler, &*inner).await;
+            let (next_wakeup, heap_len) = Self::check_timer_heap(&mut handler, &inner.state).await;
 
-            trace!("next wakeup = {:?}", ScheduledInstant::new(next_wakeup));
+            trace!("next wakeup = {:?}, heap_len = {heap_len}", ScheduledInstant::new(next_wakeup));
             // Update our timer to wake at the next wake up time according to
             // the heap.
             timer.set(next_wakeup);
 
-            // TODO(https://fxbug.dev/42083407): Tune the waiter collection
-            // target heap size and GC the timer heap based on the number of
-            // timers.
+            // Our target heap size is the number of timers we have alive,
+            // capped to a minimum size to avoid too much GC thrash.
+            //
+            // We'll run a GC on the heap whenever we hit twice the target size,
+            // at which point we expect the GC to bring the number of entries
+            // down to around the target size.
+            let target_heap_len =
+                inner.timer_count.load(atomic::Ordering::SeqCst).max(MIN_TARGET_HEAP_SIZE);
+            timer.set_target_heap_size(target_heap_len);
+            if heap_len > target_heap_len * 2 {
+                gc_generation += 1;
+                let after = Self::gc_timer_heap(&inner.state, gc_generation);
+                trace!(
+                    "timer gc gen({}) triggered with heap_len={}, target={}, after={}",
+                    gc_generation,
+                    heap_len,
+                    target_heap_len,
+                    after
+                );
+            }
         }
         // Cleanup everything on the heap before returning.
-        inner.lock().heap.clear();
+        inner.state.lock().heap.clear();
+    }
+
+    /// Walks the timer heap, removing any stale entries that might have
+    /// accumulated due to timer scheduling/cancelation thrash.
+    ///
+    /// Returns the heap length after GC.
+    fn gc_timer_heap(inner: &CoreMutex<TimerDispatcherState<T>>, generation: usize) -> usize {
+        let mut guard = inner.lock();
+        let TimerDispatcherState { heap, notifier: _, watcher: _ } = &mut *guard;
+        heap.retain(|TimeAndValue { time, value }| {
+            let current = fasync::Time::from_nanos(value.scheduled.load(atomic::Ordering::SeqCst));
+            // Retain all the entries that are still valid.
+            match ScheduledEntryValidity::new(current, *time) {
+                ScheduledEntryValidity::Valid | ScheduledEntryValidity::ValidForLaterTime => {
+                    // Only keep entries that we haven't seen yet on this GC
+                    // sweep. It is possible to observe many `ValidForLaterTime`
+                    // entries for a single timer and we want to keep only one
+                    // of them.
+                    value.gc_generation.swap(generation, atomic::Ordering::SeqCst) != generation
+                }
+                ScheduledEntryValidity::Invalid => false,
+            }
+        });
+        heap.len()
     }
 
     /// Checks the timer heap, firing any elapsed timers.
     ///
-    /// Returns the next wakeup time for the worker task.
+    /// Returns the next wakeup time for the worker task and the total number of
+    /// entries in the internal heap.
     async fn check_timer_heap<H: FnMut(T)>(
         handler: &mut H,
-        inner: &CoreMutex<TimerDispatcherInner<T>>,
-    ) -> fasync::Time {
+        inner: &CoreMutex<TimerDispatcherState<T>>,
+    ) -> (fasync::Time, usize) {
         let mut fired_count = 0;
         loop {
             let fire = {
                 let mut guard = inner.lock();
-                let TimerDispatcherInner { heap, notifier: _, watcher: _ } = &mut *guard;
+                let TimerDispatcherState { heap, notifier: _, watcher: _ } = &mut *guard;
+                let heap_len = heap.len();
                 let Some(front) = heap.peek_mut() else {
                     // Nothing to wait for.
-                    return UNSCHEDULED_SENTINEL;
+                    return (UNSCHEDULED_SENTINEL, heap_len);
                 };
                 if !front.should_fire_at(fasync::Time::now()) {
                     // Wait until the time at the front of the heap to fire.
-                    return front.time;
+                    return (front.time, heap_len);
                 }
                 // NB: This is an associated function, probably because
                 // PeekMut implements Deref.
@@ -169,12 +220,17 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     }
 }
 
-struct TimerDispatcherInner<T> {
+struct TimerDispatcherState<T> {
     heap: BinaryHeap<TimerScheduledEntry<T>>,
     // Notifier is removed on close.
     notifier: Option<NeedsDataNotifier>,
     // Watcher is taken on spawn.
     watcher: Option<NeedsDataWatcher>,
+}
+
+struct TimerDispatcherInner<T> {
+    timer_count: AtomicUsize,
+    state: CoreMutex<TimerDispatcherState<T>>,
 }
 
 /// A reusable struct to place a value and a timestamp in a [`BinaryHeap`].
@@ -211,6 +267,35 @@ impl<T> PartialOrd for TimeAndValue<T> {
 /// An entry in the [`TimerDispatcher`] heap.
 type TimerScheduledEntry<T> = TimeAndValue<Arc<TimerState<T>>>;
 
+/// The validity state of a [`TimerScheduledEntry`].
+enum ScheduledEntryValidity {
+    /// This entry is valid and can cause a timer to fire.
+    Valid,
+    /// This entry is valid at a later time, loaded from the timer state.
+    ValidForLaterTime,
+    /// This entry is invalid and can be discarded.
+    Invalid,
+}
+
+impl ScheduledEntryValidity {
+    /// Evaluates the validity of a scheduled entry with `current_value` and
+    /// cached `scheduled_entry`.
+    fn new(current_value: fasync::Time, scheduled_entry: fasync::Time) -> Self {
+        if current_value == UNSCHEDULED_SENTINEL {
+            return Self::Invalid;
+        }
+        match current_value.cmp(&scheduled_entry) {
+            // If the timer state is holding a time before the one originally
+            // scheduled, this is a stale timer entry. We should ignore it.
+            cmp::Ordering::Less => Self::Invalid,
+            cmp::Ordering::Equal => Self::Valid,
+            // If the timer state is holding a time later than the originally
+            // scheduled, it needs to be replaced in the heap to be fired later.
+            cmp::Ordering::Greater => Self::ValidForLaterTime,
+        }
+    }
+}
+
 impl<T: Clone> TimerScheduledEntry<T> {
     /// Consumes the entry in an attempt to fire the timer.
     fn try_fire(self) -> TryFireResult<T> {
@@ -226,16 +311,17 @@ impl<T: Clone> TimerScheduledEntry<T> {
             Ok(_) => TryFireResult::Fire(timer_state.dispatch.clone()),
             Err(next) => {
                 let next = fasync::Time::from_nanos(next);
-                if next > scheduled_for && next != UNSCHEDULED_SENTINEL {
-                    // If the timer state is holding a time later than the
-                    // originally scheduled, we need to put it back into the
-                    // heap to be fired later.
-                    TryFireResult::Reschedule(Self { value: timer_state, time: next })
-                } else {
-                    // If the timer state is holding a time before the one
-                    // originally scheduled, this is a stale timer entry. We
-                    // should ignore it.
-                    TryFireResult::Ignore
+                match ScheduledEntryValidity::new(next, scheduled_for) {
+                    // If the timer state is  valid for a later time, we need to
+                    // put it back into the heap to be fired later.
+                    ScheduledEntryValidity::ValidForLaterTime => {
+                        TryFireResult::Reschedule(Self { value: timer_state, time: next })
+                    }
+                    // Ignore stale and invalid entries.
+                    ScheduledEntryValidity::Invalid => TryFireResult::Ignore,
+                    // The valid case, when the current and scheduled_for times
+                    // are the same is covered by the Ok arm above.
+                    ScheduledEntryValidity::Valid => unreachable!(),
                 }
             }
         }
@@ -265,6 +351,8 @@ struct TimerState<T> {
     /// [`TimeAndValue`] to validate the desired wake up time hasn't changed.
     scheduled: AtomicI64,
     dispatch: T,
+    // State kept with each timer to help GC.
+    gc_generation: AtomicUsize,
 }
 
 /// This type is preventing [`Timer`] from evolving poorly and deriving `Clone`.
@@ -272,7 +360,7 @@ struct NoCloneGuard;
 
 pub(crate) struct Timer<T> {
     state: Arc<TimerState<T>>,
-    heap: Arc<CoreMutex<TimerDispatcherInner<T>>>,
+    heap: Arc<TimerDispatcherInner<T>>,
     /// This type must not become Clone, see explanation in [`Timer::schedule`].
     _no_clone: NoCloneGuard,
 }
@@ -283,7 +371,7 @@ impl<T> Debug for Timer<T> {
         // to be careful in the Debug impl here, especially around the opaque
         // type T.
         let Self { state, heap: _, _no_clone: _ } = self;
-        let TimerState { scheduled, dispatch: _ } = &**state;
+        let TimerState { scheduled, dispatch: _, gc_generation: _ } = &**state;
         let scheduled = ScheduledInstant::new(fasync::Time::from_nanos(
             scheduled.load(atomic::Ordering::Relaxed),
         ));
@@ -294,6 +382,7 @@ impl<T> Debug for Timer<T> {
 impl<T> Drop for Timer<T> {
     fn drop(&mut self) {
         let _: Option<ScheduledInstant> = self.cancel();
+        let _: usize = self.heap.timer_count.fetch_sub(1, atomic::Ordering::SeqCst);
     }
 }
 
@@ -327,9 +416,9 @@ impl<T> Timer<T> {
             // If the new timer is for an earlier moment in time, then we need
             // to put this in the heap; the old entry will eventually be a
             // no-op.
-            let mut guard = self.heap.lock();
+            let mut guard = self.heap.state.lock();
             let wake_notifier = {
-                let TimerDispatcherInner { heap, notifier, watcher: _ } = &mut *guard;
+                let TimerDispatcherState { heap, notifier, watcher: _ } = &mut *guard;
                 if let Some(notifier) = notifier.as_ref() {
                     let front = heap.peek().map(|c| c.time);
                     heap.push(TimerScheduledEntry { time: when, value: Arc::clone(&self.state) });
@@ -365,7 +454,7 @@ impl<T> Timer<T> {
     }
 }
 
-const DEFAULT_TIMER_WAITER_TARGET_HEAP_SIZE: usize = 10;
+const MIN_TARGET_HEAP_SIZE: usize = 10;
 
 /// This provides a means to reuse [`fasync::Timer`] across run loops of
 /// [`TimerDispatcher`], minimizing reallocations and decreasing leaks.
@@ -395,8 +484,13 @@ impl TimerWaiter {
             timers: Default::default(),
             selected: None,
             wakeup: UNSCHEDULED_SENTINEL,
-            target_heap_size: DEFAULT_TIMER_WAITER_TARGET_HEAP_SIZE,
+            target_heap_size: MIN_TARGET_HEAP_SIZE,
         }
+    }
+
+    /// Sets the target heap size to `target`.
+    fn set_target_heap_size(&mut self, target: usize) {
+        self.target_heap_size = target;
     }
 
     /// Sets the time at which this future will resolve to ready.
@@ -543,10 +637,13 @@ mod scheduled_instant {
 
 #[cfg(test)]
 mod tests {
-    use futures::channel::mpsc;
+    use std::pin::pin;
 
     use crate::bindings::integration_tests::set_logger_for_test;
-    use std::pin::pin;
+
+    use fuchsia_zircon as zx;
+    use futures::channel::mpsc;
+    use test_case::test_case;
 
     use super::*;
 
@@ -602,6 +699,7 @@ mod tests {
         A,
         B,
         C,
+        Other(usize),
     }
 
     struct TestContext {
@@ -620,7 +718,11 @@ mod tests {
         }
 
         fn heap_len(&self) -> usize {
-            self.dispatcher.inner.lock().heap.len()
+            self.dispatcher.inner.state.lock().heap.len()
+        }
+
+        fn schedule_notifier(&self) {
+            self.dispatcher.inner.state.lock().notifier.as_ref().unwrap().schedule()
         }
 
         async fn shutdown(self) {
@@ -775,6 +877,56 @@ mod tests {
             t.fired.by_ref().take(3).collect::<Vec<_>>().now_or_never(),
             Some(vec![TimerId::A, TimerId::B, TimerId::C])
         );
+
+        (t, executor)
+    }
+
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
+    #[test_case(1; "min_target_size")]
+    #[test_case(MIN_TARGET_HEAP_SIZE * 2; "timer_count")]
+    fn heap_gc(timer_count: usize) {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut t = TestContext::new();
+        assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), 0);
+        let mut timers =
+            (0..timer_count).map(|i| t.dispatcher.new_timer(TimerId::Other(i))).collect::<Vec<_>>();
+        let timer = &mut timers[0];
+        assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), timer_count);
+
+        assert_eq!(timer.schedule(T1), None);
+        assert_eq!(t.heap_len(), 1);
+
+        let mut reschedule = || {
+            let prev: fasync::Time = timer.cancel().unwrap().into();
+            assert_eq!(timer.schedule(prev + zx::Duration::from_seconds(1)), None);
+        };
+
+        // Canceling and rescheduling creates a new heap entry.
+        reschedule();
+        assert_eq!(t.heap_len(), 2);
+        // GC won't be triggered until we hit the gc threshold.
+        t.assert_no_timers(&mut executor);
+        assert_eq!(t.heap_len(), 2);
+        let threshold = timer_count.max(MIN_TARGET_HEAP_SIZE) * 2;
+        while t.heap_len() < threshold {
+            reschedule();
+        }
+
+        // Kick the notifier and check to check that GC doesn't run yet.
+        t.schedule_notifier();
+        t.assert_no_timers(&mut executor);
+        assert_eq!(t.heap_len(), threshold);
+
+        // Do one more round to push over the threshold and check that GC runs.
+        reschedule();
+        t.schedule_notifier();
+        t.assert_no_timers(&mut executor);
+        assert_eq!(t.heap_len(), 1);
+
+        // On drop the number of timers should decrease.
+        drop(timers);
+        assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), 0);
 
         (t, executor)
     }
