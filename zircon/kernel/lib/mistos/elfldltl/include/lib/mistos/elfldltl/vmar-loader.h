@@ -12,11 +12,13 @@
 #include <lib/mistos/util/system.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 
 #include <type_traits>
+
+#include <ktl/byte.h>
+#include <ktl/span.h>
 
 namespace elfldltl {
 
@@ -54,7 +56,7 @@ class VmarLoader {
     // It makes the RELRO region passed to MmapLoader::Commit read-only.
     template <class Diagnostics>
     [[nodiscard]] bool Commit(Diagnostics& diag) && {
-      zx::vmar vmar = std::exchange(vmar_, {});
+      zx::vmar vmar = ktl::exchange(vmar_, {});
       if (size_ > 0) {
         zx_status_t status = vmar.protect(ZX_VM_PERM_READ, addr_, size_);
         if (status != ZX_OK) {
@@ -66,13 +68,13 @@ class VmarLoader {
 
     // Alternatively, the VMAR handle can be extracted without doing
     // protections.
-    [[nodiscard]] zx::vmar TakeVmar() && { return std::move(vmar_); }
+    [[nodiscard]] zx::vmar TakeVmar() && { return ktl::move(vmar_); }
 
    private:
     friend VmarLoader;
 
     template <class Region>
-    Relro(zx::vmar vmar, const Region& region, uintptr_t load_bias) : vmar_{std::move(vmar)} {
+    Relro(zx::vmar vmar, const Region& region, uintptr_t load_bias) : vmar_{ktl::move(vmar)} {
       if (!region.empty()) {
         addr_ = region.start + load_bias;
         size_ = region.size();
@@ -86,7 +88,7 @@ class VmarLoader {
 
   // This can be specialized by the user for particular LoadInfo types passed
   // to Load().  It's constructed by Load() for each segment using the specific
-  // LoadInfo::*Segment type, not the LoadInfo::Segment std::variant type, so
+  // LoadInfo::*Segment type, not the LoadInfo::Segment ktl::variant type, so
   // it can have a constructor that works differently for each type.  The
   // constructor will be called with the individual segment object reference,
   // and the VMO for the whole file.  Both will be valid for the lifetime of
@@ -108,7 +110,7 @@ class VmarLoader {
     // If true and the segment is writable, make a copy-on-write child VMO.
     // This is the usual behavior when using the original file VMO directly.
     // A specialization can return anything convertible to bool.
-    constexpr std::true_type copy_on_write() const { return {}; }
+    constexpr ktl::true_type copy_on_write() const { return {}; }
 
     // This is the offset within the VMO whence the segment should be mapped
     // (or cloned if this->copy_on_write()).
@@ -146,7 +148,7 @@ class VmarLoader {
   /// of that parent VMAR.
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Allocate(Diagnostics& diag, const LoadInfo& load_info,
-                              std::optional<size_t> vmar_offset = std::nullopt) {
+                              ktl::optional<size_t> vmar_offset = ktl::nullopt) {
     if (zx_status_t status =
             AllocateVmar(load_info.vaddr_size(), load_info.vaddr_start(), vmar_offset);
         status != ZX_OK) [[unlikely]] {
@@ -176,7 +178,7 @@ class VmarLoader {
   void Place(zx::vmar load_image_vmar, zx_vaddr_t load_bias) {
     ZX_DEBUG_ASSERT_MSG(!load_image_vmar_, "Place or Allocate called twice");
     ZX_DEBUG_ASSERT(load_image_vmar);
-    load_image_vmar_ = std::move(load_image_vmar);
+    load_image_vmar_ = ktl::move(load_image_vmar);
     load_bias_ = load_bias;
   }
 
@@ -187,14 +189,14 @@ class VmarLoader {
   /// Commit is used to keep the mapping created by Load around even after the
   /// VmarLoader object is destroyed.  This method must be the last thing
   /// called on the object if it is used, hence it can only be called with
-  /// `auto relro = std::move(loader).Commit(relro_bounds);`.  If Commit() is
+  /// `auto relro = ktl::move(loader).Commit(relro_bounds);`.  If Commit() is
   /// not called, then loading is aborted by destroying the VMAR when the
   /// VmarLoader object is destroyed.  Commit() returns the Relro object (see
   /// above) that holds the VMAR handle allowing it to change page protections
   /// of the load image.
   template <class Region>
   [[nodiscard]] Relro Commit(const Region& relro_bounds) && {
-    return {std::exchange(load_image_vmar_, {}), relro_bounds, load_bias()};
+    return {ktl::exchange(load_image_vmar_, {}), relro_bounds, load_bias()};
   }
 
  protected:
@@ -232,7 +234,7 @@ class VmarLoader {
     }
 
     VmoName base_name_storage = VmarLoader::GetVmoName(vmo->borrow());
-    std::string_view base_name = std::string_view(base_name_storage.data());
+    ktl::string_view base_name = ktl::string_view(base_name_storage.data());
 
     auto mapper = [this, vaddr_start = load_info.vaddr_start(), vmo, &diag, base_name,
                    num_data_segments = size_t{0},
@@ -386,7 +388,7 @@ class VmarLoader {
 
  private:
   friend StaticOrDynExecutableVmarLoader;
-  using VmoName = std::array<char, ZX_MAX_NAME_LEN>;
+  using VmoName = ktl::array<char, ZX_MAX_NAME_LEN>;
 
   static VmoName GetVmoName(zx::unowned_vmo vmo);
 
@@ -418,7 +420,7 @@ class VmarLoader {
   // vmar_offset argument (relative to the parent VMAR given at construction).
   // The load_image_vmar_ and load_bias_ members are updated.
   zx_status_t AllocateVmar(size_t vaddr_size, size_t vaddr_start,
-                           std::optional<size_t> vmar_offset);
+                           ktl::optional<size_t> vmar_offset);
 
   zx_status_t Map(uintptr_t vmar_offset, zx_vm_option_t options, zx::unowned_vmo vmo,
                   uint64_t vmo_offset, size_t size) {
@@ -428,10 +430,10 @@ class VmarLoader {
 
   template <bool ZeroPartialPage>
   zx_status_t MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo,
-                          std::string_view base_name, uint64_t vmo_offset, size_t size,
+                          ktl::string_view base_name, uint64_t vmo_offset, size_t size,
                           size_t& num_data_segments);
 
-  zx_status_t MapZeroFill(uintptr_t vmar_offset, std::string_view base_name, size_t size,
+  zx_status_t MapZeroFill(uintptr_t vmar_offset, ktl::string_view base_name, size_t size,
                           size_t& num_zero_segments);
 
   // The region of the address space that the module is being loaded into.  The
@@ -477,7 +479,7 @@ class LocalVmarLoader : public VmarLoader {
       return false;
     }
     const uintptr_t image = load_info.vaddr_start() + load_bias();
-    memory_.set_image({reinterpret_cast<std::byte*>(image), load_info.vaddr_size()});
+    memory_.set_image({reinterpret_cast<ktl::byte*>(image), load_info.vaddr_size()});
     memory_.set_base(load_info.vaddr_start());
     return true;
   }
@@ -557,11 +559,11 @@ class StaticOrDynExecutableVmarLoader : public VmarLoader {
 // Both possible MapWritable instantiations are defined in vmar-loader.cc.
 
 extern template zx_status_t VmarLoader::MapWritable<false>(  //
-    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, ktl::string_view base_name,
     uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 extern template zx_status_t VmarLoader::MapWritable<true>(  //
-    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, ktl::string_view base_name,
     uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 }  // namespace elfldltl

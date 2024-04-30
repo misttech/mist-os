@@ -68,7 +68,7 @@ class SegmentWithVmo {
     VmoHolder(VmoHolder&&) = default;
     VmoHolder& operator=(VmoHolder&&) = default;
 
-    explicit VmoHolder(zx::vmo vmo) : vmo_{std::move(vmo)} {}
+    explicit VmoHolder(zx::vmo vmo) : vmo_{ktl::move(vmo)} {}
 
     zx::vmo& vmo() { return vmo_; }
     const zx::vmo& vmo() const { return vmo_; }
@@ -76,8 +76,8 @@ class SegmentWithVmo {
    private:
     zx::vmo vmo_;
   };
-  static_assert(std::is_move_constructible_v<VmoHolder>);
-  static_assert(std::is_move_assignable_v<VmoHolder>);
+  static_assert(ktl::is_move_constructible_v<VmoHolder>);
+  static_assert(ktl::is_move_assignable_v<VmoHolder>);
 
   // The Copy and NoCopy templates are shorthands using this.
   template <class CopyT>
@@ -109,16 +109,16 @@ class SegmentWithVmo {
       // does, its CanMergeWith is the one to return false.
       template <class Other>
       bool CanMergeWith(const Other& other) const {
-        static_assert(std::is_move_constructible_v<WithVmo>);
-        static_assert(std::is_move_assignable_v<WithVmo>);
+        static_assert(ktl::is_move_constructible_v<WithVmo>);
+        static_assert(ktl::is_move_assignable_v<WithVmo>);
         return !vmo();
       }
 
       // Similar to `CanMergeWith`, this segment can't be replaced by another
       // segment if there's a VMO installed.
       bool CanReplace() const {
-        static_assert(std::is_move_constructible_v<WithVmo>);
-        static_assert(std::is_move_assignable_v<WithVmo>);
+        static_assert(ktl::is_move_constructible_v<WithVmo>);
+        static_assert(ktl::is_move_assignable_v<WithVmo>);
         return !vmo();
       }
 
@@ -135,11 +135,11 @@ class SegmentWithVmo {
         zx::unowned_vmo other_vmo;
 
         // For copy from the unadorned Segment, there's never a VMO to copy.
-        if constexpr (!std::is_same_v<OtherSegment, Segment>) {
+        if constexpr (!ktl::is_same_v<OtherSegment, Segment>) {
           // Copy from the corresponding Segment subclass of this wrapper is
           // the other supported option, to clone the existing VMO, if any.
-          static_assert(std::is_same_v<OtherSegment, SameSegment<CopyT>> ||
-                        std::is_same_v<OtherSegment, SameSegment<OtherCopyT>>);
+          static_assert(ktl::is_same_v<OtherSegment, SameSegment<CopyT>> ||
+                        ktl::is_same_v<OtherSegment, SameSegment<OtherCopyT>>);
           other_vmo = other.vmo().borrow();
         }
 
@@ -155,7 +155,7 @@ class SegmentWithVmo {
           }
         }
 
-        return fit::ok(std::move(copy));
+        return fit::ok(ktl::move(copy));
       }
 
      private:
@@ -167,7 +167,7 @@ class SegmentWithVmo {
 
     // Use the wrapper if need be, or the original type if not.
     template <class Segment>
-    using Type = std::conditional_t<kSegmentHasFilesz<Segment>, WithVmo<Segment>, Segment>;
+    using Type = ktl::conditional_t<kSegmentHasFilesz<Segment>, WithVmo<Segment>, Segment>;
 
     // This implements the VmarLoader::SegmentVmo class for LoadInfo types used
     // with SegmentWithVmo::Copy and SegmentWithVmo::NoCopy.  It's the base
@@ -202,22 +202,22 @@ class SegmentWithVmo {
      private:
       // In Copy, copy_on_write() is statically true all the time.  In NoCopy,
       // it's true by default but can be set to false in the constructor.
-      using CopyTrue = std::conditional_t<CopyT{}, CopyT, std::true_type>;
-      using CopyFalse = std::conditional_t<CopyT{}, CopyT, std::false_type>;
+      using CopyTrue = ktl::conditional_t<CopyT{}, CopyT, ktl::true_type>;
+      using CopyFalse = ktl::conditional_t<CopyT{}, CopyT, ktl::false_type>;
 
       zx::unowned_vmo vmo_;
-      std::conditional_t<CopyT{}, CopyT, bool> copy_on_write_{CopyTrue{}};
+      ktl::conditional_t<CopyT{}, CopyT, bool> copy_on_write_{CopyTrue{}};
       uint64_t offset_;
     };
   };
 
   template <class Segment>
-  using Copy = typename Wrapper<std::true_type>::template Type<Segment>;
-  using CopySegmentVmo = Wrapper<std::true_type>::SegmentVmo;
+  using Copy = typename Wrapper<ktl::true_type>::template Type<Segment>;
+  using CopySegmentVmo = Wrapper<ktl::true_type>::SegmentVmo;
 
   template <class Segment>
-  using NoCopy = Wrapper<std::false_type>::template Type<Segment>;
-  using NoCopySegmentVmo = Wrapper<std::true_type>::SegmentVmo;
+  using NoCopy = Wrapper<ktl::false_type>::template Type<Segment>;
+  using NoCopySegmentVmo = Wrapper<ktl::true_type>::SegmentVmo;
 
   // This takes a LoadInfo::*Segment type that has file contents (i.e. not
   // ZeroFillSegment), and ensures that segment.vmo() is a valid segment.
@@ -251,7 +251,7 @@ class SegmentWithVmo {
                                           size_t page_size, bool readonly = false) {
     using DataWithZeroFillSegment = typename LoadInfo::DataWithZeroFillSegment;
     auto align_segment = [vmo, page_size, readonly, &diag](auto& segment) {
-      using Segment = std::decay_t<decltype(segment)>;
+      using Segment = ktl::decay_t<decltype(segment)>;
 
       // When there's a partial page to zero, this will create a new VMO.  With
       // the readonly flag, we want to ensure this VMO won't be modified in the
@@ -281,7 +281,7 @@ class SegmentWithVmo {
       constexpr zx_rights_t kReadonlyRights =
           ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_MAP | ZX_RIGHT_READ;
 
-      if constexpr (std::is_same_v<Segment, DataWithZeroFillSegment>) {
+      if constexpr (ktl::is_same_v<Segment, DataWithZeroFillSegment>) {
         const size_t zero_size = segment.MakeAligned(page_size);
         if (zero_size > 0) {
           ZX_DEBUG_ASSERT(!segment.vmo());
@@ -340,7 +340,7 @@ class SegmentWithVmo {
     template <class Diagnostics>
     Result operator()(Diagnostics& diag, Segment& segment) const {
       auto get_memory = [this, &diag](auto& segment) -> Result {
-        using SegmentType = std::decay_t<decltype(segment)>;
+        using SegmentType = ktl::decay_t<decltype(segment)>;
         if constexpr (kSegmentHasFilesz<SegmentType>) {
           // Make sure there's a mutable VMO available.
           if (!MakeMutable(diag, segment, vmo_->borrow())) [[unlikely]] {
@@ -360,13 +360,13 @@ class SegmentWithVmo {
             return fit::error{SystemError(diag, segment, kMapFail, result.error_value())};
           }
 
-          return fit::ok(std::move(memory));
+          return fit::ok(ktl::move(memory));
         } else {
           // This should be impossible via LoadInfoMutableMemory.
           return fit::error{diag.FormatError(kMutableZeroFill)};
         }
       };
-      return std::visit(get_memory, segment);
+      return ktl::visit(get_memory, segment);
     }
 
    private:
@@ -375,19 +375,19 @@ class SegmentWithVmo {
   };
 
  private:
-  static constexpr std::string_view kCopyVmoFail =
+  static constexpr ktl::string_view kCopyVmoFail =
       "cannot create copy-on-write VMO for segment contents";
-  static constexpr std::string_view kZeroVmoFail =
+  static constexpr ktl::string_view kZeroVmoFail =
       "cannot zero partial page in VMO for data segment";
-  static constexpr std::string_view kProtectVmoFail =
+  static constexpr ktl::string_view kProtectVmoFail =
       "cannot drop ZX_RIGHT_WRITE on VMO for data segment";
-  static constexpr std::string_view kColonSpace = ": ";
-  static constexpr std::string_view kMapFail = "cannot map segment to apply relocations";
-  static constexpr std::string_view kMutableZeroFill = "cannot make zero-fill segment mutable";
+  static constexpr ktl::string_view kColonSpace = ": ";
+  static constexpr ktl::string_view kMapFail = "cannot map segment to apply relocations";
+  static constexpr ktl::string_view kMutableZeroFill = "cannot make zero-fill segment mutable";
 
   template <class Diagnostics, class Segment>
   static constexpr bool SystemError(Diagnostics& diag, const Segment& segment,
-                                    std::string_view fail, zx_status_t status) {
+                                    ktl::string_view fail, zx_status_t status) {
     return diag.SystemError(fail, FileOffset{segment.offset()}, kColonSpace, ZirconError{status});
   }
 

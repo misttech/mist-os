@@ -7,31 +7,33 @@
 
 #include <lib/mistos/util/status.h>
 #include <lib/mistos/zx/vmar.h>
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
+
+#include <ktl/span.h>
+
+#include <ktl/enforce.h>
 
 namespace {
 
-constexpr std::string_view kVmoNameUnknown = "<unknown ELF file>";
+constexpr ktl::string_view kVmoNameUnknown = "<unknown ELF file>";
 
-constexpr std::string_view kVmoNamePrefixData = "data";
-constexpr std::string_view kVmoNamePrefixBss = "bss";
+constexpr ktl::string_view kVmoNamePrefixData = "data";
+constexpr ktl::string_view kVmoNamePrefixBss = "bss";
 
 constexpr char kHexDigits[] = "0132456789ABCDEF";
 
-template <const std::string_view& Prefix>
-void SetVmoName(zx::unowned_vmo vmo, std::string_view base_name, size_t n) {
-  std::array<char, ZX_MAX_NAME_LEN> buffer{};
-  cpp20::span vmo_name(buffer);
+template <const ktl::string_view& Prefix>
+void SetVmoName(zx::unowned_vmo vmo, ktl::string_view base_name, size_t n) {
+  ktl::array<char, ZX_MAX_NAME_LEN> buffer{};
+  ktl::span vmo_name(buffer);
 
   // First, "data" or "bss".
   size_t name_idx = Prefix.copy(vmo_name.data(), vmo_name.size());
 
   // Then the ordinal in hex (almost surely just one digit, but who knows).
   // Count the bits and divide with round-up to count the nybbles.
-  const size_t hex_chars = (cpp20::bit_width(n | 1) + 3) / 4;
-  cpp20::span hex = cpp20::span(vmo_name).subspan(name_idx, hex_chars);
+  const size_t hex_chars = (ktl::bit_width(n | 1) + 3) / 4;
+  ktl::span hex = ktl::span(vmo_name).subspan(name_idx, hex_chars);
   for (auto it = hex.rbegin(); it != hex.rend(); ++it) {
     *it = kHexDigits[n & 0xf];
     n >>= 4;
@@ -43,7 +45,7 @@ void SetVmoName(zx::unowned_vmo vmo, std::string_view base_name, size_t n) {
   vmo_name[name_idx++] = ':';
 
   // Finally append the original VMO name, however much fits.
-  cpp20::span avail = vmo_name.subspan(name_idx);
+  ktl::span avail = vmo_name.subspan(name_idx);
   name_idx += base_name.copy(avail.data(), avail.size());
   ZX_DEBUG_ASSERT(name_idx <= vmo_name.size());
 
@@ -66,7 +68,7 @@ VmarLoader::VmoName VmarLoader::GetVmoName(zx::unowned_vmo vmo) {
 }
 
 zx_status_t VmarLoader::AllocateVmar(size_t vaddr_size, size_t vaddr_start,
-                                     std::optional<size_t> vmar_offset) {
+                                     ktl::optional<size_t> vmar_offset) {
   ZX_DEBUG_ASSERT_MSG(!load_image_vmar_, "AllocateVmar called twice");
   zx_vaddr_t child_addr;
   constexpr zx_vm_option_t kFlags =
@@ -87,7 +89,7 @@ zx_status_t VmarLoader::AllocateVmar(size_t vaddr_size, size_t vaddr_start,
 // This has both explicit instantiations below.
 template <bool ZeroInVmo>
 zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo,
-                                    std::string_view base_name, uint64_t vmo_offset, size_t size,
+                                    ktl::string_view base_name, uint64_t vmo_offset, size_t size,
                                     size_t& num_data_segments) {
   if constexpr (!ZeroInVmo) {
     ZX_DEBUG_ASSERT((size & (page_size() - 1)) == 0);
@@ -127,14 +129,14 @@ zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, 
 // Explicitly instantiate both flavors.
 
 template zx_status_t VmarLoader::MapWritable<false>(  //
-    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, ktl::string_view base_name,
     uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 template zx_status_t VmarLoader::MapWritable<true>(  //
-    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, ktl::string_view base_name,
     uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
-zx_status_t VmarLoader::MapZeroFill(uintptr_t vmar_offset, std::string_view base_name, size_t size,
+zx_status_t VmarLoader::MapZeroFill(uintptr_t vmar_offset, ktl::string_view base_name, size_t size,
                                     size_t& num_zero_segments) {
   zx::vmo vmo;
   zx_status_t status = zx::vmo::create(size, 0, &vmo);

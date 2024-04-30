@@ -9,6 +9,10 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
+#include <ktl/byte.h>
+
+#include <ktl/enforce.h>
+
 namespace elfldltl {
 
 zx::result<> MappedVmoFile::Init(zx::unowned_vmo vmo, zx::unowned_vmar vmar) {
@@ -21,7 +25,7 @@ zx::result<> MappedVmoFile::Init(zx::unowned_vmo vmo, zx::unowned_vmar vmar) {
       uintptr_t mapped;
       status = vmar->map(ZX_VM_PERM_READ, 0, *vmo, 0, vmo_size, &mapped);
       if (status == ZX_OK) {
-        set_image({reinterpret_cast<std::byte*>(mapped), content_size});
+        set_image({reinterpret_cast<ktl::byte*>(mapped), content_size});
         vmar_ = vmar->borrow();
         mapped_size_ = vmo_size;
       }
@@ -38,7 +42,7 @@ zx::result<> MappedVmoFile::InitMutable(zx::unowned_vmo vmo, size_t size, uintpt
   uintptr_t mapped;
   zx_status_t status = vmar->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, *vmo, 0, size, &mapped);
   if (status == ZX_OK) {
-    set_image({reinterpret_cast<std::byte*>(mapped), size});
+    set_image({reinterpret_cast<ktl::byte*>(mapped), size});
     set_base(base);
     mapped_size_ = size;
     vmar_ = vmar->borrow();

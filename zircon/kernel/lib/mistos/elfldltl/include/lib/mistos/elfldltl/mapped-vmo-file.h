@@ -39,7 +39,7 @@ class MappedVmoFile : public DirectMemory {
     set_image(other.image());
     other.set_image(old_image);
     set_base(other.base());
-    std::swap(mapped_size_, other.mapped_size_);
+    ktl::swap(mapped_size_, other.mapped_size_);
     return *this;
   }
 

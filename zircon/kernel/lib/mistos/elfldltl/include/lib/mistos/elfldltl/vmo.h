@@ -10,8 +10,10 @@
 #include <lib/elfldltl/zircon.h>
 #include <lib/fit/result.h>
 #include <lib/mistos/zx/vmo.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/errors.h>
+
+#include <ktl/byte.h>
+#include <ktl/span.h>
 
 namespace elfldltl {
 
@@ -22,7 +24,7 @@ namespace elfldltl {
 namespace internal {
 
 inline fit::result<ZirconError> ReadVmo(const zx::vmo& vmo, uint64_t offset,
-                                        cpp20::span<std::byte> buffer) {
+                                        ktl::span<ktl::byte> buffer) {
   zx_status_t status = vmo.read(buffer.data(), offset, buffer.size());
   if (status == ZX_ERR_OUT_OF_RANGE) {
     return fit::error{ZirconError{}};  // This indicates EOF.
@@ -34,7 +36,7 @@ inline fit::result<ZirconError> ReadVmo(const zx::vmo& vmo, uint64_t offset,
 }
 
 inline fit::result<ZirconError> ReadUnownedVmo(const zx::unowned_vmo& vmo, uint64_t offset,
-                                               cpp20::span<std::byte> buffer) {
+                                               ktl::span<ktl::byte> buffer) {
   return ReadVmo(*vmo, offset, buffer);
 }
 
