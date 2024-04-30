@@ -6,10 +6,9 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_BUFFER_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_BUFFER_H_
 
+#include <lib/fit/result.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <zircon/types.h>
-
-#include <fit/result.h>
 
 namespace starnix_uapi {
 

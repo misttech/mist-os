@@ -6,7 +6,7 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_MOUNT_FLAGS_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_MOUNT_FLAGS_H_
 
-#include <lib/mistos/util/bitflags_v2.h>
+#include <lib/mistos/util/bitflags.h>
 
 // clang-format off
 #include <linux/mount.h>
