@@ -8,25 +8,25 @@ namespace fs_test {
 namespace {
 
 TEST_F(HostFilesystemTest, Basic) {
-  ASSERT_EQ(emu_mkdir("::alpha", 0755), 0);
-  ASSERT_EQ(emu_mkdir("::alpha/bravo", 0755), 0);
-  ASSERT_EQ(emu_mkdir("::alpha/bravo/charlie", 0755), 0);
-  ASSERT_EQ(emu_mkdir("::alpha/bravo/charlie/delta", 0755), 0);
-  ASSERT_EQ(emu_mkdir("::alpha/bravo/charlie/delta/echo", 0755), 0);
-  int fd1 = emu_open("::alpha/bravo/charlie/delta/echo/foxtrot", O_RDWR | O_CREAT, 0644);
+  ASSERT_EQ(emu_mkdir("::alpha"), 0);
+  ASSERT_EQ(emu_mkdir("::alpha/bravo"), 0);
+  ASSERT_EQ(emu_mkdir("::alpha/bravo/charlie"), 0);
+  ASSERT_EQ(emu_mkdir("::alpha/bravo/charlie/delta"), 0);
+  ASSERT_EQ(emu_mkdir("::alpha/bravo/charlie/delta/echo"), 0);
+  int fd1 = emu_open("::alpha/bravo/charlie/delta/echo/foxtrot", O_RDWR | O_CREAT);
   ASSERT_GT(fd1, 0);
-  int fd2 = emu_open("::alpha/bravo/charlie/delta/echo/foxtrot", O_RDWR, 0644);
+  int fd2 = emu_open("::alpha/bravo/charlie/delta/echo/foxtrot", O_RDWR);
   ASSERT_GT(fd2, 0);
   ASSERT_EQ(emu_write(fd1, "Hello, World!\n", 14), 14);
   ASSERT_EQ(emu_close(fd1), 0);
   ASSERT_EQ(emu_close(fd2), 0);
 
-  fd1 = emu_open("::file.txt", O_CREAT | O_RDWR, 0644);
+  fd1 = emu_open("::file.txt", O_CREAT | O_RDWR);
   ASSERT_GT(fd1, 0);
   ASSERT_EQ(emu_close(fd1), 0);
 
-  ASSERT_EQ(emu_mkdir("::emptydir", 0755), 0);
-  fd1 = emu_open("::emptydir", O_RDONLY, 0644);
+  ASSERT_EQ(emu_mkdir("::emptydir"), 0);
+  fd1 = emu_open("::emptydir", O_RDONLY);
   ASSERT_GT(fd1, 0);
   char buf;
   ASSERT_LT(emu_read(fd1, &buf, 1), 0);

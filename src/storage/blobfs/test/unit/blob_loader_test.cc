@@ -82,13 +82,12 @@ class BlobLoaderTest : public TestWithParam<TestParamType> {
   // of the on-disk blob.
   [[maybe_unused]] std::unique_ptr<BlobInfo> AddBlob(size_t sz) {
     fbl::RefPtr<fs::Vnode> root;
-    EXPECT_EQ(setup_.blobfs()->OpenRootNode(&root), ZX_OK);
-    fs::Vnode* root_node = root.get();
+    ZX_ASSERT(setup_.blobfs()->OpenRootNode(&root) == ZX_OK);
 
     std::unique_ptr<BlobInfo> info = GenerateRealisticBlob("", sz);
 
-    fbl::RefPtr<fs::Vnode> file;
-    EXPECT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ZX_ASSERT(file.is_ok());
 
     size_t actual;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);

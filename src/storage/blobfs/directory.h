@@ -33,7 +33,7 @@ class Directory final : public fs::Vnode {
   zx_status_t Append(const void* data, size_t len, size_t* out_end, size_t* out_actual) final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
-  zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode>* out) final;
+  zx::result<fbl::RefPtr<Vnode>> Create(std::string_view name, fs::CreationType type) final;
   zx::result<std::string> GetDevicePath() const final;
   zx_status_t Unlink(std::string_view name, bool must_be_dir) final;
   void Sync(SyncCallback closure) final;

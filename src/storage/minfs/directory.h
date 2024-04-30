@@ -52,7 +52,7 @@ class Directory final : public VnodeMinfs, public fbl::Recyclable<Directory> {
   zx_status_t Write(const void* data, size_t len, size_t offset, size_t* out_actual) final;
   zx_status_t Append(const void* data, size_t len, size_t* out_end, size_t* out_actual) final;
   zx_status_t Readdir(fs::VdirCookie* cookie, void* dirents, size_t len, size_t* out_actual) final;
-  zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode>* out) final;
+  zx::result<fbl::RefPtr<Vnode>> Create(std::string_view name, fs::CreationType type) final;
   zx_status_t Unlink(std::string_view name, bool must_be_dir) final;
   zx_status_t Rename(fbl::RefPtr<fs::Vnode> newdir, std::string_view oldname,
                      std::string_view newname, bool src_must_be_dir, bool dst_must_be_dir) final;

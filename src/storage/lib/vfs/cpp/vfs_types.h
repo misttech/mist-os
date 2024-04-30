@@ -60,6 +60,14 @@ constexpr fuchsia_io::OpenFlags kAllIo1Rights = fuchsia_io::OpenFlags::kRightRea
                                                 fuchsia_io::OpenFlags::kRightWritable |
                                                 fuchsia_io::OpenFlags::kRightExecutable;
 
+// Specifies the type of object when creating new nodes.
+enum class CreationType : uint8_t {
+  kFile = 0,
+  kDirectory = 1,
+  // Max value used for fuzzing.
+  kMaxValue = kDirectory,
+};
+
 // Identifies a single type of node protocol where required for protocol negotiation/resolution.
 enum class VnodeProtocol : uint8_t {
   kNode = 0,  // All Vnodes support fuchsia.io/Node, so it does not have an explicit representation.

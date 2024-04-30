@@ -42,7 +42,7 @@ bool emu_is_mounted();
 int emu_get_used_resources(const char* path, uint64_t* out_data_size, uint64_t* out_inodes,
                            uint64_t* out_used_size);
 
-int emu_open(const char* path, int flags, mode_t mode);
+int emu_open(const char* path, int flags);
 int emu_close(int fd);
 
 ssize_t emu_write(int fd, const void* buf, size_t count);
@@ -55,7 +55,7 @@ off_t emu_lseek(int fd, off_t offset, int whence);
 int emu_fstat(int fd, struct stat* s);
 int emu_stat(const char* fn, struct stat* s);
 
-int emu_mkdir(const char* path, mode_t mode);
+int emu_mkdir(const char* path);
 DIR* emu_opendir(const char* name);
 struct dirent* emu_readdir(DIR* dirp);
 void emu_rewinddir(DIR* dirp);
@@ -84,7 +84,7 @@ class FileWrapper {
       r = open(path, flags, mode);
     } else {
       out->hostfile_ = false;
-      r = emu_open(path, flags, mode);
+      r = emu_open(path, flags);
     }
     if (r > 0) {
       out->fd_ = r;
@@ -128,7 +128,7 @@ class DirWrapper {
   ~DirWrapper() { Close(); }
 
   static int Make(const char* path, mode_t mode) {
-    return host_path(path) ? mkdir(path, mode) : emu_mkdir(path, mode);
+    return host_path(path) ? mkdir(path, mode) : emu_mkdir(path);
   }
   static int Open(const char* path, DirWrapper* out) {
     if (host_path(path)) {

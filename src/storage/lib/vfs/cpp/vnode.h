@@ -280,10 +280,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Set attributes of the vnode.
   virtual zx_status_t SetAttributes(VnodeAttributesUpdate a);
 
-  // Create a new node under vn. The vfs layer assumes that upon success, the |out| vnode has been
-  // already opened i.e. |Open()| is not called again on the created vnode. Name is len bytes long,
-  // and does not include a null terminator. Mode specifies the type of entity to create.
-  virtual zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<Vnode>* out);
+  // Create a new object with specified |name| and |type| under this Vnode. On success, the newly
+  // created Vnode must already be opened (i.e. |Open()| will not be called on the result).
+  virtual zx::result<fbl::RefPtr<Vnode>> Create(std::string_view name, CreationType type);
 
   // Removes name from directory vn
   virtual zx_status_t Unlink(std::string_view name, bool must_be_dir);

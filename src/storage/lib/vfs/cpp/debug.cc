@@ -7,9 +7,17 @@
 #ifdef FS_TRACE_DEBUG_ENABLED
 
 std::ostream& operator<<(std::ostream& os, const fs::VnodeConnectionOptions& options) {
-  os << "VnodeConnectionOptions{ flags: " << fidl::ostream::Formatted(options.flags)
-     << ", rights: " << fidl::ostream::Formatted(options.rights) << "}";
-  return os;
+  return os << "VnodeConnectionOptions{ flags: " << fidl::ostream::Formatted(options.flags)
+            << ", rights: " << fidl::ostream::Formatted(options.rights) << "}";
+}
+
+std::ostream& operator<<(std::ostream& os, fs::CreationType type) {
+  switch (type) {
+    case fs::CreationType::kDirectory:
+      return os << "directory";
+    case fs::CreationType::kFile:
+      return os << "file";
+  }
 }
 
 #endif

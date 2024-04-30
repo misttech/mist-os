@@ -1175,9 +1175,9 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
 TEST_F(NodeManagerTest, DnodeBidxConsistency) {
   // To test |StartBidxOfNode|, kTargetOffset must be bigger than kAddrsPerInode, which is 923.
   constexpr pgoff_t kTargetOffset = 30000U;
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test", S_IFREG, &test_file);
-  fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file));
 
   auto path_or = GetNodePath(*vn, kTargetOffset);
   ASSERT_TRUE(path_or.is_ok());

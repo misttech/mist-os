@@ -33,10 +33,10 @@ TEST_F(ReadWriteTest, WriteZeroLength) {
   ASSERT_TRUE(Mkfs(bcache_or.value().get()).is_ok());
   auto fs_or = Runner::Create(loop.dispatcher(), std::move(bcache_or.value()), MountOptions());
   ASSERT_TRUE(fs_or.is_ok());
-  auto root_or = fs_or->minfs().VnodeGet(kMinfsRootIno);
-  ASSERT_TRUE(root_or.is_ok());
-  fbl::RefPtr<fs::Vnode> foo;
-  ASSERT_EQ(root_or->Create("foo", 0, &foo), ZX_OK);
+  auto root = fs_or->minfs().VnodeGet(kMinfsRootIno);
+  ASSERT_TRUE(root.is_ok());
+  zx::result foo = root->Create("foo", fs::CreationType::kFile);
+  ASSERT_TRUE(foo.is_ok()) << foo.status_string();
 
   constexpr size_t kBufferSize = 65374;
   std::unique_ptr<uint8_t[]> buffer(new uint8_t[kBufferSize]());
@@ -57,7 +57,6 @@ TEST_F(ReadWriteTest, WriteZeroLength) {
   ASSERT_EQ(written_len, kBufferSize);
 
   foo->Close();
-  foo = nullptr;
 }
 
 }  // namespace

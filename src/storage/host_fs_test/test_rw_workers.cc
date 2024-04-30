@@ -209,7 +209,7 @@ void RwWorkersTest::NewWorker(const char* where, const char* fn, WorkerFn work, 
   w->work = work;
   w->flags = flags;
 
-  if ((w->fd = emu_open(w->name, O_RDWR | O_CREAT | O_EXCL, 0644)) < 0) {
+  if ((w->fd = emu_open(w->name, O_RDWR | O_CREAT | O_EXCL)) < 0) {
     std::cerr << "worker('" << w->name << "') cannot create file" << std::endl;
     return;
   }

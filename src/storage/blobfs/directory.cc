@@ -93,11 +93,19 @@ zx_status_t Directory::GetAttributes(fs::VnodeAttributes* a) {
   return ZX_OK;
 }
 
-zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode>* out) {
-  TRACE_DURATION("blobfs", "Directory::Create", "name", name, "mode", mode);
-  assert(memchr(name.data(), '/', name.length()) == nullptr);
+zx::result<fbl::RefPtr<fs::Vnode>> Directory::Create(std::string_view name, fs::CreationType type) {
+  TRACE_DURATION("blobfs", "Directory::Create", "name", name);
+  ZX_DEBUG_ASSERT(name.find('/') == std::string_view::npos);
 
-  return blobfs_->node_operations().create.Track([&] {
+  fbl::RefPtr<Blob> new_blob;
+  zx_status_t status = blobfs_->node_operations().create.Track([&]() -> zx_status_t {
+    switch (type) {
+      case fs::CreationType::kFile:
+        break;
+      default:
+        return ZX_ERR_INVALID_ARGS;
+    }
+
     bool is_delivery_blob = false;
     // Special case: If this is a delivery blob, we have to strip the prefix.
     if (name.length() > kDeliveryBlobPrefix.length() &&
@@ -111,16 +119,16 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
       return status;
     }
 
-    fbl::RefPtr<Blob> vn = fbl::AdoptRef(new Blob(*blobfs_, digest, is_delivery_blob));
-    if (zx_status_t status = blobfs_->GetCache().Add(vn); status != ZX_OK) {
+    new_blob = fbl::AdoptRef(new Blob(*blobfs_, digest, is_delivery_blob));
+    if (zx_status_t status = blobfs_->GetCache().Add(new_blob); status != ZX_OK) {
       return status;
     }
-    if (zx_status_t status = vn->Open(nullptr); status != ZX_OK) {
+    if (zx_status_t status = new_blob->Open(nullptr); status != ZX_OK) {
       return status;
     }
-    *out = std::move(vn);
     return ZX_OK;
   });
+  return zx::make_result(status, std::move(new_blob));
 }
 
 zx::result<std::string> Directory::GetDevicePath() const {

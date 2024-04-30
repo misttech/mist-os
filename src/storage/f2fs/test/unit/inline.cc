@@ -31,11 +31,11 @@ TEST(InlineDirTest, InlineDirCreation) {
 
   // Inline dir creation
   std::string inline_dir_name("inline");
-  fbl::RefPtr<fs::Vnode> inline_child;
-  ASSERT_EQ(root_dir->Create(inline_dir_name, S_IFDIR, &inline_child), ZX_OK);
+  zx::result inline_child = root_dir->Create(inline_dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(inline_child.is_ok()) << inline_child.status_string();
 
   fbl::RefPtr<VnodeF2fs> inline_child_dir =
-      fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_child));
+      fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(inline_child));
 
   FileTester::CheckInlineDir(inline_child_dir.get());
 
@@ -54,17 +54,18 @@ TEST(InlineDirTest, InlineDirCreation) {
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
   // Check if existing inline dir is still inline regardless of mount option
-  FileTester::Lookup(root_dir.get(), inline_dir_name, &inline_child);
-  inline_child_dir = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_child));
+  fbl::RefPtr<fs::Vnode> child;
+  FileTester::Lookup(root_dir.get(), inline_dir_name, &child);
+  inline_child_dir = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
   FileTester::CheckInlineDir(inline_child_dir.get());
 
   // However, newly created dir should be non-inline
   std::string non_inline_dir_name("noninline");
-  fbl::RefPtr<fs::Vnode> non_inline_child;
-  ASSERT_EQ(root_dir->Create(non_inline_dir_name, S_IFDIR, &non_inline_child), ZX_OK);
+  zx::result non_inline_child = root_dir->Create(non_inline_dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(non_inline_child.is_ok()) << non_inline_child.status_string();
 
   fbl::RefPtr<VnodeF2fs> non_inline_child_dir =
-      fbl::RefPtr<VnodeF2fs>::Downcast(std::move(non_inline_child));
+      fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(non_inline_child));
   FileTester::CheckNonInlineDir(non_inline_child_dir.get());
 
   ASSERT_EQ(inline_child_dir->Close(), ZX_OK);
@@ -96,17 +97,17 @@ TEST(InlineDirTest, InlineDirConvert) {
 
   // Inline dir creation
   std::string inline_dir_name("inline");
-  fbl::RefPtr<fs::Vnode> inline_child;
-  ASSERT_EQ(root_dir->Create(inline_dir_name, S_IFDIR, &inline_child), ZX_OK);
+  zx::result inline_child = root_dir->Create(inline_dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(inline_child.is_ok()) << inline_child.status_string();
 
-  fbl::RefPtr<Dir> inline_child_dir = fbl::RefPtr<Dir>::Downcast(std::move(inline_child));
+  fbl::RefPtr<Dir> inline_child_dir = fbl::RefPtr<Dir>::Downcast(*std::move(inline_child));
 
   unsigned int child_count = 0;
 
   // Fill all slots of inline dentry
   // Since two dentry slots are already allocated for "." and "..", decrease 2 from kNrInlineDentry
   for (; child_count < inline_child_dir->MaxInlineDentry() - 2; ++child_count) {
-    uint32_t mode = child_count % 2 == 0 ? S_IFDIR : S_IFREG;
+    umode_t mode = child_count % 2 == 0 ? S_IFDIR : S_IFREG;
     FileTester::CreateChild(inline_child_dir.get(), mode, std::to_string(child_count));
   }
 
@@ -128,12 +129,13 @@ TEST(InlineDirTest, InlineDirConvert) {
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
   // Check if existing inline dir is still inline regardless of mount option
-  FileTester::Lookup(root_dir.get(), inline_dir_name, &inline_child);
-  inline_child_dir = fbl::RefPtr<Dir>::Downcast(std::move(inline_child));
+  fbl::RefPtr<fs::Vnode> child;
+  FileTester::Lookup(root_dir.get(), inline_dir_name, &child);
+  inline_child_dir = fbl::RefPtr<Dir>::Downcast(std::move(child));
   FileTester::CheckInlineDir(inline_child_dir.get());
 
   // If one more dentry is added, it should be converted to non-inline dir
-  uint32_t mode = child_count % 2 == 0 ? S_IFDIR : S_IFREG;
+  umode_t mode = child_count % 2 == 0 ? S_IFDIR : S_IFREG;
   FileTester::CreateChild(inline_child_dir.get(), mode, std::to_string(child_count));
 
   FileTester::CheckNonInlineDir(inline_child_dir.get());
@@ -165,10 +167,10 @@ TEST(InlineDirTest, InlineDentryOps) {
 
   // Inline dir creation
   std::string inline_dir_name("inline");
-  fbl::RefPtr<fs::Vnode> inline_child;
-  ASSERT_EQ(root_dir->Create(inline_dir_name, S_IFDIR, &inline_child), ZX_OK);
+  zx::result inline_child = root_dir->Create(inline_dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(inline_child.is_ok()) << inline_child.status_string();
 
-  fbl::RefPtr<Dir> inline_child_dir = fbl::RefPtr<Dir>::Downcast(std::move(inline_child));
+  fbl::RefPtr<Dir> inline_child_dir = fbl::RefPtr<Dir>::Downcast(*std::move(inline_child));
 
   std::unordered_set<std::string> child_set = {"a", "b", "c", "d", "e"};
 
@@ -230,8 +232,9 @@ TEST(InlineDirTest, InlineDentryOps) {
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  FileTester::Lookup(root_dir.get(), inline_dir_name, &inline_child);
-  inline_child_dir = fbl::RefPtr<Dir>::Downcast(std::move(inline_child));
+  fbl::RefPtr<fs::Vnode> child;
+  FileTester::Lookup(root_dir.get(), inline_dir_name, &child);
+  inline_child_dir = fbl::RefPtr<Dir>::Downcast(std::move(child));
   dir_ptr = inline_child_dir.get();
 
   FileTester::CheckNonInlineDir(dir_ptr);
@@ -261,15 +264,18 @@ TEST(InlineDirTest, NestedInlineDirectories) {
   FileTester::CreateRoot(fs.get(), &root);
   fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  fbl::RefPtr<fs::Vnode> vnode;
-  ASSERT_EQ(root_dir->Create(std::string("alpha"), S_IFDIR, &vnode), ZX_OK);
-  fbl::RefPtr<Dir> parent_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
+  zx::result vnode = root_dir->Create("alpha", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<Dir> parent_dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode));
 
-  ASSERT_EQ(parent_dir->Create(std::string("bravo"), S_IFDIR, &vnode), ZX_OK);
-  fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
+  vnode = parent_dir->Create("bravo", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode));
 
-  ASSERT_EQ(child_dir->Create(std::string("charlie"), S_IFREG, &vnode), ZX_OK);
-  fbl::RefPtr<File> child_file = fbl::RefPtr<File>::Downcast(std::move(vnode));
+  vnode = child_dir->Create("charlie", fs::CreationType::kFile);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+
+  fbl::RefPtr<File> child_file = fbl::RefPtr<File>::Downcast(*std::move(vnode));
 
   char data[] = "Hello, world!";
   FileTester::AppendToFile(child_file.get(), data, sizeof(data));
@@ -303,25 +309,29 @@ TEST(InlineDirTest, InlineDirPino) {
   fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
   // Inline dir creation
-  fbl::RefPtr<fs::Vnode> vnode;
-  ASSERT_EQ(root_dir->Create("a", S_IFDIR, &vnode), ZX_OK);
-  fbl::RefPtr<Dir> a_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
+  zx::result vnode = root_dir->Create("a", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<Dir> a_dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode));
   ASSERT_EQ(a_dir->GetParentNid(), root_dir->Ino());
 
-  ASSERT_EQ(root_dir->Create("b", S_IFDIR, &vnode), ZX_OK);
-  fbl::RefPtr<Dir> b_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
+  vnode = root_dir->Create("b", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<Dir> b_dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode));
   ASSERT_EQ(b_dir->GetParentNid(), root_dir->Ino());
 
-  ASSERT_EQ(a_dir->Create("c", S_IFDIR, &vnode), ZX_OK);
-  fbl::RefPtr<Dir> c_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
+  vnode = a_dir->Create("c", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<Dir> c_dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode));
   ASSERT_EQ(c_dir->GetParentNid(), a_dir->Ino());
 
-  ASSERT_EQ(a_dir->Create("d", S_IFREG, &vnode), ZX_OK);
-  fbl::RefPtr<File> d1_file = fbl::RefPtr<File>::Downcast(std::move(vnode));
+  vnode = a_dir->Create("d", fs::CreationType::kFile);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<File> d1_file = fbl::RefPtr<File>::Downcast(*std::move(vnode));
   ASSERT_EQ(d1_file->GetParentNid(), a_dir->Ino());
 
-  ASSERT_EQ(b_dir->Create("d", S_IFREG, &vnode), ZX_OK);
-  fbl::RefPtr<File> d2_file = fbl::RefPtr<File>::Downcast(std::move(vnode));
+  vnode = b_dir->Create("d", fs::CreationType::kFile);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  fbl::RefPtr<File> d2_file = fbl::RefPtr<File>::Downcast(*std::move(vnode));
   ASSERT_EQ(d2_file->GetParentNid(), b_dir->Ino());
 
   // rename "/a/c" to "/b/c" and "/a/d" to "/b/d"
@@ -348,12 +358,13 @@ TEST(InlineDirTest, InlineDirPino) {
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  FileTester::Lookup(root_dir.get(), "b", &vnode);
-  b_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
-  FileTester::Lookup(b_dir.get(), "c", &vnode);
-  c_dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
-  FileTester::Lookup(b_dir.get(), "d", &vnode);
-  d1_file = fbl::RefPtr<File>::Downcast(std::move(vnode));
+  fbl::RefPtr<fs::Vnode> lookup_vn;
+  FileTester::Lookup(root_dir.get(), "b", &lookup_vn);
+  b_dir = fbl::RefPtr<Dir>::Downcast(std::move(lookup_vn));
+  FileTester::Lookup(b_dir.get(), "c", &lookup_vn);
+  c_dir = fbl::RefPtr<Dir>::Downcast(std::move(lookup_vn));
+  FileTester::Lookup(b_dir.get(), "d", &lookup_vn);
+  d1_file = fbl::RefPtr<File>::Downcast(std::move(lookup_vn));
 
   // Check i_pino of renamed directory
   ASSERT_EQ(c_dir->GetParentNid(), b_dir->Ino());
@@ -388,11 +399,11 @@ TEST(InlineDataTest, InlineRegFileTruncate) {
 
   // Inline file creation
   std::string inline_file_name("inline");
-  fbl::RefPtr<fs::Vnode> inline_child;
-  ASSERT_EQ(root_dir->Create(inline_file_name, S_IFREG, &inline_child), ZX_OK);
+  zx::result inline_child = root_dir->Create(inline_file_name, fs::CreationType::kFile);
+  ASSERT_TRUE(inline_child.is_ok()) << inline_child.status_string();
 
   fbl::RefPtr<VnodeF2fs> inline_child_file =
-      fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_child));
+      fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(inline_child));
 
   inline_child_file->SetFlag(InodeInfoFlag::kInlineData);
   FileTester::CheckInlineFile(inline_child_file.get());
@@ -453,8 +464,9 @@ TEST(InlineDataTest, InlineRegFileTruncate) {
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  FileTester::Lookup(root_dir.get(), inline_file_name, &inline_child);
-  inline_child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_child));
+  fbl::RefPtr<fs::Vnode> child;
+  FileTester::Lookup(root_dir.get(), inline_file_name, &child);
+  inline_child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
   FileTester::CheckNonInlineFile(inline_child_file.get());
 
   inline_child_file_ptr = static_cast<File *>(inline_child_file.get());
@@ -490,11 +502,11 @@ TEST(InlineDataTest, DataExistFlag) {
 
   // Inline file creation, then check if kDataExist flag is unset
   std::string inline_file_name("inline");
-  fbl::RefPtr<fs::Vnode> inline_child;
-  ASSERT_EQ(root_dir->Create(inline_file_name, S_IFREG, &inline_child), ZX_OK);
+  zx::result inline_child = root_dir->Create(inline_file_name, fs::CreationType::kFile);
+  ASSERT_TRUE(inline_child.is_ok()) << inline_child.status_string();
 
   fbl::RefPtr<VnodeF2fs> inline_child_file =
-      fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_child));
+      fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(inline_child));
 
   inline_child_file->SetFlag(InodeInfoFlag::kInlineData);
   FileTester::CheckInlineFile(inline_child_file.get());
@@ -541,8 +553,9 @@ TEST(InlineDataTest, DataExistFlag) {
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  FileTester::Lookup(root_dir.get(), inline_file_name, &inline_child);
-  inline_child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_child));
+  fbl::RefPtr<fs::Vnode> child;
+  FileTester::Lookup(root_dir.get(), inline_file_name, &child);
+  inline_child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
   FileTester::CheckInlineFile(inline_child_file.get());
   FileTester::CheckDataExistFlagSet(inline_child_file.get());
 

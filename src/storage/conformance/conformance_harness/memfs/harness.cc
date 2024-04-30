@@ -29,9 +29,9 @@ namespace fio_test = fuchsia_io_test;
 void AddEntry(const fio_test::DirectoryEntry& entry, memfs::VnodeDir& dir) {
   switch (entry.Which()) {
     case fio_test::DirectoryEntry::Tag::kDirectory: {
-      fbl::RefPtr<fs::Vnode> node;
-      ZX_ASSERT(dir.Create(*entry.directory()->name(), S_IFDIR, &node) == ZX_OK);
-      auto sub_dir = fbl::RefPtr<memfs::VnodeDir>::Downcast(std::move(node));
+      zx::result node = dir.Create(*entry.directory()->name(), fs::CreationType::kDirectory);
+      ZX_ASSERT_MSG(node.is_ok(), "Failed to create directory: %s", node.status_string());
+      auto sub_dir = fbl::RefPtr<memfs::VnodeDir>::Downcast(*std::move(node));
       if (entry.directory()->entries().has_value()) {
         for (const auto& entry : *entry.directory()->entries()) {
           AddEntry(*entry, *sub_dir);
@@ -40,9 +40,9 @@ void AddEntry(const fio_test::DirectoryEntry& entry, memfs::VnodeDir& dir) {
       break;
     }
     case fio_test::DirectoryEntry::Tag::kFile: {
-      fbl::RefPtr<fs::Vnode> node;
-      ZX_ASSERT(dir.Create(*entry.file()->name(), S_IFREG, &node) == ZX_OK);
-      auto file = fbl::RefPtr<memfs::VnodeFile>::Downcast(std::move(node));
+      zx::result node = dir.Create(*entry.file()->name(), fs::CreationType::kFile);
+      ZX_ASSERT_MSG(node.is_ok(), "Failed to create file: %s", node.status_string());
+      auto file = fbl::RefPtr<memfs::VnodeFile>::Downcast(*std::move(node));
       const auto& contents = entry.file()->contents();
       if (contents.has_value()) {
         zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_WRITE);
@@ -98,9 +98,10 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
   void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
     uint64_t test_id = test_counter_.fetch_add(1);
     std::string directory_name = fxl::StringPrintf("test.%ld", test_id);
-    fbl::RefPtr<fs::Vnode> test_root;
-    ZX_ASSERT(root_->Create(directory_name, S_IFDIR, &test_root) == ZX_OK);
-    auto root_dir = fbl::RefPtr<memfs::VnodeDir>::Downcast(std::move(test_root));
+
+    zx::result test_root = root_->Create(directory_name, fs::CreationType::kDirectory);
+    ZX_ASSERT_MSG(test_root.is_ok(), "Failed to create test root: %s", test_root.status_string());
+    auto root_dir = fbl::RefPtr<memfs::VnodeDir>::Downcast(*std::move(test_root));
 
     if (request.root().entries().has_value()) {
       for (auto& entry : *request.root().entries()) {

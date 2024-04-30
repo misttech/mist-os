@@ -116,12 +116,9 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
   void AddEntry(const fuchsia::io::test::DirectoryEntry& entry, Directory& parent) {
     switch (entry.Which()) {
       case fuchsia::io::test::DirectoryEntry::Tag::kDirectory: {
-        fbl::RefPtr<fs::Vnode> vnode;
-        // Minfs doesn't support rights flags.
-        zx_status_t status = parent.Create(entry.directory().name(), S_IFDIR, &vnode);
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to create a directory: %s",
-                      zx_status_get_string(status));
-        auto directory = fbl::RefPtr<Directory>::Downcast(std::move(vnode));
+        zx::result vnode = parent.Create(entry.directory().name(), fs::CreationType::kDirectory);
+        ZX_ASSERT_MSG(vnode.is_ok(), "Failed to create a directory: %s", vnode.status_string());
+        auto directory = fbl::RefPtr<Directory>::Downcast(*std::move(vnode));
         ZX_ASSERT_MSG(directory != nullptr, "A vnode of the wrong type was created");
         if (entry.directory().has_entries()) {
           PopulateDirectory(entry.directory().entries(), *directory);
@@ -131,14 +128,13 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
         break;
       }
       case fuchsia::io::test::DirectoryEntry::Tag::kFile: {
-        fbl::RefPtr<fs::Vnode> file;
-        // Minfs doesn't support rights flags.
-        zx_status_t status = parent.Create(entry.file().name(), S_IFREG, &file);
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to create a file: %s", zx_status_get_string(status));
+        zx::result file = parent.Create(entry.file().name(), fs::CreationType::kFile);
+        ZX_ASSERT_MSG(file.is_ok(), "Failed to create a file: %s", file.status_string());
 
         size_t actual = 0;
-        status = file->Write(entry.file().contents().data(), entry.file().contents().size(),
-                             /*offset=*/0, &actual);
+        zx_status_t status =
+            file->Write(entry.file().contents().data(), entry.file().contents().size(),
+                        /*offset=*/0, &actual);
         ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to file: %s", zx_status_get_string(status));
         // The file was opened when it was created.
         file->Close();
@@ -165,11 +161,9 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     ++directory_count_;
     std::string directory_name = std::to_string(directory_count_);
     fbl::RefPtr<Directory> root = GetRootNode();
-    fbl::RefPtr<fs::Vnode> vnode;
-    zx_status_t status = root->Create(directory_name, S_IFDIR, &vnode);
-    ZX_ASSERT_MSG(status == ZX_OK, "Failed to create a unique directory: %s",
-                  zx_status_get_string(status));
-    auto directory = fbl::RefPtr<Directory>::Downcast(std::move(vnode));
+    zx::result vnode = root->Create(directory_name, fs::CreationType::kDirectory);
+    ZX_ASSERT_MSG(vnode.is_ok(), "Failed to create a unique directory: %s", vnode.status_string());
+    auto directory = fbl::RefPtr<Directory>::Downcast(*std::move(vnode));
     ZX_ASSERT_MSG(directory != nullptr, "A vnode of the wrong type was created");
     return directory;
   }

@@ -54,9 +54,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   fbl::RefPtr<fs::Vnode> root_node;
   {
-    zx::result root_or = fs.VnodeGet(kMinfsRootIno);
-    ZX_ASSERT_MSG(root_or.is_ok(), "Failed to get root node: %s", root_or.status_string());
-    root_node = std::move(root_or.value());
+    zx::result root = fs.VnodeGet(kMinfsRootIno);
+    ZX_ASSERT_MSG(root.is_ok(), "Failed to get root node: %s", root.status_string());
+    root_node = std::move(root.value());
   }
 
   std::vector<fbl::RefPtr<fs::Vnode>> open_files;
@@ -109,15 +109,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           ZX_ASSERT_MSG(status == ZX_OK, "Failed to close file: %s", zx_status_get_string(status));
           open_files.erase(open_files.begin() + file_index);
         }
-        // Try to create a file with a randomized path/mode.
+        // Try to create a file with a randomized path and node type.
         std::string name = fuzzed_data.ConsumeRandomLengthString(NAME_MAX + 2);
-        uint32_t mode = fuzzed_data.ConsumeIntegral<uint32_t>();
-        fbl::RefPtr<fs::Vnode> vnode;
-        zx_status_t status = root_node->Create(name, mode, &vnode);
-        // It's okay if we failed to create the file, since name/mode may be invalid.
-        if (status == ZX_OK) {
+        fs::CreationType type = fuzzed_data.ConsumeEnum<fs::CreationType>();
+        zx::result vnode = root_node->Create(name, type);
+        // It's okay if we failed to create the file, since name or node type may be invalid.
+        if (vnode.is_ok()) {
           created_files.push_back(std::move(name));
-          open_files.push_back(std::move(vnode));
+          open_files.push_back(std::move(*vnode));
         }
         break;
       }

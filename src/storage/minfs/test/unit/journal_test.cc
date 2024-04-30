@@ -21,11 +21,11 @@ class JournalIntegrationTest : public JournalIntegrationFixture {
   // Creates an entry in the root of the filesystem and synchronizing writeback operations to
   // storage.
   void PerformOperation(Minfs& fs) override {
-    auto root_or = fs.VnodeGet(kMinfsRootIno);
-    ASSERT_TRUE(root_or.is_ok());
+    auto root = fs.VnodeGet(kMinfsRootIno);
+    ASSERT_TRUE(root.is_ok());
 
-    fbl::RefPtr<fs::Vnode> child;
-    ASSERT_EQ(root_or->Create("foo", 0, &child), ZX_OK);
+    zx::result child = root->Create("foo", fs::CreationType::kFile);
+    ASSERT_TRUE(child.is_ok()) << child.status_string();
     ASSERT_EQ(child->Close(), ZX_OK);
   }
 };
@@ -76,16 +76,19 @@ class JournalUnlinkTest : public JournalIntegrationFixture {
   // Creating but also removing an entry from the root of the filesystem, while a connection to the
   // unlinked vnode remains alive.
   void PerformOperation(Minfs& fs) override {
-    auto root_or = fs.VnodeGet(kMinfsRootIno);
-    ASSERT_TRUE(root_or.is_ok());
+    auto root = fs.VnodeGet(kMinfsRootIno);
+    ASSERT_TRUE(root.is_ok());
 
-    fbl::RefPtr<fs::Vnode> foo, bar, baz;
-    ASSERT_EQ(root_or->Create("foo", 0, &foo), ZX_OK);
-    ASSERT_EQ(root_or->Create("bar", 0, &bar), ZX_OK);
-    ASSERT_EQ(root_or->Create("baz", 0, &baz), ZX_OK);
-    ASSERT_EQ(root_or->Unlink("foo", false), ZX_OK);
-    ASSERT_EQ(root_or->Unlink("bar", false), ZX_OK);
-    ASSERT_EQ(root_or->Unlink("baz", false), ZX_OK);
+    zx::result foo = root->Create("foo", fs::CreationType::kFile);
+    ASSERT_TRUE(foo.is_ok()) << foo.status_string();
+    zx::result bar = root->Create("bar", fs::CreationType::kFile);
+    ASSERT_TRUE(bar.is_ok()) << bar.status_string();
+    zx::result baz = root->Create("baz", fs::CreationType::kFile);
+    ASSERT_TRUE(baz.is_ok()) << baz.status_string();
+
+    ASSERT_EQ(root->Unlink("foo", false), ZX_OK);
+    ASSERT_EQ(root->Unlink("bar", false), ZX_OK);
+    ASSERT_EQ(root->Unlink("baz", false), ZX_OK);
 
     RecordWriteCount(fs);
 
@@ -128,10 +131,10 @@ TEST_F(JournalUnlinkTest, ReadOnlyFsckDoesNotReplayJournal) {
 class JournalGrowFvmTest : public JournalIntegrationFixture {
  private:
   void PerformOperation(Minfs& fs) override {
-    auto root_or = fs.VnodeGet(kMinfsRootIno);
-    ASSERT_TRUE(root_or.is_ok());
-    fbl::RefPtr<fs::Vnode> foo, bar, baz;
-    ASSERT_EQ(root_or->Create("foo", 0, &foo), ZX_OK);
+    auto root = fs.VnodeGet(kMinfsRootIno);
+    ASSERT_TRUE(root.is_ok());
+    zx::result foo = root->Create("foo", fs::CreationType::kFile);
+    ASSERT_TRUE(foo.is_ok()) << foo.status_string();
     // Write to a file until we cause an FVM extension.
     std::vector<uint8_t> buf(TransactionLimits::kMaxWriteBytes);
     size_t done = 0;
@@ -192,10 +195,10 @@ TEST_F(JournalIntegrationTest, BlocksAreReservedUntilMetadataIsCommitted) {
   ASSERT_TRUE(fs_or.is_ok());
 
   // Create a file and make it allocate 1 block.
-  auto root_or = fs_or->minfs().VnodeGet(kMinfsRootIno);
-  ASSERT_TRUE(root_or.is_ok());
-  fbl::RefPtr<fs::Vnode> foo;
-  ASSERT_EQ(root_or->Create("foo", 0, &foo), ZX_OK);
+  auto root = fs_or->minfs().VnodeGet(kMinfsRootIno);
+  ASSERT_TRUE(root.is_ok());
+  zx::result foo = root->Create("foo", fs::CreationType::kFile);
+  ASSERT_TRUE(foo.is_ok()) << foo.status_string();
   auto close = fit::defer([foo]() { ASSERT_EQ(foo->Close(), ZX_OK); });
   std::vector<uint8_t> buf(10, 0xaf);
   size_t written;
@@ -206,7 +209,7 @@ TEST_F(JournalIntegrationTest, BlocksAreReservedUntilMetadataIsCommitted) {
   ASSERT_EQ(written, buf.size());
 
   // Make a note of which block was allocated.
-  auto foo_file = fbl::RefPtr<File>::Downcast(foo);
+  auto foo_file = fbl::RefPtr<File>::Downcast(*foo);
   blk_t block = foo_file->GetInode()->dnum[0];
   EXPECT_NE(block, 0u);
 

@@ -54,7 +54,7 @@ TEST_F(HostFilesystemTest, DirectoryLarge) {
   for (int i = 0; i < num_files; ++i) {
     char path[kLargePathLength + 1];
     snprintf(path, sizeof(path), "::%0*d", kLargePathLength - 2, i);
-    int fd = emu_open(path, O_RDWR | O_CREAT | O_EXCL, 0644);
+    int fd = emu_open(path, O_RDWR | O_CREAT | O_EXCL);
     ASSERT_GT(fd, 0);
     ASSERT_EQ(emu_close(fd), 0);
   }
@@ -63,24 +63,24 @@ TEST_F(HostFilesystemTest, DirectoryLarge) {
 }
 
 TEST_F(HostFilesystemTest, DirectoryReaddir) {
-  ASSERT_EQ(emu_mkdir("::a", 0755), 0);
-  ASSERT_EQ(emu_mkdir("::a", 0755), -1);
+  ASSERT_EQ(emu_mkdir("::a"), 0);
+  ASSERT_EQ(emu_mkdir("::a"), -1);
 
   ExpectedDirectoryEntry empty_dir[] = {
       {".", DT_DIR},
   };
   ASSERT_NO_FATAL_FAILURE(CheckDirectoryContents("::a", empty_dir));
 
-  ASSERT_EQ(emu_mkdir("::a/dir1", 0755), 0);
-  int fd = emu_open("::a/file1", O_RDWR | O_CREAT | O_EXCL, 0644);
+  ASSERT_EQ(emu_mkdir("::a/dir1"), 0);
+  int fd = emu_open("::a/file1", O_RDWR | O_CREAT | O_EXCL);
   ASSERT_GT(fd, 0);
   ASSERT_EQ(emu_close(fd), 0);
 
-  fd = emu_open("::a/file2", O_RDWR | O_CREAT | O_EXCL, 0644);
+  fd = emu_open("::a/file2", O_RDWR | O_CREAT | O_EXCL);
   ASSERT_GT(fd, 0);
   ASSERT_EQ(emu_close(fd), 0);
 
-  ASSERT_EQ(emu_mkdir("::a/dir2", 0755), 0);
+  ASSERT_EQ(emu_mkdir("::a/dir2"), 0);
   ExpectedDirectoryEntry filled_dir[] = {
       {".", DT_DIR}, {"dir1", DT_DIR}, {"dir2", DT_DIR}, {"file1", DT_REG}, {"file2", DT_REG},
   };
@@ -90,12 +90,12 @@ TEST_F(HostFilesystemTest, DirectoryReaddir) {
 
 TEST_F(HostFilesystemTest, ReaddirLarge) {
   size_t num_entries = 1000;
-  ASSERT_EQ(emu_mkdir("::dir", 0755), 0);
+  ASSERT_EQ(emu_mkdir("::dir"), 0);
 
   for (size_t i = 0; i < num_entries; ++i) {
     char dirname[100];
     snprintf(dirname, 100, "::dir/%05lu", i);
-    ASSERT_EQ(emu_mkdir(dirname, 0755), 0);
+    ASSERT_EQ(emu_mkdir(dirname), 0);
   }
 
   DIR* dir = emu_opendir("::dir");

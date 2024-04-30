@@ -398,10 +398,9 @@ class F2fsMountedBcacheMapperTest : public BcacheMapperTest {
 TEST_P(F2fsMountedBcacheMapperTest, ReadWrite) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   std::array<size_t, 5> num_pages = {1, 2, 4};

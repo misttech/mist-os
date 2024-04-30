@@ -25,10 +25,9 @@ class FileTest : public F2fsFakeDevTestFixture {
 TEST_F(FileTest, BlkAddrLevel) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   char buf[kPageSize];
@@ -87,10 +86,9 @@ TEST_F(FileTest, BlkAddrLevel) {
 TEST_F(FileTest, NidAndBlkaddrAllocFree) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   char buf[kPageSize];
@@ -167,10 +165,9 @@ TEST_F(FileTest, NidAndBlkaddrAllocFree) {
 TEST_F(FileTest, FileReadExceedFileSize) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   uint32_t data_size = kPageSize * 7 / 4;
@@ -206,10 +203,9 @@ TEST_F(FileTest, FileReadExceedFileSize) {
 TEST_F(FileTest, Truncate) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   constexpr uint32_t data_size = Page::Size() * 2;
@@ -280,10 +276,9 @@ TEST_F(FileTest, Truncate) {
 TEST_F(FileTest, MixedSizeWrite) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   std::array<size_t, 5> num_pages = {1, 2, 4, 8, 16};
@@ -340,10 +335,9 @@ TEST_F(FileTest, MixedSizeWrite) {
 TEST_F(FileTest, LargeChunkReadWrite) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<File> test_file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<File> test_file_vn = fbl::RefPtr<File>::Downcast(*std::move(test_file));
 
   constexpr size_t kNumPage = 256;
   constexpr size_t kDataSize = kPageSize * kNumPage;
@@ -373,10 +367,9 @@ TEST_F(FileTest, LargeChunkReadWrite) {
 TEST_F(FileTest, MixedSizeWriteUnaligned) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
   File *test_file_ptr = static_cast<File *>(test_file_vn.get());
 
   std::array<size_t, 5> num_pages = {1, 2, 4, 8, 16};
@@ -454,10 +447,9 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
 }
 
 TEST_F(FileTest, Readahead) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<File> test_file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<File> test_file_vn = fbl::RefPtr<File>::Downcast(*std::move(test_file));
 
   constexpr size_t kNumPage = kAddrsPerBlock * 3;
   constexpr size_t kDataSize = kPageSize * kNumPage;
@@ -509,24 +501,25 @@ TEST(FileTest2, FailedNidReuse) {
   FileTester::CreateRoot(fs.get(), &root);
   fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  fbl::RefPtr<fs::Vnode> tmp_child;
   uint32_t iter = 0;
   while (true) {
-    if (auto err = root_dir->Create(std::to_string(++iter), S_IFREG, &tmp_child); err != ZX_OK) {
-      ASSERT_EQ(err, ZX_ERR_NO_SPACE);
+    zx::result tmp_child = root_dir->Create(std::to_string(++iter), fs::CreationType::kFile);
+    if (tmp_child.is_error()) {
+      ASSERT_EQ(tmp_child.error_value(), ZX_ERR_NO_SPACE) << tmp_child.status_string();
       break;
     }
     ASSERT_EQ(tmp_child->Close(), ZX_OK);
-    tmp_child = nullptr;
   }
 
   const size_t kIteration = fs->GetNodeManager().GetFreeNidCount() + 1;
   for (size_t i = 0; i < kIteration; ++i) {
-    ASSERT_EQ(root_dir->Create(std::to_string(++iter), S_IFREG, &tmp_child), ZX_ERR_NO_SPACE);
+    zx::result tmp_child = root_dir->Create(std::to_string(++iter), fs::CreationType::kFile);
+    ASSERT_EQ(tmp_child.status_value(), ZX_ERR_NO_SPACE) << tmp_child.status_string();
   }
 
   for (size_t i = 0; i < kIteration; ++i) {
-    ASSERT_EQ(root_dir->Create(std::to_string(++iter), S_IFDIR, &tmp_child), ZX_ERR_NO_SPACE);
+    zx::result tmp_child = root_dir->Create(std::to_string(++iter), fs::CreationType::kDirectory);
+    ASSERT_EQ(tmp_child.status_value(), ZX_ERR_NO_SPACE) << tmp_child.status_string();
   }
 
   root_dir->Close();

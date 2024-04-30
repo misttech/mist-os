@@ -52,10 +52,10 @@ void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T 
 }
 
 TEST_F(VnodeTest, Time) {
-  fbl::RefPtr<fs::Vnode> test_fs_vnode;
   std::string dir_name("test");
-  ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &test_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_fs_vnode));
+  zx::result test_fs_vnode = root_dir_->Create(dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_fs_vnode.is_ok()) << test_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_fs_vnode));
 
   ASSERT_EQ(test_vnode->GetNameView(), dir_name);
 
@@ -71,10 +71,10 @@ TEST_F(VnodeTest, Time) {
 }
 
 TEST_F(VnodeTest, Advise) TA_NO_THREAD_SAFETY_ANALYSIS {
-  fbl::RefPtr<fs::Vnode> test_fs_vnode;
   std::string dir_name("test");
-  ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &test_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_fs_vnode));
+  zx::result test_fs_vnode = root_dir_->Create(dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_fs_vnode.is_ok()) << test_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_fs_vnode));
   Dir *test_dir_ptr = static_cast<Dir *>(test_vnode.get());
 
   ASSERT_EQ(test_vnode->GetNameView(), dir_name);
@@ -116,10 +116,9 @@ TEST_F(VnodeTest, EmptyOverridenMethods) {
 }
 
 TEST_F(VnodeTest, Mode) {
-  fbl::RefPtr<fs::Vnode> dir_fs_vnode;
-  std::string dir_name("test_dir");
-  ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &dir_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> dir_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(dir_fs_vnode));
+  zx::result dir_fs_vnode = root_dir_->Create("test_dir", fs::CreationType::kDirectory);
+  ASSERT_TRUE(dir_fs_vnode.is_ok()) << dir_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> dir_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(dir_fs_vnode));
 
   ASSERT_TRUE(S_ISDIR(dir_vnode->GetMode()));
   ASSERT_EQ(dir_vnode->IsDir(), true);
@@ -133,10 +132,9 @@ TEST_F(VnodeTest, Mode) {
   ASSERT_EQ(dir_vnode->Close(), ZX_OK);
   dir_vnode = nullptr;
 
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  std::string file_name("test_file");
-  ASSERT_EQ(root_dir_->Create(file_name, S_IFREG, &file_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   ASSERT_TRUE(S_ISREG(file_vnode->GetMode()));
   ASSERT_EQ(file_vnode->IsDir(), false);
@@ -195,10 +193,9 @@ TEST_F(VnodeTest, VgetExceptionCase) {
 }
 
 TEST_F(VnodeTest, SetAttributes) {
-  fbl::RefPtr<fs::Vnode> dir_fs_vnode;
-  std::string dir_name("test_dir");
-  ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &dir_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> dir_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(dir_fs_vnode));
+  zx::result dir_fs_vnode = root_dir_->Create("test_dir", fs::CreationType::kDirectory);
+  ASSERT_TRUE(dir_fs_vnode.is_ok()) << dir_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> dir_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(dir_fs_vnode));
 
   ASSERT_EQ(dir_vnode->SetAttributes(fs::VnodeAttributesUpdate()
                                          .set_modification_time(std::nullopt)
@@ -214,10 +211,9 @@ TEST_F(VnodeTest, SetAttributes) {
 }
 
 TEST_F(VnodeTest, TruncateExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  std::string file_name("test_file");
-  ASSERT_EQ(root_dir_->Create(file_name, S_IFREG, &file_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   // 1. Check TruncateBlocks() exception
   file_vnode->SetSize(1);
@@ -247,10 +243,9 @@ TEST_F(VnodeTest, TruncateExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
   file_vnode = nullptr;
 
   // 3. Check TruncateToSize() exception
-  fbl::RefPtr<fs::Vnode> block_fs_vnode;
-  std::string block_name("test_block");
-  ASSERT_EQ(root_dir_->Create(block_name, S_IFBLK, &block_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> block_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(block_fs_vnode));
+  zx::result block_fs_vnode = root_dir_->CreateWithMode("test_block", S_IFBLK);
+  ASSERT_TRUE(block_fs_vnode.is_ok()) << block_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> block_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(block_fs_vnode));
   uint64_t block_size = block_vnode->GetSize();
   block_vnode->TruncateToSize();
   ASSERT_EQ(block_vnode->GetSize(), block_size);
@@ -260,10 +255,9 @@ TEST_F(VnodeTest, TruncateExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 TEST_F(VnodeTest, SyncFile) {
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  std::string file_name("test_dir");
-  ASSERT_EQ(root_dir_->Create(file_name, S_IFREG, &file_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   // 1. Check need_cp
   uint64_t pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
@@ -310,10 +304,9 @@ TEST_F(VnodeTest, SyncFile) {
 }
 
 TEST_F(VnodeTest, GrabCachePages) {
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  std::string file_name("test_file");
-  ASSERT_EQ(root_dir_->Create(file_name, S_IFDIR, &file_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   constexpr pgoff_t kStartOffset = 0;
   constexpr pgoff_t kEndOffset = 1000;
@@ -368,10 +361,9 @@ void CheckDataPages(LockedPagesAndAddrs &address_and_pages, pgoff_t start_offset
 }
 
 TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  std::string file_name("test_file");
-  ASSERT_EQ(root_dir_->Create(file_name, S_IFREG, &file_fs_vnode), ZX_OK);
-  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(std::move(file_fs_vnode));
+  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(*std::move(file_fs_vnode));
 
   constexpr pgoff_t kStartOffset = 0;
   constexpr pgoff_t kEndOffset = 1000;

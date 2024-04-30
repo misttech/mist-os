@@ -131,11 +131,10 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
     Dir *root_dir = static_cast<Dir *>(data_root.get());
 
     for (int i = 0; i < dir_cnt; ++i) {
-      fbl::RefPtr<fs::Vnode> vnode;
       std::string filename = "dir_" + std::to_string(version) + "_" + std::to_string(i);
-      ASSERT_EQ(root_dir->Create(filename.c_str(), S_IFDIR, &vnode), ZX_OK);
+      zx::result vnode = root_dir->Create(filename, fs::CreationType::kDirectory);
+      ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
       vnode->Close();
-      vnode.reset();
     }
   }
 
@@ -145,11 +144,10 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
     Dir *root_dir = static_cast<Dir *>(data_root.get());
 
     for (int i = 0; i < file_cnt; ++i) {
-      fbl::RefPtr<fs::Vnode> vnode;
       std::string filename = "file_" + std::to_string(version) + "_" + std::to_string(i);
-      ASSERT_EQ(root_dir->Create(filename.c_str(), S_IFREG, &vnode), ZX_OK);
+      zx::result vnode = root_dir->Create(filename, fs::CreationType::kFile);
+      ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
       vnode->Close();
-      vnode.reset();
     }
   }
 
@@ -918,9 +916,9 @@ TEST(CheckpointUnmountTest, UmountFlag) {
 }
 
 TEST_F(CheckpointTest, CpError) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test", S_IFREG, &test_file);
-  fbl::RefPtr<f2fs::File> vnode = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<f2fs::File> vnode = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file));
   char wbuf[] = "Checkpoint error test";
   char rbuf[kBlockSize];
 
@@ -948,13 +946,15 @@ TEST_F(CheckpointTest, CpError) {
   // All operations causing dirty pages are not allowed.
   ASSERT_EQ(vnode->Truncate(0), ZX_ERR_BAD_STATE);
   ASSERT_EQ(root_dir_->Unlink("test", false), ZX_ERR_BAD_STATE);
-  ASSERT_EQ(root_dir_->Create("test2", S_IFREG, &test_file), ZX_ERR_BAD_STATE);
+  test_file = root_dir_->Create("test2", fs::CreationType::kFile);
+  ASSERT_EQ(test_file.status_value(), ZX_ERR_BAD_STATE) << test_file.status_string();
   ASSERT_EQ(root_dir_->Rename(root_dir_, "test", "test1", false, false), ZX_ERR_BAD_STATE);
   ASSERT_EQ(root_dir_->Link("test", vnode), ZX_ERR_BAD_STATE);
 
   // Read operations should succeed.
   FileTester::ReadFromFile(vnode.get(), rbuf, sizeof(wbuf), 0);
-  ASSERT_EQ(root_dir_->Lookup("test", &test_file), ZX_OK);
+  fbl::RefPtr<fs::Vnode> vn;
+  ASSERT_EQ(root_dir_->Lookup("test", &vn), ZX_OK);
   ASSERT_EQ(strcmp(wbuf, rbuf), 0);
   DeviceTester::SetHook(fs_.get(), nullptr);
 

@@ -20,12 +20,12 @@ class BitmapTest : public F2fsFakeDevTestFixture {
         }) {}
 
   zx::result<fbl::RefPtr<VnodeF2fs>> Create(std::string name, bool is_file = true) {
-    fbl::RefPtr<fs::Vnode> vnode;
-    umode_t mode = is_file ? S_IFREG : S_IFDIR;
-    if (zx_status_t status = root_dir_->Create(name, mode, &vnode); status != ZX_OK) {
-      return zx::error(status);
+    zx::result vnode =
+        root_dir_->Create(name, is_file ? fs::CreationType::kFile : fs::CreationType::kDirectory);
+    if (vnode.is_error()) {
+      return vnode.take_error();
     }
-    return zx::ok(fbl::RefPtr<VnodeF2fs>::Downcast(std::move(vnode)));
+    return zx::ok(fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(vnode)));
   }
 };
 

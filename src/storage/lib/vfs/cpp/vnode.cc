@@ -171,8 +171,8 @@ zx_status_t Vnode::Readdir(VdirCookie* cookie, void* dirents, size_t len, size_t
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t Vnode::Create(std::string_view name, uint32_t mode, fbl::RefPtr<Vnode>* out) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx::result<fbl::RefPtr<Vnode>> Vnode::Create(std::string_view name, CreationType type) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx_status_t Vnode::Unlink(std::string_view name, bool must_be_dir) { return ZX_ERR_NOT_SUPPORTED; }

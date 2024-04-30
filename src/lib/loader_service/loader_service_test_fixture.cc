@@ -104,9 +104,12 @@ void LoaderServiceTest::AddDirectoryEntry(const fbl::RefPtr<memfs::VnodeDir>& ro
     fbl::RefPtr<fs::Vnode> out;
     zx_status_t status = dir->Lookup(subdir, &out);
     if (status == ZX_ERR_NOT_FOUND) {
-      status = dir->Create(subdir, S_IFDIR, &out);
+      zx::result new_vn = dir->Create(subdir, fs::CreationType::kDirectory);
+      ASSERT_TRUE(new_vn.is_ok()) << new_vn.status_string();
+      out = *std::move(new_vn);
+    } else {
+      ASSERT_OK(status);
     }
-    ASSERT_OK(status);
 
     dir = fbl::RefPtr<memfs::VnodeDir>::Downcast(std::move(out));
     view.remove_prefix(next + 1);

@@ -57,10 +57,10 @@ void MountTestDisableExt(F2fs *fs, uint32_t expectation) {
   for (const char *ext_item : kMediaExtList) {
     std::string name = "test.";
     name += ext_item;
-    fbl::RefPtr<fs::Vnode> vnode;
     // create regular files with cold file extensions
-    ASSERT_EQ(root_dir->Create(name, S_IFREG, &vnode), ZX_OK);
-    File *file = static_cast<File *>(vnode.get());
+    zx::result vnode = root_dir->Create(name, fs::CreationType::kFile);
+    ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+    File *file = static_cast<File *>(vnode.value().get());
     ASSERT_EQ(file->IsColdFile(), result);
     vnode->Close();
   }
@@ -71,14 +71,14 @@ void MountTestDisableExt(F2fs *fs, uint32_t expectation) {
 
 void TestSegmentType(F2fs *fs, Dir *root_dir, std::string_view name, bool is_dir,
                      std::vector<CursegType> &out) {
-  fbl::RefPtr<fs::Vnode> vnode;
-  uint32_t flag = (is_dir ? S_IFDIR : S_IFREG);
   nid_t nid = 100;
   uint32_t inode_ofs = 0;
   uint32_t indirect_node_ofs = 3;
   CursegType type;
-  ASSERT_EQ(root_dir->Create(name, flag, &vnode), ZX_OK);
-  VnodeF2fs *vn = static_cast<VnodeF2fs *>(vnode.get());
+  zx::result vnode =
+      root_dir->Create(name, is_dir ? fs::CreationType::kDirectory : fs::CreationType::kFile);
+  ASSERT_TRUE(vnode.is_ok()) << vnode.status_string();
+  VnodeF2fs *vn = static_cast<VnodeF2fs *>(vnode.value().get());
 
   // data block test
   {

@@ -65,7 +65,9 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   // create and link
   zx_status_t Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) final
       __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
-  zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out) final
+  zx::result<fbl::RefPtr<fs::Vnode>> Create(std::string_view name, fs::CreationType type) final
+      __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
+  zx::result<fbl::RefPtr<fs::Vnode>> CreateWithMode(std::string_view name, umode_t mode)
       __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
   zx_status_t DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out)
       __TA_REQUIRES(mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());

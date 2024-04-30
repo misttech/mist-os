@@ -68,8 +68,8 @@ class BlobfsCheckerTest : public testing::Test {
                      uint64_t* size_out = nullptr, std::string* name_out = nullptr) {
     std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", size);
 
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(node.Create(info->path, 0, &file), ZX_OK);
+    zx::result file = node.Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
 
     size_t actual;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
@@ -78,7 +78,7 @@ class BlobfsCheckerTest : public testing::Test {
     EXPECT_EQ(file->Close(), ZX_OK);
 
     if (block_out) {
-      auto blob = fbl::RefPtr<Blob>::Downcast(file);
+      auto blob = fbl::RefPtr<Blob>::Downcast(*file);
       // Get the block that contains the blob.
       *block_out =
           blobfs()->GetNode(blob->Ino())->extents[0].Start() + DataStartBlock(blobfs()->Info());

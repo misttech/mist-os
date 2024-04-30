@@ -45,12 +45,14 @@ class F2fsFakeDevTestFixture : public testing::Test {
 
 class SingleFileTest : public F2fsFakeDevTestFixture {
  public:
-  SingleFileTest(uint32_t mode = S_IFREG, const TestOptions &options = TestOptions())
+  SingleFileTest(umode_t mode = S_IFREG, const TestOptions &options = TestOptions())
       : F2fsFakeDevTestFixture(options), mode_(mode) {}
 
   void SetUp() override {
     F2fsFakeDevTestFixture::SetUp();
-    root_dir_->Create("FileCacheTest", mode_, &test_file_);
+    zx::result file = root_dir_->CreateWithMode("FileCacheTest", mode_);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
+    test_file_ = std::move(*file);
   }
 
   void TearDown() override {
@@ -80,7 +82,7 @@ class SingleFileTest : public F2fsFakeDevTestFixture {
 
  private:
   fbl::RefPtr<fs::Vnode> test_file_;
-  uint32_t mode_ = S_IFREG;
+  umode_t mode_ = S_IFREG;
 };
 
 class FileTester {
@@ -98,7 +100,7 @@ class FileTester {
   static void CreateRoot(F2fs *fs, fbl::RefPtr<VnodeF2fs> *out);
   static void Lookup(VnodeF2fs *parent, std::string_view name, fbl::RefPtr<fs::Vnode> *out);
 
-  static void CreateChild(Dir *vn, uint32_t mode, std::string_view name);
+  static void CreateChild(Dir *vn, umode_t mode, std::string_view name);
   static void DeleteChild(Dir *vn, std::string_view name, bool is_dir = true);
   static void RenameChild(fbl::RefPtr<Dir> &old_vnode, fbl::RefPtr<Dir> &new_vnode,
                           std::string_view oldname, std::string_view newname);
@@ -108,7 +110,7 @@ class FileTester {
   static void DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes, fbl::RefPtr<Dir> &parent,
                              uint32_t inode_cnt);
 
-  static void VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2fs> &vnode);
+  static void VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2fs> &vnode);
 
   static void CheckInlineDir(VnodeF2fs *vn);
   static void CheckNonInlineDir(VnodeF2fs *vn);

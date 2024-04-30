@@ -458,38 +458,48 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
   return ZX_OK;
 }
 
-zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out) {
+zx::result<fbl::RefPtr<fs::Vnode>> Dir::Create(std::string_view name, fs::CreationType type) {
+  switch (type) {
+    case fs::CreationType::kDirectory:
+      return CreateWithMode(name, S_IFDIR);
+    case fs::CreationType::kFile:
+      return CreateWithMode(name, S_IFREG);
+  }
+}
+
+zx::result<fbl::RefPtr<fs::Vnode>> Dir::CreateWithMode(std::string_view name, umode_t mode) {
   if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   if (!fs::IsValidName(name)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fs()->GetSegmentManager().BalanceFs(kMaxNeededBlocksForUpdate + 1);
+  fbl::RefPtr<fs::Vnode> new_vnode;
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
     std::lock_guard dir_lock(mutex_);
     if (GetNlink() == 0)
-      return ZX_ERR_NOT_FOUND;
+      return zx::error(ZX_ERR_NOT_FOUND);
 
     if (auto ret = FindEntry(name); !ret.is_error()) {
-      return ZX_ERR_ALREADY_EXISTS;
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
 
-    zx_status_t ret = ZX_OK;
     if (S_ISDIR(mode)) {
-      ret = Mkdir(name, safemath::checked_cast<umode_t>(mode), out);
+      if (zx_status_t status = Mkdir(name, mode, &new_vnode); status != ZX_OK) {
+        return zx::error(status);
+      }
     } else {
-      ret = DoCreate(name, safemath::checked_cast<umode_t>(mode), out);
-    }
-    if (ret != ZX_OK) {
-      return ret;
+      if (zx_status_t status = DoCreate(name, mode, &new_vnode); status != ZX_OK) {
+        return zx::error(status);
+      }
     }
   }
-
-  return (*out)->Open(nullptr);
+  ZX_ASSERT(new_vnode);
+  return zx::make_result(new_vnode->Open(nullptr), new_vnode);
 }
 
 zx_status_t Dir::Unlink(std::string_view name, bool must_be_dir) {
