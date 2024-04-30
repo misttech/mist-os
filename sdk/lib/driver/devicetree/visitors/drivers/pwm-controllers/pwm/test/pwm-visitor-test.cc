@@ -70,7 +70,13 @@ TEST(PwmVisitorTest, TestMetadataAndBindProperty) {
       ASSERT_TRUE(pwm_channels->channels());
       ASSERT_EQ(pwm_channels->channels()->size(), 2u);
       EXPECT_EQ((*pwm_channels->channels())[0].id(), static_cast<uint32_t>(PIN1));
+      EXPECT_EQ((*pwm_channels->channels())[0].period_ns(), static_cast<uint32_t>(PIN1_PERIOD));
+      EXPECT_EQ((*pwm_channels->channels())[0].polarity().value(), true);
+      EXPECT_FALSE((*pwm_channels->channels())[0].skip_init());
       EXPECT_EQ((*pwm_channels->channels())[1].id(), static_cast<uint32_t>(PIN2));
+      EXPECT_EQ((*pwm_channels->channels())[1].period_ns(), static_cast<uint32_t>(PIN2_PERIOD));
+      EXPECT_EQ((*pwm_channels->channels())[1].polarity().value(), true);
+      EXPECT_EQ((*pwm_channels->channels())[1].skip_init().value(), true);
 
       node_tested_count++;
     }

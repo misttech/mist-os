@@ -22,9 +22,10 @@ properties:
       - amlogic,meson-g12a-ee-pwm
 
   "#pwm-cells":
-    const: 2
+    const: 3
     description: 1st cell represents the PWM ID
       2nd cell represents PWM period in nanoseconds.
+      3rd cell represents PWM flags defined in pwm_visitor_dt::PwmFlags
 
 additionalProperties: True
 

@@ -19,9 +19,12 @@ properties:
 
   "#pwm-cells":
     minimum: 1
-    description:
-      Number of cells in PWM specifier. 1st cell represents the PWM ID and
-      typically another cell might be used for PWM period.
+    description: Number of cells in PWM specifier.
+      1st cell represents the PWM ID.
+      Optionally 2nd cell might be used for PWM period in nanoseconds.
+      Optionally 3rd cell might be used to encode PWM flags defined in pwm-visitor.h.
+      - PWM_POLARITY_INVERTED
+      - PWM_SKIP_INIT
 
 additionalProperties: True
 

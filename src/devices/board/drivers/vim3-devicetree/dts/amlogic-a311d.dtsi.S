@@ -28,7 +28,7 @@
 	vddcpu0: pwm_a0_d-regulator {
 		compatible = "amlogic,pwm-regulator";
 		regulator-name = "pwm_vreg_little";
-		pwms = <&pwm 9 1250>; // A311D_PWM_A0_D
+		pwms = <&pwm 9 1250 0>; // A311D_PWM_A0_D
 		pinctrl-0 = <&pwm_a0_d_regulator_pins>;
 		regulator-min-microvolt = <690000>;
 		regulator-max-microvolt = <1050000>;
@@ -38,7 +38,7 @@
 	vddcpu1: pwm_a-regulator {
 		compatible = "amlogic,pwm-regulator";
 		regulator-name = "pwm_vreg_big";
-		pwms = <&pwm 0 1250>; // A311D_PWM_A
+		pwms = <&pwm 0 1250 0>; // A311D_PWM_A
 		pinctrl-0 = <&pwm_a_regulator_pins>;
 		regulator-min-microvolt = <690000>;
 		regulator-max-microvolt = <1050000>;

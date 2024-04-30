@@ -11,6 +11,7 @@
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 
+#include <cstdint>
 #include <regex>
 #include <vector>
 
@@ -113,8 +114,27 @@ zx::result<> PwmVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   PwmChannelInfo pwm_channel = {};
   pwm_channel.id() = cells[0];
 
-  FDF_LOG(DEBUG, "PWM channel added - ID 0x%x with name '%s' to controller '%s'", cells[0],
-          pwm_name ? std::string(*pwm_name).c_str() : "<anonymous>", parent.name().c_str());
+  // Second cell if present specifies the PWM period in nanoseconds.
+  if (cells.size() >= 2) {
+    pwm_channel.period_ns() = cells[1];
+  }
+
+  // Third cell if present would contain the PWM flags.
+  if (cells.size() == 3) {
+    if (cells[2] & static_cast<uint32_t>(PwmFlags::PWM_POLARITY_INVERTED)) {
+      pwm_channel.polarity() = true;
+    }
+    if (cells[2] & static_cast<uint32_t>(PwmFlags::PWM_SKIP_INIT)) {
+      pwm_channel.skip_init() = true;
+    }
+  }
+
+  FDF_LOG(
+      DEBUG,
+      "PWM channel added - ID 0x%x, Period %d, Polarity %d, Skip init %d, and name '%s' to controller '%s'",
+      *pwm_channel.id(), pwm_channel.period_ns().value_or(0), pwm_channel.polarity().value_or(0),
+      pwm_channel.skip_init().value_or(0),
+      pwm_name ? std::string(*pwm_name).c_str() : "<anonymous>", parent.name().c_str());
 
   if (!controller.pwm_channels.channels()) {
     controller.pwm_channels.channels() = std::vector<PwmChannelInfo>();
