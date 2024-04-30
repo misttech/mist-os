@@ -19,6 +19,8 @@ use {
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
     },
+    async_trait::async_trait,
+    bedrock_error::BedrockError,
     cm_rust::{
         CapabilityDecl, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
     },
@@ -632,7 +634,7 @@ fn extend_dict_with_offer(
             )
             .into_router()
         }
-        cm_rust::OfferSource::Void => new_unit_router(),
+        cm_rust::OfferSource::Void => UnitRouter::new(),
         // This is only relevant for services, so this arm is never reached.
         cm_rust::OfferSource::Collection(_name) => return,
     };
@@ -719,7 +721,7 @@ fn extend_dict_with_expose(
             )
             .into_router()
         }
-        cm_rust::ExposeSource::Void => new_unit_router(),
+        cm_rust::ExposeSource::Void => UnitRouter::new(),
         // This is only relevant for services, so this arm is never reached.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
@@ -731,6 +733,24 @@ fn extend_dict_with_expose(
     }
 }
 
-fn new_unit_router() -> Router {
-    Router::new_ok(Unit {})
+struct UnitRouter {}
+
+impl UnitRouter {
+    fn new() -> Router {
+        Router::new(UnitRouter {})
+    }
+}
+
+#[async_trait]
+impl sandbox::Routable for UnitRouter {
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+        match request.availability {
+            cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {
+                Err(RoutingError::SourceCapabilityIsVoid.into())
+            }
+            cm_rust::Availability::Optional | cm_rust::Availability::Transitional => {
+                Ok(Unit {}.into())
+            }
+        }
+    }
 }
