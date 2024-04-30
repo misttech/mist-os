@@ -46,8 +46,8 @@ persist="--no-persist"
 while (($#)); do
   case "$1" in
     -l)
-      shift
       port="$2"
+      shift
       ;;
     --name)
       source_name="$2"
