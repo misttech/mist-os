@@ -5,7 +5,7 @@
 use std::{io::Read, mem, slice, sync::Arc};
 
 use anyhow::Error;
-use fidl_fuchsia_sysmem::{BufferCollectionSynchronousProxy, CoherencyDomain};
+use fidl_fuchsia_sysmem2::{BufferCollectionSynchronousProxy, CoherencyDomain};
 use fuchsia_trace::duration;
 use fuchsia_zircon::sys;
 use fuchsia_zircon::{self as zx, prelude::*};
@@ -109,12 +109,17 @@ impl VmoImage {
         height: u32,
         index: u32,
     ) -> Self {
-        let (status, buffers) = buffer_collection
-            .wait_for_buffers_allocated(zx::Time::after(10.second()))
+        let wait_result = buffer_collection
+            .wait_for_all_buffers_allocated(zx::Time::INFINITE)
             .expect("failed to allocate buffer collection");
-        assert_eq!(status, zx::sys::ZX_OK);
+        assert!(
+            wait_result.is_ok(),
+            "wait_for_all_buffers_allocated failed: {:?}",
+            wait_result.unwrap_err()
+        );
 
-        let vmo_buffer = &buffers.buffers[index as usize];
+        let buffers = wait_result.unwrap().buffer_collection_info.unwrap();
+        let vmo_buffer = &buffers.buffers.as_ref().unwrap()[index as usize];
         let vmo = vmo_buffer
             .vmo
             .as_ref()
@@ -122,11 +127,13 @@ impl VmoImage {
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("failed to duplicate VMO handle");
 
-        let len_bytes = buffers.settings.buffer_settings.size_bytes;
+        let settings = buffers.settings.as_ref().unwrap();
+        let buffer_settings = settings.buffer_settings.as_ref().unwrap();
+        let len_bytes = buffer_settings.size_bytes.as_ref().unwrap();
         let mapping = Arc::new(
             mapped_vmo::Mapping::create_from_vmo(
                 &vmo,
-                len_bytes as usize,
+                *len_bytes as usize,
                 zx::VmarFlags::PERM_READ
                     | zx::VmarFlags::PERM_WRITE
                     | zx::VmarFlags::MAP_RANGE
@@ -135,9 +142,10 @@ impl VmoImage {
             .expect("failed to crate mapping from VMO"),
         );
 
-        assert_eq!(buffers.settings.has_image_format_constraints, true);
-        let bytes_per_row = buffers.settings.image_format_constraints.min_bytes_per_row;
-        let divisor = buffers.settings.image_format_constraints.bytes_per_row_divisor;
+        assert!(settings.image_format_constraints.is_some());
+        let image_format_constraints = settings.image_format_constraints.as_ref().unwrap();
+        let bytes_per_row = image_format_constraints.min_bytes_per_row.as_ref().unwrap();
+        let divisor = image_format_constraints.bytes_per_row_divisor.as_ref().unwrap();
         let bytes_per_row = ((bytes_per_row + divisor - 1) / divisor) * divisor;
         let stride = bytes_per_row as usize / mem::size_of::<u8>();
 
@@ -145,11 +153,11 @@ impl VmoImage {
             vmo,
             width,
             height,
-            len_bytes: len_bytes as u64,
+            len_bytes: *len_bytes as u64,
             mapping,
             stride,
             buffer_layer_cache: None,
-            coherency_domain: buffers.settings.buffer_settings.coherency_domain,
+            coherency_domain: *buffer_settings.coherency_domain.as_ref().unwrap(),
             layout: forma::buffer::layout::LinearLayout::new(
                 width as usize,
                 stride,

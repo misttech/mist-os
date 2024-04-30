@@ -727,7 +727,7 @@ mod tests {
     };
     use euclid::{approxeq::ApproxEq, size2, vec2};
     use fuchsia_async::{self as fasync, Time, TimeoutExt};
-    use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
+    use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameUsage};
     use once_cell::sync::Lazy;
 
     const DEFAULT_TIMEOUT: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(5);
@@ -746,7 +746,7 @@ mod tests {
         let mut buffer_allocator = BufferCollectionAllocator::new(
             size.width,
             size.height,
-            fidl_fuchsia_sysmem::PixelFormatType::Bgra32,
+            fidl_fuchsia_images2::PixelFormat::B8G8R8A8,
             FrameUsage::Cpu,
             3,
         )

@@ -26,10 +26,11 @@ use display_utils::{
     INVALID_LAYER_ID,
 };
 use euclid::size2;
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy};
 use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata};
 use fuchsia_async::{self as fasync, OnSignals};
-use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
+use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{
     self as zx, AsHandleRef, Duration, Event, HandleBased, Signals, Status, Time,
@@ -322,9 +323,16 @@ impl DisplayDirectViewStrategy {
         };
 
         let coordinator_token = buffer_allocator.duplicate_token().await?;
+        // Sysmem token channels serve both sysmem(1) and sysmem2, so we can convert here until
+        // display has an import_buffer_collection that takes a sysmem2 token.
         display
             .coordinator
-            .import_buffer_collection(&collection_id.into(), coordinator_token)
+            .import_buffer_collection(
+                &collection_id.into(),
+                ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                    coordinator_token.into_channel(),
+                ),
+            )
             .await?
             .map_err(zx::Status::from_raw)?;
         display
@@ -343,22 +351,42 @@ impl DisplayDirectViewStrategy {
             .await
             .context(format!("view: {:?} allocate_buffers", display.display_id))?;
 
-        ensure!(buffers.settings.has_image_format_constraints, "No image format constraints");
         ensure!(
-            buffers.buffer_count as usize == render_frame_count,
+            buffers.settings.as_ref().unwrap().image_format_constraints.is_some(),
+            "No image format constraints"
+        );
+        ensure!(
+            buffers
+                .settings
+                .as_ref()
+                .unwrap()
+                .image_format_constraints
+                .as_ref()
+                .unwrap()
+                .pixel_format_modifier
+                .is_some(),
+            "Sysmem will always set pixel_format_modifier"
+        );
+        ensure!(
+            buffers.buffers.as_ref().unwrap().len() == render_frame_count,
             "Buffers do not match frame count"
         );
 
-        let image_tiling_type =
-            if buffers.settings.image_format_constraints.pixel_format.has_format_modifier {
-                match buffers.settings.image_format_constraints.pixel_format.format_modifier.value {
-                    fidl_fuchsia_sysmem::FORMAT_MODIFIER_INTEL_I915_X_TILED => 1,
-                    fidl_fuchsia_sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED => 2,
-                    _ => fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR,
-                }
-            } else {
-                fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR
-            };
+        let image_tiling_type = match buffers
+            .settings
+            .as_ref()
+            .unwrap()
+            .image_format_constraints
+            .as_ref()
+            .unwrap()
+            .pixel_format_modifier
+            .as_ref()
+            .unwrap()
+        {
+            fidl_fuchsia_images2::PixelFormatModifier::IntelI915XTiled => 1,
+            fidl_fuchsia_images2::PixelFormatModifier::IntelI915YTiled => 2,
+            _ => fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR,
+        };
 
         let image_metadata = ImageMetadata {
             width: unsize.width,
@@ -370,7 +398,8 @@ impl DisplayDirectViewStrategy {
         let mut image_indexes = BTreeMap::new();
         let mut wait_events = WaitEvents::new();
         let mut signal_events = WaitEvents::new();
-        for index in 0..buffers.buffer_count as usize {
+        let buffer_count = buffers.buffers.as_ref().unwrap().len();
+        for index in 0..buffer_count as usize {
             let uindex = index as u32;
             let image_id = next_image_id();
             let display_image_id = DisplayImageId(image_id);

@@ -25,12 +25,13 @@ use async_trait::async_trait;
 use async_utils::hanging_get::client::HangingGetStream;
 use display_utils::BufferCollectionId as DisplayBufferCollectionId;
 use euclid::size2;
-use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream};
+use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream, ClientEnd};
+use fidl_fuchsia_images2::PixelFormat;
 use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_views::ViewRef;
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
+use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{self as zx, Event, HandleBased, Signals, Time};
@@ -94,7 +95,7 @@ impl Plumber {
         flatland: &flatland::FlatlandProxy,
         allocator: &flatland::AllocatorProxy,
         size: UintSize,
-        pixel_format: fidl_fuchsia_sysmem::PixelFormatType,
+        pixel_format: PixelFormat,
         buffer_count: usize,
         collection_id: u32,
         first_image_id: u64,
@@ -127,7 +128,13 @@ impl Plumber {
         let buffer_tokens = BufferCollectionTokenPair::new();
         let args = flatland::RegisterBufferCollectionArgs {
             export_token: Some(buffer_tokens.export_token),
-            buffer_collection_token: Some(sysmem_buffer_collection_token),
+            // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here
+            // until flatland has a field for a sysmem2 token.
+            buffer_collection_token: Some(ClientEnd::<
+                fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
+            >::new(
+                sysmem_buffer_collection_token.into_channel()
+            )),
             ..Default::default()
         };
 
@@ -146,7 +153,8 @@ impl Plumber {
         };
         let mut image_ids = BTreeSet::new();
         let mut image_indexes = BTreeMap::new();
-        for index in 0..buffers.buffer_count as usize {
+        let buffer_count = buffers.buffers.as_ref().unwrap().len();
+        for index in 0..buffer_count as usize {
             let image_id = index + first_image_id as usize;
             image_ids.insert(image_id as u64);
             let uindex = index as u32;
@@ -527,7 +535,7 @@ impl FlatlandViewStrategy {
                 &self.flatland,
                 &self.allocator,
                 size.to_u32(),
-                fidl_fuchsia_sysmem::PixelFormatType::Bgra32,
+                fidl_fuchsia_images2::PixelFormat::B8G8R8A8,
                 RENDER_BUFFER_COUNT,
                 buffer_collection_id,
                 next_image_id,

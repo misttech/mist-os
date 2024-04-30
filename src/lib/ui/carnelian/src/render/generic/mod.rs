@@ -11,7 +11,7 @@ use euclid::{
     point2, size2,
 };
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_sysmem::BufferCollectionTokenMarker;
+use fidl_fuchsia_sysmem2::BufferCollectionTokenMarker;
 
 use crate::{color::Color, drawing::DisplayRotation, Point, ViewAssistantContext};
 

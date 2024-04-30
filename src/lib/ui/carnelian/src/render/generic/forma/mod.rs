@@ -10,7 +10,7 @@ use crate::{
 
 use euclid::default::Size2D;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_sysmem::BufferCollectionTokenMarker;
+use fidl_fuchsia_sysmem2::BufferCollectionTokenMarker;
 
 mod composition;
 mod context;

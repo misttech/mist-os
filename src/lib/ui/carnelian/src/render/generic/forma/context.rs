@@ -7,18 +7,18 @@ use std::{cell::RefCell, collections::HashMap, io::Read, mem, ptr, u32};
 use anyhow::Error;
 use display_utils::PixelFormat;
 use euclid::default::{Rect, Size2D};
-use fidl::endpoints::{ClientEnd, ServerEnd};
-use fidl_fuchsia_sysmem::{
-    AllocatorMarker, BufferCollectionConstraints, BufferCollectionSynchronousProxy,
-    BufferCollectionTokenMarker, BufferMemoryConstraints, BufferUsage, CoherencyDomain, ColorSpace,
-    ColorSpaceType, FormatModifier, HeapType, ImageFormatConstraints,
-    PixelFormat as SysmemPixelFormat, PixelFormatType, CPU_USAGE_WRITE_OFTEN,
-    FORMAT_MODIFIER_LINEAR,
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_images2::{ColorSpace, PixelFormat as Images2PixelFormat, PixelFormatModifier};
+use fidl_fuchsia_math::SizeU;
+use fidl_fuchsia_sysmem2::{
+    AllocatorBindSharedCollectionRequest, AllocatorMarker, BufferCollectionConstraints,
+    BufferCollectionMarker, BufferCollectionSetConstraintsRequest,
+    BufferCollectionSynchronousProxy, BufferCollectionTokenMarker, BufferMemoryConstraints,
+    BufferUsage, CoherencyDomain, ImageFormatConstraints, CPU_USAGE_WRITE_OFTEN,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_framebuffer::sysmem::set_allocator_name;
+use fuchsia_framebuffer::sysmem2::set_allocator_name;
 use fuchsia_trace::{duration_begin, duration_end};
-use fuchsia_zircon as zx;
 use fuchsia_zircon::sys;
 
 use crate::{
@@ -35,56 +35,26 @@ use crate::{
 
 fn buffer_collection_constraints(width: u32, height: u32) -> BufferCollectionConstraints {
     let image_format_constraints = ImageFormatConstraints {
-        pixel_format: SysmemPixelFormat {
-            type_: PixelFormatType::Bgra32,
-            has_format_modifier: true,
-            format_modifier: FormatModifier { value: FORMAT_MODIFIER_LINEAR },
-        },
-        color_spaces_count: 1,
-        color_space: [ColorSpace { type_: ColorSpaceType::Srgb }; 32],
-        min_coded_width: width,
-        max_coded_width: u32::MAX,
-        min_coded_height: height,
-        max_coded_height: u32::MAX,
-        min_bytes_per_row: width * mem::size_of::<u32>() as u32,
-        max_bytes_per_row: u32::MAX,
-        max_coded_width_times_coded_height: u32::MAX,
-        layers: 1,
-        coded_width_divisor: 1,
-        coded_height_divisor: 1,
-        bytes_per_row_divisor: 1,
-        start_offset_divisor: 1,
-        display_width_divisor: 1,
-        display_height_divisor: 1,
-        required_min_coded_width: 0,
-        required_max_coded_width: 0,
-        required_min_coded_height: 0,
-        required_max_coded_height: 0,
-        required_min_bytes_per_row: 0,
-        required_max_bytes_per_row: 0,
+        pixel_format: Some(Images2PixelFormat::B8G8R8A8),
+        pixel_format_modifier: Some(PixelFormatModifier::Linear),
+        color_spaces: Some(vec![ColorSpace::Srgb]),
+        min_size: Some(SizeU { width, height }),
+        min_bytes_per_row: Some(width * mem::size_of::<u32>() as u32),
+        ..Default::default()
     };
 
     BufferCollectionConstraints {
-        usage: BufferUsage { none: 0, cpu: CPU_USAGE_WRITE_OFTEN, vulkan: 0, display: 0, video: 0 },
-        min_buffer_count_for_camping: 0,
-        min_buffer_count_for_dedicated_slack: 0,
-        min_buffer_count_for_shared_slack: 0,
-        min_buffer_count: 1,
-        max_buffer_count: u32::MAX,
-        has_buffer_memory_constraints: true,
-        buffer_memory_constraints: BufferMemoryConstraints {
-            min_size_bytes: width * height * mem::size_of::<u32>() as u32,
-            max_size_bytes: u32::MAX,
-            physically_contiguous_required: false,
-            secure_required: false,
-            ram_domain_supported: true,
-            cpu_domain_supported: true,
-            inaccessible_domain_supported: false,
-            heap_permitted_count: 0,
-            heap_permitted: [HeapType::SystemRam; 32],
-        },
-        image_format_constraints_count: 1,
-        image_format_constraints: [image_format_constraints; 32],
+        usage: Some(BufferUsage { cpu: Some(CPU_USAGE_WRITE_OFTEN), ..Default::default() }),
+        min_buffer_count: Some(1),
+        buffer_memory_constraints: Some(BufferMemoryConstraints {
+            min_size_bytes: Some(width as u64 * height as u64 * mem::size_of::<u32>() as u64),
+            ram_domain_supported: Some(true),
+            cpu_domain_supported: Some(true),
+            inaccessible_domain_supported: Some(false),
+            ..Default::default()
+        }),
+        image_format_constraints: Some(vec![image_format_constraints]),
+        ..Default::default()
     }
 }
 
@@ -160,17 +130,22 @@ impl FormaContext {
     ) -> Self {
         let sysmem = connect_to_protocol::<AllocatorMarker>().expect("failed to connect to sysmem");
         set_allocator_name(&sysmem).unwrap_or_else(|e| eprintln!("set_allocator_name: {:?}", e));
-        let (collection_client, collection_request) = zx::Channel::create();
+        let (collection_client, collection_request) =
+            fidl::endpoints::create_endpoints::<BufferCollectionMarker>();
         sysmem
-            .bind_shared_collection(
-                ClientEnd::new(token.into_channel()),
-                ServerEnd::new(collection_request),
-            )
+            .bind_shared_collection(AllocatorBindSharedCollectionRequest {
+                token: Some(token),
+                buffer_collection_request: Some(collection_request),
+                ..Default::default()
+            })
             .expect("failed to bind shared collection");
-        let buffer_collection = BufferCollectionSynchronousProxy::new(collection_client);
+        let buffer_collection = collection_client.into_sync_proxy();
         let constraints = buffer_collection_constraints(size.width, size.height);
         buffer_collection
-            .set_constraints(true, &constraints)
+            .set_constraints(BufferCollectionSetConstraintsRequest {
+                constraints: Some(constraints),
+                ..Default::default()
+            })
             .expect("failed to set constraints on sysmem buffer");
 
         Self {
