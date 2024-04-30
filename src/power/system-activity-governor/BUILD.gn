@@ -61,5 +61,8 @@ fuchsia_package("package") {
 
 group("tests") {
   testonly = true
-  deps = [ "integration/tests" ]
+  deps = [
+    "fake/tests",
+    "integration/tests",
+  ]
 }

@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
-  name = "fake_system_activity_governor"
+  name = "test_system_activity_governor"
   edition = "2021"
   sources = [
     "src/main.rs",

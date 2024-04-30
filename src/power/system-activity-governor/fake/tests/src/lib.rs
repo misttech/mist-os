@@ -233,6 +233,15 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .unwrap()
         .unwrap();
 
+    let mut current_state = fctrl::SystemActivityGovernorState {
+        execution_state_level: Some(ExecutionStateLevel::Active),
+        application_activity_level: Some(ApplicationActivityLevel::Active),
+        full_wake_handling_level: Some(FullWakeHandlingLevel::Inactive),
+        wake_handling_level: Some(WakeHandlingLevel::Inactive),
+        ..Default::default()
+    };
+    assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
+
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
             execution_state_level: Some(ExecutionStateLevel::Inactive),
@@ -242,6 +251,9 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .await
         .unwrap()
         .unwrap();
+    current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
+    current_state.execution_state_level.replace(ExecutionStateLevel::Inactive);
+    assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
     // OnSuspend and OnResume should have been called once.
     on_suspend_rx.next().await.unwrap();
@@ -268,6 +280,9 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .await
         .unwrap()
         .unwrap();
+    current_state.application_activity_level.replace(ApplicationActivityLevel::Active);
+    current_state.execution_state_level.replace(ExecutionStateLevel::Active);
+    assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
     assert_eq!(1, test_driver.required_level.watch().await?.unwrap());
     assert_eq!(
@@ -329,6 +344,11 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
+    // Wait until SAG state changes to [2, 1, 0, 0].
+    current_state.full_wake_handling_level.replace(FullWakeHandlingLevel::Inactive);
+    current_state.application_activity_level.replace(ApplicationActivityLevel::Active);
+    assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
+
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
             execution_state_level: Some(ExecutionStateLevel::WakeHandling),
@@ -342,6 +362,8 @@ async fn test_set_valid_sag_states() -> Result<()> {
 
     // Wait until SAG state changes to [1, 0, 1, 0].
     current_state.execution_state_level.replace(ExecutionStateLevel::WakeHandling);
+    current_state.full_wake_handling_level.replace(FullWakeHandlingLevel::Active);
+    current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
     let _ = sag_ctrl_state
@@ -464,7 +486,7 @@ async fn test_set_invalid_sag_states() -> Result<()> {
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
 
     // Check initial booting state [2, 0, 0, 0].
-    let state = fctrl::SystemActivityGovernorState {
+    let mut state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
         application_activity_level: Some(ApplicationActivityLevel::Inactive),
         full_wake_handling_level: Some(FullWakeHandlingLevel::Active),
@@ -487,6 +509,8 @@ async fn test_set_invalid_sag_states() -> Result<()> {
             .unwrap(),
         Ok(())
     );
+    state.application_activity_level.replace(ApplicationActivityLevel::Active);
+    assert_eq!(sag_ctrl_state.watch().await.unwrap(), state);
 
     // After triggering "boot complete" logic, when ExecutionState is Active, ApplicationActivity has to be active.
     assert_eq!(

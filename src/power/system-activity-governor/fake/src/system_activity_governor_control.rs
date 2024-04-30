@@ -127,34 +127,45 @@ impl SystemActivityGovernorControl {
             .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
             .collect();
 
+        // execution_state power level is initially Inactive and quickly changes to Active upon SAG
+        // start. Usually when the status_endpoints are fetched, SAG has finished this transition
+        // from Inactive to Active. The stable state initial state of execution_state is Active.
         let es_status = status_endpoints.remove("execution_state".into()).unwrap();
-        let intial_execution_state_level = ExecutionStateLevel::from_primitive(
+        let mut initial_execution_state_level = ExecutionStateLevel::from_primitive(
             es_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
+        // In rare cases, this transition hasn't happened. Get the stable state power level in a
+        // second watch call.
+        if initial_execution_state_level == ExecutionStateLevel::Inactive {
+            initial_execution_state_level = ExecutionStateLevel::from_primitive(
+                es_status.watch_power_level().await.unwrap().unwrap(),
+            )
+            .unwrap();
+        }
         let aa_status = status_endpoints.remove("application_activity".into()).unwrap();
-        let intial_application_activity_level = ApplicationActivityLevel::from_primitive(
+        let initial_application_activity_level = ApplicationActivityLevel::from_primitive(
             aa_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
 
         let fwh_status = status_endpoints.remove("full_wake_handling".into()).unwrap();
-        let intial_full_wake_handling_level = FullWakeHandlingLevel::from_primitive(
+        let initial_full_wake_handling_level = FullWakeHandlingLevel::from_primitive(
             fwh_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
 
         let wh_status = status_endpoints.remove("wake_handling".into()).unwrap();
-        let intial_wake_handling_level = WakeHandlingLevel::from_primitive(
+        let initial_wake_handling_level = WakeHandlingLevel::from_primitive(
             wh_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
 
         let state = fctrl::SystemActivityGovernorState {
-            execution_state_level: Some(intial_execution_state_level),
-            application_activity_level: Some(intial_application_activity_level),
-            full_wake_handling_level: Some(intial_full_wake_handling_level),
-            wake_handling_level: Some(intial_wake_handling_level),
+            execution_state_level: Some(initial_execution_state_level),
+            application_activity_level: Some(initial_application_activity_level),
+            full_wake_handling_level: Some(initial_full_wake_handling_level),
+            wake_handling_level: Some(initial_wake_handling_level),
             ..Default::default()
         };
         let current_state = Rc::new(Mutex::new(state.clone()));
