@@ -9,12 +9,12 @@ use crate::{
     vfs::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-        fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, DirEntry, DirectoryEntryType,
-        DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdNumber,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback,
-        SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget, ValueOrSize,
-        VecDirectory, VecDirectoryEntry, XattrOp,
+        fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, CheckAccessReason, DirEntry,
+        DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode,
+        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
+        SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
     },
 };
 use bstr::B;
@@ -909,24 +909,39 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         access: Access,
         info: &RwLock<FsNodeInfo>,
+        reason: CheckAccessReason,
     ) -> Result<(), Errno> {
-        if FuseFs::from_fs(&node.fs())?
-            .default_permissions
-            .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
-        {
-            let info = self.refresh_expired_node_attributes(current_task, info)?;
-            return node.default_check_access_impl(current_task, access, info);
-        }
+        match reason {
+            CheckAccessReason::Access | CheckAccessReason::Chdir | CheckAccessReason::Chroot => {
+                if FuseFs::from_fs(&node.fs())?
+                    .default_permissions
+                    .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
+                {
+                    let info = self.refresh_expired_node_attributes(current_task, info)?;
+                    return node.default_check_access_impl(current_task, access, info);
+                }
 
-        let response = self.connection.lock().execute_operation(
-            current_task,
-            self,
-            FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
-        )?;
-        if let FuseResponse::Access(result) = response {
-            result
-        } else {
-            error!(EINVAL)
+                // Per `libfuse`'s low-level handler for `FUSE_ACCESS` requests, the kernel
+                // is only expected to send `FUSE_ACCESS` requests for the `access` and `chdir`
+                // family of syscalls when the `default_permissions` flag isn't set on the FUSE
+                // fs. Seems like `chroot` also triggers a `FUSE_ACCESS` request on Linux.
+
+                let response = self.connection.lock().execute_operation(
+                    current_task,
+                    self,
+                    FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
+                )?;
+
+                if let FuseResponse::Access(result) = response {
+                    result
+                } else {
+                    error!(EINVAL)
+                }
+            }
+            CheckAccessReason::InternalPermissionChecks => {
+                let info = self.refresh_expired_node_attributes(current_task, info)?;
+                return node.default_check_access_impl(current_task, access, info);
+            }
         }
     }
 

@@ -19,8 +19,8 @@ use crate::{
         SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, Waiter,
     },
     vfs::{
-        FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, ResolveBase,
-        SymlinkMode, SymlinkTarget, MAX_SYMLINK_FOLLOWS,
+        CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
+        NamespaceNode, ResolveBase, SymlinkMode, SymlinkTarget, MAX_SYMLINK_FOLLOWS,
     },
 };
 use extended_pstate::ExtendedPstateState;
@@ -424,7 +424,7 @@ impl CurrentTask {
             if !dir.entry.node.is_dir() {
                 return error!(ENOTDIR);
             }
-            dir.check_access(self, Access::EXEC)?;
+            dir.check_access(self, Access::EXEC, CheckAccessReason::InternalPermissionChecks)?;
         }
         Ok((dir, path.into()))
     }
@@ -829,7 +829,11 @@ impl CurrentTask {
         // File node must have EXEC mode permissions.
         // Note that the ability to execute a file is unrelated to the flags
         // used in the `open` call.
-        executable.name.check_access(self, Access::EXEC)?;
+        executable.name.check_access(
+            self,
+            Access::EXEC,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
 
         let elf_security_state = security::check_exec_access(self, executable.node())?;
 

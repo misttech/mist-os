@@ -5,8 +5,8 @@
 use crate::{
     task::CurrentTask,
     vfs::{
-        path, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, MountInfo,
-        NamespaceNode, UnlinkKind,
+        path, CheckAccessReason, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr,
+        FsString, MountInfo, NamespaceNode, UnlinkKind,
     },
 };
 use bitflags::bitflags;
@@ -494,8 +494,18 @@ impl DirEntry {
         }
 
         // This task must have write access to the old and new parent nodes.
-        old_parent.node.check_access(current_task, mount, Access::WRITE)?;
-        new_parent.node.check_access(current_task, mount, Access::WRITE)?;
+        old_parent.node.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
+        new_parent.node.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
 
         // The mount check ensures that the nodes we're touching are part of the
         // same file system. It doesn't matter where we grab the FileSystem reference from.
@@ -716,7 +726,12 @@ impl DirEntry {
             return error!(ENOTDIR);
         }
         // The user must be able to search the directory (requires the EXEC permission)
-        self.node.check_access(current_task, mount, Access::EXEC)?;
+        self.node.check_access(
+            current_task,
+            mount,
+            Access::EXEC,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
 
         // Check if the child is already in children. In that case, we can
         // simply return the child and we do not need to call init_fn.

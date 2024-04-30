@@ -497,6 +497,13 @@ impl FallocMode {
     }
 }
 
+pub enum CheckAccessReason {
+    Access,
+    Chdir,
+    Chroot,
+    InternalPermissionChecks,
+}
+
 pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Delegate the access check to the node.
     fn check_access(
@@ -505,6 +512,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         current_task: &CurrentTask,
         access: Access,
         info: &RwLock<FsNodeInfo>,
+        _reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         node.default_check_access_impl(current_task, access, info.read())
     }
@@ -1184,7 +1192,12 @@ impl FsNode {
                 self.check_o_noatime_allowed(current_task)?;
             }
 
-            self.check_access(current_task, mount, Access::from_open_flags(flags))?;
+            self.check_access(
+                current_task,
+                mount,
+                Access::from_open_flags(flags),
+                CheckAccessReason::InternalPermissionChecks,
+            )?;
         }
 
         let (mode, rdev) = {
@@ -1224,7 +1237,12 @@ impl FsNode {
         mount: &MountInfo,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.check_access(current_task, mount, Access::EXEC)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::EXEC,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.ops().lookup(self, current_task, name)
     }
 
@@ -1242,7 +1260,12 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
         if mode.is_dir() {
@@ -1280,7 +1303,12 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)
     }
@@ -1293,7 +1321,12 @@ impl FsNode {
         mut owner: FsCred,
         link_behavior: FsNodeLinkBehavior,
     ) -> Result<FsNodeHandle, Errno> {
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
         node.link_behavior.set(link_behavior).unwrap();
@@ -1318,7 +1351,12 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
 
         if child.is_dir() {
             return error!(EPERM);
@@ -1345,15 +1383,22 @@ impl FsNode {
         if !creds.has_capability(CAP_FOWNER) && child_uid != creds.fsuid {
             // If current_task is not the user of the existing file, it needs to have read and write
             // access to the existing file.
-            child.check_access(current_task, mount, Access::READ | Access::WRITE).map_err(|e| {
-                // `check_access(..)` returns EACCES when the access rights doesn't match - change
-                // it to EPERM to match Linux standards.
-                if e == EACCES {
-                    errno!(EPERM)
-                } else {
-                    e
-                }
-            })?;
+            child
+                .check_access(
+                    current_task,
+                    mount,
+                    Access::READ | Access::WRITE,
+                    CheckAccessReason::InternalPermissionChecks,
+                )
+                .map_err(|e| {
+                    // `check_access(..)` returns EACCES when the access rights doesn't match - change
+                    // it to EPERM to match Linux standards.
+                    if e == EACCES {
+                        errno!(EPERM)
+                    } else {
+                        e
+                    }
+                })?;
             // There are also security issues that may arise when users link to setuid, setgid, or
             // special files.
             if mode.contains(FileMode::ISGID | FileMode::IXGRP) {
@@ -1384,7 +1429,12 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         // The user must be able to search and write to the directory.
-        self.check_access(current_task, mount, Access::EXEC | Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::EXEC | Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.check_sticky_bit(current_task, child)?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().unlink(&mut locked, self, current_task, name, child)?;
@@ -1406,7 +1456,12 @@ impl FsNode {
             return error!(EISDIR);
         }
 
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
 
         self.truncate_common(locked, current_task, length)
     }
@@ -1607,12 +1662,13 @@ impl FsNode {
         current_task: &CurrentTask,
         mount: &MountInfo,
         access: Access,
+        reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         if access.contains(Access::WRITE) {
             mount.check_readonly_filesystem()?;
         }
 
-        self.ops.check_access(self, current_task, access, &self.info)
+        self.ops.check_access(self, current_task, access, &self.info, reason)
     }
 
     /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
@@ -1893,7 +1949,12 @@ impl FsNode {
         name: &FsStr,
         max_size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
-        self.check_access(current_task, mount, Access::READ)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::READ,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
         self.ops().get_xattr(self, current_task, name, max_size)
     }
@@ -1906,7 +1967,12 @@ impl FsNode {
         value: &FsStr,
         op: XattrOp,
     ) -> Result<(), Errno> {
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
         self.ops().set_xattr(self, current_task, name, value, op)?;
         post_setxattr(current_task, self, name, value);
@@ -1919,7 +1985,12 @@ impl FsNode {
         mount: &MountInfo,
         name: &FsStr,
     ) -> Result<(), Errno> {
-        self.check_access(current_task, mount, Access::WRITE)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
         self.ops().remove_xattr(self, current_task, name)
     }
@@ -2015,7 +2086,12 @@ impl FsNode {
         let set_current_time = matches!((atime, mtime), (TimeUpdateType::Now, TimeUpdateType::Now));
         if !has_owner_priviledge {
             if set_current_time {
-                self.check_access(current_task, mount, Access::WRITE)?
+                self.check_access(
+                    current_task,
+                    mount,
+                    Access::WRITE,
+                    CheckAccessReason::InternalPermissionChecks,
+                )?
             } else {
                 return error!(EPERM);
             }
@@ -2257,7 +2333,12 @@ mod tests {
                 info.uid = uid;
                 info.gid = gid;
             });
-            node.check_access(&current_task, &MountInfo::detached(), access)
+            node.check_access(
+                &current_task,
+                &MountInfo::detached(),
+                access,
+                CheckAccessReason::InternalPermissionChecks,
+            )
         };
 
         assert_eq!(check_access(0, 0, 0o700, Access::EXEC), error!(EACCES));
