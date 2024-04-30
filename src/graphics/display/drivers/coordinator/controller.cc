@@ -865,42 +865,52 @@ ConfigStamp Controller::TEST_controller_stamp() const {
   return controller_stamp_;
 }
 
-zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
-  ZX_DEBUG_ASSERT_MSG(device_ptr && device_ptr->get() == this, "Wrong controller passed to Bind()");
+// static
+zx::result<> Controller::Create(zx_device_t* parent) {
+  fbl::AllocChecker alloc_checker;
 
+  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, parent);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for Controller");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  zx::result<> bind_result = controller->Bind();
+  if (bind_result.is_error()) {
+    zxlogf(ERROR, "Failed to bind the Controller device: %s", bind_result.status_string());
+    return bind_result.take_error();
+  }
+
+  controller->PostBind();
+
+  // `controller` is now managed by the driver manager.
+  [[maybe_unused]] Controller* controller_released = controller.release();
+
+  return zx::ok();
+}
+
+zx::result<> Controller::Bind() {
   zx_status_t status = engine_driver_client_.Bind();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind driver %d", status);
-    return status;
+    return zx::error(status);
   }
 
   status = loop_.StartThread("display-client-loop", &loop_thread_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to start loop %d", status);
-    return status;
-  }
-
-  status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
-                      .set_flags(DEVICE_ADD_NON_BINDABLE)
-                      .set_inspect_vmo(inspector_.DuplicateVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add display core device %d", status);
-    return status;
+    return zx::error(status);
   }
 
   // Set the display controller looper thread to use a scheduler role.
   {
-    const char* role_name = "fuchsia.graphics.display.drivers.display.controller";
-    status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(loop_thread_), role_name,
-                                        strlen(role_name));
+    const char kRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
+    status = device_set_profile_by_role(parent(), thrd_get_zx_handle(loop_thread_), kRoleName,
+                                        strlen(kRoleName));
     if (status != ZX_OK) {
       zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
     }
   }
-
-  [[maybe_unused]] auto ptr = device_ptr->release();
-
-  engine_driver_client_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
 
   supports_capture_ = engine_driver_client_.IsCaptureSupported();
   zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
@@ -909,9 +919,24 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
   zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
   if (vsync_monitor_init_result.is_error()) {
     // VsyncMonitor::Init() logged the error.
-    return vsync_monitor_init_result.status_value();
+    return vsync_monitor_init_result.take_error();
   }
-  return ZX_OK;
+
+  status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
+                      .set_flags(DEVICE_ADD_NON_BINDABLE)
+                      .set_inspect_vmo(inspector_.DuplicateVmo()));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add display coordinator device: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  return zx::ok();
+}
+
+void Controller::PostBind() {
+  // Now that the driver is bound successfully, it's safe to link the display
+  // coordinator to the engine driver.
+  engine_driver_client_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
 }
 
 void Controller::DdkUnbind(ddk::UnbindTxn txn) {
@@ -979,25 +1004,15 @@ size_t Controller::TEST_imported_images_count() const {
   return virtcon_images + primary_images + display_images;
 }
 
-// ControllerInstance methods
-
-}  // namespace display
-
-static zx_status_t display_controller_bind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  std::unique_ptr<display::Controller> core(new (&ac) display::Controller(parent));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  return core->Bind(&core);
-}
-
-static constexpr zx_driver_ops_t display_controller_ops = []() {
+static constexpr zx_driver_ops_t kControllerOps = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = display_controller_bind;
+  ops.bind = [](void* ctx, zx_device_t* device) {
+    return Controller::Create(device).status_value();
+  };
   return ops;
 }();
 
-ZIRCON_DRIVER(display_controller, display_controller_ops, "zircon", "0.1");
+}  // namespace display
+
+ZIRCON_DRIVER(display_controller, display::kControllerOps, "zircon", "0.1");

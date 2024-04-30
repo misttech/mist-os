@@ -90,12 +90,13 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
                             display_->display_controller_impl_banjo_protocol()->ops,
                             display_->display_controller_impl_banjo_protocol()->ctx);
 
-  std::unique_ptr<display::Controller> c(new Controller(mock_display));
-  // Save a copy for test cases.
-  coordinator_controller_ = c.get();
-  if (auto status = c->Bind(&c); status != ZX_OK) {
-    ZX_PANIC("c->Bind(&c) return status was not ZX_OK. Error: %s.", zx_status_get_string(status));
+  zx::result<> create_controller_result = Controller::Create(mock_display);
+  if (create_controller_result.is_error()) {
+    ZX_PANIC("Failed to create display coordinator Controller device: %s",
+             create_controller_result.status_string());
   }
+  // Save a copy for test cases.
+  coordinator_controller_ = mock_display->GetLatestChild()->GetDeviceContext<display::Controller>();
 
   auto display_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
   fidl::BindServer(display_loop_.dispatcher(), std::move(display_endpoints->server),

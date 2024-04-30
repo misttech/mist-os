@@ -68,6 +68,10 @@ class Controller : public DeviceType,
                    public ddk::DisplayControllerInterfaceProtocol<Controller>,
                    public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
  public:
+  // Factory method used by the device manager glue code.
+  // Creates and binds a new coordinator Controller device.
+  static zx::result<> Create(zx_device_t* parent);
+
   // Creates a new coordinator Controller device. It creates a new Inspector
   // which will be solely owned by the Controller device.
   explicit Controller(zx_device_t* parent);
@@ -85,7 +89,6 @@ class Controller : public DeviceType,
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
-  zx_status_t Bind(std::unique_ptr<display::Controller>* device_ptr);
 
   void DisplayControllerInterfaceOnDisplaysChanged(
       const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
@@ -147,6 +150,15 @@ class Controller : public DeviceType,
  private:
   friend ControllerTest;
   friend IntegrationTest;
+
+  // Initializes the driver and binds it to the driver manager.
+  zx::result<> Bind();
+
+  // Initialization logic that occurs after the driver is bound to the driver
+  // manager.
+  //
+  // Must be called after a successful Bind().
+  void PostBind();
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
