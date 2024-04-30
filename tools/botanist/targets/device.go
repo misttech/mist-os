@@ -456,30 +456,7 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 	return err
 }
 
-func (t *Device) writePubKey() (string, error) {
-	pubkey, err := os.CreateTemp("", "pubkey*")
-	if err != nil {
-		return "", err
-	}
-	defer pubkey.Close()
-
-	if _, err := pubkey.Write(ssh.MarshalAuthorizedKey(t.signers[0].PublicKey())); err != nil {
-		return "", err
-	}
-	return pubkey.Name(), nil
-}
-
 func (t *Device) flash(ctx context.Context, productBundle string) error {
-	var pubkey string
-	var err error
-	if len(t.signers) > 0 {
-		pubkey, err = t.writePubKey()
-		if err != nil {
-			return err
-		}
-		defer os.Remove(pubkey)
-	}
-
 	// Print logs to avoid hitting the I/O timeout.
 	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
@@ -490,7 +467,7 @@ func (t *Device) flash(ctx context.Context, productBundle string) error {
 	}()
 
 	// TODO(https://fxbug.dev/42168777): Need support for ffx target flash for cuckoo tests.
-	return t.ffx.Flash(ctx, t.config.FastbootSernum, pubkey, productBundle)
+	return t.ffx.Flash(ctx, t.config.FastbootSernum, "", productBundle)
 }
 
 // Nasty hack to try to deal with the fact that some devices have real bad USB

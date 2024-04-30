@@ -170,7 +170,6 @@ type GCE struct {
 	ipv4        net.IP
 	loggerCtx   context.Context
 	opts        Options
-	pubkeyPath  string
 	serial      io.ReadWriteCloser
 }
 
@@ -186,20 +185,6 @@ type createInstanceRes struct {
 
 // NewGCE creates, starts, and connects to the serial console of a GCE VM.
 func NewGCE(ctx context.Context, config GCEConfig, opts Options) (*GCE, error) {
-	// Generate an SSH key pair. We do this even if the caller has provided
-	// an SSH key in opts because we require a very specific input format:
-	// PEM encoded, PKCS1 marshaled RSA keys.
-	pkeyPath, err := generatePrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	opts.SSHKey = pkeyPath
-	pubkeyPath, err := generatePublicKey(opts.SSHKey)
-	if err != nil {
-		return nil, err
-	}
-	logger.Infof(ctx, "generated SSH key pair for use with GCE instance")
-
 	u, err := user.Current()
 	if err != nil {
 		return nil, err
@@ -209,7 +194,6 @@ func NewGCE(ctx context.Context, config GCEConfig, opts Options) (*GCE, error) {
 		currentUser: u.Username,
 		loggerCtx:   ctx,
 		opts:        opts,
-		pubkeyPath:  pubkeyPath,
 	}
 
 	if config.InstanceName == "" && config.Zone == "" {
@@ -274,7 +258,7 @@ func (g *GCE) provisionSSHKey(ctx context.Context) error {
 	}
 	time.Sleep(2 * time.Minute)
 	logger.Infof(g.loggerCtx, "provisioning SSH key over serial")
-	p, err := os.ReadFile(g.pubkeyPath)
+	p, err := os.ReadFile(g.opts.AuthorizedKey)
 	if err != nil {
 		return err
 	}
@@ -333,7 +317,7 @@ func (g *GCE) addSSHKey() error {
 		"-instance-name", g.config.InstanceName,
 		"-zone", g.config.Zone,
 		"-user", g.currentUser,
-		"-pubkey", g.pubkeyPath,
+		"-pubkey", g.opts.AuthorizedKey,
 	}
 	logger.Infof(g.loggerCtx, "GCE Mediator client command: %s", invocation)
 	cmd := exec.Command(invocation[0], invocation[1:]...)
@@ -360,7 +344,7 @@ func (g *GCE) createInstance() error {
 		"-swarming-host", g.config.SwarmingServer,
 		"-machine-shape", g.config.MachineShape,
 		"-user", g.currentUser,
-		"-pubkey", g.pubkeyPath,
+		"-pubkey", g.opts.AuthorizedKey,
 	}
 
 	logger.Infof(g.loggerCtx, "GCE Mediator client command: %s", invocation)
