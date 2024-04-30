@@ -248,7 +248,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/vim3-pwm-backlight.cm" ]
     },
     {
-      package_target = "//src/ui/input/drivers/adc-buttons:package"
+      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/adc-buttons.cm" ]
     },

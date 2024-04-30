@@ -2,10 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/drivers/bazel_driver_package.gni")
+import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
-import("//build/components.gni")
-import("//build/drivers.gni")
-import("//build/test.gni")
+
+bazel_driver_package("bazel_package") {
+  bazel_target = "//src/ui/input/drivers/adc-buttons:adc-buttons"
+  package_name = "adc-buttons"
+}
 
 driver_bind_rules("adc-buttons-bind") {
   rules = "adc-buttons.bind"
@@ -18,67 +22,11 @@ driver_bind_rules("adc-buttons-bind") {
   ]
 }
 
-fuchsia_driver("adc-buttons-driver") {
-  output_name = "adc-buttons"
-  deps = [
-    ":adc-buttons-bind",
-    ":common",
-    "//src/devices/lib/driver:driver_runtime",
-  ]
-}
-
-fuchsia_driver_component("adc-buttons") {
-  visibility = [ ":*" ]
-  component_name = "adc-buttons"
-  deps = [ ":adc-buttons-driver" ]
-  info = "adc-buttons-info.json"
-  manifest = "meta/adc-buttons.cml"
-}
-
-fuchsia_driver_package("package") {
-  package_name = "adc-buttons"
-  driver_components = [ ":adc-buttons" ]
-}
-
-source_set("common") {
-  sources = [
-    "adc-buttons-device.cc",
-    "adc-buttons.cc",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_cpp",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devfs/cpp",
-    "//src/devices/bin/driver_runtime",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
-test("adc-buttons-test") {
-  configs += [ "//build/config:all_source" ]
-  output_name = "adc-buttons-test"
-  sources = [ "adc-buttons-test.cc" ]
-  deps = [
-    ":common",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/compat/cpp:cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_unittest_package("adc-buttons-test-package") {
-  package_name = "adc-buttons-test"
-  deps = [ ":adc-buttons-test" ]
+bazel_fuchsia_test_package("adc-buttons-test-package") {
+  test_package_name = "adc-buttons-test"
+  test_component_names = [ "adc-buttons-test-bin" ]
   test_specs = {
+    environments = basic_envs
     log_settings = {
       max_severity = "ERROR"
     }
