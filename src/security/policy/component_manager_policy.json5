@@ -277,9 +277,6 @@
                 source_name: "fuchsia.kernel.VmexResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/42073035): Remove once merkle verification happens
-                    // out-of-process.
-                    "/bootstrap/fshost/fxfs",
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
