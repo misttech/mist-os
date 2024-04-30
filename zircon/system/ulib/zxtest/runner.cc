@@ -8,8 +8,12 @@
 #include <string_view>
 #include <utility>
 
+#include <fbl/alloc_checker.h>
+
 #if _KERNEL_MISTOS
 #include <lib/lazy_init/lazy_init.h>
+
+#include <ktl/unique_ptr.h>
 #endif
 #include <fbl/string_printf.h>
 #include <zxtest/base/log-sink.h>
@@ -203,7 +207,9 @@ void Runner::SkipCurrent(const Message& message) {
 #if _KERNEL_MISTOS
 lazy_init::LazyInit<Runner> g_runner;
 void InitRunner(uint level) {
-  g_runner.Initialize(Reporter(std::make_unique<FileLogSink>(stdout)));
+  fbl::AllocChecker ac;
+  g_runner.Initialize(Reporter(ktl::make_unique<FileLogSink>(&ac, stdout)));
+  ZX_ASSERT(ac.check());
 }
 #endif
 

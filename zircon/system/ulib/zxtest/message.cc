@@ -39,7 +39,9 @@ fbl::String ToHex(const void* ptr, size_t size) {
   // 1 char for each space after a byte, except for the last byte.
   const size_t expected_size = 3 * size - 1;
 #ifdef _KERNEL_MISTOS
-  char* buffer = new char[expected_size];
+  fbl::AllocChecker ac;
+  char* buffer = new (ac) char[expected_size];
+  ZX_ASSERT(ac.check());
   auto defer = fit::defer([&buffer] { delete[] buffer; });
 #else
   char buffer[expected_size];
@@ -124,7 +126,7 @@ fbl::String PrintValue(const fbl::String& value) {
 }
 
 fbl::String PrintStatus(zx_status_t status) {
-#ifdef __Fuchsia__
+#if defined(__Fuchsia__) || defined(_KERNEL_MISTOS)
   return fbl::StringPrintf("%s(%d)", zx_status_get_string(status), status);
 #else
   return fbl::StringPrintf("%d", status);

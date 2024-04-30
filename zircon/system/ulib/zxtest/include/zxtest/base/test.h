@@ -8,6 +8,12 @@
 #include <memory>
 #include <utility>
 
+#if _KERNEL_MISTOS
+#include <zircon/assert.h>
+
+#include <fbl/alloc_checker.h>
+#include <ktl/unique_ptr.h>
+#endif
 #include <zxtest/base/test-driver.h>
 #include <zxtest/base/test-internal.h>
 
@@ -33,7 +39,13 @@ class Test : private internal::TestInternal {
   template <typename Derived>
   static std::unique_ptr<Derived> Create(internal::TestDriver* driver) {
     static_assert(std::is_base_of<Test, Derived>::value, "Must inherit from zxtest::TestInternal.");
+#if _KERNEL_MISTOS
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<Derived> derived = ktl::make_unique<Derived>(&ac);
+    ZX_ASSERT(ac.check());
+#else
     std::unique_ptr<Derived> derived = std::make_unique<Derived>();
+#endif
     derived->driver_ = driver;
     return derived;
   }

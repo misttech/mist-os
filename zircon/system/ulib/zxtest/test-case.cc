@@ -15,6 +15,7 @@
 #include <memory>
 #include <utility>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/base/test-case.h>
 #include <zxtest/base/types.h>
 

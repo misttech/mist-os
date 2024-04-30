@@ -205,37 +205,12 @@
 // Printers for converting values into readable strings.
 #define LIB_ZXTEST_DEFAULT_PRINTER [](const auto& val) { return zxtest::PrintValue(val); }
 
-#ifdef __Fuchsia__
 #define LIB_ZXTEST_STATUS_PRINTER [](zx_status_t status) { return zxtest::PrintStatus(status); }
-#else
-#define LIB_ZXTEST_STATUS_PRINTER LIB_ZXTEST_DEFAULT_PRINTER
-#endif
 
 #define LIB_ZXTEST_HEXDUMP_PRINTER(size)                                       \
   [size](const auto& val) {                                                    \
     return zxtest::internal::ToHex(static_cast<const void*>(val), byte_count); \
   }
-
-#ifdef __Fuchsia__
-#define LIB_ZXTEST_DEATH_STATUS_COMPLETE zxtest::internal::DeathStatement::State::kSuccess
-#define LIB_ZXTEST_DEATH_STATUS_EXCEPTION zxtest::internal::DeathStatement::State::kException
-#define LIB_ZXTEST_DEATH_STATEMENT(statement, expected_result, desc, ...)                  \
-  do {                                                                                     \
-    LIB_ZXTEST_CHECK_RUNNING();                                                            \
-    zxtest::internal::DeathStatement death_statement(statement);                           \
-    death_statement.Execute();                                                             \
-    if (death_statement.state() != expected_result) {                                      \
-      if (death_statement.state() == zxtest::internal::DeathStatement::State::kBadState) { \
-        zxtest::Runner::GetInstance()->NotifyFatalError();                                 \
-      }                                                                                    \
-      if (!death_statement.error_message().empty()) {                                      \
-        LIB_ZXTEST_ASSERT_ERROR(true, true, death_statement.error_message().data());       \
-      } else {                                                                             \
-        LIB_ZXTEST_ASSERT_ERROR(true, true, desc, ##__VA_ARGS__);                          \
-      }                                                                                    \
-    }                                                                                      \
-  } while (0)
-#endif  // __Fuchsia__
 
 #define SCOPED_TRACE(message)                                           \
   zxtest::ScopedTrace LIB_ZXTEST_CONCAT_TOKEN(zxtest_trace_, __LINE__)( \
