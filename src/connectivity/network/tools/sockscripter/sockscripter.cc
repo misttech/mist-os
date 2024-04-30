@@ -27,28 +27,28 @@
 #define PRINT_SOCK_OPT_VAL(level, name) \
   LOG(INFO) << #level "=" << (level) << " " << #name << "=" << name
 
-#define SET_SOCK_OPT_VAL(level, name, val)                                                     \
-  {                                                                                            \
-    if (api_->setsockopt(sockfd_, (level), (name), &(val), sizeof(val)) < 0) {                 \
-      LOG(ERROR) << "Failed to set socket option " #level ":" #name "-" << "[" << errno << "]" \
-                 << strerror(errno);                                                           \
-      return false;                                                                            \
-    }                                                                                          \
-    LOG(INFO) << "Set " #level ":" #name " = " << (int)(val);                                  \
-    return true;                                                                               \
+#define SET_SOCK_OPT_VAL(level, name, val)                                     \
+  {                                                                            \
+    if (api_->setsockopt(sockfd_, (level), (name), &(val), sizeof(val)) < 0) { \
+      LOG(ERROR) << "Failed to set socket option " #level ":" #name "-"        \
+                 << "[" << errno << "]" << strerror(errno);                    \
+      return false;                                                            \
+    }                                                                          \
+    LOG(INFO) << "Set " #level ":" #name " = " << (int)(val);                  \
+    return true;                                                               \
   }
 
-#define LOG_SOCK_OPT_VAL(level, name, type_val)                                  \
-  {                                                                              \
-    type_val opt = 0;                                                            \
-    socklen_t opt_len = sizeof(opt);                                             \
-    if (api_->getsockopt(sockfd_, (level), (name), &(opt), &opt_len) < 0) {      \
-      LOG(ERROR) << "Error-Getting " #level ":" #name "-" << "[" << errno << "]" \
-                 << strerror(errno);                                             \
-      return false;                                                              \
-    }                                                                            \
-    LOG(INFO) << #level ":" #name " is set to " << (int)opt;                     \
-    return true;                                                                 \
+#define LOG_SOCK_OPT_VAL(level, name, type_val)                             \
+  {                                                                         \
+    type_val opt = 0;                                                       \
+    socklen_t opt_len = sizeof(opt);                                        \
+    if (api_->getsockopt(sockfd_, (level), (name), &(opt), &opt_len) < 0) { \
+      LOG(ERROR) << "Error-Getting " #level ":" #name "-"                   \
+                 << "[" << errno << "]" << strerror(errno);                 \
+      return false;                                                         \
+    }                                                                       \
+    LOG(INFO) << #level ":" #name " is set to " << (int)opt;                \
+    return true;                                                            \
   }
 
 bool TestRepeatCfg::Parse(const std::string& cmd) {
@@ -176,6 +176,8 @@ const struct Command {
     {"set-transparent", "{0|1}", "set IP_TRANSPARENT flag", &SockScripter::SetIpTransparent},
     {"log-transparent", nullptr, "log IP_TRANSPARENT option value",
      &SockScripter::LogIpTransparent},
+    {"set-ip-hdrincl", "{0|1}", "set IP_HDRINCL flag", &SockScripter::SetIpHeaderInclude},
+    {"log-ip-hdrincl", nullptr, "log IP_HDRINCL option value", &SockScripter::LogIpHeaderInclude},
 
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
@@ -438,8 +440,9 @@ bool SockScripter::Open(int domain, int type, int proto) {
   sockfd_ = api_->socket(domain, type, proto);
   if (sockfd_ < 0) {
     LOG(ERROR) << "Error-Opening " << GetDomainName(domain) << "-" << GetTypeName(type)
-               << " socket " << "(proto:" << GetProtoName(proto) << ") " << "failed-[" << errno
-               << "]" << strerror(errno);
+               << " socket "
+               << "(proto:" << GetProtoName(proto) << ") "
+               << "failed-[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Opened " << GetDomainName(domain) << "-" << GetTypeName(type) << " socket "
@@ -605,7 +608,8 @@ bool SockScripter::SetBindToDevice(char* arg) {
 #ifdef SO_BINDTODEVICE
   if (api_->setsockopt(sockfd_, SOL_SOCKET, SO_BINDTODEVICE, arg,
                        static_cast<socklen_t>(strlen(arg))) < 0) {
-    LOG(ERROR) << "Error-Setting SO_BINDTODEVICE failed-" << "[" << errno << "]" << strerror(errno);
+    LOG(ERROR) << "Error-Setting SO_BINDTODEVICE failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Set SO_BINDTODEVICE to " << arg;
@@ -621,7 +625,8 @@ bool SockScripter::LogBindToDevice(char* arg) {
   char name[IFNAMSIZ] = {};
   socklen_t name_len = sizeof(name);
   if (api_->getsockopt(sockfd_, SOL_SOCKET, SO_BINDTODEVICE, name, &name_len) < 0) {
-    LOG(ERROR) << "Error-Getting SO_BINDTODEVICE failed-" << "[" << errno << "]" << strerror(errno);
+    LOG(ERROR) << "Error-Getting SO_BINDTODEVICE failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "SO_BINDTODEVICE is set to " << name;
@@ -635,7 +640,8 @@ bool SockScripter::LogBindToDevice(char* arg) {
 bool SockScripter::SetIpMcastIf4(char* arg) {
   auto [if_addr, if_id] = ParseIpv4WithScope(arg);
   if (!if_addr.has_value() && !if_id.has_value()) {
-    LOG(ERROR) << "Error-No IPv4 address or local interface id given for " << "IP_MULTICAST_IF";
+    LOG(ERROR) << "Error-No IPv4 address or local interface id given for "
+               << "IP_MULTICAST_IF";
     return false;
   }
 
@@ -648,7 +654,8 @@ bool SockScripter::SetIpMcastIf4(char* arg) {
     mreq.imr_ifindex = if_id.value();
   }
   if (api_->setsockopt(sockfd_, IPPROTO_IP, IP_MULTICAST_IF, &mreq, sizeof(mreq)) < 0) {
-    LOG(ERROR) << "Error-Setting IP_MULTICAST_IF failed-" << "[" << errno << "]" << strerror(errno);
+    LOG(ERROR) << "Error-Setting IP_MULTICAST_IF failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   std::stringstream o;
@@ -668,7 +675,8 @@ bool SockScripter::LogIpMcastIf4(char* arg) {
   memset(&addr, 0, sizeof(addr));
   socklen_t addr_len = sizeof(addr);
   if (api_->getsockopt(sockfd_, IPPROTO_IP, IP_MULTICAST_IF, &addr, &addr_len) < 0) {
-    LOG(ERROR) << "Error-Getting IP_MULTICAST_IF failed-" << "[" << errno << "]" << strerror(errno);
+    LOG(ERROR) << "Error-Getting IP_MULTICAST_IF failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   char buf[INET_ADDRSTRLEN] = {};
@@ -696,8 +704,8 @@ bool SockScripter::LogIpMcastIf6(char* arg) {
   int id = -1;
   socklen_t id_len = sizeof(id);
   if (api_->getsockopt(sockfd_, IPPROTO_IPV6, IPV6_MULTICAST_IF, &id, &id_len) < 0) {
-    LOG(ERROR) << "Error-Getting IPV6_MULTICAST_IF failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Getting IPV6_MULTICAST_IF failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "IPV6_MULTICAST_IF is set to " << id;
@@ -709,7 +717,8 @@ bool SockScripter::LogBoundToAddress(char* arg) {
   socklen_t addr_len = sizeof(addr);
 
   if (api_->getsockname(sockfd_, reinterpret_cast<sockaddr*>(&addr), &addr_len) < 0) {
-    LOG(ERROR) << "Error-Calling getsockname failed-" << "[" << errno << "]" << strerror(errno);
+    LOG(ERROR) << "Error-Calling getsockname failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Bound to " << Format(addr);
@@ -721,7 +730,8 @@ bool SockScripter::LogPeerAddress(char* arg) {
   socklen_t addr_len = sizeof(addr);
 
   if (api_->getpeername(sockfd_, reinterpret_cast<sockaddr*>(&addr), &addr_len) < 0) {
-    LOG(ERROR) << "Error-Calling getpeername failed-" << "[" << errno << "]" << strerror(errno);
+    LOG(ERROR) << "Error-Calling getpeername failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Connected to " << Format(addr);
@@ -797,6 +807,21 @@ bool SockScripter::LogIpTransparent(char* arg) {
 #endif
 }
 
+bool SockScripter::SetIpHeaderInclude(char* arg) {
+  int flag;
+  if (!getFlagInt(arg, &flag)) {
+    LOG(ERROR) << "Error: Invalid IP_HDRINCL flag='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IP, IP_HDRINCL, flag)
+  return true;
+}
+
+bool SockScripter::LogIpHeaderInclude(char* arg) {
+  LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_HDRINCL, int);
+  return true;
+}
+
 bool SockScripter::Bind(char* arg) {
   std::optional addr = Parse(arg);
   if (!addr.has_value()) {
@@ -808,8 +833,8 @@ bool SockScripter::Bind(char* arg) {
   socklen_t addr_len = AddrLen(addr.value());
 
   if (api_->bind(sockfd_, reinterpret_cast<sockaddr*>(&addr.value()), addr_len) < 0) {
-    LOG(ERROR) << "Error-Bind(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Bind(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   return LogBoundToAddress(nullptr);
@@ -830,8 +855,8 @@ bool SockScripter::PacketSendTo(char* arg) {
   ssize_t sent = api_->sendto(sockfd_, snd_buf.c_str(), snd_buf.length(), snd_flags_,
                               reinterpret_cast<const struct sockaddr*>(&sll), sizeof(sll));
   if (sent < 0) {
-    LOG(ERROR) << "Error-PacketSendTo(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-PacketSendTo(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
 
@@ -848,8 +873,8 @@ bool SockScripter::PacketBind(char* arg) {
             << ", if_index:" << sll->sll_ifindex << ")";
 
   if (api_->bind(sockfd_, reinterpret_cast<const struct sockaddr*>(&sll), sizeof(sll)) < 0) {
-    LOG(ERROR) << "Error-PacketBind(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-PacketBind(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
 
@@ -887,8 +912,8 @@ bool SockScripter::Shutdown(char* arg) {
   LOG(INFO) << "Shutdown(fd:" << sockfd_ << ", " << howStr << ")";
 
   if (api_->shutdown(sockfd_, how) < 0) {
-    LOG(ERROR) << "Error-Shutdown(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Shutdown(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   return LogBoundToAddress(nullptr);
@@ -905,8 +930,8 @@ bool SockScripter::Connect(char* arg) {
   socklen_t addr_len = AddrLen(addr.value());
 
   if (api_->connect(sockfd_, reinterpret_cast<sockaddr*>(&addr.value()), addr_len) < 0) {
-    LOG(ERROR) << "Error-Connect(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Connect(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   return LogBoundToAddress(nullptr);
@@ -918,8 +943,8 @@ bool SockScripter::Disconnect(char* arg) {
   struct sockaddr_storage addr = {};
   addr.ss_family = AF_UNSPEC;
   if (api_->connect(sockfd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr.ss_family)) < 0) {
-    LOG(ERROR) << "Error-Disconnect(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Disconnect(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   return LogBoundToAddress(nullptr);
@@ -964,8 +989,8 @@ bool SockScripter::JoinOrDrop4(const char* func, char* arg, int optname, const c
   }
 
   if (api_->setsockopt(sockfd_, IPPROTO_IP, optname, &mreq, sizeof(mreq)) < 0) {
-    LOG(ERROR) << "Error-Setting " << optname_str << " failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Setting " << optname_str << " failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   std::stringstream o;
@@ -1069,8 +1094,8 @@ bool SockScripter::JoinOrDrop6(const char* func, char* arg, int optname, const c
   };
 
   if (api_->setsockopt(sockfd_, IPPROTO_IPV6, optname, &mreq, sizeof(mreq)) < 0) {
-    LOG(ERROR) << "Error-Setting " << optname_str << " failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Setting " << optname_str << " failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Set " << optname_str << " for " << Format(mcast_addr.value()) << " on " << if_id
@@ -1096,8 +1121,8 @@ bool SockScripter::Listen(char* arg) {
     return false;
   }
   if (api_->listen(sockfd_, backlog) < 0) {
-    LOG(ERROR) << "Error-listen(fd:" << sockfd_ << ", " << backlog << ") failed-" << "[" << errno
-               << "]" << strerror(errno);
+    LOG(ERROR) << "Error-listen(fd:" << sockfd_ << ", " << backlog << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   return true;
@@ -1111,13 +1136,13 @@ bool SockScripter::Accept(char* arg) {
 
   int fd = api_->accept(sockfd_, reinterpret_cast<sockaddr*>(&addr), &addr_len);
   if (fd < 0) {
-    LOG(ERROR) << "Error-Accept(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-Accept(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
 
-  LOG(INFO) << "  accepted(fd:" << sockfd_ << ") new connection " << "(fd:" << fd << ") from "
-            << Format(addr);
+  LOG(INFO) << "  accepted(fd:" << sockfd_ << ") new connection "
+            << "(fd:" << fd << ") from " << Format(addr);
 
   // Switch to the newly created connection, remember the previous one.
   tcp_listen_socket_fd_ = sockfd_;
@@ -1141,8 +1166,8 @@ bool SockScripter::SendTo(char* arg) {
   ssize_t sent = api_->sendto(sockfd_, snd_buf.c_str(), snd_buf.length(), snd_flags_,
                               reinterpret_cast<sockaddr*>(&addr.value()), addr_len);
   if (sent < 0) {
-    LOG(ERROR) << "Error-sendto(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-sendto(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Sent [" << sent << "] on fd:" << sockfd_;
@@ -1157,8 +1182,8 @@ bool SockScripter::Send(char* arg) {
 
   ssize_t sent = api_->send(sockfd_, snd_buf.c_str(), snd_buf.length(), snd_flags_);
   if (sent < 0) {
-    LOG(ERROR) << "Error-send(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-               << strerror(errno);
+    LOG(ERROR) << "Error-send(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
     return false;
   }
   LOG(INFO) << "Sent [" << sent << "] on fd:" << sockfd_;
@@ -1178,8 +1203,8 @@ bool SockScripter::RecvFromInternal(bool ping) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       LOG(INFO) << "  returned EAGAIN or EWOULDBLOCK!";
     } else {
-      LOG(ERROR) << "  Error-recvfrom(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-                 << strerror(errno);
+      LOG(ERROR) << "  Error-recvfrom(fd:" << sockfd_ << ") failed-"
+                 << "[" << errno << "]" << strerror(errno);
     }
     return false;
   }
@@ -1190,8 +1215,8 @@ bool SockScripter::RecvFromInternal(bool ping) {
   if (ping) {
     if (api_->sendto(sockfd_, recv_buf_, recvd, snd_flags_, reinterpret_cast<sockaddr*>(&addr),
                      addr_len) < 0) {
-      LOG(ERROR) << "Error-sendto(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-                 << strerror(errno);
+      LOG(ERROR) << "Error-sendto(fd:" << sockfd_ << ") failed-"
+                 << "[" << errno << "]" << strerror(errno);
       return false;
     }
   }
@@ -1213,16 +1238,16 @@ int SockScripter::RecvInternal(bool ping) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       LOG(INFO) << "  returned EAGAIN or EWOULDBLOCK!";
     } else {
-      LOG(ERROR) << "  Error-recv(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-                 << strerror(errno);
+      LOG(ERROR) << "  Error-recv(fd:" << sockfd_ << ") failed-"
+                 << "[" << errno << "]" << strerror(errno);
     }
     return false;
   }
   LOG(INFO) << "  received(fd:" << sockfd_ << ") [" << recvd << "]'" << recv_buf_ << "' ";
   if (ping) {
     if (api_->send(sockfd_, recv_buf_, recvd, recv_flags_) < 0) {
-      LOG(ERROR) << "Error-send(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
-                 << strerror(errno);
+      LOG(ERROR) << "Error-send(fd:" << sockfd_ << ") failed-"
+                 << "[" << errno << "]" << strerror(errno);
       return false;
     }
   }
