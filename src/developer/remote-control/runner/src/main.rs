@@ -11,7 +11,6 @@ use {
     futures::future::select,
     futures::io::BufReader,
     futures::prelude::*,
-    std::os::unix::io::{AsRawFd, FromRawFd},
     version_history::{AbiRevision, HISTORY},
 };
 
@@ -26,8 +25,8 @@ where
     futures::io::copy_buf(&mut buf_from, &mut to).await
 }
 
-fn zx_socket_from_fd(fd: i32) -> Result<fidl::AsyncSocket> {
-    let handle = fdio::transfer_fd(unsafe { std::fs::File::from_raw_fd(fd) })?;
+fn zx_socket_from_fd<F: std::os::fd::AsRawFd>(fd: F) -> Result<fidl::AsyncSocket> {
+    let handle = fdio::transfer_fd(fd)?;
     Ok(fidl::AsyncSocket::from_socket(fidl::Socket::from(handle)))
 }
 
@@ -116,8 +115,8 @@ async fn main() -> Result<()> {
     let local_socket = fidl::AsyncSocket::from_socket(local_socket);
     let (mut rx_socket, mut tx_socket) = futures::AsyncReadExt::split(local_socket);
 
-    let mut stdin = zx_socket_from_fd(std::io::stdin().lock().as_raw_fd())?;
-    let mut stdout = zx_socket_from_fd(std::io::stdout().lock().as_raw_fd())?;
+    let mut stdin = zx_socket_from_fd(std::io::stdin())?;
+    let mut stdout = zx_socket_from_fd(std::io::stdout())?;
 
     let in_fut = buffered_copy(&mut stdin, &mut tx_socket, BUFFER_SIZE);
     let out_fut = buffered_copy(&mut rx_socket, &mut stdout, BUFFER_SIZE);
