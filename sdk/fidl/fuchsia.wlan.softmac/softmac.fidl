@@ -842,6 +842,28 @@ closed protocol WlanSoftmacBridge {
         sme_channel zx.Handle:CHANNEL;
     }) error zx.Status;
 
+    /// Forwards a status containing `ETHERNET_STATUS_*` flags to the
+    /// `fuchsia.hardware.ethernet/EthernetImplIfc` proxy owned by
+    /// the C++ portion of wlansoftmac.
+    ///
+    /// As documented, the value of `status` is set by bits defined in
+    /// `ETHERNET_STATUS_*` flags. However, there is only one flag named
+    /// `ETHERNET_STATUS_ONLINE` and no specification of for the meaning
+    /// of specifying no flags. In practice, `0x1` means the status is up,
+    /// and `0x0` means the status is down.
+    ///
+    /// While this method should belong in something like an
+    /// "`EthernetImplIfcBridge` protocol", it's included in the
+    /// `WlanSoftmacBridge` protocol as a convenience. The wlansoftmac driver
+    /// will eventually cease using a `fuchsia.hardware.ethernet/EthernetImplIfc`
+    /// proxy and use a `fuchsia.hardware.network.driver/NetworkDeviceIfc`
+    /// proxy instead. At that time, an equivalent of this method should be
+    /// refactored into a separate bridge.
+    @available(added=HEAD)
+    strict SetEthernetStatus(struct {
+        status uint32;
+    }) -> ();
+
     /// Notifies the device of a successful association and configures
     /// additional parameters necessary to participate in that association.
     ///

@@ -13,7 +13,7 @@ use {
     tracing::error,
     wlan_mlme::{
         buffer::CBufferProvider,
-        device::{completers::StopCompleter, CDeviceInterface, CFrameSender, Device},
+        device::{completers::StopCompleter, CFrameSender, Device},
     },
     wlansoftmac_rust::WlanSoftmacHandle,
 };
@@ -65,7 +65,6 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         status: zx::zx_status_t,
         wlan_softmac_handle: *mut WlanSoftmacHandle,
     ),
-    device: CDeviceInterface,
     frame_sender: CFrameSender,
     buffer_provider: CBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
@@ -92,7 +91,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         let channel = fidl::AsyncChannel::from_channel(channel);
         fidl_softmac::WlanSoftmacBridgeProxy::new(channel)
     };
-    let device = Device::new(device.into(), wlan_softmac_bridge_proxy, frame_sender.into());
+    let device = Device::new(wlan_softmac_bridge_proxy, frame_sender.into());
 
     let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
         move |result: Result<WlanSoftmacHandle, zx::Status>| match result {

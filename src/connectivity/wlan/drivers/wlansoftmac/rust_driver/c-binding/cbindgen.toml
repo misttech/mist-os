@@ -39,7 +39,6 @@ exclude = [
 # wlan-mlme types
 "CBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
 "CBuffer" = "wlansoftmac_buffer_t"
-"CDeviceInterface" = "rust_device_interface_t"
 "CFrameProcessor" = "frame_processor_t"
 "CFrameProcessorOps" = "frame_processor_ops_t"
 "CFrameSender" = "frame_sender_t"

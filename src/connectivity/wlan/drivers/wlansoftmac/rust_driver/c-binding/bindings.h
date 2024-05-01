@@ -17,31 +17,6 @@
 
 typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 
-/**
- * Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
- *
- * Each of the functions in this FFI are safe to call from any thread but not
- * safe to call concurrently, i.e., they can only be called one at a time.
- *
- * # Safety
- *
- * Rust does not support marking a type as unsafe, but initializing this type is
- * definitely unsafe and deserves documentation. This is because when the bridged
- * wlansoftmac uses this FFI, it cannot guarantee each of the functions is safe to
- * call from any thread.
- *
- * By constructing a value of this type, the constructor promises each of the functions
- * is safe to call from any thread. And no undefined behavior will occur if the
- * caller only calls one of them at a time.
- */
-typedef struct {
-  void *device;
-  /**
-   * Reports the current status to the ethernet driver.
-   */
-  int32_t (*set_ethernet_status)(void *device, uint32_t status);
-} rust_device_interface_t;
-
 typedef struct {
   void *ctx;
   /**
@@ -177,8 +152,7 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
     void *init_completer,
     void (*run_init_completer)(void *init_completer, zx_status_t status,
                                wlansoftmac_handle_t *wlan_softmac_handle),
-    rust_device_interface_t device, frame_sender_t frame_sender,
-    wlansoftmac_buffer_provider_ops_t buffer_provider,
+    frame_sender_t frame_sender, wlansoftmac_buffer_provider_ops_t buffer_provider,
     zx_handle_t wlan_softmac_bridge_client_handle);
 
 /**

@@ -176,7 +176,6 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 }
 
 pub struct Device {
-    raw_device: DeviceInterface,
     frame_processor: Option<Pin<Box<FrameProcessor>>>,
     frame_sender: FrameSender,
     wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeProxy,
@@ -187,13 +186,11 @@ pub struct Device {
 
 impl Device {
     pub fn new(
-        raw_device: DeviceInterface,
         wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeProxy,
         frame_sender: FrameSender,
     ) -> Device {
         let (event_sink, event_receiver) = mpsc::unbounded();
         Device {
-            raw_device,
             frame_processor: None,
             frame_sender,
             wlan_softmac_bridge_proxy,
@@ -222,9 +219,7 @@ impl Device {
 const REQUIRED_WLAN_HEADER_LEN: usize = 10;
 const PEER_ADDR_OFFSET: usize = 4;
 
-/// This trait abstracts how Device accomplish operations. Test code
-/// can then implement trait methods instead of mocking an underlying DeviceInterface
-/// and FIDL proxy.
+/// This trait abstracts operations performed by the vendor driver and ethernet device.
 pub trait DeviceOps {
     fn wlan_softmac_query_response(
         &mut self,
@@ -256,11 +251,14 @@ pub trait DeviceOps {
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status>;
 
-    fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status>;
-    fn set_ethernet_up(&mut self) -> Result<(), zx::Status> {
+    fn set_ethernet_status(
+        &mut self,
+        status: LinkStatus,
+    ) -> impl Future<Output = Result<(), zx::Status>>;
+    fn set_ethernet_up(&mut self) -> impl Future<Output = Result<(), zx::Status>> {
         self.set_ethernet_status(LinkStatus::UP)
     }
-    fn set_ethernet_down(&mut self) -> Result<(), zx::Status> {
+    fn set_ethernet_down(&mut self) -> impl Future<Output = Result<(), zx::Status>> {
         self.set_ethernet_status(LinkStatus::DOWN)
     }
     fn set_channel(
@@ -527,8 +525,11 @@ impl DeviceOps for Device {
             })
     }
 
-    fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.set_ethernet_status)(self.raw_device.device, status.0))
+    async fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
+        self.wlan_softmac_bridge_proxy.set_ethernet_status(status.0).await.map_err(|error| {
+            error!("SetEthernetStatus failed with FIDL error: {:?}", error);
+            zx::Status::INTERNAL
+        })
     }
 
     async fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
@@ -997,47 +998,6 @@ impl FrameSender {
                 })
                 .into()
             }
-        }
-    }
-}
-
-/// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
-///
-/// Each of the functions in this FFI are safe to call from any thread but not
-/// safe to call concurrently, i.e., they can only be called one at a time.
-///
-/// # Safety
-///
-/// Rust does not support marking a type as unsafe, but initializing this type is
-/// definitely unsafe and deserves documentation. This is because when the bridged
-/// wlansoftmac uses this FFI, it cannot guarantee each of the functions is safe to
-/// call from any thread.
-///
-/// By constructing a value of this type, the constructor promises each of the functions
-/// is safe to call from any thread. And no undefined behavior will occur if the
-/// caller only calls one of them at a time.
-#[repr(C)]
-pub struct CDeviceInterface {
-    device: *mut c_void,
-    /// Reports the current status to the ethernet driver.
-    set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
-}
-
-/// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
-///
-/// Each of the functions in this FFI are safe to call from another thread but not
-/// safe to call concurrently, i.e., they can only be called one at a time.
-pub struct DeviceInterface {
-    device: *mut c_void,
-    /// Reports the current status to the ethernet driver.
-    set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
-}
-
-impl From<CDeviceInterface> for DeviceInterface {
-    fn from(device_interface: CDeviceInterface) -> Self {
-        Self {
-            device: device_interface.device,
-            set_ethernet_status: device_interface.set_ethernet_status,
         }
     }
 }
@@ -1521,7 +1481,7 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
+        async fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
             self.state.lock().link_status = status;
             Ok(())
         }
@@ -2136,10 +2096,10 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn set_ethernet_status() {
         let (mut fake_device, fake_device_state) = FakeDevice::new().await;
-        fake_device.set_ethernet_up().expect("failed setting status");
+        fake_device.set_ethernet_up().await.expect("failed setting status");
         assert_eq!(fake_device_state.lock().link_status, LinkStatus::UP);
 
-        fake_device.set_ethernet_down().expect("failed setting status");
+        fake_device.set_ethernet_down().await.expect("failed setting status");
         assert_eq!(fake_device_state.lock().link_status, LinkStatus::DOWN);
     }
 

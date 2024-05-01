@@ -143,8 +143,8 @@ void SoftmacBinding::Init() {
   {
     std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
     auto softmac_bridge =
-        SoftmacBridge::New(std::move(completer), std::move(sta_shutdown_handler), this,
-                           client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_);
+        SoftmacBridge::New(std::move(completer), std::move(sta_shutdown_handler), client_.Clone(),
+                           ethernet_proxy_lock_, &ethernet_proxy_, &cached_ethernet_status_);
     if (softmac_bridge.is_error()) {
       lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
       device_init_reply(device_, softmac_bridge.error_value(), nullptr);
@@ -358,17 +358,6 @@ zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
 void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
   WLAN_TRACE_DURATION();
   lerror("WLAN does not support ETHERNET_FEATURE_DMA");
-}
-
-zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) const {
-  WLAN_TRACE_DURATION();
-  std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
-  if (ethernet_proxy_.is_valid()) {
-    ethernet_proxy_.Status(status);
-  } else {
-    cached_ethernet_status_ = status;
-  }
-  return ZX_OK;
 }
 
 }  // namespace wlan::drivers::wlansoftmac
