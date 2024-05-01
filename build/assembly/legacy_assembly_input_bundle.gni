@@ -84,7 +84,6 @@ template("legacy_assembly_input_bundle") {
 
   assert(defined(invoker.additional_boot_args),
          "Need to define additional_boot_args")
-  assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
 
   forward_variables_from(invoker,
                          [
@@ -93,6 +92,11 @@ template("legacy_assembly_input_bundle") {
                            "create_package",
                            "create_package_archive",
                          ])
+
+  _bootfs_labels = []
+  if (defined(invoker.bootfs_labels)) {
+    _bootfs_labels = invoker.bootfs_labels
+  }
 
   bootfs_package_labels = []
   if (defined(invoker.bootfs_package_labels)) {
@@ -376,7 +380,7 @@ template("legacy_assembly_input_bundle") {
   # directly-specified arguments, creating a new metadata target, and adding it
   # to the list of all metadata targets, then second walking the metadata to
   # construct the final list.
-  cmdline_deps = invoker.bootfs_labels
+  cmdline_deps = _bootfs_labels
   if (defined(invoker.cmdline)) {
     kernel_cmdline("${target_name}_extra_cmdline") {
       args = invoker.cmdline
@@ -439,7 +443,7 @@ template("legacy_assembly_input_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    deps = invoker.bootfs_labels
+    deps = _bootfs_labels
   }
 
   fuchsia_package(labels.bootfs_files_package) {
