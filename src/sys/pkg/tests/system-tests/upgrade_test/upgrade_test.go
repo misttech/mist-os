@@ -20,7 +20,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/check"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/flash"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/pave"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/script"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
@@ -334,10 +333,6 @@ func initializeDevice(
 		expectedSystemImage = systemImage
 	}
 
-	if err := script.RunScript(ctx, device, repo, c.beforeInitScript); err != nil {
-		return nil, fmt.Errorf("failed to run before-init-script: %w", err)
-	}
-
 	var currentBootSlot *sl4f.Configuration
 
 	if build != nil {
@@ -385,10 +380,6 @@ func initializeDevice(
 		c.checkABR,
 	); err != nil {
 		return nil, fmt.Errorf("failed to validate during initialization: %w", err)
-	}
-
-	if err := script.RunScript(ctx, device, repo, c.afterInitScript); err != nil {
-		return nil, fmt.Errorf("failed to run after-init-script: %w", err)
 	}
 
 	logger.Infof(ctx, "initialization successful in %s", time.Now().Sub(startTime))
@@ -569,10 +560,6 @@ func otaToPackage(
 		c.checkABR,
 	); err != nil {
 		return fmt.Errorf("failed to validate after OTA: %w", err)
-	}
-
-	if err := script.RunScript(ctx, device, dstUpdate.Repository(), c.afterTestScript); err != nil {
-		return fmt.Errorf("failed to run test script after OTA: %w", err)
 	}
 
 	return nil

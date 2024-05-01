@@ -16,7 +16,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/check"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/flash"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/pave"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/script"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
@@ -193,10 +192,6 @@ func doTestReboot(
 		return fmt.Errorf("failed to validate device: %w", err)
 	}
 
-	if err := script.RunScript(ctx, device, repo, c.afterTestScript); err != nil {
-		return fmt.Errorf("failed to run after-test-script: %w", err)
-	}
-
 	if err := sleepAfterReboot(ctx, device); err != nil {
 		return err
 	}
@@ -229,10 +224,6 @@ func initializeDevice(
 	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
 	if err != nil {
 		return err
-	}
-
-	if err := script.RunScript(ctx, device, repo, c.beforeInitScript); err != nil {
-		return fmt.Errorf("failed to run before-init-script: %w", err)
 	}
 
 	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
@@ -292,10 +283,6 @@ func initializeDevice(
 		c.checkABR,
 	); err != nil {
 		return err
-	}
-
-	if err := script.RunScript(ctx, device, repo, c.afterInitScript); err != nil {
-		return fmt.Errorf("failed to run after-init-script: %w", err)
 	}
 
 	return nil
