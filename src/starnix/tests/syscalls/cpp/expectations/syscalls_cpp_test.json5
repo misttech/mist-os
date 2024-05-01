@@ -54,10 +54,6 @@
                 "OverlayFs/FsMountTest.OpenWithTruncAndCreatWithExistingFileSucceeds/0",
                 "OverlayFs/FsMountTest.OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS/0",
 
-                // TODO(https://fxbug.dev/331965660)
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/0",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/1",
-
                 // TODO(https://fxbug.dev/335701084)
                 "VmspliceTest.FileInPipe",
                 "VmspliceTest.ModifyBufferInPipe",

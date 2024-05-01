@@ -471,6 +471,17 @@ impl FuseNode {
         node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
     }
 
+    fn default_check_access_with_valid_node_attributes(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        access: Access,
+        info: &RwLock<FsNodeInfo>,
+    ) -> Result<(), Errno> {
+        let info = self.refresh_expired_node_attributes(current_task, info)?;
+        node.default_check_access_impl(current_task, access, info)
+    }
+
     fn refresh_expired_node_attributes<'a>(
         &self,
         current_task: &CurrentTask,
@@ -911,21 +922,26 @@ impl FsNodeOps for Arc<FuseNode> {
         info: &RwLock<FsNodeInfo>,
         reason: CheckAccessReason,
     ) -> Result<(), Errno> {
+        // Perform access checks regardless of the reason when userspace configured
+        // the kernel to perform its default access checks on behalf of the FUSE fs.
+        if FuseFs::from_fs(&node.fs())?
+            .default_permissions
+            .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
+        {
+            return self.default_check_access_with_valid_node_attributes(
+                node,
+                current_task,
+                access,
+                info,
+            );
+        }
+
         match reason {
             CheckAccessReason::Access | CheckAccessReason::Chdir | CheckAccessReason::Chroot => {
-                if FuseFs::from_fs(&node.fs())?
-                    .default_permissions
-                    .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
-                {
-                    let info = self.refresh_expired_node_attributes(current_task, info)?;
-                    return node.default_check_access_impl(current_task, access, info);
-                }
-
                 // Per `libfuse`'s low-level handler for `FUSE_ACCESS` requests, the kernel
                 // is only expected to send `FUSE_ACCESS` requests for the `access` and `chdir`
                 // family of syscalls when the `default_permissions` flag isn't set on the FUSE
                 // fs. Seems like `chroot` also triggers a `FUSE_ACCESS` request on Linux.
-
                 let response = self.connection.lock().execute_operation(
                     current_task,
                     self,
@@ -938,9 +954,24 @@ impl FsNodeOps for Arc<FuseNode> {
                     error!(EINVAL)
                 }
             }
+            CheckAccessReason::Open => {
+                // Don't perform any access checks when this access check is being
+                // performed for an open. `FUSE_OPEN` handlers are expected to validate
+                // that the open request is valid for the given node being opened,
+                // including the flags which hold the requested access permissions
+                // like read/write (e.g. `O_RDONLY`/`O_RDWR`).
+                //
+                // For more details, see fuse(4) and `libfuse`'s low-level `FUSE_OPEN`
+                // handler.
+                Ok(())
+            }
             CheckAccessReason::InternalPermissionChecks => {
-                let info = self.refresh_expired_node_attributes(current_task, info)?;
-                return node.default_check_access_impl(current_task, access, info);
+                return self.default_check_access_with_valid_node_attributes(
+                    node,
+                    current_task,
+                    access,
+                    info,
+                );
             }
         }
     }

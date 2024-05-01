@@ -501,6 +501,7 @@ pub enum CheckAccessReason {
     Access,
     Chdir,
     Chroot,
+    Open,
     InternalPermissionChecks,
 }
 
@@ -1196,7 +1197,7 @@ impl FsNode {
                 current_task,
                 mount,
                 Access::from_open_flags(flags),
-                CheckAccessReason::InternalPermissionChecks,
+                CheckAccessReason::Open,
             )?;
         }
 
