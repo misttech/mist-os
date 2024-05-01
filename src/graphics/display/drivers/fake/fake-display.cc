@@ -9,8 +9,6 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/channel.h>
@@ -36,7 +34,6 @@
 #include <string>
 #include <utility>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
@@ -74,16 +71,15 @@ constexpr uint32_t kRefreshRateFps = 60;
 constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
 }  // namespace
 
-FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config,
+FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
+                         fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
                          inspect::Inspector inspector)
-    : DeviceType(parent),
-      display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
+    : display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
       device_config_(device_config),
-      inspector_(std::move(inspector)) {
-  ZX_DEBUG_ASSERT(parent);
-}
+      sysmem_(std::move(sysmem_allocator)),
+      inspector_(std::move(inspector)) {}
 
-FakeDisplay::~FakeDisplay() = default;
+FakeDisplay::~FakeDisplay() { Deinitialize(); }
 
 zx_status_t FakeDisplay::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
   fbl::AutoLock lock(&capture_mutex_);
@@ -122,16 +118,6 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
 }
 
 zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_,
-                                                                                    "sysmem");
-  if (sysmem_client_result.is_error()) {
-    zxlogf(ERROR, "Cannot connect to the fuchsia.hardware.sysmem.Sysmem protocol: %s",
-           sysmem_client_result.status_string());
-    return sysmem_client_result.error_value();
-  }
-  sysmem_ = fidl::SyncClient(std::move(sysmem_client_result.value()));
-
   std::string debug_name = fxl::StringPrintf("fake-display[%lu]", fsl::GetCurrentProcessKoid());
   fuchsia_sysmem::AllocatorSetDebugClientInfoRequest request;
   request.name() = std::move(debug_name);
@@ -668,31 +654,6 @@ bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
   return current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId;
 }
 
-void FakeDisplay::DdkRelease() {
-  vsync_shutdown_flag_.store(true);
-  if (vsync_thread_running_) {
-    // Ignore return value here in case the vsync_thread_ isn't running.
-    thrd_join(vsync_thread_, nullptr);
-  }
-  if (IsCaptureSupported()) {
-    capture_shutdown_flag_.store(true);
-    thrd_join(capture_thread_, nullptr);
-  }
-  delete this;
-}
-
-zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
-  proto->ctx = this;
-  switch (proto_id) {
-    case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
-      proto->ops = &display_controller_impl_protocol_ops_;
-      return ZX_OK;
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
-
 zx_status_t FakeDisplay::SetupDisplayInterface() {
   {
     fbl::AutoLock image_lock(&image_mutex_);
@@ -863,7 +824,9 @@ void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
   });
 }
 
-zx_status_t FakeDisplay::Bind() {
+zx_status_t FakeDisplay::Initialize() {
+  ZX_DEBUG_ASSERT(!initialized_);
+
   zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize sysmem Allocator client: %s", zx_status_get_string(status));
@@ -900,15 +863,29 @@ zx_status_t FakeDisplay::Bind() {
     }
   }
 
-  status = DdkAdd(ddk::DeviceAddArgs("fake-display").set_inspect_vmo(inspector_.DuplicateVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
-    return status;
-  }
-
   RecordDisplayConfigToInspectRootNode();
 
+  initialized_ = true;
+
   return ZX_OK;
+}
+
+void FakeDisplay::Deinitialize() {
+  if (!initialized_) {
+    return;
+  }
+
+  vsync_shutdown_flag_.store(true);
+  if (vsync_thread_running_) {
+    // Ignore return value here in case the vsync_thread_ isn't running.
+    thrd_join(vsync_thread_, nullptr);
+  }
+  if (IsCaptureSupported()) {
+    capture_shutdown_flag_.store(true);
+    thrd_join(capture_thread_, nullptr);
+  }
+
+  initialized_ = false;
 }
 
 }  // namespace fake_display

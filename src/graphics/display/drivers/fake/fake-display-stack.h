@@ -39,7 +39,7 @@ class FakeDisplayStack {
   ~FakeDisplayStack();
 
   Controller* coordinator_controller() { return coordinator_controller_.get(); }
-  fake_display::FakeDisplay* display() { return display_; }
+  fake_display::FakeDisplay* display() { return display_.get(); }
 
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
   fidl::ClientEnd<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1();
@@ -61,9 +61,9 @@ class FakeDisplayStack {
   // Fake devices created as descendents of the root MockDevice.
   // All the devices have transferred their ownership to `mock_root_` and will
   // be torn down on `SyncShutdown()`.
-  fake_display::FakeDisplay* display_;
   zx_device_t* sysmem_device_;
 
+  std::unique_ptr<fake_display::FakeDisplay> display_;
   std::unique_ptr<Controller> coordinator_controller_;
 
   bool shutdown_ = false;

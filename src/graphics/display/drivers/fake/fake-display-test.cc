@@ -87,9 +87,8 @@ class FakeDisplayTest : public testing::Test {
 };
 
 TEST_F(FakeDisplayTest, Inspect) {
-  MockDevice* fake_display = mock_root()->GetLatestChild();
   fpromise::result<inspect::Hierarchy> read_result =
-      inspect::ReadFromVmo(fake_display->GetInspectVmo());
+      inspect::ReadFromVmo(display()->inspector().DuplicateVmo());
   ASSERT_TRUE(read_result.is_ok());
 
   const inspect::Hierarchy& hierarchy = read_result.value();

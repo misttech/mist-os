@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/ddk/driver.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -22,7 +21,6 @@
 #include <cstdint>
 #include <unordered_map>
 
-#include <ddktl/device.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
@@ -33,9 +31,6 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace fake_display {
-
-class FakeDisplay;
-using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable>;
 
 struct FakeDisplayDeviceConfig {
   // If enabled, the fake display device will not automatically emit Vsync
@@ -57,10 +52,10 @@ struct FakeDisplayDeviceConfig {
   bool no_buffer_access = false;
 };
 
-class FakeDisplay : public DeviceType,
-                    public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol> {
+class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
  public:
-  explicit FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config,
+  explicit FakeDisplay(FakeDisplayDeviceConfig device_config,
+                       fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
                        inspect::Inspector inspector);
 
   FakeDisplay(const FakeDisplay&) = delete;
@@ -68,8 +63,13 @@ class FakeDisplay : public DeviceType,
 
   ~FakeDisplay();
 
-  // This function is called from the c-bind function upon driver matching.
-  zx_status_t Bind();
+  // Initialization work that is not suitable for the constructor.
+  //
+  // Must be called exactly once for each FakeDisplay instance.
+  zx_status_t Initialize();
+
+  // This method is idempotent.
+  void Deinitialize();
 
   // DisplayControllerImplProtocol implementation:
   void DisplayControllerImplSetDisplayControllerInterface(
@@ -108,10 +108,6 @@ class FakeDisplay : public DeviceType,
 
   zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
 
-  // Required functions for DeviceType
-  void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
-
   const display_controller_impl_protocol_t* display_controller_impl_banjo_protocol() const {
     return &display_controller_impl_banjo_protocol_;
   }
@@ -132,6 +128,8 @@ class FakeDisplay : public DeviceType,
     fbl::AutoLock lock(&capture_mutex_);
     return clamp_rgb_value_;
   }
+
+  const inspect::Inspector& inspector() const { return inspector_; }
 
  private:
   enum class BufferCollectionUsage : int32_t;
@@ -250,6 +248,8 @@ class FakeDisplay : public DeviceType,
       TA_GUARDED(interface_mutex_);
 
   inspect::Inspector inspector_;
+
+  bool initialized_ = false;
 };
 
 }  // namespace fake_display
