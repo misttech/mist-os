@@ -489,18 +489,185 @@ There are a few things to note when implementing a server:
   the returned object until you're done with it. Otherwise, the task may
   be garbage collected and canceled.
 
-### Experimenting with the Python Interpreter {:.numbered}
+### Common FIDL server code patterns
 
-If you're unsure of how to construct certain types and you want to skip through
-building and running an executable, it is possible to use the Python interpreter
-to inspect FIDL structures.
+In contrast to the simple `echo` server example above, this section covers
+different types of server interactions.
 
-To start, you need to make sure you have the prerequisite FIDL libraries built
-and available for use in Python (covered above), as Python will need access to
+#### Creating a FIDL server class
+
+Let's work with the following FIDL protocol to make a server:
+
+```fidl
+library fuchsia.exampleserver;
+
+type SomeGenericError = flexible enum {
+    THIS = 1;
+    THAT = 2;
+    THOSE = 3;
+};
+
+closed protocol Example {
+    strict CheckFileExists(struct {
+        path string:255;
+        follow_symlinks bool;
+    }) -> (struct {
+        exists bool;
+    }) error SomeGenericError;
+};
+```
+
+FIDL method names are derived by changing the method name from Camel case to
+Lower snake case. So the method `CheckFileExists` in Python changes to
+`check_file_exists`.
+
+The anonymous struct types is derived from the whole protocol name and
+method. As a result, they can be quite verbose. The input method's input
+parameter is defined as a type called `ExampleCheckFileExistsRequest`. And
+the response is called `ExampleCheckFileExistsResponse`.
+
+Putting these together, the FIDL server implementation in Python looks like
+below:
+
+```py
+import fidl.fuchsia_exampleserver as fe
+
+class ExampleServerImpl(fe.Example.Server):
+
+    def some_file_check_function(path: str) -> bool:
+        # Just pretend a real check happens here.
+        return True
+
+    def check_file_exists(self, req: fe.ExampleCheckFileExistsRequest) -> fe.ExampleCheckFileExistsResponse:
+        return fe.ExampleCheckFileExistsResponse(
+            exists=ExampleServerImpl.some_file_check_function()
+        )
+```
+
+It is also possible to implement the methods as `async` without issues.
+
+In addition, returning an error requires wrapping the error in the FIDL
+`DomainError` object, for example:
+
+```py
+import fidl.fuchsia_exampleserver as fe
+
+from fidl import DomainError
+
+class ExampleServerImpl(fe.Example.Server):
+
+    def check_file_exists(self, req: fe.ExampleCheckFileExistsRequests) -> fe.ExampleCheckFileExistsResponse | DomainError:
+        return DomainError(error=fe.SomeGenericError.THIS)
+```
+
+#### Handling events
+
+Event handlers are written similarly to servers, but are derived from a
+different base class called `EventHandler`. Events are handled on the client
+side of a channel, so passing a client is necessary to construct an event
+handler.
+
+Let's start with the following FIDL code to build an example:
+
+```fidl
+library fuchsia.exampleserver;
+
+closed protocol Example {
+    strict -> OnFirst(struct {
+        message string:128;
+    });
+    strict -> OnSecond();
+};
+```
+
+This FIDL example contains two different events that the event handler needs
+to handle. Writing the simplest class that does nothing but print looks like
+below:
+
+```py
+import fidl.fuchsia_exampleserver as fe
+
+class ExampleEventHandler(fe.Example.EventHandler):
+
+    def on_first(self, req: fe.ExampleOnFirstRequest):
+        print(f"Got a message on first: {req.message}")
+
+    def on_second(self):
+        print(f"Got an 'on second' event")
+```
+
+If you want to stop handling events without error, you can raise
+`fidl.StopEventHandler`.
+
+An example of this event can be tested using some existing fuchsia controller
+testing code. But first, make sure that the Fuchsia controller tests have been
+added to your Fuchsia build settings, for example:
+
+```sh {:.devsite-disable-click-to-copy}
+fx set ... --with-host //src/developer/ffx/lib/fuchsia-controller:tests
+```
+
+With a protocol from `fuchsia.controller.test` (defined in
+[`fuchsia_controller.test.fidl`][test-fidl]), you can write code that
+uses the `ExampleEvents` protocol, for example:
+
+```py
+import asyncio
+import fidl.fuchsia_controller_test as fct
+
+from fidl import StopEventHandler
+from fuchsia_controller_py import Channel
+
+class ExampleEventHandler(fct.ExampleEvents.EventHandler):
+
+    def on_first(self, req: fct.ExampleEventsOnFirstRequest):
+        print(f"Got on-first event message: {req.message}")
+
+    def on_second(self):
+        print(f"Got on-second event")
+        raise StopEventHandler
+
+async def main():
+    client_chan, server_chan = Channel.create()
+    client = fct.ExampleEvents.Client(client_chan)
+    server = fct.ExampleEvents.Server(server_chan)
+    event_handler = ExampleEventHandler(client)
+    event_handler_task = asyncio.get_running_loop().create_task(
+        event_handler.serve()
+    )
+    server.on_first(message="first message")
+    server.on_second()
+    server.on_complete()
+    await event_handler_task
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Then this can be run by completing the Python environment setup steps in the
+[next section](#experiment-with-the-python-interpreter). When run, it prints
+the following output and exits:
+
+```sh {:.devsite-disable-click-to-copy}
+Got on-first event message: first message
+Got on-second event
+```
+
+For more examples on server testing, see this [`server.py`][server-tests]
+file.
+
+### Experiment with the Python interpreter {:#experiment-with-the-python-interpreter}
+
+If you are unsure of how to construct certain types and don't want to build and
+run an executable, you can use the Python interpreter to inspect FIDL structures.
+
+To start, make sure you have the prerequisite FIDL libraries built and available
+for use in Python (covered in the previous section), as Python needs access to
 the FIDL IR in order to function.
 
-The following commands will change depending on your fuchsia build directory (
-which defaults to `$FUCHSIA_DIR/out/default`):
+To set up the Python interpreter, run the commands below (however, these commands
+depend on your Fuchsia build directory, which defaults to
+`$FUCHSIA_DIR/out/default`):
 
 ```sh
 FUCHSIA_BUILD_DIR="$FUCHSIA_DIR/out/default" # Change depending on build dir.
@@ -512,8 +679,8 @@ fi
 export PYTHONPATH="$__PYTHONPATH"
 ```
 
-You can then start a python interpreter from anywhere, which will also support
-tab completion so you can inspect various types. For example:
+Then you can start the Python interpreter from anywhere, which also supports
+tab completion for inspectng various types, for example:
 
 
 ```sh {:.devsite-disable-click-to-copy}
@@ -536,18 +703,17 @@ fidl.fuchsia_hwinfo.ProductInfo(
 fidl.fuchsia_hwinfo.fullname
 ```
 
-You can then see all values exported by this module. If you would like to
-experiment with async in `IPython`, you can also do the same environment setup
-as above, and execute `IPython`. First, make sure you have it installed:
+You can see all values exported by this module. If you want to experiment
+with async in `IPython`, you can also do the same environment setup as above and
+execute `IPython`. But first, make sure you have `python3-ipython` installed:
 
 ```sh
 sudo apt install python3-ipython
 ```
 
-And then you can run `IPython`. The following example assumes that you run an
+Then you can run `IPython`. The following example assumes that you run an
 emulator named `fuchsia-emulator` and run from the Fuchsia default build
 directory (otherwise, `"sdk.root"` needs to be changed):
-
 
 ```sh {:.devsite-disable-click-to-copy}
 Python 3.11.8 (main, Feb  7 2024, 21:52:08) [GCC 13.2.0]
@@ -567,7 +733,7 @@ In [5]: provider = fidl.fuchsia_buildinfo.Provider.Client(hdl)
 In [6]: await provider.get_build_info()
 Out[6]: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core', board_config='x64', version='2024-04-04T18:15:05+00:00', latest_commit_date='2024-04-04T18:15:05+00:00'))
 
-In [7]:
+...
 ```
 
 <!-- Reference links -->
@@ -579,3 +745,5 @@ In [7]:
 [product-config]: /docs/development/build/build_system/boards_and_products.md
 [integration-testing]: /docs/development/tools/ffx/development/integration_testing/README.md
 [echo-fidl]: /src/developer/ffx/fidl/echo.fidl
+[server-tests]: /src/developer/ffx/lib/fuchsia-controller/tests/server.py
+[test-fidl]: /src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia_controller.test.fidl

@@ -80,6 +80,15 @@ closed protocol Testing {
     });
 };
 
+@discoverable
+closed protocol ExampleEvents {
+    strict -> OnFirst(struct {
+        message string:128;
+    });
+
+    strict -> OnSecond();
+};
+
 open protocol FlexibleMethodTester {
     flexible SomeMethod() -> (struct {
         some_bool_value bool;
