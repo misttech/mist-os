@@ -124,12 +124,10 @@ using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
 // LoadModule is created when a file needs to be loaded, and is destroyed after
 // the file module and all its dependencies have been loaded, decoded, symbols
 // resolved, and relro protected.
-template <class OSImpl>
+template <class Loader>
 class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
-                   public fbl::DoublyLinkedListable<std::unique_ptr<LoadModule<OSImpl>>> {
+                   public fbl::DoublyLinkedListable<std::unique_ptr<LoadModule<Loader>>> {
  public:
-  using Loader = typename OSImpl::Loader;
-  using File = typename OSImpl::File;
   using Relro = typename Loader::Relro;
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
@@ -202,8 +200,14 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   // to metadata to attach to the ABI module and store the information needed
   // for dependency parsing. Decode the module's dependencies (if any), and
   // return a vector their so names.
-  std::optional<Vector<Soname>> Load(Diagnostics& diag) {
-    auto file = OSImpl::RetrieveFile(diag, module_->name().str());
+  // The `retrieve_file` argument is called as an
+  // `std::optional<File>(Diagnostics&, std::string_view)` where `File` is an
+  // elfldltl File API type (see <lib/elfldltl/memory.h>).
+  template <typename RetrieveFile>
+  std::optional<Vector<Soname>> Load(Diagnostics& diag, RetrieveFile&& retrieve_file) {
+    static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
+
+    auto file = retrieve_file(diag, module_->name().str());
     if (!file) [[unlikely]] {
       return std::nullopt;
     }
@@ -255,7 +259,7 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // list of modules as needed.
-  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<OSImpl>>& modules) {
+  bool Relocate(Diagnostics& diag, ModuleList<LoadModule>& modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kNoTlsDesc);

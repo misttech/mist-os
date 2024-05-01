@@ -59,7 +59,9 @@ class DlImplTests : public DlImplLoadTestsBase {
     // fit::result<...> must be initialized to something, but this will get
     // overwritten by the return value from dynamic_linker_.Open.
     fit::result<Error, void*> result = fit::error{Error{"dlopen result is not set"}};
-    CallWithLdsvcInstalled([&]() { result = dynamic_linker_.Open<TestOS>(file, mode); });
+    CallWithLdsvcInstalled([&]() {
+      result = dynamic_linker_.Open<typename TestOS::Loader>(file, mode, TestOS::RetrieveFile);
+    });
     return result;
   }
 

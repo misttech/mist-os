@@ -58,8 +58,11 @@ class RuntimeDynamicLinker {
   // or an error if not found (ie undefined symbol).
   fit::result<Error, void*> LookupSymbol(ModuleHandle* module, const char* ref);
 
-  template <class OSImpl>
-  fit::result<Error, void*> Open(const char* file, int mode) {
+  // Open `file` with the given `mode`, returning a pointer to the loaded module
+  // for the file. The `retrieve_file` argument is a callable to be passed on to
+  // LoadModule::Load to perform the file retrieval.
+  template <class Loader, typename RetrieveFile>
+  fit::result<Error, void*> Open(const char* file, int mode, RetrieveFile&& retrieve_file) {
     auto already_loaded = CheckOpen(file, mode);
     if (already_loaded.is_error()) [[unlikely]] {
       return already_loaded.take_error();
@@ -76,7 +79,7 @@ class RuntimeDynamicLinker {
     // are generated on this module directly, it's name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto load_modules = Load<OSImpl>(diag, Soname{file});
+    auto load_modules = Load<Loader>(diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file));
     if (load_modules.is_empty()) [[unlikely]] {
       return diag.take_error();
     }
@@ -111,22 +114,26 @@ class RuntimeDynamicLinker {
   // loaded modules. Starting with the main file that was `dlopen`-ed, a
   // LoadModule is created for each file that is to be loaded, decoded, and its
   // dependencies parsed and enqueued to be processed in the same manner.
-  template <class OSImpl>
-  static ModuleList<LoadModule<OSImpl>> Load(Diagnostics& diag, Soname soname) {
+  template <class Loader, typename RetrieveFile>
+  static ModuleList<LoadModule<Loader>> Load(Diagnostics& diag, Soname soname,
+                                             RetrieveFile&& retrieve_file) {
     // This is the list of modules to load and process. The first module of this
     // list will always be the main file that was `dlopen`-ed.
-    ModuleList<LoadModule<OSImpl>> pending_modules;
+    ModuleList<LoadModule<Loader>> pending_modules;
 
+    // TODO(https://fxbug.dev/338123289): Separate LoadModule::Create and
+    // ModuleHandle::Create so that failed allocations can be handled
+    // separately.
     fbl::AllocChecker ac;
-    auto main_module = LoadModule<OSImpl>::Create(soname, ac);
+    auto main_module = LoadModule<Loader>::Create(soname, ac);
     if (!ac.check()) [[unlikely]] {
-      diag.OutOfMemory("LoadModule", sizeof(LoadModule<OSImpl>));
+      diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
       return {};
     }
 
     pending_modules.push_back(std::move(main_module));
 
-    // TODO(https://fxrev.dev/333573264): This needs to handle if a dep is
+    // TODO(https://fxbug.dev/333573264): This needs to handle if a dep is
     // already loaded.
     // Iterate over the pending modules that need to be loaded and dependencies
     // enqueued, appending each new dependency to the pending_modules list so
@@ -135,7 +142,7 @@ class RuntimeDynamicLinker {
       // TODO(caslyn): support scoped module diagnostics.
       // ld::ScopedModuleDiagnostics module_diag{diag, module_->name().str()};
 
-      auto result = it->Load(diag);
+      auto result = it->Load(diag, retrieve_file);
       if (!result) {
         return {};
       }
@@ -148,23 +155,23 @@ class RuntimeDynamicLinker {
         }
 
         fbl::AllocChecker ac;
-        auto load_module = LoadModule<OSImpl>::Create(needed_entry, ac);
+        auto load_module = LoadModule<Loader>::Create(needed_entry, ac);
         if (!ac.check()) [[unlikely]] {
-          diag.OutOfMemory("LoadModule", sizeof(LoadModule<OSImpl>));
+          diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
           return {};
         }
         pending_modules.push_back(std::move(load_module));
       }
     }
 
-    return std::move(pending_modules);
+    return pending_modules;
   }
 
   // TODO(https://fxbug.dev/324136831): Include global modules in `modules`.
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
-  template <class OSImpl>
-  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<OSImpl>>& modules) {
+  template <class Loader>
+  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<Loader>>& modules) {
     auto relocate = [&](auto& module) -> bool { return module.Relocate(diag, modules); };
     return std::all_of(std::begin(modules), std::end(modules), relocate);
   }
