@@ -25,7 +25,6 @@ use {
     json5format::{FormatOptions, PathOption},
     lazy_static::lazy_static,
     maplit::{hashmap, hashset},
-    paste::paste,
     reference_doc::ReferenceDoc,
     serde::{de, ser, Deserialize, Serialize},
     serde_json::{Map, Value},
@@ -1542,108 +1541,83 @@ macro_rules! merge_from_other_field {
     };
 }
 
-/// Subtracts the capabilities in `$ours` from `$theirs` if the type matches `$type_name` and the
-/// declarations match. Stores the result in `$theirs`.
+/// Subtracts the capabilities in `ours` from `theirs` if the declarations match in their type and
+/// other fields, resulting in the removal of duplicates between `ours` and `theirs`. Stores the
+/// result in `theirs`.
 ///
 /// Inexact matches on `availability` are allowed if there is a partial order between them. The
 /// stronger availability is chosen.
-///
-/// This is a macro to let us easily specialize on the $type_name.
-macro_rules! compute_capability_diff {
-    ($ours:ident, $theirs:ident, $type_name:ident) => {
-        let our_field: Option<OneOrMany<Name>> =
-            $ours.$type_name().map(|o| o.into_iter().cloned().collect());
-        let their_field: Option<OneOrMany<Name>> =
-            $theirs.$type_name().map(|o| o.into_iter().cloned().collect());
-        match (our_field, their_field) {
-            (_, None) | (None, _) => {} // One of the declarations is not for `type_name`.
-            (Some(our_field), Some(their_field)) => {
-                // Check if the non-capability fields match before proceeding.
-                let mut ours_partial = $ours.clone();
-                let mut theirs_partial = $theirs.clone();
-                for e in [&mut ours_partial, &mut theirs_partial] {
-                    paste! { e.[<set_ $type_name>](None) };
-                    // Availability is allowed to differ (see merge algorithm below)
-                    e.set_availability(None);
-                }
-                let avail_cmp = $ours
-                    .availability()
-                    .unwrap_or_default()
-                    .partial_cmp(&$theirs.availability().unwrap_or_default());
-                if ours_partial != theirs_partial || avail_cmp.is_none() {
-                    // One of the following is true:
-                    // - The fields other than `availability` do not match.
-                    // - The fields other than `availability` do match, but `availability`
-                    //   does not and is incompatible (no partial order).
-                    // Either way, `ours` and `theirs` are not diffable.
-                } else {
-                    let avail_cmp = avail_cmp.unwrap();
-                    let mut our_entries_to_remove = HashSet::new();
-                    let mut their_entries_to_remove = HashSet::new();
-                    for e in &their_field {
-                        if !our_field.contains(e) {
-                            // Not a duplicate, so keep.
-                        } else {
-                            match avail_cmp {
-                                cmp::Ordering::Less => {
-                                    // Their availability is stronger, meaning theirs should take
-                                    // priority. Keep `e` in theirs, and remove it from ours.
-                                    our_entries_to_remove.insert(e);
-                                }
-                                cmp::Ordering::Greater => {
-                                    // Our availability is stronger, meaning ours should take
-                                    // priority. Remove `e` from theirs.
-                                    their_entries_to_remove.insert(e);
-                                }
-                                cmp::Ordering::Equal => {
-                                    // The availabilities are equal, so `e` is a duplicate.
-                                    their_entries_to_remove.insert(e);
-                                }
-                            }
-                        }
+fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
+    // Return early if one is empty.
+    if ours.names().is_empty() || theirs.names().is_empty() {
+        return;
+    }
+
+    // Return early if the types don't match.
+    if ours.capability_type() != theirs.capability_type() {
+        return;
+    }
+
+    let our_field: Vec<_> = ours.names().into_iter().cloned().collect();
+    let their_field: Vec<_> = theirs.names().into_iter().cloned().collect();
+    // Check if the non-capability fields match before proceeding.
+    let mut ours_partial = ours.clone();
+    let mut theirs_partial = theirs.clone();
+    for e in [&mut ours_partial, &mut theirs_partial] {
+        e.set_names(Vec::new());
+        // Availability is allowed to differ (see merge algorithm below)
+        e.set_availability(None);
+    }
+    let avail_cmp = ours
+        .availability()
+        .unwrap_or_default()
+        .partial_cmp(&theirs.availability().unwrap_or_default());
+    if ours_partial != theirs_partial || avail_cmp.is_none() {
+        // One of the following is true:
+        // - The fields other than `availability` do not match.
+        // - The fields other than `availability` do match, but `availability`
+        //   does not and is incompatible (no partial order).
+        // Either way, `ours` and `theirs` are not diffable.
+    } else {
+        let avail_cmp = avail_cmp.unwrap();
+        let mut our_entries_to_remove = HashSet::new();
+        let mut their_entries_to_remove = HashSet::new();
+        for e in &their_field {
+            if !our_field.contains(e) {
+                // Not a duplicate, so keep.
+            } else {
+                match avail_cmp {
+                    cmp::Ordering::Less => {
+                        // Their availability is stronger, meaning theirs should take
+                        // priority. Keep `e` in theirs, and remove it from ours.
+                        our_entries_to_remove.insert(e.clone());
                     }
-                    fn update_entries(
-                        decl: &mut impl CapabilityClause,
-                        field: &OneOrMany<Name>,
-                        to_remove: &HashSet<&Name>,
-                    ) {
-                        if to_remove.is_empty() {
-                            return;
-                        }
-                        let mut new_entries: Vec<_> = field.iter().cloned().collect();
-                        new_entries.retain(|e| !to_remove.contains(&e));
-                        let new_entries = match new_entries.len() {
-                            1 => Some(OneOrMany::One(new_entries.remove(0))),
-                            0 => None,
-                            _ => Some(OneOrMany::Many(new_entries)),
-                        };
-                        paste! { decl.[<set_ $type_name>](new_entries); }
+                    cmp::Ordering::Greater => {
+                        // Our availability is stronger, meaning ours should take
+                        // priority. Remove `e` from theirs.
+                        their_entries_to_remove.insert(e.clone());
                     }
-                    update_entries($ours, &our_field, &our_entries_to_remove);
-                    update_entries($theirs, &their_field, &their_entries_to_remove);
+                    cmp::Ordering::Equal => {
+                        // The availabilities are equal, so `e` is a duplicate.
+                        their_entries_to_remove.insert(e.clone());
+                    }
                 }
             }
         }
-    };
-}
-
-/// Subtracts the capabilities in `ours` from `theirs` if the declarations match in their type and
-/// other fields, resulting in the removal of duplicates between `ours` and `theirs`. Stores the
-/// result in `theirs`. Returns true if `theirs` is empty, which is a signal to the caller that it
-/// can be discarded.
-fn compute_diff<T>(ours: &mut T, theirs: &mut T)
-where
-    T: CapabilityClause,
-{
-    compute_capability_diff!(ours, theirs, service);
-    compute_capability_diff!(ours, theirs, protocol);
-    compute_capability_diff!(ours, theirs, directory);
-    compute_capability_diff!(ours, theirs, storage);
-    compute_capability_diff!(ours, theirs, resolver);
-    compute_capability_diff!(ours, theirs, runner);
-    compute_capability_diff!(ours, theirs, event_stream);
-    compute_capability_diff!(ours, theirs, dictionary);
-    compute_capability_diff!(ours, theirs, config);
+        fn update_entries(
+            decl: &mut impl CapabilityClause,
+            mut field: Vec<Name>,
+            to_remove: &HashSet<Name>,
+        ) {
+            if to_remove.is_empty() {
+                return;
+            }
+            field.retain(|e| !to_remove.contains(e));
+            decl.set_names(field);
+        }
+        update_entries(ours, our_field, &our_entries_to_remove);
+        update_entries(theirs, their_field, &their_entries_to_remove);
+    }
 }
 
 impl Document {
@@ -3473,31 +3447,31 @@ pub trait CapabilityClause: Clone + PartialEq {
     }
 
     fn set_names(&mut self, names: Vec<Name>) {
-        let names = if names.len() == 1 {
-            OneOrMany::One(names.first().unwrap().clone())
-        } else {
-            OneOrMany::Many(names)
+        let names = match names.len() {
+            0 => None,
+            1 => Some(OneOrMany::One(names.first().unwrap().clone())),
+            _ => Some(OneOrMany::Many(names)),
         };
 
         let cap_type = self.capability_type();
         if cap_type == "protocol" {
-            self.set_protocol(Some(names));
+            self.set_protocol(names);
         } else if cap_type == "service" {
-            self.set_service(Some(names));
+            self.set_service(names);
         } else if cap_type == "directory" {
-            self.set_directory(Some(names));
+            self.set_directory(names);
         } else if cap_type == "storage" {
-            self.set_storage(Some(names));
+            self.set_storage(names);
         } else if cap_type == "runner" {
-            self.set_runner(Some(names));
+            self.set_runner(names);
         } else if cap_type == "resolver" {
-            self.set_resolver(Some(names));
+            self.set_resolver(names);
         } else if cap_type == "event_stream" {
-            self.set_event_stream(Some(names));
+            self.set_event_stream(names);
         } else if cap_type == "dictionary" {
-            self.set_dictionary(Some(names));
+            self.set_dictionary(names);
         } else if cap_type == "config" {
-            self.set_config(Some(names));
+            self.set_config(names);
         } else {
             panic!("Unknown capability type {}", cap_type);
         }
