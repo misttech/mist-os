@@ -661,19 +661,25 @@ mod tests {
             remote_ip: _,
             remote_mac: _,
         } = I::FAKE_CONFIG;
-        let addr =
+        let addr_sub =
             AddrSubnet::from_witness(local_ip, subnet.prefix()).expect("error creating AddrSubnet");
 
         assert_eq!(get_addrs(&mut ctx), []);
 
-        assert_eq!(ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, addr,), Ok(()));
-        let addr = addr.addr();
+        assert_eq!(ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, addr_sub), Ok(()));
+        let addr = addr_sub.addr();
         assert_eq!(&get_addrs(&mut ctx)[..], [addr]);
 
-        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr), Ok(()));
+        assert_eq!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr).unwrap().into_removed(),
+            addr_sub
+        );
         assert_eq!(get_addrs(&mut ctx), []);
 
-        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr), Err(NotFoundError));
+        assert_matches!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr),
+            Err(NotFoundError)
+        );
     }
 
     #[ip_test]

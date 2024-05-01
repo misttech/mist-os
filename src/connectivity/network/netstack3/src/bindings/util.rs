@@ -7,6 +7,7 @@ use std::{
     fmt::Debug,
     num::{NonZeroU16, NonZeroU64},
     ops::Deref,
+    pin::pin,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Weak,
@@ -24,7 +25,9 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{task::AtomicWaker, FutureExt as _, Stream, StreamExt as _};
+use futures::{
+    future::FusedFuture, task::AtomicWaker, Future, FutureExt as _, Stream, StreamExt as _,
+};
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -44,7 +47,7 @@ use netstack3_core::{
     socket::{
         self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
     },
-    sync::{RemoveResourceResult, RemoveResourceResultWithContext},
+    sync::RemoveResourceResult,
     types::WorkQueueReport,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -280,13 +283,16 @@ pub(crate) async fn yielding_data_notifier_loop<F: FnMut() -> Option<WorkQueueRe
     }
 }
 
-pub(crate) async fn wait_for_resource_removal<T: 'static>(
+pub(crate) async fn wait_for_resource_removal<
+    T: 'static,
+    F: Future<Output = Result<T, futures::channel::oneshot::Canceled>> + FusedFuture,
+>(
     resource_name: &'static str,
     resource_id: &impl Debug,
-    result: RemoveResourceResultWithContext<T, BindingsCtx>,
+    result: RemoveResourceResult<T, F>,
     debug_refs: &impl Debug,
 ) -> T {
-    let mut receiver = match result {
+    let receiver = match result {
         RemoveResourceResult::Removed(r) => {
             tracing::trace!("{resource_name} {resource_id:?} removal completed synchronously");
             return r;
@@ -307,6 +313,7 @@ pub(crate) async fn wait_for_resource_removal<T: 'static>(
         })
         .collect::<()>();
 
+    let mut receiver = pin!(receiver);
     futures::select! {
         () = interval_logging => unreachable!("interval channel never completes"),
         r = receiver => r.expect("sender dropped without notifying")

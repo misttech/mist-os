@@ -1678,10 +1678,14 @@ mod tests {
             );
 
             for subnet in subnets {
-                ctx.core_api()
-                    .device_ip::<I>()
-                    .del_ip_addr(&device, subnet.addr())
-                    .expect("failed to remove addr from device");
+                assert_eq!(
+                    ctx.core_api()
+                        .device_ip::<I>()
+                        .del_ip_addr(&device, subnet.addr())
+                        .expect("failed to remove addr from device")
+                        .into_removed(),
+                    subnet
+                );
             }
         }
     }

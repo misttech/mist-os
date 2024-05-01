@@ -788,7 +788,20 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         // make it impossible to make this mistake by centralizing the
         // "source of truth" for addresses on a device.
         return match ctx.api().device_ip_any().del_ip_addr(&core_id, specified_addr) {
-            Ok(()) => true,
+            Ok(result) => {
+                let _: AddrSubnetEither = util::wait_for_resource_removal(
+                    "device addr",
+                    &specified_addr,
+                    result.map_deferred(|d| {
+                        d.map_left(|l| l.map_ok(Into::into))
+                            .map_right(|r| r.map_ok(Into::into))
+                            .fuse()
+                    }),
+                    &(),
+                )
+                .await;
+                true
+            }
             Err(netstack3_core::error::NotFoundError) => false,
         };
     };
@@ -1401,7 +1414,17 @@ async fn run_address_state_provider(
     }
 
     if remove_address {
-        assert_matches!(ctx.api().device_ip_any().del_ip_addr(&device_id, address), Ok(()));
+        let result =
+            ctx.api().device_ip_any().del_ip_addr(&device_id, address).expect("address must exist");
+        let _: AddrSubnetEither = util::wait_for_resource_removal(
+            "device addr",
+            &address,
+            result.map_deferred(|d| {
+                d.map_left(|l| l.map_ok(Into::into)).map_right(|r| r.map_ok(Into::into)).fuse()
+            }),
+            &(),
+        )
+        .await;
     }
 
     if let Some(removal_reason) = removal_reason {

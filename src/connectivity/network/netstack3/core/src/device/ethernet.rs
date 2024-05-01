@@ -2387,13 +2387,19 @@ mod tests {
         assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Del ip1 (ok)
-        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap();
+        assert_eq!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap().into_removed(),
+            as1
+        );
         assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(contains_addr(&ctx.core_ctx, &device, ip2));
         assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Del ip1 again (ip1 not found)
-        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1), Err(NotFoundError));
+        assert_matches!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1),
+            Err(NotFoundError)
+        );
         assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(contains_addr(&ctx.core_ctx, &device, ip2));
         assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
@@ -2480,11 +2486,9 @@ mod tests {
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 0);
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 0);
 
+        let as1 = AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap();
         // Add ip1 to device.
-        ctx.core_api()
-            .device_ip::<I>()
-            .add_ip_addr_subnet(&device, AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap())
-            .unwrap();
+        ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, as1).unwrap();
         assert!(contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(!contains_addr(&ctx.core_ctx, &device, ip2));
 
@@ -2505,7 +2509,10 @@ mod tests {
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 3);
 
         // Remove ip1
-        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap();
+        assert_eq!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap().into_removed(),
+            as1
+        );
         assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(contains_addr(&ctx.core_ctx, &device, ip2));
 
@@ -2659,7 +2666,10 @@ mod tests {
         // Remove ip1 from the device.
         //
         // Should get packets destined for the solicited node address and ip2.
-        ctx.core_api().device_ip::<Ipv6>().del_ip_addr(&device, ip1).unwrap();
+        assert_eq!(
+            ctx.core_api().device_ip::<Ipv6>().del_ip_addr(&device, ip1).unwrap().into_removed(),
+            addr_sub1
+        );
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 5);
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 6);
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, sn_addr, 7);

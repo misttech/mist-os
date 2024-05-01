@@ -18,6 +18,33 @@ pub enum RemoveResourceResult<R, D> {
     Deferred(D),
 }
 
+impl<R, D> RemoveResourceResult<R, D> {
+    // TODO(https://fxbug.dev/336291808): Delete this method when we expose
+    // deferred resources to bindings.
+    pub(crate) fn unwrap_removed(self) -> R {
+        match self {
+            Self::Removed(r) => r,
+            Self::Deferred(_) => panic!("unexpected deferred removal"),
+        }
+    }
+
+    /// Maps the `Removed` variant to a different type.
+    pub fn map_removed<N, F: FnOnce(R) -> N>(self, f: F) -> RemoveResourceResult<N, D> {
+        match self {
+            Self::Removed(r) => RemoveResourceResult::Removed(f(r)),
+            Self::Deferred(d) => RemoveResourceResult::Deferred(d),
+        }
+    }
+
+    /// Maps the `Deferred` variant to a different type.
+    pub fn map_deferred<N, F: FnOnce(D) -> N>(self, f: F) -> RemoveResourceResult<R, N> {
+        match self {
+            Self::Removed(r) => RemoveResourceResult::Removed(r),
+            Self::Deferred(d) => RemoveResourceResult::Deferred(f(d)),
+        }
+    }
+}
+
 impl<R> RemoveResourceResult<R, Never> {
     /// A helper function to unwrap a [`RemoveResourceResult`] that can never be
     /// [`RemoveResourceResult::Deferred`].

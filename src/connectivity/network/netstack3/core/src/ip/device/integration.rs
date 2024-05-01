@@ -32,7 +32,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CoreTimerContext, CounterContext, InstantContext},
+    context::{CoreTimerContext, CounterContext},
     device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
@@ -74,7 +74,7 @@ use crate::{
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
-    sync::WeakRc,
+    sync::{RemoveResourceResultWithContext, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -236,7 +236,10 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             AddressRemovedReason::Manual,
             config,
         )
-        .map(|(addr_sub, config)| {
+        .map(|(addr_sub, config, result)| {
+            // TODO(https://fxbug.dev/336291808): Expose deferred removals to
+            // bindings.
+            let _ = result.unwrap_removed();
             assert_eq!(&addr_sub.addr(), addr);
             match config {
                 Ipv6AddrConfig::Slaac(s) => (addr_sub, s),
@@ -538,7 +541,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 fn assignment_state_v4<
-    BC: InstantContext,
+    BC: IpDeviceStateBindingsTypes,
     CC: IpDeviceStateContext<Ipv4, BC> + GmpQueryHandler<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -1168,7 +1171,7 @@ where
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> AddrSubnet<I::Addr, I::AssignedWitness> {
+    ) -> RemoveResourceResultWithContext<AddrSubnet<I::Addr>, BC> {
         let Self { config: _, core_ctx } = self;
         device::IpDeviceStateContext::<I, BC>::remove_ip_address(core_ctx, device_id, addr)
     }

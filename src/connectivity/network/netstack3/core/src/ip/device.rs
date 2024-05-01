@@ -75,6 +75,7 @@ use crate::{
         types::IpTypesIpExt,
     },
     socket::address::SocketIpAddr,
+    sync::RemoveResourceResultWithContext,
     Instant,
 };
 
@@ -477,7 +478,8 @@ impl<
 
 /// The bindings execution context for IP devices.
 pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
-    TimerContext
+    IpDeviceStateBindingsTypes
+    + TimerContext
     + RngContext
     + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>
 {
@@ -485,7 +487,8 @@ pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
 impl<
         D: device::StrongId,
         I: IpDeviceIpExt,
-        BC: TimerContext
+        BC: IpDeviceStateBindingsTypes
+            + TimerContext
             + RngContext
             + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>,
     > IpDeviceBindingsContext<I, D> for BC
@@ -564,7 +567,7 @@ pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
 }
 
 /// Accessor for IP device state.
-pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
+pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: IpDeviceStateBindingsTypes>:
     IpDeviceAddressContext<I, BT>
 {
     type IpDeviceAddressCtx<'a>: IpDeviceAddressContext<
@@ -604,7 +607,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> AddrSubnet<I::Addr, I::AssignedWitness>;
+    ) -> RemoveResourceResultWithContext<AddrSubnet<I::Addr>, BT>;
 
     /// Returns the address ID for the given address value.
     fn get_address_id(
@@ -664,7 +667,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
 
 /// The context provided to the callback passed to
 /// [`IpDeviceConfigurationContext::with_ip_device_configuration_mut`].
-pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
+pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BT: IpDeviceStateBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
     type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, BT, DeviceId = Self::DeviceId>
@@ -1016,15 +1019,24 @@ impl<
         if assigned {
             IpAddressState::Assigned
         } else {
-            del_ip_addr(
+            match del_ip_addr(
                 self,
                 bindings_ctx,
                 device_id,
                 DelIpAddr::AddressId(addr_id),
                 AddressRemovedReason::DadFailed,
-            )
-            .unwrap();
-            IpAddressState::Tentative
+            ) {
+                Ok(result) => {
+                    // TODO(https://fxbug.dev/336291808): Expose deferred
+                    // removals to bindings.
+                    let _ = result.unwrap_removed();
+                    IpAddressState::Tentative
+                }
+                Err(NotFoundError) => {
+                    // We may have raced with user removal of this address.
+                    IpAddressState::Unavailable
+                }
+            }
         }
     }
 
@@ -1245,6 +1257,11 @@ fn disable_ipv6_device_with_config<
                     AddressRemovedReason::Manual,
                     device_config,
                 )
+                .map(|remove_result| {
+                    // TODO(https://fxbug.dev/336291808): Expose deferred
+                    // removals to bindings.
+                    let _ = remove_result.unwrap_removed();
+                })
                 .unwrap_or_else(|NotFoundError| {
                     // We're not holding locks on the addresses anymore we must
                     // allow a NotFoundError since the address can be removed as
@@ -1337,7 +1354,7 @@ fn disable_ipv4_device_with_config<
 ///
 /// Returns an [`Iterator`] of `AddrSubnet`.
 pub(crate) fn with_assigned_ipv4_addr_subnets<
-    BT: InstantBindingsTypes,
+    BT: IpDeviceStateBindingsTypes,
     CC: IpDeviceStateContext<Ipv4, BT>,
     O,
     F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
@@ -1351,7 +1368,10 @@ pub(crate) fn with_assigned_ipv4_addr_subnets<
 }
 
 /// Gets a single IPv4 address and subnet for a device.
-pub(crate) fn get_ipv4_addr_subnet<BT: InstantBindingsTypes, CC: IpDeviceStateContext<Ipv4, BT>>(
+pub(crate) fn get_ipv4_addr_subnet<
+    BT: IpDeviceStateBindingsTypes,
+    CC: IpDeviceStateContext<Ipv4, BT>,
+>(
     core_ctx: &mut CC,
     device_id: &CC::DeviceId,
 ) -> Option<AddrSubnet<Ipv4Addr>> {
@@ -1359,7 +1379,10 @@ pub(crate) fn get_ipv4_addr_subnet<BT: InstantBindingsTypes, CC: IpDeviceStateCo
 }
 
 /// Gets the hop limit for new IPv6 packets that will be sent out from `device`.
-pub(crate) fn get_ipv6_hop_limit<BT: InstantBindingsTypes, CC: IpDeviceStateContext<Ipv6, BT>>(
+pub(crate) fn get_ipv6_hop_limit<
+    BT: IpDeviceStateBindingsTypes,
+    CC: IpDeviceStateContext<Ipv6, BT>,
+>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
 ) -> NonZeroU8 {
@@ -1620,8 +1643,14 @@ fn del_ip_addr_inner<
     reason: AddressRemovedReason,
     // Require configuration lock to do this.
     _config: &I::Configuration,
-) -> Result<(AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BC::Instant>), NotFoundError>
-{
+) -> Result<
+    (
+        AddrSubnet<I::Addr, I::AssignedWitness>,
+        I::AddressConfig<BC::Instant>,
+        RemoveResourceResultWithContext<AddrSubnet<I::Addr>, BC>,
+    ),
+    NotFoundError,
+> {
     let addr_id = match addr {
         DelIpAddr::SpecifiedAddr(addr) => core_ctx.get_address_id(device_id, addr)?,
         DelIpAddr::AddressId(id) => id,
@@ -1636,16 +1665,16 @@ fn del_ip_addr_inner<
         })
         .ok_or(NotFoundError)?;
 
-    let addr_sub = core_ctx.remove_ip_address(device_id, addr_id);
-    let addr = addr_sub.addr();
+    let addr_sub = addr_id.addr_sub();
+    let result = core_ctx.remove_ip_address(device_id, addr_id);
 
     bindings_ctx.on_event(IpDeviceEvent::AddressRemoved {
         device: device_id.clone(),
-        addr: addr.into(),
+        addr: addr_sub.addr().into(),
         reason,
     });
 
-    Ok((addr_sub, addr_config))
+    Ok((addr_sub, addr_config, result))
 }
 
 /// Removes an IP address and associated subnet from this device.
@@ -1659,7 +1688,7 @@ fn del_ip_addr<
     device_id: &CC::DeviceId,
     addr: DelIpAddr<CC::AddressId, I::Addr>,
     reason: AddressRemovedReason,
-) -> Result<(), NotFoundError> {
+) -> Result<RemoveResourceResultWithContext<AddrSubnet<I::Addr>, BC>, NotFoundError> {
     info!("removing addr {addr} from device {device_id:?}");
     core_ctx.with_ip_device_configuration(device_id, |config, mut core_ctx| {
         del_ip_addr_inner_and_notify_handler(
@@ -1689,10 +1718,11 @@ fn del_ip_addr_inner_and_notify_handler<
     addr: DelIpAddr<CC::AddressId, I::Addr>,
     reason: AddressRemovedReason,
     config: &I::Configuration,
-) -> Result<(), NotFoundError> {
+) -> Result<RemoveResourceResultWithContext<AddrSubnet<I::Addr>, BC>, NotFoundError> {
     del_ip_addr_inner(core_ctx, bindings_ctx, device_id, addr, reason, config).map(
-        |(addr_sub, config)| {
-            core_ctx.on_address_removed(bindings_ctx, device_id, addr_sub, config, reason)
+        |(addr_sub, config, result)| {
+            core_ctx.on_address_removed(bindings_ctx, device_id, addr_sub, config, reason);
+            result
         },
     )
 }

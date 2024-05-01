@@ -23,8 +23,8 @@ use packet_formats::utils::NonZeroDuration;
 
 use crate::{
     context::{
-        CoreTimerContext, InstantBindingsTypes, NestedIntoCoreTimerCtx, TimerBindingsTypes,
-        TimerContext,
+        CoreTimerContext, InstantBindingsTypes, NestedIntoCoreTimerCtx, ReferenceNotifiers,
+        TimerBindingsTypes, TimerContext,
     },
     device,
     inspect::{Inspectable, InspectableValue, Inspector},
@@ -759,8 +759,14 @@ impl<BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<Ipv6, BT>> for Ipv6Devi
 }
 
 /// Bindings types required for IP device state.
-pub trait IpDeviceStateBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
-impl<BT> IpDeviceStateBindingsTypes for BT where BT: InstantBindingsTypes + TimerBindingsTypes {}
+pub trait IpDeviceStateBindingsTypes:
+    InstantBindingsTypes + TimerBindingsTypes + ReferenceNotifiers
+{
+}
+impl<BT> IpDeviceStateBindingsTypes for BT where
+    BT: InstantBindingsTypes + TimerBindingsTypes + ReferenceNotifiers
+{
+}
 
 /// IPv4 and IPv6 state combined.
 pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {

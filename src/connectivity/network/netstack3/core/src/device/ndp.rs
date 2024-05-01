@@ -986,11 +986,9 @@ mod tests {
 
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
+        let addr_sub = AddrSubnet::new(local_ip().into(), 128).unwrap();
         // Add an IP.
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
-            .unwrap();
+        ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&dev_id, addr_sub).unwrap();
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
@@ -1019,10 +1017,14 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame1, _frame2]);
 
         // Remove local ip
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .del_ip_addr(&dev_id, local_ip().into_specified())
-            .unwrap();
+        assert_eq!(
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .del_ip_addr(&dev_id, local_ip().into_specified())
+                .unwrap()
+                .into_removed(),
+            addr_sub
+        );
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), None);
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
@@ -3518,10 +3520,15 @@ mod tests {
         );
 
         // Deleting the address should cancel its SLAAC timers.
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .del_ip_addr(&device, expected_addr.into_specified())
-            .unwrap();
+        let expected_addr_sub = AddrSubnet::new(expected_addr.get(), prefix_length).unwrap();
+        assert_eq!(
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .del_ip_addr(&device, expected_addr.into_specified())
+                .unwrap()
+                .into_removed(),
+            expected_addr_sub
+        );
         assert_empty(get_global_ipv6_addrs(&ctx, &device));
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
@@ -3534,11 +3541,16 @@ mod tests {
         let (mut ctx, device, expected_addr) =
             test_host_generate_temporary_slaac_address(INFINITE_LIFETIME, INFINITE_LIFETIME);
 
+        let expected_addr_sub = AddrSubnet::new(expected_addr.get(), 64).unwrap();
         // Deleting the address should cancel its SLAAC timers.
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .del_ip_addr(&device, expected_addr.into_specified())
-            .unwrap();
+        assert_eq!(
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .del_ip_addr(&device, expected_addr.into_specified())
+                .unwrap()
+                .into_removed(),
+            expected_addr_sub
+        );
         assert_empty(get_global_ipv6_addrs(&ctx, &device).into_iter().filter(|e| match e.config {
             Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
             Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,

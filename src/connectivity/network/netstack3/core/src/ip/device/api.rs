@@ -6,6 +6,7 @@
 
 use alloc::vec::Vec;
 
+use either::Either;
 use net_types::{
     ip::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
@@ -17,7 +18,7 @@ use thiserror::Error;
 use tracing::trace;
 
 use crate::{
-    context::{ContextPair, EventContext as _, InstantBindingsTypes},
+    context::{ContextPair, EventContext as _, InstantBindingsTypes, ReferenceNotifiers},
     device::{AnyDevice, DeviceIdContext},
     error::ExistsError,
     error::NotFoundError,
@@ -40,6 +41,7 @@ use crate::{
         types::RawMetric,
         AddressRemovedReason,
     },
+    sync::{RemoveResourceResult, RemoveResourceResultWithContext},
     time::Instant,
 };
 
@@ -116,7 +118,10 @@ where
         &mut self,
         device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
         addr: SpecifiedAddr<I::Addr>,
-    ) -> Result<(), NotFoundError> {
+    ) -> Result<
+        RemoveResourceResultWithContext<AddrSubnet<I::Addr>, C::BindingsContext>,
+        NotFoundError,
+    > {
         let (core_ctx, bindings_ctx) = self.contexts();
         ip::device::del_ip_addr(
             core_ctx,
@@ -355,11 +360,30 @@ where
         &mut self,
         device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
         addr: impl Into<SpecifiedAddr<IpAddr>>,
-    ) -> Result<(), NotFoundError> {
+    ) -> Result<
+        RemoveResourceResult<
+            AddrSubnetEither,
+            // NB: This is a bit of a mouthful, but we can't change the type of
+            // a ReferenceReceiver once created and it comes from deep inside
+            // core. The complexity should be contained here and this is simpler
+            // than making the ReferenceNotifiers trait fancier.
+            Either<
+                <C::BindingsContext as ReferenceNotifiers>::ReferenceReceiver<AddrSubnet<Ipv4Addr>>,
+                <C::BindingsContext as ReferenceNotifiers>::ReferenceReceiver<AddrSubnet<Ipv6Addr>>,
+            >,
+        >,
+        NotFoundError,
+    > {
         let addr = addr.into();
         match addr.into() {
-            IpAddr::V4(addr) => self.ip::<Ipv4>().del_ip_addr(device, addr),
-            IpAddr::V6(addr) => self.ip::<Ipv6>().del_ip_addr(device, addr),
+            IpAddr::V4(addr) => self
+                .ip::<Ipv4>()
+                .del_ip_addr(device, addr)
+                .map(|r| r.map_removed(Into::into).map_deferred(Either::Left)),
+            IpAddr::V6(addr) => self
+                .ip::<Ipv6>()
+                .del_ip_addr(device, addr)
+                .map(|r| r.map_removed(Into::into).map_deferred(Either::Right)),
         }
     }
 
