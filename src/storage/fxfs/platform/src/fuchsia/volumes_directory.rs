@@ -1787,41 +1787,52 @@ mod tests {
         device.ensure_unique();
         device.reopen(false);
         let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
-        let volumes_directory = VolumesDirectory::new(
-            root_volume(filesystem.clone()).await.unwrap(),
-            Weak::new(),
-            None,
-        )
-        .await
-        .unwrap();
-        let _premount_blob =
-            volumes_directory.mount_volume(PREMOUNT_BLOB, None, true).await.expect("Reopen volume");
-        let _premount_noblob = volumes_directory
-            .mount_volume(PREMOUNT_NOBLOB, None, false)
+        {
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
             .await
-            .expect("Reopen volume");
-        let _live_blob =
-            volumes_directory.mount_volume(LIVE_BLOB, None, true).await.expect("Reopen volume");
-        let _live_noblob =
-            volumes_directory.mount_volume(LIVE_NOBLOB, None, false).await.expect("Reopen volume");
+            .unwrap();
 
-        // Verify which recordings ran based on the saved recordings.
-        volumes_directory
-            .delete_profile(PREMOUNT_BLOB, RECORDING_NAME)
-            .await
-            .expect("Finding profile to delete.");
-        volumes_directory
-            .delete_profile(PREMOUNT_NOBLOB, RECORDING_NAME)
-            .await
-            .expect_err("Profile should not exist");
-        volumes_directory
-            .delete_profile(LIVE_BLOB, RECORDING_NAME)
-            .await
-            .expect("Finding profile to delete.");
-        volumes_directory
-            .delete_profile(LIVE_NOBLOB, RECORDING_NAME)
-            .await
-            .expect_err("Profile should not exist");
+            let _premount_blob = volumes_directory
+                .mount_volume(PREMOUNT_BLOB, None, true)
+                .await
+                .expect("Reopen volume");
+            let _premount_noblob = volumes_directory
+                .mount_volume(PREMOUNT_NOBLOB, None, false)
+                .await
+                .expect("Reopen volume");
+            let _live_blob =
+                volumes_directory.mount_volume(LIVE_BLOB, None, true).await.expect("Reopen volume");
+            let _live_noblob = volumes_directory
+                .mount_volume(LIVE_NOBLOB, None, false)
+                .await
+                .expect("Reopen volume");
+
+            // Verify which recordings ran based on the saved recordings.
+            volumes_directory
+                .delete_profile(PREMOUNT_BLOB, RECORDING_NAME)
+                .await
+                .expect("Finding profile to delete.");
+            volumes_directory
+                .delete_profile(PREMOUNT_NOBLOB, RECORDING_NAME)
+                .await
+                .expect_err("Profile should not exist");
+            volumes_directory
+                .delete_profile(LIVE_BLOB, RECORDING_NAME)
+                .await
+                .expect("Finding profile to delete.");
+            volumes_directory
+                .delete_profile(LIVE_NOBLOB, RECORDING_NAME)
+                .await
+                .expect_err("Profile should not exist");
+
+            volumes_directory.terminate().await;
+        }
+
+        filesystem.close().await.expect("Filesystem close");
     }
 
     #[fuchsia::test(threads = 10)]
