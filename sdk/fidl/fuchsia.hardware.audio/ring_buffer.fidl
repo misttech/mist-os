@@ -416,8 +416,7 @@ closed protocol RingBuffer {
 
     /// Stop the ring buffer. Once this call's response is received, no further position
     /// notifications will be sent until `Start` is called again.
-    /// If `Stop` is called before `GetVmo`, or if `Stop` is called for a second time before the
-    /// first call has completed, then the channel must be closed with `ZX_ERR_BAD_STATE`.
+    /// If `Stop` is called before `GetVmo`, the channel must be closed with `ZX_ERR_BAD_STATE`.
     // TODO(https://fxbug.dev/42115360): Add timestamp parameter.
     strict Stop() -> ();
 
