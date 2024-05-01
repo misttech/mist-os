@@ -82,13 +82,16 @@ pte_t arm64_kernel_translation_table[MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP] __ALIGNE
 // Physical address of the above table, saved in start.S.
 paddr_t arm64_kernel_translation_table_phys;
 
-// Whether ASID use is enabled.
-bool feat_asid_enabled;
-
 // Global accessor for the kernel page table
 pte_t* arm64_get_kernel_ptable() { return arm64_kernel_translation_table; }
 
 namespace {
+
+// Whether ASID use is enabled.
+bool feat_asid_enabled;
+
+// Whether or not we allow break-before-make. Used in very early boot.
+bool allow_bbm = false;
 
 KCOUNTER(cm_flush_all, "mmu.consistency_manager.flush_all")
 KCOUNTER(cm_flush_all_replacing, "mmu.consistency_manager.flush_all_replacing")
@@ -154,6 +157,16 @@ void InitializePageCache(uint32_t level) {
 
 // Initialize the cache after the percpu data structures are initialized.
 LK_INIT_HOOK(arm64_mmu_page_cache_init, InitializePageCache, LK_INIT_LEVEL_KERNEL + 1)
+
+void enable_bbm(uint32_t level) {
+  dprintf(INFO, "ARM: enabling break-before-make\n");
+  allow_bbm = true;
+}
+
+// Enable break-before-make when splitting large pages after the VM has been initialized
+// which is where a bunch of pieces of the physmap and kernel are unmapped or permissions
+// lowered.
+LK_INIT_HOOK(arm64_mmu_enable_bbm, enable_bbm, LK_INIT_LEVEL_VM)
 
 // Convert user level mmu flags to flags that go in L1 descriptors.
 // Hypervisor flag modifies behavior to work for single translation regimes
@@ -749,14 +762,16 @@ zx_status_t ArmArchVmAspace::SplitLargePage(vaddr_t vaddr, const uint index_shif
     new_page_table[i] = mapped_paddr | attrs;
   }
 
-  // As we are changing the block size of a translation we must do a break-before-make in accordance
-  // with ARM requirements to avoid TLB and other inconsistency.
-  update_pte(&page_table[pt_index], MMU_PTE_DESCRIPTOR_INVALID);
-  cm.FlushEntry(vaddr, true);
-  AssertHeld(cm.lock_ref());
-  // Must force the flush to happen now before installing the new entry. This will also ensure the
-  // page table entries we wrote will be visible before we install it.
-  cm.Flush();
+  if (allow_bbm) {
+    // As we are changing the block size of a translation we must do a break-before-make in
+    // accordance with ARM requirements to avoid TLB and other inconsistency.
+    update_pte(&page_table[pt_index], MMU_PTE_DESCRIPTOR_INVALID);
+    cm.FlushEntry(vaddr, true);
+    AssertHeld(cm.lock_ref());
+    // Must force the flush to happen now before installing the new entry. This will also ensure the
+    // page table entries we wrote will be visible before we install it.
+    cm.Flush();
+  }
 
   update_pte(&page_table[pt_index], paddr | MMU_PTE_L012_DESCRIPTOR_TABLE);
   LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, pt_index, page_table[pt_index]);
@@ -874,7 +889,7 @@ ssize_t ArmArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t
         chunk_size != block_size) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure we are permitted to do that.
-      if (enlarge != EnlargeOperation::Yes) {
+      if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       zx_status_t s = SplitLargePage(vaddr, index_shift, index, page_table, cm);
@@ -1067,7 +1082,7 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
         chunk_size != block_size) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure that is permitted.
-      if (enlarge != EnlargeOperation::Yes) {
+      if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       zx_status_t s = SplitLargePage(vaddr, index_shift, index, page_table, cm);
