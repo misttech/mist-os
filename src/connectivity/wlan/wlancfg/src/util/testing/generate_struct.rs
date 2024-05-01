@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use crate::util::historical_list::HistoricalList;
-
 use {
     crate::{
-        client::{connection_selection::bss_selection::BssQualityData, types},
+        client::types,
         config_management::{Credential, HistoricalListsByBssid},
         util::pseudo_energy::SignalData,
     },
@@ -338,13 +336,5 @@ pub fn generate_random_signal_data() -> SignalData {
         rng.gen_range(0..80),
         rng.gen_range(0..10) as usize,
         rng.gen_range(0..10) as usize,
-    )
-}
-
-pub fn generate_random_bss_quality_data() -> BssQualityData {
-    BssQualityData::new(
-        generate_random_signal_data(),
-        generate_random_channel(),
-        HistoricalList::new(10),
     )
 }

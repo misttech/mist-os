@@ -6,7 +6,8 @@ use {
     crate::{
         client::{
             connection_selection::{
-                bss_selection, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
+                scoring_functions::score_current_connection_signal_data, EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
             },
             roaming::local_roam_manager::LocalRoamManagerApi,
             types,
@@ -555,33 +556,19 @@ async fn connected_state(
     debug!("Entering connected state");
     let mut connect_start_time = fasync::Time::now();
 
-    // Initialize connection data
-    let past_connections = common_options
-        .saved_networks_manager
-        .get_past_connections(
-            &options.currently_fulfilled_connection.target.network,
-            &options.currently_fulfilled_connection.target.credential,
-            &options.ap_state.original().bssid,
-        )
-        .await;
-
-    // Send initial quality data to the RoamManager for tracking and getting the initial score.
-    // This should not trigger any scans since the connection just began.
-    let bss_quality_data = bss_selection::BssQualityData::new(
-        SignalData::new(
-            options.ap_state.tracked.signal.rssi_dbm,
-            options.ap_state.tracked.signal.snr_db,
-            EWMA_SMOOTHING_FACTOR,
-            EWMA_VELOCITY_SMOOTHING_FACTOR,
-        ),
-        options.ap_state.tracked.channel,
-        past_connections,
+    // Track the EWMA signal and velocity for metrics
+    let signal_data = SignalData::new(
+        options.ap_state.tracked.signal.rssi_dbm,
+        options.ap_state.tracked.signal.snr_db,
+        EWMA_SMOOTHING_FACTOR,
+        EWMA_VELOCITY_SMOOTHING_FACTOR,
     );
-    let (_, initial_score) = bss_selection::evaluate_current_bss(&bss_quality_data);
+    let initial_score = score_current_connection_signal_data(signal_data);
+
     // Used to receive roam requests. The sender is cloned to send to the RoamManager.
     let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
     let mut roam_monitor = common_options.roam_manager.lock().await.get_roam_monitor(
-        bss_quality_data,
+        options.ap_state.tracked.signal,
         options.currently_fulfilled_connection.clone(),
         roam_sender,
     );
@@ -2702,7 +2689,6 @@ mod tests {
 
         let ap_state =
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
-        let channel = ap_state.tracked.channel;
 
         // Add a PastConnectionData for the connected network to be send in BSS quality data.
         let mut past_connections = PastConnectionList::default();
@@ -2750,17 +2736,13 @@ mod tests {
 
         // The tracked signal data uses the RSS/SNR data from the time of connection and the first
         // stats are sent after updated with the first signal report data.
-        let mut expected_qual_data = bss_selection::BssQualityData::new(
-            SignalData::new(
-                init_rssi,
-                init_snr,
-                EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
-            ),
-            channel,
-            past_connections,
+        let mut expected_signal_data = SignalData::new(
+            init_rssi,
+            init_snr,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
         );
-        expected_qual_data.signal_data.update_with_new_measurement(rssi_1, snr_1);
+        expected_signal_data.update_with_new_measurement(rssi_1, snr_1);
 
         // Verify that connection stats are sent out
         assert_variant!(test_values.stats_receiver.try_next(), Ok(Some(stats)) => {
