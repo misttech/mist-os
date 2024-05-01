@@ -1516,27 +1516,24 @@ fn merge_from_capability_field<T: CapabilityClause>(
     Ok(())
 }
 
-/// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
-/// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is _not_ a
-/// capability routing field of [`Document`] (`use`, `offer`, `expose`, or `capabilities`).
-///
+/// Merges `us` into `other` according to the rules documented for [`include`].
 /// [`include`]: #include
-/// [`Document`]: #document
-macro_rules! merge_from_other_field {
-    ($self:ident, $other:ident, $field_name:ident) => {
-        if let Some(ref mut ours) = $self.$field_name {
-            if let Some(theirs) = $other.$field_name.take() {
-                // Add their elements, ignoring dupes with ours
-                for t in theirs {
-                    if !ours.contains(&t) {
-                        ours.push(t);
-                    }
+fn merge_from_other_field<T: std::cmp::PartialEq>(
+    us: &mut Option<Vec<T>>,
+    other: &mut Option<Vec<T>>,
+) {
+    if let Some(ref mut ours) = us {
+        if let Some(theirs) = other.take() {
+            // Add their elements, ignoring dupes with ours
+            for t in theirs {
+                if !ours.contains(&t) {
+                    ours.push(t);
                 }
             }
-        } else if let Some(theirs) = $other.$field_name.take() {
-            $self.$field_name.replace(theirs);
         }
-    };
+    } else if let Some(theirs) = other.take() {
+        us.replace(theirs);
+    }
 }
 
 /// Subtracts the capabilities in `ours` from `theirs` if the declarations match in their type and
@@ -1625,9 +1622,9 @@ impl Document {
         merge_from_capability_field(&mut self.expose, &mut other.expose)?;
         merge_from_capability_field(&mut self.offer, &mut other.offer)?;
         merge_from_capability_field(&mut self.capabilities, &mut other.capabilities)?;
-        merge_from_other_field!(self, other, include);
-        merge_from_other_field!(self, other, children);
-        merge_from_other_field!(self, other, collections);
+        merge_from_other_field(&mut self.include, &mut other.include);
+        merge_from_other_field(&mut self.children, &mut other.children);
+        merge_from_other_field(&mut self.collections, &mut other.collections);
         self.merge_environment(other, include_path)?;
         self.merge_program(other, include_path)?;
         self.merge_facets(other, include_path)?;
