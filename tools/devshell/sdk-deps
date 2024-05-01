@@ -164,6 +164,7 @@ main() {
     echo "    Not in SDK:"
     sed -i -e 's/^/      /' ${non_sdk_deps_file}
     echo "      Total items:" $(cat ${non_sdk_deps_file} | wc -l)
+    echo "      Items containing `banjo`:" $(cat {non_sdk_deps_file} | grep banjo | wc -l)
     cat ${non_sdk_deps_file}
 }
 
