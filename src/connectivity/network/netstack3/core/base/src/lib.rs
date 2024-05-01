@@ -34,6 +34,21 @@ pub mod ref_counted_hash_map {
     };
 }
 
+/// Sync utilities common to netstack3.
+pub mod sync {
+    // TODO(https://fxbug.dev/42062225): Support single-threaded variants of
+    // types exported from this module.
+
+    // Exclusively re-exports from the sync crate.
+    pub use netstack3_sync::{
+        rc::{
+            DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier,
+            Notifier as RcNotifier, Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+        },
+        LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    };
+}
+
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {

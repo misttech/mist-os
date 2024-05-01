@@ -215,17 +215,17 @@ pub mod socket {
 
 /// Useful synchronization primitives.
 pub mod sync {
-    pub(crate) mod types;
-    // TODO(https://fxbug.dev/42062225): Support single-threaded variants of types
-    // exported from this module.
+    // We take all of our dependencies directly from base for symmetry with the
+    // other crates. However, we want to explicitly have all the dependencies in
+    // GN so we can assert the dependencies on the crate variants. This defeats
+    // rustc's unused dependency check.
+    use netstack3_sync as _;
 
-    // Exclusively re-exports from the sync crate.
-    pub use netstack3_sync::{
-        rc::{
-            DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier,
-            Notifier as RcNotifier, Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
-        },
-        LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    pub(crate) mod types;
+
+    pub use netstack3_base::sync::{
+        DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
+        RcNotifier, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
     };
 
     pub use types::{RemoveResourceResult, RemoveResourceResultWithContext};
