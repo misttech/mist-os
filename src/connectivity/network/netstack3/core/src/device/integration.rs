@@ -61,7 +61,7 @@ use crate::{
         },
         types::IpTypesIpExt,
     },
-    sync::{PrimaryRc, StrongRc},
+    sync::{PrimaryRc, StrongRc, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -302,6 +302,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv4> for CoreCtx<'_, BC, L> {
     type AddressId = StrongRc<Ipv4AddressEntry<BC>>;
+    type WeakAddressId = WeakRc<Ipv4AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
@@ -591,6 +592,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv6> for CoreCtx<'_, BC, L> {
     type AddressId = StrongRc<Ipv6AddressEntry<BC>>;
+    type WeakAddressId = WeakRc<Ipv6AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>

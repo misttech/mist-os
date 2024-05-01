@@ -34,8 +34,8 @@ use crate::{
     for_any_device_id,
     ip::{
         device::{
-            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
-            Ipv6DeviceConfigurationContext,
+            IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
+            IpDeviceTimerId, Ipv6DeviceConfigurationContext,
         },
         types::RawMetric,
     },
@@ -107,7 +107,7 @@ where
                     weak_ref.clone(),
                     properties,
                 );
-                IpLinkDeviceStateInner::new::<_, C::CoreContext>(
+                IpLinkDeviceStateInner::new::<_, _, C::CoreContext>(
                     bindings_ctx,
                     weak_ref.into(),
                     link,
@@ -428,8 +428,22 @@ impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNoti
 /// layer to fulfill [`DeviceApi`].
 pub trait DeviceApiIpLayerCoreContext<D: Device, BC: DeviceLayerTypes>:
     DeviceIdAnyCompatContext<D>
-    + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>, BC>
-    + CoreTimerContext<IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>, BC>
+    + IpAddressIdSpecContext
+    + CoreTimerContext<
+        IpDeviceTimerId<
+            Ipv6,
+            <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            Self::AddressIdSpec,
+        >,
+        BC,
+    > + CoreTimerContext<
+        IpDeviceTimerId<
+            Ipv4,
+            <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            Self::AddressIdSpec,
+        >,
+        BC,
+    >
 {
 }
 
@@ -438,11 +452,20 @@ where
     D: Device,
     BC: DeviceLayerTypes,
     O: DeviceIdAnyCompatContext<D>
+        + IpAddressIdSpecContext
         + CoreTimerContext<
-            IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            IpDeviceTimerId<
+                Ipv6,
+                <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                Self::AddressIdSpec,
+            >,
             BC,
         > + CoreTimerContext<
-            IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            IpDeviceTimerId<
+                Ipv4,
+                <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                Self::AddressIdSpec,
+            >,
             BC,
         >,
 {

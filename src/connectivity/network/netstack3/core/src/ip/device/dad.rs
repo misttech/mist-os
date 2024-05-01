@@ -18,20 +18,18 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
     ip::device::{
         state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext,
-        IpDeviceIpExt,
+        IpDeviceIpExt, WeakIpAddressId,
     },
 };
 
 /// A timer ID for duplicate address detection.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct DadTimerId<D: device::WeakId> {
+pub struct DadTimerId<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> {
     pub(crate) device_id: D,
-    // TODO(https://fxbug.dev/336291808): Replace with a weak address ID when
-    // available.
-    pub(crate) addr: UnicastAddr<Ipv6Addr>,
+    pub(crate) addr: A,
 }
 
-impl<D: device::WeakId> DadTimerId<D> {
+impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> DadTimerId<D, A> {
     pub(super) fn device_id(&self) -> &D {
         let Self { device_id, addr: _ } = self;
         device_id
@@ -88,23 +86,13 @@ pub(super) trait DadAddressContext<BC>: IpDeviceAddressIdContext<Ipv6> {
 pub(super) trait DadContext<BC: DadBindingsTypes>:
     IpDeviceAddressIdContext<Ipv6>
     + DeviceIdContext<AnyDevice>
-    + CoreTimerContext<DadTimerId<Self::WeakDeviceId>, BC>
+    + CoreTimerContext<DadTimerId<Self::WeakDeviceId, Self::WeakAddressId>, BC>
 {
     type DadAddressCtx<'a>: DadAddressContext<
         BC,
         DeviceId = Self::DeviceId,
         AddressId = Self::AddressId,
     >;
-
-    /// Returns the address ID for the given address value.
-    // TODO(https://fxbug.dev/336291808): Replace this function with an upgrade
-    // on weak address IDs when they're available. As it stands, this is a panic
-    // opportunity when handling timers.
-    fn get_address_id(
-        &mut self,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-    ) -> Self::AddressId;
 
     /// Calls the function with the DAD state associated with the address.
     fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>, BC>) -> O>(
@@ -211,10 +199,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                         dad_transmits_remaining: *max_dad_transmits,
                         timer: CC::new_timer(
                             bindings_ctx,
-                            DadTimerId {
-                                device_id: device_id.downgrade(),
-                                addr: addr.addr_sub().addr().get(),
-                            },
+                            DadTimerId { device_id: device_id.downgrade(), addr: addr.downgrade() },
                         ),
                     };
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
@@ -397,14 +382,16 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, 
 }
 
 impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> HandleableTimer<CC, BC>
-    for DadTimerId<CC::WeakDeviceId>
+    for DadTimerId<CC::WeakDeviceId, CC::WeakAddressId>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
         let Self { device_id, addr } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
-        let addr_id = core_ctx.get_address_id(&device_id, addr);
+        let Some(addr_id) = addr.upgrade() else {
+            return;
+        };
         do_duplicate_address_detection(
             core_ctx,
             bindings_ctx,
@@ -435,7 +422,10 @@ mod tests {
             InstantContext as _, SendFrameContext as _, TimerHandler,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
-        ip::{device::Ipv6DeviceAddr, testutil::FakeIpDeviceIdCtx},
+        ip::{
+            device::{testutil::FakeWeakAddressId, Ipv6DeviceAddr},
+            testutil::FakeIpDeviceIdCtx,
+        },
     };
 
     struct FakeDadAddressContext {
@@ -455,6 +445,7 @@ mod tests {
 
     impl IpDeviceAddressIdContext<Ipv6> for FakeAddressCtxImpl {
         type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
+        type WeakAddressId = FakeWeakAddressId<AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>>;
     }
 
     impl DadAddressContext<FakeBindingsCtxImpl> for FakeAddressCtxImpl {
@@ -523,8 +514,12 @@ mod tests {
         }
     }
 
-    type FakeBindingsCtxImpl =
-        FakeBindingsCtx<DadTimerId<FakeWeakDeviceId<FakeDeviceId>>, DadEvent<FakeDeviceId>, (), ()>;
+    type TestDadTimerId = DadTimerId<
+        FakeWeakDeviceId<FakeDeviceId>,
+        FakeWeakAddressId<AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>>,
+    >;
+
+    type FakeBindingsCtxImpl = FakeBindingsCtx<TestDadTimerId, DadEvent<FakeDeviceId>, (), ()>;
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
 
@@ -534,28 +529,17 @@ mod tests {
 
     impl IpDeviceAddressIdContext<Ipv6> for FakeCoreCtxImpl {
         type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
+        type WeakAddressId = FakeWeakAddressId<AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>>;
     }
 
-    impl CoreTimerContext<DadTimerId<FakeWeakDeviceId<FakeDeviceId>>, FakeBindingsCtxImpl>
-        for FakeCoreCtxImpl
-    {
-        fn convert_timer(
-            dispatch_id: DadTimerId<FakeWeakDeviceId<FakeDeviceId>>,
-        ) -> DadTimerId<FakeWeakDeviceId<FakeDeviceId>> {
+    impl CoreTimerContext<TestDadTimerId, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        fn convert_timer(dispatch_id: TestDadTimerId) -> TestDadTimerId {
             dispatch_id
         }
     }
 
     impl DadContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type DadAddressCtx<'a> = FakeAddressCtxImpl;
-
-        fn get_address_id(
-            &mut self,
-            &FakeDeviceId: &Self::DeviceId,
-            addr: UnicastAddr<Ipv6Addr>,
-        ) -> Self::AddressId {
-            get_address_id(addr.get())
-        }
 
         fn with_dad_state<
             O,
@@ -613,11 +597,7 @@ mod tests {
                     ip_device_id_ctx: Default::default(),
                 }),
             }));
-        TimerHandler::handle_timer(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            DadTimerId { device_id: FakeWeakDeviceId(FakeDeviceId), addr: DAD_ADDRESS },
-        );
+        TimerHandler::handle_timer(&mut core_ctx, &mut bindings_ctx, dad_timer_id());
     }
 
     #[test]
@@ -627,7 +607,7 @@ mod tests {
                 FakeCoreCtxImpl::with_state(FakeDadContext {
                     state: Ipv6DadState::Tentative {
                         dad_transmits_remaining: None,
-                        timer: bindings_ctx.new_timer(DAD_TIMER_ID),
+                        timer: bindings_ctx.new_timer(dad_timer_id()),
                     },
                     retrans_timer: RETRANS_TIMER,
                     max_dad_transmits: None,
@@ -658,8 +638,12 @@ mod tests {
         );
     }
 
-    const DAD_TIMER_ID: DadTimerId<FakeWeakDeviceId<FakeDeviceId>> =
-        DadTimerId { addr: DAD_ADDRESS, device_id: FakeWeakDeviceId(FakeDeviceId) };
+    fn dad_timer_id() -> TestDadTimerId {
+        DadTimerId {
+            addr: FakeWeakAddressId(get_address_id(DAD_ADDRESS.get())),
+            device_id: FakeWeakDeviceId(FakeDeviceId),
+        }
+    }
 
     fn check_dad(
         core_ctx: &FakeCoreCtxImpl,
@@ -692,7 +676,7 @@ mod tests {
         assert_eq!(options.iter().count(), 0);
         bindings_ctx
             .timer_ctx()
-            .assert_timers_installed([(DAD_TIMER_ID, bindings_ctx.now() + retrans_timer.get())]);
+            .assert_timers_installed([(dad_timer_id(), bindings_ctx.now() + retrans_timer.get())]);
     }
 
     #[test]
@@ -705,7 +689,7 @@ mod tests {
             FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                    timer: bindings_ctx.new_timer(DAD_TIMER_ID),
+                    timer: bindings_ctx.new_timer(dad_timer_id()),
                 },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
@@ -733,7 +717,7 @@ mod tests {
                 NonZeroU16::new(DAD_TRANSMITS_REQUIRED - count - 1),
                 RETRANS_TIMER,
             );
-            assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(DAD_TIMER_ID));
+            assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
         }
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
             core_ctx.get_ref();
@@ -759,7 +743,7 @@ mod tests {
                 FakeCoreCtxImpl::with_state(FakeDadContext {
                     state: Ipv6DadState::Tentative {
                         dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                        timer: bindings_ctx.new_timer(DAD_TIMER_ID),
+                        timer: bindings_ctx.new_timer(dad_timer_id()),
                     },
                     retrans_timer: RETRANS_TIMER,
                     max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),

@@ -171,7 +171,7 @@ mod tests {
                     TemporarySlaacConfig,
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
-                IpAddressId as _, IpDeviceBindingsContext, Ipv6DeviceAddr,
+                IpAddressId as _, IpDeviceBindingsContext, IpDeviceStateContext, Ipv6DeviceAddr,
                 Ipv6DeviceConfigurationContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -529,13 +529,20 @@ mod tests {
     }
 
     fn dad_timer_id(
+        ctx: &mut crate::testutil::FakeCtx,
         id: EthernetDeviceId<FakeBindingsCtx>,
         addr: Ipv6DeviceAddr,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(
             Ipv6DeviceTimerId::Dad(crate::ip::device::dad::DadTimerId {
                 device_id: id.downgrade().into(),
-                addr: addr.get(),
+                addr: IpDeviceStateContext::<Ipv6, _>::get_address_id(
+                    &mut ctx.core_ctx(),
+                    &id.into(),
+                    addr.into_specified(),
+                )
+                .unwrap()
+                .downgrade(),
             })
             .into(),
         ))
@@ -600,7 +607,7 @@ mod tests {
         net.with_context("local", |ctx| {
             assert_eq!(
                 ctx.trigger_next_timer().unwrap(),
-                dad_timer_id(local_eth_device_id, local_ip())
+                dad_timer_id(ctx, local_eth_device_id, local_ip())
             );
         });
 
@@ -742,7 +749,7 @@ mod tests {
         for _ in 0..3 {
             assert_eq!(
                 ctx.trigger_next_timer().unwrap(),
-                dad_timer_id(eth_dev_id.clone(), local_ip())
+                dad_timer_id(&mut ctx, eth_dev_id.clone(), local_ip())
             );
         }
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip(),), Some(true));
@@ -785,9 +792,9 @@ mod tests {
                 .unwrap();
         });
 
-        let expected_timer_id = dad_timer_id(local_eth_device_id, local_ip());
         // During the first and second period, the remote host is still down.
         net.with_context("local", |ctx| {
+            let expected_timer_id = dad_timer_id(ctx, local_eth_device_id, local_ip());
             assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
             assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
         });
@@ -907,7 +914,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Send another NS.
-        let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
+        let local_timer_id = dad_timer_id(&mut ctx, eth_dev_id.clone(), local_ip());
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
@@ -921,7 +928,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Run to the end for DAD for local ip
-        let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
+        let remote_timer_id = dad_timer_id(&mut ctx, eth_dev_id, remote_ip());
         assert_eq!(
             ctx.trigger_timers_for(Duration::from_secs(2)),
             [
@@ -988,7 +995,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Send another NS.
-        let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
+        let local_timer_id = dad_timer_id(&mut ctx, eth_dev_id.clone(), local_ip());
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
@@ -1002,7 +1009,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Run 1s
-        let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
+        let remote_timer_id = dad_timer_id(&mut ctx, eth_dev_id, remote_ip());
         assert_eq!(
             ctx.trigger_timers_for(Duration::from_secs(1)),
             [local_timer_id, remote_timer_id.clone()]
@@ -1669,7 +1676,7 @@ mod tests {
             )
             .unwrap();
 
-        let expected_timer_id = dad_timer_id(device_id, remote_ip());
+        let expected_timer_id = dad_timer_id(&mut ctx, device_id, remote_ip());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
         assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
@@ -3163,7 +3170,7 @@ mod tests {
         let dad_timer_ids = get_matching_slaac_address_entries(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
         })
-        .map(|entry| dad_timer_id(eth_device_id.clone(), entry.addr_sub().addr()))
+        .map(|entry| dad_timer_id(&mut ctx, eth_device_id.clone(), entry.addr_sub().addr()))
         .collect::<Vec<_>>();
         ctx.trigger_timers_until_and_expect_unordered(before_regen, dad_timer_ids);
 

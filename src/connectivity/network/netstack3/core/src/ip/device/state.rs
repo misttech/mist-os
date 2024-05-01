@@ -34,7 +34,8 @@ use crate::{
             route_discovery::Ipv6RouteDiscoveryState,
             router_solicitation::RsState,
             slaac::{SlaacConfiguration, SlaacState},
-            IpAddressId, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
+            IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr,
+            Ipv6DeviceTimerId, WeakIpAddressId,
         },
         gmp::{
             igmp::{IgmpGroupState, IgmpState, IgmpTimerId},
@@ -43,7 +44,7 @@ use crate::{
         },
         types::{IpTypesIpExt, RawMetric},
     },
-    sync::{Mutex, PrimaryRc, RwLock, StrongRc},
+    sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc},
     Instant,
 };
 
@@ -106,6 +107,12 @@ impl IpDeviceStateIpExt for Ipv4 {
 }
 
 impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<BT>> {
+    type Weak = WeakRc<Ipv4AddressEntry<BT>>;
+
+    fn downgrade(&self) -> Self::Weak {
+        StrongRc::downgrade(self)
+    }
+
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
         IpDeviceAddr::new_ipv4_specified(self.addr_sub.addr())
     }
@@ -115,13 +122,33 @@ impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv4Addr> for StrongRc<Ipv4Addr
     }
 }
 
+impl<BT: IpDeviceStateBindingsTypes> WeakIpAddressId<Ipv4Addr> for WeakRc<Ipv4AddressEntry<BT>> {
+    type Strong = StrongRc<Ipv4AddressEntry<BT>>;
+    fn upgrade(&self) -> Option<Self::Strong> {
+        self.upgrade()
+    }
+}
+
 impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<BT>> {
+    type Weak = WeakRc<Ipv6AddressEntry<BT>>;
+
+    fn downgrade(&self) -> Self::Weak {
+        StrongRc::downgrade(self)
+    }
+
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
         IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub.addr())
     }
 
     fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         self.addr_sub
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> WeakIpAddressId<Ipv6Addr> for WeakRc<Ipv6AddressEntry<BT>> {
+    type Strong = StrongRc<Ipv6AddressEntry<BT>>;
+    fn upgrade(&self) -> Option<Self::Strong> {
+        self.upgrade()
     }
 }
 
@@ -688,7 +715,11 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
-    pub fn new<D: device::WeakId, CC: CoreTimerContext<Ipv6DeviceTimerId<D>, BC>>(
+    pub fn new<
+        D: device::WeakId,
+        A: WeakIpAddressId<Ipv6Addr>,
+        CC: CoreTimerContext<Ipv6DeviceTimerId<D, A>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {
@@ -746,22 +777,24 @@ pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
     pub(crate) fn new<
         D: device::WeakId,
-        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>
-            + CoreTimerContext<IpDeviceTimerId<Ipv4, D>, BC>,
+        A: IpAddressIdSpec,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,
     >(
         bindings_ctx: &mut BC,
         device_id: D,
         metric: RawMetric,
     ) -> Self {
         Self {
-            ipv4: Ipv4DeviceState::new::<_, NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv4, D>>>(
+            ipv4: Ipv4DeviceState::new::<D, NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv4, D, A>>>(
                 bindings_ctx,
                 device_id.clone(),
             ),
-            ipv6: Ipv6DeviceState::new::<_, NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv6, D>>>(
-                bindings_ctx,
-                device_id,
-            ),
+            ipv6: Ipv6DeviceState::new::<
+                D,
+                A::WeakV6,
+                NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv6, D, A>>,
+            >(bindings_ctx, device_id),
             metric,
         }
     }

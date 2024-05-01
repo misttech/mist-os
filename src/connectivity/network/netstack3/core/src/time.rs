@@ -14,7 +14,7 @@ use crate::{
     context::{CoreCtx, CoreTimerContext, HandleableTimer, TimerHandler},
     device::{DeviceLayerTimerId, WeakDeviceId},
     ip::{
-        device::{IpDeviceIpExt, IpDeviceTimerId},
+        device::{integration::IpAddrCtxSpec, IpDeviceIpExt, IpDeviceTimerId},
         IpLayerTimerId,
     },
     transport::TransportLayerTimerId,
@@ -52,9 +52,9 @@ pub(crate) enum TimerIdInner<BT: BindingsTypes> {
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
-    Ipv4Device(IpDeviceTimerId<Ipv4, WeakDeviceId<BT>>),
+    Ipv4Device(IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>),
     /// A timer event for an IPv6 device.
-    Ipv6Device(IpDeviceTimerId<Ipv6, WeakDeviceId<BT>>),
+    Ipv6Device(IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>),
 }
 
 impl<BT: BindingsTypes> From<DeviceLayerTimerId<BT>> for TimerId<BT> {
@@ -75,10 +75,10 @@ impl<BT: BindingsTypes> From<TransportLayerTimerId<BT>> for TimerId<BT> {
     }
 }
 
-impl<BT: BindingsTypes, I: IpDeviceIpExt> From<IpDeviceTimerId<I, WeakDeviceId<BT>>>
-    for TimerId<BT>
+impl<BT: BindingsTypes, I: IpDeviceIpExt>
+    From<IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>> for TimerId<BT>
 {
-    fn from(value: IpDeviceTimerId<I, WeakDeviceId<BT>>) -> Self {
+    fn from(value: IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>) -> Self {
         I::map_ip(
             value,
             |v4| TimerId(TimerIdInner::Ipv4Device(v4)),
@@ -93,8 +93,8 @@ where
     CC: TimerHandler<BT, DeviceLayerTimerId<BT>>
         + TimerHandler<BT, TransportLayerTimerId<BT>>
         + TimerHandler<BT, IpLayerTimerId>
-        + TimerHandler<BT, IpDeviceTimerId<Ipv4, WeakDeviceId<BT>>>
-        + TimerHandler<BT, IpDeviceTimerId<Ipv6, WeakDeviceId<BT>>>,
+        + TimerHandler<BT, IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>>
+        + TimerHandler<BT, IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
         trace!("handle_timer: dispatching timerid: {self:?}");

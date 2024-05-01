@@ -6,6 +6,7 @@
 
 use core::{
     borrow::Borrow,
+    convert::Infallible as Never,
     marker::PhantomData,
     num::NonZeroU8,
     ops::{Deref as _, DerefMut as _},
@@ -54,13 +55,13 @@ use crate::{
             },
             state::{
                 DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, Ipv4DeviceConfiguration,
-                Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
-                SlaacConfig,
+                IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, Ipv4AddressEntry,
+                Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+                Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
             },
-            AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
-            IpDeviceIpExt, IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr,
-            Ipv6DeviceTimerId,
+            AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
+            IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceStateContext,
+            IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
         },
         gmp::{
             self,
@@ -73,6 +74,7 @@ use crate::{
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
+    sync::WeakRc,
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -828,19 +830,6 @@ impl<
         BC,
     >;
 
-    fn get_address_id(
-        &mut self,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-    ) -> Self::AddressId {
-        device::IpDeviceStateContext::<Ipv6, BC>::get_address_id(
-            self,
-            device_id,
-            addr.into_specified(),
-        )
-        .expect("DAD address must always exist")
-    }
-
     fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>, BC>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
@@ -1115,6 +1104,7 @@ where
     CoreCtx<'a, BC, L>: device::IpDeviceAddressIdContext<I>,
 {
     type AddressId = <CoreCtx<'a, BC, L> as device::IpDeviceAddressIdContext<I>>::AddressId;
+    type WeakAddressId = <CoreCtx<'a, BC, L> as device::IpDeviceAddressIdContext<I>>::WeakAddressId;
 }
 
 impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext, L> device::IpDeviceAddressContext<I, BC>
@@ -1484,18 +1474,35 @@ impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'
     }
 }
 
-impl<'a, Config, L, BC: BindingsContext> CoreTimerContext<DadTimerId<WeakDeviceId<BC>>, BC>
+pub struct IpAddrCtxSpec<BT>(Never, PhantomData<BT>);
+
+impl<BT: BindingsTypes> IpAddressIdSpec for IpAddrCtxSpec<BT> {
+    type WeakV4 = WeakRc<Ipv4AddressEntry<BT>>;
+    type WeakV6 = WeakRc<Ipv6AddressEntry<BT>>;
+}
+
+impl<BC: BindingsContext, L> IpAddressIdSpecContext for CoreCtx<'_, BC, L> {
+    type AddressIdSpec = IpAddrCtxSpec<BC>;
+}
+
+impl<'a, Config, L, BC: BindingsContext>
+    CoreTimerContext<DadTimerId<WeakDeviceId<BC>, WeakRc<Ipv6AddressEntry<BC>>>, BC>
     for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    fn convert_timer(dispatch_id: DadTimerId<WeakDeviceId<BC>>) -> BC::DispatchId {
-        IpDeviceTimerId::<Ipv6, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
+    fn convert_timer(
+        dispatch_id: DadTimerId<WeakDeviceId<BC>, WeakRc<Ipv6AddressEntry<BC>>>,
+    ) -> BC::DispatchId {
+        IpDeviceTimerId::<Ipv6, _, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
     }
 }
 
 impl<I: IpDeviceIpExt, BT: BindingsTypes, L>
-    CoreTimerContext<IpDeviceTimerId<I, WeakDeviceId<BT>>, BT> for CoreCtx<'_, BT, L>
+    CoreTimerContext<IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>, BT>
+    for CoreCtx<'_, BT, L>
 {
-    fn convert_timer(dispatch_id: IpDeviceTimerId<I, WeakDeviceId<BT>>) -> BT::DispatchId {
+    fn convert_timer(
+        dispatch_id: IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>,
+    ) -> BT::DispatchId {
         dispatch_id.into()
     }
 }

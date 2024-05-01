@@ -17,11 +17,10 @@ use crate::{
     },
     inspect::Inspectable,
     ip::{
-        device::{state::DualStackIpDeviceState, IpDeviceTimerId},
+        device::{state::DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
         types::RawMetric,
     },
-    sync::RwLock,
-    sync::WeakRc,
+    sync::{RwLock, WeakRc},
 };
 
 /// Provides the specifications for device state held by [`BaseDeviceId`] in
@@ -92,8 +91,9 @@ impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
     pub(super) fn new<
         D: device::WeakId,
-        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>
-            + CoreTimerContext<IpDeviceTimerId<Ipv4, D>, BC>,
+        A: IpAddressIdSpec,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,
     >(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -102,7 +102,7 @@ impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
         origin: OriginTracker,
     ) -> Self {
         Self {
-            ip: DualStackIpDeviceState::new::<_, CC>(bindings_ctx, device_id, metric),
+            ip: DualStackIpDeviceState::new::<D, A, CC>(bindings_ctx, device_id, metric),
             link,
             origin,
             sockets: RwLock::new(HeldDeviceSockets::default()),
