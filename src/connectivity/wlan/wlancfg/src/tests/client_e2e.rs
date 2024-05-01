@@ -51,6 +51,8 @@ use {
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;
 pub const TEST_PHY_ID: u16 = 41;
+const RECOVERY_PROFILE_EMPTY_STRING: &str = "";
+const RECOVERY_PROFILE_THRESHOLDED_RECOVERY: &str = "thresholded_recovery";
 lazy_static! {
     pub static ref TEST_SSID: types::Ssid = types::Ssid::try_from("test_ssid").unwrap();
 }
@@ -166,7 +168,11 @@ struct ExistingConnectionSmeObjects {
 }
 
 // setup channels and proxies needed for the tests
-fn test_setup(exec: &mut TestExecutor) -> TestValues {
+fn test_setup(
+    exec: &mut TestExecutor,
+    recovery_profile: &str,
+    recovery_enabled: bool,
+) -> TestValues {
     let (monitor_service_proxy, monitor_service_requests) =
         create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
             .expect("failed to create SeviceService proxy");
@@ -237,8 +243,8 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
 
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_service_proxy.clone(),
-        recovery::lookup_recovery_profile(""),
-        false,
+        recovery::lookup_recovery_profile(recovery_profile),
+        recovery_enabled,
         inspect::Inspector::default().root().create_child("phy_manager"),
         telemetry_sender.clone(),
         recovery_sender,
@@ -906,7 +912,7 @@ fn test_save_and_connect(
     test_credentials: TestCredentials,
 ) {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec);
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     let _ = save_and_connect(
         TEST_SSID.clone(),
@@ -963,7 +969,7 @@ fn test_save_and_fail_to_connect(
     let saved_credential = test_credentials.policy.clone();
 
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec);
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -1104,7 +1110,7 @@ fn test_fail_to_save(
     saved_credential: fidl_policy::Credential,
 ) {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec);
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     // Generate network ID
     let network_id = fidl_policy::NetworkIdentifier { ssid: ssid, type_: saved_security };
@@ -1134,7 +1140,7 @@ fn test_fail_to_save(
 #[fuchsia::test]
 fn test_connect_to_new_network() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec);
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     // Connect to a network initially.
     let mut existing_connection = save_and_connect(
@@ -1338,7 +1344,7 @@ fn test_connect_to_new_network() {
 #[fuchsia::test]
 fn test_autoconnect_to_saved_network() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec);
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -1586,7 +1592,7 @@ fn test_autoconnect_to_saved_network() {
 #[fuchsia::test]
 fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     let mut exec = fasync::TestExecutor::new();
-    let mut test_values = test_setup(&mut exec);
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     // No request has been sent yet. Future should be idle.
     assert_variant!(
@@ -1897,4 +1903,251 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
         assert_eq!(networks.unwrap().len(), 0);
     }
+}
+
+fn request_scan_and_reply(
+    exec: &mut TestExecutor,
+    test_values: &mut TestValues,
+    sme_stream: &mut fidl_sme::ClientSmeRequestStream,
+    reply: Result<Vec<fidl_sme::ScanResult>, fidl_sme::ScanErrorCode>,
+) {
+    // Make a scan request.
+    let (_iter, server) = create_proxy().expect("failed to create iterator");
+    assert_variant!(
+        test_values.external_interfaces.client_controller.scan_for_networks(server),
+        Ok(())
+    );
+
+    // Run the internal futures to route the scan request to SME.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+    let next_sme_stream_req =
+        run_while(exec, &mut test_values.internal_objects.internal_futures, sme_stream.next());
+
+    // Respond with a failure.
+    assert_variant!(
+        next_sme_stream_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+            responder, ..
+        })) => {
+            responder
+                .send(
+                    reply
+                        .map(|results| write_vmo(results)
+                        .expect("failed to create scan result VMO"))
+                )
+                .expect("failed to send scan error");
+        }
+    );
+}
+
+fn expect_destroy_iface_request_and_reply(
+    exec: &mut TestExecutor,
+    test_values: &mut TestValues,
+    expected_iface_id: u16,
+    reply: i32,
+) {
+    let destroy_iface_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        destroy_iface_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::DestroyIface {
+            req: fidl_fuchsia_wlan_device_service::DestroyIfaceRequest {iface_id},
+            responder
+        })) => {
+            assert_eq!(iface_id, expected_iface_id);
+            responder
+                .send(reply)
+                .expect("failed to ack destroy iface request")
+        }
+    );
+}
+
+fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
+    exec: &mut TestExecutor,
+    test_values: &mut TestValues,
+    expected_phy_id: u16,
+    expected_iface_id: u16,
+) -> fidl_sme::ClientSmeRequestStream {
+    let legacy_client = legacy::IfaceRef::new();
+    let listener = device_monitor::Listener::new(
+        test_values.external_interfaces.monitor_service_proxy.clone(),
+        legacy_client.clone(),
+        test_values.internal_objects.phy_manager.clone(),
+        test_values.internal_objects.iface_manager.clone(),
+    );
+    let remove_iface_event = DeviceWatcherEvent::OnIfaceRemoved { iface_id: expected_iface_id };
+    let remove_iface_fut = device_monitor::handle_event(&listener, remove_iface_event);
+    let mut remove_iface_fut = pin!(remove_iface_fut);
+    assert_variant!(exec.run_until_stalled(&mut remove_iface_fut), Poll::Pending);
+
+    let iface_creation_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        iface_creation_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
+            req: fidl_fuchsia_wlan_device_service::CreateIfaceRequest {
+                phy_id, role: fidl_common::WlanMacRole::Client, sta_addr: [0, 0, 0, 0, 0, 0]
+            },
+            responder
+        })) => {
+            assert_eq!(phy_id, expected_phy_id);
+            assert!(responder.send(
+                zx::sys::ZX_OK,
+                Some(&fidl_fuchsia_wlan_device_service::CreateIfaceResponse {iface_id: expected_iface_id})
+            ).is_ok());
+        }
+    );
+
+    // Expect a feature support query as part of the interface creation
+    let feature_support_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        feature_support_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
+            iface_id, feature_support_server, responder
+        })) => {
+            assert_eq!(iface_id, expected_iface_id);
+            assert!(responder.send(Ok(())).is_ok());
+            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
+
+            // Send back feature support information
+            let security_support_req = run_while(
+                exec,
+                &mut test_values.internal_objects.internal_futures,
+                stream.next(),
+            );
+            assert_variant!(
+                security_support_req,
+                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
+                    responder
+                })) => {
+                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
+                }
+            );
+        }
+    );
+
+    // Expect that we have requested a client SME proxy as part of interface creation
+    let sme_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    let sme_server = assert_variant!(
+        sme_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+            iface_id, sme_server, responder
+        })) => {
+            assert_eq!(iface_id, expected_iface_id);
+            // Send back a positive acknowledgement.
+            assert!(responder.send(Ok(())).is_ok());
+            sme_server
+        }
+    );
+    let sme_stream = sme_server.into_stream().expect("failed to create SME stream");
+
+    // There will be another security support query as part of adding the interface to iface_manager
+    let feature_support_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        feature_support_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
+            iface_id, feature_support_server, responder
+        })) => {
+            assert_eq!(iface_id, expected_iface_id);
+            assert!(responder.send(Ok(())).is_ok());
+            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
+
+            // Send back feature support information
+            let security_support_req = run_while(
+                exec,
+                &mut test_values.internal_objects.internal_futures,
+                stream.next(),
+            );
+            assert_variant!(
+                security_support_req,
+                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
+                    responder
+                })) => {
+                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
+                }
+            );
+        }
+    );
+
+    // Run the iface removal notification to completion.  This is subtle, but the device watcher
+    // holds a lock on the IfaceManager until this future completes.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+    assert_variant!(exec.run_until_stalled(&mut remove_iface_fut), Poll::Ready(()));
+
+    sme_stream
+}
+
+#[test_case(Err(fidl_sme::ScanErrorCode::ShouldWait), 9; "should wait")]
+#[test_case(Err(fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware), 9; "cancelled")]
+#[test_case(Err(fidl_sme::ScanErrorCode::InternalError), 5; "internal error")]
+#[test_case(Err(fidl_sme::ScanErrorCode::InternalMlmeError), 5; "mlme error")]
+#[test_case(Err(fidl_sme::ScanErrorCode::NotSupported), 5; "not supported")]
+#[test_case(Ok(vec![]), 10; "empty results")]
+#[fuchsia::test(add_test_attr = false)]
+fn test_scan_recovery(
+    scan_result: Result<Vec<fidl_sme::ScanResult>, fidl_sme::ScanErrorCode>,
+    defect_threshold: usize,
+) {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Enable client connections.
+    let mut iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Return the specified scan result until the recovery threshold is triggered.
+    for _ in 0..defect_threshold {
+        request_scan_and_reply(
+            &mut exec,
+            &mut test_values,
+            &mut iface_sme_stream,
+            scan_result.clone(),
+        );
+    }
+
+    // Recovery should now recommend that the interface be destroyed.
+    expect_destroy_iface_request_and_reply(
+        &mut exec,
+        &mut test_values,
+        TEST_CLIENT_IFACE_ID,
+        zx::sys::ZX_OK,
+    );
+
+    // Inform the internals that the interface was removed.  The internals will then recreate the
+    // interface.
+    let _ = inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
+        &mut exec,
+        &mut test_values,
+        TEST_PHY_ID,
+        TEST_CLIENT_IFACE_ID,
+    );
 }
