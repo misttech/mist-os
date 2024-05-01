@@ -423,10 +423,10 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
 
   // |mutex_| guards access to |link_graph_| and |link_topologies_|.
   //
-  // TODO(https://fxbug.dev/42120738): These maps are modified at Link creation and destruction time (within
-  // the ObjectLinker closures) as well as within UpdateLinks, which is called by the core render
-  // loop. This produces a possible priority inversion between the Flatland instance threads and the
-  // (possibly deadline scheduled) render thread.
+  // TODO(https://fxbug.dev/42120738): These maps are modified at Link creation and destruction time
+  // (within the ObjectLinker closures) as well as within UpdateLinks, which is called by the core
+  // render loop. This produces a possible priority inversion between the Flatland instance threads
+  // and the (possibly deadline scheduled) render thread.
   std::mutex mutex_;
 
   // Structs representing the child and parent ends of a link.
@@ -438,10 +438,10 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
     std::shared_ptr<ChildViewWatcherImpl> child_view_watcher;
   };
 
-  // Keyed by LinkToChild::parent_transform_handle.
-  std::unordered_map<TransformHandle, ChildEnd> parent_to_child_map_;
-  // Keyed by LinkToParent::child_transform_handle.
-  std::unordered_map<TransformHandle, ParentEnd> child_to_parent_map_;
+  // Keyed by LinkToChild::parent_transform_handle. Access is managed by |mutex_|.
+  std::unordered_map<TransformHandle, ChildEnd> parent_to_child_map_ FXL_GUARDED_BY(mutex_);
+  // Keyed by LinkToParent::child_transform_handle. Access is managed by |mutex_|.
+  std::unordered_map<TransformHandle, ParentEnd> child_to_parent_map_ FXL_GUARDED_BY(mutex_);
   // The set of current link topologies. Access is managed by |mutex_|.
   GlobalTopologyData::LinkTopologyMap link_topologies_ FXL_GUARDED_BY(mutex_);
 

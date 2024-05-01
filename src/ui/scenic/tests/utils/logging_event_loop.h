@@ -29,13 +29,13 @@ namespace integration_tests {
 /// class and forward calls to it. But that adds more code without a meaningful benefit.
 class LoggingEventLoop : private loop_fixture::RealLoop {
  public:
+  LoggingEventLoop();
+  ~LoggingEventLoop();
+
   void RunLoopUntil(fit::function<bool()> condition,
                     cpp20::source_location caller = cpp20::source_location::current());
 
  protected:
-  LoggingEventLoop();
-  ~LoggingEventLoop();
-
   bool RunLoopWithTimeout(zx::duration timeout,
                           cpp20::source_location caller = cpp20::source_location::current());
 

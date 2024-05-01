@@ -5,9 +5,11 @@
 #ifndef SRC_UI_LIB_ESCHER_RESOURCES_RESOURCE_RECYCLER_H_
 #define SRC_UI_LIB_ESCHER_RESOURCES_RESOURCE_RECYCLER_H_
 
+#include <mutex>
 #include <unordered_map>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
+#include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/ui/lib/escher/impl/command_buffer_sequencer.h"
 #include "src/ui/lib/escher/resources/resource_manager.h"
 
@@ -29,6 +31,9 @@ class ResourceRecycler : public ResourceManager, public impl::CommandBufferSeque
  private:
   // Gives subclasses a chance to recycle the resource. Default implementation
   // immediately destroys resource.
+  // Note that if OnCommandBufferFinished() and OnReceiveOwnable() is called from multiple threads,
+  // RecycleResource() will also be called from multiple threads, so the implementers should
+  // guarantee thread-safety.
   virtual void RecycleResource(std::unique_ptr<Resource> resource) {}
 
   // Implement impl::CommandBufferSequenceListener::CommandBufferFinished().
@@ -42,10 +47,14 @@ class ResourceRecycler : public ResourceManager, public impl::CommandBufferSeque
 
   uint64_t last_finished_sequence_number_ = 0;
 
+  // This mutex protects access to |unused_resources_|. These class methods
+  // may be called from multiple threads.
+  mutable std::mutex lock_;
+
   // We need to use an unordered_map instead of an unordered_set because you
   // can't modify elements of an unordered_set, which prevents us from
   // removing a unique_ptr.
-  std::unordered_map<Resource*, std::unique_ptr<Resource>> unused_resources_;
+  std::unordered_map<Resource*, std::unique_ptr<Resource>> unused_resources_ FXL_GUARDED_BY(lock_);
 
   fxl::WeakPtrFactory<ResourceRecycler> weak_factory_;  // must be last
 

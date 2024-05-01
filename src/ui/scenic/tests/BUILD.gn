@@ -101,6 +101,25 @@ source_set("screen_capture_utils") {
   ]
 }
 
+executable("flatland_allocation_test_bin") {
+  testonly = true
+  sources = [ "flatland_integration_tests/flatland_allocation_test.cc" ]
+  deps = [
+    ":common_deps_cts",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//src/ui/scenic/lib/allocation:allocation",
+    "//src/ui/scenic/lib/utils:utils",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+fuchsia_test_component("flatland_allocation_test") {
+  component_name = "flatland_allocation_test"
+  manifest = "meta/flatland_allocation_test.cml"
+  deps = [ ":flatland_allocation_test_bin" ]
+  test_type = "vulkan"
+}
+
 executable("flatland_touch_integration_test_bin") {
   testonly = true
   sources = [
@@ -411,6 +430,7 @@ fuchsia_test_component("flatland_pixeltest_general") {
 
 fuchsia_test_package("flatland_integration_tests") {
   test_components = [
+    ":flatland_allocation_test",
     ":flatland_focus_integration_test",
     ":flatland_mouse_integration_test",
     ":flatland_pixeltest_flip_and_orientation",
