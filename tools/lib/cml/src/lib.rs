@@ -1558,8 +1558,6 @@ fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
         return;
     }
 
-    let our_field: Vec<_> = ours.names().into_iter().cloned().collect();
-    let their_field: Vec<_> = theirs.names().into_iter().cloned().collect();
     // Check if the non-capability fields match before proceeding.
     let mut ours_partial = ours.clone();
     let mut theirs_partial = theirs.clone();
@@ -1568,23 +1566,28 @@ fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
         // Availability is allowed to differ (see merge algorithm below)
         e.set_availability(None);
     }
-    let avail_cmp = ours
-        .availability()
-        .unwrap_or_default()
-        .partial_cmp(&theirs.availability().unwrap_or_default());
-    if ours_partial != theirs_partial || avail_cmp.is_none() {
-        // One of the following is true:
-        // - The fields other than `availability` do not match.
-        // - The fields other than `availability` do match, but `availability`
-        //   does not and is incompatible (no partial order).
-        // Either way, `ours` and `theirs` are not diffable.
+    if ours_partial != theirs_partial {
+        // The fields other than `availability` do not match, nothing to remove.
         return;
     }
-    let avail_cmp = avail_cmp.unwrap();
+
+    // Compare the availabilities.
+    let Some(avail_cmp) = ours
+        .availability()
+        .unwrap_or_default()
+        .partial_cmp(&theirs.availability().unwrap_or_default())
+    else {
+        // The availabilities are incompatible (no partial order).
+        return;
+    };
+
+    let mut our_names: Vec<_> = ours.names().into_iter().cloned().collect();
+    let mut their_names: Vec<_> = theirs.names().into_iter().cloned().collect();
+
     let mut our_entries_to_remove = HashSet::new();
     let mut their_entries_to_remove = HashSet::new();
-    for e in &their_field {
-        if !our_field.contains(e) {
+    for e in &their_names {
+        if !our_names.contains(e) {
             // Not a duplicate, so keep.
             continue;
         }
@@ -1605,19 +1608,11 @@ fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
             }
         }
     }
-    fn update_entries(
-        decl: &mut impl CapabilityClause,
-        mut field: Vec<Name>,
-        to_remove: &HashSet<Name>,
-    ) {
-        if to_remove.is_empty() {
-            return;
-        }
-        field.retain(|e| !to_remove.contains(e));
-        decl.set_names(field);
-    }
-    update_entries(ours, our_field, &our_entries_to_remove);
-    update_entries(theirs, their_field, &their_entries_to_remove);
+    our_names.retain(|e| !our_entries_to_remove.contains(e));
+    their_names.retain(|e| !their_entries_to_remove.contains(e));
+
+    ours.set_names(our_names);
+    theirs.set_names(their_names);
 }
 
 impl Document {
