@@ -218,7 +218,7 @@ impl vfs::directory::entry_container::Directory for Validation {
         zx::Status,
     > {
         super::read_dirents(
-            &BTreeMap::from([("missing".to_string(), super::DirentType::File)]),
+            &BTreeMap::from([("missing".to_string(), fio::DirentType::File)]),
             pos,
             sink,
         )

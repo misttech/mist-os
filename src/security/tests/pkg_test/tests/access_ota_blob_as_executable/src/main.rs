@@ -18,10 +18,7 @@ use {
     fuchsia_async::Task,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_fs::directory::readdir,
-    fuchsia_fs::{
-        directory::{open_file, open_in_namespace},
-        file,
-    },
+    fuchsia_fs::{directory::open_file, file},
     fuchsia_hash::Hash,
     fuchsia_merkle::MerkleTree,
     fuchsia_zircon::{AsHandleRef, Rights, Status},
@@ -31,7 +28,6 @@ use {
     tracing::info,
 };
 
-const PKGFS_PATH: &str = "/pkgfs";
 const DEFAULT_DOMAIN: &str = "fuchsia.com";
 const HELLO_WORLD_PACKAGE_NAME: &str = "hello_world";
 const HELLO_WORLD_V0_PACKAGED_BINARY_PATH: &str = "bin/hello_world_v0";
@@ -85,8 +81,6 @@ impl ReadableExecutableResult {
 
 // Result of attempting to open executable in package several different ways.
 struct AccessCheckResult {
-    /// Result of opening via pkgfs-packages API.
-    pub pkgfs_packages: Option<ReadableExecutableResult>,
     /// Result of opening via fuchsia.pkg/PackageCache.Get API.
     pub pkg_cache_get: Option<ReadableExecutableResult>,
     /// Result of opening via package resolver API with
@@ -98,8 +92,6 @@ struct AccessCheckResult {
 }
 
 struct AccessCheckSelectors {
-    /// Perform access check against pkgfs-packages API.
-    pub pkgfs_packages: bool,
     /// Perform access check against pkg-cache's fuchsia.pkg/PackageCache.Get API.
     pub pkg_cache_get: bool,
     /// Perform access check against package resolver API with
@@ -113,12 +105,7 @@ struct AccessCheckSelectors {
 impl AccessCheckSelectors {
     /// Enable all access checks.
     pub fn all() -> Self {
-        Self {
-            pkgfs_packages: true,
-            pkg_cache_get: true,
-            pkg_resolver_with_hash: true,
-            pkg_resolver_without_hash: true,
-        }
+        Self { pkg_cache_get: true, pkg_resolver_with_hash: true, pkg_resolver_without_hash: true }
     }
 }
 
@@ -151,24 +138,6 @@ impl AccessCheckRequest {
         let mut package = File::open(&self.config.local_package_path).unwrap();
         let package_merkle = MerkleTree::from_reader(&mut package).unwrap().root();
         let package_blob_id = BlobId { merkle_root: package_merkle.into() };
-
-        // Open package via pkgfs-packages API.
-        let pkgfs_packages_path = format!("{}/packages/{}/0", PKGFS_PATH, self.config.package_name);
-        let pkgfs_packages_rx_result = if self.selectors.pkgfs_packages {
-            info!(path = %pkgfs_packages_path, "Opening package from pkgfs-packages");
-            let package_directory_proxy = open_in_namespace(
-                &pkgfs_packages_path,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )
-            .unwrap();
-            Some((
-                self.attempt_readable(&package_directory_proxy).await,
-                self.attempt_executable(&package_directory_proxy).await,
-            ))
-        } else {
-            info!(path = %pkgfs_packages_path, "Skipping open package from pkgfs-packages");
-            None
-        };
 
         // Open package as executable via pkg-cache's fuchsia.pkg/PackageCache.Get API.
         let pkg_cache_get_rx_result = if self.selectors.pkg_cache_get {
@@ -234,7 +203,6 @@ impl AccessCheckRequest {
         // Check that all opened-as-executable buffers contain the same data.
         let buffers = vec![
             // ..._rx_result.1 contains Result<Box<Buffer>>.
-            pkgfs_packages_rx_result.as_ref().map(|rx| &rx.1),
             pkg_cache_get_rx_result.as_ref().map(|rx| &rx.1),
             pkg_resolver_with_hash_rx_result.as_ref().map(|rx| &rx.1),
         ]
@@ -246,7 +214,6 @@ impl AccessCheckRequest {
         Self::check_buffer_consistency(&buffers);
 
         AccessCheckResult {
-            pkgfs_packages: Self::pair_to_result(pkgfs_packages_rx_result),
             pkg_cache_get: Self::pair_to_result(pkg_cache_get_rx_result),
             pkg_resolver_with_hash: Self::pair_to_result(pkg_resolver_with_hash_rx_result),
             pkg_resolver_without_hash: Self::pair_to_result(pkg_resolver_without_hash_rx_result),
@@ -477,7 +444,6 @@ async fn access_ota_blob_as_executable() {
                 pkg_resolver_with_hash: true,
 
                 // Disable non-hash-qualified checks.
-                pkgfs_packages: false,
                 pkg_resolver_without_hash: false,
             },
         },
@@ -496,7 +462,6 @@ async fn access_ota_blob_as_executable() {
 
                 // Disable most checks; only interested in package resolution.
                 pkg_cache_get: false,
-                pkgfs_packages: false,
                 pkg_resolver_without_hash: false,
             },
         },
@@ -512,7 +477,6 @@ async fn access_ota_blob_as_executable() {
     );
 
     // Pre-update base version access check: Access should always succeed.
-    assert!(hello_world_v0_access_check_result.pkgfs_packages.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result.pkg_cache_get.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result
         .pkg_resolver_with_hash
@@ -540,10 +504,7 @@ async fn access_ota_blob_as_executable() {
         hello_world_v1_access_check.perform_access_check().await;
 
     // Post-update new version access check: Access should fail on all
-    // hash-qualified attempts to open as executable. Additionally, the system-updater adds
-    // the OTA packages to the retained index before resolving them, preventing the packages from
-    // appearing in the dynamic index, so we should not be able to obtain readable packages from
-    // the pkgfs directories or PackageCache.Open.
+    // hash-qualified attempts to open as executable.
     assert!(hello_world_v1_access_check_result.pkg_cache_get.unwrap().is_executable_err());
     assert!(hello_world_v1_access_check_result.pkg_resolver_with_hash.unwrap().is_executable_err());
 
@@ -551,7 +512,6 @@ async fn access_ota_blob_as_executable() {
         hello_world_v0_access_check.perform_access_check().await;
 
     // Post-update base version access check: Access should always succeed.
-    assert!(hello_world_v0_access_check_result.pkgfs_packages.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result.pkg_cache_get.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result
         .pkg_resolver_with_hash

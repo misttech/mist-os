@@ -40,13 +40,6 @@
             subdir: "bin",
         },
         {
-            directory: "pkgfs",
-            from: "parent",
-            as: "pkgfs-packages",
-            to: "#session-manager",
-            subdir: "packages",
-        },
-        {
             directory: "bin",
             from: "parent",
             to: "#session-manager",

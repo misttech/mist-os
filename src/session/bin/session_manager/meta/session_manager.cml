@@ -502,7 +502,6 @@
             directory: [
                 "bin",
                 "boot-bin",
-                "pkgfs-packages",
             ],
             from: "parent",
             to: [ "#session" ],
