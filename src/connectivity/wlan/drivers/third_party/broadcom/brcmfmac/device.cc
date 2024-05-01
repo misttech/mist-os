@@ -355,8 +355,8 @@ void Device::DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& 
   WlanInterface* iface = iface_ptr->get();
   if (!iface) {
     // Check the pointer inside the pointer, the actual interface pointer.
-    BRCMF_ERR("%s interface has already been destroyed", info.display_name);
-    on_complete(ZX_ERR_BAD_HANDLE);
+    BRCMF_WARN("%s interface not found", info.display_name);
+    on_complete(ZX_ERR_NOT_FOUND);
     return;
   }
 
