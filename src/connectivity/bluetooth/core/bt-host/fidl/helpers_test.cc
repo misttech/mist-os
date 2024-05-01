@@ -178,12 +178,12 @@ TEST(HelpersTest, UuidFromFidl) {
 }
 
 TEST(HelpersTest, FidlToScmsTEnableTest) {
-  bt::StaticPacket<android_hci::A2dpScmsTEnableWriter> result_enable = FidlToScmsTEnable(true);
+  bt::StaticPacket<android_emb::A2dpScmsTEnableWriter> result_enable = FidlToScmsTEnable(true);
   EXPECT_EQ(result_enable.view().enabled().Read(),
             pw::bluetooth::emboss::GenericEnableParam::ENABLE);
   EXPECT_EQ(result_enable.view().header().Read(), 0x0);
 
-  bt::StaticPacket<android_hci::A2dpScmsTEnableWriter> result_disable = FidlToScmsTEnable(false);
+  bt::StaticPacket<android_emb::A2dpScmsTEnableWriter> result_disable = FidlToScmsTEnable(false);
   EXPECT_EQ(result_disable.view().enabled().Read(),
             pw::bluetooth::emboss::GenericEnableParam::DISABLE);
   EXPECT_EQ(result_disable.view().header().Read(), 0x0);
@@ -199,16 +199,16 @@ TEST(HelpersTest, FidlToEncoderSettingsSbcTest) {
   fbredr::AudioSamplingFrequency sampling_frequency = fbredr::AudioSamplingFrequency::HZ_44100;
   fbredr::AudioChannelMode channel_mode = fbredr::AudioChannelMode::MONO;
 
-  bt::StaticPacket<android_hci::SbcCodecInformationWriter> result =
+  bt::StaticPacket<android_emb::SbcCodecInformationWriter> result =
       FidlToEncoderSettingsSbc(*encoder_settings, sampling_frequency, channel_mode);
 
-  EXPECT_EQ(android_hci::SbcAllocationMethod::LOUDNESS, result.view().allocation_method().Read());
-  EXPECT_EQ(android_hci::SbcSubBands::SUBBANDS_8, result.view().subbands().Read());
-  EXPECT_EQ(android_hci::SbcBlockLen::BLOCK_LEN_4, result.view().block_length().Read());
+  EXPECT_EQ(android_emb::SbcAllocationMethod::LOUDNESS, result.view().allocation_method().Read());
+  EXPECT_EQ(android_emb::SbcSubBands::SUBBANDS_8, result.view().subbands().Read());
+  EXPECT_EQ(android_emb::SbcBlockLen::BLOCK_LEN_4, result.view().block_length().Read());
   EXPECT_EQ(0, result.view().min_bitpool_value().Read());
   EXPECT_EQ(0, result.view().max_bitpool_value().Read());
-  EXPECT_EQ(android_hci::SbcSamplingFrequency::HZ_44100, result.view().sampling_frequency().Read());
-  EXPECT_EQ(android_hci::SbcChannelMode::MONO, result.view().channel_mode().Read());
+  EXPECT_EQ(android_emb::SbcSamplingFrequency::HZ_44100, result.view().sampling_frequency().Read());
+  EXPECT_EQ(android_emb::SbcChannelMode::MONO, result.view().channel_mode().Read());
 }
 
 TEST(HelpersTest, FidlToEncoderSettingsAacTest) {
@@ -223,12 +223,12 @@ TEST(HelpersTest, FidlToEncoderSettingsAacTest) {
   fbredr::AudioSamplingFrequency sampling_frequency = fbredr::AudioSamplingFrequency::HZ_44100;
   fbredr::AudioChannelMode channel_mode = fbredr::AudioChannelMode::MONO;
 
-  bt::StaticPacket<android_hci::AacCodecInformationWriter> result =
+  bt::StaticPacket<android_emb::AacCodecInformationWriter> result =
       FidlToEncoderSettingsAac(*encoder_settings, sampling_frequency, channel_mode);
 
   EXPECT_EQ(result.view().object_type().Read(), 1);
   EXPECT_EQ(result.view().variable_bit_rate().Read(),
-            android_hci::AacEnableVariableBitRate::ENABLE);
+            android_emb::AacEnableVariableBitRate::ENABLE);
 }
 
 template <typename T>

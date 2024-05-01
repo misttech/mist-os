@@ -4,12 +4,14 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/emboss_control_packets.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
 
 #include <pw_bluetooth/hci_vendor.emb.h>
 
 namespace bt::hci {
+
+namespace android_hci = hci_spec::vendor::android;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 EmbossCommandPacket::EmbossCommandPacket(hci_spec::OpCode opcode,
                                          size_t packet_size)
@@ -108,9 +110,9 @@ std::optional<pw::bluetooth::emboss::StatusCode> EmbossEventPacket::StatusCode()
               .Read();
 
       switch (subevent_code) {
-        case hci_spec::vendor::android::kLEMultiAdvtStateChangeSubeventCode: {
-          return StatusCodeFromView<pw::bluetooth::vendor::android_hci::
-                                        LEMultiAdvtStateChangeSubeventView>();
+        case android_hci::kLEMultiAdvtStateChangeSubeventCode: {
+          return StatusCodeFromView<
+              android_emb::LEMultiAdvtStateChangeSubeventView>();
         }
 
         default: {

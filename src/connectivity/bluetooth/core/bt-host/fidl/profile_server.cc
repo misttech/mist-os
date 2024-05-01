@@ -25,7 +25,7 @@
 #include "zircon/errors.h"
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
-namespace android_hci = pw::bluetooth::vendor::android_hci;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 using fidlbredr::DataElement;
 using fidlbredr::Profile;
 using pw::bluetooth::AclPriority;
@@ -281,8 +281,8 @@ void ProfileServer::AudioOffloadExt::GetSupportedFeatures(GetSupportedFeaturesCa
 
   const uint32_t a2dp_offload_capabilities =
       adapter_state.android_vendor_capabilities->a2dp_source_offload_capability_mask();
-  const uint32_t sbc_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::SBC);
-  const uint32_t aac_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::AAC);
+  const uint32_t sbc_capability = static_cast<uint32_t>(android_emb::A2dpCodecType::SBC);
+  const uint32_t aac_capability = static_cast<uint32_t>(android_emb::A2dpCodecType::AAC);
 
   if (a2dp_offload_capabilities & sbc_capability) {
     fidlbredr::AudioSbcSupport audio_sbc_support;
