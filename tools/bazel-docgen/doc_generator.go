@@ -5,8 +5,21 @@
 package bazel_docgen
 
 import (
+	"log"
+	"sort"
+
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
+	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v2"
+)
+
+type supportedDocType int
+
+const (
+	docTypeRule = iota
+	docTypeProvider
+	docTypeStarlarkFunction
+	docTypeRepositoryRule
 )
 
 type tocEntry struct {
@@ -14,67 +27,90 @@ type tocEntry struct {
 	Path     string     `yaml:",omitempty"`
 	Heading  string     `yaml:",omitempty"`
 	Sections []tocEntry `yaml:"section,omitempty"`
+	docType  int
 }
 
-func RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Renderer, fileProvider FileProvider) {
+func newTocEntry(title string, filename string, docType int) tocEntry {
+	return tocEntry{
+		Title:   title,
+		Path:    "/" + filename,
+		docType: docType,
+	}
+}
+
+func checkDuplicateName(name string, entries map[string]tocEntry) {
+	if _, ok := entries[name]; ok {
+		log.Fatalln("Detected multiple entries with the same name: ", name)
+	}
+}
+
+func filterEntries(entries []tocEntry, docType int) []tocEntry {
+	var filteredEntries []tocEntry
+	for _, entry := range entries {
+		if entry.docType == docType {
+			filteredEntries = append(filteredEntries, entry)
+		}
+	}
+
+	sort.Slice(filteredEntries, func(i, j int) bool {
+		return filteredEntries[i].Title < filteredEntries[j].Title
+	})
+	return filteredEntries
+}
+
+func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider FileProvider) {
 	fileProvider.Open()
 
-	// Render all of our rules
-	var ruleEntries []tocEntry
-	for _, rule := range moduleInfo.GetRuleInfo() {
-		file_name := "rule_" + rule.RuleName + ".md"
-		if err := renderer.RenderRuleInfo(rule, fileProvider.NewFile(file_name)); err != nil {
-			panic(err)
-		}
-		ruleEntries = append(ruleEntries, tocEntry{
-			Title: rule.RuleName,
-			Path:  file_name,
-		})
-	}
+	entries := make(map[string]tocEntry)
 
-	// Render all of our providers
-	var providerEntries []tocEntry
-	for _, provider := range moduleInfo.GetProviderInfo() {
-		file_name := "provider_" + provider.ProviderName + ".md"
-		if err := renderer.RenderProviderInfo(provider, fileProvider.NewFile(file_name)); err != nil {
-			panic(err)
-		}
-		providerEntries = append(providerEntries, tocEntry{
-			Title: provider.ProviderName,
-			Path:  file_name,
-		})
-	}
+	for _, moduleInfo := range roots {
 
-	// Render all of our starlark functions
-	var starlarkFunctionEntries []tocEntry
-	for _, funcInfo := range moduleInfo.GetFuncInfo() {
-		file_name := "func_" + funcInfo.FunctionName + ".md"
-		if err := renderer.RenderStarlarkFunctionInfo(funcInfo, fileProvider.NewFile(file_name)); err != nil {
-			panic(err)
+		// Render all of our rules
+		for _, rule := range moduleInfo.GetRuleInfo() {
+			fileName := "rule_" + rule.RuleName + ".md"
+			checkDuplicateName(fileName, entries)
+			if err := renderer.RenderRuleInfo(rule, fileProvider.NewFile(fileName)); err != nil {
+				panic(err)
+			}
+			entries[fileName] = newTocEntry(rule.RuleName, fileName, docTypeRule)
 		}
-		starlarkFunctionEntries = append(starlarkFunctionEntries, tocEntry{
-			Title: funcInfo.FunctionName,
-			Path:  file_name,
-		})
-	}
 
-	// Render all of our rules
-	var repoRuleEntries []tocEntry
-	for _, repo_rule := range moduleInfo.GetRepositoryRuleInfo() {
-		file_name := "repo_rule_" + repo_rule.RuleName + ".md"
-		if err := renderer.RenderRepositoryRuleInfo(repo_rule, fileProvider.NewFile(file_name)); err != nil {
-			panic(err)
+		// Render all of our providers
+		for _, provider := range moduleInfo.GetProviderInfo() {
+			fileName := "provider_" + provider.ProviderName + ".md"
+			checkDuplicateName(fileName, entries)
+			if err := renderer.RenderProviderInfo(provider, fileProvider.NewFile(fileName)); err != nil {
+				panic(err)
+			}
+			entries[fileName] = newTocEntry(provider.ProviderName, fileName, docTypeProvider)
 		}
-		repoRuleEntries = append(repoRuleEntries, tocEntry{
-			Title: repo_rule.RuleName,
-			Path:  file_name,
-		})
+
+		// Render all of our starlark functions
+		for _, funcInfo := range moduleInfo.GetFuncInfo() {
+			fileName := "func_" + funcInfo.FunctionName + ".md"
+			checkDuplicateName(fileName, entries)
+			if err := renderer.RenderStarlarkFunctionInfo(funcInfo, fileProvider.NewFile(fileName)); err != nil {
+				panic(err)
+			}
+			entries[fileName] = newTocEntry(funcInfo.FunctionName, fileName, docTypeStarlarkFunction)
+		}
+
+		// Render all of our rules
+		for _, repoRule := range moduleInfo.GetRepositoryRuleInfo() {
+			fileName := "repo_rule_" + repoRule.RuleName + ".md"
+			checkDuplicateName(fileName, entries)
+			if err := renderer.RenderRepositoryRuleInfo(repoRule, fileProvider.NewFile(fileName)); err != nil {
+				panic(err)
+			}
+			entries[fileName] = newTocEntry(repoRule.RuleName, fileName, docTypeRepositoryRule)
+		}
 	}
 
 	// Render our README.md
 	readmeWriter := fileProvider.NewFile("README.md")
 	readmeWriter.Write([]byte(""))
 
+	tocEntries := maps.Values(entries)
 	toc := []tocEntry{
 		{
 			Title: "Overview",
@@ -87,19 +123,19 @@ func RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Renderer, fileProvider 
 			Sections: []tocEntry{
 				{
 					Title:    "Rules",
-					Sections: ruleEntries,
+					Sections: filterEntries(tocEntries, docTypeRule),
 				},
 				{
 					Title:    "Providers",
-					Sections: providerEntries,
+					Sections: filterEntries(tocEntries, docTypeProvider),
 				},
 				{
 					Title:    "Starlark Functions",
-					Sections: starlarkFunctionEntries,
+					Sections: filterEntries(tocEntries, docTypeStarlarkFunction),
 				},
 				{
 					Title:    "Repository Rules",
-					Sections: repoRuleEntries,
+					Sections: filterEntries(tocEntries, docTypeRepositoryRule),
 				},
 			},
 		},

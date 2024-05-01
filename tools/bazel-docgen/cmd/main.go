@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -15,26 +16,36 @@ import (
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 )
 
+// A type which allows us to collect multiple proto files
+type protoList []string
+
 type docGenFlags struct {
 	outDir  string
 	zipFile string
-	proto   string
+	protos  protoList
+}
+
+func (pl *protoList) String() string {
+	return fmt.Sprint(*pl)
+}
+
+func (pl *protoList) Set(value string) error {
+	*pl = append(*pl, value)
+	return nil
 }
 
 func parseFlags() docGenFlags {
 	var flags docGenFlags
 	flag.StringVar(&flags.outDir, "out_dir", "", "path to a directory which will contain output files.")
 	flag.StringVar(&flags.zipFile, "zip_file", "", "path to a file containing the zip file.")
-	flag.StringVar(&flags.proto, "proto", "", "path to a protobuf, as a textproto, file which contains the docs")
+	flag.Var(&flags.protos, "proto", "path to a protobuf, as a textproto, file which contains the docs")
 	flag.Parse()
 
 	return flags
 }
 
-func main() {
-	flags := parseFlags()
-
-	bytes, err := os.ReadFile(flags.proto)
+func unmarshalProto(proto string) pb.ModuleInfo {
+	bytes, err := os.ReadFile(proto)
 	if err != nil {
 		log.Fatalln("Error reading file:", err)
 	}
@@ -43,6 +54,12 @@ func main() {
 	if err := prototext.Unmarshal(bytes, &root); err != nil {
 		log.Fatalln("Failed to parse module info:", err)
 	}
+
+	return root
+}
+
+func main() {
+	flags := parseFlags()
 
 	renderer := bazel_docgen.NewMarkdownRenderer()
 
@@ -61,5 +78,11 @@ func main() {
 		log.Fatalln("Either --zip_file or --out_dir must be set.")
 	}
 
-	bazel_docgen.RenderModuleInfo(root, renderer, fileProvider)
+	var roots []pb.ModuleInfo
+
+	for _, proto := range flags.protos {
+		roots = append(roots, unmarshalProto(proto))
+	}
+
+	bazel_docgen.RenderModuleInfo(roots, renderer, fileProvider)
 }
