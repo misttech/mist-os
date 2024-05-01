@@ -11,7 +11,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/channel.h>
@@ -865,13 +864,6 @@ void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
 }
 
 zx_status_t FakeDisplay::Bind() {
-  zx::result pdev_result = ddk::PDevFidl::Create(parent(), ddk::PDevFidl::kFragmentName);
-  if (pdev_result.is_error()) {
-    zxlogf(ERROR, "Failed to get PDev protocol: %s", pdev_result.status_string());
-    return pdev_result.error_value();
-  }
-  pdev_ = std::move(pdev_result.value());
-
   zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize sysmem Allocator client: %s", zx_status_get_string(status));

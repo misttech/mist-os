@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -174,8 +173,6 @@ class FakeDisplay : public DeviceType,
   const display_controller_impl_protocol_t display_controller_impl_banjo_protocol_;
 
   FakeDisplayDeviceConfig device_config_;
-
-  ddk::PDevFidl pdev_;
 
   std::atomic_bool vsync_shutdown_flag_ = false;
   std::atomic_bool capture_shutdown_flag_ = false;
