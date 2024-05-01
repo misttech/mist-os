@@ -41,6 +41,9 @@ type KernelDriver = enum : uint32 {
     /// 'WD32'
     Generic32Watchdog = 0x32334457;
 
+    /// 'GENI'
+    GeniUart = 0x494E4547;
+
     /// '8250'
     I8250PioUart = 0x30353238;
 
@@ -71,7 +74,7 @@ type KernelDriver = enum : uint32 {
 
 /// Kernel driver struct that can be used for simple drivers.
 /// Used by ZBI_KERNEL_DRIVER_PL011_UART, ZBI_KERNEL_DRIVER_AMLOGIC_UART, and
-/// ZBI_KERNEL_DRIVER_I8250_MMIO_UART.
+/// ZBI_KERNEL_DRIVER_GENI_UART, ZBI_KERNEL_DRIVER_I8250_MMIO_UART.
 type DcfgSimple = struct {
     mmio_phys uint64;
     irq uint32;
