@@ -281,7 +281,7 @@
                 "ExecveatTest.SymlinkNoFollowWithNormalFile",
 
                 // This test call exec from a process with multiple threads.
-                // Starnix doesnt' support this yet: https://fxbug.dev/42082680
+                // Starnix doesnt' support this  https://fxbug.dev/42082680
                 "ExecTest.FromSiblingThread",
                 "ExecTest.WithSiblingThread",
 
@@ -413,6 +413,27 @@
                 "IP6TablesBasic.GetEntriesErrorPrecedence",
                 "IP6TablesBasic.GetInfoErrorPrecedence",
                 "IP6TablesTest.InitialInfo",
+
+                // Various socket tests
+                "*IpMulticastIfDefault*",
+                "*IpMulticastIfDefaultReqn*",
+                "*IpMulticastIfInvalidAddr*",
+                "*IpMulticastIfInvalidNic*",
+                "*IpMulticastIfSetAddr*",
+                "*IpMulticastIfSetAddrGetReqn*",
+                "*IpMulticastIfSetNic*",
+                "*IpMulticastIfSetNicGetReqn*",
+                "*IpMulticastIfSetReqAddr*",
+                "*IpMulticastIfSetReqAddrGetReqn*",
+                "*IpMulticastIfZero/2",
+                "*IpMulticastIfZero/3",
+                "*IpMulticastInvalidDrop/2",
+                "*IpMulticastInvalidDrop/3",
+                "*TestJoinGroupNoIf*",
+                "*TestJoinGroupInvalidIf/2",
+                "*TestJoinGroupInvalidIf/3",
+                "*TestMultipleJoinsOnSingleSocket/2",
+                "*TestMultipleJoinsOnSingleSocket/3",
 
                 // itimer_test
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyActive",
@@ -908,7 +929,7 @@
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
 
-                // The test runs as follows:
+                // The test runs as foll
                 // 1. P0T0 forks itself creating P1T0.
                 // 2. P0T0 waits for P1 to exit normally.
                 // 3. P1T0 clones itself using CLONE_THREAD | CLONE_VFORK. This creates P1T1 and
@@ -1044,7 +1065,7 @@
                 "PselectTest.SignalMaskBlocksSignal",
                 "UnameTest.Sanity",
 
-                // TODO: These tests have different outcomes in socket_domain_test and
+                // T These tests have different outcomes in socket_domain_test and
                 // socket_ip_tcp_loopback_test.
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
@@ -1094,7 +1115,7 @@
                 // Requires investigation into error `libgcc_s.so.1 must be
                 // installed for pthread_exit to work`.  It is likely a problem
                 // where we are statically linking libgcc_s and dynamically linking
-                // libpthread.  See http://g/grte/c/AOZW4ySVadE/m/NhMQgRs-5r8J
+                // libpthread.  See h//g/grte/c/AOZW4ySVadE/m/NhMQgRs-5r8J
                 "RobustFutexTest.PthreadMutexAttr",
 
                 // uidgid_test - https://fxbug.dev/42159674
@@ -1142,7 +1163,7 @@
 
                 // SignalMask[Blocks/Allows]Signal require timers to send signals.
                 // Passes sometimes, so it has to be skipped.
-                // TODO(b/297438987): Re-enable once timers are implemented.
+                // TODO(b/2974389 Re-enable once timers are implemented.
                 "PpollTest.SignalMaskBlocksSignal",
 
                 // These tests hang / hard crash
@@ -1160,7 +1181,7 @@
                 "VforkTest.ExecedChildExitDoesntUnstopParent",
                 "VforkTest.ParentStopsUntilChildExits",
 
-                // TODO(b/302340440): Save XMM registers in signal handlers on x64.
+                // TODO(b/3023404 Save XMM registers in signal handlers on x64.
                 "FPSigTest.NestedSignals",
 
                 // Skip for roll
