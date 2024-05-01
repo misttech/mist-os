@@ -128,7 +128,7 @@ if (current_toolchain == default_toolchain) {
         "start32.S",
       ]
       deps = [
-        ":phys32-header",
+        ":phys32.h",
         ":reset",
         "//zircon/kernel/lib/arch",
         "//zircon/kernel/lib/ktl",
@@ -167,29 +167,6 @@ if (current_toolchain == default_toolchain) {
                                      clang_inputs),
                          ".",
                          root_build_dir)
-    }
-
-    source_set("legacy-boot") {
-      public = [ "legacy-boot.h" ]
-      public_deps = [
-        "//zircon/kernel/lib/ktl",
-        "//zircon/kernel/lib/libc",
-        "//zircon/system/ulib/uart",
-      ]
-
-      sources = [ "legacy-boot.cc" ]
-      deps = [
-        "//src/lib/zbitl",
-        "//zircon/kernel/phys:acpi",
-        "//zircon/kernel/phys:address-space",
-        "//zircon/kernel/phys:allocation-init",
-        "//zircon/kernel/phys:symbolize",
-        "//zircon/kernel/phys:uart",
-        "//zircon/kernel/phys/lib/boot-shim",
-        "//zircon/kernel/phys/lib/memalloc",
-        "//zircon/system/ulib/hwreg",
-        "//zircon/system/ulib/pretty",
-      ]
     }
 
     # Just putting this in deps of a phys_executable() in the kernel.phys32
@@ -235,60 +212,85 @@ if (current_toolchain == default_toolchain) {
     # Just putting this in deps of a phys_executable() in the kernel.phys32
     # environment makes it a Linux x86 (bzImage) compatible kernel image.
     source_set("linuxboot") {
-      public = [ "linuxboot.h" ]
-
       sources = [ "linuxboot-header.S" ]
       libs = [ "./linuxboot.ld" ]
       deps = [
         ":linuxboot-asm",
         ":linuxboot-init",
+        ":linuxboot.h",
         ":phys32",
-        ":phys32-header",
+        ":phys32.h",
         "//zircon/kernel/lib/arch",
       ]
 
-      public_deps = [
-        # linuxboot.h has #include <lib/zircon-internal/e820.h>
-        "//zircon/system/ulib/zircon-internal:headers",
-      ]
-
-      # This input is a gzipped linux in-kernel config.
-      # To update this file, edit ikconfig.txt in this directory and run:
-      #   gzip zircon/kernel/arch/x86/phys/ikconfig.txt \
-      #        -c zircon/kernel/arch/x86/phys/ikconfig.gz
-      inputs = [ "ikconfig.gz" ]
-      ikconfig_file = rebase_path("ikconfig.gz", root_build_dir)
-      defines = [ "IKCONFIG_FILE=\"$ikconfig_file\"" ]
-
-      # This does `#include "linuxboot.h"` but shouldn't link this stuff in
-      # (and that would create a circular dependency here anyway).  It's just a
-      # private helper for the linuxboot-header.S code.
-      friend = [ ":linuxboot-asm" ]
-
-      allow_circular_includes_from = [ ":linuxboot-init" ]
+      configs += [ ":ikconfig.config" ]
     }
+  }
 
-    # This is a little library instead of a source_set() so it can be included
-    # implicitly by phys_executable() without adding bloat to the tiny tests
-    # that don't use it.
-    static_library("linuxboot-init") {
-      visibility = [ ":linuxboot" ]
-      sources = [ "linuxboot-init.cc" ]
-      deps = [
-        "//zircon/kernel/lib/arch",
-        "//zircon/kernel/phys:allocation",
-        "//zircon/kernel/phys:main",
-        "//zircon/kernel/phys:symbolize",
-        "//zircon/kernel/phys/lib/memalloc",
-        "//zircon/system/ulib/zircon-internal",
-      ]
-      public_deps = [
-        ":legacy-boot",
-        "//sdk/lib/zbi-format",
-        "//zircon/kernel/lib/ktl",
-        "//zircon/kernel/lib/libc",
-      ]
-    }
+  source_set("legacy-boot") {
+    public = [ "legacy-boot.h" ]
+    public_deps = [
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+      "//zircon/system/ulib/uart",
+    ]
+
+    sources = [ "legacy-boot.cc" ]
+    deps = [
+      "//src/lib/zbitl",
+      "//zircon/kernel/phys:acpi",
+      "//zircon/kernel/phys:address-space",
+      "//zircon/kernel/phys:allocation-init",
+      "//zircon/kernel/phys:symbolize",
+      "//zircon/kernel/phys:uart",
+      "//zircon/kernel/phys/lib/boot-shim",
+      "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/system/ulib/hwreg",
+      "//zircon/system/ulib/pretty",
+    ]
+  }
+
+  source_set("linuxboot.h") {
+    public = [ "linuxboot.h" ]
+    public_deps = [
+      # linuxboot.h has #include <lib/zircon-internal/e820.h>
+      "//zircon/system/ulib/zircon-internal:headers",
+    ]
+  }
+
+  config("ikconfig.config") {
+    visibility = [ ":linuxboot" ]
+
+    # This input is a gzipped linux in-kernel config.
+    # To update this file, edit ikconfig.txt in this directory and run:
+    #   gzip zircon/kernel/arch/x86/phys/ikconfig.txt \
+    #        -c zircon/kernel/arch/x86/phys/ikconfig.gz
+    inputs = [ "ikconfig.gz" ]
+    ikconfig_file = rebase_path("ikconfig.gz", root_build_dir)
+    defines = [ "IKCONFIG_FILE=\"$ikconfig_file\"" ]
+  }
+
+  # This is a little library instead of a source_set() so it can be included
+  # implicitly by phys_executable() without adding bloat to the tiny tests
+  # that don't use it.
+  static_library("linuxboot-init") {
+    visibility = [ ":*" ]
+    sources = [ "linuxboot-init.cc" ]
+    deps = [
+      ":linuxboot.h",
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:allocation",
+      "//zircon/kernel/phys:main",
+      "//zircon/kernel/phys:symbolize",
+      "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/system/ulib/zircon-internal",
+    ]
+    public_deps = [
+      ":legacy-boot",
+      "//sdk/lib/zbi-format",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
   }
 
   source_set("reset") {
@@ -358,7 +360,7 @@ group("arch-phys-info") {
 }
 
 # This is evaluated differently in different environments, so outside the if.
-hwreg_asm_header("phys32-header") {
+hwreg_asm_header("phys32.h") {
   output_name = "phys32.h"
   sources = [ "gdt32.cc" ]
   defines = [
@@ -372,7 +374,7 @@ hwreg_asm_header("linuxboot-asm") {
   visibility = [ ":linuxboot" ]
   output_name = "linuxboot-asm.h"
   sources = [ "linuxboot-asm-gen.cc" ]
-  deps = [ "//zircon/system/ulib/zircon-internal" ]
+  deps = [ ":linuxboot.h" ]
 }
 
 if (current_cpu == "x64") {
