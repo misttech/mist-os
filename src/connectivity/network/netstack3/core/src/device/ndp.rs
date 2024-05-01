@@ -218,7 +218,7 @@ mod tests {
                                 Ipv6Scope::Global => Some(GlobalIpv6Addr {
                                     addr_sub,
                                     flags: *flags,
-                                    config: *config,
+                                    config: config.unwrap(),
                                 }),
                                 Ipv6Scope::InterfaceLocal
                                 | Ipv6Scope::LinkLocal

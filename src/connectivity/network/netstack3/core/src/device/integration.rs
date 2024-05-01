@@ -367,7 +367,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<Ipv4Addr>, <Ipv4 as IpDeviceIpExt>::AddressConfig<BC::Instant>) {
+    ) -> AddrSubnet<Ipv4Addr> {
         let primary = with_ip_device_state(self, device_id, |mut state| {
             state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>().remove(&addr.addr())
         })
@@ -375,9 +375,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let Ipv4AddressEntry { addr_sub, state } = PrimaryRc::unwrap(primary);
-        let Ipv4AddressState { config } = state.into_inner();
-        (addr_sub, config)
+        let Ipv4AddressEntry { addr_sub, state: _ } = PrimaryRc::unwrap(primary);
+        addr_sub
     }
 
     fn get_address_id(
@@ -655,8 +654,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>)
-    {
+    ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         let primary = with_ip_device_state(self, device_id, |mut state| {
             state
                 .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
@@ -666,9 +664,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let Ipv6AddressEntry { addr_sub, dad_state: _, state } = PrimaryRc::unwrap(primary);
-        let Ipv6AddressState { flags: _, config } = state.into_inner();
-        (addr_sub, config)
+        let Ipv6AddressEntry { addr_sub, dad_state: _, state: _ } = PrimaryRc::unwrap(primary);
+        addr_sub
     }
 
     fn get_address_id(

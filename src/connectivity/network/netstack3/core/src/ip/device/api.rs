@@ -224,13 +224,23 @@ where
             struct Wrap<'a, I: IpDeviceIpExt, II: Instant>(&'a mut I::AddressState<II>);
             let IpInvariant(valid_until) = I::map_ip(
                 Wrap(address_state),
-                |Wrap(Ipv4AddressState { config: Ipv4AddrConfig { valid_until } })| {
-                    IpInvariant(Ok(valid_until))
+                |Wrap(Ipv4AddressState { config })| {
+                    IpInvariant(match config {
+                        Some(Ipv4AddrConfig { valid_until }) => Ok(valid_until),
+                        // Address is being removed, configuration has been
+                        // taken out.
+                        None => Err(NotFoundError.into()),
+                    })
                 },
                 |Wrap(Ipv6AddressState { flags: _, config })| {
                     IpInvariant(match config {
-                        Ipv6AddrConfig::Slaac(_) => Err(SetIpAddressPropertiesError::NotManual),
-                        Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => {
+                        // Address is being removed, configuration has been
+                        // taken out.
+                        None => Err(NotFoundError.into()),
+                        Some(Ipv6AddrConfig::Slaac(_)) => {
+                            Err(SetIpAddressPropertiesError::NotManual)
+                        }
+                        Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until })) => {
                             Ok(valid_until)
                         }
                     })

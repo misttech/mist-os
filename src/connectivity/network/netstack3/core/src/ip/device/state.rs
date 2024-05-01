@@ -886,7 +886,7 @@ pub struct Ipv4AddressEntry<BT: IpDeviceStateBindingsTypes> {
 
 impl<BT: IpDeviceStateBindingsTypes> Ipv4AddressEntry<BT> {
     pub(crate) fn new(addr_sub: AddrSubnet<Ipv4Addr>, config: Ipv4AddrConfig<BT::Instant>) -> Self {
-        Self { addr_sub, state: RwLock::new(Ipv4AddressState { config }) }
+        Self { addr_sub, state: RwLock::new(Ipv4AddressState { config: Some(config) }) }
     }
 
     pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv4Addr> {
@@ -918,13 +918,15 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv4DeviceA
 
 #[derive(Debug)]
 pub struct Ipv4AddressState<Instant> {
-    pub(crate) config: Ipv4AddrConfig<Instant>,
+    pub(crate) config: Option<Ipv4AddrConfig<Instant>>,
 }
 
 impl<Instant: crate::Instant> Inspectable for Ipv4AddressState<Instant> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { config: Ipv4AddrConfig { valid_until } } = self;
-        inspector.record_inspectable_value("ValidUntil", valid_until)
+        let Self { config } = self;
+        if let Some(Ipv4AddrConfig { valid_until }) = config {
+            inspector.record_inspectable_value("ValidUntil", valid_until)
+        }
     }
 }
 
@@ -1013,7 +1015,7 @@ pub(crate) struct Ipv6AddressFlags {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Ipv6AddressState<Instant> {
     pub(crate) flags: Ipv6AddressFlags,
-    pub(crate) config: Ipv6AddrConfig<Instant>,
+    pub(crate) config: Option<Ipv6AddrConfig<Instant>>,
 }
 
 impl<Instant: crate::Instant> Inspectable for Ipv6AddressState<Instant> {
@@ -1021,25 +1023,30 @@ impl<Instant: crate::Instant> Inspectable for Ipv6AddressState<Instant> {
         let Self { flags: Ipv6AddressFlags { deprecated, assigned }, config } = self;
         inspector.record_bool("Deprecated", *deprecated);
         inspector.record_bool("Assigned", *assigned);
-        let (is_slaac, valid_until) = match config {
-            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => (false, *valid_until),
-            Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }) => (true, *valid_until),
-            Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(TemporarySlaacConfig {
-                valid_until,
-                desync_factor,
-                creation_time,
-                dad_counter,
-            })) => {
-                // Record the extra temporary slaac configuration before
-                // returning.
-                inspector.record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
-                inspector.record_uint("DadCounter", *dad_counter);
-                inspector.record_inspectable_value("CreationTime", creation_time);
-                (true, Lifetime::Finite(*valid_until))
-            }
-        };
-        inspector.record_bool("IsSlaac", is_slaac);
-        inspector.record_inspectable_value("ValidUntil", &valid_until);
+
+        if let Some(config) = config {
+            let (is_slaac, valid_until) = match config {
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => {
+                    (false, *valid_until)
+                }
+                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }) => (true, *valid_until),
+                Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(TemporarySlaacConfig {
+                    valid_until,
+                    desync_factor,
+                    creation_time,
+                    dad_counter,
+                })) => {
+                    // Record the extra temporary slaac configuration before
+                    // returning.
+                    inspector.record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
+                    inspector.record_uint("DadCounter", *dad_counter);
+                    inspector.record_inspectable_value("CreationTime", creation_time);
+                    (true, Lifetime::Finite(*valid_until))
+                }
+            };
+            inspector.record_bool("IsSlaac", is_slaac);
+            inspector.record_inspectable_value("ValidUntil", &valid_until);
+        }
     }
 }
 
@@ -1068,7 +1075,7 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
             addr_sub,
             dad_state: Mutex::new(dad_state),
             state: RwLock::new(Ipv6AddressState {
-                config,
+                config: Some(config),
                 flags: Ipv6AddressFlags { deprecated: false, assigned },
             }),
         }

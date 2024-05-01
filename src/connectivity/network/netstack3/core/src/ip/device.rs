@@ -302,6 +302,10 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
     fn timer_device_id<D: device::WeakId, A: IpAddressIdSpec>(
         timer: &Self::Timer<D, A>,
     ) -> Option<D::Strong>;
+
+    fn take_addr_config_for_removal<I: Instant>(
+        addr_state: &mut Self::AddressState<I>,
+    ) -> Option<Self::AddressConfig<I>>;
 }
 
 impl IpDeviceIpExt for Ipv4 {
@@ -329,6 +333,12 @@ impl IpDeviceIpExt for Ipv4 {
     ) -> Option<D::Strong> {
         timer.device_id()
     }
+
+    fn take_addr_config_for_removal<I: Instant>(
+        addr_state: &mut Self::AddressState<I>,
+    ) -> Option<Self::AddressConfig<I>> {
+        addr_state.config.take()
+    }
 }
 
 impl IpDeviceIpExt for Ipv6 {
@@ -354,6 +364,12 @@ impl IpDeviceIpExt for Ipv6 {
         timer: &Self::Timer<D, A>,
     ) -> Option<D::Strong> {
         timer.device_id()
+    }
+
+    fn take_addr_config_for_removal<I: Instant>(
+        addr_state: &mut Self::AddressState<I>,
+    ) -> Option<Self::AddressConfig<I>> {
+        addr_state.config.take()
     }
 }
 
@@ -579,11 +595,16 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
     ) -> Result<Self::AddressId, ExistsError>;
 
     /// Removes an address from the device identified by the ID.
+    // TODO(https://fxbug.dev/336291808): This function must return whether the
+    // resource has been destroyed synchronously or if destruction is deferred
+    // to account for other strong references to `addr`. That can be bubbled up
+    // to bindings for a safe wait on user-initiated removals or signaled for
+    // internal removals.
     fn remove_ip_address(
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BT::Instant>);
+    ) -> AddrSubnet<I::Addr, I::AssignedWitness>;
 
     /// Returns the address ID for the given address value.
     fn get_address_id(
@@ -1215,7 +1236,7 @@ fn disable_ipv6_device_with_config<
         })
         .into_iter()
         .for_each(|(addr_id, config)| {
-            if config == Ipv6AddrConfig::SLAAC_LINK_LOCAL {
+            if config == Some(Ipv6AddrConfig::SLAAC_LINK_LOCAL) {
                 del_ip_addr_inner_and_notify_handler(
                     core_ctx,
                     bindings_ctx,
@@ -1224,7 +1245,11 @@ fn disable_ipv6_device_with_config<
                     AddressRemovedReason::Manual,
                     device_config,
                 )
-                .expect("delete listed address")
+                .unwrap_or_else(|NotFoundError| {
+                    // We're not holding locks on the addresses anymore we must
+                    // allow a NotFoundError since the address can be removed as
+                    // we release the lock.
+                })
             } else {
                 DadHandler::stop_duplicate_address_detection(
                     core_ctx,
@@ -1601,9 +1626,17 @@ fn del_ip_addr_inner<
         DelIpAddr::SpecifiedAddr(addr) => core_ctx.get_address_id(device_id, addr)?,
         DelIpAddr::AddressId(id) => id,
     };
-
     DadHandler::stop_duplicate_address_detection(core_ctx, bindings_ctx, device_id, &addr_id);
-    let (addr_sub, addr_config) = core_ctx.remove_ip_address(device_id, addr_id);
+    // Extract the configuration out of the address to properly mark it as ready
+    // for deletion. If the configuration has already been taken, consider as if
+    // the address is already removed.
+    let addr_config = core_ctx
+        .with_ip_address_state_mut(device_id, &addr_id, |addr_state| {
+            I::take_addr_config_for_removal(addr_state)
+        })
+        .ok_or(NotFoundError)?;
+
+    let addr_sub = core_ctx.remove_ip_address(device_id, addr_id);
     let addr = addr_sub.addr();
 
     bindings_ctx.on_event(IpDeviceEvent::AddressRemoved {

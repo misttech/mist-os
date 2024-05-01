@@ -442,8 +442,16 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
             slaac_addrs
                 .with_addrs(|addrs| addrs.map(|a| a.addr_sub.addr()).collect::<Vec<_>>())
                 .into_iter()
-                .map(|addr| {
-                    slaac_addrs.remove_addr(bindings_ctx, &addr).expect("remove existing address")
+                .filter_map(|addr| {
+                    slaac_addrs.remove_addr(bindings_ctx, &addr).map(Some).unwrap_or_else(
+                        |NotFoundError| {
+                            // We're not holding locks on the assigned addresses
+                            // here, so we can't assume a race is impossible with
+                            // something else removing the address. Just assume that
+                            // it is gone.
+                            None
+                        },
+                    )
                 })
                 .collect::<Vec<_>>()
         })

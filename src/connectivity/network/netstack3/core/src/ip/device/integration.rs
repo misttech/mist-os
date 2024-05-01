@@ -122,12 +122,12 @@ where
                  }| {
                     let addr_sub = addr_id.addr_sub();
                     match config {
-                        Ipv6AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
+                        Some(Ipv6AddrConfig::Slaac(config)) => Some(SlaacAddressEntry {
                             addr_sub,
                             config: *config,
                             deprecated: *deprecated,
                         }),
-                        Ipv6AddrConfig::Manual(_manual_config) => None,
+                        None | Some(Ipv6AddrConfig::Manual(_)) => None,
                     }
                 },
             )
@@ -161,10 +161,10 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
                 } = &mut *state;
 
                 match config {
-                    Ipv6AddrConfig::Slaac(config) => {
+                    Some(Ipv6AddrConfig::Slaac(config)) => {
                         cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
                     }
-                    Ipv6AddrConfig::Manual(_manual_config) => {}
+                    None | Some(Ipv6AddrConfig::Manual(_)) => {}
                 }
             })
         })
@@ -212,7 +212,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
                     addr_sub,
                     config: assert_matches::assert_matches!(
                         config,
-                        Ipv6AddrConfig::Slaac(c) => c
+                        Some(Ipv6AddrConfig::Slaac(c)) => c
                     ),
                     deprecated,
                 },
@@ -1168,7 +1168,7 @@ where
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BC::Instant>) {
+    ) -> AddrSubnet<I::Addr, I::AssignedWitness> {
         let Self { config: _, core_ctx } = self;
         device::IpDeviceStateContext::<I, BC>::remove_ip_address(core_ctx, device_id, addr)
     }
