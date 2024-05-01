@@ -54,6 +54,7 @@ cc_library(
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/hci",
         "//src/connectivity/bluetooth/core/bt-host/transport",
+        "@pigweed//pw_bluetooth:emboss_l2cap_frames",
         "@pigweed//pw_string",
         "@pigweed//third_party/fuchsia:fit",
     ],
