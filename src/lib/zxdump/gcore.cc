@@ -1071,7 +1071,7 @@ task found in the postmortem data is also still alive on the running system.
 
   cli.KoidArguments(argc, argv, optind, allow_jobs);
 
-  cli.NeedRootResource(flags.collect_kernel);
+  cli.NeedInfoResource(flags.collect_kernel);
   cli.NeedSystem(flags.collect_system);
 
   if (cli.empty() && cli.ok()) {

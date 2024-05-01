@@ -112,11 +112,11 @@ void CommandLineHelper::KoidArguments(int argc, char** argv, int i, bool allow_j
   }
 }
 
-void CommandLineHelper::NeedRootResource(bool need) {
+void CommandLineHelper::NeedInfoResource(bool need) {
   if (need && live_) {
-    auto result = zxdump::GetRootResource();
-    if (Ok(result, "cannot get root resource")) {
-      Ok(holder_.Insert(std::move(result).value()), "root resource");
+    auto result = zxdump::GetInfoResource();
+    if (Ok(result, "cannot get info resource")) {
+      Ok(holder_.Insert(std::move(result).value()), "info resource");
     }
   }
 }

@@ -167,16 +167,16 @@ void TestProcessForKernelInfo::StartChild() {
   });
   ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild());
 
-  // Fetch the root resource, since we'll need it to dump.
-  auto root_result = zxdump::GetRootResource();
-  EXPECT_TRUE(root_result.is_ok()) << root_result.error_value();
-  root_resource_ = *std::move(root_result);
+  // Fetch the info resource, since we'll need it to dump.
+  auto info_result = zxdump::GetInfoResource();
+  EXPECT_TRUE(info_result.is_ok()) << info_result.error_value();
+  info_resource_ = *std::move(info_result);
 }
 
 void TestProcessForKernelInfo::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
-  zxdump::LiveHandle root_resource_copy;
-  EXPECT_EQ(ZX_OK, root_resource().duplicate(ZX_RIGHT_SAME_RIGHTS, &root_resource_copy));
-  auto insert_result = holder.Insert(std::move(root_resource_copy));
+  zxdump::LiveHandle info_resource_copy;
+  EXPECT_EQ(ZX_OK, info_resource().duplicate(ZX_RIGHT_SAME_RIGHTS, &info_resource_copy));
+  auto insert_result = holder.Insert(std::move(info_resource_copy));
   EXPECT_TRUE(insert_result.is_ok()) << insert_result.error_value();
 
   auto result = dump.CollectKernel();
@@ -189,24 +189,24 @@ void TestProcessForKernelInfo::CheckDump(zxdump::TaskHolder& holder) {
       InfoTraits<ZX_INFO_KMEM_STATS>,  //
       InfoTraits<ZX_INFO_GUEST_STATS>>;
 
-  zxdump::Resource& root = holder.root_resource();
-  EXPECT_NE(root.koid(), ZX_KOID_INVALID);
-  EXPECT_EQ(root.type(), ZX_OBJ_TYPE_RESOURCE);
+  zxdump::Resource& info = holder.info_resource();
+  EXPECT_NE(info.koid(), ZX_KOID_INVALID);
+  EXPECT_EQ(info.type(), ZX_OBJ_TYPE_RESOURCE);
 
   KernelData dump_data, live_data;
 
   {
-    // Use a fresh holder to populate the live data.  It can consume the root
+    // Use a fresh holder to populate the live data.  It can consume the info
     // resource handle we used in Precollect, since we've already dumped and
     // don't need it any more.
     zxdump::TaskHolder live_holder;
-    auto live_root = live_holder.Insert(std::move(root_resource_));
-    ASSERT_TRUE(live_root.is_ok()) << live_root.error_value();
-    ASSERT_NO_FATAL_FAILURE(live_data.Fill(*live_root));
+    auto live_info = live_holder.Insert(std::move(info_resource_));
+    ASSERT_TRUE(live_info.is_ok()) << live_info.error_value();
+    ASSERT_NO_FATAL_FAILURE(live_data.Fill(*live_info));
   }
 
   // Fetch all the data from the dump.
-  ASSERT_NO_FATAL_FAILURE(dump_data.Fill(root));
+  ASSERT_NO_FATAL_FAILURE(dump_data.Fill(info));
 
   // Check that the dump data makes sense as data collected before the live
   // data just collected (after the dump was made).

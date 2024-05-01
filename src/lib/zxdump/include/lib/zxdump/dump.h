@@ -167,7 +167,7 @@ class ProcessDump : protected DumpBase {
   // called at all.  The kernel information is included in the total size
   // returned by CollectProcess.  Note this only works if the
   // zxdump::TaskHolder from which the zxdump::Process being dumped was loaded
-  // has had the root resource inserted (either the real live object or from a
+  // has had the info resource inserted (either the real live object or from a
   // dump).
   fit::result<Error> CollectKernel();
 
