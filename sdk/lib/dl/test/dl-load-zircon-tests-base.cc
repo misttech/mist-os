@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 #include "dl-load-zircon-tests-base.h"
 
+#include <fidl/fuchsia.ldsvc/cpp/wire.h>
 #include <lib/ld/testing/test-vmo.h>
-#include <zircon/dlfcn.h>
 
 namespace dl::testing {
 
@@ -17,30 +17,23 @@ std::optional<DlLoadZirconTestsBase::File> DlLoadZirconTestsBase::RetrieveFile(
     Diagnostics& diag, std::string_view filename) {
   FileCheck(filename);
 
-  // TODO(caslyn): We should avoid altering the global loader service state in
-  // this test class. Instead RetrieveFile will become an object method
-  // on DlImplLoadTestsBase which will have direct access to the mock loader,
-  // and we will remove the TestOS class abstraction (Loader/File aliases
-  // will be moved to the DlImplLoadTestsBase and passed separately to `Open`).
-
-  // Obtain and save a handle to the loader installed for the test to make
-  // fuchsia.ldsvc/Loader.LoadObject requests to.
-  constexpr auto init_ldsvc = []() {
-    zx::unowned_channel channel{dl_set_loader_service(ZX_HANDLE_INVALID)};
-    EXPECT_TRUE(channel->is_valid());
-    zx_handle_t reset = dl_set_loader_service(channel->get());
-    EXPECT_EQ(reset, ZX_HANDLE_INVALID);
-    return fidl::UnownedClientEnd<fuchsia_ldsvc::Loader>{channel};
-  };
-  static const auto ldsvc_endpoint = init_ldsvc();
-
+  // Borrow the client channel handle to the mock loader service and make a
+  // fuchsia.ldsvc/Loader.LoadObject request to it.
   fidl::Arena arena;
-  if (auto result = fidl::WireCall(ldsvc_endpoint)->LoadObject({arena, filename}); result.ok()) {
-    if (auto load_result = result.Unwrap(); load_result->rv == ZX_OK) {
-      return DlLoadZirconTestsBase::File{std::move(load_result->object), diag};
-    }
+  auto result = fidl::WireCall(mock_.client())->LoadObject({arena, filename});
+  EXPECT_TRUE(result.ok());
+  auto load_result = result.Unwrap();
+  if (load_result->rv == ZX_OK) {
+    return File{std::move(load_result->object), diag};
   }
+  // The only expected failure is a "not found" error.
+  EXPECT_EQ(load_result->rv, ZX_ERR_NOT_FOUND);
 
+  // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages.
+  // Consider amending the signature for RetrieveFile to differentiate between
+  // retrieving the dependency vs root module for the purpose of emitting
+  // diag.MissingDependency for the former and something different for the
+  // latter.
   diag.SystemError("cannot open ", filename);
   return std::nullopt;
 }

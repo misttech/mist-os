@@ -143,6 +143,11 @@ void MockLoaderServiceForTest::ExpectConfig(std::string_view config) {
   mock_loader_->ExpectConfig(config, zx::ok());
 }
 
+fidl::ClientEnd<fuchsia_ldsvc::Loader>& MockLoaderServiceForTest::client() {
+  ReadyMock();
+  return mock_loader_->client();
+}
+
 zx::channel MockLoaderServiceForTest::TakeLdsvc() {
   zx::channel ldsvc;
   if (mock_loader_) {

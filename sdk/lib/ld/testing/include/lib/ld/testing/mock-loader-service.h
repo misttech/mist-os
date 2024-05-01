@@ -128,6 +128,10 @@ class MockLoaderServiceForTest {
   // that it will receive a Config request.
   void ExpectConfig(std::string_view config);
 
+  // Return a reference to the client end to the MockLoader's FIDL server. This
+  // will start the server if it hasn't been initialized yet.
+  fidl::ClientEnd<fuchsia_ldsvc::Loader>& client();
+
   // Take ownership of the client end to the MockLoader's FIDL server.
   zx::channel TakeLdsvc();
 
