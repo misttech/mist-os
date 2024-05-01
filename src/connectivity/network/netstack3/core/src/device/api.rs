@@ -185,7 +185,6 @@ where
         match PrimaryRc::unwrap_or_notify_with(primary.into_inner(), || {
             let (notifier, receiver) = C::BindingsContext::new_reference_notifier::<
                 D::External<C::BindingsContext>,
-                _,
             >(debug_references);
             let notifier =
                 crate::sync::MapRcNotifier::new(notifier, |state: BaseDeviceState<_, _>| {

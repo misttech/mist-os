@@ -87,7 +87,7 @@ use crate::{
         IpLayerEvent,
     },
     state::{StackState, StackStateBuilder},
-    sync::Mutex,
+    sync::{DynDebugReferences, Mutex},
     time::TimerId,
     transport::{
         tcp::{
@@ -919,8 +919,8 @@ impl crate::ReferenceNotifiers for FakeBindingsCtx {
 
     type ReferenceNotifier<T: Send + 'static> = Never;
 
-    fn new_reference_notifier<T: Send + 'static, D: Debug>(
-        debug_references: D,
+    fn new_reference_notifier<T: Send + 'static>(
+        debug_references: DynDebugReferences,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
         // NB: We don't want deferred destruction in core tests. These are
         // always single-threaded and single-task, and we want to encourage

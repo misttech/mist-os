@@ -1173,7 +1173,7 @@ pub(crate) struct WrapOtherStackIpOptionsMut<
 /// Types and behavior for datagram sockets.
 ///
 /// These sockets may or may not support dual-stack operation.
-pub trait DatagramSocketSpec: Sized {
+pub trait DatagramSocketSpec: Sized + 'static {
     /// Name of this datagram protocol.
     const NAME: &'static str;
 
@@ -1207,7 +1207,10 @@ pub trait DatagramSocketSpec: Sized {
     /// just use [`ListenerIpAddr`].
     type ListenerIpAddr<I: IpExt>: Clone
         + Debug
-        + Into<(Option<SpecifiedAddr<I::Addr>>, NonZeroU16)>;
+        + Into<(Option<SpecifiedAddr<I::Addr>>, NonZeroU16)>
+        + Send
+        + Sync
+        + 'static;
 
     /// The sharing state for a socket.
     ///
@@ -1215,7 +1218,7 @@ pub trait DatagramSocketSpec: Sized {
     /// sharing state of connected vs listening sockets. At the moment, datagram
     /// sockets have no need for differentiated sharing states, so consolidate
     /// them under one type.
-    type SharingState: Clone + Debug + Default;
+    type SharingState: Clone + Debug + Default + Send + Sync + 'static;
 
     /// The type of an IP address for a connected socket.
     ///
@@ -1266,7 +1269,7 @@ pub trait DatagramSocketSpec: Sized {
     ///
     /// This is used to store opaque bindings data alongside the core data
     /// inside the socket references.
-    type ExternalData<I: Ip>: Debug + Send + Sync;
+    type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 
     /// Returns the IP protocol of this datagram specification.
     fn ip_proto<I: IpProtoExt>() -> I::Proto;
@@ -1486,10 +1489,15 @@ pub(crate) fn close<
     // Drop the (hopefully last) strong ID before unwrapping the primary
     // reference.
     core::mem::drop(id);
-    let debug_references = PrimaryRc::debug_references(&primary);
+
+    fn foo<T: Send + Sync + 'static>() {}
+
+    foo::<ReferenceState<I, CC::WeakDeviceId, S>>();
+
+    let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
     match PrimaryRc::unwrap_or_notify_with(primary, || {
         let (notifier, receiver) =
-            BC::new_reference_notifier::<S::ExternalData<I>, _>(debug_references);
+            BC::new_reference_notifier::<S::ExternalData<I>>(debug_references);
         let notifier =
             MapRcNotifier::new(notifier, |ReferenceState { state: _, external_data }| {
                 external_data

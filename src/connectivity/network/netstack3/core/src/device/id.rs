@@ -19,7 +19,7 @@ use crate::{
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
         Device, DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes,
     },
-    sync::{PrimaryRc, StrongRc},
+    sync::{DynDebugReferences, PrimaryRc, StrongRc},
 };
 
 /// An identifier for a device.
@@ -98,63 +98,17 @@ impl<BT: DeviceLayerTypes> WeakDeviceId<BT> {
     }
 
     /// Creates a [`DebugReferences`] instance for this device.
-    pub fn debug_references(&self) -> DebugReferences<BT> {
-        DebugReferences(for_any_device_id!(
+    pub fn debug_references(&self) -> DynDebugReferences {
+        for_any_device_id!(
             WeakDeviceId,
             self,
-            BaseWeakDeviceId { cookie } => cookie.weak_ref.debug_references().into()
-        ))
+            BaseWeakDeviceId { cookie } => cookie.weak_ref.debug_references().into_dyn()
+        )
     }
 
     /// Returns the bindings identifier associated with the device.
     pub fn bindings_id(&self) -> &BT::DeviceIdentifier {
         for_any_device_id!(WeakDeviceId, self, id => id.bindings_id())
-    }
-}
-
-enum DebugReferencesInner<BT: DeviceLayerTypes> {
-    Loopback(crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>),
-    Ethernet(crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>),
-    PureIp(crate::sync::DebugReferences<BaseDeviceState<PureIpDevice, BT>>),
-}
-
-impl<BT: DeviceLayerTypes> From<crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>>
-    for DebugReferencesInner<BT>
-{
-    fn from(inner: crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>) -> Self {
-        DebugReferencesInner::Loopback(inner)
-    }
-}
-
-impl<BT: DeviceLayerTypes>
-    From<crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>>
-    for DebugReferencesInner<BT>
-{
-    fn from(inner: crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>) -> Self {
-        DebugReferencesInner::Ethernet(inner)
-    }
-}
-
-impl<BT: DeviceLayerTypes> From<crate::sync::DebugReferences<BaseDeviceState<PureIpDevice, BT>>>
-    for DebugReferencesInner<BT>
-{
-    fn from(inner: crate::sync::DebugReferences<BaseDeviceState<PureIpDevice, BT>>) -> Self {
-        DebugReferencesInner::PureIp(inner)
-    }
-}
-
-/// A type offering a [`Debug`] implementation that helps debug dangling device
-/// references.
-pub struct DebugReferences<BT: DeviceLayerTypes>(DebugReferencesInner<BT>);
-
-impl<BT: DeviceLayerTypes> Debug for DebugReferences<BT> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self(inner) = self;
-        match inner {
-            DebugReferencesInner::Loopback(d) => write!(f, "Loopback({d:?})"),
-            DebugReferencesInner::Ethernet(d) => write!(f, "Ethernet({d:?})"),
-            DebugReferencesInner::PureIp(d) => write!(f, "PureIp({d:?})"),
-        }
     }
 }
 

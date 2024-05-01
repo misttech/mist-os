@@ -222,8 +222,8 @@ pub mod sync {
     // Exclusively re-exports from the sync crate.
     pub use netstack3_sync::{
         rc::{
-            DebugReferences, MapNotifier as MapRcNotifier, Notifier as RcNotifier,
-            Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+            DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier,
+            Notifier as RcNotifier, Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
         },
         LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
     };

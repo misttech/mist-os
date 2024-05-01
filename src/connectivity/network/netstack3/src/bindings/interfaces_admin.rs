@@ -68,7 +68,10 @@ use crate::bindings::{
     devices::{self, EthernetInfo, StaticCommonInfo},
     netdevice_worker,
     routes::{self, admin::RouteSet},
-    util::{self, IllegalNonPositiveValueError, IntoCore as _, IntoFidl, TryIntoCore},
+    util::{
+        IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
+        TryIntoCore,
+    },
     BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime,
 };
 
@@ -691,7 +694,6 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
             .expect("device was not removed since retrieval");
         // Keep a weak ID around to debug pending destruction.
         let weak_id = core_id.downgrade();
-        let debug_references = weak_id.debug_references();
         match core_id {
             DeviceId::Ethernet(core_id) => {
                 // We want to remove the routes on the device _after_ we mark
@@ -700,13 +702,10 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let EthernetInfo { netdevice, .. } = util::wait_for_resource_removal(
-                    "ethernet device",
-                    &id,
-                    result,
-                    &debug_references,
-                )
-                .await;
+                let EthernetInfo { netdevice, .. } = result
+                    .map_deferred(|d| d.into_future("ethernet device", &id))
+                    .into_future()
+                    .await;
                 (netdevice, weak_id)
             }
             DeviceId::Loopback(core_id) => {
@@ -720,13 +719,10 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                     static_common_info: _,
                     dynamic_common_info: _,
                     rx_notifier: _,
-                } = util::wait_for_resource_removal(
-                    "loopback device",
-                    &id,
-                    result,
-                    &debug_references,
-                )
-                .await;
+                } = result
+                    .map_deferred(|d| d.into_future("loopback device", &id))
+                    .into_future()
+                    .await;
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 tracing::warn!("loopback interface was removed");
@@ -739,13 +735,10 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let devices::PureIpDeviceInfo { netdevice, .. } = util::wait_for_resource_removal(
-                    "pure ip device",
-                    &id,
-                    result,
-                    &debug_references,
-                )
-                .await;
+                let devices::PureIpDeviceInfo { netdevice, .. } = result
+                    .map_deferred(|d| d.into_future("pure ip device", &id))
+                    .into_future()
+                    .await;
                 (netdevice, weak_id)
             }
         }
@@ -789,17 +782,17 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         // "source of truth" for addresses on a device.
         return match ctx.api().device_ip_any().del_ip_addr(&core_id, specified_addr) {
             Ok(result) => {
-                let _: AddrSubnetEither = util::wait_for_resource_removal(
-                    "device addr",
-                    &specified_addr,
-                    result.map_deferred(|d| {
-                        d.map_left(|l| l.map_ok(Into::into))
-                            .map_right(|r| r.map_ok(Into::into))
-                            .fuse()
-                    }),
-                    &(),
-                )
-                .await;
+                let _: AddrSubnetEither = result
+                    .map_deferred(|d| {
+                        d.map_left(|l| {
+                            l.into_future("device addr", &specified_addr).map(Into::into)
+                        })
+                        .map_right(|r| {
+                            r.into_future("device addr", &specified_addr).map(Into::into)
+                        })
+                    })
+                    .into_future()
+                    .await;
                 true
             }
             Err(netstack3_core::error::NotFoundError) => false,
@@ -1416,15 +1409,13 @@ async fn run_address_state_provider(
     if remove_address {
         let result =
             ctx.api().device_ip_any().del_ip_addr(&device_id, address).expect("address must exist");
-        let _: AddrSubnetEither = util::wait_for_resource_removal(
-            "device addr",
-            &address,
-            result.map_deferred(|d| {
-                d.map_left(|l| l.map_ok(Into::into)).map_right(|r| r.map_ok(Into::into)).fuse()
-            }),
-            &(),
-        )
-        .await;
+        let _: AddrSubnetEither = result
+            .map_deferred(|d| {
+                d.map_left(|l| l.into_future("device addr", &address).map(Into::into))
+                    .map_right(|r| r.into_future("device addr", &address).map(Into::into))
+            })
+            .into_future()
+            .await;
     }
 
     if let Some(removal_reason) = removal_reason {

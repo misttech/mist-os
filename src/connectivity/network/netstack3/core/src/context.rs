@@ -222,8 +222,8 @@ pub trait ReferenceNotifiers {
     ///
     /// `debug_references` is given to provide information on outstanding
     /// references that caused the notifier to be requested.
-    fn new_reference_notifier<T: Send + 'static, D: Debug>(
-        debug_references: D,
+    fn new_reference_notifier<T: Send + 'static>(
+        debug_references: sync::DynDebugReferences,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
 }
 
@@ -415,7 +415,7 @@ pub(crate) mod testutil {
         device::{link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes},
         filter::FilterBindingsTypes,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
-        sync::Mutex,
+        sync::{DynDebugReferences, Mutex},
         testutil::FakeCryptoRng,
     };
     #[cfg(test)]
@@ -729,8 +729,8 @@ pub(crate) mod testutil {
 
         type ReferenceNotifier<T: Send + 'static> = Never;
 
-        fn new_reference_notifier<T: Send + 'static, D: Debug>(
-            debug_references: D,
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
         ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
             // NB: We don't want deferred destruction in core tests. These are
             // always single-threaded and single-task, and we want to encourage

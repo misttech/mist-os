@@ -679,6 +679,25 @@ impl<T> Weak<T> {
     }
 }
 
+fn debug_refs(
+    refs: Option<(usize, &AtomicBool, &caller::Callers)>,
+    name: &'static str,
+    f: &mut core::fmt::Formatter<'_>,
+) -> core::fmt::Result {
+    let mut f = f.debug_struct(name);
+    match refs {
+        Some((strong_count, marked_for_destruction, callers)) => f
+            .field("strong_count", &strong_count)
+            .field("marked_for_destruction", marked_for_destruction)
+            .field("callers", callers)
+            .finish(),
+        None => {
+            let strong_count = 0_usize;
+            f.field("strong_count", &strong_count).finish_non_exhaustive()
+        }
+    }
+}
+
 /// Provides a [`Debug`] implementation that contains information helpful for
 /// debugging dangling references.
 pub struct DebugReferences<T>(alloc::sync::Weak<Inner<T>>);
@@ -686,19 +705,45 @@ pub struct DebugReferences<T>(alloc::sync::Weak<Inner<T>>);
 impl<T> core::fmt::Debug for DebugReferences<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(inner) = self;
-        let mut f = f.debug_struct("DebugReferences");
-        if let Some(inner) = inner.upgrade() {
-            let strong_count = alloc::sync::Arc::strong_count(&inner);
-            let Inner { marked_for_destruction, callers, data: _, notifier: _, debug_token: _ } =
-                &*inner;
-            f.field("strong_count", &strong_count)
-                .field("marked_for_destruction", marked_for_destruction)
-                .field("callers", callers)
-                .finish()
-        } else {
-            let strong_count = 0_usize;
-            f.field("strong_count", &strong_count).finish_non_exhaustive()
-        }
+        let inner = inner.upgrade();
+        let refs = inner.as_ref().map(|inner| {
+            (alloc::sync::Arc::strong_count(inner), &inner.marked_for_destruction, &inner.callers)
+        });
+        debug_refs(refs, "DebugReferences", f)
+    }
+}
+
+impl<T: Send + Sync + 'static> DebugReferences<T> {
+    /// Transforms this `DebugReferences` into a [`DynDebugReferences`].
+    pub fn into_dyn(self) -> DynDebugReferences {
+        let Self(w) = self;
+        DynDebugReferences(w)
+    }
+}
+
+/// Like [`DebugReferences`], but type-erases the contained type.
+pub struct DynDebugReferences(alloc::sync::Weak<dyn ExposeRefs>);
+
+impl core::fmt::Debug for DynDebugReferences {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(inner) = self;
+        let inner = inner.upgrade();
+        let refs = inner.as_ref().map(|inner| {
+            let (marked_for_destruction, callers) = inner.refs_info();
+            (alloc::sync::Arc::strong_count(inner), marked_for_destruction, callers)
+        });
+        debug_refs(refs, "DynDebugReferences", f)
+    }
+}
+
+/// A trait allowing [`DynDebugReferences`] to erase the `T` type on [`Inner`].
+trait ExposeRefs: Send + Sync + 'static {
+    fn refs_info(&self) -> (&AtomicBool, &caller::Callers);
+}
+
+impl<T: Send + Sync + 'static> ExposeRefs for Inner<T> {
+    fn refs_info(&self) -> (&AtomicBool, &caller::Callers) {
+        (&self.marked_for_destruction, &self.callers)
     }
 }
 

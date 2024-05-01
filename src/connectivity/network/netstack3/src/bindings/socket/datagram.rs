@@ -50,8 +50,9 @@ use crate::bindings::{
     },
     trace_duration,
     util::{
-        self, DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
-        TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
+        DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
+        TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
+        TryIntoFidlWithContext,
     },
     BindingId, BindingsCtx, Ctx,
 };
@@ -347,15 +348,14 @@ where
     }
 
     async fn close(ctx: &mut Ctx, id: Self::SocketId) {
-        let debug_references = id.debug_references();
         let weak = id.downgrade();
-        let DatagramSocketExternalData { message_queue: _ } = util::wait_for_resource_removal(
-            "udp socket",
-            &weak,
-            ctx.api().udp().close(id),
-            &debug_references,
-        )
-        .await;
+        let DatagramSocketExternalData { message_queue: _ } = ctx
+            .api()
+            .udp()
+            .close(id)
+            .map_deferred(|d| d.into_future("udp socket", &weak))
+            .into_future()
+            .await;
     }
 
     fn set_socket_device(
@@ -602,15 +602,14 @@ where
     }
 
     async fn close(ctx: &mut Ctx, id: Self::SocketId) {
-        let debug_references = id.debug_references();
         let weak = id.downgrade();
-        let DatagramSocketExternalData { message_queue: _ } = util::wait_for_resource_removal(
-            "icmp socket",
-            &weak,
-            ctx.api().icmp_echo().close(id),
-            &debug_references,
-        )
-        .await;
+        let DatagramSocketExternalData { message_queue: _ } = ctx
+            .api()
+            .icmp_echo()
+            .close(id)
+            .map_deferred(|d| d.into_future("icmp socket", &weak))
+            .into_future()
+            .await;
     }
 
     fn set_socket_device(

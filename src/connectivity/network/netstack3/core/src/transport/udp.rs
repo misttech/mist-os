@@ -1086,9 +1086,9 @@ pub trait UdpReceiveBindingsContext<I: IpExt, D: device::StrongId>: UdpBindingsT
 /// edge in fake tests bindings contexts that are already parameterized on I
 /// themselves. This is still better than relying on `Box<dyn Any>` to keep the
 /// external data in our references so we take the rough edge.
-pub trait UdpBindingsTypes: Sized {
+pub trait UdpBindingsTypes: Sized + 'static {
     /// Opaque bindings data held by core for a given IP version.
-    type ExternalData<I: Ip>: Debug + Send + Sync;
+    type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 }
 
 /// The bindings context for UDP.

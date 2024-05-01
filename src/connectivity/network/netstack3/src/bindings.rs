@@ -33,6 +33,7 @@ use std::{
     collections::HashMap,
     convert::{Infallible as Never, TryFrom as _},
     ffi::CStr,
+    fmt::Debug,
     future::Future,
     num::NonZeroU16,
     ops::Deref,
@@ -85,7 +86,7 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
-    sync::RwLock as CoreRwLock,
+    sync::{DynDebugReferences, RwLock as CoreRwLock},
     udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
     TimerBindingsTypes, TimerContext, TimerId, TracingContext,
@@ -678,16 +679,53 @@ impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
     }
 }
 
+pub(crate) struct ReferenceReceiver<T> {
+    pub(crate) receiver: futures::channel::oneshot::Receiver<T>,
+    pub(crate) debug_references: DynDebugReferences,
+}
+
+impl<T> ReferenceReceiver<T> {
+    pub(crate) fn into_future<'a>(
+        self,
+        resource_name: &'static str,
+        resource_id: &'a impl Debug,
+    ) -> impl Future<Output = T> + 'a
+    where
+        T: 'a,
+    {
+        let Self { receiver, debug_references: refs } = self;
+        tracing::debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
+        // If we get stuck trying to remove the resource, log the remaining refs
+        // at a low frequency to aid debugging.
+        let interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
+            .map(move |()| {
+                tracing::warn!(
+                    "{resource_name} {resource_id:?} removal is pending references: {refs:?}"
+                )
+            })
+            .collect::<()>();
+
+        futures::future::select(receiver, interval_logging).map(|r| match r {
+            futures::future::Either::Left((rcv, _)) => {
+                rcv.expect("sender dropped without notifying")
+            }
+            futures::future::Either::Right(((), _)) => {
+                unreachable!("interval channel never completes")
+            }
+        })
+    }
+}
+
 impl netstack3_core::ReferenceNotifiers for BindingsCtx {
-    type ReferenceReceiver<T: 'static> = futures::channel::oneshot::Receiver<T>;
+    type ReferenceReceiver<T: 'static> = ReferenceReceiver<T>;
 
     type ReferenceNotifier<T: Send + 'static> = ReferenceNotifier<T>;
 
-    fn new_reference_notifier<T: Send + 'static, D: std::fmt::Debug>(
-        _debug_references: D,
+    fn new_reference_notifier<T: Send + 'static>(
+        debug_references: DynDebugReferences,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
         let (sender, receiver) = futures::channel::oneshot::channel();
-        (ReferenceNotifier(Some(sender)), receiver)
+        (ReferenceNotifier(Some(sender)), ReferenceReceiver { receiver, debug_references })
     }
 }
 
