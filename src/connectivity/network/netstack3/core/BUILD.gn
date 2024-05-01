@@ -97,7 +97,6 @@ rustc_library_with_features("netstack3-core") {
     "src/socket/base.rs",
     "src/socket/datagram.rs",
     "src/state.rs",
-    "src/sync/types.rs",
     "src/testutil.rs",
     "src/time.rs",
     "src/trace.rs",

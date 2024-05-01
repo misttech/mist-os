@@ -46,12 +46,12 @@ use crate::{
     counters::Counter,
     marker::{BindingsContext, BindingsTypes},
     state::StackState,
-    sync, Instant,
+    Instant,
 };
 
 pub use netstack3_base::{
     ContextPair, CoreTimerContext, HandleableTimer, InstantBindingsTypes, InstantContext,
-    NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext, TimerHandler,
+    NestedIntoCoreTimerCtx, ReferenceNotifiers, TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -209,22 +209,6 @@ pub trait TracingContext {
     /// Care should be taken to avoid a duration's scope spanning an `await`
     /// point in asynchronous code.
     fn duration(&self, name: &'static CStr) -> Self::DurationScope;
-}
-
-/// A context trait determining the types to be used for reference notifications.
-pub trait ReferenceNotifiers {
-    /// The receiver for shared reference destruction notifications.
-    type ReferenceReceiver<T: 'static>: 'static;
-    /// The notifier for shared reference destruction notifications.
-    type ReferenceNotifier<T: Send + 'static>: sync::RcNotifier<T> + 'static;
-
-    /// Creates a new Notifier/Receiver pair for `T`.
-    ///
-    /// `debug_references` is given to provide information on outstanding
-    /// references that caused the notifier to be requested.
-    fn new_reference_notifier<T: Send + 'static>(
-        debug_references: sync::DynDebugReferences,
-    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
 }
 
 /// Provides access to core context implementations.

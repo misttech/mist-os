@@ -39,10 +39,7 @@ use crate::{
         },
         types::RawMetric,
     },
-    sync::{
-        types::{RemoveResourceResult, RemoveResourceResultWithContext},
-        PrimaryRc,
-    },
+    sync::{PrimaryRc, RemoveResourceResult, RemoveResourceResultWithContext},
     Inspector,
 };
 

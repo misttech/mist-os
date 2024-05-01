@@ -17,6 +17,7 @@ rustc_library_with_features("netstack3-base") {
     "src/data_structures/ref_counted_hash_map.rs",
     "src/inspect.rs",
     "src/lib.rs",
+    "src/resource_references.rs",
     "src/time.rs",
     "src/time/local_timer_heap.rs",
     "src/time/testutil.rs",
