@@ -9,6 +9,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 
+#include <ddktl/metadata.h>
 #include <fbl/alloc_checker.h>
 
 namespace serial {
@@ -21,18 +22,18 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  serial_port_info_t info;
-  size_t actual;
-  status =
-      device_get_metadata(parent, DEVICE_METADATA_SERIAL_PORT_INFO, &info, sizeof(info), &actual);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: device_get_metadata failed %d", __func__, status);
-    return status;
+  zx::result fidl_info = ddk::GetEncodedMetadata<fuchsia_hardware_serial::wire::SerialPortInfo>(
+      parent, DEVICE_METADATA_SERIAL_PORT_INFO);
+  if (fidl_info.is_error()) {
+    zxlogf(ERROR, "device_get_metadata failed: %s", fidl_info.status_string());
+    return fidl_info.error_value();
   }
-  if (actual < sizeof(info)) {
-    zxlogf(ERROR, "%s: serial_port_info_t metadata too small", __func__);
-    return ZX_ERR_INTERNAL;
-  }
+
+  const serial_port_info_t info{
+      .serial_class = static_cast<uint32_t>(fidl_info->serial_class),
+      .serial_vid = fidl_info->serial_vid,
+      .serial_pid = fidl_info->serial_pid,
+  };
 
   std::optional<fdf::MmioBuffer> mmio;
   status = pdev.MapMmio(0, &mmio);

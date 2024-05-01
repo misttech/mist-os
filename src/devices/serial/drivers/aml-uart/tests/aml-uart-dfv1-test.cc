@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/ddk/metadata.h>
 
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
 #include <zxtest/zxtest.h>
@@ -28,7 +27,6 @@ class AmlUartHarness : public zxtest::Test {
         .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
         .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
     };
-    fake_parent_->SetMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, &kSerialInfo, sizeof(kSerialInfo));
 
     fake_pdev::FakePDevFidl::Config config;
     config.irqs[0] = {};

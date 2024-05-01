@@ -84,19 +84,28 @@ void AmlUartV2::OnReceivedMetadata(
         return;
       }
 
-      if (size != sizeof(serial_port_info_)) {
-        FDF_LOG(ERROR, "sizeof serial_port_info_t doesn't match read size. %lu != %lu", size,
-                sizeof(serial_port_info_));
-        CompleteStart(zx::error(ZX_ERR_INTERNAL));
-        return;
-      }
-
-      status = metadata.data.read(&serial_port_info_, 0, size);
+      std::vector<uint8_t> fidl_info_buffer(size);
+      status = metadata.data.read(fidl_info_buffer.data(), 0, fidl_info_buffer.size());
       if (status != ZX_OK) {
         FDF_LOG(ERROR, "Failed to read metadata vmo: %s", zx_status_get_string(status));
         CompleteStart(zx::error(status));
         return;
       }
+
+      fit::result fidl_info =
+          fidl::InplaceUnpersist<fuchsia_hardware_serial::wire::SerialPortInfo>(fidl_info_buffer);
+      if (fidl_info.is_error()) {
+        FDF_LOG(ERROR, "Failed to decode metadata: %s",
+                fidl_info.error_value().FormatDescription().c_str());
+        CompleteStart(zx::error(fidl_info.error_value().status()));
+        return;
+      }
+
+      serial_port_info_ = {
+          .serial_class = static_cast<uint32_t>(fidl_info->serial_class),
+          .serial_vid = fidl_info->serial_vid,
+          .serial_pid = fidl_info->serial_pid,
+      };
 
       // We can break since we have now read DEVICE_METADATA_SERIAL_PORT_INFO.
       break;

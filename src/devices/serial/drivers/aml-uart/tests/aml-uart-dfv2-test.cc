@@ -13,8 +13,8 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
 
-static constexpr serial_port_info_t kSerialInfo = {
-    .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci),
+static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
+    .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
     .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
     .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
 };
@@ -42,7 +42,11 @@ class Environment : public fdf_testing::Environment {
 
     // Configure and add compat.
     compat_server_.Init("default", "topo");
-    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, &kSerialInfo, sizeof(kSerialInfo));
+
+    fit::result encoded = fidl::Persist(kSerialInfo);
+    ZX_ASSERT(encoded.is_ok());
+
+    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, encoded->data(), encoded->size());
     return zx::make_result(compat_server_.Serve(dispatcher, &to_driver_vfs));
   }
 
