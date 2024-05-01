@@ -4,7 +4,9 @@
 
 #include "dl-load-tests-base.h"
 
+#include <fcntl.h>
 #include <lib/elfldltl/testing/get-test-data.h>
+#include <lib/ld/abi.h>
 
 #include <gtest/gtest.h>
 
@@ -38,6 +40,21 @@ void DlLoadTestsBase::Needed(
       ASSERT_FALSE(elfldltl::testing::TryGetTestLib(name)) << name;
     }
   }
+}
+
+void DlLoadTestsBase::FileCheck(std::string_view filename) {
+  EXPECT_NE(filename, ld::abi::Abi<>::kSoname.str());
+}
+
+std::optional<DlLoadTestsBase::File> DlLoadTestsBase::RetrieveFile(Diagnostics& diag,
+                                                                   std::string_view filename) {
+  FileCheck(filename);
+  std::filesystem::path path = elfldltl::testing::GetTestDataPath(filename);
+  if (fbl::unique_fd fd{open(path.c_str(), O_RDONLY)}) {
+    return File{std::move(fd), diag};
+  }
+  diag.SystemError("cannot open ", filename);
+  return std::nullopt;
 }
 
 }  // namespace dl::testing

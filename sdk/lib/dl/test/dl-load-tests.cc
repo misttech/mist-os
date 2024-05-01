@@ -44,7 +44,7 @@ using DlTests = Fixture;
 // expectations and behave the same way, with exceptions noted within the test.
 using TestTypes = ::testing::Types<
 #ifdef __Fuchsia__
-    dl::testing::DlImplTests<dl::testing::TestFuchsia>,
+    dl::testing::DlImplLoadZirconTests,
 #endif
 // TODO(https://fxbug.dev/324650368): Test fixtures currently retrieve files
 // from different prefixed locations depending on the platform. Find a way
@@ -53,7 +53,7 @@ using TestTypes = ::testing::Types<
 #ifndef __Fuchsia__
     // libdl's POSIX test fixture can also be tested on Fuchsia and is included
     // for any ELF supported host.
-    dl::testing::DlImplTests<dl::testing::TestPosix>,
+    dl::testing::DlImplLoadPosixTests,
 #endif
     dl::testing::DlSystemTests>;
 

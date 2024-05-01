@@ -5,6 +5,8 @@
 #ifndef LIB_DL_TEST_DL_LOAD_ZIRCON_TESTS_BASE_H_
 #define LIB_DL_TEST_DL_LOAD_ZIRCON_TESTS_BASE_H_
 
+#include <lib/elfldltl/vmar-loader.h>
+#include <lib/elfldltl/vmo.h>
 #include <lib/ld/testing/mock-loader-service.h>
 
 #include "dl-load-tests-base.h"
@@ -20,6 +22,10 @@ namespace dl::testing {
 // the fuchsia.ldsvc.Loader as expected.
 class DlLoadZirconTestsBase : public DlLoadTestsBase {
  public:
+  using Base = DlLoadTestsBase;
+  using File = elfldltl::VmoFile<Diagnostics>;
+  using Loader = elfldltl::LocalVmarLoader;
+
   // `ExpectRootModule` will prime the mock loader with the root module and
   // register an expectation for it. Usually, `ExpectRootModule` is used for the
   // module that is being `dlopen`-ed and should be called before `Needed` for
@@ -42,7 +48,14 @@ class DlLoadZirconTestsBase : public DlLoadTestsBase {
   // wrapper to the base classes.
   void CallWithLdsvcInstalled(fit::closure func) { mock_.CallWithLdsvcInstalled(std::move(func)); }
 
+  // Retrieve a VMO from the test package.
+  std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
+
  private:
+  // Calls Base::FileCheck and includes an additional check for Fuchsia-specific
+  // startup modules.
+  static void FileCheck(std::string_view filename);
+
   ld::testing::MockLoaderServiceForTest mock_;
 };
 

@@ -5,50 +5,22 @@
 #ifndef LIB_DL_TEST_DL_IMPL_TESTS_H_
 #define LIB_DL_TEST_DL_IMPL_TESTS_H_
 
-#include <lib/elfldltl/fd.h>
-#include <lib/elfldltl/mmap-loader.h>
+#include <lib/stdcompat/functional.h>
 
-#include <fbl/unique_fd.h>
-
-#include "../diagnostics.h"
 #include "../runtime-dynamic-linker.h"
 #include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
-#include <lib/elfldltl/vmar-loader.h>
-#include <lib/elfldltl/vmo.h>
-
 #include "dl-load-zircon-tests-base.h"
 #endif
 
 namespace dl::testing {
 
-#ifdef __Fuchsia__
-class TestFuchsia {
- public:
-  using File = elfldltl::VmoFile<Diagnostics>;
-  using Loader = elfldltl::LocalVmarLoader;
-
-  static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
-};
-#endif
-
-class TestPosix {
- public:
-  using File = elfldltl::UniqueFdFile<Diagnostics>;
-  using Loader = elfldltl::MmapLoader;
-
-  static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
-};
-
-#ifdef __Fuchsia__
-using DlImplLoadTestsBase = DlLoadZirconTestsBase;
-#else
-using DlImplLoadTestsBase = DlLoadTestsBase;
-#endif
-
-template <class TestOS>
-class DlImplTests : public DlImplLoadTestsBase {
+// The Base class provides testing facilities and logic specific to the platform
+// the test is running on. DlImplTests invokes Base methods when functions
+// need to operate differently depending on the OS.
+template <class Base>
+class DlImplTests : public Base {
  public:
   // Error messages in tests can be matched exactly with this test fixture,
   // since the error message returned from the libdl implementation will be the
@@ -59,8 +31,9 @@ class DlImplTests : public DlImplLoadTestsBase {
     // fit::result<...> must be initialized to something, but this will get
     // overwritten by the return value from dynamic_linker_.Open.
     fit::result<Error, void*> result = fit::error{Error{"dlopen result is not set"}};
-    CallWithLdsvcInstalled([&]() {
-      result = dynamic_linker_.Open<typename TestOS::Loader>(file, mode, TestOS::RetrieveFile);
+    Base::CallWithLdsvcInstalled([&]() {
+      result = dynamic_linker_.Open<typename Base::Loader>(
+          file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
     });
     return result;
   }
@@ -72,6 +45,11 @@ class DlImplTests : public DlImplLoadTestsBase {
  private:
   RuntimeDynamicLinker dynamic_linker_;
 };
+
+using DlImplLoadPosixTests = DlImplTests<DlLoadTestsBase>;
+#ifdef __Fuchsia__
+using DlImplLoadZirconTests = DlImplTests<DlLoadZirconTestsBase>;
+#endif
 
 }  // namespace dl::testing
 
