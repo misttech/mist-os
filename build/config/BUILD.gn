@@ -1271,12 +1271,6 @@ config("werror") {
   # TODO(https://fxbug.dev/42069541): Remove blanket allow once lint is actionable.
   rustflags += [ "-Awhere_clauses_object_safety" ]
 
-  # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
-  rustflags += [
-    "-Aunknown_lints",
-    "-Anon_local_definitions",
-  ]
-
   if (deny_warnings) {
     rustflags += [ "-Dwarnings" ]
   }
