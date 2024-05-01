@@ -4,7 +4,6 @@
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv1.h"
 
-#include <fuchsia/hardware/serial/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
@@ -22,18 +21,12 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  zx::result fidl_info = ddk::GetEncodedMetadata<fuchsia_hardware_serial::wire::SerialPortInfo>(
+  zx::result info = ddk::GetEncodedMetadata<fuchsia_hardware_serial::wire::SerialPortInfo>(
       parent, DEVICE_METADATA_SERIAL_PORT_INFO);
-  if (fidl_info.is_error()) {
-    zxlogf(ERROR, "device_get_metadata failed: %s", fidl_info.status_string());
-    return fidl_info.error_value();
+  if (info.is_error()) {
+    zxlogf(ERROR, "device_get_metadata failed: %s", info.status_string());
+    return info.error_value();
   }
-
-  const serial_port_info_t info{
-      .serial_class = static_cast<uint32_t>(fidl_info->serial_class),
-      .serial_vid = fidl_info->serial_vid,
-      .serial_pid = fidl_info->serial_pid,
-  };
 
   std::optional<fdf::MmioBuffer> mmio;
   status = pdev.MapMmio(0, &mmio);
@@ -48,7 +41,7 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  return uart->Init(std::move(pdev), info, *std::move(mmio));
+  return uart->Init(std::move(pdev), **info, *std::move(mmio));
 }
 
 void AmlUartV1::DdkUnbind(ddk::UnbindTxn txn) {
@@ -65,28 +58,14 @@ void AmlUartV1::DdkUnbind(ddk::UnbindTxn txn) {
 
 void AmlUartV1::DdkRelease() {
   if (aml_uart_.has_value()) {
-    aml_uart_->SerialImplAsyncEnable(false);
+    aml_uart_->Enable(false);
   }
 
   delete this;
 }
 
-zx_status_t AmlUartV1::DdkGetProtocol(uint32_t proto_id, void* out) {
-  if (proto_id != ZX_PROTOCOL_SERIAL_IMPL_ASYNC) {
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
-  }
-
-  if (!aml_uart_.has_value()) {
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  serial_impl_async_protocol_t* hci_proto = static_cast<serial_impl_async_protocol_t*>(out);
-  hci_proto->ops = static_cast<const serial_impl_async_protocol_ops_t*>(aml_uart_->get_ops());
-  hci_proto->ctx = &aml_uart_;
-  return ZX_OK;
-}
-
-zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev, const serial_port_info_t& serial_port_info,
+zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev,
+                            const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
                             fdf::MmioBuffer mmio) {
   zx::result irq_dispatcher_result =
       fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
@@ -109,11 +88,13 @@ zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev, const serial_port_info_t& serial
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;
-  constexpr uint32_t kDefaultConfig = SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
-  aml_uart_->SerialImplAsyncConfig(kDefaultBaudRate, kDefaultConfig);
+  constexpr uint32_t kDefaultConfig = fuchsia_hardware_serialimpl::kSerialDataBits8 |
+                                      fuchsia_hardware_serialimpl::kSerialStopBits1 |
+                                      fuchsia_hardware_serialimpl::kSerialParityNone;
+  aml_uart_->Config(kDefaultBaudRate, kDefaultConfig);
   zx_device_prop_t props[] = {
       {BIND_PROTOCOL, 0, ZX_PROTOCOL_SERIAL_IMPL_ASYNC},
-      {BIND_SERIAL_CLASS, 0, aml_uart_->serial_port_info().serial_class},
+      {BIND_SERIAL_CLASS, 0, static_cast<uint8_t>(aml_uart_->serial_port_info().serial_class)},
   };
 
   fuchsia_hardware_serialimpl::Service::InstanceHandler handler({

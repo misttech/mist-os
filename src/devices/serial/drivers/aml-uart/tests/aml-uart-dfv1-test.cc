@@ -22,8 +22,8 @@ struct IncomingNamespace {
 class AmlUartHarness : public zxtest::Test {
  public:
   void SetUp() override {
-    static constexpr serial_port_info_t kSerialInfo = {
-        .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci),
+    static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
+        .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
         .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
         .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
     };
@@ -60,61 +60,142 @@ class AmlUartHarness : public zxtest::Test {
 
   DeviceState& device_state() { return state_; }
 
+  auto& Runtime() { return *runtime_; }
+
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateClient() {
+    auto [client, server] = fdf::Endpoints<fuchsia_hardware_serialimpl::Device>::Create();
+    binding_.emplace(fdf::Dispatcher::GetCurrent()->get(), std::move(server),
+                     &device_->aml_uart_for_testing(), fidl::kIgnoreBindingClosure);
+    return fdf::WireClient(std::move(client), fdf::Dispatcher::GetCurrent()->get());
+  }
+
  private:
   DeviceState state_;  // Must not be destructed before fake_parent_.
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_ = mock_ddk::GetDriverRuntime();
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
   serial::AmlUartV1* device_;
+  std::optional<fdf::ServerBinding<fuchsia_hardware_serialimpl::Device>> binding_;
 };
 
 TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
-  serial_port_info_t info;
-  ASSERT_OK(Device().SerialImplAsyncGetInfo(&info));
-  ASSERT_EQ(info.serial_class, fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci));
-  ASSERT_EQ(info.serial_pid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458);
-  ASSERT_EQ(info.serial_vid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM);
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->GetInfo().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+
+    const auto& info = result->value()->info;
+    ASSERT_EQ(info.serial_class, fuchsia_hardware_serial::Class::kBluetoothHci);
+    ASSERT_EQ(info.serial_pid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458);
+    ASSERT_EQ(info.serial_vid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM);
+  });
+
+  Runtime().RunUntilIdle();
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncConfig) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(false));
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  Runtime().RunUntilIdle();
+
   ASSERT_EQ(device_state().Control().tx_enable(), 0);
   ASSERT_EQ(device_state().Control().rx_enable(), 0);
   ASSERT_EQ(device_state().Control().inv_cts(), 0);
-  static constexpr uint32_t serial_test_config =
-      SERIAL_DATA_BITS_6 | SERIAL_STOP_BITS_2 | SERIAL_PARITY_EVEN | SERIAL_FLOW_CTRL_CTS_RTS;
-  ASSERT_OK(Device().SerialImplAsyncConfig(20, serial_test_config));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
-  ASSERT_TRUE(device_state().FlowControl());
-  ASSERT_OK(Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
+
+  static constexpr uint32_t serial_test_config = fuchsia_hardware_serialimpl::kSerialDataBits6 |
+                                                 fuchsia_hardware_serialimpl::kSerialStopBits2 |
+                                                 fuchsia_hardware_serialimpl::kSerialParityEven |
+                                                 fuchsia_hardware_serialimpl::kSerialFlowCtrlCtsRts;
+  client.buffer(arena)->Config(20, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  Runtime().RunUntilIdle();
+
+  ASSERT_EQ(device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+  ASSERT_EQ(device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+  ASSERT_EQ(device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
   ASSERT_TRUE(device_state().FlowControl());
 
-  ASSERT_NOT_OK(Device().SerialImplAsyncConfig(0, serial_test_config));
-  ASSERT_NOT_OK(Device().SerialImplAsyncConfig(UINT32_MAX, serial_test_config));
-  ASSERT_NOT_OK(Device().SerialImplAsyncConfig(1, serial_test_config));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
+  client.buffer(arena)
+      ->Config(40, fuchsia_hardware_serialimpl::kSerialSetBaudRateOnly)
+      .ThenExactlyOnce([](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+      });
+  Runtime().RunUntilIdle();
+
+  ASSERT_EQ(device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+  ASSERT_EQ(device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+  ASSERT_EQ(device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
   ASSERT_TRUE(device_state().FlowControl());
-  ASSERT_OK(Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
+
+  client.buffer(arena)->Config(0, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  });
+
+  client.buffer(arena)->Config(UINT32_MAX, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  });
+
+  client.buffer(arena)->Config(1, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  });
+  Runtime().RunUntilIdle();
+
+  ASSERT_EQ(device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+  ASSERT_EQ(device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+  ASSERT_EQ(device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
+  ASSERT_TRUE(device_state().FlowControl());
+
+  client.buffer(arena)
+      ->Config(40, fuchsia_hardware_serialimpl::kSerialSetBaudRateOnly)
+      .ThenExactlyOnce([](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+      });
+  Runtime().RunUntilIdle();
+
+  ASSERT_EQ(device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+  ASSERT_EQ(device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+  ASSERT_EQ(device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
   ASSERT_TRUE(device_state().FlowControl());
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncEnable) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(false));
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  Runtime().RunUntilIdle();
+
   ASSERT_EQ(device_state().Control().tx_enable(), 0);
   ASSERT_EQ(device_state().Control().rx_enable(), 0);
   ASSERT_EQ(device_state().Control().inv_cts(), 0);
-  ASSERT_OK(Device().SerialImplAsyncEnable(true));
+
+  client.buffer(arena)->Enable(true).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  Runtime().RunUntilIdle();
+
   ASSERT_EQ(device_state().Control().tx_enable(), 1);
   ASSERT_EQ(device_state().Control().rx_enable(), 1);
   ASSERT_EQ(device_state().Control().inv_cts(), 0);
@@ -127,83 +208,111 @@ TEST_F(AmlUartHarness, SerialImplAsyncEnable) {
 }
 
 TEST_F(AmlUartHarness, SerialImplReadAsync) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(true));
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  client.buffer(arena)->Enable(true).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+
+  std::vector<uint8_t> expected_data;
   for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
+    expected_data.push_back(static_cast<uint8_t>(i));
   }
-  auto cb = [](void* ctx, zx_status_t status, const uint8_t* buffer, size_t bufsz) {
-    auto context = static_cast<Context*>(ctx);
-    EXPECT_EQ(bufsz, kDataLen);
-    EXPECT_EQ(memcmp(buffer, context->data, bufsz), 0);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncReadAsync(cb, &context);
-  device_state().Inject(context.data, kDataLen);
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
+
+  client.buffer(arena)->Read().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    const std::vector actual_data(result->value()->data.cbegin(), result->value()->data.cend());
+    EXPECT_EQ(expected_data, actual_data);
+    Runtime().Quit();
+  });
+  // Let the driver run and enqueue the read. It won't be completed until we inject an interrupt.
+  Runtime().RunUntilIdle();
+
+  device_state().Inject(expected_data.data(), kDataLen);
+
+  // Wait for the interrupt dispatcher to read out the data and complete the read.
+  Runtime().Run();
 }
 
 TEST_F(AmlUartHarness, SerialImplWriteAsync) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(true));
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  client.buffer(arena)->Enable(true).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+
+  std::vector<uint8_t> expected_data;
   for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
+    expected_data.push_back(static_cast<uint8_t>(i));
   }
-  auto cb = [](void* ctx, zx_status_t status) {
-    auto context = static_cast<Context*>(ctx);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncWriteAsync(context.data, kDataLen, cb, &context);
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
-  auto buf = device_state().TxBuf();
-  ASSERT_EQ(buf.size(), kDataLen);
-  ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+
+  client.buffer(arena)
+      ->Write(fidl::VectorView<uint8_t>::FromExternal(expected_data.data(), kDataLen))
+      .ThenExactlyOnce([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        Runtime().Quit();
+      });
+
+  Runtime().Run();
+
+  EXPECT_EQ(expected_data, device_state().TxBuf());
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncWriteDoubleCallback) {
   // NOTE: we don't start the IRQ thread.  The Handle*RaceForTest() enable.
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  std::vector<uint8_t> expected_data;
   for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
+    expected_data.push_back(static_cast<uint8_t>(i));
   }
-  auto cb = [](void* ctx, zx_status_t status) {
-    auto context = static_cast<Context*>(ctx);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncWriteAsync(context.data, kDataLen, cb, &context);
+
+  bool write_complete = false;
+  client.buffer(arena)
+      ->Write(fidl::VectorView<uint8_t>::FromExternal(expected_data.data(), kDataLen))
+      .ThenExactlyOnce([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        write_complete = true;
+      });
+  Runtime().RunUntilIdle();
   Device().HandleTXRaceForTest();
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
-  auto buf = device_state().TxBuf();
-  ASSERT_EQ(buf.size(), kDataLen);
-  ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+  Runtime().RunUntil([&]() { return write_complete; });
+
+  EXPECT_EQ(expected_data, device_state().TxBuf());
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncReadDoubleCallback) {
   // NOTE: we don't start the IRQ thread.  The Handle*RaceForTest() enable.
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  std::vector<uint8_t> expected_data;
   for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
+    expected_data.push_back(static_cast<uint8_t>(i));
   }
-  auto cb = [](void* ctx, zx_status_t status, const uint8_t* buffer, size_t bufsz) {
-    auto context = static_cast<Context*>(ctx);
-    EXPECT_EQ(bufsz, kDataLen);
-    EXPECT_EQ(memcmp(buffer, context->data, bufsz), 0);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncReadAsync(cb, &context);
-  device_state().Inject(context.data, kDataLen);
+
+  client.buffer(arena)->Read().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    const std::vector actual_data(result->value()->data.cbegin(), result->value()->data.cend());
+    EXPECT_EQ(expected_data, actual_data);
+    Runtime().Quit();
+  });
+  Runtime().RunUntilIdle();
+
+  device_state().Inject(expected_data.data(), kDataLen);
   Device().HandleRXRaceForTest();
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
+  Runtime().Run();
 }

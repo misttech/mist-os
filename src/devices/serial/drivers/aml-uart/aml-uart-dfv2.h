@@ -36,12 +36,10 @@ class AmlUartV2 : public fdf::DriverBase {
 
   void CompleteStart(zx::result<> result);
 
-  compat::DeviceServer::BanjoConfig GetBanjoConfig();
-
   std::optional<fdf::StartCompleter> start_completer_;
   fidl::WireClient<fuchsia_driver_compat::Device> compat_client_;
   fidl::WireClient<fuchsia_driver_framework::Node> parent_node_client_;
-  serial_port_info_t serial_port_info_;
+  fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_;
   std::optional<fdf::SynchronizedDispatcher> irq_dispatcher_;
   std::optional<AmlUart> aml_uart_;
   std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;

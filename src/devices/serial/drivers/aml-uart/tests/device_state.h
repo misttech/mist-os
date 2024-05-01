@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/serial/c/banjo.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <lib/zx/interrupt.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
@@ -83,9 +83,9 @@ class DeviceState {
   uint32_t StopBits() {
     switch (Control().stop_len()) {
       case 0:
-        return SERIAL_STOP_BITS_1;
+        return fuchsia_hardware_serialimpl::kSerialStopBits1;
       case 1:
-        return SERIAL_STOP_BITS_2;
+        return fuchsia_hardware_serialimpl::kSerialStopBits2;
       default:
         return 255;
     }
@@ -94,13 +94,13 @@ class DeviceState {
   uint32_t DataBits() {
     switch (Control().xmit_len()) {
       case 0:
-        return SERIAL_DATA_BITS_8;
+        return fuchsia_hardware_serialimpl::kSerialDataBits8;
       case 1:
-        return SERIAL_DATA_BITS_7;
+        return fuchsia_hardware_serialimpl::kSerialDataBits7;
       case 2:
-        return SERIAL_DATA_BITS_6;
+        return fuchsia_hardware_serialimpl::kSerialDataBits6;
       case 3:
-        return SERIAL_DATA_BITS_5;
+        return fuchsia_hardware_serialimpl::kSerialDataBits5;
       default:
         return 255;
     }
@@ -109,11 +109,11 @@ class DeviceState {
   uint32_t Parity() {
     switch (Control().parity()) {
       case 0:
-        return SERIAL_PARITY_NONE;
+        return fuchsia_hardware_serialimpl::kSerialParityNone;
       case 2:
-        return SERIAL_PARITY_EVEN;
+        return fuchsia_hardware_serialimpl::kSerialParityEven;
       case 3:
-        return SERIAL_PARITY_ODD;
+        return fuchsia_hardware_serialimpl::kSerialParityOdd;
       default:
         return 255;
     }

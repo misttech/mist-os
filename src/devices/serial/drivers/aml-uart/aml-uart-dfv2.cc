@@ -39,7 +39,7 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
   if (aml_uart_.has_value()) {
-    aml_uart_->SerialImplAsyncEnable(false);
+    aml_uart_->Enable(false);
   }
 
   if (irq_dispatcher_.has_value()) {
@@ -102,7 +102,7 @@ void AmlUartV2::OnReceivedMetadata(
       }
 
       serial_port_info_ = {
-          .serial_class = static_cast<uint32_t>(fidl_info->serial_class),
+          .serial_class = fidl_info->serial_class,
           .serial_vid = fidl_info->serial_vid,
           .serial_pid = fidl_info->serial_pid,
       };
@@ -114,8 +114,7 @@ void AmlUartV2::OnReceivedMetadata(
 
   device_server_.Begin(incoming(), outgoing(), node_name(), child_name,
                        fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
-                       compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}),
-                       GetBanjoConfig());
+                       compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
 }
 
 void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result) {
@@ -161,8 +160,10 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;
-  constexpr uint32_t kDefaultConfig = SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
-  aml_uart_->SerialImplAsyncConfig(kDefaultBaudRate, kDefaultConfig);
+  constexpr uint32_t kDefaultConfig = fuchsia_hardware_serialimpl::kSerialDataBits8 |
+                                      fuchsia_hardware_serialimpl::kSerialStopBits1 |
+                                      fuchsia_hardware_serialimpl::kSerialParityNone;
+  aml_uart_->Config(kDefaultBaudRate, kDefaultConfig);
 
   zx::result node_controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
@@ -198,7 +199,7 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
           .properties = {{
               fdf::MakeProperty(0x0001 /*BIND_PROTOCOL*/, ZX_PROTOCOL_SERIAL_IMPL_ASYNC),
               fdf::MakeProperty(0x0600 /*BIND_SERIAL_CLASS*/,
-                                aml_uart_->serial_port_info().serial_class),
+                                static_cast<uint8_t>(aml_uart_->serial_port_info().serial_class)),
           }},
           .offers2 = std::move(offers),
       },
@@ -234,16 +235,6 @@ void AmlUartV2::CompleteStart(zx::result<> result) {
   ZX_ASSERT(start_completer_.has_value());
   start_completer_.value()(result);
   start_completer_.reset();
-}
-
-compat::DeviceServer::BanjoConfig AmlUartV2::GetBanjoConfig() {
-  compat::DeviceServer::BanjoConfig config{.default_proto_id = ZX_PROTOCOL_SERIAL_IMPL_ASYNC};
-  config.callbacks[ZX_PROTOCOL_SERIAL_IMPL_ASYNC] = [this]() {
-    ZX_ASSERT(aml_uart_.has_value());
-    return compat::DeviceServer::GenericProtocol{.ops = aml_uart_->get_ops(),
-                                                 .ctx = &aml_uart_.value()};
-  };
-  return config;
 }
 
 }  // namespace serial

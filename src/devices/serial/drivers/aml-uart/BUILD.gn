@@ -56,7 +56,6 @@ source_set("aml-uart-source") {
     "//src/lib/ddk",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
@@ -137,7 +136,6 @@ source_set("aml-uart-dfv2-source") {
     "//src/devices/bin/driver_runtime",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
