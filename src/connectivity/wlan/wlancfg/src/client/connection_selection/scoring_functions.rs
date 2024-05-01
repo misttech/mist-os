@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    client::{connection_selection::bss_selection::BssQualityData, types},
-    config_management::FailureReason::CredentialRejected,
-    util::pseudo_energy::*,
+    client::types, config_management::FailureReason::CredentialRejected, util::pseudo_energy::*,
 };
 
 const RSSI_AND_VELOCITY_SCORE_WEIGHT: f32 = 0.6;
@@ -159,15 +157,6 @@ pub fn score_current_connection_signal_data(data: SignalData) -> u8 {
 
     return ((rssi_velocity_score as f32 * RSSI_AND_VELOCITY_SCORE_WEIGHT)
         + (snr_score as f32 * SNR_SCORE_WEIGHT)) as u8;
-}
-
-/// Give a numerical score to the connection quality in order to decide whether to look for a new
-/// network and to ultimately decide whether to switch to a new network or stay on the same one.
-/// score should be between 0 and 1, where 0 is an unusable connection and 1 is a great connection.
-pub fn score_connection_quality(_quality_data: &BssQualityData) -> f32 {
-    // TODO(https://fxbug.dev/42165352) Actually implement the connection quality scoring and the threshold
-    // for a bad connection
-    return 1.0;
 }
 
 #[cfg(test)]
