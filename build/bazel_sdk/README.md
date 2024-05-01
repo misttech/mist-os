@@ -24,7 +24,7 @@ process of generating this final artifact is driven by the GN build system since
 the core IDK is still created by GN. In order to build the bazel SDK you must
 invoke a gn build via fx.
 
-```
+```bash
 $ fx build generate_fuchsia_sdk_repository
 ```
 
@@ -44,16 +44,16 @@ enough for local development.
 The output of the build can be found at
 `$(fx bazel info output_base)/external/fuchsia_sdk`
 
-### Overriding a local fuchsia_sdk repository in your local checkout
+### Overriding @fuchsia_sdk
 
-Once the SDK is locally built you can override your project's fuchsia_sdk
+Once the SDK is locally built you can override your project's `@fuchsia_sdk//`
 repository with the one that is built locally by using Bazel's
 `--override_repository`.
 
 It can be helpful to put the path in an environment variable and create an alias
 since this needs to be pass to each invocation of bazel. You can then
 
-```
+```bash
 $ export FUCHSIA_SDK_PATH="$(fx bazel info output_base)/external/fuchsia_sdk"
 $ export SDK_OVERRIDE="--override_repository=fuchsia_sdk=$FUCHSIA_SDK_PATH"
 ```
@@ -61,7 +61,7 @@ $ export SDK_OVERRIDE="--override_repository=fuchsia_sdk=$FUCHSIA_SDK_PATH"
 Then you can use the $SDK_OVERRIDE variable in all of your subsequent bazel
 invocations
 
-```
+```bash
 $ bazel build $SDK_OVERRIDE //foo:pkg
 $ bazel test $SDK_OVERRIDE //foo:test
 ```
@@ -93,10 +93,23 @@ configuration correctness by performing the following:
 6. Click into the "gerrit_link". This will open a new gerrit page.
 7. Copy the contents of `patches.json` locally into your OOT repo's root.
 
-Note: It will not be as seamless to iterate on build rules locally with this
-approach. To achieve that, you'll need to download the Bazel SDK via
-[CAS](https://chrome-infra-packages.appspot.com/p/infra/tools/luci/cas) and
-follow the same local `$SDK_OVERRIDE` steps above.
+### Iterating on build rules
+
+If you need to make changes to the SDK content, for example changing a fidl
+file, you must recreate the Bazel SDK by running the previous steps. However, if
+you are just iterating on the starlark rules that make up the SDK, you can use
+the following steps:
+
+1. Follow the previous section's steps.
+2. Fetch the Bazel SDK: `bazel build @fuchsia_sdk//:BUILD.bazel`
+3. Make a copy of `@fuchsia_sdk`:
+   `cp -r $(bazel info execution_root)/external/fuchsia_sdk/ /tmp/fuchsia_sdk`
+4. Symlink builddefs:
+    1. Remove existing builddefs: `rm -rf /tmp/fuchsia_sdk/{common, fuchsia}`
+    2. Symlink in-tree builddefs:
+        `ln -s $FUCHSIA_DIR/build/bazel_sdk/bazel_rules_fuchsia/{common, fuchsia} /tmp/fuchsia_sdk/`
+5. Follow the steps in the `Overriding @fuchsia_sdk` section with
+    `FUCHSIA_SDK_PATH=/tmp/fuchsia_sdk`
 
 ## Executing E2E Developer Workflow Tests
 
