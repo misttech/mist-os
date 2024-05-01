@@ -92,6 +92,7 @@ if (is_host) {
       "affordance_tests/test_session:session_test_fc($host_toolchain)",
       "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
       "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
+      "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
       "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
       "transport_tests/test_ffx:ffx_test_fc($host_toolchain)",
       "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
@@ -100,8 +101,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
     testonly = true
-    public_deps =
-        [ "affordance_tests/test_ui:user_input_test_fc($host_toolchain)" ]
+    public_deps = []
   }
 
   # core.vim3
@@ -149,7 +149,7 @@ if (is_host) {
   group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
     testonly = true
     public_deps = [
-      "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
+      "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
       "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     ]
   }
@@ -189,8 +189,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
     testonly = true
-    public_deps =
-        [ "affordance_tests/test_ui:user_input_test_fc($host_toolchain)" ]
+    public_deps = []
   }
 
   # starnix.vim3

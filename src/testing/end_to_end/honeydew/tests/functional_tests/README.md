@@ -103,6 +103,9 @@ build group the new test belongs to.
     make sure to include the appropriate `*_packages` group. Please reach out to
     [Lacewing team] if you need help with this one. And also, please include
     [Lacewing team] as one of the reviewer in this CL.
+* Update the test case's `python_mobly_test` rule in BUILD.gn to include
+  appropriate BOARDS (based on what all the boards this test need to be run in
+  infra) in `environments` field ([example](../../../examples/test_soft_reboot/BUILD.gn))
 
 ### CQ VS CI vs FYI
 
