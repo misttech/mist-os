@@ -19,7 +19,7 @@
 #include <optional>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/graphics/display/drivers/coordinator/coordinator-driver.h"
+#include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 
@@ -38,7 +38,7 @@ class FakeDisplayStack {
                    const fake_display::FakeDisplayDeviceConfig& device_config);
   ~FakeDisplayStack();
 
-  CoordinatorDriver* coordinator_driver() { return coordinator_driver_; }
+  Controller* coordinator_controller() { return coordinator_controller_.get(); }
   fake_display::FakeDisplay* display() { return display_; }
 
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
@@ -62,8 +62,9 @@ class FakeDisplayStack {
   // All the devices have transferred their ownership to `mock_root_` and will
   // be torn down on `SyncShutdown()`.
   fake_display::FakeDisplay* display_;
-  CoordinatorDriver* coordinator_driver_;
   zx_device_t* sysmem_device_;
+
+  std::unique_ptr<Controller> coordinator_controller_;
 
   bool shutdown_ = false;
 
