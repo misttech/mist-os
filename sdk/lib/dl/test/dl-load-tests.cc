@@ -120,10 +120,11 @@ TYPED_TEST(DlTests, Basic) {
 // function's return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Relative) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kRelativeRelocFile = "relative-reloc.module.so";
 
-  this->ExpectRootModule("relative-reloc.module.so");
+  this->ExpectRootModule(kRelativeRelocFile);
 
-  auto result = this->DlOpen("relative-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kRelativeRelocFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -138,10 +139,11 @@ TYPED_TEST(DlTests, Relative) {
 // functions' return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Symbolic) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kSymbolicRelocFile = "symbolic-reloc.module.so";
 
-  this->ExpectRootModule("symbolic-reloc.module.so");
+  this->ExpectRootModule(kSymbolicRelocFile);
 
-  auto result = this->DlOpen("symbolic-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kSymbolicRelocFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
