@@ -1482,40 +1482,38 @@ where
     }
 }
 
-/// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
-/// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is a
-/// capability routing field of [`Document`]: `use`, `offer`, `expose`, or `capabilities`.
-///
+/// Merges `us` into `other` according to the rules documented for [`include`].
 /// [`include`]: #include
-/// [`Document`]: struct.Document.html
-macro_rules! merge_from_capability_field {
-    ($self:ident, $other:ident, $field_name:ident) => {
-        // Empty entries are an error, and merging removes empty entries so we first need to check
-        // for them.
-        for entry in $self.$field_name.iter().flatten().chain($other.$field_name.iter().flatten()) {
-            if entry.names().is_empty() {
-                return Err(Error::Validate {
-                    err: format!("{}: Missing type name: {:#?}", entry.decl_type(), entry),
-                    filename: None,
-                });
-            }
+fn merge_from_capability_field<T: CapabilityClause>(
+    us: &mut Option<Vec<T>>,
+    other: &mut Option<Vec<T>>,
+) -> Result<(), Error> {
+    // Empty entries are an error, and merging removes empty entries so we first need to check
+    // for them.
+    for entry in us.iter().flatten().chain(other.iter().flatten()) {
+        if entry.names().is_empty() {
+            return Err(Error::Validate {
+                err: format!("{}: Missing type name: {:#?}", entry.decl_type(), entry),
+                filename: None,
+            });
         }
+    }
 
-        if let Some(all_ours) = $self.$field_name.as_mut() {
-            if let Some(all_theirs) = $other.$field_name.take() {
-                for mut theirs in all_theirs {
-                    for ours in &mut *all_ours {
-                        compute_diff(ours, &mut theirs);
-                    }
-                    all_ours.push(theirs);
+    if let Some(all_ours) = us.as_mut() {
+        if let Some(all_theirs) = other.take() {
+            for mut theirs in all_theirs {
+                for ours in &mut *all_ours {
+                    compute_diff(ours, &mut theirs);
                 }
+                all_ours.push(theirs);
             }
-            // Post-filter step: remove empty entries.
-            all_ours.retain(|ours| !ours.names().is_empty())
-        } else if let Some(theirs) = $other.$field_name.take() {
-            $self.$field_name.replace(theirs);
         }
-    };
+        // Post-filter step: remove empty entries.
+        all_ours.retain(|ours| !ours.names().is_empty())
+    } else if let Some(theirs) = other.take() {
+        us.replace(theirs);
+    }
+    Ok(())
 }
 
 /// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
@@ -1623,10 +1621,10 @@ impl Document {
     ) -> Result<(), Error> {
         // Flatten the mergable fields that may contain a
         // list of capabilities in one clause.
-        merge_from_capability_field!(self, other, r#use);
-        merge_from_capability_field!(self, other, expose);
-        merge_from_capability_field!(self, other, offer);
-        merge_from_capability_field!(self, other, capabilities);
+        merge_from_capability_field(&mut self.r#use, &mut other.r#use)?;
+        merge_from_capability_field(&mut self.expose, &mut other.expose)?;
+        merge_from_capability_field(&mut self.offer, &mut other.offer)?;
+        merge_from_capability_field(&mut self.capabilities, &mut other.capabilities)?;
         merge_from_other_field!(self, other, include);
         merge_from_other_field!(self, other, children);
         merge_from_other_field!(self, other, collections);
@@ -3386,7 +3384,7 @@ pub trait FromClause {
     fn from_(&self) -> OneOrMany<AnyRef<'_>>;
 }
 
-pub trait CapabilityClause: Clone + PartialEq {
+pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
     fn service(&self) -> Option<OneOrMany<&Name>>;
     fn protocol(&self) -> Option<OneOrMany<&Name>>;
     fn directory(&self) -> Option<OneOrMany<&Name>>;
