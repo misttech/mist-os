@@ -1578,46 +1578,46 @@ fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
         // - The fields other than `availability` do match, but `availability`
         //   does not and is incompatible (no partial order).
         // Either way, `ours` and `theirs` are not diffable.
-    } else {
-        let avail_cmp = avail_cmp.unwrap();
-        let mut our_entries_to_remove = HashSet::new();
-        let mut their_entries_to_remove = HashSet::new();
-        for e in &their_field {
-            if !our_field.contains(e) {
-                // Not a duplicate, so keep.
-            } else {
-                match avail_cmp {
-                    cmp::Ordering::Less => {
-                        // Their availability is stronger, meaning theirs should take
-                        // priority. Keep `e` in theirs, and remove it from ours.
-                        our_entries_to_remove.insert(e.clone());
-                    }
-                    cmp::Ordering::Greater => {
-                        // Our availability is stronger, meaning ours should take
-                        // priority. Remove `e` from theirs.
-                        their_entries_to_remove.insert(e.clone());
-                    }
-                    cmp::Ordering::Equal => {
-                        // The availabilities are equal, so `e` is a duplicate.
-                        their_entries_to_remove.insert(e.clone());
-                    }
-                }
-            }
-        }
-        fn update_entries(
-            decl: &mut impl CapabilityClause,
-            mut field: Vec<Name>,
-            to_remove: &HashSet<Name>,
-        ) {
-            if to_remove.is_empty() {
-                return;
-            }
-            field.retain(|e| !to_remove.contains(e));
-            decl.set_names(field);
-        }
-        update_entries(ours, our_field, &our_entries_to_remove);
-        update_entries(theirs, their_field, &their_entries_to_remove);
+        return;
     }
+    let avail_cmp = avail_cmp.unwrap();
+    let mut our_entries_to_remove = HashSet::new();
+    let mut their_entries_to_remove = HashSet::new();
+    for e in &their_field {
+        if !our_field.contains(e) {
+            // Not a duplicate, so keep.
+            continue;
+        }
+        match avail_cmp {
+            cmp::Ordering::Less => {
+                // Their availability is stronger, meaning theirs should take
+                // priority. Keep `e` in theirs, and remove it from ours.
+                our_entries_to_remove.insert(e.clone());
+            }
+            cmp::Ordering::Greater => {
+                // Our availability is stronger, meaning ours should take
+                // priority. Remove `e` from theirs.
+                their_entries_to_remove.insert(e.clone());
+            }
+            cmp::Ordering::Equal => {
+                // The availabilities are equal, so `e` is a duplicate.
+                their_entries_to_remove.insert(e.clone());
+            }
+        }
+    }
+    fn update_entries(
+        decl: &mut impl CapabilityClause,
+        mut field: Vec<Name>,
+        to_remove: &HashSet<Name>,
+    ) {
+        if to_remove.is_empty() {
+            return;
+        }
+        field.retain(|e| !to_remove.contains(e));
+        decl.set_names(field);
+    }
+    update_entries(ours, our_field, &our_entries_to_remove);
+    update_entries(theirs, their_field, &their_entries_to_remove);
 }
 
 impl Document {
