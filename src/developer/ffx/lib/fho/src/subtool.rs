@@ -24,6 +24,7 @@ pub trait FfxTool: FfxMain + Sized {
 
     fn forces_stdout_log(&self) -> bool;
     fn supports_machine_output(&self) -> bool;
+    fn has_schema(&self) -> bool;
 
     async fn from_env(env: FhoEnvironment, cmd: Self::Command) -> Result<Self>;
 
@@ -36,11 +37,18 @@ pub trait FfxTool: FfxMain + Sized {
 
 #[async_trait(?Send)]
 pub trait FfxMain: Sized {
-    type Writer: TryFromEnv + ffx_writer::ToolIO;
+    type Writer: TryFromEnv + ToolIO;
 
     /// The entrypoint of the tool. Once FHO has set up the environment for the tool, this is
     /// invoked. Should not be invoked directly unless for testing.
     async fn main(self, writer: Self::Writer) -> Result<()>;
+
+    /// Given the writer, print the output schema. This is exposed to allow
+    /// traversing the subtool adapters which combine more than one subtool which
+    /// probably have different writers since they will have different output.
+    async fn try_print_schema(self, mut writer: Self::Writer) -> Result<()> {
+        writer.try_print_schema().map_err(|e| e.into())
+    }
 }
 
 #[derive(FromArgs)]
@@ -121,12 +129,16 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
 
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
         metrics.print_notice(&mut std::io::stderr()).await?;
-        let mut writer: <T as FfxMain>::Writer = TryFromEnv::try_from_env(&self.env).await?;
+        let writer = TryFromEnv::try_from_env(&self.env).await?;
         let res: Result<ExitStatus> = if self.env.ffx.global.schema {
-            if <T as FfxMain>::Writer::has_schema() {
-                writer.try_print_schema().map(|_| ExitStatus::from_raw(0)).map_err(|e| e.into())
+            if self.main.has_schema() {
+                self.main
+                    .try_print_schema(writer)
+                    .await
+                    .map(|_| ExitStatus::from_raw(0))
+                    .map_err(|e| e.into())
             } else {
-                Err(user_error!("--schema is not supported for this command"))
+                Err(user_error!("--schema is not supported for this command (subtool)."))
             }
         } else {
             self.main.main(writer).await.map(|_| ExitStatus::from_raw(0))

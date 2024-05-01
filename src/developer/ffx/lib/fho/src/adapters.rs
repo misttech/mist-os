@@ -51,6 +51,11 @@ macro_rules! embedded_plugin {
             use $crate::macro_deps::ffx_writer::ToolIO;
             <<$tool as $crate::FfxMain>::Writer as ToolIO>::is_machine_supported()
         }
+
+        pub fn ffx_plugin_has_schema() -> bool {
+            use $crate::macro_deps::ffx_writer::ToolIO;
+            <<$tool as $crate::FfxMain>::Writer as ToolIO>::has_schema()
+        }
     };
 }
 
@@ -90,6 +95,8 @@ mod tests {
             !ffx_plugin_is_machine_supported(),
             "Test plugin should not support machine output"
         );
+
+        assert!(!ffx_plugin_has_schema(), "Test plugin should not support machine output schema");
 
         let fake_tool = match tool_cmd.subcommand {
             FhoHandler::Standalone(t) => t,

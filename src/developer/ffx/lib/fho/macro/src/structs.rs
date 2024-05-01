@@ -252,6 +252,9 @@ impl ToTokens for NamedFieldStruct<'_> {
                 fn supports_machine_output(&self) -> bool {
                     <<Self as fho::FfxMain>::Writer as fho::ToolIO>::is_machine_supported()
                 }
+                fn has_schema(&self) -> bool {
+                    <<Self as fho::FfxMain>::Writer as fho::ToolIO>::has_schema()
+                }
             }
         };
         tokens.extend(res);
