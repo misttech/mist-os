@@ -1267,6 +1267,9 @@ assembly_input_bundle("core_realm_eng") {
     # available.
     "cat",
     "sha1sum",
+
+    # These are used by test infrastructure, and always need to be available.
+    "mkdir",
   ]
   on_demand = []
   foreach(bin, sbase_binaries) {
