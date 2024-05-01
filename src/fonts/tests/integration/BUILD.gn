@@ -121,15 +121,6 @@ foreach(comp, ALL_COMPONENTS) {
     deps = [ ":${comp}_cml" ]
   }
 
-  fuchsia_structured_config_values("${comp}_structured_config") {
-    cm_label = ":${comp}_manifest"
-    component_name = comp
-    values = {
-      verbose_logging = integration_tests_verbose_logging
-      font_manifest = ""
-    }
-  }
-
   fuchsia_component(comp) {
     testonly = true
     cm_label = ":${comp}_manifest"
@@ -155,6 +146,19 @@ foreach(comp, ALL_COMPONENTS) {
     } else {
       assert(false, "component $comp does not have defined deps")
     }
+  }
+}
+
+# Generate a manifest that provides the config for these components.
+fuchsia_structured_config_values2("test_config_values") {
+  testonly = true
+
+  # One of the test cms was picked, they all use the same values.
+  cm_label = ":fonts_with_aliases_fonts_manifest"
+  output_component_name = "test_config_values"
+  values = {
+    verbose_logging = integration_tests_verbose_logging
+    font_manifest = ""
   }
 }
 
@@ -186,12 +190,10 @@ fuchsia_test_package("font_provider_integration_tests") {
   deps = [
     ":font_provider_integration_tests_driver",
     ":mock_font_resolver_cm",
+    ":test_config_values",
   ]
   foreach(comp, ALL_COMPONENTS) {
-    deps += [
-      ":${comp}",
-      ":${comp}_structured_config",
-    ]
+    deps += [ ":${comp}" ]
   }
   test_specs = {
     environments = basic_envs

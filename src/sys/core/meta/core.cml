@@ -125,6 +125,14 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: [ "#font_provider" ],
+            config: [
+                "fuchsia.fonts.FontManifest",
+                "fuchsia.fonts.VerboseLogging",
+            ],
+        },
+        {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "#cobalt",
             to: "#network",

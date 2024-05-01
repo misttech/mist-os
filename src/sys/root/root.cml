@@ -63,6 +63,8 @@
             from: "#config",
             to: "#core",
             config: [
+                "fuchsia.fonts.FontManifest",
+                "fuchsia.fonts.VerboseLogging",
                 "fuchsia.http-client.StopOnIdleTimeoutMillis",
                 "fuchsia.memory.CaptureOnPressureChange",
                 "fuchsia.memory.CriticalCaptureDelay",
