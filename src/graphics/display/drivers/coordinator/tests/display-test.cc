@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/testing/predicates/status.h"
@@ -55,7 +56,11 @@ TEST(DisplayTest, ClientVSyncOk) {
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(nullptr, std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 
@@ -106,7 +111,11 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(nullptr, std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 
@@ -127,7 +136,11 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(nullptr, std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 
@@ -151,7 +164,11 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(nullptr, std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 

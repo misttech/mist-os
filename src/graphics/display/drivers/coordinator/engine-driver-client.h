@@ -12,7 +12,6 @@
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 
-#include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
@@ -29,16 +28,22 @@ class Controller;
 // C++ <-> Banjo/FIDL bridge for a connection to a display engine driver.
 class EngineDriverClient {
  public:
-  EngineDriverClient();
+  // Factory method for production use.
+  // `parent` must be valid.
+  static zx::result<std::unique_ptr<EngineDriverClient>> Create(zx_device_t* parent);
+
+  // Production code must use the Create() factory method.
+  // `dc` must be valid.
+  explicit EngineDriverClient(ddk::DisplayControllerImplProtocolClient dc);
+
+  // Production code must use the Create() factory method.
+  // `engine` must be valid.
+  explicit EngineDriverClient(fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine);
 
   EngineDriverClient(const EngineDriverClient&) = delete;
   EngineDriverClient& operator=(const EngineDriverClient&) = delete;
 
   ~EngineDriverClient();
-
-  // TODO(https://fxbug.dev/338002075): Replace the multi-step initialization
-  // with a factory function.
-  zx_status_t Bind(zx_device_t* parent);
 
   void ReleaseImage(DriverImageId driver_image_id);
   zx::result<> ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
@@ -73,23 +78,19 @@ class EngineDriverClient {
   zx::result<> SetDisplayPower(DisplayId display_id, bool power_on);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
-  bool is_bound() const { return is_bound_; }
-
  private:
   // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
   // right approach.
   fdf::Arena arena_;
 
+  // Whether to use the FIDL client. If false, use the Banjo client.
+  bool use_engine_;
+
   // FIDL Client
   fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;
 
-  // Whether to use the FIDL client. If false, use the Banjo client.
-  bool use_engine_ = false;
-
   // Banjo Client
   ddk::DisplayControllerImplProtocolClient dc_;
-
-  bool is_bound_ = false;
 };
 
 }  // namespace display

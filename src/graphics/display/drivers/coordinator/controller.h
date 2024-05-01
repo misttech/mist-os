@@ -76,11 +76,17 @@ class Controller : public DeviceType,
 
   // Creates a new coordinator Controller device. It creates a new Inspector
   // which will be solely owned by the Controller device.
-  explicit Controller(zx_device_t* parent);
+  //
+  // `engine_driver_client` must not be null.
+  explicit Controller(zx_device_t* parent,
+                      std::unique_ptr<EngineDriverClient> engine_driver_client);
 
   // Creates a new coordinator Controller device with an injected `inspector`.
   // The `inspector` and inspect data may be duplicated and shared.
-  Controller(zx_device_t* parent, inspect::Inspector inspector);
+  //
+  // `engine_driver_client` must not be null.
+  Controller(zx_device_t* parent, std::unique_ptr<EngineDriverClient> engine_driver_client,
+             inspect::Inspector inspector);
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -126,7 +132,7 @@ class Controller : public DeviceType,
   template <typename Callback>
   bool FindDisplayInfo(DisplayId display_id, Callback callback) __TA_REQUIRES(mtx());
 
-  EngineDriverClient* engine_driver_client() { return &engine_driver_client_; }
+  EngineDriverClient* engine_driver_client() { return engine_driver_client_.get(); }
 
   bool supports_capture() { return supports_capture_; }
 
@@ -207,7 +213,7 @@ class Controller : public DeviceType,
   libsync::Completion dispatcher_shutdown_completion_;
 
   std::unique_ptr<async_watchdog::Watchdog> watchdog_;
-  EngineDriverClient engine_driver_client_;
+  std::unique_ptr<EngineDriverClient> engine_driver_client_;
 
   zx_time_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;

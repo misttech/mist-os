@@ -139,7 +139,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     uint32_t display_cfg_result;
     client_composition_opcode_t layer_result = 0;
     size_t display_layer_results_count;
-    display_cfg_result = engine_driver_client_.CheckConfiguration(
+    display_cfg_result = engine_driver_client_->CheckConfiguration(
         test_configs, 1, &layer_result,
         /*client_composition_opcodes_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
@@ -221,7 +221,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
       // The array is empty if memory allocation failed. We prefer using an
       // empty ELD to dropping the display altogether.
-      engine_driver_client_.SetEld(display_id, eld);
+      engine_driver_client_->SetEld(display_id, eld);
     }
 
     fbl::AutoLock lock(mtx());
@@ -612,11 +612,11 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   }
 
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
-  engine_driver_client_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
+  engine_driver_client_->ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
 void Controller::ReleaseImage(DriverImageId driver_image_id) {
-  engine_driver_client_.ReleaseImage(driver_image_id);
+  engine_driver_client_->ReleaseImage(driver_image_id);
 }
 
 void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
@@ -627,7 +627,7 @@ void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_i
     return;
   }
 
-  const zx::result<> result = engine_driver_client_.ReleaseCapture(driver_capture_image_id);
+  const zx::result<> result = engine_driver_client_->ReleaseCapture(driver_capture_image_id);
   if (result.is_error() && result.error_value() == ZX_ERR_SHOULD_WAIT) {
     ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
@@ -861,7 +861,15 @@ ConfigStamp Controller::TEST_controller_stamp() const {
 zx::result<> Controller::Create(zx_device_t* parent) {
   fbl::AllocChecker alloc_checker;
 
-  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, parent);
+  auto create_engine_driver_client_result = EngineDriverClient::Create(parent);
+  if (create_engine_driver_client_result.is_error()) {
+    zxlogf(ERROR, "Failed to create EngineDriverClient: %s",
+           create_engine_driver_client_result.status_string());
+    return create_engine_driver_client_result.take_error();
+  }
+
+  auto controller = fbl::make_unique_checked<Controller>(
+      &alloc_checker, parent, std::move(create_engine_driver_client_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -880,12 +888,6 @@ zx::result<> Controller::Create(zx_device_t* parent) {
 }
 
 zx::result<> Controller::Bind() {
-  zx_status_t status = engine_driver_client_.Bind(parent());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to bind driver %d", status);
-    return zx::error(status);
-  }
-
   const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(
@@ -907,9 +909,8 @@ zx::result<> Controller::Bind() {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  supports_capture_ = engine_driver_client_.IsCaptureSupported();
-  zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
-         zx_status_get_string(status));
+  supports_capture_ = engine_driver_client_->IsCaptureSupported();
+  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
 
   zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
   if (vsync_monitor_init_result.is_error()) {
@@ -917,14 +918,14 @@ zx::result<> Controller::Bind() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_driver_client_.SetDisplayControllerInterface({
+  engine_driver_client_->SetDisplayControllerInterface({
       .ops = &display_controller_interface_protocol_ops_,
       .ctx = this,
   });
 
-  status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
-                      .set_flags(DEVICE_ADD_NON_BINDABLE)
-                      .set_inspect_vmo(inspector_.DuplicateVmo()));
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
+                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                  .set_inspect_vmo(inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add display coordinator device: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -960,19 +961,28 @@ void Controller::DdkRelease() {
     fbl::AutoLock lock(mtx());
     ++controller_stamp_;
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-    engine_driver_client_.ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+    engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
   }
 
   delete this;
 }
 
-Controller::Controller(zx_device_t* parent) : Controller(parent, inspect::Inspector{}) {}
+Controller::Controller(zx_device_t* parent,
+                       std::unique_ptr<EngineDriverClient> engine_driver_client)
+    : Controller(parent, std::move(engine_driver_client), inspect::Inspector{}) {
+  ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
+}
 
-Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
+Controller::Controller(zx_device_t* parent,
+                       std::unique_ptr<EngineDriverClient> engine_driver_client,
+                       inspect::Inspector inspector)
     : DeviceType(parent),
       inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
-      vsync_monitor_(root_.CreateChild("vsync_monitor")) {
+      vsync_monitor_(root_.CreateChild("vsync_monitor")),
+      engine_driver_client_(std::move(engine_driver_client)) {
+  ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
+
   mtx_init(&mtx_, mtx_plain);
 
   last_valid_apply_config_timestamp_ns_property_ =
@@ -985,9 +995,7 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
 
 Controller::~Controller() {
   zxlogf(INFO, "Controller::~Controller");
-  if (engine_driver_client_.is_bound()) {
-    engine_driver_client_.ResetDisplayControllerInterface();
-  }
+  engine_driver_client_->ResetDisplayControllerInterface();
 }
 
 size_t Controller::TEST_imported_images_count() const {

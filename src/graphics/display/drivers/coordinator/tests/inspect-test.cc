@@ -11,14 +11,36 @@
 
 #include "lib/fpromise/single_threaded_executor.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 
 namespace display {
 
 namespace {
 
+struct EngineDriverClientAndServer {
+  static EngineDriverClientAndServer Create();
+
+  std::unique_ptr<EngineDriverClient> engine_driver_client;
+  fdf::ServerEnd<fuchsia_hardware_display_engine::Engine> engine_server;
+};
+
+// static
+EngineDriverClientAndServer EngineDriverClientAndServer::Create() {
+  auto [engine_client, engine_server] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  return {
+      .engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client)),
+      .engine_server = std::move(engine_server),
+  };
+}
+
 class InspectTest : public ::testing::Test {
  public:
-  InspectTest() : inspector_(), controller_(nullptr, inspector_) {}
+  InspectTest()
+      : engine_driver_client_and_server_(EngineDriverClientAndServer::Create()),
+        inspector_(),
+        controller_(nullptr, std::move(engine_driver_client_and_server_.engine_driver_client),
+                    inspector_) {}
 
   void SetUp() override {
     fpromise::result<inspect::Hierarchy> hierarchy_maybe =
@@ -29,6 +51,7 @@ class InspectTest : public ::testing::Test {
   }
 
  protected:
+  EngineDriverClientAndServer engine_driver_client_and_server_;
   inspect::Inspector inspector_;
   Controller controller_;
   inspect::Hierarchy hierarchy_;
