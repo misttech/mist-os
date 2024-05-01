@@ -10,12 +10,10 @@ use {
     fuchsia_async::LocalExecutor,
     fuchsia_zircon as zx,
     std::{ffi::c_void, sync::Once},
-    tracing::error,
     wlan_mlme::{
         buffer::CBufferProvider,
-        device::{completers::StopCompleter, CFrameSender, Device},
+        device::{CFrameSender, Device},
     },
-    wlansoftmac_rust::WlanSoftmacHandle,
 };
 
 static LOGGER_ONCE: Once = Once::new();
@@ -60,11 +58,7 @@ static LOGGER_ONCE: Once = Once::new();
 #[no_mangle]
 pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     init_completer: *mut c_void,
-    run_init_completer: unsafe extern "C" fn(
-        init_completer: *mut c_void,
-        status: zx::zx_status_t,
-        wlan_softmac_handle: *mut WlanSoftmacHandle,
-    ),
+    run_init_completer: unsafe extern "C" fn(init_completer: *mut c_void, status: zx::zx_status_t),
     frame_sender: CFrameSender,
     buffer_provider: CBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
@@ -94,17 +88,13 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     let device = Device::new(wlan_softmac_bridge_proxy, frame_sender.into());
 
     let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
-        move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
-            Ok(handle) => {
+        move |result: Result<(), zx::Status>| match result {
+            Ok(()) => {
                 // Safety: This is safe because the caller of this function promised
                 // `run_init_completer` is thread-safe and `init_completer` is valid until
                 // its called.
                 unsafe {
-                    run_init_completer(
-                        init_completer,
-                        zx::Status::OK.into_raw(),
-                        Box::into_raw(Box::new(handle)),
-                    );
+                    run_init_completer(init_completer, zx::Status::OK.into_raw());
                 }
             }
             Err(status) => {
@@ -112,7 +102,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
                 // `run_init_completer` is thread-safe and `init_completer` is valid until
                 // its called.
                 unsafe {
-                    run_init_completer(init_completer, status.into_raw(), std::ptr::null_mut());
+                    run_init_completer(init_completer, status.into_raw());
                 }
             }
         },
@@ -120,61 +110,4 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         buffer_provider,
     ));
     zx::Status::from(result).into_raw()
-}
-
-/// Stop the bridged wlansoftmac driver associated with `softmac`.
-///
-/// This function takes ownership of the `WlanSoftmacHandle` that `softmac` points to and destroys
-/// it. When the bridged driver stops, `run_stop_completer` will be called.
-///
-/// # Safety
-///
-/// There are two layers of safety documentation for this function. The first layer is for this
-/// function itself, and the second is for the `run_stop_completer` function.
-///
-/// ## For this function itself
-///
-/// This function is unsafe for the following reasons:
-///
-///   - This function cannot guarantee `run_stop_completer` is thread-safe, i.e., that it's safe to
-///     to call at any time from any thread.
-///   - This function cannot guarantee `stop_completer` points to a valid object when
-///     `run_stop_completer` is called.
-///   - This function cannot guarantee `softmac` is a valid pointer, and the only pointer, to a
-///     `WlanSoftmacHandle`.
-///
-/// By calling this function, the caller promises the following:
-///
-///   - The `run_stop_completer` function is thread-safe.
-///   - The `stop_completer` pointer will point to a valid object at least until
-///     `run_stop_completer` is called.
-///   - The `softmac` pointer is the same pointer received from `run_init_completer` (called as
-///     a consequence of the startup initiated by calling `start_and_run_bridged_wlansoftmac`.
-///
-/// ## For `run_stop_completer`
-///
-/// The `run_stop_completer` function is unsafe because it cannot guarantee the `stop_completer`
-/// argument will be the same `stop_completer` passed to `stop_bridged_wlansoftmac`, and cannot
-/// guarantee it will be called exactly once.
-///
-/// The caller of `run_stop_completer` must promise to pass the same `stop_completer` from
-/// `stop_bridged_wlansoftmac` to `run_stop_completer` and call `run_stop_completer` exactly once.
-#[no_mangle]
-pub unsafe extern "C" fn stop_bridged_wlansoftmac(
-    stop_completer: *mut c_void,
-    run_stop_completer: unsafe extern "C" fn(stop_completer: *mut c_void),
-    softmac: *mut WlanSoftmacHandle,
-) {
-    if softmac.is_null() {
-        error!("Call to stop_bridged_wlansoftmac() with NULL pointer!");
-        return;
-    }
-    // Safety: The caller promises `softmac` is a `WlanSoftmacHandle`.
-    let softmac = unsafe { Box::from_raw(softmac) };
-
-    softmac.stop(StopCompleter::new(Box::new(move ||
-                     // Safety: This is safe because the caller of this function promised
-                     // `run_stop_completer` is thread-safe and `stop_completer` is valid until its
-                     // called.
-                     unsafe { run_stop_completer(stop_completer) })));
 }

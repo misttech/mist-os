@@ -64,42 +64,6 @@ pub mod completers {
         }
     }
 
-    pub struct StopCompleter {
-        // TODO(42075638): Using dynamic dispatch since otherwise we would need to plumb generics
-        // everywhere MLME uses a DriverEventSink. Since we will remove DriverEventSink soon, this
-        // is not worthwhile.
-        completer: Option<Box<dyn FnOnce()>>,
-    }
-
-    impl StopCompleter {
-        pub fn new(completer: Box<dyn FnOnce()>) -> Self {
-            Self { completer: Some(completer) }
-        }
-
-        pub fn complete(mut self) {
-            let completer = match self.completer.take() {
-                None => {
-                    error!("Failed to call completer because it is None.");
-                    return;
-                }
-                Some(completer) => completer,
-            };
-            completer()
-        }
-    }
-
-    impl Drop for StopCompleter {
-        fn drop(&mut self) {
-            if let Some(completer) = self.completer.take() {
-                error!(
-                    "About to drop StopCompleter without calling it!\n\
-                     Calling StopCompleter completer from drop() to mitigate potential deadlock."
-                );
-                completer()
-            }
-        }
-    }
-
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -133,26 +97,6 @@ pub mod completers {
             });
             drop(init_completer);
             assert_eq!(Ok(Some(Err(zx::Status::BAD_STATE))), receiver.try_recv());
-        }
-
-        #[test]
-        fn stop_completer_sends_value() {
-            let (sender, mut receiver) = oneshot::channel();
-            let stop_completer = StopCompleter::new(Box::new(move || {
-                sender.send(()).expect("Failed to send.");
-            }));
-            stop_completer.complete();
-            assert_eq!(Ok(Some(())), receiver.try_recv());
-        }
-
-        #[test]
-        fn stop_completer_sends_value_on_drop() {
-            let (sender, mut receiver) = oneshot::channel();
-            let stop_completer = StopCompleter::new(Box::new(move || {
-                sender.send(()).expect("Failed to send.");
-            }));
-            drop(stop_completer);
-            assert_eq!(Ok(Some(())), receiver.try_recv());
         }
     }
 }

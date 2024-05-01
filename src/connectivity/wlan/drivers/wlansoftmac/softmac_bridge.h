@@ -23,8 +23,7 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-using InitCompleter = fit::callback<void(zx_status_t status, wlansoftmac_handle_t* rust_handle)>;
-using StopCompleter = fit::callback<void()>;
+using InitCompleter = fit::callback<void(zx_status_t status)>;
 
 class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
@@ -35,7 +34,7 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
       std::shared_ptr<std::mutex> ethernet_proxy_lock,
       ddk::EthernetIfcProtocolClient* ethernet_proxy,
       std::optional<uint32_t>* cached_ethernet_status);
-  zx_status_t Stop(std::unique_ptr<StopCompleter> completer);
+  void StopBridgedDriver(std::unique_ptr<fit::callback<void()>> completer);
   ~SoftmacBridge() override;
 
   void Query(QueryCompleter::Sync& completer) final;
@@ -88,7 +87,6 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   // again until its reset upon the framework calling the unbind hook.
   mutable std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
-  wlansoftmac_handle_t* rust_handle_;
   fdf::Dispatcher rust_dispatcher_;
 
   std::shared_ptr<std::mutex> ethernet_proxy_lock_;

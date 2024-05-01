@@ -344,6 +344,16 @@ closed protocol WlanSoftmacIfcBase {
 @available(added=HEAD)
 closed protocol WlanSoftmacIfcBridge {
     compose WlanSoftmacIfcBase;
+
+    /// Stop the bridged driver.
+    ///
+    /// Calling this method causes both the server end of this protocol (`WlanSoftmacIfcBridge`)
+    /// to close and the client end of `WlanSoftmacBridge` to close. The server will not return a
+    /// response from this method until after processing all queued events.
+    ///
+    /// In practice, the wlansoftmac driver calls this method during unbind.
+    @available(added=HEAD)
+    strict StopBridgedDriver() -> ();
 };
 
 

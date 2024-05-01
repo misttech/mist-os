@@ -17,7 +17,7 @@ sys_includes = [ "zircon/types.h" ]
 
 [parse]
 parse_deps = true
-include = ["wlan_mlme", "wlansoftmac_rust"]
+include = ["wlan_mlme"]
 
 [export]
 include = [
@@ -33,9 +33,6 @@ exclude = [
 ]
 
 [export.rename]
-# wlansoftmac-rust types
-"WlanSoftmacHandle" = "wlansoftmac_handle_t"
-
 # wlan-mlme types
 "CBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
 "CBuffer" = "wlansoftmac_buffer_t"
@@ -43,7 +40,7 @@ exclude = [
 "CFrameProcessorOps" = "frame_processor_ops_t"
 "CFrameSender" = "frame_sender_t"
 
-# This struct is used for void* context fields in protocol ops.
+# This struct is used for void* context fields for data path operations.
 "DriverEventSink" = "void"
 
 [fn]

@@ -163,26 +163,16 @@ void SoftmacBinding::Unbind() {
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
 
-  // Synchronize SoftmacBridge::Stop returning before the StopCompleter
-  // calls destroys the SoftmacBridge.
-  auto stop_returned = std::make_unique<libsync::Completion>();
-  auto unowned_stop_returned = stop_returned.get();
-
-  auto stop_completer = std::make_unique<StopCompleter>(
-      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(), softmac_bridge,
-       device = device_, stop_returned = std::move(stop_returned)]() mutable {
-        WLAN_LAMBDA_TRACE_DURATION("StopCompleter");
-        async::PostTask(main_device_dispatcher, [softmac_bridge, device,
-                                                 stop_returned = std::move(stop_returned)]() {
-          WLAN_LAMBDA_TRACE_DURATION(
-              "SoftmacBridge destruction + softmac_ifc_bridge reset + device_unbind_reply");
-          stop_returned->Wait();
-          delete softmac_bridge;
-          device_unbind_reply(device);
-        });
+  // Note that SoftmacBridge::Stop will return before StopCompleter is called because
+  // the SoftmacIfcBridge.softmac_ifc_bridge_client_ runs on the same dispatcher as
+  // this function (SoftmacBinding::Unbind).
+  auto stop_completer =
+      std::make_unique<fit::callback<void()>>([softmac_bridge, device = device_]() mutable {
+        WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction + device_unbind_reply");
+        delete softmac_bridge;
+        device_unbind_reply(device);
       });
-  softmac_bridge->Stop(std::move(stop_completer));
-  unowned_stop_returned->Signal();
+  softmac_bridge->StopBridgedDriver(std::move(stop_completer));
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.

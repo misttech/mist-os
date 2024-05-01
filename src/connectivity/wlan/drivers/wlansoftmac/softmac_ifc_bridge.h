@@ -33,6 +33,7 @@ class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc
                       ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequest& request,
                           NotifyScanCompleteCompleter::Sync& completer) override;
+  void StopBridgedDriver(std::unique_ptr<fit::callback<void()>> stop_completer);
 
  private:
   explicit SoftmacIfcBridge(const frame_processor_t* frame_processor)

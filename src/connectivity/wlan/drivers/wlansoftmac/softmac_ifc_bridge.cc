@@ -115,4 +115,15 @@ void SoftmacIfcBridge::NotifyScanComplete(NotifyScanCompleteRequest& request,
           completer.ToAsync()));
 }
 
+void SoftmacIfcBridge::StopBridgedDriver(std::unique_ptr<fit::callback<void()>> stop_completer) {
+  WLAN_TRACE_DURATION();
+  (*softmac_ifc_bridge_client_)
+      ->StopBridgedDriver()
+      .Then(
+          [stop_completer = std::move(stop_completer)](
+              fidl::Result<fuchsia_wlan_softmac::WlanSoftmacIfcBridge::StopBridgedDriver>& result) {
+            (*stop_completer)();
+          });
+}
+
 }  // namespace wlan::drivers::wlansoftmac
