@@ -858,36 +858,28 @@ ConfigStamp Controller::TEST_controller_stamp() const {
 }
 
 // static
-zx::result<> Controller::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<Controller>> Controller::Create(
+    std::unique_ptr<EngineDriverClient> engine_driver_client) {
   fbl::AllocChecker alloc_checker;
 
-  auto create_engine_driver_client_result = EngineDriverClient::Create(parent);
-  if (create_engine_driver_client_result.is_error()) {
-    zxlogf(ERROR, "Failed to create EngineDriverClient: %s",
-           create_engine_driver_client_result.status_string());
-    return create_engine_driver_client_result.take_error();
-  }
-
-  auto controller = fbl::make_unique_checked<Controller>(
-      &alloc_checker, parent, std::move(create_engine_driver_client_result).value());
+  auto controller =
+      fbl::make_unique_checked<Controller>(&alloc_checker, std::move(engine_driver_client));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> bind_result = controller->Bind();
-  if (bind_result.is_error()) {
-    zxlogf(ERROR, "Failed to bind the Controller device: %s", bind_result.status_string());
-    return bind_result.take_error();
+  zx::result<> initialize_result = controller->Initialize();
+  if (initialize_result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize the Controller device: %s",
+           initialize_result.status_string());
+    return initialize_result.take_error();
   }
 
-  // `controller` is now managed by the driver manager.
-  [[maybe_unused]] Controller* controller_released = controller.release();
-
-  return zx::ok();
+  return zx::ok(std::move(controller));
 }
 
-zx::result<> Controller::Bind() {
+zx::result<> Controller::Initialize() {
   const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(
@@ -923,19 +915,11 @@ zx::result<> Controller::Bind() {
       .ctx = this,
   });
 
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
-                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
-                                  .set_inspect_vmo(inspector_.DuplicateVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add display coordinator device: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
   return zx::ok();
 }
 
-void Controller::DdkUnbind(ddk::UnbindTxn txn) {
-  zxlogf(INFO, "Controller::DdkUnbind");
+void Controller::PrepareStop() {
+  zxlogf(INFO, "Controller::PrepareStop");
 
   fbl::AutoLock lock(mtx());
   unbinding_ = true;
@@ -944,11 +928,9 @@ void Controller::DdkUnbind(ddk::UnbindTxn txn) {
   for (auto& client : clients_) {
     client->CloseOnControllerLoop();
   }
-
-  txn.Reply();
 }
 
-void Controller::DdkRelease() {
+void Controller::Stop() {
   vsync_monitor_.Deinitialize();
 
   // Clients may have active work holding mtx_ in dispatcher_, so shut it down without mtx_.
@@ -963,21 +945,16 @@ void Controller::DdkRelease() {
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
     engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
   }
-
-  delete this;
 }
 
-Controller::Controller(zx_device_t* parent,
-                       std::unique_ptr<EngineDriverClient> engine_driver_client)
-    : Controller(parent, std::move(engine_driver_client), inspect::Inspector{}) {
+Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client)
+    : Controller(std::move(engine_driver_client), inspect::Inspector{}) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
 }
 
-Controller::Controller(zx_device_t* parent,
-                       std::unique_ptr<EngineDriverClient> engine_driver_client,
+Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
                        inspect::Inspector inspector)
-    : DeviceType(parent),
-      inspector_(std::move(inspector)),
+    : inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
       vsync_monitor_(root_.CreateChild("vsync_monitor")),
       engine_driver_client_(std::move(engine_driver_client)) {
@@ -1009,15 +986,4 @@ size_t Controller::TEST_imported_images_count() const {
   return virtcon_images + primary_images + display_images;
 }
 
-static constexpr zx_driver_ops_t kControllerOps = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = [](void* ctx, zx_device_t* device) {
-    return Controller::Create(device).status_value();
-  };
-  return ops;
-}();
-
 }  // namespace display
-
-ZIRCON_DRIVER(display_controller, display::kControllerOps, "zircon", "0.1");

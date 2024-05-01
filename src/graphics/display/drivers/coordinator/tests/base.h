@@ -32,7 +32,7 @@ class TestBase : public testing::Test {
   void SetUp() override;
   void TearDown() override;
 
-  Controller* controller() { return tree_->coordinator_controller(); }
+  Controller* controller() { return tree_->coordinator_driver()->controller(); }
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
   fidl::ClientEnd<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1();

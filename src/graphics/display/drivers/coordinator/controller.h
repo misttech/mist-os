@@ -10,7 +10,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/ddk/device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -24,17 +23,12 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
-#include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #include <list>
 #include <memory>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
-#include <fbl/intrusive_double_list.h>
-#include <fbl/intrusive_hash_table.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
@@ -62,30 +56,26 @@ class ControllerTest;
 class DisplayConfig;
 class IntegrationTest;
 
-using DeviceType = ddk::Device<Controller, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_display::Provider>::Mixin>;
-
 // Multiplexes between display controller clients and display engine drivers.
-class Controller : public DeviceType,
-                   public ddk::DisplayControllerInterfaceProtocol<Controller>,
-                   public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
+class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
+                   public fidl::WireServer<fuchsia_hardware_display::Provider> {
  public:
-  // Factory method used by the device manager glue code.
-  // Creates and binds a new coordinator Controller device.
-  static zx::result<> Create(zx_device_t* parent);
+  // Factory method for production use.
+  // Creates and initializes a Controller instance.
+  static zx::result<std::unique_ptr<Controller>> Create(
+      std::unique_ptr<EngineDriverClient> engine_driver_client);
 
-  // Creates a new coordinator Controller device. It creates a new Inspector
-  // which will be solely owned by the Controller device.
+  // Creates a new coordinator Controller instance. It creates a new Inspector
+  // which will be solely owned by the Controller instance.
   //
   // `engine_driver_client` must not be null.
-  explicit Controller(zx_device_t* parent,
-                      std::unique_ptr<EngineDriverClient> engine_driver_client);
+  explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client);
 
-  // Creates a new coordinator Controller device with an injected `inspector`.
+  // Creates a new coordinator Controller instance with an injected `inspector`.
   // The `inspector` and inspect data may be duplicated and shared.
   //
   // `engine_driver_client` must not be null.
-  Controller(zx_device_t* parent, std::unique_ptr<EngineDriverClient> engine_driver_client,
+  Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
              inspect::Inspector inspector);
 
   Controller(const Controller&) = delete;
@@ -95,8 +85,9 @@ class Controller : public DeviceType,
 
   static void PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode);
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+  // These method names reference the DFv2 (fdf::DriverBase) driver lifecycle.
+  void PrepareStop();
+  void Stop();
 
   void DisplayControllerInterfaceOnDisplaysChanged(
       const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
@@ -142,6 +133,7 @@ class Controller : public DeviceType,
   // places where we believe a mutex aliases mtx()
   void AssertMtxAliasHeld(mtx_t* m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(m == mtx()); }
   mtx_t* mtx() const { return &mtx_; }
+  const inspect::Inspector& inspector() const { return inspector_; }
 
   // Test helpers
   size_t TEST_imported_images_count() const;
@@ -159,20 +151,20 @@ class Controller : public DeviceType,
 
   display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 
+  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
+                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
+                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+
  private:
   friend ControllerTest;
   friend IntegrationTest;
 
-  // Initializes the driver and binds it to the driver manager.
-  zx::result<> Bind();
+  // Initializes logic that is not suitable for the constructor.
+  zx::result<> Initialize();
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
-
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& _completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& _completer) override;
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.

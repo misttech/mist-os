@@ -19,7 +19,7 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/coordinator-driver.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 
@@ -90,17 +90,18 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
                             display_->display_controller_impl_banjo_protocol()->ops,
                             display_->display_controller_impl_banjo_protocol()->ctx);
 
-  zx::result<> create_controller_result = Controller::Create(mock_display);
+  zx::result<> create_controller_result = CoordinatorDriver::Create(mock_display);
   if (create_controller_result.is_error()) {
     ZX_PANIC("Failed to create display coordinator Controller device: %s",
              create_controller_result.status_string());
   }
   // Save a copy for test cases.
-  coordinator_controller_ = mock_display->GetLatestChild()->GetDeviceContext<display::Controller>();
+  coordinator_driver_ =
+      mock_display->GetLatestChild()->GetDeviceContext<display::CoordinatorDriver>();
 
   auto display_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
   fidl::BindServer(display_loop_.dispatcher(), std::move(display_endpoints->server),
-                   coordinator_controller_);
+                   coordinator_driver_);
   display_loop_.StartThread("display-server-thread");
   display_provider_client_ = fidl::WireSyncClient<fuchsia_hardware_display::Provider>(
       std::move(display_endpoints->client));
@@ -175,14 +176,14 @@ void FakeDisplayStack::SyncShutdown() {
   display_loop_.Shutdown();
   display_loop_.JoinThreads();
 
-  coordinator_controller_->DdkAsyncRemove();
+  coordinator_driver_->DdkAsyncRemove();
   display_->DdkAsyncRemove();
   device_async_remove(sysmem_device_);
   mock_ddk::ReleaseFlaggedDevices(mock_root_.get());
 
   // All the fake devices are expected to be deleted by `ReleaseFlaggedDevices`.
   display_ = nullptr;
-  coordinator_controller_ = nullptr;
+  coordinator_driver_ = nullptr;
   sysmem_device_ = nullptr;
 
   // Sysmem device is torn down, so there's no driver depending on the pdev

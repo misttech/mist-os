@@ -60,7 +60,7 @@ TEST(DisplayTest, ClientVSyncOk) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(nullptr, std::move(engine_driver_client));
+  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 
@@ -115,7 +115,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(nullptr, std::move(engine_driver_client));
+  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 
@@ -140,7 +140,7 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(nullptr, std::move(engine_driver_client));
+  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 
@@ -168,7 +168,7 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(nullptr, std::move(engine_driver_client));
+  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
   controller.SetDispatcherForTesting(std::move(dispatcher));
 

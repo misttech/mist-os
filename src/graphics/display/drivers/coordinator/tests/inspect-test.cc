@@ -39,8 +39,7 @@ class InspectTest : public ::testing::Test {
   InspectTest()
       : engine_driver_client_and_server_(EngineDriverClientAndServer::Create()),
         inspector_(),
-        controller_(nullptr, std::move(engine_driver_client_and_server_.engine_driver_client),
-                    inspector_) {}
+        controller_(std::move(engine_driver_client_and_server_.engine_driver_client), inspector_) {}
 
   void SetUp() override {
     fpromise::result<inspect::Hierarchy> hierarchy_maybe =

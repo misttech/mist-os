@@ -54,6 +54,8 @@ source_set("shared") {
     "client.h",
     "controller.cc",
     "controller.h",
+    "coordinator-driver.cc",
+    "coordinator-driver.h",
     "display-info.cc",
     "display-info.h",
     "eld.cc",
