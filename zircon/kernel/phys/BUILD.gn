@@ -388,8 +388,12 @@ if (toolchain_environment == "kernel.phys" ||
   # This is linked into the special-case phys_executable() tests that
   # are run directly as QEMU kernels.
   source_set("qemu-header") {
-    sources = [ "qemu-header.S" ]
+    deps = [ ":raw-header" ]
     public_configs = [ "$arch_phys:qemu.config" ]
+  }
+
+  source_set("raw-header") {
+    sources = [ "raw-header.S" ]
   }
 
   static_library("allocation") {
