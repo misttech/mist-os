@@ -14,6 +14,7 @@
 
 #include <bind/fuchsia/platform/cpp/bind.h>
 
+#include "src/devices/bin/driver_manager/controller_allowlist_passthrough.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -406,7 +407,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   // TODO(https://fxbug.dev/331779666): disable controller access for composite nodes
   primary->devfs_device_.topological_node().value().add_child(
       composite->name_, std::nullopt,
-      composite->CreateDevfsPassthrough(std::nullopt, std::nullopt, true),
+      composite->CreateDevfsPassthrough(std::nullopt, std::nullopt, true, ""),
       composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
@@ -878,21 +879,27 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
 
   Devnode::Target devfs_target;
   std::optional<std::string_view> devfs_class_path;
+  std::string class_name = "Unknown_Class_name";
   auto& devfs_args = args.devfs_args();
   if (devfs_args.has_value()) {
     if (devfs_args->class_name().has_value()) {
       devfs_class_path = devfs_args->class_name();
+      class_name = std::string(devfs_args->class_name().value());
     }
     // We do not populate the connection to the controller unless it is specifically
     // supported through the connector_supports argument.
     bool allow_controller_connection = (devfs_args->connector_supports().has_value() &&
                                         (devfs_args->connector_supports().value() &
                                          fuchsia_device_fs::ConnectionType::kController));
+    if (allow_controller_connection && !devfs_args->class_name().has_value()) {
+      class_name = "No_class_name_but_driver_url_is_" + driver_url();
+    }
+
     devfs_target = child->CreateDevfsPassthrough(std::move(devfs_args->connector()),
                                                  std::move(devfs_args->controller_connector()),
-                                                 allow_controller_connection);
+                                                 allow_controller_connection, class_name);
   } else {
-    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt, false);
+    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt, false, class_name);
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
@@ -1446,13 +1453,10 @@ void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
 
 zx_status_t Node::ConnectControllerInterface(
     fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  if (devfs_controller_connector_.has_value()) {
-    return fidl::WireCall(devfs_controller_connector_.value())
-        ->Connect(server_end.TakeChannel())
-        .status();
-  }
-  dev_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
-                                      fidl::kIgnoreBindingClosure);
+  // This should never be called
+  ZX_ASSERT_MSG(false,
+                "Connect To controller should never be called in node.cc,"
+                " as it is intercepted by the ControllerAllowlistPassthrough");
   return ZX_OK;
 }
 
@@ -1466,9 +1470,10 @@ zx_status_t Node::ConnectDeviceInterface(zx::channel channel) {
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector,
-    bool allow_controller_connection) {
+    bool allow_controller_connection, const std::string& class_name) {
+  controller_allowlist_passthrough_ = ControllerAllowlistPassthrough::Create(
+      std::move(controller_connector), weak_from_this(), dispatcher_, class_name);
   devfs_connector_ = std::move(connector);
-  devfs_controller_connector_ = std::move(controller_connector);
   return Devnode::PassThrough(
       [node = weak_from_this(), node_name = name_](zx::channel server_end) {
         std::shared_ptr locked_node = node.lock();
@@ -1492,7 +1497,7 @@ Devnode::Target Node::CreateDevfsPassthrough(
           LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
           return ZX_ERR_BAD_STATE;
         }
-        return locked_node->ConnectControllerInterface(std::move(server_end));
+        return locked_node->controller_allowlist_passthrough_->Connect(std::move(server_end));
       });
 }
 

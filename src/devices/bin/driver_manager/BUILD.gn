@@ -70,6 +70,8 @@ source_set("driver_runner") {
     "bind/bind_result_tracker.h",
     "composite_node_spec_v2.cc",
     "composite_node_spec_v2.h",
+    "controller_allowlist_passthrough.cc",
+    "controller_allowlist_passthrough.h",
     "driver_host.cc",
     "driver_host.h",
     "driver_runner.cc",
