@@ -105,6 +105,8 @@ AUTO_DERIVE_TRAITS = [
     (r"in6_addr", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"in6_pktinfo", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"inotify_event", ["AsBytes", "NoCell"]),
+    (r"dm_name_list", ["AsBytes", "NoCell", "FromBytes", "FromZeros"]),
+    (r"dm_target_versions", ["AsBytes", "NoCell", "FromBytes", "FromZeros"]),
     (
         r"input_event",
         ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"],
