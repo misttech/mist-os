@@ -3472,7 +3472,10 @@ assembly_input_bundle("session_manager") {
           # config.
           component_name = "core"
           shards = rebase_path(
-                  [ "//src/session/bin/session_manager/meta/minimal.core_shard.cml" ],
+                  [
+                    "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
+                    "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
+                  ],
                   root_build_dir)
         },
       ]
