@@ -114,7 +114,7 @@ group("bincode") {
 }
 
 group("bit-set") {
-  public_deps = [ ":bit-set-v0_5_0" ]
+  public_deps = [ ":bit-set-v0_5_3" ]
 }
 
 group("bit-vec") {
@@ -2329,68 +2329,37 @@ rust_library("bincode-v1_3_3") {
   applicable_licenses = [ ":bincode-v1_3_3.license" ]
 }
 
-license("bit-set-v0_5_0.license") {
+license("bit-set-v0_5_3.license") {
   public_package_name = "bit_set"
   license_files = [
-    "//third_party/rust_crates/vendor/bit-set-0.5.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/bit-set-0.5.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/bit-set-0.5.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bit-set-0.5.3/LICENSE-MIT",
   ]
 }
 
-rust_library("bit-set-v0_5_0") {
+rust_library("bit-set-v0_5_3") {
   crate_name = "bit_set"
-  crate_root = "//third_party/rust_crates/vendor/bit-set-0.5.0/src/lib.rs"
-  output_name = "bit_set-ff87f32c24820532"
+  crate_root = "//third_party/rust_crates/vendor/bit-set-0.5.3/src/lib.rs"
+  output_name = "bit_set-1bfda5d01e22a6bd"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bit-vec-v0_5_0" ]
+  deps += [ ":bit-vec-v0_6_3" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=ff87f32c24820532",
-    "-Cextra-filename=-ff87f32c24820532",
+    "-Cmetadata=1bfda5d01e22a6bd",
+    "-Cextra-filename=-1bfda5d01e22a6bd",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":bit-set-v0_5_0.license" ]
-}
-
-license("bit-vec-v0_5_0.license") {
-  public_package_name = "bit_vec"
-  license_files = [
-    "//third_party/rust_crates/vendor/bit-vec-0.5.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/bit-vec-0.5.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("bit-vec-v0_5_0") {
-  crate_name = "bit_vec"
-  crate_root = "//third_party/rust_crates/vendor/bit-vec-0.5.0/src/lib.rs"
-  output_name = "bit_vec-56024dde80975899"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=56024dde80975899",
-    "-Cextra-filename=-56024dde80975899",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":bit-vec-v0_5_0.license" ]
+  applicable_licenses = [ ":bit-set-v0_5_3.license" ]
 }
 
 license("bit-vec-v0_6_3.license") {
@@ -5129,7 +5098,7 @@ rust_library("fancy-regex-v0_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bit-set-v0_5_0" ]
+  deps += [ ":bit-set-v0_5_3" ]
   deps += [ ":regex-v1_7_3" ]
 
   rustenv = []
@@ -10960,7 +10929,7 @@ rust_library("proptest-v1_0_0") {
 
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":bit-set-v0_5_0" ]
+  deps += [ ":bit-set-v0_5_3" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":num-traits-v0_2_14" ]
