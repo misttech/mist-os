@@ -95,7 +95,7 @@ closed protocol Pager {
     /// forwarded to the pager service for acknowledgement before proceeding with the write.
     ///
     /// `ZX_VMO_UNBOUNDED` to create a VMO that is initialized to the largest possible size. Cannot be used
-    /// in conjunction with `ZX_VMO_RESIZABLE`. Passed in size argument is not used and must be set to 0.
+    /// in conjunction with `ZX_VMO_RESIZABLE`. Size argument sets the stream size only.
     ///
     /// On success, the returned VMO has the same rights as a VMO created with [`zx_vmo_create()`], as well
     /// as having the same behavior with respect to `ZX_VMO_ZERO_CHILDREN`. Syscalls that operate on VMOs
@@ -152,7 +152,7 @@ closed protocol Pager {
     /// ## Errors
     ///
     /// `ZX_ERR_INVALID_ARGS` *out* is an invalid pointer or NULL, *options* contains an unsupported
-    /// combination of flags, or`ZX_VMO_UNBOUNDED` is used with a size other than 0.
+    /// combination of flags.
     ///
     /// `ZX_ERR_BAD_HANDLE` *pager* or *port* is not a valid handle.
     ///

@@ -2382,11 +2382,13 @@ TEST(VmoTestCase, VmoUnbounded) {
   // Can't create a VMO that's both unbounded and resizable.
   EXPECT_EQ(zx::vmo::create(0, ZX_VMO_UNBOUNDED | ZX_VMO_RESIZABLE, &vmo), ZX_ERR_INVALID_ARGS);
 
-  // Size argument must be set to 0 with unbounded flag.
-  EXPECT_EQ(zx::vmo::create(42, ZX_VMO_UNBOUNDED, &vmo), ZX_ERR_INVALID_ARGS);
-
   // Make a a vmo with ZX_VMO_UNBOUNDED option.
-  ASSERT_OK(zx::vmo::create(0, ZX_VMO_UNBOUNDED, &vmo));
+  ASSERT_OK(zx::vmo::create(42, ZX_VMO_UNBOUNDED, &vmo));
+
+  // Stream size should be set to size argument.
+  uint64_t content_size = 0;
+  EXPECT_OK(vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size)));
+  EXPECT_EQ(content_size, 42);
 
   uint64_t size = 0;
   vmo.get_size(&size);
@@ -2445,10 +2447,11 @@ TEST(VmoTestCase, VmoUnbounded) {
   EXPECT_EQ(pager.create_vmo(ZX_VMO_UNBOUNDED | ZX_VMO_RESIZABLE, port, 0, 0, &pvmo),
             ZX_ERR_INVALID_ARGS);
 
-  // Size argument must be set to 0 with unbounded flag.
-  EXPECT_EQ(pager.create_vmo(ZX_VMO_UNBOUNDED, port, 0, 42, &pvmo), ZX_ERR_INVALID_ARGS);
+  ASSERT_OK(pager.create_vmo(ZX_VMO_UNBOUNDED, port, 0, 43, &pvmo));
 
-  ASSERT_OK(pager.create_vmo(ZX_VMO_UNBOUNDED, port, 0, 0, &pvmo));
+  // Stream size should be set to size argument.
+  EXPECT_OK(pvmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size)));
+  EXPECT_EQ(content_size, 43);
 
   // Unbounded VMO does not get the RESIZE right, or be able to be resized.
   ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));

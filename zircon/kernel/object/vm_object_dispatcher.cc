@@ -46,9 +46,6 @@ zx::result<VmObjectDispatcher::CreateStats> VmObjectDispatcher::parse_create_sys
     flags &= ~ZX_VMO_DISCARDABLE;
   }
   if (flags & ZX_VMO_UNBOUNDED) {
-    if (size != 0) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
     flags &= ~ZX_VMO_UNBOUNDED;
     res.size = VmObjectPaged::max_size();
   }
