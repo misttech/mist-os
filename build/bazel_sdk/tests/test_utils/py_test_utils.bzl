@@ -22,7 +22,7 @@ load("@bazel_skylib//lib:shell.bzl", "shell")
 #       return [
 #           create_python3_shell_wrapper_provider(
 #               ctx.attr.script.short_path,
-#               ctx.attr.args,
+#               ctx.attr.script_args,
 #               ctx.runfiles(files = ctx.files.data),
 #           ),
 #       ]
@@ -36,7 +36,7 @@ load("@bazel_skylib//lib:shell.bzl", "shell")
 #               allow_single_file = True,
 #               doc = "Label to Python3 script to invoke at runtime for this test.",
 #           ),
-#           "args": attr.string_list(
+#           "script_args": attr.string_list(
 #               default = [],
 #               doc = "List of extra arguments to pass to the script.",
 #           ),
@@ -77,7 +77,7 @@ def create_python3_shell_wrapper_provider(ctx, py3_script_path, args = [], runfi
             return [
                 create_python3_shell_wrapper_provider(
                     ctx.attr.script.short_path,
-                    ctx.attr.args,
+                    ctx.attr.script_args,
                     ctx.runfiles(files = ctx.files.data),
                 ),
             ]
@@ -91,7 +91,7 @@ def create_python3_shell_wrapper_provider(ctx, py3_script_path, args = [], runfi
                     allow_single_file = True,
                     doc = "Label to Python3 script to invoke at runtime for this test.",
                 ),
-                "args": attr.string_list(
+                "script_args": attr.string_list(
                     default = [],
                     doc = "List of extra arguments to pass to the script.",
                 ),
