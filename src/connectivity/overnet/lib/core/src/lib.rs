@@ -19,6 +19,7 @@ mod test_util;
 pub use coding::{decode_fidl, encode_fidl};
 pub use future_help::log_errors;
 pub use labels::{Endpoint, NodeId, NodeLinkId};
+pub use proxy::set_proxy_drop_event_handler;
 pub use router::{AscenddClientRouting, ListPeersContext, ListablePeer, Router};
 
 pub use test_util::NodeIdGenerator;

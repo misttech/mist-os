@@ -5,3 +5,4 @@
 mod main;
 pub(super) mod spawn;
 mod xfer;
+pub use main::set_proxy_drop_event_handler;
