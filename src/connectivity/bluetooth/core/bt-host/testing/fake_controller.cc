@@ -3372,7 +3372,7 @@ void FakeController::OnAndroidLEGetVendorCapabilities() {
   // sent only the payload.
   auto packet = hci::EmbossEventPacket::New<
       android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>(
-      hci_android::kLEGetVendorCapabilities);
+      hci_spec::kCommandCompleteEventCode);
   MutableBufferView buffer = packet.mutable_data();
   settings_.android_extension_settings.data().Copy(&buffer);
   RespondWithCommandComplete(hci_android::kLEGetVendorCapabilities, &packet);
