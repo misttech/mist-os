@@ -100,5 +100,5 @@ def create_device(
             )
     except Exception as err:
         raise errors.FuchsiaDeviceError(
-            f"Failed to create device for '{device_name}'"
+            f"Failed to create device for '{device_name}': {err}"
         ) from err

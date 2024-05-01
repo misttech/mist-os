@@ -250,11 +250,11 @@ class FfxConfigTests(unittest.TestCase):
     def test_setup_raises_timeout_error(
         self, mock_subprocess_check_call: mock.Mock
     ) -> None:
-        """Test case for ffx.FfxConfig.setup() raises subprocess.TimeoutExpired"""
+        """Test case for ffx.FfxConfig.setup() raises errors.FfxTimeoutError"""
 
         ffx_config = ffx.FfxConfig()
 
-        with self.assertRaises(subprocess.TimeoutExpired):
+        with self.assertRaises(errors.FfxTimeoutError):
             ffx_config.setup(
                 binary_path=_BINARY_PATH,
                 isolate_dir=_ISOLATE_DIR,
@@ -412,8 +412,8 @@ class FfxTests(unittest.TestCase):
     def test_get_target_information_raises_timeout_expired(
         self, mock_ffx_run: mock.Mock
     ) -> None:
-        """Verify get_target_information raising subprocess.TimeoutExpired."""
-        with self.assertRaises(subprocess.TimeoutExpired):
+        """Verify get_target_information raising errors.FfxTimeoutError."""
+        with self.assertRaises(errors.FfxTimeoutError):
             self.ffx_obj_with_ip.get_target_information()
 
         mock_ffx_run.assert_called()
@@ -735,7 +735,7 @@ class FfxTests(unittest.TestCase):
                     "side_effect": subprocess.TimeoutExpired(
                         timeout=10, cmd="ffx -t fuchsia-emulator target show"
                     ),
-                    "expected_error": subprocess.TimeoutExpired,
+                    "expected_error": errors.FfxTimeoutError,
                 },
             ),
         ],
@@ -807,7 +807,7 @@ class FfxTests(unittest.TestCase):
                     "side_effect": subprocess.TimeoutExpired(
                         timeout=10, cmd="ffx target add 127.0.0.1:8082"
                     ),
-                    "expected": subprocess.TimeoutExpired,
+                    "expected": errors.FfxTimeoutError,
                 },
             ),
         ],
@@ -913,7 +913,7 @@ class FfxTests(unittest.TestCase):
                     "side_effect": subprocess.TimeoutExpired(
                         timeout=10, cmd="ffx -t fuchsia-emulator target wait"
                     ),
-                    "expected_error": subprocess.TimeoutExpired,
+                    "expected_error": errors.FfxTimeoutError,
                 },
             ),
         ],
@@ -966,7 +966,7 @@ class FfxTests(unittest.TestCase):
                         timeout=10,
                         cmd="ffx -t fuchsia-emulator target --wait --down",
                     ),
-                    "expected_error": subprocess.TimeoutExpired,
+                    "expected_error": errors.FfxTimeoutError,
                 },
             ),
         ],

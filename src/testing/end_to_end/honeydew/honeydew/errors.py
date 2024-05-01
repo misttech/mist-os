@@ -87,6 +87,10 @@ class HoneydewTimeoutError(HoneydewError):
     """Exception for timeout based raised by Honeydew."""
 
 
+class FfxTimeoutError(HoneydewTimeoutError):
+    """Exception for timeout based errors raised by ffx commands running on host machine."""
+
+
 class HoneydewRtcError(HoneydewError):
     """Raised by rtc.Rtc class."""
 
