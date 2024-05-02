@@ -23,7 +23,6 @@ pub mod msi_resource;
 pub mod power_resource;
 pub mod profile_resource;
 pub mod root_job;
-pub mod root_resource;
 #[cfg(target_arch = "aarch64")]
 pub mod smc_resource;
 pub mod vmex_resource;

@@ -77,8 +77,7 @@ use {
         iommu_resource::IommuResource, irq_resource::IrqResource, items::Items,
         kernel_stats::KernelStats, mexec_resource::MexecResource, mmio_resource::MmioResource,
         msi_resource::MsiResource, power_resource::PowerResource,
-        profile_resource::ProfileResource, root_resource::RootResource,
-        vmex_resource::VmexResource,
+        profile_resource::ProfileResource, vmex_resource::VmexResource,
     },
     cm_config::{RuntimeConfig, VmexSource},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
@@ -600,9 +599,6 @@ impl BuiltinEnvironment {
         let irq_resource_handle =
             take_startup_handle(HandleType::IrqResource.into()).map(zx::Resource::from);
 
-        let root_resource_handle =
-            take_startup_handle(HandleType::Resource.into()).map(zx::Resource::from);
-
         let zbi_vmo_handle = take_startup_handle(HandleType::BootdataVmo.into()).map(zx::Vmo::from);
         let mut zbi_parser = match zbi_vmo_handle {
             Some(zbi_vmo) => Some(
@@ -706,10 +702,27 @@ impl BuiltinEnvironment {
         }
 
         // Set up WriteOnlyLog service.
-        let write_only_log = root_resource_handle.as_ref().map(|handle| {
-            WriteOnlyLog::new(zx::DebugLog::create(handle, zx::DebugLogOpts::empty()).unwrap())
-        });
-        if let Some(write_only_log) = write_only_log {
+        let debuglog_resource = system_resource_handle
+            .as_ref()
+            .map(|handle| {
+                match handle.create_child(
+                    zx::ResourceKind::SYSTEM,
+                    None,
+                    zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
+                    1,
+                    b"debuglog",
+                ) {
+                    Ok(resource) => Some(resource),
+                    Err(_) => None,
+                }
+            })
+            .flatten();
+
+        if let Some(debuglog_resource) = debuglog_resource {
+            let write_only_log = WriteOnlyLog::new(
+                zx::DebugLog::create(&debuglog_resource, zx::DebugLogOpts::empty()).unwrap(),
+            );
+
             root_input_builder.add_builtin_protocol_if_enabled::<fboot::WriteOnlyLogMarker>(
                 move |stream| write_only_log.clone().serve(stream).boxed(),
             );
@@ -744,14 +757,6 @@ impl BuiltinEnvironment {
         if let Some(irq_resource) = irq_resource {
             root_input_builder.add_builtin_protocol_if_enabled::<fkernel::IrqResourceMarker>(
                 move |stream| irq_resource.clone().serve(stream).boxed(),
-            );
-        }
-
-        // Set up RootResource service.
-        let root_resource = root_resource_handle.map(RootResource::new);
-        if let Some(root_resource) = root_resource {
-            root_input_builder.add_builtin_protocol_if_enabled::<fboot::RootResourceMarker>(
-                move |stream| root_resource.clone().serve(stream).boxed(),
             );
         }
 
