@@ -88,7 +88,6 @@ build_api_module("tests") {
   ]
 }
 
-
 # Host-only tests.  These cannot have any dependency on an assembled platform
 # image, or the compiled OS itself, not even for their host_test_data().
 validated_test_types_group("host_tests") {
@@ -112,6 +111,8 @@ group("default") {
   deps = [
     "//:tests",
     "//bundles/boot_tests",
+    "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix",
+    "//zircon/kernel/lib/mistos/userloader/example:tests",
 
     #
     "//zircon/tools:tests",
