@@ -134,6 +134,7 @@ mod tests {
     use super::*;
 
     use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_bluetooth as fidl_bt;
     use fidl_fuchsia_bluetooth_bredr as bredr;
     use fuchsia_inspect_derive::WithInspect;
 
@@ -166,10 +167,10 @@ mod tests {
 
         let params = bredr::ScoConnectionParameters {
             parameter_set: Some(bredr::HfpParameterSet::D1),
-            air_coding_format: Some(bredr::CodingFormat::Cvsd),
+            air_coding_format: Some(fidl_bt::AssignedCodingFormat::Cvsd),
             air_frame_size: Some(60),
             io_bandwidth: Some(16000),
-            io_coding_format: Some(bredr::CodingFormat::LinearPcm),
+            io_coding_format: Some(fidl_bt::AssignedCodingFormat::LinearPcm),
             io_frame_size: Some(16),
             io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
             io_pcm_sample_payload_msb_position: Some(1),

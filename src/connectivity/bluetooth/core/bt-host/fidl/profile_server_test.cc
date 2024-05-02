@@ -32,6 +32,7 @@
 namespace bthost {
 namespace {
 
+namespace fbt = fuchsia::bluetooth;
 namespace fidlbredr = fuchsia::bluetooth::bredr;
 namespace android_emb = pw::bluetooth::vendor::android_hci;
 
@@ -51,10 +52,10 @@ fidlbredr::ScoConnectionParameters CreateScoConnectionParameters(
     fidlbredr::HfpParameterSet param_set = fidlbredr::HfpParameterSet::T2) {
   fidlbredr::ScoConnectionParameters params;
   params.set_parameter_set(param_set);
-  params.set_air_coding_format(fidlbredr::CodingFormat::MSBC);
+  params.set_air_coding_format(fbt::AssignedCodingFormat::MSBC);
   params.set_air_frame_size(8u);
   params.set_io_bandwidth(32000);
-  params.set_io_coding_format(fidlbredr::CodingFormat::LINEAR_PCM);
+  params.set_io_coding_format(fbt::AssignedCodingFormat::LINEAR_PCM);
   params.set_io_frame_size(16u);
   params.set_io_pcm_data_format(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED);
   params.set_io_pcm_sample_payload_msb_position(3u);

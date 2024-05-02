@@ -1562,13 +1562,13 @@ TEST_F(HelpersAdapterTest, FidlToScoParameters) {
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
   params.set_parameter_set(fbredr::HfpParameterSet::T2);
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
-  params.set_air_coding_format(fbredr::CodingFormat::MSBC);
+  params.set_air_coding_format(fbt::AssignedCodingFormat::MSBC);
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
   params.set_air_frame_size(8u);
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
   params.set_io_bandwidth(32000);
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
-  params.set_io_coding_format(fbredr::CodingFormat::LINEAR_PCM);
+  params.set_io_coding_format(fbt::AssignedCodingFormat::LINEAR_PCM);
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
   params.set_io_frame_size(16u);
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
@@ -1644,7 +1644,7 @@ TEST_F(HelpersAdapterTest, FidlToScoParameters) {
   EXPECT_TRUE(FidlToScoParameters(params).is_error());
 
   // PCM format for non-PCM IO coding formats is kNotApplicable and MSB is 0.
-  params.set_io_coding_format(fbredr::CodingFormat::TRANSPARENT);
+  params.set_io_coding_format(fbt::AssignedCodingFormat::TRANSPARENT);
   ASSERT_TRUE(FidlToScoParameters(params).is_ok());
   out = FidlToScoParameters(params).value();
   EXPECT_EQ(view.input_pcm_data_format().Read(),

@@ -1613,8 +1613,9 @@ bt::sco::ParameterSet FidlToScoParameterSet(const fbredr::HfpParameterSet param_
   }
 }
 
-bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParameters::VendorCodingFormatWriter>
-FidlToScoCodingFormat(const fbredr::CodingFormat format) {
+std::optional<bt::StaticPacket<
+    pw::bluetooth::emboss::SynchronousConnectionParameters::VendorCodingFormatWriter>>
+FidlToScoCodingFormat(const fbt::AssignedCodingFormat format) {
   bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParameters::VendorCodingFormatWriter>
       out;
   auto view = out.view();
@@ -1622,30 +1623,32 @@ FidlToScoCodingFormat(const fbredr::CodingFormat format) {
   view.company_id().Write(0);
   view.vendor_codec_id().Write(0);
   switch (format) {
-    case fbredr::CodingFormat::ALAW:
+    case fbt::AssignedCodingFormat::A_LAW_LOG:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::A_LAW);
       break;
-    case fbredr::CodingFormat::MULAW:
+    case fbt::AssignedCodingFormat::U_LAW_LOG:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::U_LAW);
       break;
-    case fbredr::CodingFormat::CVSD:
+    case fbt::AssignedCodingFormat::CVSD:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::CVSD);
       break;
-    case fbredr::CodingFormat::TRANSPARENT:
+    case fbt::AssignedCodingFormat::TRANSPARENT:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::TRANSPARENT);
       break;
-    case fbredr::CodingFormat::LINEAR_PCM:
+    case fbt::AssignedCodingFormat::LINEAR_PCM:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::LINEAR_PCM);
       break;
-    case fbredr::CodingFormat::MSBC:
+    case fbt::AssignedCodingFormat::MSBC:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::MSBC);
       break;
-    case fbredr::CodingFormat::LC3:
+    case fbt::AssignedCodingFormat::LC3:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::LC3);
       break;
-    case fbredr::CodingFormat::G729A:
+    case fbt::AssignedCodingFormat::G_729A:
       view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::G729A);
       break;
+    default:
+      return std::nullopt;
   }
   return out;
 }
@@ -1694,9 +1697,15 @@ FidlToScoParameters(const fbredr::ScoConnectionParameters& params) {
     bt_log(WARN, "fidl", "SCO parameters missing air_coding_format");
     return fpromise::error();
   }
-  auto air_coding_format = FidlToScoCodingFormat(params.air_coding_format());
-  view.transmit_coding_format().CopyFrom(air_coding_format.view());
-  view.receive_coding_format().CopyFrom(air_coding_format.view());
+  std::optional<bt::StaticPacket<
+      pw::bluetooth::emboss::SynchronousConnectionParameters::VendorCodingFormatWriter>>
+      air_coding_format = FidlToScoCodingFormat(params.air_coding_format());
+  if (!air_coding_format) {
+    bt_log(WARN, "fidl", "SCO parameters contains unknown air_coding_format");
+    return fpromise::error();
+  }
+  view.transmit_coding_format().CopyFrom(air_coding_format->view());
+  view.receive_coding_format().CopyFrom(air_coding_format->view());
 
   if (!params.has_air_frame_size()) {
     bt_log(WARN, "fidl", "SCO parameters missing air_frame_size");
@@ -1716,9 +1725,15 @@ FidlToScoParameters(const fbredr::ScoConnectionParameters& params) {
     bt_log(WARN, "fidl", "SCO parameters missing io_coding_format");
     return fpromise::error();
   }
-  auto io_coding_format = FidlToScoCodingFormat(params.io_coding_format());
-  view.input_coding_format().CopyFrom(io_coding_format.view());
-  view.output_coding_format().CopyFrom(io_coding_format.view());
+  std::optional<bt::StaticPacket<
+      pw::bluetooth::emboss::SynchronousConnectionParameters::VendorCodingFormatWriter>>
+      io_coding_format = FidlToScoCodingFormat(params.io_coding_format());
+  if (!io_coding_format) {
+    bt_log(WARN, "fidl", "SCO parameters contains unknown io_coding_format");
+    return fpromise::error();
+  }
+  view.input_coding_format().CopyFrom(io_coding_format->view());
+  view.output_coding_format().CopyFrom(io_coding_format->view());
 
   if (!params.has_io_frame_size()) {
     bt_log(WARN, "fidl", "SCO parameters missing io_frame_size");

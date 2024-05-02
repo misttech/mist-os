@@ -15,6 +15,7 @@ rustc_binary("bin") {
 
   deps = [
     ":hfp_profile_config",
+    "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust",
     "//sdk/fidl/fuchsia.bluetooth.hfp.test:fuchsia.bluetooth.hfp.test_rust",
