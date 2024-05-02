@@ -226,7 +226,7 @@ void HostServer::StartLEDiscovery() {
       /*active=*/true, [self = weak_self_.GetWeakPtr()](auto session) {
         // End the new session if this AdapterServer got destroyed in the
         // meantime (e.g. because the client disconnected).
-        if (!self.is_alive() || !self->discovery_) {
+        if (!self.is_alive() || self->discovery_session_servers_.empty()) {
           return;
         }
 
@@ -259,12 +259,15 @@ void HostServer::StartDiscovery(::fuchsia::bluetooth::host::HostStartDiscoveryRe
   }
   fidl::InterfaceRequest<fhost::DiscoverySession> token = std::move(*request.mutable_token());
 
-  if (discovery_) {
-    bt_log(WARN, "fidl", "discovery already in progress");
-    token.Close(ZX_ERR_ALREADY_BOUND);
+  std::unique_ptr<DiscoverySessionServer> server =
+      std::make_unique<DiscoverySessionServer>(std::move(token), this);
+  DiscoverySessionServer* server_ptr = server.get();
+  discovery_session_servers_.emplace(server_ptr, std::move(server));
+
+  // If there were existing sessions, then discovery is already starting/started.
+  if (discovery_session_servers_.size() != 1) {
     return;
   }
-  discovery_ = std::make_unique<DiscoverySessionServer>(std::move(token), this);
 
   if (!adapter()->bredr()) {
     StartLEDiscovery();
@@ -273,7 +276,7 @@ void HostServer::StartDiscovery(::fuchsia::bluetooth::host::HostStartDiscoveryRe
   // TODO(jamuraa): start these in parallel instead of sequence
   adapter()->bredr()->RequestDiscovery([self = weak_self_.GetWeakPtr(), func = __FUNCTION__](
                                            bt::hci::Result<> result, auto session) mutable {
-    if (!self.is_alive() || !self->discovery_) {
+    if (!self.is_alive() || self->discovery_session_servers_.empty()) {
       return;
     }
 
@@ -288,17 +291,25 @@ void HostServer::StartDiscovery(::fuchsia::bluetooth::host::HostStartDiscoveryRe
   });
 }
 
-void HostServer::StopDiscovery(zx_status_t epitaph) {
+void HostServer::StopDiscovery(zx_status_t epitaph, bool notify_info_change) {
   bool discovering = le_discovery_session_ || bredr_discovery_session_;
   bredr_discovery_session_ = nullptr;
   le_discovery_session_ = nullptr;
-  if (discovery_) {
-    discovery_->Close(epitaph);
-    discovery_ = nullptr;
+  for (auto& [server, _] : discovery_session_servers_) {
+    server->Close(epitaph);
   }
+  discovery_session_servers_.clear();
 
-  if (discovering) {
+  if (discovering && notify_info_change) {
     NotifyInfoChange();
+  }
+}
+
+void HostServer::OnDiscoverySessionServerClose(DiscoverySessionServer* server) {
+  server->Close(ZX_ERR_CANCELED);
+  discovery_session_servers_.erase(server);
+  if (discovery_session_servers_.empty()) {
+    StopDiscovery(ZX_ERR_CANCELED);
   }
 }
 
@@ -748,11 +759,10 @@ void HostServer::Shutdown() {
   requesting_discoverable_ = false;
   requesting_background_scan_ = false;
 
-  le_discovery_session_ = nullptr;
   le_background_scan_ = nullptr;
-  bredr_discovery_session_ = nullptr;
   bredr_discoverable_session_ = nullptr;
-  discovery_ = nullptr;
+
+  StopDiscovery(ZX_ERR_CANCELED, /*notify_info_change=*/false);
 
   // Drop all connections that are attached to this HostServer.
   le_connections_.clear();
@@ -780,11 +790,18 @@ void HostServer::handle_unknown_method(uint64_t ordinal, bool method_has_respons
   bt_log(WARN, "fidl", "Received unknown method with ordinal: %lu", ordinal);
 }
 
-void HostServer::DiscoverySessionServer::Stop() { host_->StopDiscovery(ZX_ERR_CANCELED); }
+void HostServer::DiscoverySessionServer::Stop() { host_->OnDiscoverySessionServerClose(this); }
 
 void HostServer::DiscoverySessionServer::handle_unknown_method(uint64_t ordinal,
                                                                bool method_has_response) {
   bt_log(WARN, "fidl", "Received unknown method with ordinal: %lu", ordinal);
+}
+
+HostServer::DiscoverySessionServer::DiscoverySessionServer(
+    fidl::InterfaceRequest<::fuchsia::bluetooth::host::DiscoverySession> request, HostServer* host)
+    : ServerBase(this, std::move(request)), host_(host) {
+  binding()->set_error_handler(
+      [this, host](zx_status_t /*status*/) { host->OnDiscoverySessionServerClose(this); });
 }
 
 bt::sm::IOCapability HostServer::io_capability() const {

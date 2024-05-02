@@ -108,8 +108,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
    public:
     explicit DiscoverySessionServer(
         fidl::InterfaceRequest<::fuchsia::bluetooth::host::DiscoverySession> request,
-        HostServer* host)
-        : ServerBase(this, std::move(request)), host_(host) {}
+        HostServer* host);
 
     void Close(zx_status_t epitaph) { binding()->Close(epitaph); }
 
@@ -161,7 +160,9 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   // Helper to start LE Discovery (called by StartDiscovery)
   void StartLEDiscovery();
 
-  void StopDiscovery(zx_status_t epitaph);
+  void StopDiscovery(zx_status_t epitaph, bool notify_info_change = true);
+
+  void OnDiscoverySessionServerClose(DiscoverySessionServer* server);
 
   // Resets the I/O capability of this server to no I/O and tells the GAP layer
   // to reject incoming pairing requests.
@@ -185,7 +186,8 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   // We hold a weak pointer to GATT for dispatching GATT FIDL requests.
   bt::gatt::GATT::WeakPtr gatt_;
 
-  std::unique_ptr<DiscoverySessionServer> discovery_;
+  std::unordered_map<DiscoverySessionServer*, std::unique_ptr<DiscoverySessionServer>>
+      discovery_session_servers_;
   std::unique_ptr<bt::gap::LowEnergyDiscoverySession> le_discovery_session_;
   std::unique_ptr<bt::gap::BrEdrDiscoverySession> bredr_discovery_session_;
 

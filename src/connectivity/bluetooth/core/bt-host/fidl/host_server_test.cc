@@ -611,7 +611,7 @@ TEST_F(HostServerTest, StartDiscoveryWithMissingToken) {
   RunLoopUntilIdle();
 }
 
-TEST_F(HostServerTest, StartDiscoveryTwiceFails) {
+TEST_F(HostServerTest, StartDiscoveryTwiceAndCloseTwice) {
   fhost::DiscoverySessionHandle discovery_0;
   fhost::HostStartDiscoveryRequest start_request_0;
   start_request_0.set_token(discovery_0.NewRequest());
@@ -631,8 +631,30 @@ TEST_F(HostServerTest, StartDiscoveryTwiceFails) {
   host_client()->StartDiscovery(std::move(start_request_1));
   RunLoopUntilIdle();
   EXPECT_FALSE(discovery_error_0);
-  ASSERT_TRUE(discovery_error_1);
-  EXPECT_EQ(discovery_error_1.value(), ZX_ERR_ALREADY_BOUND);
+  EXPECT_FALSE(discovery_error_1);
+
+  std::optional<fsys::HostInfo> info;
+  host_client()->WatchState(
+      [&](fhost::Host_WatchState_Result result) { info = std::move(result.response().info); });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(info.has_value());
+  EXPECT_TRUE(info->discovering());
+  info.reset();
+
+  host_client()->WatchState(
+      [&](fhost::Host_WatchState_Result result) { info = std::move(result.response().info); });
+  RunLoopUntilIdle();
+  EXPECT_FALSE(info.has_value());
+
+  discovery_client_0.Unbind();
+  RunLoopUntilIdle();
+  // Client 1 is still open, so discovery should still be enabled.
+  EXPECT_FALSE(info.has_value());
+
+  discovery_client_1.Unbind();
+  RunLoopUntilIdle();
+  ASSERT_TRUE(info.has_value());
+  EXPECT_FALSE(info->discovering());
 }
 
 TEST_F(HostServerTest, WatchDiscoverableState) {
