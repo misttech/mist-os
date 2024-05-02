@@ -214,7 +214,6 @@
         // Needed by some non-hermetic tests
         {
             protocol: [
-                "fuchsia.boot.RootResource",
                 "fuchsia.device.NameProvider",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebuglogResource",
