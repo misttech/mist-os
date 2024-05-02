@@ -137,17 +137,9 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.boot.RootResource",
-                "fuchsia.boot.WriteOnlyLog",
-            ],
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [ "#driver_manager" ],
-        },
-        {
-            protocol: [ "fuchsia.boot.RootResource" ],
-            from: "parent",
-            to: [ "#boot-drivers" ],
         },
         {
             protocol: "fuchsia.process.Launcher",
