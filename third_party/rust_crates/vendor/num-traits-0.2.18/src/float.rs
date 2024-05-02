@@ -1,14 +1,11 @@
-use core::mem;
+use core::cmp::Ordering;
 use core::num::FpCategory;
 use core::ops::{Add, Div, Neg};
 
 use core::f32;
 use core::f64;
 
-use {Num, NumCast, ToPrimitive};
-
-#[cfg(all(not(feature = "std"), feature = "libm"))]
-use libm;
+use crate::{Num, NumCast, ToPrimitive};
 
 /// Generic trait for floating point numbers that works with `no_std`.
 ///
@@ -170,6 +167,7 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
     /// check(0.0f64, false);
     /// ```
     #[inline]
+    #[allow(clippy::eq_op)]
     fn is_nan(self) -> bool {
         self != self
     }
@@ -242,6 +240,32 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
     #[inline]
     fn is_normal(self) -> bool {
         self.classify() == FpCategory::Normal
+    }
+
+    /// Returns `true` if the number is [subnormal].
+    ///
+    /// ```
+    /// use num_traits::float::FloatCore;
+    /// use std::f64;
+    ///
+    /// let min = f64::MIN_POSITIVE; // 2.2250738585072014e-308_f64
+    /// let max = f64::MAX;
+    /// let lower_than_min = 1.0e-308_f64;
+    /// let zero = 0.0_f64;
+    ///
+    /// assert!(!min.is_subnormal());
+    /// assert!(!max.is_subnormal());
+    ///
+    /// assert!(!zero.is_subnormal());
+    /// assert!(!f64::NAN.is_subnormal());
+    /// assert!(!f64::INFINITY.is_subnormal());
+    /// // Values between `0` and `min` are Subnormal.
+    /// assert!(lower_than_min.is_subnormal());
+    /// ```
+    /// [subnormal]: https://en.wikipedia.org/wiki/Subnormal_number
+    #[inline]
+    fn is_subnormal(self) -> bool {
+        self.classify() == FpCategory::Subnormal
     }
 
     /// Returns the floating point category of the number. If only one property
@@ -370,12 +394,10 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
             } else {
                 self - f + one
             }
+        } else if -f < h {
+            self - f
         } else {
-            if -f < h {
-                self - f
-            } else {
-                self - f - one
-            }
+            self - f - one
         }
     }
 
@@ -508,8 +530,7 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
     }
 
     /// Returns `true` if `self` is positive, including `+0.0` and
-    /// `FloatCore::infinity()`, and since Rust 1.20 also
-    /// `FloatCore::nan()`.
+    /// `FloatCore::infinity()`, and `FloatCore::nan()`.
     ///
     /// # Examples
     ///
@@ -527,6 +548,7 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
     /// check(-0.0f64, false);
     /// check(f64::NEG_INFINITY, false);
     /// check(f64::MIN_POSITIVE, true);
+    /// check(f64::NAN, true);
     /// check(-f64::NAN, false);
     /// ```
     #[inline]
@@ -535,8 +557,7 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
     }
 
     /// Returns `true` if `self` is negative, including `-0.0` and
-    /// `FloatCore::neg_infinity()`, and since Rust 1.20 also
-    /// `-FloatCore::nan()`.
+    /// `FloatCore::neg_infinity()`, and `-FloatCore::nan()`.
     ///
     /// # Examples
     ///
@@ -555,6 +576,7 @@ pub trait FloatCore: Num + NumCast + Neg<Output = Self> + PartialOrd + Copy {
     /// check(f64::NEG_INFINITY, true);
     /// check(f64::MIN_POSITIVE, false);
     /// check(f64::NAN, false);
+    /// check(-f64::NAN, true);
     /// ```
     #[inline]
     fn is_sign_negative(self) -> bool {
@@ -763,45 +785,28 @@ impl FloatCore for f32 {
         integer_decode_f32(self)
     }
 
-    #[inline]
-    #[cfg(not(feature = "std"))]
-    fn classify(self) -> FpCategory {
-        const EXP_MASK: u32 = 0x7f800000;
-        const MAN_MASK: u32 = 0x007fffff;
-
-        // Safety: this identical to the implementation of f32::to_bits(),
-        // which is only available starting at Rust 1.20
-        let bits: u32 = unsafe { mem::transmute(self) };
-        match (bits & MAN_MASK, bits & EXP_MASK) {
-            (0, 0) => FpCategory::Zero,
-            (_, 0) => FpCategory::Subnormal,
-            (0, EXP_MASK) => FpCategory::Infinite,
-            (_, EXP_MASK) => FpCategory::Nan,
-            _ => FpCategory::Normal,
-        }
-    }
-
-    #[inline]
-    #[cfg(not(feature = "std"))]
-    fn to_degrees(self) -> Self {
-        // Use a constant for better precision.
-        const PIS_IN_180: f32 = 57.2957795130823208767981548141051703_f32;
-        self * PIS_IN_180
-    }
-
-    #[inline]
-    #[cfg(not(feature = "std"))]
-    fn to_radians(self) -> Self {
-        self * (f32::consts::PI / 180.0)
-    }
-
-    #[cfg(feature = "std")]
     forward! {
         Self::is_nan(self) -> bool;
         Self::is_infinite(self) -> bool;
         Self::is_finite(self) -> bool;
         Self::is_normal(self) -> bool;
         Self::classify(self) -> FpCategory;
+        Self::is_sign_positive(self) -> bool;
+        Self::is_sign_negative(self) -> bool;
+        Self::min(self, other: Self) -> Self;
+        Self::max(self, other: Self) -> Self;
+        Self::recip(self) -> Self;
+        Self::to_degrees(self) -> Self;
+        Self::to_radians(self) -> Self;
+    }
+
+    #[cfg(has_is_subnormal)]
+    forward! {
+        Self::is_subnormal(self) -> bool;
+    }
+
+    #[cfg(feature = "std")]
+    forward! {
         Self::floor(self) -> Self;
         Self::ceil(self) -> Self;
         Self::round(self) -> Self;
@@ -809,14 +814,22 @@ impl FloatCore for f32 {
         Self::fract(self) -> Self;
         Self::abs(self) -> Self;
         Self::signum(self) -> Self;
-        Self::is_sign_positive(self) -> bool;
-        Self::is_sign_negative(self) -> bool;
-        Self::min(self, other: Self) -> Self;
-        Self::max(self, other: Self) -> Self;
-        Self::recip(self) -> Self;
         Self::powi(self, n: i32) -> Self;
-        Self::to_degrees(self) -> Self;
-        Self::to_radians(self) -> Self;
+    }
+
+    #[cfg(all(not(feature = "std"), feature = "libm"))]
+    forward! {
+        libm::floorf as floor(self) -> Self;
+        libm::ceilf as ceil(self) -> Self;
+        libm::roundf as round(self) -> Self;
+        libm::truncf as trunc(self) -> Self;
+        libm::fabsf as abs(self) -> Self;
+    }
+
+    #[cfg(all(not(feature = "std"), feature = "libm"))]
+    #[inline]
+    fn fract(self) -> Self {
+        self - libm::truncf(self)
     }
 }
 
@@ -837,46 +850,28 @@ impl FloatCore for f64 {
         integer_decode_f64(self)
     }
 
-    #[inline]
-    #[cfg(not(feature = "std"))]
-    fn classify(self) -> FpCategory {
-        const EXP_MASK: u64 = 0x7ff0000000000000;
-        const MAN_MASK: u64 = 0x000fffffffffffff;
-
-        // Safety: this identical to the implementation of f64::to_bits(),
-        // which is only available starting at Rust 1.20
-        let bits: u64 = unsafe { mem::transmute(self) };
-        match (bits & MAN_MASK, bits & EXP_MASK) {
-            (0, 0) => FpCategory::Zero,
-            (_, 0) => FpCategory::Subnormal,
-            (0, EXP_MASK) => FpCategory::Infinite,
-            (_, EXP_MASK) => FpCategory::Nan,
-            _ => FpCategory::Normal,
-        }
-    }
-
-    #[inline]
-    #[cfg(not(feature = "std"))]
-    fn to_degrees(self) -> Self {
-        // The division here is correctly rounded with respect to the true
-        // value of 180/π. (This differs from f32, where a constant must be
-        // used to ensure a correctly rounded result.)
-        self * (180.0 / f64::consts::PI)
-    }
-
-    #[inline]
-    #[cfg(not(feature = "std"))]
-    fn to_radians(self) -> Self {
-        self * (f64::consts::PI / 180.0)
-    }
-
-    #[cfg(feature = "std")]
     forward! {
         Self::is_nan(self) -> bool;
         Self::is_infinite(self) -> bool;
         Self::is_finite(self) -> bool;
         Self::is_normal(self) -> bool;
         Self::classify(self) -> FpCategory;
+        Self::is_sign_positive(self) -> bool;
+        Self::is_sign_negative(self) -> bool;
+        Self::min(self, other: Self) -> Self;
+        Self::max(self, other: Self) -> Self;
+        Self::recip(self) -> Self;
+        Self::to_degrees(self) -> Self;
+        Self::to_radians(self) -> Self;
+    }
+
+    #[cfg(has_is_subnormal)]
+    forward! {
+        Self::is_subnormal(self) -> bool;
+    }
+
+    #[cfg(feature = "std")]
+    forward! {
         Self::floor(self) -> Self;
         Self::ceil(self) -> Self;
         Self::round(self) -> Self;
@@ -884,14 +879,22 @@ impl FloatCore for f64 {
         Self::fract(self) -> Self;
         Self::abs(self) -> Self;
         Self::signum(self) -> Self;
-        Self::is_sign_positive(self) -> bool;
-        Self::is_sign_negative(self) -> bool;
-        Self::min(self, other: Self) -> Self;
-        Self::max(self, other: Self) -> Self;
-        Self::recip(self) -> Self;
         Self::powi(self, n: i32) -> Self;
-        Self::to_degrees(self) -> Self;
-        Self::to_radians(self) -> Self;
+    }
+
+    #[cfg(all(not(feature = "std"), feature = "libm"))]
+    forward! {
+        libm::floor as floor(self) -> Self;
+        libm::ceil as ceil(self) -> Self;
+        libm::round as round(self) -> Self;
+        libm::trunc as trunc(self) -> Self;
+        libm::fabs as abs(self) -> Self;
+    }
+
+    #[cfg(all(not(feature = "std"), feature = "libm"))]
+    #[inline]
+    fn fract(self) -> Self {
+        self - libm::trunc(self)
     }
 }
 
@@ -1082,8 +1085,34 @@ pub trait Float: Num + Copy + NumCast + PartialOrd + Neg<Output = Self> {
     /// // Values between `0` and `min` are Subnormal.
     /// assert!(!lower_than_min.is_normal());
     /// ```
-    /// [subnormal]: http://en.wikipedia.org/wiki/Denormal_number
+    /// [subnormal]: http://en.wikipedia.org/wiki/Subnormal_number
     fn is_normal(self) -> bool;
+
+    /// Returns `true` if the number is [subnormal].
+    ///
+    /// ```
+    /// use num_traits::Float;
+    /// use std::f64;
+    ///
+    /// let min = f64::MIN_POSITIVE; // 2.2250738585072014e-308_f64
+    /// let max = f64::MAX;
+    /// let lower_than_min = 1.0e-308_f64;
+    /// let zero = 0.0_f64;
+    ///
+    /// assert!(!min.is_subnormal());
+    /// assert!(!max.is_subnormal());
+    ///
+    /// assert!(!zero.is_subnormal());
+    /// assert!(!f64::NAN.is_subnormal());
+    /// assert!(!f64::INFINITY.is_subnormal());
+    /// // Values between `0` and `min` are Subnormal.
+    /// assert!(lower_than_min.is_subnormal());
+    /// ```
+    /// [subnormal]: https://en.wikipedia.org/wiki/Subnormal_number
+    #[inline]
+    fn is_subnormal(self) -> bool {
+        self.classify() == FpCategory::Subnormal
+    }
 
     /// Returns the floating point category of the number. If only one property
     /// is going to be tested, it is generally faster to use the specific
@@ -1210,12 +1239,13 @@ pub trait Float: Num + Copy + NumCast + PartialOrd + Neg<Output = Self> {
     fn signum(self) -> Self;
 
     /// Returns `true` if `self` is positive, including `+0.0`,
-    /// `Float::infinity()`, and since Rust 1.20 also `Float::nan()`.
+    /// `Float::infinity()`, and `Float::nan()`.
     ///
     /// ```
     /// use num_traits::Float;
     /// use std::f64;
     ///
+    /// let nan: f64 = f64::NAN;
     /// let neg_nan: f64 = -f64::NAN;
     ///
     /// let f = 7.0;
@@ -1223,18 +1253,20 @@ pub trait Float: Num + Copy + NumCast + PartialOrd + Neg<Output = Self> {
     ///
     /// assert!(f.is_sign_positive());
     /// assert!(!g.is_sign_positive());
+    /// assert!(nan.is_sign_positive());
     /// assert!(!neg_nan.is_sign_positive());
     /// ```
     fn is_sign_positive(self) -> bool;
 
     /// Returns `true` if `self` is negative, including `-0.0`,
-    /// `Float::neg_infinity()`, and since Rust 1.20 also `-Float::nan()`.
+    /// `Float::neg_infinity()`, and `-Float::nan()`.
     ///
     /// ```
     /// use num_traits::Float;
     /// use std::f64;
     ///
     /// let nan: f64 = f64::NAN;
+    /// let neg_nan: f64 = -f64::NAN;
     ///
     /// let f = 7.0;
     /// let g = -7.0;
@@ -1242,6 +1274,7 @@ pub trait Float: Num + Copy + NumCast + PartialOrd + Neg<Output = Self> {
     /// assert!(!f.is_sign_negative());
     /// assert!(g.is_sign_negative());
     /// assert!(!nan.is_sign_negative());
+    /// assert!(neg_nan.is_sign_negative());
     /// ```
     fn is_sign_negative(self) -> bool;
 
@@ -1806,6 +1839,35 @@ pub trait Float: Num + Copy + NumCast + PartialOrd + Neg<Output = Self> {
     /// assert!(abs_difference < 1e-10);
     /// ```
     fn integer_decode(self) -> (u64, i16, i8);
+
+    /// Returns a number composed of the magnitude of `self` and the sign of
+    /// `sign`.
+    ///
+    /// Equal to `self` if the sign of `self` and `sign` are the same, otherwise
+    /// equal to `-self`. If `self` is a `NAN`, then a `NAN` with the sign of
+    /// `sign` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use num_traits::Float;
+    ///
+    /// let f = 3.5_f32;
+    ///
+    /// assert_eq!(f.copysign(0.42), 3.5_f32);
+    /// assert_eq!(f.copysign(-0.42), -3.5_f32);
+    /// assert_eq!((-f).copysign(0.42), 3.5_f32);
+    /// assert_eq!((-f).copysign(-0.42), -3.5_f32);
+    ///
+    /// assert!(f32::nan().copysign(1.0).is_nan());
+    /// ```
+    fn copysign(self, sign: Self) -> Self {
+        if self.is_sign_negative() == sign.is_sign_negative() {
+            self
+        } else {
+            self.neg()
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -1883,6 +1945,16 @@ macro_rules! float_impl_std {
                 Self::acosh(self) -> Self;
                 Self::atanh(self) -> Self;
             }
+
+            #[cfg(has_copysign)]
+            forward! {
+                Self::copysign(self, sign: Self) -> Self;
+            }
+
+            #[cfg(has_is_subnormal)]
+            forward! {
+                Self::is_subnormal(self) -> bool;
+            }
         }
     };
 }
@@ -1908,7 +1980,7 @@ macro_rules! float_impl_libm {
 
         #[inline]
         fn fract(self) -> Self {
-            self - FloatCore::trunc(self)
+            self - Float::trunc(self)
         }
 
         #[inline]
@@ -1917,28 +1989,34 @@ macro_rules! float_impl_libm {
         }
 
         forward! {
-            FloatCore::is_nan(self) -> bool;
-            FloatCore::is_infinite(self) -> bool;
-            FloatCore::is_finite(self) -> bool;
-            FloatCore::is_normal(self) -> bool;
-            FloatCore::classify(self) -> FpCategory;
+            Self::is_nan(self) -> bool;
+            Self::is_infinite(self) -> bool;
+            Self::is_finite(self) -> bool;
+            Self::is_normal(self) -> bool;
+            Self::classify(self) -> FpCategory;
+            Self::is_sign_positive(self) -> bool;
+            Self::is_sign_negative(self) -> bool;
+            Self::min(self, other: Self) -> Self;
+            Self::max(self, other: Self) -> Self;
+            Self::recip(self) -> Self;
+            Self::to_degrees(self) -> Self;
+            Self::to_radians(self) -> Self;
+        }
+
+        #[cfg(has_is_subnormal)]
+        forward! {
+            Self::is_subnormal(self) -> bool;
+        }
+
+        forward! {
             FloatCore::signum(self) -> Self;
-            FloatCore::is_sign_positive(self) -> bool;
-            FloatCore::is_sign_negative(self) -> bool;
-            FloatCore::recip(self) -> Self;
             FloatCore::powi(self, n: i32) -> Self;
-            FloatCore::to_degrees(self) -> Self;
-            FloatCore::to_radians(self) -> Self;
-            FloatCore::max(self, other: Self) -> Self;
-            FloatCore::min(self, other: Self) -> Self;
         }
     };
 }
 
 fn integer_decode_f32(f: f32) -> (u64, i16, i8) {
-    // Safety: this identical to the implementation of f32::to_bits(),
-    // which is only available starting at Rust 1.20
-    let bits: u32 = unsafe { mem::transmute(f) };
+    let bits: u32 = f.to_bits();
     let sign: i8 = if bits >> 31 == 0 { 1 } else { -1 };
     let mut exponent: i16 = ((bits >> 23) & 0xff) as i16;
     let mantissa = if exponent == 0 {
@@ -1952,9 +2030,7 @@ fn integer_decode_f32(f: f32) -> (u64, i16, i8) {
 }
 
 fn integer_decode_f64(f: f64) -> (u64, i16, i8) {
-    // Safety: this identical to the implementation of f64::to_bits(),
-    // which is only available starting at Rust 1.20
-    let bits: u64 = unsafe { mem::transmute(f) };
+    let bits: u64 = f.to_bits();
     let sign: i8 = if bits >> 63 == 0 { 1 } else { -1 };
     let mut exponent: i16 = ((bits >> 52) & 0x7ff) as i16;
     let mantissa = if exponent == 0 {
@@ -1981,129 +2057,40 @@ impl Float for f32 {
     fn abs_sub(self, other: Self) -> Self {
         libm::fdimf(self, other)
     }
-    #[inline]
-    fn floor(self) -> Self {
-        libm::floorf(self)
-    }
-    #[inline]
-    fn ceil(self) -> Self {
-        libm::ceilf(self)
-    }
-    #[inline]
-    fn round(self) -> Self {
-        libm::roundf(self)
-    }
-    #[inline]
-    fn trunc(self) -> Self {
-        libm::truncf(self)
-    }
-    #[inline]
-    fn abs(self) -> Self {
-        libm::fabsf(self)
-    }
-    #[inline]
-    fn mul_add(self, a: Self, b: Self) -> Self {
-        libm::fmaf(self, a, b)
-    }
-    #[inline]
-    fn powf(self, n: Self) -> Self {
-        libm::powf(self, n)
-    }
-    #[inline]
-    fn sqrt(self) -> Self {
-        libm::sqrtf(self)
-    }
-    #[inline]
-    fn exp(self) -> Self {
-        libm::expf(self)
-    }
-    #[inline]
-    fn exp2(self) -> Self {
-        libm::exp2f(self)
-    }
-    #[inline]
-    fn ln(self) -> Self {
-        libm::logf(self)
-    }
-    #[inline]
-    fn log2(self) -> Self {
-        libm::log2f(self)
-    }
-    #[inline]
-    fn log10(self) -> Self {
-        libm::log10f(self)
-    }
-    #[inline]
-    fn cbrt(self) -> Self {
-        libm::cbrtf(self)
-    }
-    #[inline]
-    fn hypot(self, other: Self) -> Self {
-        libm::hypotf(self, other)
-    }
-    #[inline]
-    fn sin(self) -> Self {
-        libm::sinf(self)
-    }
-    #[inline]
-    fn cos(self) -> Self {
-        libm::cosf(self)
-    }
-    #[inline]
-    fn tan(self) -> Self {
-        libm::tanf(self)
-    }
-    #[inline]
-    fn asin(self) -> Self {
-        libm::asinf(self)
-    }
-    #[inline]
-    fn acos(self) -> Self {
-        libm::acosf(self)
-    }
-    #[inline]
-    fn atan(self) -> Self {
-        libm::atanf(self)
-    }
-    #[inline]
-    fn atan2(self, other: Self) -> Self {
-        libm::atan2f(self, other)
-    }
-    #[inline]
-    fn sin_cos(self) -> (Self, Self) {
-        libm::sincosf(self)
-    }
-    #[inline]
-    fn exp_m1(self) -> Self {
-        libm::expm1f(self)
-    }
-    #[inline]
-    fn ln_1p(self) -> Self {
-        libm::log1pf(self)
-    }
-    #[inline]
-    fn sinh(self) -> Self {
-        libm::sinhf(self)
-    }
-    #[inline]
-    fn cosh(self) -> Self {
-        libm::coshf(self)
-    }
-    #[inline]
-    fn tanh(self) -> Self {
-        libm::tanhf(self)
-    }
-    #[inline]
-    fn asinh(self) -> Self {
-        libm::asinhf(self)
-    }
-    #[inline]
-    fn acosh(self) -> Self {
-        libm::acoshf(self)
-    }
-    #[inline]
-    fn atanh(self) -> Self {
-        libm::atanhf(self)
+
+    forward! {
+        libm::floorf as floor(self) -> Self;
+        libm::ceilf as ceil(self) -> Self;
+        libm::roundf as round(self) -> Self;
+        libm::truncf as trunc(self) -> Self;
+        libm::fabsf as abs(self) -> Self;
+        libm::fmaf as mul_add(self, a: Self, b: Self) -> Self;
+        libm::powf as powf(self, n: Self) -> Self;
+        libm::sqrtf as sqrt(self) -> Self;
+        libm::expf as exp(self) -> Self;
+        libm::exp2f as exp2(self) -> Self;
+        libm::logf as ln(self) -> Self;
+        libm::log2f as log2(self) -> Self;
+        libm::log10f as log10(self) -> Self;
+        libm::cbrtf as cbrt(self) -> Self;
+        libm::hypotf as hypot(self, other: Self) -> Self;
+        libm::sinf as sin(self) -> Self;
+        libm::cosf as cos(self) -> Self;
+        libm::tanf as tan(self) -> Self;
+        libm::asinf as asin(self) -> Self;
+        libm::acosf as acos(self) -> Self;
+        libm::atanf as atan(self) -> Self;
+        libm::atan2f as atan2(self, other: Self) -> Self;
+        libm::sincosf as sin_cos(self) -> (Self, Self);
+        libm::expm1f as exp_m1(self) -> Self;
+        libm::log1pf as ln_1p(self) -> Self;
+        libm::sinhf as sinh(self) -> Self;
+        libm::coshf as cosh(self) -> Self;
+        libm::tanhf as tanh(self) -> Self;
+        libm::asinhf as asinh(self) -> Self;
+        libm::acoshf as acosh(self) -> Self;
+        libm::atanhf as atanh(self) -> Self;
+        libm::copysignf as copysign(self, other: Self) -> Self;
     }
 }
 
@@ -2116,129 +2103,40 @@ impl Float for f64 {
     fn abs_sub(self, other: Self) -> Self {
         libm::fdim(self, other)
     }
-    #[inline]
-    fn floor(self) -> Self {
-        libm::floor(self)
-    }
-    #[inline]
-    fn ceil(self) -> Self {
-        libm::ceil(self)
-    }
-    #[inline]
-    fn round(self) -> Self {
-        libm::round(self)
-    }
-    #[inline]
-    fn trunc(self) -> Self {
-        libm::trunc(self)
-    }
-    #[inline]
-    fn abs(self) -> Self {
-        libm::fabs(self)
-    }
-    #[inline]
-    fn mul_add(self, a: Self, b: Self) -> Self {
-        libm::fma(self, a, b)
-    }
-    #[inline]
-    fn powf(self, n: Self) -> Self {
-        libm::pow(self, n)
-    }
-    #[inline]
-    fn sqrt(self) -> Self {
-        libm::sqrt(self)
-    }
-    #[inline]
-    fn exp(self) -> Self {
-        libm::exp(self)
-    }
-    #[inline]
-    fn exp2(self) -> Self {
-        libm::exp2(self)
-    }
-    #[inline]
-    fn ln(self) -> Self {
-        libm::log(self)
-    }
-    #[inline]
-    fn log2(self) -> Self {
-        libm::log2(self)
-    }
-    #[inline]
-    fn log10(self) -> Self {
-        libm::log10(self)
-    }
-    #[inline]
-    fn cbrt(self) -> Self {
-        libm::cbrt(self)
-    }
-    #[inline]
-    fn hypot(self, other: Self) -> Self {
-        libm::hypot(self, other)
-    }
-    #[inline]
-    fn sin(self) -> Self {
-        libm::sin(self)
-    }
-    #[inline]
-    fn cos(self) -> Self {
-        libm::cos(self)
-    }
-    #[inline]
-    fn tan(self) -> Self {
-        libm::tan(self)
-    }
-    #[inline]
-    fn asin(self) -> Self {
-        libm::asin(self)
-    }
-    #[inline]
-    fn acos(self) -> Self {
-        libm::acos(self)
-    }
-    #[inline]
-    fn atan(self) -> Self {
-        libm::atan(self)
-    }
-    #[inline]
-    fn atan2(self, other: Self) -> Self {
-        libm::atan2(self, other)
-    }
-    #[inline]
-    fn sin_cos(self) -> (Self, Self) {
-        libm::sincos(self)
-    }
-    #[inline]
-    fn exp_m1(self) -> Self {
-        libm::expm1(self)
-    }
-    #[inline]
-    fn ln_1p(self) -> Self {
-        libm::log1p(self)
-    }
-    #[inline]
-    fn sinh(self) -> Self {
-        libm::sinh(self)
-    }
-    #[inline]
-    fn cosh(self) -> Self {
-        libm::cosh(self)
-    }
-    #[inline]
-    fn tanh(self) -> Self {
-        libm::tanh(self)
-    }
-    #[inline]
-    fn asinh(self) -> Self {
-        libm::asinh(self)
-    }
-    #[inline]
-    fn acosh(self) -> Self {
-        libm::acosh(self)
-    }
-    #[inline]
-    fn atanh(self) -> Self {
-        libm::atanh(self)
+
+    forward! {
+        libm::floor as floor(self) -> Self;
+        libm::ceil as ceil(self) -> Self;
+        libm::round as round(self) -> Self;
+        libm::trunc as trunc(self) -> Self;
+        libm::fabs as abs(self) -> Self;
+        libm::fma as mul_add(self, a: Self, b: Self) -> Self;
+        libm::pow as powf(self, n: Self) -> Self;
+        libm::sqrt as sqrt(self) -> Self;
+        libm::exp as exp(self) -> Self;
+        libm::exp2 as exp2(self) -> Self;
+        libm::log as ln(self) -> Self;
+        libm::log2 as log2(self) -> Self;
+        libm::log10 as log10(self) -> Self;
+        libm::cbrt as cbrt(self) -> Self;
+        libm::hypot as hypot(self, other: Self) -> Self;
+        libm::sin as sin(self) -> Self;
+        libm::cos as cos(self) -> Self;
+        libm::tan as tan(self) -> Self;
+        libm::asin as asin(self) -> Self;
+        libm::acos as acos(self) -> Self;
+        libm::atan as atan(self) -> Self;
+        libm::atan2 as atan2(self, other: Self) -> Self;
+        libm::sincos as sin_cos(self) -> (Self, Self);
+        libm::expm1 as exp_m1(self) -> Self;
+        libm::log1p as ln_1p(self) -> Self;
+        libm::sinh as sinh(self) -> Self;
+        libm::cosh as cosh(self) -> Self;
+        libm::tanh as tanh(self) -> Self;
+        libm::asinh as asinh(self) -> Self;
+        libm::acosh as acosh(self) -> Self;
+        libm::atanh as atanh(self) -> Self;
+        libm::copysign as copysign(self, sign: Self) -> Self;
     }
 }
 
@@ -2313,6 +2211,89 @@ float_const_impl! {
     SQRT_2,
 }
 
+/// Trait for floating point numbers that provide an implementation
+/// of the `totalOrder` predicate as defined in the IEEE 754 (2008 revision)
+/// floating point standard.
+pub trait TotalOrder {
+    /// Return the ordering between `self` and `other`.
+    ///
+    /// Unlike the standard partial comparison between floating point numbers,
+    /// this comparison always produces an ordering in accordance to
+    /// the `totalOrder` predicate as defined in the IEEE 754 (2008 revision)
+    /// floating point standard. The values are ordered in the following sequence:
+    ///
+    /// - negative quiet NaN
+    /// - negative signaling NaN
+    /// - negative infinity
+    /// - negative numbers
+    /// - negative subnormal numbers
+    /// - negative zero
+    /// - positive zero
+    /// - positive subnormal numbers
+    /// - positive numbers
+    /// - positive infinity
+    /// - positive signaling NaN
+    /// - positive quiet NaN.
+    ///
+    /// The ordering established by this function does not always agree with the
+    /// [`PartialOrd`] and [`PartialEq`] implementations. For example,
+    /// they consider negative and positive zero equal, while `total_cmp`
+    /// doesn't.
+    ///
+    /// The interpretation of the signaling NaN bit follows the definition in
+    /// the IEEE 754 standard, which may not match the interpretation by some of
+    /// the older, non-conformant (e.g. MIPS) hardware implementations.
+    ///
+    /// # Examples
+    /// ```
+    /// use num_traits::float::TotalOrder;
+    /// use std::cmp::Ordering;
+    /// use std::{f32, f64};
+    ///
+    /// fn check_eq<T: TotalOrder>(x: T, y: T) {
+    ///     assert_eq!(x.total_cmp(&y), Ordering::Equal);
+    /// }
+    ///
+    /// check_eq(f64::NAN, f64::NAN);
+    /// check_eq(f32::NAN, f32::NAN);
+    ///
+    /// fn check_lt<T: TotalOrder>(x: T, y: T) {
+    ///     assert_eq!(x.total_cmp(&y), Ordering::Less);
+    /// }
+    ///
+    /// check_lt(-f64::NAN, f64::NAN);
+    /// check_lt(f64::INFINITY, f64::NAN);
+    /// check_lt(-0.0_f64, 0.0_f64);
+    /// ```
+    fn total_cmp(&self, other: &Self) -> Ordering;
+}
+macro_rules! totalorder_impl {
+    ($T:ident, $I:ident, $U:ident, $bits:expr) => {
+        impl TotalOrder for $T {
+            #[inline]
+            #[cfg(has_total_cmp)]
+            fn total_cmp(&self, other: &Self) -> Ordering {
+                // Forward to the core implementation
+                Self::total_cmp(&self, other)
+            }
+            #[inline]
+            #[cfg(not(has_total_cmp))]
+            fn total_cmp(&self, other: &Self) -> Ordering {
+                // Backport the core implementation (since 1.62)
+                let mut left = self.to_bits() as $I;
+                let mut right = other.to_bits() as $I;
+
+                left ^= (((left >> ($bits - 1)) as $U) >> 1) as $I;
+                right ^= (((right >> ($bits - 1)) as $U) >> 1) as $I;
+
+                left.cmp(&right)
+            }
+        }
+    };
+}
+totalorder_impl!(f64, i64, u64, 64);
+totalorder_impl!(f32, i32, u32, 32);
+
 #[cfg(test)]
 mod tests {
     use core::f64::consts;
@@ -2329,7 +2310,7 @@ mod tests {
 
     #[test]
     fn convert_deg_rad() {
-        use float::FloatCore;
+        use crate::float::FloatCore;
 
         for &(deg, rad) in &DEG_RAD_PAIRS {
             assert!((FloatCore::to_degrees(rad) - deg).abs() < 1e-6);
@@ -2345,7 +2326,7 @@ mod tests {
     #[test]
     fn convert_deg_rad_std() {
         for &(deg, rad) in &DEG_RAD_PAIRS {
-            use Float;
+            use crate::Float;
 
             assert!((Float::to_degrees(rad) - deg).abs() < 1e-6);
             assert!((Float::to_radians(deg) - rad).abs() < 1e-6);
@@ -2357,11 +2338,8 @@ mod tests {
     }
 
     #[test]
-    // This fails with the forwarded `std` implementation in Rust 1.8.
-    // To avoid the failure, the test is limited to `no_std` builds.
-    #[cfg(not(feature = "std"))]
     fn to_degrees_rounding() {
-        use float::FloatCore;
+        use crate::float::FloatCore;
 
         assert_eq!(
             FloatCore::to_degrees(1_f32),
@@ -2372,7 +2350,7 @@ mod tests {
     #[test]
     #[cfg(any(feature = "std", feature = "libm"))]
     fn extra_logs() {
-        use float::{Float, FloatConst};
+        use crate::float::{Float, FloatConst};
 
         fn check<F: Float + FloatConst>(diff: F) {
             let _2 = F::from(2.0).unwrap();
@@ -2386,5 +2364,119 @@ mod tests {
 
         check::<f32>(1e-6);
         check::<f64>(1e-12);
+    }
+
+    #[test]
+    #[cfg(any(feature = "std", feature = "libm"))]
+    fn copysign() {
+        use crate::float::Float;
+        test_copysign_generic(2.0_f32, -2.0_f32, f32::nan());
+        test_copysign_generic(2.0_f64, -2.0_f64, f64::nan());
+        test_copysignf(2.0_f32, -2.0_f32, f32::nan());
+    }
+
+    #[cfg(any(feature = "std", feature = "libm"))]
+    fn test_copysignf(p: f32, n: f32, nan: f32) {
+        use crate::float::Float;
+        use core::ops::Neg;
+
+        assert!(p.is_sign_positive());
+        assert!(n.is_sign_negative());
+        assert!(nan.is_nan());
+
+        assert_eq!(p, Float::copysign(p, p));
+        assert_eq!(p.neg(), Float::copysign(p, n));
+
+        assert_eq!(n, Float::copysign(n, n));
+        assert_eq!(n.neg(), Float::copysign(n, p));
+
+        assert!(Float::copysign(nan, p).is_sign_positive());
+        assert!(Float::copysign(nan, n).is_sign_negative());
+    }
+
+    #[cfg(any(feature = "std", feature = "libm"))]
+    fn test_copysign_generic<F: crate::float::Float + ::core::fmt::Debug>(p: F, n: F, nan: F) {
+        assert!(p.is_sign_positive());
+        assert!(n.is_sign_negative());
+        assert!(nan.is_nan());
+        assert!(!nan.is_subnormal());
+
+        assert_eq!(p, p.copysign(p));
+        assert_eq!(p.neg(), p.copysign(n));
+
+        assert_eq!(n, n.copysign(n));
+        assert_eq!(n.neg(), n.copysign(p));
+
+        assert!(nan.copysign(p).is_sign_positive());
+        assert!(nan.copysign(n).is_sign_negative());
+    }
+
+    #[cfg(any(feature = "std", feature = "libm"))]
+    fn test_subnormal<F: crate::float::Float + ::core::fmt::Debug>() {
+        let min_positive = F::min_positive_value();
+        let lower_than_min = min_positive / F::from(2.0f32).unwrap();
+        assert!(!min_positive.is_subnormal());
+        assert!(lower_than_min.is_subnormal());
+    }
+
+    #[test]
+    #[cfg(any(feature = "std", feature = "libm"))]
+    fn subnormal() {
+        test_subnormal::<f64>();
+        test_subnormal::<f32>();
+    }
+
+    #[test]
+    fn total_cmp() {
+        use crate::float::TotalOrder;
+        use core::cmp::Ordering;
+        use core::{f32, f64};
+
+        fn check_eq<T: TotalOrder>(x: T, y: T) {
+            assert_eq!(x.total_cmp(&y), Ordering::Equal);
+        }
+        fn check_lt<T: TotalOrder>(x: T, y: T) {
+            assert_eq!(x.total_cmp(&y), Ordering::Less);
+        }
+        fn check_gt<T: TotalOrder>(x: T, y: T) {
+            assert_eq!(x.total_cmp(&y), Ordering::Greater);
+        }
+
+        check_eq(f64::NAN, f64::NAN);
+        check_eq(f32::NAN, f32::NAN);
+
+        check_lt(-0.0_f64, 0.0_f64);
+        check_lt(-0.0_f32, 0.0_f32);
+
+        // x87 registers don't preserve the exact value of signaling NaN:
+        // https://github.com/rust-lang/rust/issues/115567
+        #[cfg(not(target_arch = "x86"))]
+        {
+            let s_nan = f64::from_bits(0x7ff4000000000000);
+            let q_nan = f64::from_bits(0x7ff8000000000000);
+            check_lt(s_nan, q_nan);
+
+            let neg_s_nan = f64::from_bits(0xfff4000000000000);
+            let neg_q_nan = f64::from_bits(0xfff8000000000000);
+            check_lt(neg_q_nan, neg_s_nan);
+
+            let s_nan = f32::from_bits(0x7fa00000);
+            let q_nan = f32::from_bits(0x7fc00000);
+            check_lt(s_nan, q_nan);
+
+            let neg_s_nan = f32::from_bits(0xffa00000);
+            let neg_q_nan = f32::from_bits(0xffc00000);
+            check_lt(neg_q_nan, neg_s_nan);
+        }
+
+        check_lt(-f64::NAN, f64::NEG_INFINITY);
+        check_gt(1.0_f64, -f64::NAN);
+        check_lt(f64::INFINITY, f64::NAN);
+        check_gt(f64::NAN, 1.0_f64);
+
+        check_lt(-f32::NAN, f32::NEG_INFINITY);
+        check_gt(1.0_f32, -f32::NAN);
+        check_lt(f32::INFINITY, f32::NAN);
+        check_gt(f32::NAN, 1.0_f32);
     }
 }
