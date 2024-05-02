@@ -16,7 +16,7 @@ use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
-use std::{io::Write, time::Duration};
+use std::{io::Write, net::IpAddr, time::Duration};
 use timeout::timeout;
 
 mod show;
@@ -102,7 +102,16 @@ async fn gather_target_show(
         TargetAddrInfo::Ip(_info) => 22,
         TargetAddrInfo::IpPort(info) => info.port,
     };
-    let ssh_address = AddressData { host: addr.to_string(), port };
+    let ssh_address = match addr.ip() {
+        IpAddr::V4(ip) => AddressData { host: ip.to_string(), port },
+        IpAddr::V6(ip) => AddressData {
+            host: format!(
+                "[{ip}{}]",
+                if addr.scope_id() != 0 { format!("%{}", addr.scope_id()) } else { "".into() }
+            ),
+            port,
+        },
+    };
 
     let (compatibility_state, compatibility_message) = match &host.compatibility {
         Some(compatibility) => (
