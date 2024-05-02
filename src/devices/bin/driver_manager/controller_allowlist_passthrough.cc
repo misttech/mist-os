@@ -28,7 +28,12 @@ const char *kAllowAllUses = "Allow_all_uses";
 // https://fxbug.dev/331409420 for more information about migrating off of the
 // fuchsia.device/Controller protocol.
 const std::unordered_map<std::string, std::unordered_set<std::string_view>> kControllerAllowlists({
-    {"ConnectToController", {kAllowAllUses}},
+    {"ConnectToController",
+     {
+         "block",  // zxcrypt-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/sample-driver.cm",  // device_controller_fidl
+         "driver_runner_test",  // driver-runner-test
+     }},
     {"ConnectToDeviceFidl", {kAllowAllUses}},
     {"Bind", {kAllowAllUses}},
     {"Rebind", {kAllowAllUses}},
@@ -53,8 +58,9 @@ void ControllerAllowlistPassthrough::CheckAllowlist(const std::string &function_
                 "attempts to access a device and function not registered at\n"
                 "src/devices/bin/driver_manager/controller_allowlist_passthrough.cc.\n"
                 "If you need to add to the allowlist, add a bug as a child under "
-                "https://fxbug.dev/331409420.\n",
-                function_name.c_str(), class_name_.c_str());
+                "https://fxbug.dev/331409420. To learn more, see: "
+                "sdk/fidl/fuchsia.device.fs/README.md\n",
+                class_name_.c_str(), function_name.c_str());
 }
 
 void ControllerAllowlistPassthrough::ConnectToDeviceFidl(
