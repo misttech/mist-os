@@ -6,7 +6,7 @@ include /src/connectivity/lib/at-commands/OWNERS
 include /src/connectivity/lib/packet-formats-dhcp/OWNERS
 include /src/connectivity/lowpan/lib/openthread_rust/OWNERS
 include /src/connectivity/network/dhcpv4/OWNERS
-include /src/connectivity/policy/reachability/OWNERS
+include /src/connectivity/policy/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/devices/lib/OWNERS
 include /src/devices/usb/OWNERS

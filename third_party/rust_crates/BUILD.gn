@@ -565,7 +565,7 @@ group("num") {
 }
 
 group("num-derive") {
-  public_deps = [ ":num-derive-v0_3_3($host_toolchain)" ]
+  public_deps = [ ":num-derive-v0_4_2($host_toolchain)" ]
 }
 
 group("num-traits") {
@@ -9012,37 +9012,37 @@ rust_library("num_cpus-v1_13_0") {
   applicable_licenses = [ ":num_cpus-v1_13_0.license" ]
 }
 
-license("num-derive-v0_3_3.license") {
+license("num-derive-v0_4_2.license") {
   public_package_name = "num_derive"
   license_files = [
-    "//third_party/rust_crates/vendor/num-derive-0.3.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-derive-0.3.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-derive-0.4.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-derive-0.4.2/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("num-derive-v0_3_3") {
+rust_proc_macro("num-derive-v0_4_2") {
   crate_name = "num_derive"
-  crate_root = "//third_party/rust_crates/vendor/num-derive-0.3.3/src/lib.rs"
-  output_name = "num_derive-aba044aab91859c"
+  crate_root = "//third_party/rust_crates/vendor/num-derive-0.4.2/src/lib.rs"
+  output_name = "num_derive-59c052b6ac9cc106"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=aba044aab91859c",
-    "-Cextra-filename=-aba044aab91859c",
+    "--edition=2021",
+    "-Cmetadata=59c052b6ac9cc106",
+    "-Cextra-filename=-59c052b6ac9cc106",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-derive-v0_3_3.license" ]
+  applicable_licenses = [ ":num-derive-v0_4_2.license" ]
 }
 
 license("num-integer-v0_1_44.license") {
@@ -9178,7 +9178,15 @@ rust_library("num-traits-v0_2_18") {
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"i128\"",
     "--cfg=feature=\"std\"",
-    "--cfg=has_i128",
+    "--cfg=has_copysign",
+    "--cfg=has_div_euclid",
+    "--cfg=has_float_to_from_bytes",
+    "--cfg=has_int_to_from_bytes",
+    "--cfg=has_is_subnormal",
+    "--cfg=has_leading_trailing_ones",
+    "--cfg=has_reverse_bits",
+    "--cfg=has_to_int_unchecked",
+    "--cfg=has_total_cmp",
   ]
 
   visibility = [ ":*" ]
