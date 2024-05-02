@@ -28,7 +28,9 @@ pub async fn exec() -> Result<()> {
     )?;
 
     match args.subcommand {
-        ComponentSubcommand::Show(args) => show_cmd_print(args.query, realm_query, writer).await,
+        ComponentSubcommand::Show(args) => {
+            show_cmd_print(args.query, realm_query, writer, true).await
+        }
         ComponentSubcommand::Create(args) => {
             let config_overrides = resolve_raw_config_overrides(
                 &realm_query,
