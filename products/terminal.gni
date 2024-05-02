@@ -84,7 +84,4 @@ fxfs_blob = false
 fuchsia_product_assembly_config_label = "//products/terminal"
 zedboot_product_assembly_config_label = "//products/zedboot:zedboot_with_fvm"
 
-# Include the session framework
-core_realm_shards += [ "//src/session/bin/session_manager:terminal_core_shard" ]
-
 discoverable_package_labels = [ "//bundles/tools" ]

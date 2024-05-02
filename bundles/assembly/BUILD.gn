@@ -794,9 +794,6 @@ assembly_input_bundle("core_realm") {
             "//src/recovery/system/meta/core_shards/base.shard.cml",
             "//src/recovery/system/meta/core_shards/ui.shard.cml",
             "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
-            "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
-            "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
-            "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",
             "//src/settings/service/meta/setui_service_base.core_shard.cml",
             "//src/testing/sl4f/meta/sl4f_base.core_shard.cml",
             "//src/ui/meta/ui_routes_base.shard.cml",
@@ -2016,7 +2013,6 @@ assembly_input_bundle("input_group_two") {
                     "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
                     "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
                     "//src/media/sessions/meta/mediasession.core_shard.cml",
-                    "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
                   ],
                   root_build_dir)
         },
@@ -3475,10 +3471,7 @@ assembly_input_bundle("session_manager") {
           # config.
           component_name = "core"
           shards = rebase_path(
-                  [
-                    "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
-                    "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
-                  ],
+                  [ "//src/session/bin/session_manager/meta/session_manager.core_shard.cml" ],
                   root_build_dir)
         },
       ]
