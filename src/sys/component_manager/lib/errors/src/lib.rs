@@ -216,6 +216,8 @@ pub enum OpenOutgoingDirError {
     InstanceNonExecutable,
     #[error("open error: {0}")]
     Open(#[from] zx::Status),
+    #[error("fidl IPC to protocol in outgoing directory failed: {0}")]
+    Fidl(fidl::Error),
 }
 
 impl Explain for OpenOutgoingDirError {
@@ -224,6 +226,7 @@ impl Explain for OpenOutgoingDirError {
             Self::InstanceNotResolved => zx::Status::NOT_FOUND,
             Self::InstanceNonExecutable => zx::Status::NOT_FOUND,
             Self::Open(err) => *err,
+            Self::Fidl(_) => zx::Status::NOT_FOUND,
         }
     }
 }
@@ -234,6 +237,7 @@ impl From<OpenOutgoingDirError> for fsys::OpenError {
             OpenOutgoingDirError::InstanceNotResolved => fsys::OpenError::InstanceNotResolved,
             OpenOutgoingDirError::InstanceNonExecutable => fsys::OpenError::NoSuchDir,
             OpenOutgoingDirError::Open(_) => fsys::OpenError::FidlError,
+            OpenOutgoingDirError::Fidl(_) => fsys::OpenError::FidlError,
         }
     }
 }

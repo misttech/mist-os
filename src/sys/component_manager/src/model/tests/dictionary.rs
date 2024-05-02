@@ -3,9 +3,21 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::testing::routing_test_helpers::*, cm_rust::*, cm_rust_testing::*,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx, moniker::Moniker,
-    routing_test_helpers::RoutingTestModel, std::path::PathBuf, test_case::test_case,
+    crate::{
+        framework::factory::FactoryCapabilityHost,
+        model::testing::{out_dir::OutDir, routing_test_helpers::*},
+    },
+    cm_rust::*,
+    cm_rust_testing::*,
+    fidl::endpoints::{self, ServerEnd},
+    fidl_fidl_examples_routing_echo::EchoMarker,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+    futures::TryStreamExt,
+    moniker::Moniker,
+    routing_test_helpers::RoutingTestModel,
+    std::path::PathBuf,
+    test_case::test_case,
 };
 
 #[fuchsia::test]
@@ -1307,6 +1319,121 @@ async fn extend_from_child() {
             .await;
         }
     }
+}
+
+#[fuchsia::test]
+async fn extend_from_program() {
+    // Tests extending a dictionary, when the source dictionary is provided by the program.
+
+    const GETTER_PATH: &str = "svc/fuchsia.component.sandbox.DictionaryGetter";
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .capability(
+                    CapabilityBuilder::dictionary()
+                        .name("dict")
+                        .source_dictionary(DictionarySource::Program, GETTER_PATH),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("dict")
+                        .source(OfferSource::Self_)
+                        .target_static_child("leaf"),
+                )
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("A").from_dictionary("dict"))
+                .build(),
+        ),
+    ];
+    let test = RoutingTestBuilder::new("root", components).build().await;
+
+    let factory_host = FactoryCapabilityHost::new();
+    let (factory, stream) =
+        endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
+    let _factory_task = fasync::Task::spawn(async move {
+        factory_host.serve(stream).await.unwrap();
+    });
+
+    // Create a dictionary with a Sender at "A" for the Echo protocol.
+    let dict = factory.create_dictionary().await.unwrap();
+    let dict = dict.into_proxy().unwrap();
+    let (receiver_client, mut receiver_stream) =
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+    let sender = factory.create_sender(receiver_client).await.unwrap();
+    dict.insert("A", fsandbox::Capability::Sender(sender)).await.unwrap().unwrap();
+
+    // Serve the Echo protocol from the Receiver.
+    let _receiver_task = fasync::Task::spawn(async move {
+        let mut task_group = fasync::TaskGroup::new();
+        while let Ok(Some(request)) = receiver_stream.try_next().await {
+            match request {
+                fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
+                    let channel: ServerEnd<EchoMarker> = channel.into();
+                    task_group.spawn(OutDir::echo_protocol_fn(channel.into_stream().unwrap()));
+                }
+                fsandbox::ReceiverRequest::_UnknownMethod { .. } => {
+                    unimplemented!()
+                }
+            }
+        }
+    });
+
+    // Serve the DictionaryGetter protocol from the root's out dir. Its implementation calls
+    // Dictionary/Clone and returns the handle.
+    let mut root_out_dir = OutDir::new();
+    let dict_clone = Clone::clone(&dict);
+    root_out_dir.add_entry(
+        format!("/{GETTER_PATH}").parse().unwrap(),
+        vfs::service::endpoint(move |scope, channel| {
+            let server_end: ServerEnd<fsandbox::DictionaryGetterMarker> =
+                channel.into_zx_channel().into();
+            let mut stream = server_end.into_stream().unwrap();
+            let dict = Clone::clone(&dict_clone);
+            scope.spawn(async move {
+                while let Ok(Some(request)) = stream.try_next().await {
+                    match request {
+                        fsandbox::DictionaryGetterRequest::Get { responder } => {
+                            let client_end = dict.clone().await.unwrap();
+                            let _ = responder.send(client_end);
+                        }
+                        fsandbox::DictionaryGetterRequest::_UnknownMethod { .. } => {
+                            unimplemented!()
+                        }
+                    }
+                }
+            });
+        }),
+    );
+    test.mock_runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+    // Using "A" from the dictionary should succeed.
+    for _ in 0..3 {
+        test.check_use(
+            "leaf".try_into().unwrap(),
+            CheckUse::Protocol {
+                path: "/svc/A".parse().unwrap(),
+                expected_res: ExpectedResult::Ok,
+            },
+        )
+        .await;
+    }
+
+    // Now, remove "A" from the dictionary. Using "A" this time should fail.
+    let _ = dict.remove("A").await.unwrap().unwrap();
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+        },
+    )
+    .await;
 }
 
 #[fuchsia::test]

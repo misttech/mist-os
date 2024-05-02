@@ -24,15 +24,20 @@ use {
     cm_rust::{
         CapabilityDecl, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
     },
-    cm_types::{IterablePath, Name, SeparatedPath},
-    fidl_fuchsia_component_decl as fdecl,
+    cm_types::{IterablePath, Name, RelativePath, SeparatedPath},
+    errors::{CapabilityProviderError, ComponentProviderError, OpenError, OpenOutgoingDirError},
+    fidl::endpoints,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_io as fio,
     futures::FutureExt,
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
+    sandbox::Routable,
     sandbox::WeakComponentToken,
     sandbox::{Capability, Dict, Request, Router, Unit},
     std::{collections::HashMap, fmt::Debug, sync::Arc},
     tracing::warn,
+    vfs::execution_scope::ExecutionScope,
 };
 
 /// Once a component has been resolved and its manifest becomes known, this function produces the
@@ -251,8 +256,48 @@ fn extend_dict_with_dictionary(
                 }
             }
             cm_rust::DictionarySource::Program => {
-                warn!("TODO(https://fxbug.dev/336363726): Implement DictionarySource::Program");
-                return;
+                struct ProgramRouter {
+                    component: WeakComponentInstance,
+                    source_path: RelativePath,
+                }
+                #[async_trait]
+                impl Routable for ProgramRouter {
+                    async fn route(&self, _request: Request) -> Result<Capability, BedrockError> {
+                        fn open_error(e: OpenOutgoingDirError) -> OpenError {
+                            CapabilityProviderError::from(ComponentProviderError::from(e)).into()
+                        }
+
+                        let component = self.component.upgrade().map_err(|_| {
+                            RoutingError::from(ComponentInstanceError::instance_not_found(
+                                self.component.moniker.clone(),
+                            ))
+                        })?;
+                        let open = component.get_outgoing();
+
+                        let (getter, server_end) =
+                            endpoints::create_proxy::<fsandbox::DictionaryGetterMarker>().unwrap();
+                        open.open(
+                            ExecutionScope::new(),
+                            fio::OpenFlags::empty(),
+                            vfs::path::Path::validate_and_split(self.source_path.to_string())
+                                .expect("path must be valid"),
+                            server_end.into_channel(),
+                        );
+                        let client_end = getter
+                            .get()
+                            .await
+                            .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?;
+                        // Internalize the Dictionary `client_end`
+                        let cap = fsandbox::Capability::Dictionary(client_end);
+                        let cap = Capability::try_from(cap)
+                            .map_err(|_| RoutingError::BedrockRemoteCapability)?;
+                        Ok(cap)
+                    }
+                }
+                Router::new(ProgramRouter {
+                    component: component.as_weak(),
+                    source_path: source_path.clone(),
+                })
             }
         };
         router = make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router);

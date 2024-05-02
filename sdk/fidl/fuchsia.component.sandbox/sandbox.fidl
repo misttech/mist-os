@@ -256,3 +256,16 @@ open protocol Factory {
         capability Capability;
     });
 };
+
+/// Components can use [DictionaryGetter] to provide a [Dictionary] by serving
+//this protocol in their outgoing directory.
+@discoverable
+@available(added=HEAD)
+open protocol DictionaryGetter {
+    /// Returns the [Dictionary].
+    ///
+    /// Note: Consecutive calls to [Get] are not required to return the same [Dictionary].
+    flexible Get() -> (resource struct {
+        dictionary client_end:Dictionary;
+    });
+};
