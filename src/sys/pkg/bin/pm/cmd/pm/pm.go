@@ -15,7 +15,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/delta"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/expand"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/genkey"
 	initcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/init"
@@ -48,7 +47,6 @@ Repository Commands:
 
 Tools:
     snapshot - capture metadata from multiple packages in a single file
-    delta    - compare two snapshot files
 
 For help with individual commands run "pm <command> --help"
 `
@@ -95,7 +93,8 @@ func doMain() int {
 		err = buildcmd.Run(cfg, flag.Args()[1:])
 
 	case "delta":
-		err = delta.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "delta is deprecated without replacement")
+		err = nil
 
 	case "expand":
 		err = expand.Run(cfg, flag.Args()[1:])
