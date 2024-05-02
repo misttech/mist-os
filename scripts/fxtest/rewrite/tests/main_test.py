@@ -620,7 +620,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertIsSubset({("fx", "ota", "--no-build")}, call_prefixes)
 
     async def test_print_logs_success(self) -> None:
-        """Test that --print-logs searches for logs, can be given a log,
+        """Test that print_logs searches for logs, can be given a log,
         and handles invalid data
         """
         env = environment.ExecutionEnvironment.initialize_from_args(

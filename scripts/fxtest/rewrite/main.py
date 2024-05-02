@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import textwrap
 import typing
 
 import args
@@ -54,7 +55,14 @@ def main() -> None:
 
     # Special utility mode handling
     if real_flags.print_logs:
-        sys.exit(do_print_logs(real_flags))
+        assert_no_selection(real_flags, "-pr log")
+        warning_message = "WARNING: --print-logs is deprecated and will be removed. Use `--previous log`"
+        print(warning_message, "\n")
+        ret = do_print_logs(real_flags)
+        print(warning_message)
+        sys.exit(ret)
+    if real_flags.previous is not None:
+        sys.exit(do_process_previous(real_flags))
 
     # No special modes, proceed with async execution.
     fut = asyncio.ensure_future(
@@ -109,6 +117,48 @@ async def async_main_wrapper(
         await to_wait
 
     return ret
+
+
+def assert_no_selection(flags: args.Flags, suggested_args: str) -> None:
+    """Assert that flags do not have any selections, and print an
+       error message if they do.
+
+    Args:
+        flags (args.Flags): Command flags
+        suggested_args (str): Suggestion for what the user should
+            run after executing their tests.
+    """
+    if flags.selection:
+        selection_args = " ".join(flags.selection)
+        print(
+            f"ERROR: --previous mode does not support running tests, it only displays information from your previous run.\nTry running `fx test {selection_args}` and then `fx test {suggested_args}`"
+        )
+        sys.exit(1)
+
+
+def do_process_previous(flags: args.Flags) -> int:
+    assert_no_selection(flags, f"-pr {flags.previous}")
+    if flags.previous is args.PrevOption.LOG:
+        return do_print_logs(flags)
+    if flags.previous is args.PrevOption.HELP:
+        print("--previous options:")
+        for arg in args.PrevOption:
+            prefix = f"{arg:>8}: "
+            print(
+                "\n".join(
+                    textwrap.wrap(
+                        prefix + arg.help(),
+                        width=70,
+                        initial_indent="  ",
+                        subsequent_indent="  " + " " * len(prefix),
+                    )
+                )
+                + "\n"
+            )
+        return 0
+    else:
+        print(f"Unknown --previous option {flags.previous}")
+        return 1
 
 
 def do_print_logs(flags: args.Flags) -> int:
