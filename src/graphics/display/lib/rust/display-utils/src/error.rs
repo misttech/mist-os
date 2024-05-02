@@ -32,7 +32,7 @@ pub enum Error {
     AlreadyRequested,
 
     /// Error while allocating shared sysmem buffers.
-    #[error("sysmem buffer collection allocation failed")]
+    #[error("sysmem buffer collection allocation failed, or invalid response from sysmem")]
     BuffersNotAllocated,
 
     /// Error while establishing a connection to sysmem.

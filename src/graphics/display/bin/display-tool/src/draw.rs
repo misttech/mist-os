@@ -6,7 +6,7 @@ use {
     anyhow::{format_err, Context, Result},
     display_utils::{Image, ImageId},
     fuchsia_image_format::{
-        image_format_minimum_row_bytes, image_format_stride_bytes_per_width_pixel,
+        image_format_minimum_row_bytes_2, image_format_stride_bytes_per_width_pixel_2,
     },
     fuchsia_zircon as zx,
     mapped_vmo::Mapping,
@@ -31,7 +31,7 @@ pub struct Frame {
 
 impl MappedImage {
     pub fn create(image: Image) -> Result<MappedImage> {
-        let size: usize = image.buffer_settings.size_bytes.try_into()?;
+        let size: usize = *image.buffer_settings.size_bytes.as_ref().unwrap() as usize;
         let mapping = Mapping::create_from_vmo(
             &image.vmo,
             size,
@@ -40,8 +40,11 @@ impl MappedImage {
         .context("failed to map VMO")?;
 
         let constraints = &image.format_constraints;
-        let pixel_width = image_format_stride_bytes_per_width_pixel(&constraints.pixel_format);
-        let row_bytes = image_format_minimum_row_bytes(constraints, image.parameters.width)?;
+        let pixel_width = image_format_stride_bytes_per_width_pixel_2(
+            *constraints.pixel_format.as_ref().unwrap(),
+        )
+        .unwrap();
+        let row_bytes = image_format_minimum_row_bytes_2(constraints, image.parameters.width)?;
         Ok(MappedImage { image, mapping, pixel_width, row_bytes })
     }
 

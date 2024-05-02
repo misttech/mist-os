@@ -72,7 +72,7 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
             width,
             height,
             pixel_format,
-            color_space: fidl_fuchsia_sysmem::ColorSpaceType::Srgb,
+            color_space: fidl_fuchsia_images2::ColorSpace::Srgb,
             name: Some("image layer".to_string()),
         };
         let mut next_image_id = ImageId(1);

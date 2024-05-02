@@ -2,19 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::ClientEnd;
+use fsysmem2::{
+    AllocatorAllocateSharedCollectionRequest, AllocatorBindSharedCollectionRequest,
+    AllocatorSetDebugClientInfoRequest, BufferCollectionSetConstraintsRequest,
+    BufferCollectionTokenDuplicateRequest, NodeSetNameRequest,
+};
+
 use {
-    fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy},
+    fidl::endpoints::{create_endpoints, create_proxy, Proxy},
     fidl_fuchsia_hardware_display_types as fdisplay_types,
-    fidl_fuchsia_sysmem::{
-        self as fsysmem, AllocatorMarker, BufferCollectionInfo2, BufferCollectionMarker,
+    fidl_fuchsia_images2::{self as fimages2},
+    fidl_fuchsia_sysmem2::{
+        self as fsysmem2, AllocatorMarker, BufferCollectionInfo, BufferCollectionMarker,
         BufferCollectionProxy, BufferCollectionTokenMarker, BufferCollectionTokenProxy,
-        ColorSpaceType,
     },
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_image_format::{
-        BUFFER_COLLECTION_CONSTRAINTS_DEFAULT, BUFFER_MEMORY_CONSTRAINTS_DEFAULT,
-        BUFFER_USAGE_DEFAULT, IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
-    },
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
 };
 
@@ -40,7 +43,7 @@ pub struct ImageParameters {
 
     /// The sysmem color space standard representation. The user must take care that `color_space`
     /// is compatible with the supplied `pixel_format`.
-    pub color_space: ColorSpaceType,
+    pub color_space: fimages2::ColorSpace,
 
     /// Optional name to assign to the VMO that backs this image.
     pub name: Option<String>,
@@ -62,10 +65,10 @@ pub struct Image {
 
     /// The image format constraints that resulted from the sysmem buffer negotiation. Contains the
     /// effective image parameters.
-    pub format_constraints: fsysmem::ImageFormatConstraints,
+    pub format_constraints: fsysmem2::ImageFormatConstraints,
 
     /// The effective buffer memory settings that resulted from the sysmem buffer negotiation.
-    pub buffer_settings: fsysmem::BufferMemorySettings,
+    pub buffer_settings: fsysmem2::BufferMemorySettings,
 
     // The BufferCollection that backs this image.
     proxy: BufferCollectionProxy,
@@ -85,20 +88,36 @@ impl Image {
     ) -> Result<Image> {
         let mut collection = allocate_image_buffer(coordinator.clone(), params).await?;
         coordinator.import_image(collection.id, image_id, params.into()).await?;
-        let vmo = collection.info.buffers[0]
+        let vmo = collection.info.buffers.as_ref().unwrap()[0]
             .vmo
             .as_ref()
             .ok_or(Error::BuffersNotAllocated)?
             .duplicate_handle(zx::Rights::SAME_RIGHTS)?;
 
         collection.release();
+
         Ok(Image {
             id: image_id,
             collection_id: collection.id,
             vmo,
             parameters: params.clone(),
-            format_constraints: collection.info.settings.image_format_constraints,
-            buffer_settings: collection.info.settings.buffer_settings,
+            format_constraints: collection
+                .info
+                .settings
+                .as_ref()
+                .unwrap()
+                .image_format_constraints
+                .as_ref()
+                .unwrap()
+                .clone(),
+            buffer_settings: collection
+                .info
+                .settings
+                .as_mut()
+                .unwrap()
+                .buffer_settings
+                .take()
+                .unwrap(),
             proxy: collection.proxy.clone(),
             coordinator,
         })
@@ -107,7 +126,7 @@ impl Image {
 
 impl Drop for Image {
     fn drop(&mut self) {
-        let _ = self.proxy.close();
+        let _ = self.proxy.release();
         let _ = self.coordinator.release_buffer_collection(self.collection_id);
     }
 }
@@ -133,7 +152,7 @@ impl From<ImageParameters> for fdisplay_types::ImageMetadata {
 // in the early-return cases above.
 struct BufferCollection {
     id: BufferCollectionId,
-    info: BufferCollectionInfo2,
+    info: BufferCollectionInfo,
     proxy: BufferCollectionProxy,
     coordinator: Coordinator,
     released: bool,
@@ -149,7 +168,7 @@ impl Drop for BufferCollection {
     fn drop(&mut self) {
         if !self.released {
             let _ = self.coordinator.release_buffer_collection(self.id);
-            let _ = self.proxy.close();
+            let _ = self.proxy.release();
         }
     }
 }
@@ -165,30 +184,54 @@ async fn allocate_image_buffer(
     {
         let name = fuchsia_runtime::process_self().get_name()?;
         let koid = fuchsia_runtime::process_self().get_koid()?;
-        allocator.set_debug_client_info(name.to_str()?, koid.raw_koid())?;
+        allocator.set_debug_client_info(&AllocatorSetDebugClientInfoRequest {
+            name: Some(name.to_str()?.to_string()),
+            id: Some(koid.raw_koid()),
+            ..Default::default()
+        })?;
     }
     let collection_token = {
         let (proxy, remote) = create_proxy::<BufferCollectionTokenMarker>()?;
-        allocator.allocate_shared_collection(remote)?;
+        allocator.allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
+            token_request: Some(remote),
+            ..Default::default()
+        })?;
         proxy
     };
     // TODO(armansito): The priority number here is arbitrary but I don't expect there to be
     // contention for the assigned name as this client library should be the collection's sole
     // owner. Still, come up with a better way to assign this.
     if let Some(ref name) = params.name {
-        collection_token.set_name(100, name.as_str())?;
+        collection_token.set_name(&NodeSetNameRequest {
+            priority: Some(100),
+            name: Some(name.clone()),
+            ..Default::default()
+        })?;
     }
 
     // Duplicate of `collection_token` to be transferred to the display driver.
     let display_duplicate = {
         let (local, remote) = create_endpoints::<BufferCollectionTokenMarker>();
-        collection_token.duplicate(std::u32::MAX, remote)?;
+        collection_token.duplicate(BufferCollectionTokenDuplicateRequest {
+            rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+            token_request: Some(remote),
+            ..Default::default()
+        })?;
         collection_token.sync().await?;
         local
     };
 
     // Register the collection with the display driver.
-    let id = coordinator.import_buffer_collection(display_duplicate).await?;
+    //
+    // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here until this
+    // protocol has a field for a sysmem2 token.
+    let id = coordinator
+        .import_buffer_collection(
+            ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                display_duplicate.into_channel(),
+            ),
+        )
+        .await?;
 
     // Tell sysmem to perform the buffer allocation and wait for the result. Clean up on error.
     match allocate_image_buffer_helper(params, allocator, collection_token).await {
@@ -202,72 +245,76 @@ async fn allocate_image_buffer(
 
 async fn allocate_image_buffer_helper(
     params: &ImageParameters,
-    allocator: fsysmem::AllocatorProxy,
+    allocator: fsysmem2::AllocatorProxy,
     token: BufferCollectionTokenProxy,
-) -> Result<(BufferCollectionInfo2, BufferCollectionProxy)> {
+) -> Result<(BufferCollectionInfo, BufferCollectionProxy)> {
     // Turn in the collection token to obtain a connection to the logical buffer collection.
     let collection = {
         let (local, remote) = create_endpoints::<BufferCollectionMarker>();
-        let token_channel =
-            token.into_channel().map_err(|_| Error::SysmemConnection)?.into_zx_channel();
-        allocator.bind_shared_collection(ClientEnd::new(token_channel), remote)?;
+        let token_client = token.into_client_end().map_err(|_| Error::SysmemConnection)?;
+        allocator.bind_shared_collection(AllocatorBindSharedCollectionRequest {
+            token: Some(token_client),
+            buffer_collection_request: Some(remote),
+            ..Default::default()
+        })?;
         local.into_proxy()?
     };
 
     // Set local constraints and allocate buffers.
-    collection.set_constraints(true, &buffer_collection_constraints(params))?;
+    collection.set_constraints(BufferCollectionSetConstraintsRequest {
+        constraints: Some(buffer_collection_constraints(params)),
+        ..Default::default()
+    })?;
     let collection_info = {
-        let (status, info) = collection.wait_for_buffers_allocated().await?;
-        let _ = zx::Status::ok(status)?;
-        info
+        let response = collection
+            .wait_for_all_buffers_allocated()
+            .await?
+            .map_err(|_| Error::BuffersNotAllocated)?;
+        response.buffer_collection_info.ok_or(Error::BuffersNotAllocated)?
     };
 
     // We expect there to be at least one available vmo.
-    if collection_info.buffer_count == 0 {
-        collection.close()?;
+    if collection_info.buffers.as_ref().unwrap().is_empty() {
+        collection.release()?;
         return Err(Error::BuffersNotAllocated);
     }
 
     Ok((collection_info, collection))
 }
 
-fn buffer_collection_constraints(params: &ImageParameters) -> fsysmem::BufferCollectionConstraints {
-    let usage = fsysmem::BufferUsage {
-        cpu: fsysmem::CPU_USAGE_READ_OFTEN | fsysmem::CPU_USAGE_WRITE_OFTEN,
-        ..BUFFER_USAGE_DEFAULT
+fn buffer_collection_constraints(
+    params: &ImageParameters,
+) -> fsysmem2::BufferCollectionConstraints {
+    let usage = fsysmem2::BufferUsage {
+        cpu: Some(fsysmem2::CPU_USAGE_READ_OFTEN | fsysmem2::CPU_USAGE_WRITE_OFTEN),
+        ..Default::default()
     };
 
-    let buffer_memory_constraints = fsysmem::BufferMemoryConstraints {
-        ram_domain_supported: true,
-        cpu_domain_supported: true,
-        ..BUFFER_MEMORY_CONSTRAINTS_DEFAULT
+    let buffer_memory_constraints = fsysmem2::BufferMemoryConstraints {
+        ram_domain_supported: Some(true),
+        cpu_domain_supported: Some(true),
+        ..Default::default()
     };
 
     // TODO(armansito): parameterize the format modifier
-    let pixel_format = fsysmem::PixelFormat {
-        type_: params.pixel_format.into(),
-        has_format_modifier: true,
-        format_modifier: fsysmem::FormatModifier { value: fsysmem::FORMAT_MODIFIER_LINEAR },
+    let image_constraints = fsysmem2::ImageFormatConstraints {
+        pixel_format: Some(params.pixel_format.into()),
+        pixel_format_modifier: Some(fimages2::PixelFormatModifier::Linear),
+        required_max_size: Some(fidl_fuchsia_math::SizeU {
+            width: params.width,
+            height: params.height,
+        }),
+        color_spaces: Some(vec![params.color_space]),
+        ..Default::default()
     };
 
-    let mut image_constraints = fsysmem::ImageFormatConstraints {
-        required_max_coded_width: params.width,
-        required_max_coded_height: params.height,
-        color_spaces_count: 1,
-        pixel_format,
-        ..IMAGE_FORMAT_CONSTRAINTS_DEFAULT
+    let constraints = fsysmem2::BufferCollectionConstraints {
+        min_buffer_count: Some(1),
+        usage: Some(usage),
+        buffer_memory_constraints: Some(buffer_memory_constraints),
+        image_format_constraints: Some(vec![image_constraints]),
+        ..Default::default()
     };
-    image_constraints.color_space[0].type_ = params.color_space;
-
-    let mut constraints = fsysmem::BufferCollectionConstraints {
-        min_buffer_count: 1,
-        usage,
-        has_buffer_memory_constraints: true,
-        buffer_memory_constraints,
-        image_format_constraints_count: 1,
-        ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
-    };
-    constraints.image_format_constraints[0] = image_constraints;
 
     constraints
 }
