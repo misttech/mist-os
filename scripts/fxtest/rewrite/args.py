@@ -237,13 +237,6 @@ def parse_args(
         default=False,
         help="This argument is deprecated and will be removed. Please use --previous log",
     )
-    utility.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        default=False,
-        help="Silence INFO and INSTRUCTION messages from the tool",
-    )
     build = parser.add_argument_group("Build Options")
     build.add_argument(
         "--build",
@@ -524,6 +517,13 @@ def parse_args(
         type=float,
         default=0,
         help="If non-zero, automatically show output for tests taking longer than this many seconds.",
+    )
+    output.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Silence INFO and INSTRUCTION messages from the tool",
     )
 
     if defaults is not None:
