@@ -65,8 +65,8 @@ closed protocol Vmo {
     ///     use, and unlock them when done with `ZX_VMO_OP_UNLOCK` making them eligible for reclamation by
     ///     the kernel. A newly created discardable VMO is initially unlocked.
     ///
-    ////  - `ZX_VMO_UNBOUNDED` to create a VMO that is initialized to the largest possible size. Cannot be
-    ////     used in conjunction with `ZX_VMO_RESIZABLE`. Size argument sets the stream size only.
+    ///  - `ZX_VMO_UNBOUNDED` to create a VMO that is initialized to the largest possible size. Cannot be
+    ///     used in conjunction with `ZX_VMO_RESIZABLE`. Size argument sets the stream size only.
     ///
     /// The `ZX_VMO_ZERO_CHILDREN` signal is active on a newly created VMO. It becomes
     /// inactive whenever a child of the VMO is created and becomes active again when
