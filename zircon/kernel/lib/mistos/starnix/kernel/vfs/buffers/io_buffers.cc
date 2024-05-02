@@ -7,24 +7,25 @@
 
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 
+#include <iterator>
 #include <vector>
+#include <algorithm>
 
 namespace starnix {
 
-fit::result<Errno, size_t> OutputBuffer::write(ktl::span<uint8_t> _buffer) {
-  ktl::span buffer{_buffer.data(), _buffer.size()};
-
-  return write_each([&buffer](ktl::span<uint8_t> data) -> fit::result<Errno, size_t> {
-    auto size = std::min(buffer.size(), data.size());
-    ktl::span to_clone(buffer.data(), size);
-    ktl::span remaining(buffer.data() + size, buffer.size() - size);
+fit::result<Errno, size_t> OutputBuffer::write(const ktl::span<uint8_t>& buffer) {
+  ktl::span buf = buffer;
+  return write_each([&](ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
+    auto size = std::min(buf.size(), data.size());
+    ktl::span to_clone(buf.data(), size);
+    ktl::span remaining(buf.data() + size, buf.size() - size);
     __unsanitized_memcpy(data.data(), to_clone.data(), size);
-    buffer = remaining;
+    buf = remaining;
     return fit::ok(size);
   });
 }
 
-fit::result<Errno, size_t> OutputBuffer::write_all(ktl::span<uint8_t> buffer) {
+fit::result<Errno, size_t> OutputBuffer::write_all(const ktl::span<uint8_t>& buffer) {
   auto result = write(buffer);
   if (result.is_error())
     return result.take_error();
@@ -37,11 +38,11 @@ fit::result<Errno, size_t> OutputBuffer::write_all(ktl::span<uint8_t> buffer) {
   }
 }
 
-fit::result<Errno, size_t> OutputBuffer::write_buffer(InputBuffer* input) {
-  return write_each([input](ktl::span<uint8_t> data) -> fit::result<Errno, size_t> {
-    auto size = std::min(data.size(), input->available());
+fit::result<Errno, size_t> OutputBuffer::write_buffer(InputBuffer& input) {
+  return write_each([&](ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
+    auto size = ktl::min(data.size(), input.available());
     ktl::span<uint8_t> tmp{data.data(), size};
-    return input->read_exact(tmp);
+    return input.read_exact(tmp);
   });
 }
 
@@ -56,7 +57,7 @@ fit::result<Errno, std::vector<uint8_t>> InputBuffer::peek_all() {
       });
 }
 
-VecInputBuffer VecInputBuffer::New(ktl::span<uint8_t> data) {
+VecInputBuffer VecInputBuffer::New(const ktl::span<uint8_t>& data) {
   return VecInputBuffer(std::vector<uint8_t>(data.begin(), data.end()));
 }
 

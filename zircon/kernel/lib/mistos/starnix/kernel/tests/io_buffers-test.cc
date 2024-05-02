@@ -3,7 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h"
+#include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 
 #include <array>
 
@@ -39,11 +39,12 @@ TEST(IoBuffers, test_vec_input_buffer) {
 
   input_buffer = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
   uint8_t buffer[5];
-  ASSERT_EQ(5, input_buffer.read_exact(ktl::span<uint8_t>{buffer, 5}).value_or(0), "read");
+  ktl::span<uint8_t> span{buffer, 5};
+  ASSERT_EQ(5, input_buffer.read_exact(span).value_or(0), "read");
   ASSERT_EQ(5, input_buffer.bytes_read());
   ASSERT_EQ(5, input_buffer.available());
   ASSERT_BYTES_EQ("hello", buffer, 5);
-  ASSERT_EQ(5, input_buffer.read_exact(ktl::span<uint8_t>{buffer, 5}).value_or(0), "read");
+  ASSERT_EQ(5, input_buffer.read_exact(span).value_or(0), "read");
   ASSERT_EQ(10, input_buffer.bytes_read());
   ASSERT_EQ(0, input_buffer.available());
   ASSERT_BYTES_EQ("world", buffer, 5);
@@ -84,7 +85,7 @@ TEST(IoBuffers, test_vec_write_buffer) {
   ktl::span<uint8_t> data{(uint8_t*)"helloworld", 10};
   auto input_buffer = VecInputBuffer::New(data);
   auto output_buffer = VecOutputBuffer::New(20);
-  ASSERT_EQ(10, output_buffer.write_buffer(&input_buffer).value(), "write_buffer");
+  ASSERT_EQ(10, output_buffer.write_buffer(input_buffer).value(), "write_buffer");
   ASSERT_EQ(0, memcmp(data.data(), output_buffer.data(), data.size()));
 }
 

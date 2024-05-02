@@ -13,6 +13,7 @@
 #include <functional>
 #include <vector>
 
+#include <ktl/algorithm.h>
 #include <ktl/span.h>
 #include <zxtest/cpp/zxtest_prod.h>
 
@@ -22,7 +23,7 @@ using namespace starnix_uapi;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
 /// order, and must return for each, how many bytes has been written.
-using OutputBufferCallback = std::function<fit::result<Errno, size_t>(ktl::span<uint8_t>)>;
+using OutputBufferCallback = std::function<fit::result<Errno, size_t>(ktl::span<uint8_t>&)>;
 
 using PeekBufferSegmentsCallback = std::function<void(const UserBuffer&)>;
 
@@ -90,30 +91,31 @@ class OutputBuffer : public Buffer {
   /// be partial.
   ///
   /// Returns the number of bytes written in this buffer.
-  virtual fit::result<Errno, size_t> write(ktl::span<uint8_t> _buffer);
+  virtual fit::result<Errno, size_t> write(const ktl::span<uint8_t>& _buffer);
 
   /// Write the content of `buffer` into this buffer. It is an error to pass a buffer larger than
   /// the number of bytes available in this buffer. In that case, the content of the buffer after
   /// the operation is unspecified.
   ///
   /// In case of success, always returns `buffer.len()`.
-  virtual fit::result<Errno, size_t> write_all(ktl::span<uint8_t> buffer);
+  virtual fit::result<Errno, size_t> write_all(const ktl::span<uint8_t>& buffer);
 
   /// Write the content of the given `InputBuffer` into this buffer. The number of bytes written
   /// will be the smallest between the number of bytes available in this buffer and in the
   /// `InputBuffer`.
   ///
   /// Returns the number of bytes read and written.
-  virtual fit::result<Errno, size_t> write_buffer(InputBuffer* input);
+  virtual fit::result<Errno, size_t> write_buffer(InputBuffer& input);
 
  public:
   // C++
   virtual ~OutputBuffer() = default;
 };
 
-/// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
-/// order, and must return for each, how many bytes has been written.
-using InputBufferCallback = std::function<fit::result<Errno, size_t>(ktl::span<uint8_t>)>;
+/// The callback for `InputBuffer::peek_each` and `InputBuffer::read_each`. The callback is passed
+/// the buffers to write to in order, and must return for each, how many bytes has been read.
+
+using InputBufferCallback = std::function<fit::result<Errno, size_t>(const ktl::span<uint8_t>&)>;
 
 /// The InputBuffer allows for reading bytes from a buffer.
 /// A single InputBuffer will only read up to MAX_RW_COUNT bytes which is the maximum size of a
@@ -178,10 +180,10 @@ class InputBuffer : public Buffer {
   /// If `buffer` is too large, the remaining bytes will be left untouched.
   ///
   /// Returns the number of bytes read from this buffer.
-  virtual fit::result<Errno, size_t> peek(ktl::span<uint8_t> buffer) {
+  virtual fit::result<Errno, size_t> peek(ktl::span<uint8_t>& buffer) {
     auto index = 0;
-    return peek_each([buffer, &index](ktl::span<uint8_t> data) -> fit::result<Errno, size_t> {
-      auto size = std::min(buffer.size() - index, data.size());
+    return peek_each([&](const ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
+      auto size = ktl::min(buffer.size() - index, data.size());
       auto dest = buffer.subspan(index, index + size);
       auto src = data.subspan(0, size);
       __unsanitized_memcpy(dest.data(), src.data(), src.size());
@@ -195,7 +197,7 @@ class InputBuffer : public Buffer {
   /// If `buffer` is too large, the remaining bytes will be left untouched.
   ///
   /// Returns the number of bytes read from this buffer.
-  virtual fit::result<Errno, size_t> read(ktl::span<uint8_t> buffer) {
+  virtual fit::result<Errno, size_t> read(ktl::span<uint8_t>& buffer) {
     auto peek_result = peek(buffer);
     if (peek_result.is_error())
       return peek_result.take_error();
@@ -213,7 +215,7 @@ class InputBuffer : public Buffer {
   /// If `buffer` is larger than the number of available bytes, an error will be returned.
   ///
   /// In case of success, always returns `buffer.len()`.
-  virtual fit::result<Errno, size_t> read_exact(ktl::span<uint8_t> buffer) {
+  virtual fit::result<Errno, size_t> read_exact(ktl::span<uint8_t>& buffer) {
     auto result = read(buffer);
     if (result.is_error())
       return result.take_error();
@@ -321,7 +323,6 @@ class VecOutputBuffer : public OutputBuffer {
   ZXTEST_FRIEND_TEST(IoBuffers, test_vec_output_buffer);
 
   VecOutputBuffer(size_t capacity) : buffer_(), capacity_(capacity) { buffer_.reserve(capacity); }
-  // VecOutputBuffer(std::vector<uint8_t> buffer) : buffer_(std::move(buffer)) {}
 };
 
 /// An InputBuffer that read data from an internal buffer.
@@ -334,7 +335,7 @@ class VecInputBuffer : public InputBuffer {
 
  public:
   // impl VecInputBuffer
-  static VecInputBuffer New(ktl::span<uint8_t> data);
+  static VecInputBuffer New(const ktl::span<uint8_t>& data);
 
   // impl From<Vec<u8>>
   static VecInputBuffer from(const std::vector<uint8_t>& buffer);
@@ -346,14 +347,12 @@ class VecInputBuffer : public InputBuffer {
   fit::result<Errno> peek_each_segment(PeekBufferSegmentsCallback callback) final {
     // std::vector<uint8_t> sliced_buffer(buffer_.begin() + bytes_read_, buffer_.end());
     // ktl::span buffer{sliced_buffer.data(), sliced_buffer.size()};
-
     return fit::error(errno(ENOTSUP));
   }
 
   /// impl InputBuffer
   fit::result<Errno, size_t> peek_each(InputBufferCallback callback) final {
-    std::vector<uint8_t> sliced_buffer(buffer_.begin() + bytes_read_, buffer_.end());
-    ktl::span buffer{sliced_buffer.data(), sliced_buffer.size()};
+    ktl::span buffer{buffer_.begin() + bytes_read_, buffer_.end()};
 
     auto callback_result = callback(buffer);
     auto read = callback_result.value();
