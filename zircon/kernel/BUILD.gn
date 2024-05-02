@@ -905,6 +905,13 @@ if (!is_efi_toolchain) {
         "boot-test-success",
         "graceful-shutdown",
       ]
+
+      # Keep kernel as first item in ZBI
+      deps = [ ":kernel(:kernel_$current_cpu)" ]
+      # Additional itens used for testing
+      deps += [
+        "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix:zbi_input",
+      ]
     }
   }
 }
