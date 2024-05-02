@@ -21,5 +21,5 @@ func (f *FFXInstance) Flash(ctx context.Context, serialNum, sshKey, productBundl
 	}
 
 	ffxArgs = append(ffxArgs, "--product-bundle", productBundle)
-	return f.Run(ctx, ffxArgs...)
+	return f.RunWithTimeout(ctx, 0, ffxArgs...)
 }
