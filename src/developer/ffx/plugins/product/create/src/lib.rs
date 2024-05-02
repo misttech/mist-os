@@ -136,11 +136,17 @@ pub async fn pb_create_with_sdk_version(
             (None, None, vec![])
         };
 
+    // We always create a blobs directory even if there is no repository, because tools that read
+    // the product bundle may instantiate a TUF repo in order to iterate over all the blobs, which
+    // inadvertently creates the blobs directory, which dirties the product bundle, causing
+    // hermeticity errors.
+    let repo_path = &cmd.out_dir;
+    let blobs_path = repo_path.join("blobs");
+    std::fs::create_dir(&blobs_path).context("Creating blobs directory")?;
+
     let repositories = if let Some(tuf_keys) = &cmd.tuf_keys {
-        let repo_path = &cmd.out_dir;
         let main_metadata_path = repo_path.join("repository");
         let recovery_metadata_path = repo_path.join("recovery_repository");
-        let blobs_path = repo_path.join("blobs");
         let keys_path = repo_path.join("keys");
         let delivery_blob_type = cmd.delivery_blob_type.unwrap_or(DEFAULT_DELIVERY_BLOB_TYPE);
 
