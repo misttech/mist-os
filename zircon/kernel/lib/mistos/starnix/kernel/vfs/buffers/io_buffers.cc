@@ -18,7 +18,7 @@ fit::result<Errno, size_t> OutputBuffer::write(ktl::span<uint8_t> _buffer) {
     auto size = std::min(buffer.size(), data.size());
     ktl::span to_clone(buffer.data(), size);
     ktl::span remaining(buffer.data() + size, buffer.size() - size);
-    memcpy(data.data(), to_clone.data(), size);
+    __unsanitized_memcpy(data.data(), to_clone.data(), size);
     buffer = remaining;
     return fit::ok(size);
   });

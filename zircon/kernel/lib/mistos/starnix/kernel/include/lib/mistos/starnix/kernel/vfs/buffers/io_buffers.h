@@ -184,7 +184,7 @@ class InputBuffer : public Buffer {
       auto size = std::min(buffer.size() - index, data.size());
       auto dest = buffer.subspan(index, index + size);
       auto src = data.subspan(0, size);
-      memcpy(dest.data(), src.data(), src.size());
+      __unsanitized_memcpy(dest.data(), src.data(), src.size());
       index += size;
       return fit::ok(size);
     });
