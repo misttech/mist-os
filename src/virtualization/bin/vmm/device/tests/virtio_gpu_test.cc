@@ -5,6 +5,7 @@
 #include <fuchsia/element/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl_test_base.h>
@@ -112,6 +113,7 @@ class VirtioGpuTest : public TestWithDevice,
         .AddRoute(Route{.capabilities =
                             {
                                 Protocol{fuchsia::sysmem::Allocator::Name_},
+                                Protocol{fuchsia::sysmem2::Allocator::Name_},
                                 Protocol{fuchsia::tracing::provider::Registry::Name_},
                                 Protocol{fuchsia::ui::composition::Allocator::Name_},
                                 Protocol{fuchsia::ui::scenic::Scenic::Name_},

@@ -19,6 +19,7 @@
     use: [
         { service: "fuchsia.hardware.pci.Service" },
         { service: "fuchsia.hardware.sysmem.Service" },
+        { service: "fuchsia.hardware.sysmem2.Service" },
     ],
     expose: [
         {

@@ -54,6 +54,7 @@ rustc_binary("virtio_gpu_bin") {
   sources = _common_sources
 
   deps = _common_deps + [
+           "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
            "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
            "//src/lib/ui/fuchsia-framebuffer",
          ]

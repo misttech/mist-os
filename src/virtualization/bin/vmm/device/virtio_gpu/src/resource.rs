@@ -15,7 +15,7 @@ use {
     anyhow::Context,
     fidl_fuchsia_ui_composition::{AllocatorMarker, RegisterBufferCollectionArgs},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage},
+    fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameUsage},
     fuchsia_scenic::BufferCollectionTokenPair,
 };
 
@@ -28,13 +28,13 @@ pub const fn bytes_per_pixel() -> usize {
 #[cfg(not(test))]
 pub const fn sysmem_pixel_format(
     virtio_pixel_format: u32,
-) -> Option<fidl_fuchsia_sysmem::PixelFormatType> {
+) -> Option<fidl_fuchsia_images2::PixelFormat> {
     match virtio_pixel_format {
         wire::VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM | wire::VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM => {
-            Some(fidl_fuchsia_sysmem::PixelFormatType::Bgra32)
+            Some(fidl_fuchsia_images2::PixelFormat::B8G8R8A8)
         }
         wire::VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM | wire::VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM => {
-            Some(fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8)
+            Some(fidl_fuchsia_images2::PixelFormat::R8G8B8A8)
         }
         _ => None,
     }
@@ -52,6 +52,8 @@ pub struct Resource2D<'a> {
 impl<'a> Resource2D<'a> {
     #[cfg(not(test))]
     pub async fn allocate(cmd: &wire::VirtioGpuResourceCreate2d) -> Result<Resource2D<'a>, Error> {
+        use fidl::endpoints::ClientEnd;
+
         let pixel_format = if let Some(pixel_format) = sysmem_pixel_format(cmd.format.get()) {
             pixel_format
         } else {
@@ -75,7 +77,13 @@ impl<'a> Resource2D<'a> {
         let buffer_tokens = BufferCollectionTokenPair::new();
         let flatland_registration_args = RegisterBufferCollectionArgs {
             export_token: Some(buffer_tokens.export_token),
-            buffer_collection_token: Some(buffer_collection_token_for_flatland),
+            // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here
+            // until flatland has a field for a sysmem2 token.
+            buffer_collection_token: Some(ClientEnd::<
+                fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
+            >::new(
+                buffer_collection_token_for_flatland.into_channel()
+            )),
             ..Default::default()
         };
         let allocator =
@@ -89,12 +97,21 @@ impl<'a> Resource2D<'a> {
         // Now allocate the buffers with sysmem so that we can get the VMO backing the allocation.
         let mut allocation =
             buffer_allocator.allocate_buffers(true).await.context("buffer allocation failed")?;
-        let vmo = &allocation.buffers[0].vmo.take();
+        let vmo = allocation.buffers.as_mut().unwrap()[0].vmo.take();
         let mapping_flags = zx::VmarFlags::PERM_READ
             | zx::VmarFlags::PERM_WRITE
             | zx::VmarFlags::MAP_RANGE
             | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
-        let mapping_size = allocation.settings.buffer_settings.size_bytes as usize;
+        let mapping_size = *allocation
+            .settings
+            .as_ref()
+            .unwrap()
+            .buffer_settings
+            .as_ref()
+            .unwrap()
+            .size_bytes
+            .as_ref()
+            .unwrap() as usize;
         let mapping = mapped_vmo::Mapping::create_from_vmo(
             vmo.as_ref().unwrap(),
             mapping_size,
