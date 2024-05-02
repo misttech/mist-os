@@ -17,10 +17,7 @@ import trace_processing.trace_utils as trace_utils
 _LOGGER: logging.Logger = logging.getLogger("InputLatencyMetricsProcessor")
 _AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
 _CATEGORY_INPUT: str = "input"
-# TODO: This tracing event is sent when input pipeline sends input events to
-# scenic. We should find a better event to include the process time in input
-# pipeline. Maybe "touch-binding-process-report".
-_INPUT_EVENT_NAME: str = "presentation_on_event"
+_INPUT_EVENT_NAME: str = "input-device-process-reports"
 _CATEGORY_GFX: str = "gfx"
 _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
 

@@ -8,7 +8,7 @@
             "ts": 99,
             "ph": "X",
             "cat": "input",
-            "name": "presentation_on_event"
+            "name": "input-device-process-reports"
         },
         {
             "cat": "input",
@@ -76,7 +76,7 @@
             "ts": 109,
             "ph": "X",
             "cat": "input",
-            "name": "presentation_on_event"
+            "name": "input-device-process-reports"
         },
         {
             "cat": "input",
@@ -144,7 +144,7 @@
             "ts": 119,
             "ph": "X",
             "cat": "input",
-            "name": "presentation_on_event"
+            "name": "input-device-process-reports"
         },
         {
             "cat": "input",
@@ -212,7 +212,7 @@
             "ts": 129,
             "ph": "X",
             "cat": "input",
-            "name": "presentation_on_event"
+            "name": "input-device-process-reports"
         },
         {
             "cat": "input",
@@ -280,7 +280,7 @@
             "ts": 139,
             "ph": "X",
             "cat": "input",
-            "name": "presentation_on_event"
+            "name": "input-device-process-reports"
         },
         {
             "cat": "input",
