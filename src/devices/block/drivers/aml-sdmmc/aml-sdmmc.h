@@ -32,6 +32,7 @@
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
+#include "src/devices/block/drivers/aml-sdmmc/aml_sdmmc_config.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace aml_sdmmc {
@@ -52,6 +53,7 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
 
   AmlSdmmc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+        config_(take_config<aml_sdmmc_config::Config>()),
         registered_vmos_{
             // clang-format off
             SdmmcVmoStore{vmo_store::Options{}},
@@ -301,6 +303,8 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   void AdjustHardwarePowerLevel();
 
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
+
+  aml_sdmmc_config::Config config_;
 
   zx::bti bti_;
 

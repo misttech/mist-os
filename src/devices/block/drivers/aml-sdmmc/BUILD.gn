@@ -24,6 +24,7 @@ driver_bind_rules("aml-sdmmc-bind") {
 
 _common_deps = [
   ":aml-sdmmc-bind",
+  ":aml-sdmmc-config",
   "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
   "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
   "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
@@ -99,16 +100,32 @@ fuchsia_driver("aml-sdmmc-driver") {
          ]
 }
 
-fuchsia_driver_component("aml-sdmmc") {
+fuchsia_component_manifest("aml-sdmmc-manifest") {
   component_name = "aml-sdmmc"
+  manifest = "meta/aml-sdmmc.cml"
+}
+
+fuchsia_driver_component("aml-sdmmc") {
+  cm_label = ":aml-sdmmc-manifest"
   deps = [ ":aml-sdmmc-driver" ]
   info = "aml-sdmmc-info.json"
-  manifest = "meta/aml-sdmmc.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("aml-sdmmc-config") {
+  cm_label = ":aml-sdmmc-manifest"
+}
+
+fuchsia_structured_config_values("sc-values") {
+  cm_label = ":aml-sdmmc-manifest"
+  values = {
+    enable_suspend = false
+  }
 }
 
 fuchsia_driver_package("package") {
   package_name = "aml-sdmmc"
   driver_components = [ ":aml-sdmmc" ]
+  deps = [ ":sc-values" ]
 }
 
 test("aml-sdmmc-test-bin") {

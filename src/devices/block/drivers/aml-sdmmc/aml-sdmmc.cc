@@ -285,7 +285,7 @@ zx::result<> AmlSdmmc::InitResources(
     }
   }
 
-  {
+  if (config_.enable_suspend()) {
     auto result = ConfigurePowerManagement(pdev);
     if (!result.is_ok()) {
       return result.take_error();
@@ -306,7 +306,8 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
   if (result->is_error()) {
     FDF_LOGL(INFO, logger(), "Was not able to get power config: %s",
              zx_status_get_string(result->error_value()));
-    // Some boards don't have power configs. Do not fail driver initialization in this case.
+    // Some boards and/or instances (e.g., SDIO, SD) may not have power configs. Do not fail driver
+    // initialization in this case.
     return zx::success();
   }
 
@@ -327,13 +328,9 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
   for (const auto& config : result->value()->config) {
     auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
     if (tokens.is_error()) {
-      // TODO(b/309152899): Use fuchsia.power.SuspendEnabled config cap to determine whether to
-      // expect Power Framework.
-      FDF_LOGL(WARNING, logger(),
-               "Failed to get power dependency tokens: %u. Perhaps the product does not have Power "
-               "Framework?",
+      FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u",
                static_cast<uint8_t>(tokens.error_value()));
-      return zx::success();
+      return zx::error(ZX_ERR_INTERNAL);
     }
 
     zx::event active_power_dep_token;
