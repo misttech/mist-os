@@ -419,7 +419,7 @@ impl Mapping {
 
 const PROGRAM_BREAK_LIMIT: u64 = 64 * 1024 * 1024;
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct ProgramBreak {
     // These base address at which the data segment is mapped.
     base: UserAddress,
@@ -429,6 +429,9 @@ struct ProgramBreak {
     // The addresses from [base, current.round_up(*PAGE_SIZE)) are mapped into the
     // client address space from the underlying |vmo|.
     current: UserAddress,
+
+    /// Placeholder VMO mapped to pages reserved for program break growth.
+    placeholder_vmo: Arc<zx::Vmo>,
 }
 
 /// The policy about whether the address space can be dumped.
@@ -444,6 +447,7 @@ pub enum DumpPolicy {
     /// Corresponds to SUID_DUMP_USER.
     User,
 }
+
 pub struct MemoryManagerState {
     /// The VMAR in which userspace mappings occur.
     ///
@@ -2674,26 +2678,27 @@ impl MemoryManager {
         let mut released_mappings = vec![];
         let mut state = self.state.write();
 
-        // Ensure that a program break exists by mapping at least one page.
-        let mut brk = match state.brk {
+        // Ensure that there is address-space set aside for the program break.
+        let brk = match state.brk.clone() {
             None => {
                 let vmo = zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?;
                 set_zx_name(&vmo, b"starnix-brk");
-                let length = *PAGE_SIZE as usize;
-                let flags = MappingFlags::READ | MappingFlags::WRITE;
-                let addr = state.map_vmo(
+
+                // Map the whole program-break VMO into the Zircon address-space, to prevent
+                // other mappings using the range, unless they do so deliberately.
+                // Pages in this range are made writable, and added to `mappings`, as the
+                // caller grows the program break.
+                let base = state.map_internal(
                     DesiredAddress::Any,
-                    Arc::new(vmo),
-                    0,
-                    length,
-                    flags,
-                    false,
-                    MappingName::Heap,
-                    FileWriteGuardRef(None),
-                    &mut released_mappings,
+                    &vmo,
+                    0u64,
+                    PROGRAM_BREAK_LIMIT as usize,
+                    MappingFlags::ANONYMOUS,
+                    /* populate= */ false,
                 )?;
-                let brk = ProgramBreak { base: addr, current: addr };
-                state.brk = Some(brk);
+
+                let brk = ProgramBreak { base, current: base, placeholder_vmo: Arc::new(vmo) };
+                state.brk = Some(brk.clone());
                 brk
             }
             Some(brk) => brk,
@@ -2705,61 +2710,85 @@ impl MemoryManager {
             return Ok(brk.current);
         }
 
-        let (range, mapping) = state.mappings.get(&brk.current).ok_or_else(|| errno!(EFAULT))?;
-
-        let old_end = range.end;
-        let new_end = (addr + 1u64).round_up(*PAGE_SIZE).unwrap();
+        let old_end = brk.current.round_up(*PAGE_SIZE).unwrap();
+        let new_end = addr.round_up(*PAGE_SIZE).unwrap();
 
         match new_end.cmp(&old_end) {
             std::cmp::Ordering::Less => {
-                // We've been asked to free memory.
+                // Shrinking the program break removes any mapped pages in the
+                // affected range, regardless of whether they were actually program
+                // break pages, or other mappings.
                 let delta = old_end - new_end;
-                match &mapping.backing {
-                    MappingBacking::Vmo(backing) => {
-                        let vmo = &backing.vmo;
-                        let vmo_offset = new_end - brk.base;
-                        vmo.op_range(zx::VmoOp::ZERO, vmo_offset as u64, delta as u64)
-                            .map_err(impossible_error)?;
-                    }
-                    #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => {
-                        state.private_anonymous.release_range(old_end..new_end);
-                    }
+                let vmo_offset = (new_end - brk.base) as u64;
+
+                // Overwrite the released address range with the program break placeholder.
+                if state
+                    .map_internal(
+                        DesiredAddress::FixedOverwrite(new_end),
+                        &*brk.placeholder_vmo,
+                        vmo_offset,
+                        delta,
+                        MappingFlags::ANONYMOUS,
+                        /* populate= */ false,
+                    )
+                    .is_err()
+                {
+                    return Ok(brk.current);
                 }
-                state.unmap(new_end, delta, &mut released_mappings)?;
+
+                // Remove `mappings` in the released range, and zero any pages that were mapped
+                // anonymously.
+                if state.update_after_unmap(new_end, delta, &mut released_mappings).is_err() {
+                    // Things are in an inconsistent state. Good luck, userspace.
+                    return Ok(brk.current);
+                }
             }
             std::cmp::Ordering::Greater => {
-                // We've been asked to map more memory.
+                let range = old_end..new_end;
                 let delta = new_end - old_end;
-                let vmo_offset = old_end - brk.base;
-                let range = range.clone();
-                let mapping = mapping.clone();
 
-                released_mappings.extend(state.mappings.remove(&range));
+                // Check for mappings over the program break region.
+                if state.mappings.intersection(&range).next().is_some() {
+                    return Ok(brk.current);
+                }
 
-                let (vmo, offset) = match &mapping.backing {
-                    MappingBacking::Vmo(backing) => (&backing.vmo, vmo_offset as u64),
-                    #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => {
-                        (&state.private_anonymous.backing, old_end.ptr() as u64)
-                    }
+                // If there was previously at least one page of program break then we can
+                // extend that mapping, rather than making a new allocation.
+                let existing = if old_end > brk.base {
+                    let last_page = old_end - *PAGE_SIZE;
+                    state.mappings.get(&last_page).filter(|(_, m)| m.name == MappingName::Heap)
+                } else {
+                    None
                 };
 
-                match state.user_vmar.map(
-                    old_end - self.base_addr,
-                    &vmo,
-                    offset,
-                    delta,
-                    zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE | zx::VmarFlags::SPECIFIC,
-                ) {
-                    Ok(_) => {
-                        state.mappings.insert(brk.base..new_end, mapping);
+                if let Some((range, _)) = existing {
+                    let range_start = range.start;
+                    let old_length = range.end - range.start;
+                    if state
+                        .try_remap_in_place(
+                            range_start,
+                            old_length,
+                            old_length + delta,
+                            &mut released_mappings,
+                        )
+                        .unwrap_or_default()
+                        .is_none()
+                    {
+                        return Ok(brk.current);
                     }
-                    Err(_) => {
-                        // We failed to extend the mapping, which means we need to add
-                        // back the old mapping.
-                        // Return the old program break.
-                        state.mappings.insert(brk.base..old_end, mapping);
+                } else {
+                    // Otherwise, allocating fresh anonymous pages is good-enough.
+                    if state
+                        .map_anonymous(
+                            DesiredAddress::FixedOverwrite(old_end),
+                            delta,
+                            ProtectionFlags::READ | ProtectionFlags::WRITE,
+                            MappingOptions::ANONYMOUS,
+                            MappingName::Heap,
+                            &mut released_mappings,
+                        )
+                        .is_err()
+                    {
                         return Ok(brk.current);
                     }
                 }
@@ -2767,9 +2796,11 @@ impl MemoryManager {
             _ => {}
         };
 
-        brk.current = addr;
-        state.brk = Some(brk);
-        Ok(brk.current)
+        // Any required updates to the program break succeeded, so update internal state.
+        let mut new_brk = brk;
+        new_brk.current = addr;
+        state.brk = Some(new_brk);
+        Ok(addr)
     }
 
     pub fn snapshot_to<L>(
@@ -3735,10 +3766,9 @@ mod tests {
         let mm = current_task.mm();
 
         // Look up the given addr in the mappings table.
-        let get_range = |addr: &UserAddress| {
+        let get_range = |addr: UserAddress| {
             let state = mm.state.read();
-            let (range, _) = state.mappings.get(addr).expect("failed to find mapping");
-            range.clone()
+            state.mappings.get(&addr).map(|(range, _)| range.clone())
         };
 
         // Initialize the program break.
@@ -3747,29 +3777,34 @@ mod tests {
             .expect("failed to set initial program break");
         assert!(base_addr > UserAddress::default());
 
-        // Check that the initial program break actually maps some memory.
-        let range0 = get_range(&base_addr);
+        // Page containing the program break address should not be mapped.
+        assert_eq!(get_range(base_addr), None);
+
+        // Growing it by a single byte results in that page becoming mapped.
+        let addr0 = mm.set_brk(&current_task, base_addr + 1u64).expect("failed to grow brk");
+        assert!(addr0 > base_addr);
+        let range0 = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range0.start, base_addr);
         assert_eq!(range0.end, base_addr + *PAGE_SIZE);
 
-        // Grow the program break by a tiny amount that does not actually result in a change.
-        let addr1 = mm.set_brk(&current_task, base_addr + 1u64).expect("failed to grow brk");
-        assert_eq!(addr1, base_addr + 1u64);
-        let range1 = get_range(&base_addr);
+        // Grow the program break by another byte, which won't be enough to cause additional pages to be mapped.
+        let addr1 = mm.set_brk(&current_task, base_addr + 2u64).expect("failed to grow brk");
+        assert_eq!(addr1, base_addr + 2u64);
+        let range1 = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range1.start, range0.start);
         assert_eq!(range1.end, range0.end);
 
         // Grow the program break by a non-trival amount and observe the larger mapping.
         let addr2 = mm.set_brk(&current_task, base_addr + 24893u64).expect("failed to grow brk");
         assert_eq!(addr2, base_addr + 24893u64);
-        let range2 = get_range(&base_addr);
+        let range2 = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range2.start, base_addr);
         assert_eq!(range2.end, addr2.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break and observe the smaller mapping.
         let addr3 = mm.set_brk(&current_task, base_addr + 14832u64).expect("failed to shrink brk");
         assert_eq!(addr3, base_addr + 14832u64);
-        let range3 = get_range(&base_addr);
+        let range3 = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range3.start, base_addr);
         assert_eq!(range3.end, addr3.round_up(*PAGE_SIZE).unwrap());
 
@@ -3777,17 +3812,15 @@ mod tests {
         let addr4 =
             mm.set_brk(&current_task, base_addr + 3u64).expect("failed to drastically shrink brk");
         assert_eq!(addr4, base_addr + 3u64);
-        let range4 = get_range(&base_addr);
+        let range4 = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range4.start, base_addr);
         assert_eq!(range4.end, addr4.round_up(*PAGE_SIZE).unwrap());
 
-        // Shrink the program break close to zero and observe that the mapping is not entirely gone.
+        // Shrink the program break to zero and observe that the mapping is entirely gone.
         let addr5 =
             mm.set_brk(&current_task, base_addr).expect("failed to drastically shrink brk to zero");
         assert_eq!(addr5, base_addr);
-        let range5 = get_range(&base_addr);
-        assert_eq!(range5.start, base_addr);
-        assert_eq!(range5.end, addr5 + *PAGE_SIZE);
+        assert_eq!(get_range(base_addr), None);
     }
 
     #[::fuchsia::test]
@@ -3804,6 +3837,9 @@ mod tests {
             .set_brk(&current_task, UserAddress::default())
             .expect("failed to set initial program break");
         assert!(brk_addr > UserAddress::default());
+
+        // Allocate a single page of BRK space, so that the break base address is mapped.
+        let _ = mm.set_brk(&current_task, brk_addr + 1u64).expect("failed to grow program break");
         assert!(has(&brk_addr));
 
         let mapped_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);

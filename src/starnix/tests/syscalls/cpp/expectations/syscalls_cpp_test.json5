@@ -61,15 +61,6 @@
                 "VmspliceTest.UnmapBufferInPipeThenMapInPlace",
                 "VmspliceTest.RemapSharedBufferInPipeThenModify",
                 "VmspliceTest/VmspliceUnmapBufferAfterVmsplicingRemappedBufferTest.UnmapBufferAfterVmsplicingRemappedBuffer/*",
-
-                // TODO(https://fxbug.dev/334365844)
-                "Task.BrkIsZeroedAfterShrinkAndRegrow",
-
-                // TODO(https://fxbug.dev/333450691)
-                "Task.BrkIsOutOfRange",
-
-                // TODO(https://fxbug.dev/333435783)
-                "Task.BrkShrinkUnmapsAnonMmap",
             ],
         },
     ],
