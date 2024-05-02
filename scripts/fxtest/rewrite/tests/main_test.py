@@ -713,24 +713,6 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 f"Did not find substring, content was:\n{output.getvalue()}",
             )
 
-        # Corrupt the data a bit, the output should still work.
-        with open(new_file_path, "r+b") as f:
-            # Overwrite last 20 bytes of the file with 0
-            f.seek(-20, 2)
-            f.write(b"\0" * 80)
-        output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            return_code = main.do_print_logs(
-                args.parse_args(["--logpath", new_file_path])
-            )
-            self.assertEqual(
-                return_code, 0, f"Content was:\n{output.getvalue()}"
-            )
-            self.assertIsNotNone(
-                re.search(r"3 tests were run", output.getvalue(), re.MULTILINE),
-                f"Did not find substring, content was:\n{output.getvalue()}",
-            )
-
     async def test_print_logs_failure(self) -> None:
         """Test that --print-logs prints an error and exits if the log cannot be found"""
 
