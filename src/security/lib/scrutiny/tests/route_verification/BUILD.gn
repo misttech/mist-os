@@ -21,6 +21,14 @@ import("//src/sys/core/build/core_shard.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
 if (is_fuchsia) {
+  fuchsia_component("test_session") {
+    testonly = true
+    manifest = "meta/test_session.cml"
+
+    # We don't intend to run this component, just make its manifest visible to scrutiny.
+    check_references = false
+  }
+
   fuchsia_component("component_with_broken_use") {
     testonly = true
     manifest = "meta/component_with_broken_use.cml"
@@ -43,15 +51,8 @@ if (is_fuchsia) {
     deps = [
       ":component_with_broken_use",
       ":component_with_collection",
+      ":test_session",
     ]
-  }
-
-  core_shard("core_shard") {
-    shard_file = "meta/core_shard.cml"
-  }
-
-  core_realm_definition("core_realm") {
-    deps = [ ":core_shard" ]
   }
 
   files = {
@@ -82,9 +83,9 @@ if (is_fuchsia) {
   }
 
   product_assembly_configuration("product_assembly_config") {
+    testonly = true
     platform = {
       build_type = "user"
-      feature_set_level = "utility"
       storage = {
         filesystems = {
           image_name = "assembly"
@@ -98,7 +99,36 @@ if (is_fuchsia) {
           }
         }
       }
+
+      session = {
+        enabled = true
+        autolaunch = false
+      }
+
+      # These are all required (to compile the core realm) when the session is
+      # enabled:
+      bluetooth = {
+        type = "standard"
+      }
+
+      media = {
+        audio = {
+          full_stack = {
+          }
+        }
+      }
+      ui = {
+        enabled = true
+      }
     }
+    product = {
+      session_url = "fuchsia-pkg://fuchsia.com/package_for_scrutiny_testing#meta/test_session.cm"
+    }
+    base_packages = [
+      {
+        package_target = ":package"
+      },
+    ]
   }
 
   assembled_system("assembly") {
@@ -108,15 +138,7 @@ if (is_fuchsia) {
     generate_vbmeta = false
     product_assembly_config_label = ":product_assembly_config"
     board_config_label = ":board_config"
-
-    # Needed for scrutiny to find root.cm and other component config.
-    bootfs_labels = [ "//build/input:bootfs" ]
-    base_packages = [ ":package" ]
-
     generate_image_metadata = false
-
-    # Needed for scrutiny to find things for the component model.
-    core_realm_definition = ":core_realm"
   }
 
   generated_partitions_config("partitions_config") {
@@ -230,9 +252,9 @@ if (is_host) {
       "--fail-protocol",
       "fuchsia.foo.bar",
       "--fail-moniker",
-      "core/component_with_broken_use",
+      "core/session-manager/session:session/component_with_broken_use",
       "--fail-dynamic-moniker",
-      "core/component_with_collection/coll:component_with_broken_use",
+      "core/session-manager/session:session/component_with_collection/coll:component_with_broken_use",
       "--success-protocol",
       "fuchsia.logger.LogSink",
       "--depfile",
