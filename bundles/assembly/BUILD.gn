@@ -398,6 +398,17 @@ assembly_input_bundle("embeddable_eng") {
   ]
 }
 
+# This is a temporary AIB hold wlanphy driver. This driver will eventually
+# be moved to bootstrap AIB and this AIB will be removed.
+assembly_input_bundle("wlanphy_driver") {
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/wlan/drivers/wlanphy:wlanphy"
+      driver_components = [ "meta/wlanphy.cm" ]
+    },
+  ]
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #

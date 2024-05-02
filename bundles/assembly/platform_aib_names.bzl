@@ -38,6 +38,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "resources",
     "virtcon",
     "virtcon_disable",
+    "wlanphy_driver",
 ]
 
 # These are the userdebug platform AIBs that are used by bootstrap

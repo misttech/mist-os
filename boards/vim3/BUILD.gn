@@ -18,6 +18,7 @@ _base = {
     "fuchsia::pmm_checker",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
+    "fuchsia::platform_driver_migration",
   ]
 
   input_bundles = [
@@ -295,11 +296,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/connectivity/bluetooth/hci/transport/uart"
       package_set = "base"
       driver_components = [ "meta/bt-transport-uart.cm" ]
-    },
-    {
-      package_target = "//src/connectivity/wlan/drivers/wlanphy:wlanphy"
-      package_set = "base"
-      driver_components = [ "meta/wlanphy.cm" ]
     },
     {
       package_target = "//src/power/fake-powersource:fake-battery"
