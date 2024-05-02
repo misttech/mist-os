@@ -127,8 +127,8 @@ class CurrentTask : public MemoryAccessor {
       const fbl::RefPtr<Kernel>& kernel, const fbl::String& initial_name);
 
   fit::result<Errno> exec(const FileHandle& executable, const fbl::String& path,
-                          const std::vector<fbl::String>& argv,
-                          const std::vector<fbl::String>& environ);
+                          const fbl::Vector<fbl::String>& argv,
+                          const fbl::Vector<fbl::String>& environ);
 
   /// Determine namespace node indicated by the dir_fd.
   ///

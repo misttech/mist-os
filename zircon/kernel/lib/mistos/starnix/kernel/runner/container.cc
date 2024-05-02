@@ -19,14 +19,19 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/back_insert_iterator.h>
 #include <trace.h>
+#include <zircon/assert.h>
 
 #include <vector>
 
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
+#include <ktl/algorithm.h>
 
 #include "../kernel_priv.h"
+
+#include <ktl/enforce.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
@@ -63,14 +68,16 @@ fit::result<Errno, Container> create_container(const ConfigWrapper& config) {
   // startup_file_path to be created. The task struct is still used
   // to initialize the system up until this point, regardless of whether
   // or not there is an actual init to be run.
-  auto argv = [&]() -> std::vector<fbl::String> {
-    std::vector<fbl::String> argv;
-    if (config->init.empty()) {
-      argv.emplace_back(DEFAULT_INIT);
+  auto argv = [&]() -> fbl::Vector<fbl::String> {
+    fbl::Vector<fbl::String> argv;
+    if (config->init.is_empty()) {
+      fbl::AllocChecker ac;
+      argv.push_back(DEFAULT_INIT, &ac);
+      ZX_ASSERT(ac.check());
     } else {
-      argv = config->init;
+      ktl::copy(config->init.begin(), config->init.end(), util::back_inserter(argv));
     }
-    return argv;
+    return ktl::move(argv);
   }();
 
   auto executable = CurrentTask::open_file_bootfs(argv[0] /*, OpenFlags::RDONLY*/);
@@ -78,7 +85,7 @@ fit::result<Errno, Container> create_container(const ConfigWrapper& config) {
     return executable.take_error();
 
   auto initial_name = fbl::String();
-  if (!config->init.empty()) {
+  if (!config->init.is_empty()) {
     initial_name = config->init[0];
   };
 
@@ -95,7 +102,7 @@ fit::result<Errno, Container> create_container(const ConfigWrapper& config) {
   }
 
   auto pre_run = [&](CurrentTask& init_task) -> fit::result<Errno> {
-    return init_task.exec(executable.value(), argv[0], argv, std::vector<fbl::String>());
+    return init_task.exec(executable.value(), argv[0], ktl::move(argv), fbl::Vector<fbl::String>());
   };
 
   auto task_complete = []() -> void { LTRACEF("Finished running init process.\n"); };

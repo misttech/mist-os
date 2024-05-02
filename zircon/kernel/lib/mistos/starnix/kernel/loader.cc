@@ -1,4 +1,5 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -24,6 +25,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/math.h>
+#include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/random.h>
 #include <lib/mistos/zx/vmo.h>
 #include <lib/zbi-format/internal/bootfs.h>
@@ -37,15 +39,18 @@
 #include <optional>
 
 #include <fbl/ref_ptr.h>
+#include <fbl/static_vector.h>
 #include <fbl/string.h>
+#include <fbl/vector.h>
 #include <ktl/byte.h>
+#include <ktl/numeric.h>
 #include <ktl/span.h>
 
-// clang-format off
-#include <linux/auxvec.h>
-// clang-format on
-
 #include "../kernel_priv.h"
+
+#include <ktl/enforce.h>
+
+#include <linux/auxvec.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
@@ -67,15 +72,15 @@ constexpr size_t kMaxSegments = 4;
 constexpr size_t kMaxPhdrs = 16;
 const size_t kRandomSeedBytes = 16;
 
-size_t get_initial_stack_size(const fbl::String& path, const std::vector<fbl::String>& argv,
-                              const std::vector<fbl::String>& environ,
-                              const std::vector<std::pair<uint32_t, uint64_t>>& auxv) {
+size_t get_initial_stack_size(const fbl::String& path, const fbl::Vector<fbl::String>& argv,
+                              const fbl::Vector<fbl::String>& environ,
+                              const fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv) {
   auto accumulate_size = [](size_t accumulator, const auto& arg) {
     return accumulator + arg.length() + 1;
   };
 
-  size_t stack_size = std::accumulate(argv.begin(), argv.end(), 0, accumulate_size);
-  stack_size += std::accumulate(environ.begin(), environ.end(), 0, accumulate_size);
+  size_t stack_size = ktl::accumulate(argv.begin(), argv.end(), 0, accumulate_size);
+  stack_size += ktl::accumulate(environ.begin(), environ.end(), 0, accumulate_size);
   stack_size += path.length() + 1;
   stack_size += kRandomSeedBytes;
   stack_size += ((argv.size() + 1) + (environ.size() + 1)) * sizeof(const char*);
@@ -85,8 +90,8 @@ size_t get_initial_stack_size(const fbl::String& path, const std::vector<fbl::St
 
 fit::result<Errno, StackResult> populate_initial_stack(
     const MemoryAccessor& ma, UserAddress mapping_base, const fbl::String& path,
-    const std::vector<fbl::String>& argv, const std::vector<fbl::String>& envp,
-    std::vector<std::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr) {
+    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& envp,
+    fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr) {
   LTRACE;
   auto stack_pointer = original_stack_start_addr;
 
@@ -136,47 +141,51 @@ fit::result<Errno, StackResult> populate_initial_stack(
     return result.take_error();
   stack_pointer = random_seed_addr;
 
-  auxv.emplace_back(AT_EXECFN, static_cast<uint64_t>(execfn_addr.ptr()));
-  auxv.emplace_back(AT_RANDOM, static_cast<uint64_t>(random_seed_addr.ptr()));
-  auxv.emplace_back(AT_NULL, static_cast<uint64_t>(0));
+  fbl::AllocChecker ac;
+  auxv.push_back(ktl::pair(AT_EXECFN, static_cast<uint64_t>(execfn_addr.ptr())), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_RANDOM, static_cast<uint64_t>(random_seed_addr.ptr())), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_NULL, static_cast<uint64_t>(0)), &ac);
+  ZX_ASSERT(ac.check());
 
   // After the remainder (argc/argv/environ/auxv) is pushed, the stack pointer must be 16 byte
   // aligned. This is required by the ABI and assumed by the compiler to correctly align SSE
   // operations. But this can't be done after it's pushed, since it has to be right at the top of
   // the stack. So we collect it all, align the stack appropriately now that we know the size,
   // and push it all at once.
-  std::vector<ktl::byte> main_data;
+  fbl::Vector<ktl::byte> main_data;
   // argc
   uint64_t argc = argv.size();
-  std::copy_n(cpp20::bit_cast<ktl::array<ktl::byte, sizeof(argc)>>(argc).data(), sizeof(argc),
-              std::back_inserter(main_data));
+  ktl::span<ktl::byte> argc_data(reinterpret_cast<ktl::byte*>(&argc), sizeof(argc));
+  ktl::copy_n(argc_data.data(), argc_data.size(), util::back_inserter(main_data));
 
   // argv
-  std::vector<const ktl::byte> kZero(8, ktl::byte{0});
+  constexpr fbl::static_vector<ktl::byte, 8> kZero(8, ktl::byte{0});
   auto next_arg_addr = argv_start;
   for (auto arg : argv) {
-    std::copy_n(cpp20::bit_cast<ktl::array<ktl::byte, sizeof(next_arg_addr)>>(next_arg_addr).data(),
-                sizeof(next_arg_addr), std::back_inserter(main_data));
+    ktl::span<ktl::byte> ptr(reinterpret_cast<ktl::byte*>(&next_arg_addr), sizeof(next_arg_addr));
+    ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_arg_addr += arg.length() + 1;
   }
-  std::copy_n(kZero.data(), kZero.size(), std::back_inserter(main_data));
+  ktl::copy(kZero.begin(), kZero.end(), util::back_inserter(main_data));
   // environ
   auto next_env_addr = environ_start;
   for (auto env : envp) {
-    std::copy_n(cpp20::bit_cast<ktl::array<ktl::byte, sizeof(next_env_addr)>>(next_env_addr).data(),
-                sizeof(next_env_addr), std::back_inserter(main_data));
+    ktl::span<ktl::byte> ptr(reinterpret_cast<ktl::byte*>(&next_env_addr), sizeof(next_env_addr));
+    ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_env_addr += env.length() + 1;
   }
-  std::copy_n(kZero.data(), kZero.size(), std::back_inserter(main_data));
+  ktl::copy(kZero.begin(), kZero.end(), util::back_inserter(main_data));
   // auxv
   size_t auxv_start_offset = main_data.size();
   for (auto kv : auxv) {
-    std::copy_n(
-        cpp20::bit_cast<ktl::array<ktl::byte, sizeof(uint64_t)>>(static_cast<uint64_t>(kv.first))
-            .data(),
-        sizeof(uint64_t), std::back_inserter(main_data));
-    std::copy_n(cpp20::bit_cast<ktl::array<ktl::byte, sizeof(kv.second)>>(kv.second).data(),
-                sizeof(kv.second), std::back_inserter(main_data));
+    uint64_t key = static_cast<uint64_t>(kv.first);
+    ktl::span<ktl::byte> key_span(reinterpret_cast<ktl::byte*>(&key), sizeof(key));
+    ktl::span<ktl::byte> value_span(reinterpret_cast<ktl::byte*>(&kv.second), sizeof(kv.second));
+
+    ktl::copy_n(key_span.data(), key_span.size(), util::back_inserter(main_data));
+    ktl::copy_n(value_span.data(), value_span.size(), util::back_inserter(main_data));
   }
   size_t auxv_end_offset = main_data.size();
 
@@ -230,7 +239,7 @@ fit::result<Errno, LoadedElf> load_elf(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
-  cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
+  ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
   zx::vmar tmp_user_vmar;
   {
@@ -248,7 +257,7 @@ fit::result<Errno, LoadedElf> load_elf(
           (void*)(ehdr.entry + loader.load_bias()));
 
   using RelroRegion = decltype(load_info)::Region;
-  zx::vmar loaded_vmar = std::move(loader).Commit(RelroRegion{}).TakeVmar();
+  zx::vmar loaded_vmar = ktl::move(loader).Commit(RelroRegion{}).TakeVmar();
 
   return fit::ok(LoadedElf{ehdr, load_info.vaddr_start(), loader.load_bias()});
 }
@@ -256,10 +265,10 @@ fit::result<Errno, LoadedElf> load_elf(
 // Resolves a file handle into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     const CurrentTask& current_task, const starnix::FileHandle& file, zx::vmo vmo,
-    const std::vector<fbl::String>& argv, const std::vector<fbl::String>& environ
+    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& environ
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   LTRACE;
-  std::optional<starnix::ResolvedInterpElf> resolved_interp;
+  ktl::optional<starnix::ResolvedInterpElf> resolved_interp;
 
   auto diag = GetDiagnostics();
   elfldltl::UnownedVmoFile vmo_file(vmo.borrow(), diag);
@@ -267,9 +276,9 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
-  cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
+  ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
-  std::optional<elfldltl::Elf<>::Phdr> interp;
+  ktl::optional<elfldltl::Elf<>::Phdr> interp;
   elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container> load_info;
   ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(PAGE_SIZE),
                                   elfldltl::PhdrInterpObserver<elfldltl::Elf<>>(interp)));
@@ -312,7 +321,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
 
     resolved_interp = starnix::ResolvedInterpElf{
         open_result.value(),
-        std::move(interp_vmo),
+        ktl::move(interp_vmo),
     };
   }
 
@@ -320,14 +329,23 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
   let file_write_guard =
       file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
   */
-  return fit::ok(starnix::ResolvedElf{std::move(file), std::move(vmo), std::move(resolved_interp),
-                                      argv, environ /*, selinux_state, file_write_guard*/});
+
+  fbl::Vector<fbl::String> argv_cpy;
+  ktl::copy(argv.begin(), argv.end(), util::back_inserter(argv_cpy));
+
+  fbl::Vector<fbl::String> environ_cpy;
+  ktl::copy(environ.begin(), environ.end(), util::back_inserter(environ_cpy));
+
+  return fit::ok(starnix::ResolvedElf{
+      ktl::move(file), ktl::move(vmo), ktl::move(resolved_interp), ktl::move(argv_cpy),
+      ktl::move(environ_cpy) /*, selinux_state, file_write_guard*/});
 }
 
 // Resolves a #! script file into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_script(
     const starnix::CurrentTask& current_task, zx::vmo vmo, const fbl::String& path,
-    std::vector<fbl::String> argv, const std::vector<fbl::String>& environ, size_t recursion_depth
+    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& environ,
+    size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   LTRACE;
   return fit::error(errno(-1));
@@ -337,7 +355,8 @@ fit::result<Errno, starnix::ResolvedElf> resolve_script(
 // recursion depth.
 fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
     const starnix::CurrentTask& current_task, const starnix::FileHandle& file, fbl::String path,
-    std::vector<fbl::String> argv, const std::vector<fbl::String>& environ, size_t recursion_depth
+    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& environ,
+    size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   LTRACE;
   if (recursion_depth > MAX_RECURSION_DEPTH) {
@@ -351,7 +370,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
     return fit::error(errno(from_status_like_fdio(status)));
   }
 
-  std::array<char, HASH_BANG_SIZE> header{};
+  ktl::array<char, HASH_BANG_SIZE> header{};
   status = file_vmo.read(header.data(), 0, HASH_BANG_SIZE);
   switch (status) {
     case ZX_OK:
@@ -363,10 +382,10 @@ fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
   }
 
   if (header == HASH_BANG) {
-    return resolve_script(current_task, std::move(file_vmo), path, argv, environ, recursion_depth
+    return resolve_script(current_task, ktl::move(file_vmo), path, argv, environ, recursion_depth
                           /*, selinux_state*/);
   } else {
-    return resolve_elf(current_task, file, std::move(file_vmo), argv, environ /*, selinux_state*/);
+    return resolve_elf(current_task, file, ktl::move(file_vmo), argv, environ /*, selinux_state*/);
   }
 }
 
@@ -376,8 +395,8 @@ namespace starnix {
 
 fit::result<Errno, ResolvedElf> resolve_executable(
     const CurrentTask& current_task, const FileHandle& file, const fbl::String& path,
-    std::vector<fbl::String> argv,
-    const std::vector<fbl::String>& environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
+    const fbl::Vector<fbl::String>& argv,
+    const fbl::Vector<fbl::String>& environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   return resolve_executable_impl(current_task, file, path, argv, environ, 0);
 }
 
@@ -390,7 +409,7 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
     return main_elf.take_error();
   }
 
-  std::optional<LoadedElf> interp_elf;
+  ktl::optional<LoadedElf> interp_elf;
   if (resolved_elf.interp.has_value()) {
     auto& interp = resolved_elf.interp.value();
     auto load_interp_result = load_elf(interp.file, interp.vmo, current_task->mm()/*,
@@ -456,19 +475,22 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
     )?;
   */
 
-  std::vector<std::pair<uint32_t, uint64_t>> auxv;
-  // auxv.push_back(std::make_pair(AT_UID, creds.uid));
-  // auxv.push_back(std::make_pair(AT_EUID, creds.euid));
-  // auxv.push_back(std::make_pair(AT_GID, creds.gid));
-  // auxv.push_back(std::make_pair(AT_EGID, creds.egid));
-  // auxv.push_back(std::make_pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0));
-  auxv.emplace_back(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE));
-  // auxv.push_back(std::make_pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff));
-  // auxv.push_back(std::make_pair(AT_PHENT, info.main_elf.header.phentsize));
-  // auxv.push_back(std::make_pair(AT_PHNUM, info.main_elf.header.phnum));
-  // auxv.push_back(std::make_pair(AT_ENTRY, info.main_elf.load_bias + info.main_elf.header.entry));
-  // auxv.push_back(std::make_pair(AT_SYSINFO_EHDR, vdso_base));
-  auxv.emplace_back(AT_SECURE, 0);
+  fbl::AllocChecker ac;
+  fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
+  // auxv.push_back(ktl::make_pair(AT_UID, creds.uid));
+  // auxv.push_back(ktl::make_pair(AT_EUID, creds.euid));
+  // auxv.push_back(ktl::make_pair(AT_GID, creds.gid));
+  // auxv.push_back(ktl::make_pair(AT_EGID, creds.egid));
+  // auxv.push_back(ktl::make_pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0));
+  auxv.push_back(ktl::pair(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE)), &ac);
+  ZX_ASSERT(ac.check());
+  // auxv.push_back(ktl::make_pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff));
+  // auxv.push_back(ktl::make_pair(AT_PHENT, info.main_elf.header.phentsize));
+  // auxv.push_back(ktl::make_pair(AT_PHNUM, info.main_elf.header.phnum));
+  // auxv.push_back(ktl::make_pair(AT_ENTRY, info.main_elf.load_bias + info.main_elf.header.entry));
+  // auxv.push_back(ktl::make_pair(AT_SYSINFO_EHDR, vdso_base));
+  auxv.push_back(ktl::pair(AT_SECURE, 0), &ac);
+  ZX_ASSERT(ac.check());
 
   // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
   // this is based on adding 0x1000 each time a segfault appears.

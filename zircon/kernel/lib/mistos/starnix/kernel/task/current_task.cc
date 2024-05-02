@@ -151,8 +151,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
 }
 
 fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const fbl::String& path,
-                                     const std::vector<fbl::String>& argv,
-                                     const std::vector<fbl::String>& environ) {
+                                     const fbl::Vector<fbl::String>& argv,
+                                     const fbl::Vector<fbl::String>& environ) {
   LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
   // Executable must be a regular file
   /*

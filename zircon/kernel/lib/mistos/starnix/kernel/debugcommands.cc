@@ -9,6 +9,9 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <zircon/assert.h>
+
+#include <ktl/enforce.h>
 
 static int starnix_main(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -36,7 +39,9 @@ static int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
     int idx = 2;
     int remain = argc - idx;
     while (remain-- > 0) {
-      wrapper.config.init.emplace_back(argv[idx++].str);
+      fbl::AllocChecker ac;
+      wrapper.config.init.push_back(argv[idx++].str, &ac);
+      ZX_ASSERT(ac.check());
     }
     wrapper.config.name = "starnix-container";
     auto container = starnix::create_container(wrapper);
