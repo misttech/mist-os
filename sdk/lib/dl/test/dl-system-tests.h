@@ -34,6 +34,13 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
+
+ private:
+  // This will call the system dlopen in an OS-specific context. This method is
+  // defined directly on this test fixture rather than its OS-tailored base
+  // classes because the logic it performs is only needed for testing the
+  // system dlopen by this test fixture.
+  void* CallDlOpen(const char* file, int mode);
 };
 
 }  // namespace dl::testing

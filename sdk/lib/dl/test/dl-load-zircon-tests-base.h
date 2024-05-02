@@ -44,8 +44,6 @@ class DlLoadZirconTestsBase : public DlLoadTestsBase {
     mock_.Needed(name_found_pairs);
   }
 
-  // TODO(caslyn): This function can be removed once we introduce a CallDlopen
-  // wrapper to the base classes.
   void CallWithLdsvcInstalled(fit::closure func) { mock_.CallWithLdsvcInstalled(std::move(func)); }
 
   // Retrieve a VMO from the test package.

@@ -28,14 +28,9 @@ class DlImplTests : public Base {
   static constexpr bool kCanMatchExactError = true;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
-    // fit::result<...> must be initialized to something, but this will get
-    // overwritten by the return value from dynamic_linker_.Open.
-    fit::result<Error, void*> result = fit::error{Error{"dlopen result is not set"}};
-    Base::CallWithLdsvcInstalled([&]() {
-      result = dynamic_linker_.Open<typename Base::Loader>(
-          file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
-    });
-    return result;
+    // TODO(caslyn): verify and clear mock expectations.
+    return dynamic_linker_.Open<typename Base::Loader>(
+        file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {

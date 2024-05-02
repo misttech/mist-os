@@ -36,10 +36,6 @@ class DlLoadTestsBase : public DlTestsBase {
 
   static void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
-  // There is no particular loader to install on non-Fuchsia systems during
-  // tests, so this function simply runs the function it was passed.
-  static void CallWithLdsvcInstalled(fit::closure func) { func(); }
-
   // Check that startup modules are not retrieved from the filesystem.
   static void FileCheck(std::string_view filename);
 
