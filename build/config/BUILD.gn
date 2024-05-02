@@ -1418,8 +1418,14 @@ config("tlsdesc") {
       have_tlsdesc = 1
     }
   } else {
-    # TLSDESC is either always on or always off (so far) under Clang.
+    # TLSDESC is always on for Aarch64 under Clang.
     if (current_cpu == "arm64") {
+      have_tlsdesc = 1
+    }
+
+    # TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang on RISCV.
+    if (current_cpu == "riscv64") {
+      cflags = [ "-mtls-dialect=desc" ]
       have_tlsdesc = 1
     }
   }
@@ -1439,9 +1445,14 @@ config("no-tlsdesc") {
       cflags = [ "-mtls-dialect=gnu" ]
     }
   } else {
-    # TLSDESC is either always on or always off (so far) under Clang.
+    # TLSDESC is always on for Aarch64 under Clang.
     if (current_cpu == "arm64") {
       have_tlsdesc = 1
+    }
+
+    # TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang on RISCV.
+    if (current_cpu == "riscv64") {
+      cflags = [ "-mtls-dialect=trad" ]
     }
   }
   defines = [
