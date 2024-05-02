@@ -715,7 +715,7 @@ group("regex") {
 }
 
 group("regex-syntax") {
-  public_deps = [ ":regex-syntax-v0_6_29" ]
+  public_deps = [ ":regex-syntax-v0_8_3" ]
 }
 
 group("ring") {
@@ -12262,6 +12262,47 @@ rust_library("regex-syntax-v0_6_29") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":regex-syntax-v0_6_29.license" ]
+}
+
+license("regex-syntax-v0_8_3.license") {
+  public_package_name = "regex_syntax"
+  license_files = [
+    "//third_party/rust_crates/vendor/regex-syntax-0.8.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/regex-syntax-0.8.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/regex-syntax-0.8.3/src/unicode_tables/LICENSE-UNICODE",
+  ]
+}
+
+rust_library("regex-syntax-v0_8_3") {
+  crate_name = "regex_syntax"
+  crate_root = "//third_party/rust_crates/vendor/regex-syntax-0.8.3/src/lib.rs"
+  output_name = "regex_syntax-b15c1f1d5c6432f4"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=b15c1f1d5c6432f4",
+    "-Cextra-filename=-b15c1f1d5c6432f4",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+    "--cfg=feature=\"unicode\"",
+    "--cfg=feature=\"unicode-age\"",
+    "--cfg=feature=\"unicode-bool\"",
+    "--cfg=feature=\"unicode-case\"",
+    "--cfg=feature=\"unicode-gencat\"",
+    "--cfg=feature=\"unicode-perl\"",
+    "--cfg=feature=\"unicode-script\"",
+    "--cfg=feature=\"unicode-segment\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":regex-syntax-v0_8_3.license" ]
 }
 
 license("remove_dir_all-v0_5_1.license") {

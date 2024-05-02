@@ -1412,7 +1412,7 @@ dependencies = [
  "rayon",
  "ref-cast",
  "regex",
- "regex-syntax",
+ "regex-syntax 0.8.3",
  "ring",
  "rust_icu_common",
  "rust_icu_sys",
@@ -3073,7 +3073,7 @@ dependencies = [
  "rand 0.8.4",
  "rand_chacha 0.3.1",
  "rand_xorshift 0.3.0",
- "regex-syntax",
+ "regex-syntax 0.6.29",
  "rusty-fork",
  "tempfile",
 ]
@@ -3449,7 +3449,7 @@ checksum = "8b1f693b24f6ac912f4893ef08244d70b6067480d2f1a46e950c9691e6749d1d"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -3457,7 +3457,7 @@ name = "regex-automata"
 version = "0.1.9"
 dependencies = [
  "byteorder",
- "regex-syntax",
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -3465,6 +3465,12 @@ name = "regex-syntax"
 version = "0.6.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adad44e29e4c806119491a7f06f03de4d1af22c3a680dd47f1e6e179439d1f56"
 
 [[package]]
 name = "remove_dir_all"

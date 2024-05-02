@@ -180,7 +180,7 @@ rand_xorshift = "0.3"
 rayon = "1.2.1"
 ref-cast = "1.0.9"
 regex = "1.7.3"
-regex-syntax = "0.6.5"
+regex-syntax = "0.8.3"
 ring = "0.16.20"
 rustc-hash = "1.0.1"
 rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
