@@ -5,8 +5,9 @@
 mod test_suite;
 
 use crate::test_suite::*;
+use fidl_fuchsia_images2 as images2;
+use fidl_fuchsia_math::{RectU, SizeU};
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem as sysmem;
 use fuchsia_async as fasync;
 use h264_stream::*;
 use std::rc::Rc;
@@ -24,22 +25,13 @@ fn h264_stream_output_generated() -> Result<()> {
     let mut exec = fasync::TestExecutor::new();
 
     let test_case = H264EncoderTestCase {
-        input_format: sysmem::ImageFormat2 {
-            pixel_format: sysmem::PixelFormat {
-                type_: sysmem::PixelFormatType::Nv12,
-                has_format_modifier: false,
-                format_modifier: sysmem::FormatModifier { value: 0 },
-            },
-            coded_width: WIDTH,
-            coded_height: HEIGHT,
-            bytes_per_row: WIDTH,
-            display_width: WIDTH,
-            display_height: HEIGHT,
-            layers: 0,
-            color_space: sysmem::ColorSpace { type_: sysmem::ColorSpaceType::Rec601Pal },
-            has_pixel_aspect_ratio: false,
-            pixel_aspect_ratio_width: 0,
-            pixel_aspect_ratio_height: 0,
+        input_format: images2::ImageFormat {
+            pixel_format: Some(images2::PixelFormat::Nv12),
+            color_space: Some(images2::ColorSpace::Rec601Pal),
+            size: Some(SizeU { width: WIDTH, height: HEIGHT }),
+            display_rect: Some(RectU { x: 0, y: 0, width: WIDTH, height: HEIGHT }),
+            bytes_per_row: Some(WIDTH),
+            ..Default::default()
         },
         num_frames: 6,
         settings: Rc::new(move || -> EncoderSettings {

@@ -7,7 +7,7 @@
 use crate::pcm_audio::*;
 use crate::timestamp_validator::*;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem::*;
+use fidl_fuchsia_sysmem2::*;
 use fuchsia_zircon as zx;
 use rand::prelude::*;
 use std::rc::Rc;
@@ -158,16 +158,15 @@ impl AudioEncoderTestCase {
         // Pick an output packet size likely not divisible by any output codec frame size, to test
         // that half filled output packets are cleaned up in the codec without error when the
         // client disconnects early.
-        const ODD_OUTPUT_PACKET_SIZE: u32 = 4096 - 1;
+        const ODD_OUTPUT_PACKET_SIZE: u64 = 4096 - 1;
 
         let stream_options = Some(StreamOptions {
             output_buffer_collection_constraints: Some(BufferCollectionConstraints {
-                has_buffer_memory_constraints: true,
-                buffer_memory_constraints: BufferMemoryConstraints {
-                    min_size_bytes: ODD_OUTPUT_PACKET_SIZE,
-                    ..BUFFER_MEMORY_CONSTRAINTS_DEFAULT
-                },
-                ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
+                buffer_memory_constraints: Some(BufferMemoryConstraints {
+                    min_size_bytes: Some(ODD_OUTPUT_PACKET_SIZE),
+                    ..buffer_memory_constraints_default()
+                }),
+                ..buffer_collection_constraints_default()
             }),
             stop_after_first_output: true,
             ..StreamOptions::default()
@@ -198,12 +197,11 @@ impl AudioEncoderTestCase {
 
         let stream_options = Some(StreamOptions {
             input_buffer_collection_constraints: Some(BufferCollectionConstraints {
-                has_buffer_memory_constraints: true,
-                buffer_memory_constraints: BufferMemoryConstraints {
-                    min_size_bytes: (max_framelength * pcm_frame_size) as u32,
-                    ..BUFFER_MEMORY_CONSTRAINTS_DEFAULT
-                },
-                ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
+                buffer_memory_constraints: Some(BufferMemoryConstraints {
+                    min_size_bytes: Some((max_framelength * pcm_frame_size) as u64),
+                    ..buffer_memory_constraints_default()
+                }),
+                ..buffer_collection_constraints_default()
             }),
             ..StreamOptions::default()
         });
@@ -217,7 +215,7 @@ impl AudioEncoderTestCase {
                 fixed_framelength_stream.as_ref(),
             ))],
             stream: fixed_framelength_stream,
-            stream_options,
+            stream_options: stream_options.clone(),
         };
 
         let variable_framelength_stream = self.create_test_stream((0..).map(move |i| {

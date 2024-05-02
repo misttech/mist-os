@@ -5,7 +5,7 @@
 #![allow(clippy::large_futures)]
 
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem::{BufferCollectionConstraints, BufferMemoryConstraints};
+use fidl_fuchsia_sysmem2::{BufferCollectionConstraints, BufferMemoryConstraints};
 use std::rc::Rc;
 use stream_processor_decoder_factory::*;
 use stream_processor_test::*;
@@ -26,17 +26,17 @@ pub struct AudioDecoderOutputTest {
     pub expected_output_format: FormatDetails,
 }
 
-const TEST_BUFFER_COLLECTION_CONSTRAINTS: BufferCollectionConstraints =
+fn test_buffer_collection_constraints() -> BufferCollectionConstraints {
     BufferCollectionConstraints {
-        has_buffer_memory_constraints: true,
-        buffer_memory_constraints: BufferMemoryConstraints {
+        buffer_memory_constraints: Some(BufferMemoryConstraints {
             // Chosen to be larger than most decoder tests requirements, and not particularly
             // an even size of output frames (at 16 bits per sample, an odd number satisfies this)
-            min_size_bytes: 10001,
-            ..BUFFER_MEMORY_CONSTRAINTS_DEFAULT
-        },
-        ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
-    };
+            min_size_bytes: Some(10001),
+            ..Default::default()
+        }),
+        ..buffer_collection_constraints_default()
+    }
+}
 
 impl AudioDecoderTestCase {
     pub async fn run(self) -> Result<()> {
@@ -79,7 +79,7 @@ impl AudioDecoderTestCase {
                 stream_options: Some(StreamOptions {
                     queue_format_details: false,
                     // Set the buffer constraints slightly off-kilter to test fenceposting
-                    output_buffer_collection_constraints: Some(TEST_BUFFER_COLLECTION_CONSTRAINTS),
+                    output_buffer_collection_constraints: Some(test_buffer_collection_constraints()),
                     ..StreamOptions::default()
                 }),
             });
