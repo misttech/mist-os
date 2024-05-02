@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 
-#include "sdk/lib/driver/power/cpp/element-description.h"
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace fdf_power {

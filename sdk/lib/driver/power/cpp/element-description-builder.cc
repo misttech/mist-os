@@ -7,8 +7,6 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/zx/event.h>
 
-#include "sdk/lib/driver/power/cpp/element-description.h"
-
 namespace fdf_power {
 
 ElementDesc ElementDescBuilder::Build() {

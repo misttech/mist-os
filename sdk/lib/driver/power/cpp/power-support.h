@@ -46,6 +46,22 @@ using ElementDependencyMap =
     std::unordered_map<fuchsia_hardware_power::ParentElement,
                        std::vector<fuchsia_power_broker::LevelDependency>, ParentElementHasher>;
 
+struct ElementDesc {
+  fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
+  TokenMap tokens_;
+  zx::event active_token_;
+  zx::event passive_token_;
+  std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
+            fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>
+      level_control_servers_;
+  fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server_;
+
+  // The below are created if the caller did not supply their corresponding server end
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_;
+};
+
 /// Given a `PowerElementConfiguration` from driver framework, convert this
 /// into a set of Power Broker's `LevelDependency` objects. The map is keyed
 /// by the name of the parent/dependency.
@@ -134,6 +150,23 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
         level_control,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor);
 
+/// Call `AddElement` on the `power_broker` channel passed in.
+/// This function uses `ElementDescription` passed in to make the proper call
+/// to `fuchsia.power.broker/Topology.AddElement`. See `ElementDescription` for
+/// more information about what fields are inputs to `AddElement`.
+///
+/// Returns the response from power broker if successful which includes
+/// channels to further control the created power element.
+///
+/// Error
+///   - Error::DEPENDENCY_NOT_FOUND if there is a dependency specified by
+///     `config` which is to found in `tokens`.
+///   - Error::INVALID_ARGS if `config` appears to be invalid, we fail to
+///     duplicate a token and therefore assume it must have been invalid, or
+///     the call to power broker fails for any reason *other* than a closed
+///     channel.
+fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
+    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description);
 }  // namespace fdf_power
 
 #endif  // LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_

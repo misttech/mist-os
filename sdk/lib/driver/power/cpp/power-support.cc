@@ -544,4 +544,12 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
   return fit::success(fidl::ToNatural(std::move(*add_result->value())));
 }
 
+fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
+    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description) {
+  return AddElement(power_broker, description.element_config_, std::move(description.tokens_),
+                    description.active_token_.borrow(), description.passive_token_.borrow(),
+                    std::move(description.level_control_servers_),
+                    std::move(description.lessor_server_));
+}
+
 }  // namespace fdf_power

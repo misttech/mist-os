@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/element-description.h>
 #include <lib/driver/power/cpp/power-support.h>
 
 namespace fake_child_device {
@@ -45,10 +44,7 @@ zx::result<> FakeChild::Start() {
         fdf_power::ElementDescBuilder(power_config->value()->config[0], std::move(tokens)).Build();
 
     fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
-        fdf_power::AddElement(
-            broker, description.element_config_, std::move(description.tokens_),
-            description.active_token_.borrow(), description.passive_token_.borrow(),
-            std::move(description.level_control_servers_), std::move(description.lessor_server_));
+        fdf_power::AddElement(broker, description);
     if (!add_result.is_ok()) {
       return zx::error(ZX_ERR_INTERNAL);
     }

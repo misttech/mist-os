@@ -9,7 +9,6 @@
 
 #include "lib/fidl/cpp/wire/channel.h"
 #include "sdk/lib/driver/power/cpp/element-description-builder.h"
-#include "sdk/lib/driver/power/cpp/element-description.h"
 #include "sdk/lib/driver/power/cpp/power-support.h"
 #include "zircon/syscalls/object.h"
 

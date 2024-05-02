@@ -15,7 +15,6 @@ source_set("cpp") {
   sources = [
     "element-description-builder.cc",
     "element-description-builder.h",
-    "element-description.h",
     "power-support.cc",
     "power-support.h",
   ]

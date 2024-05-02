@@ -8,7 +8,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/element-description.h>
 #include <lib/driver/power/cpp/power-support.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -51,10 +50,7 @@ zx::result<> FakeParent::Start() {
 
     fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(power_broker_req.value());
     fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
-        fdf_power::AddElement(
-            broker, power_config[0], std::move(description.tokens_),
-            description.active_token_.borrow(), description.passive_token_.borrow(),
-            std::move(description.level_control_servers_), std::move(description.lessor_server_));
+        fdf_power::AddElement(broker, description);
 
     topology_client_ =
         fidl::WireClient<fuchsia_power_broker::Topology>(std::move(broker), dispatcher());
