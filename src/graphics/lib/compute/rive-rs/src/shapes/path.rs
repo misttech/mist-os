@@ -113,15 +113,17 @@ impl ObjectRef<'_, Path> {
             Out,
         }
 
-        impl ObjectRef<'_, PathVertex> {
-            fn get_or_translation(&self, dir: Dir) -> math::Vec {
-                self.try_cast::<CubicVertex>()
-                    .map(|cubic| match dir {
-                        Dir::In => cubic.render_in(),
-                        Dir::Out => cubic.render_out(),
-                    })
-                    .unwrap_or_else(|| self.render_translation())
-            }
+        fn path_vertex_get_or_translation(
+            path_vertex: ObjectRef<'_, PathVertex>,
+            dir: Dir,
+        ) -> math::Vec {
+            path_vertex
+                .try_cast::<CubicVertex>()
+                .map(|cubic| match dir {
+                    Dir::In => cubic.render_in(),
+                    Dir::Out => cubic.render_out(),
+                })
+                .unwrap_or_else(|| path_vertex.render_translation())
         }
 
         let first_point = self.vertices.index(0);
@@ -155,12 +157,12 @@ impl ObjectRef<'_, Path> {
                 let prev = self.vertices.index(self.vertices.len() - 1);
 
                 let pos = point.cast::<PathVertex>().render_translation();
-                let to_prev = prev.as_ref().get_or_translation(Dir::Out) - pos;
+                let to_prev = path_vertex_get_or_translation(prev.as_ref(), Dir::Out) - pos;
                 let to_prev_length = to_prev.length();
                 let to_prev = to_prev * to_prev_length.recip();
 
                 let next = self.vertices.index(1);
-                let to_next = next.as_ref().get_or_translation(Dir::In) - pos;
+                let to_next = path_vertex_get_or_translation(next.as_ref(), Dir::In) - pos;
                 let to_next_length = to_next.length();
                 let to_next = to_next * to_next_length.recip();
 
@@ -212,7 +214,7 @@ impl ObjectRef<'_, Path> {
                     let to_prev = to_prev * to_prev_length.recip();
 
                     let next = self.vertices.index((i + 1) % self.vertices.len());
-                    let to_next = next.as_ref().get_or_translation(Dir::In) - pos;
+                    let to_next = path_vertex_get_or_translation(next.as_ref(), Dir::In) - pos;
                     let to_next_length = to_next.length();
                     let to_next = to_next * to_next_length.recip();
 
