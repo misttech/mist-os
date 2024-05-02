@@ -11,10 +11,10 @@ GN ?= $(MISTOSROOT)/prebuilt/third_party/gn/$(HOST_OS)-$(HOST_ARCH)/gn
 NINJA ?= $(MISTOSROOT)/prebuilt/third_party/ninja/$(HOST_OS)-$(HOST_ARCH)/ninja
 NOECHO ?= @
 
-export NINJA_STATUS_MAX_COMMANDS=4
-export NINJA_STATUS_REFRESH_MILLIS=100
-export NINJA_PERSISTENT_MODE=0
-export NINJA_STATUS=[%f/%t](%r)
+#export NINJA_STATUS_MAX_COMMANDS=4
+#export NINJA_STATUS_REFRESH_MILLIS=100
+#export NINJA_PERSISTENT_MODE=0
+#export NINJA_STATUS=[%f/%t](%r)
 
 info: ## Print build info
 	@echo "HOST_OS=$(HOST_OS)"
@@ -74,6 +74,7 @@ ci: zxtest kasan info gen ## Run test kernel-zxtest.zbi with kasan
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-zxtest.zbi -s1 \
+	-c "kernel.bypass-debuglog=true" \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: ci
 
