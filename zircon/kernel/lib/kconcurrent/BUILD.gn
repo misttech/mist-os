@@ -8,18 +8,24 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("headers") {
   headers = [
+    "lib/kconcurrent/chainlock.h",
     "lib/kconcurrent/copy.h",
     "lib/kconcurrent/seqlock.h",
   ]
 
   public_deps = [
     "//zircon/system/ulib/concurrent:headers",
+    "//zircon/system/ulib/fbl:headers",
     "//zircon/system/ulib/lockdep:headers",
   ]
 }
 
 source_set("kconcurrent") {
-  sources = [ "seqlock.cc" ]
+  sources = [
+    "chainlock.cc",
+    "chainlock_transaction.cc",
+    "seqlock.cc",
+  ]
   public_deps = [ ":headers" ]
   deps = [
     "//zircon/kernel/lib/arch",
