@@ -6,6 +6,7 @@
 #define SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_H_
 
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -52,11 +53,9 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   explicit AmlUart(ddk::PDevFidl pdev,
                    const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
-                   fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher)
-      : pdev_(std::move(pdev)),
-        serial_port_info_(serial_port_info),
-        mmio_(std::move(mmio)),
-        irq_dispatcher_(std::move(irq_dispatcher)) {}
+                   fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
+                   std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end =
+                       std::nullopt);
 
   zx_status_t Config(uint32_t baud_rate, uint32_t flags);
   zx_status_t Enable(bool enable);
@@ -118,6 +117,12 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   fdf::UnownedSynchronizedDispatcher irq_dispatcher_;
   zx::interrupt irq_;
   async::IrqMethod<AmlUart, &AmlUart::HandleIrq> irq_handler_{this};
+
+  static const fuchsia_power_broker::PowerLevel kWakeHandlingLeaseOn =
+      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> lessor_client_;
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end_;
 };
 
 }  // namespace serial

@@ -7,6 +7,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/power/cpp/power-support.h>
 
 namespace serial {
 
@@ -20,7 +21,8 @@ constexpr std::string_view driver_name = "aml-uart";
 
 AmlUartV2::AmlUartV2(fdf::DriverStartArgs start_args,
                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : fdf::DriverBase(driver_name, std::move(start_args), std::move(driver_dispatcher)) {}
+    : fdf::DriverBase(driver_name, std::move(start_args), std::move(driver_dispatcher)),
+      driver_config_(take_config<aml_uart_dfv2_config::Config>()) {}
 
 void AmlUartV2::Start(fdf::StartCompleter completer) {
   start_completer_.emplace(std::move(completer));
@@ -56,6 +58,10 @@ void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
 AmlUart& AmlUartV2::aml_uart_for_testing() {
   ZX_ASSERT(aml_uart_.has_value());
   return aml_uart_.value();
+}
+
+fidl::ClientEnd<fuchsia_power_broker::ElementControl>& AmlUartV2::element_control_for_testing() {
+  return element_control_client_end_;
 }
 
 void AmlUartV2::OnReceivedMetadata(
@@ -117,6 +123,63 @@ void AmlUartV2::OnReceivedMetadata(
                        compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
 }
 
+zx_status_t AmlUartV2::GetPowerconfiguration(
+    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
+  auto power_broker = incoming()->Connect<fuchsia_power_broker::Topology>();
+  if (power_broker.is_error() || !power_broker->is_valid()) {
+    FDF_LOG(WARNING, "Failed to connect to power broker: %s", power_broker.status_string());
+    return power_broker.status_value();
+  }
+
+  const auto result_power_config = pdev->GetPowerConfiguration();
+  if (!result_power_config.ok()) {
+    FDF_LOG(ERROR, "Call to get power config failed: %s", result_power_config.status_string());
+    return result_power_config.status();
+  }
+  if (result_power_config->is_error()) {
+    FDF_LOG(INFO, "GetPowerConfiguration failed: %s",
+            zx_status_get_string(result_power_config->error_value()));
+    return result_power_config->error_value();
+  }
+  if (result_power_config->value()->config.count() != 1) {
+    FDF_LOG(INFO, "Unexpected number of power configurations: %zu",
+            result_power_config->value()->config.count());
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  const auto& config = result_power_config->value()->config[0];
+  if (config.element().name().get() != "aml-uart-wake-on-interrupt") {
+    FDF_LOG(ERROR, "Unexpected power element: %s",
+            std::string(config.element().name().get()).c_str());
+    return ZX_ERR_BAD_STATE;
+  }
+
+  // Get dependency tokens from the config, these tokens represent the dependency from the current
+  // element to its parent(s).
+  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
+  if (tokens.is_error()) {
+    FDF_LOG(ERROR, "Failed to get power dependency tokens: %u",
+            static_cast<uint8_t>(tokens.error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+
+  zx::result lessor_endpoints = fidl::CreateEndpoints<fuchsia_power_broker::Lessor>();
+
+  auto result_add_element =
+      fdf_power::AddElement(power_broker.value(), config, std::move(tokens.value()), {}, {}, {},
+                            std::move(lessor_endpoints->server));
+  if (result_add_element.is_error()) {
+    FDF_LOG(ERROR, "Failed to add power element: %u",
+            static_cast<uint8_t>(result_add_element.error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+
+  element_control_client_end_ = std::move(result_add_element->element_control_channel());
+  lessor_client_end_ = std::move(lessor_endpoints->client);
+
+  return ZX_OK;
+}
+
 void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result) {
   if (device_server_init_result.is_error()) {
     CompleteStart(device_server_init_result.take_error());
@@ -130,7 +193,17 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     return;
   }
 
-  ddk::PDevFidl pdev(std::move(pdev_connection.value()));
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> fidl_pdev(
+      std::move(pdev_connection.value()));
+
+  if (driver_config_.enable_suspend()) {
+    if (zx_status_t status = GetPowerconfiguration(fidl_pdev); status != ZX_OK) {
+      FDF_LOG(INFO, "Could not get power configuration: %s", zx_status_get_string(status));
+      return;
+    }
+  }
+
+  ddk::PDevFidl pdev(fidl_pdev.TakeClientEnd());
 
   std::optional<fdf::MmioBuffer> mmio;
   zx_status_t status = pdev.MapMmio(0, &mmio);
@@ -156,7 +229,7 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
 
   irq_dispatcher_.emplace(std::move(irq_dispatcher_result.value()));
   aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()),
-                    irq_dispatcher_->borrow());
+                    irq_dispatcher_->borrow(), std::move(lessor_client_end_));
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;

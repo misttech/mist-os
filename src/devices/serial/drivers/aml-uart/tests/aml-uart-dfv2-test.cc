@@ -4,7 +4,11 @@
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
@@ -19,6 +23,119 @@ static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
     .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
 };
 
+class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+ public:
+  FakeSystemActivityGovernor() = default;
+
+  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
+    fuchsia_power_system::PowerElements elements;
+    zx::event::create(0, &wake_handling_);
+    zx::event duplicate;
+    wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
+
+    fuchsia_power_system::WakeHandling wake_handling = {
+        {.active_dependency_token = std::move(duplicate)}};
+
+    elements = {{.wake_handling = std::move(wake_handling)}};
+
+    completer.Reply({{std::move(elements)}});
+  }
+
+  void RegisterListener(RegisterListenerRequest& request,
+                        RegisterListenerCompleter::Sync& completer) override {}
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  zx::event wake_handling_;
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+};
+
+class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
+ public:
+  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& request,
+                   WatchStatusCompleter::Sync& completer) override {
+    completer.Reply(lease_status_);
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
+};
+
+class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
+ public:
+  void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
+             LeaseCompleter::Sync& completer) override {
+    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
+    auto lease_control_impl = std::make_unique<FakeLeaseControl>();
+    lease_control_ = lease_control_impl.get();
+    lease_control_binding_ = fidl::BindServer<fuchsia_power_broker::LeaseControl>(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control->server),
+        std::move(lease_control_impl),
+        [](FakeLeaseControl* impl, fidl::UnbindInfo info,
+           fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end) mutable {});
+
+    completer.Reply(fit::success(std::move(lease_control->client)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  FakeLeaseControl* lease_control_;
+  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
+};
+
+class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
+ public:
+  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void AddElement(fuchsia_power_broker::ElementSchema& request,
+                  AddElementCompleter::Sync& completer) override {
+    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
+    element_control_server_ = std::move(element_control->server);
+    if (request.lessor_channel()) {
+      auto lessor_impl = std::make_unique<FakeLessor>();
+      wake_lessor_ = lessor_impl.get();
+      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
+          fidl::BindServer<fuchsia_power_broker::Lessor>(
+              fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              std::move(*request.lessor_channel()), std::move(lessor_impl),
+              [](FakeLessor* impl, fidl::UnbindInfo info,
+                 fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
+    }
+
+    fuchsia_power_broker::TopologyAddElementResponse result{
+        {.element_control_channel = std::move(element_control->client)},
+    };
+
+    completer.Reply(fit::success(std::move(result)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server() {
+    return element_control_server_;
+  }
+
+ private:
+  FakeLessor* wake_lessor_ = nullptr;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
+  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
+};
+
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
@@ -30,6 +147,31 @@ class Environment : public fdf_testing::Environment {
     state_.set_irq_signaller(config.irqs[0].borrow());
     config.mmios[0] = state_.GetMmio();
 
+    // Add power configuration to config.
+    constexpr uint8_t kPowerLevelOff =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
+    constexpr uint8_t kPowerLevelHandling =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+    constexpr char kPowerElementName[] = "aml-uart-wake-on-interrupt";
+    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
+        .child_level = kPowerLevelHandling,
+        .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+    }};
+    fuchsia_hardware_power::PowerDependency wake_handling = {{
+        .child = kPowerElementName,
+        .parent = fuchsia_hardware_power::ParentElement::WithSag(
+            fuchsia_hardware_power::SagElement::kWakeHandling),
+        .level_deps = {{std::move(wake_handling_on)}},
+        .strength = fuchsia_hardware_power::RequirementType::kActive,
+    }};
+    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
+    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelHandling, .name = "on"}};
+    fuchsia_hardware_power::PowerElement element = {
+        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
+    fuchsia_hardware_power::PowerElementConfiguration wake_config = {
+        {.element = std::move(element), .dependencies = {{std::move(wake_handling)}}}};
+    config.power_elements.push_back(wake_config);
+
     pdev_server_.SetConfig(std::move(config));
 
     // Add pdev.
@@ -39,6 +181,16 @@ class Environment : public fdf_testing::Environment {
         to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
             pdev_server_.GetInstanceHandler(dispatcher), kInstanceName);
     ZX_ASSERT(add_service_result.is_ok());
+
+    // Add power protocols.
+    auto result_sag =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+            system_activity_governor_.CreateHandler());
+    EXPECT_EQ(ZX_OK, result_sag.status_value());
+    auto result_broker =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
+            power_broker_.CreateHandler());
+    EXPECT_EQ(ZX_OK, result_broker.status_value());
 
     // Configure and add compat.
     compat_server_.Init("default", "topo");
@@ -51,17 +203,20 @@ class Environment : public fdf_testing::Environment {
   }
 
   DeviceState& device_state() { return state_; }
+  FakePowerBroker& power_broker() { return power_broker_; }
 
  private:
   DeviceState state_;
   fake_pdev::FakePDevFidl pdev_server_;
+  FakeSystemActivityGovernor system_activity_governor_;
+  FakePowerBroker power_broker_;
   compat::DeviceServer compat_server_;
 };
 
 class AmlUartTestConfig {
  public:
   static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStartDriver = false;
   static constexpr bool kAutoStopDriver = true;
 
   using DriverType = serial::AmlUartV2;
@@ -71,7 +226,7 @@ class AmlUartTestConfig {
 class AmlUartAsyncTestConfig {
  public:
   static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStartDriver = false;
   static constexpr bool kAutoStopDriver = true;
 
   using DriverType = serial::AmlUartV2;
@@ -80,6 +235,16 @@ class AmlUartAsyncTestConfig {
 
 class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig> {
  public:
+  void SetUp() override {
+    zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
+      aml_uart_dfv2_config::Config fake_config;
+      fake_config.enable_suspend() = false;
+      args.config(fake_config.ToVmo());
+    });
+
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   fdf::WireSyncClient<fuchsia_hardware_serialimpl::Device> CreateClient() {
     zx::result driver_connect_result =
         Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
@@ -92,6 +257,16 @@ class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig> 
 
 class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTestConfig> {
  public:
+  void SetUp() override {
+    zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
+      aml_uart_dfv2_config::Config fake_config;
+      fake_config.enable_suspend() = false;
+      args.config(fake_config.ToVmo());
+    });
+
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateClient() {
     zx::result driver_connect_result =
         Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
@@ -103,6 +278,19 @@ class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTe
   }
 
   serial::AmlUart& Device() { return driver()->aml_uart_for_testing(); }
+};
+
+class AmlUartHarnessWithPower : public AmlUartHarness {
+ public:
+  void SetUp() override {
+    zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
+      aml_uart_dfv2_config::Config fake_config;
+      fake_config.enable_suspend() = true;
+      args.config(fake_config.ToVmo());
+    });
+
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 };
 
 TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
@@ -389,4 +577,23 @@ TEST_F(AmlUartAsyncHarness, SerialImplAsyncReadDoubleCallback) {
       [&](Environment& env) { env.device_state().Inject(expected_data.data(), kDataLen); });
   Device().HandleRXRaceForTest();
   runtime().Run();
+}
+
+TEST_F(AmlUartHarnessWithPower, PowerElementControl) {
+  zx_info_handle_basic_t broker_element_control, driver_element_control;
+
+  RunInDriverContext([&](serial::AmlUartV2& driver) {
+    zx_status_t status = driver.element_control_for_testing().channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &driver_element_control, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  });
+
+  RunInEnvironmentTypeContext([&](Environment& env) {
+    zx_status_t status = env.power_broker().element_control_server().channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &broker_element_control, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  });
+  ASSERT_EQ(broker_element_control.koid, driver_element_control.related_koid);
 }

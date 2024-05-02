@@ -19,6 +19,13 @@
         { service: "fuchsia.hardware.serialimpl.Service" },
     ],
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+        { protocol: "fuchsia.power.broker.Topology" },
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [

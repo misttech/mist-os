@@ -56,7 +56,9 @@ source_set("aml-uart-source") {
     "//src/lib/ddk",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
+    "//sdk/lib/driver/power/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//src/lib/ddktl",
@@ -136,9 +138,12 @@ source_set("aml-uart-dfv2-source") {
     "//src/devices/bin/driver_runtime",
   ]
   public_deps = [
+    ":aml-uart-dfv2-config",
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/power/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/async:async-cpp",
@@ -153,19 +158,35 @@ fuchsia_driver("aml-uart-dfv2-driver") {
   deps = [ ":aml-uart-dfv2-source" ]
 }
 
-fuchsia_driver_component("aml-uart-dfv2") {
-  info = "aml-uart-info.json"
+fuchsia_component_manifest("aml-uart-dfv2-manifest") {
   component_name = "aml-uart-dfv2"
+  manifest = "meta/aml-uart-dfv2.cml"
+}
+
+fuchsia_driver_component("aml-uart-dfv2") {
+  cm_label = ":aml-uart-dfv2-manifest"
+  info = "aml-uart-info.json"
   deps = [
     ":aml-uart-dfv2-driver",
     ":aml_uart_bind",
   ]
-  manifest = "meta/aml-uart-dfv2.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("aml-uart-dfv2-config") {
+  cm_label = ":aml-uart-dfv2-manifest"
+}
+
+fuchsia_structured_config_values("sc-values") {
+  cm_label = ":aml-uart-dfv2-manifest"
+  values = {
+    enable_suspend = true
+  }
 }
 
 fuchsia_driver_package("package-dfv2") {
   package_name = "aml-uart-dfv2"
   driver_components = [ ":aml-uart-dfv2" ]
+  deps = [ ":sc-values" ]
 }
 
 test("aml-uart-dfv2-test-bin") {
@@ -177,6 +198,7 @@ test("aml-uart-dfv2-test-bin") {
   deps = [
     ":aml-uart-dfv2-source",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
     "//src/devices/bus/testing/fake-pdev",

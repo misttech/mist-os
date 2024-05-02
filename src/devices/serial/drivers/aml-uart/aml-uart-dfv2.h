@@ -10,6 +10,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart.h"
+#include "src/devices/serial/drivers/aml-uart/aml_uart_dfv2_config.h"
 
 namespace serial {
 
@@ -25,7 +26,12 @@ class AmlUartV2 : public fdf::DriverBase {
   // Used by the unit test to access the device.
   AmlUart& aml_uart_for_testing();
 
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl>& element_control_for_testing();
+
  private:
+  zx_status_t GetPowerconfiguration(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
+
   void OnReceivedMetadata(
       fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& metadata_result);
 
@@ -45,6 +51,12 @@ class AmlUartV2 : public fdf::DriverBase {
   std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
   compat::AsyncInitializedDeviceServer device_server_;
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
+
+  aml_uart_dfv2_config::Config driver_config_;
+
+  // Client ends for talking to power broker.
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client_end_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end_;
 };
 
 }  // namespace serial

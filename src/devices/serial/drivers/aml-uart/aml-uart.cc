@@ -11,6 +11,7 @@
 #endif
 
 #include <threads.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/threads.h>
 
 #include <fbl/auto_lock.h>
@@ -46,6 +47,21 @@ fit::closure DriverTransportWriteOperation::MakeCallback(zx_status_t status) {
 }
 
 }  // namespace internal
+
+AmlUart::AmlUart(ddk::PDevFidl pdev,
+                 const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
+                 fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
+                 std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end)
+    : pdev_(std::move(pdev)),
+      serial_port_info_(serial_port_info),
+      mmio_(std::move(mmio)),
+      irq_dispatcher_(std::move(irq_dispatcher)) {
+  if (lessor_client_end != std::nullopt) {
+    lessor_client_.Bind(std::move(*lessor_client_end));
+  } else {
+    zxlogf(INFO, "No lessor client end gets passed into AmlUart during initialization.");
+  }
+}
 
 constexpr auto kMinBaudRate = 2;
 
@@ -208,7 +224,7 @@ zx_status_t AmlUart::Enable(bool enable) {
   fbl::AutoLock al(&enable_lock_);
 
   if (enable && !enabled_) {
-    zx_status_t status = pdev_.GetInterrupt(0, 0, &irq_);
+    zx_status_t status = pdev_.GetInterrupt(0, ZX_INTERRUPT_WAKE_VECTOR, &irq_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
       return status;
