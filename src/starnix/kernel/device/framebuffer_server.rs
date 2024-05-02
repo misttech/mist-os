@@ -13,12 +13,13 @@
 use crate::task::Kernel;
 use anyhow::anyhow;
 use fidl::{
-    endpoints::{create_proxy, create_request_stream},
+    endpoints::{create_proxy, create_request_stream, ClientEnd},
     HandleBased,
 };
 use fidl_fuchsia_element as felement;
+use fidl_fuchsia_images2 as fimages2;
 use fidl_fuchsia_math as fmath;
-use fidl_fuchsia_sysmem as fsysmem;
+use fidl_fuchsia_sysmem2 as fsysmem2;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_views as fuiviews;
 use flatland_frame_scheduling_lib::{
@@ -28,7 +29,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_sync,
 };
-use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
+use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
 use futures::{
@@ -74,7 +75,7 @@ pub struct FramebufferServer {
     flatland: fuicomposition::FlatlandProxy,
 
     /// The buffer collection that is registered with Flatland.
-    collection: fsysmem::BufferCollectionInfo2,
+    collection: fsysmem2::BufferCollectionInfo,
 
     /// The width of the display and framebuffer image.
     image_width: u32,
@@ -123,7 +124,7 @@ impl FramebufferServer {
 
     /// Returns a clone of the VMO that is shared with Flatland.
     pub fn get_vmo(&self) -> Result<zx::Vmo, Errno> {
-        self.collection.buffers[0]
+        self.collection.buffers.as_ref().unwrap()[0]
             .vmo
             .as_ref()
             .ok_or_else(|| errno!(EINVAL))?
@@ -148,7 +149,7 @@ fn init_fb_scene(
     allocator: &fuicomposition::AllocatorSynchronousProxy,
     width: u32,
     height: u32,
-) -> Result<fsysmem::BufferCollectionInfo2, anyhow::Error> {
+) -> Result<fsysmem2::BufferCollectionInfo, anyhow::Error> {
     flatland
         .create_transform(&ROOT_TRANSFORM_ID)
         .map_err(|_| anyhow!("error creating transform"))?;
@@ -172,7 +173,7 @@ fn init_fb_scene(
             let mut buffer_allocator = BufferCollectionAllocator::new(
                 width,
                 height,
-                fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
+                fimages2::PixelFormat::R8G8B8A8,
                 FrameUsage::Cpu,
                 1,
             )?;
@@ -202,7 +203,13 @@ fn init_fb_scene(
     let buffer_tokens = BufferCollectionTokenPair::new();
     let args = fuicomposition::RegisterBufferCollectionArgs {
         export_token: Some(buffer_tokens.export_token),
-        buffer_collection_token: Some(sysmem_buffer_collection_token),
+        // The token channel is serving both sysmem(1) and sysmem2, so we can convert here until
+        // flatland has a field for a sysmem2 token.
+        buffer_collection_token: Some(
+            ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                sysmem_buffer_collection_token.into_channel(),
+            ),
+        ),
         ..Default::default()
     };
 
