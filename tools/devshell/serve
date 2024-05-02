@@ -46,7 +46,7 @@ persist="--no-persist"
 while (($#)); do
   case "$1" in
     -l)
-      port="$2"
+      port="${2##*:}"
       shift
       ;;
     --name)
@@ -287,7 +287,7 @@ if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; the
   package_tool_args=( repository publish "${repo_dir}" "${package_tool_flags[@]}" )
 
   # Check for erroneously running instances of package-tool
-  package_tool_pids=$(pgrep -f "package-tool repository publish $(fx get-build-dir)/amber-files --watch")
+  package_tool_pids=$(pgrep -f "package-tool repository publish $(fx-command-run get-build-dir)/amber-files --watch")
   if [[ -n $package_tool_pids ]]; then
     fx-info "Incremental auto-publisher for this build config is/are already running under pid(s): $(echo $package_tool_pids)"
     fx-info "This is likely a side effect from a previous run. Restarting."
