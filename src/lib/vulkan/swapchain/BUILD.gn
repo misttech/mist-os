@@ -59,7 +59,7 @@ loadable_module("swapchain") {
   deps = [
     ":layer_common",
     ":surface_header",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fdio",
@@ -99,7 +99,7 @@ source_set("display") {
     ":surface_header",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/lib/fdio",
     "//src/lib/fsl",
     "//zircon/system/ulib/async:async-cpp",
