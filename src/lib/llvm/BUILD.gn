@@ -114,6 +114,28 @@ template("llvm_library") {
 # `if (using_old_prebuilt) { ... }` and an `else {...}` branch. Update the
 # contents of the else branch to the if branch. Then make any necessary changes
 # to the else branch for the new version.
+llvm_library("LLVMAArch64CodeGen") {
+  deps = [
+    ":LLVMAArch64Desc",
+    ":LLVMAArch64Info",
+    ":LLVMAArch64Utils",
+    ":LLVMAnalysis",
+    ":LLVMAsmPrinter",
+    ":LLVMCFGuard",
+    ":LLVMCodeGen",
+    ":LLVMCodeGenTypes",
+    ":LLVMCore",
+    ":LLVMGlobalISel",
+    ":LLVMMC",
+    ":LLVMScalarOpts",
+    ":LLVMSelectionDAG",
+    ":LLVMSupport",
+    ":LLVMTarget",
+    ":LLVMTargetParser",
+    ":LLVMTransformUtils",
+  ]
+}
+
 llvm_library("LLVMAArch64Desc") {
   deps = [
     ":LLVMAArch64Info",
@@ -657,6 +679,7 @@ llvm_library("LLVMX86CodeGen") {
     ":LLVMAsmPrinter",
     ":LLVMCFGuard",
     ":LLVMCodeGen",
+    ":LLVMCodeGenTypes",
     ":LLVMCore",
     ":LLVMGlobalISel",
     ":LLVMInstrumentation",
@@ -665,6 +688,7 @@ llvm_library("LLVMX86CodeGen") {
     ":LLVMSelectionDAG",
     ":LLVMSupport",
     ":LLVMTarget",
+    ":LLVMTargetParser",
     ":LLVMTransformUtils",
     ":LLVMX86Desc",
     ":LLVMX86Info",
