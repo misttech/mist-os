@@ -47,7 +47,6 @@ type Client struct {
 // NewClient creates a new Client.
 func NewClient(
 	ctx context.Context,
-	deviceSshPort int,
 	repoPort int,
 	deviceResolver DeviceResolver,
 	privateKey ssh.Signer,
@@ -65,7 +64,6 @@ func NewClient(
 		ctx,
 		&addrResolver{
 			deviceResolver: deviceResolver,
-			port:           strconv.Itoa(deviceSshPort),
 		},
 		sshConfig,
 		sshConnectBackoff,
@@ -641,9 +639,14 @@ func (c *Client) StartRpcSession(ctx context.Context, repo *packages.Repository)
 	}
 	defer repoServer.Shutdown(ctx)
 
-	deviceHostname, err := c.deviceResolver.ResolveName(ctx)
+	sshAddr, err := c.deviceResolver.ResolveSshAddress(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving device host: %w", err)
+	}
+
+	deviceHostname, _, err := net.SplitHostPort(sshAddr)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing ssh address %v: %w", sshAddr, err)
 	}
 
 	rpcClient, err := sl4f.NewClient(ctx, c.sshClient, net.JoinHostPort(deviceHostname, "80"), "fuchsia.com")
@@ -754,21 +757,20 @@ func (c *Client) Name() string {
 
 type addrResolver struct {
 	deviceResolver DeviceResolver
-	port           string
 }
 
 func (r addrResolver) Resolve(ctx context.Context) (net.Addr, error) {
-	host, err := r.deviceResolver.ResolveName(ctx)
+	addr, err := r.deviceResolver.ResolveSshAddress(ctx)
 	if err != nil {
-		logger.Warningf(ctx, "failed to resolve %v: %v", r.deviceResolver.NodeName(), err)
+		logger.Warningf(ctx, "failed to resolve ssh address for %v: %v", r.deviceResolver.NodeName(), err)
 		return nil, err
 	}
 
-	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, r.port))
+	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
-		logger.Warningf(ctx, "failed to connet to %v (%v): %v", r.deviceResolver.NodeName(), host, err)
+		logger.Warningf(ctx, "failed to connect to %v (%v): %v", r.deviceResolver.NodeName(), addr, err)
 		return nil, err
 	}
 
-	return addr, nil
+	return tcpAddr, nil
 }

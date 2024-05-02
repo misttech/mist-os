@@ -7,6 +7,8 @@ package device
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
@@ -17,8 +19,8 @@ type DeviceResolver interface {
 	// NodeName returns a nodename for a device.
 	NodeName() string
 
-	// Resolve the device's nodename into a hostname.
-	ResolveName(ctx context.Context) (string, error)
+	// Resolve the device's nodename into an ssh address.
+	ResolveSshAddress(ctx context.Context) (string, error)
 
 	// Block until the device appears to be in fastboot.
 	WaitToFindDeviceInFastboot(ctx context.Context) (string, error)
@@ -31,13 +33,20 @@ type DeviceResolver interface {
 type ConstantHostResolver struct {
 	nodeName string
 	host     string
+	sshPort  int
 }
 
 // NewConstantAddressResolver constructs a fixed host.
-func NewConstantHostResolver(ctx context.Context, nodeName string, host string) ConstantHostResolver {
+func NewConstantHostResolver(
+	ctx context.Context,
+	nodeName string,
+	host string,
+	sshPort int,
+) ConstantHostResolver {
 	return ConstantHostResolver{
 		nodeName: nodeName,
 		host:     host,
+		sshPort:  sshPort,
 	}
 }
 
@@ -45,8 +54,8 @@ func (r ConstantHostResolver) NodeName() string {
 	return r.nodeName
 }
 
-func (r ConstantHostResolver) ResolveName(ctx context.Context) (string, error) {
-	return r.host, nil
+func (r ConstantHostResolver) ResolveSshAddress(ctx context.Context) (string, error) {
+	return net.JoinHostPort(r.host, strconv.Itoa(r.sshPort)), nil
 }
 
 func (r ConstantHostResolver) WaitToFindDeviceInFastboot(ctx context.Context) (string, error) {
@@ -99,7 +108,7 @@ func (r *FfxResolver) NodeName() string {
 
 func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 	nodeName := r.NodeName()
-	logger.Infof(ctx, "resolving the nodename %v", nodeName)
+	logger.Infof(ctx, "resolving the nodename %v hostname", nodeName)
 
 	targets, err := r.ffx.TargetListForNode(ctx, nodeName)
 	if err != nil {
@@ -123,6 +132,18 @@ func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 	}
 
 	return target.Addresses[0], nil
+}
+
+func (r *FfxResolver) ResolveSshAddress(ctx context.Context) (string, error) {
+	nodeName := r.NodeName()
+	logger.Infof(ctx, "resolving the nodename %v ssh address", nodeName)
+
+	addr, err := r.ffx.TargetGetSshAddress(ctx, nodeName)
+	if err != nil {
+		return "", fmt.Errorf("no ssh address found for nodename %v: %w", nodeName, err)
+	}
+
+	return addr, nil
 }
 
 func (r *FfxResolver) WaitToFindDeviceInFastboot(ctx context.Context) (string, error) {
