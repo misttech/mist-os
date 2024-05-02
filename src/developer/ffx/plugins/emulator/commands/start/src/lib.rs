@@ -6,14 +6,18 @@ use crate::pbm::{get_virtual_devices, make_configs};
 use anyhow::Context;
 use async_trait::async_trait;
 use emulator_instance::{EmulatorConfiguration, EmulatorInstances, EngineType, NetworkingMode};
-use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_emulator_common::get_file_hash;
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::{process_flag_template, EngineBuilder};
 use ffx_emulator_start_args::StartCommand;
-use fho::{bug, FfxContext, FfxMain, FfxTool, Result, SimpleWriter, TryFromEnv};
+use fho::{
+    bug, return_bug, return_user_error, Error, FfxContext, FfxMain, FfxTool, Result, ToolIO,
+    TryFromEnv, VerifiedMachineWriter,
+};
 use pbms::LoadedProductBundle;
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::{path::PathBuf, str::FromStr};
 
 mod editor;
@@ -125,6 +129,16 @@ pub struct EmuStartTool<T: EngineOperations> {
     engine_operations: T,
 }
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandStatus {
+    /// Successful execution with informational strings.
+    Ok { messages: Vec<String> },
+    /// Unexpected error with string.
+    UnexpectedError { message: String },
+    /// A known kind of error that can be reported usefully to the user
+    UserError { message: String },
+}
 // Since this is a part of a legacy plugin, add
 // the legacy entry points. If and when this
 // is migrated to a subcommand, this macro can be
@@ -133,9 +147,28 @@ fho::embedded_plugin!(EmuStartTool<EngineOperationsData>);
 
 #[async_trait(?Send)]
 impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<CommandStatus>;
 
-    async fn main(mut self, _writer: Self::Writer) -> fho::Result<()> {
+    async fn main(mut self, mut writer: Self::Writer) -> fho::Result<()> {
+        match self.do_start(&mut writer).await {
+            Ok(messages) => writer.machine(&CommandStatus::Ok { messages }).map_err(|e| bug!(e)),
+            Err(Error::User(e)) => {
+                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
+                Err(Error::User(e))
+            }
+            Err(e) => {
+                writer.machine(&CommandStatus::UnexpectedError { message: e.to_string() })?;
+                Err(e)
+            }
+        }
+    }
+}
+
+impl<T: EngineOperations> EmuStartTool<T> {
+    async fn do_start(
+        mut self,
+        writer: &mut <EmuStartTool<T> as fho::FfxMain>::Writer,
+    ) -> Result<Vec<String>> {
         let loaded_product_bundle = self.finalize_start_command().await?;
 
         let product_bundle: Option<pbms::ProductBundle> = loaded_product_bundle.map(|b| b.into());
@@ -143,12 +176,13 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
         // List the devices available in this product bundle
         if self.cmd.device_list {
             let virtual_devices = get_virtual_devices(&product_bundle.unwrap()).await?;
-            if virtual_devices.is_empty() {
-                println!("There are no virtual devices configured for this product bundle");
+            let message = if virtual_devices.is_empty() {
+                "There are no virtual devices configured for this product bundle".to_string()
             } else {
-                println!("Valid virtual device specifications are: {:?}", virtual_devices);
-            }
-            return Ok(());
+                format!("Valid virtual device specifications are: {:?}", virtual_devices)
+            };
+            writer.line(&message)?;
+            return Ok(vec![message]);
         }
 
         let emulator_configuration = make_configs(
@@ -169,60 +203,75 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
         if let Some(ref mut existing_instance) = existing {
             let name = self.cmd.name.as_ref().unwrap();
             if existing_instance.is_running().await {
-                ffx_bail!("An existing emulator instance named {name} is already running");
+                return_user_error!("An existing emulator instance named {name} is already running");
             } else if !self.cmd.reuse && !self.cmd.reuse_with_check {
                 if let Some(cleanup_err) =
                     self.engine_operations.clean_up_instance_dir(&name).await.err()
                 {
-                    ffx_bail!("Cleanup of '{name}' failed with the following error: {cleanup_err}");
+                    return_bug!(
+                        "Cleanup of '{name}' failed with the following error: {cleanup_err}"
+                    );
                 }
                 existing = None;
             }
         }
 
-        let mut engine = self.get_engine(&emulator_configuration, engine_type, existing).await?;
+        let mut engine =
+            self.get_engine(writer, &emulator_configuration, engine_type, existing).await?;
 
         if self.cmd.config.is_none() && !self.cmd.reuse && !self.cmd.dry_run {
             // We don't stage files for custom configurations, because the EmulatorConfiguration
             // doesn't hold valid paths to the system images.
             engine.stage().await?;
 
+            let mut messages: Vec<String> = vec![];
             if self.cmd.stage {
                 if self.cmd.verbose {
                     let emulator_cmd = engine.build_emulator_cmd();
-                    println!("\n[emulator] Command line after Staging: {:?}\n", emulator_cmd);
-                    println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
+                    let m = format!("[emulator] Command line after Staging: {:?}", emulator_cmd);
+                    writer.line(&m)?;
+                    messages.push(m);
+                    let m2 = format!("[emulator] With ENV: {:?}", emulator_cmd.get_envs());
+                    writer.line(&m2)?;
+                    messages.push(m2);
                 }
-                return Ok(());
+                return Ok(messages);
             }
         }
 
         if self.cmd.edit {
+            if writer.is_machine() {
+                return_user_error!("--edit cannot be used with --machine output.")
+            }
             self.engine_operations.edit_configuration(engine.emu_config_mut())?;
         }
 
+        let mut messages: Vec<String> = vec![];
+
         let emulator_cmd = engine.build_emulator_cmd();
         if self.cmd.verbose || self.cmd.dry_run {
-            println!("\n[emulator] Final Command line: {:?}\n", emulator_cmd);
-            println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
+            let m = format!("[emulator] Final Command line: {:?}", emulator_cmd);
+            writer.line(&m)?;
+            messages.push(m);
+            let m2 = format!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
+            writer.line(&m2)?;
+            messages.push(m2);
         }
 
         // If we're just staging the instance, do not call start.
         if !self.cmd.stage && !self.cmd.dry_run {
             match engine.start(&self.engine_operations.context(), emulator_cmd).await {
-                Ok(0) => Ok(()),
-                Ok(_) => ffx_bail!("Non zero return code"),
+                Ok(0) => Ok(messages),
+                Ok(c) => return Err(Error::ExitWithCode(c)),
                 Err(e) => return Err(e),
             }
         } else {
-            Ok(())
+            Ok(messages)
         }
     }
-}
-
-impl<T: EngineOperations> EmuStartTool<T> {
     async fn get_engine(
         &mut self,
+        writer: &mut <EmuStartTool<T> as fho::FfxMain>::Writer,
         emulator_configuration: &EmulatorConfiguration,
         engine_type: EngineType,
         existing_engine: Option<Box<dyn EmulatorEngine>>,
@@ -241,11 +290,15 @@ impl<T: EngineOperations> EmuStartTool<T> {
 
                 if reused {
                     self.cmd.reuse = true;
-                    println!("Reusing existing instance.");
+                    let message = "Reusing existing instance.";
+                    tracing::info!("{message}");
+                    writer.line(message)?;
                 } else {
                     // They do not match, so don't reuse and reset the engine.
                     self.cmd.reuse = false;
-                    println!("Created new instance. Product bundle data has changed.");
+                    let message = "Created new instance. Product bundle data has changed.";
+                    tracing::info!("{message}");
+                    writer.line(message)?;
                 }
             } else {
                 tracing::debug!("No existing instance to check as reusable.");
@@ -276,7 +329,9 @@ impl<T: EngineOperations> EmuStartTool<T> {
                         .context("Failed to process the flags template file.")?;
 
                     engine.save_to_disk().await?;
-                    println!("Reusing existing instance.");
+                    let message = "Reusing existing instance.";
+                    tracing::info!("{message}");
+                    writer.line(message)?;
                 } else {
                     let message = format!(
                         "Instance '{name}' not found with --reuse flag. \
@@ -284,7 +339,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                         name = emulator_configuration.runtime.name
                     );
                     tracing::debug!("{message}");
-                    println!("{message}");
+                    writer.line("{message}")?;
                     self.cmd.reuse = false;
                     engine = self
                         .engine_operations
@@ -353,7 +408,9 @@ impl<T: EngineOperations> EmuStartTool<T> {
             if self.cmd.device.is_none() {
                 let virtual_devices = get_virtual_devices(&loaded_product_bundle).await?;
                 if virtual_devices.is_empty() {
-                    ffx_bail!("There are no virtual devices configured for this product bundle")
+                    return_user_error!(
+                        "There are no virtual devices configured for this product bundle"
+                    )
                 }
                 // Virtual device spec name
                 if let Some(device_name) = self.cmd.device().await? {
@@ -653,7 +710,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        let result = tool.main(SimpleWriter::new()).await;
+        let result = tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await;
         assert!(result.is_err())
     }
 
@@ -705,7 +762,7 @@ mod tests {
             .times(1);
         tool.engine_operations.expect_context().returning(move || env.context.clone()).times(2);
 
-        let result = tool.main(SimpleWriter::new()).await;
+        let result = tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await;
         assert!(result.is_ok())
     }
 
@@ -744,7 +801,9 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new()).await.expect("main in test_get_engine_no_reuse_makes_new");
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
+            .await
+            .expect("main in test_get_engine_no_reuse_makes_new");
         Ok(())
     }
 
@@ -793,7 +852,7 @@ mod tests {
             .times(1);
         tool.engine_operations.expect_context().returning(move || env.context.clone()).times(2);
 
-        tool.main(SimpleWriter::new())
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
             .await
             .expect("main in test_get_engine_with_config_doesnt_reuse");
 
@@ -840,7 +899,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new())
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
             .await
             .expect("main in test_get_engine_without_config_does_reuse");
 
@@ -884,7 +943,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new())
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
             .await
             .expect("main in test_get_engine_doesnotexist_creates_new");
 
@@ -933,7 +992,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new())
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
             .await
             .expect("main in test_get_engine_updates_cmd_name_when_blank");
         Ok(())
@@ -980,7 +1039,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new()).await?;
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await?;
 
         Ok(())
     }
@@ -1021,7 +1080,7 @@ mod tests {
             .expect_get_emu_instances()
             .returning(move || emu_instances.clone())
             .times(1);
-        tool.main(SimpleWriter::new()).await?;
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await?;
         Ok(())
     }
 
@@ -1061,7 +1120,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        let result = tool.main(SimpleWriter::new()).await;
+        let result = tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await;
         assert!(result.is_ok(), "{:?}", result.err());
         Ok(())
     }
@@ -1106,7 +1165,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new()).await?;
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await?;
         Ok(())
     }
 
@@ -1141,7 +1200,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new()).await?;
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await?;
         Ok(())
     }
 
@@ -1196,7 +1255,7 @@ mod tests {
             .returning(move || emu_instances.clone())
             .times(1);
 
-        tool.main(SimpleWriter::new()).await?;
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await?;
         Ok(())
     }
 
@@ -1249,7 +1308,7 @@ mod tests {
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
 
-        tool.main(SimpleWriter::new()).await?;
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None)).await?;
         Ok(())
     }
 
@@ -1306,7 +1365,9 @@ mod tests {
             })
             .times(1);
 
-        tool.main(SimpleWriter::new()).await.expect("main with stage");
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
+            .await
+            .expect("main with stage");
     }
 
     // Checks that if the existing instance has matching disk hashes, it is reused.
@@ -1364,7 +1425,9 @@ mod tests {
         // New engine should not be made.
         tool.engine_operations.expect_new_engine().times(0);
 
-        tool.main(SimpleWriter::new()).await.expect("main with stage");
+        tool.main(VerifiedMachineWriter::<CommandStatus>::new(None))
+            .await
+            .expect("main with stage");
     }
 
     // Checks that the command line options are applied to the existing instance when it is reused.

@@ -19,7 +19,6 @@ use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
 use fho::user_error;
 use pbms::ProductBundle;
-
 use sdk_metadata::VirtualDeviceManifest;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
@@ -107,11 +106,11 @@ async fn apply_command_line_options(
                     match std::fs::OpenOptions::new().write(true).open(&path) {
                         Err(e) => match e.kind() {
                             std::io::ErrorKind::PermissionDenied => {
-                                tracing::debug!(
+                                tracing::warn!(
                                     "No write permission on {}. Running without acceleration.",
                                     path
                                 );
-                                println!(
+                                eprintln!(
                                     "Running without acceleration; emulator will be extremely \
                                     slow and may not establish a connection with ffx in the \
                                     allotted time.\n\n\
@@ -135,7 +134,7 @@ async fn apply_command_line_options(
                                     allotted time.\n"
                                 );
                             }
-                            _ => println!("Unknown error setting up acceleration: {:?}", e),
+                            _ => bail!("Unknown error setting up acceleration: {:?}", e),
                         },
                         Ok(_) => emu_config.host.acceleration = AccelerationMode::Hyper,
                     }
@@ -157,7 +156,7 @@ async fn apply_command_line_options(
         let available = tap_available();
         if available.is_ok() {
             emu_config.host.networking = NetworkingMode::Tap;
-            println!(
+            eprintln!(
                 "Auto resolving networking to tap-mode. For more information see \
                 https://fuchsia.dev/fuchsia-src/development/build/emulator#networking"
             );
@@ -166,7 +165,7 @@ async fn apply_command_line_options(
                 "Falling back on user-mode networking: {}",
                 available.as_ref().unwrap_err()
             );
-            println!(
+            eprintln!(
                 "Auto resolving networking to user-mode. For more information see \
                 https://fuchsia.dev/fuchsia-src/development/build/emulator#networking"
             );
@@ -293,7 +292,7 @@ fn parse_host_port_maps(
         }
     }
     if emu_config.runtime.log_level == LogLevel::Verbose {
-        println!("Port map parsed: {:?}\n", emu_config.host.port_map);
+        eprintln!("Port map parsed: {:?}\n", emu_config.host.port_map);
     }
     Ok(())
 }

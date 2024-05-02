@@ -39,11 +39,14 @@ impl QemuEngine {
         if self.data.get_emulator_configuration().device.pointing_device == PointingDevice::Touch
             && !self.data.get_emulator_configuration().runtime.headless
         {
-            eprintln!("Touchscreen as a pointing device is not available on Qemu.");
-            eprintln!(
+            let message = format!(
+                "{}\n{}",
+                "Touchscreen as a pointing device is not available on Qemu.",
                 "If you encounter errors, try changing the pointing device to 'mouse' in the \
                 Virtual Device specification."
             );
+            tracing::info!("{message}");
+            eprintln!("{message}");
         }
         self.validate_network_flags(&self.data.get_emulator_configuration())
             .and_then(|()| self.check_required_files(&self.data.get_emulator_configuration().guest))
@@ -90,7 +93,9 @@ impl EmulatorEngine for QemuEngine {
 
     fn configure(&mut self) -> Result<()> {
         let result = if self.emu_config().runtime.config_override {
-            println!("Custom configuration provided; bypassing validation.");
+            let message = "Custom configuration provided; bypassing validation.";
+            eprintln!("{message}");
+            tracing::info!("{message}");
             Ok(())
         } else {
             self.validate_configuration()

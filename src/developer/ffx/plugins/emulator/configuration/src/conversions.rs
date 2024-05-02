@@ -55,7 +55,7 @@ pub async fn convert_bundle_to_configs(
                 VirtualDevice::V1(v) => v,
             };
             if verbose {
-                println!(
+                eprintln!(
                     "Found PBM: {:#?}\nVirtual Device: {:#?}",
                     &product_bundle, &virtual_device
                 );
@@ -85,7 +85,7 @@ fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
         match VirtualDevice::try_load_from(&path) {
             Ok(VirtualDevice::V1(vd)) => Some(VirtualDevice::V1(vd)),
             Err(_) => {
-                println!(
+                eprintln!(
                     "Attempted to use the file at '{}' to configure the device, but the contents \
                     of that file are not a valid Virtual Device specification. \nChecking the \
                     Product Bundle for a device with that name...",

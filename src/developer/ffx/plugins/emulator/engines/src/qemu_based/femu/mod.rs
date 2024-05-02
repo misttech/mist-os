@@ -78,7 +78,9 @@ impl EmulatorEngine for FemuEngine {
 
     fn configure(&mut self) -> Result<()> {
         let result = if self.emu_config().runtime.config_override {
-            println!("Custom configuration provided; bypassing validation.");
+            let message = "Custom configuration provided; bypassing validation.";
+            eprintln!("{message}");
+            tracing::info!("{message}");
             Ok(())
         } else {
             self.validate_configuration()

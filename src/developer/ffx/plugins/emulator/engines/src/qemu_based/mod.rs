@@ -358,7 +358,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // tun/tap on a MacOS host we don't want to block that, so we check the OS here
                 // and make it a warning to run on MacOS instead.
                 if host_is_mac() {
-                    eprintln!(
+                    return_user_error!(
                         "Tun/Tap networking mode is not currently supported on MacOS. \
                         You may experience errors with your current configuration."
                     );
@@ -407,7 +407,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 bug!("Failed trying to clone stdout for the emulator process: {e}.")
             })?;
             emulator_cmd.stdout(stdout).stderr(stderr);
-            println!("Logging to {:?}", &self.emu_config().host.log);
+            eprintln!("Logging to {:?}", &self.emu_config().host.log);
         }
 
         // If using TAP, check for an upscript to run.
@@ -457,8 +457,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         }
 
         if self.emu_config().runtime.debugger {
-            println!("The emulator will wait for a debugger to attach before starting up.");
-            println!("Attach to process {} to continue launching the emulator.", self.get_pid());
+            eprintln!("The emulator will wait for a debugger to attach before starting up.");
+            eprintln!("Attach to process {} to continue launching the emulator.", self.get_pid());
         }
 
         if self.emu_config().runtime.console == ConsoleType::Monitor
@@ -485,7 +485,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         } else if !self.emu_config().runtime.startup_timeout.is_zero() {
             // Wait until the emulator is considered "active" before returning to the user.
             let startup_timeout = self.emu_config().runtime.startup_timeout.as_secs();
-            print!("Waiting for Fuchsia to start (up to {} seconds).", startup_timeout);
+            eprint!("Waiting for Fuchsia to start (up to {} seconds).", startup_timeout);
             tracing::debug!("Waiting for Fuchsia to start (up to {} seconds)...", startup_timeout);
             let name = self.emu_config().runtime.name.clone();
             let start = Instant::now();
@@ -493,7 +493,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             while start.elapsed().as_secs() <= startup_timeout {
                 let compat_res = ffx_target::knock_target_daemonless(name.clone(), &context).await;
                 if let Ok(compat) = compat_res {
-                    println!("\nEmulator is ready.");
+                    eprintln!("\nEmulator is ready.");
                     tracing::debug!(
                         "Emulator is ready after {} seconds.",
                         start.elapsed().as_secs()
@@ -505,11 +505,11 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         {
                             tracing::info!("Compatibility status: {:?}", compatibility.state)
                         }
-                        Some(compatibility) => println!(
+                        Some(compatibility) => eprintln!(
                             "Compatibility status: {:?} {}",
                             compatibility.state, compatibility.message
                         ),
-                        None => println!("Warning: no compatibility information is available"),
+                        None => eprintln!("Warning: no compatibility information is available"),
                     }
                     return Ok(0);
                 } else {
@@ -547,8 +547,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // Output a little status indicator to show we haven't gotten stuck.
                 // Note that we discard the result on the flush call; it's not important enough
                 // that we flushed the output stream to derail the launch.
-                print!(".");
-                std::io::stdout().flush().ok();
+                eprint!(".");
+                std::io::stderr().flush().ok();
 
                 // Sleep for a bit to allow the instance to make progress
                 Timer::new(Duration::from_secs(1)).await;
@@ -635,7 +635,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
     async fn stop_emulator(&mut self) -> Result<()> {
         if self.is_running().await {
-            println!("Terminating running instance {:?}", self.get_pid());
+            tracing::info!("Terminating running instance {:?}", self.get_pid());
             if let Some(terminate_error) = process::terminate(self.get_pid()).err() {
                 tracing::warn!("Error encountered terminating process: {:?}", terminate_error);
             }
@@ -992,7 +992,7 @@ mod tests {
     }
 
     fn write_to(path: &PathBuf, value: &str) -> Result<()> {
-        println!("Writing {} to {}", value, path.display());
+        eprintln!("Writing {} to {}", value, path.display());
         let mut file = File::options()
             .write(true)
             .open(path)
@@ -1060,8 +1060,8 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        println!("Reading contents from {}", actual.kernel_image.display());
-        println!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
+        eprintln!("Reading contents from {}", actual.kernel_image.display());
+        eprintln!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
         let mut kernel = File::open(&actual.kernel_image)
             .map_err(|e| bug!("cannot open overwritten kernel file for read: {e}"))?;
         let mut disk_image = File::open(&*actual.disk_image.unwrap())
@@ -1158,7 +1158,7 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        println!("Reading contents from {}", actual.kernel_image.display());
+        eprintln!("Reading contents from {}", actual.kernel_image.display());
         let mut kernel =
             File::open(&actual.kernel_image).expect("cannot open reused kernel file for read");
         let mut fvm =

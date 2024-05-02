@@ -177,7 +177,7 @@ impl EngineBuilder {
                 tracing::debug!("No emulators are running.");
                 return Ok(None);
             } else {
-                ffx_bail!(
+                return_user_error!(
                     "Multiple emulators are running. Indicate which emulator to access\n\
                 by specifying the emulator name with your command.\n\
                 See all the emulators available using `ffx emu list`."
