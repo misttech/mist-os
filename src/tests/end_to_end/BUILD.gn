@@ -59,7 +59,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
   }
 
   group("workbench_emulator_staging_tests") {
@@ -83,7 +83,10 @@ if (is_host) {
 
   group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
     testonly = true
-    public_deps = [ "//src/firmware/tests/lacewing:lacewing($host_toolchain)" ]
+    public_deps = [
+      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
+      "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
+    ]
   }
 
   group("workbench_vim3_staging_tests") {
@@ -106,7 +109,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
   }
 
   group("workbench_nuc_staging_tests") {

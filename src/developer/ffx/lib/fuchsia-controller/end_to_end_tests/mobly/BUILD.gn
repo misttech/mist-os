@@ -16,6 +16,11 @@ group("fuchsia_controller_tests") {
   ]
 }
 
+group("fuchsia_controller_tests_staging") {
+  testonly = true
+  deps = [ ":echo_stress_test" ]
+}
+
 python_mobly_test("target_identity_tests") {
   main_source = "target_identity_tests.py"
   libraries = [
@@ -34,6 +39,26 @@ python_mobly_test("target_identity_tests") {
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
     "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+  ]
+}
+
+python_mobly_test("echo_stress_test") {
+  enable_mypy = true
+  main_source = "echo_stress_test.py"
+  libraries = [
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
+  ]
+  transport = "fuchsia-controller"
+  environments = [
+    emu_env,
+    vim3_env,
+    nuc_env,
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
