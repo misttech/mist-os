@@ -3,8 +3,23 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use fidl_fuchsia_images2 as fimages2;
 use fidl_fuchsia_sysmem as fsysmem;
 use vk_sys as vk;
+
+pub fn drm_modifier_to_sysmem_modifier_2(
+    modifier: u64,
+) -> Result<fimages2::PixelFormatModifier, Error> {
+    match modifier {
+        DRM_FORMAT_MOD_LINEAR => Ok(fimages2::PixelFormatModifier::Linear),
+        I915_FORMAT_MOD_X_TILED => Ok(fimages2::PixelFormatModifier::IntelI915XTiled),
+        I915_FORMAT_MOD_Y_TILED => Ok(fimages2::PixelFormatModifier::IntelI915YTiled),
+        I915_FORMAT_MOD_YF_TILED => Ok(fimages2::PixelFormatModifier::IntelI915YfTiled),
+        I915_FORMAT_MOD_Y_TILED_CCS => Ok(fimages2::PixelFormatModifier::IntelI915YTiledCcs),
+        I915_FORMAT_MOD_YF_TILED_CCS => Ok(fimages2::PixelFormatModifier::IntelI915YfTiledCcs),
+        _ => Err(anyhow!("Unsupported modifier.")),
+    }
+}
 
 pub fn drm_modifier_to_sysmem_modifier(modifier: u64) -> Result<u64, Error> {
     match modifier {
@@ -47,6 +62,29 @@ pub fn drm_format_to_sysmem_format(drm_format: u32) -> Result<fsysmem::PixelForm
         DRM_FORMAT_ABGR8888 | DRM_FORMAT_XBGR8888 => Ok(fsysmem::PixelFormatType::R8G8B8A8),
         DRM_FORMAT_RGB565 => Ok(fsysmem::PixelFormatType::Rgb565),
         _ => Err(anyhow!("Unsupported format.")),
+    }
+}
+
+pub fn drm_format_to_images2_format(drm_format: u32) -> Result<fimages2::PixelFormat, Error> {
+    match drm_format {
+        DRM_FORMAT_ARGB8888 | DRM_FORMAT_XRGB8888 => Ok(fimages2::PixelFormat::B8G8R8A8),
+        DRM_FORMAT_ABGR8888 | DRM_FORMAT_XBGR8888 => Ok(fimages2::PixelFormat::R8G8B8A8),
+        DRM_FORMAT_RGB565 => Ok(fimages2::PixelFormat::R5G6B5),
+        _ => Err(anyhow!("Unsupported format.")),
+    }
+}
+
+pub fn sysmem_modifier_to_drm_modifier_2(
+    modifier: fimages2::PixelFormatModifier,
+) -> Result<u64, Error> {
+    match modifier {
+        fimages2::PixelFormatModifier::Linear => Ok(DRM_FORMAT_MOD_LINEAR),
+        fimages2::PixelFormatModifier::IntelI915XTiled => Ok(I915_FORMAT_MOD_X_TILED),
+        fimages2::PixelFormatModifier::IntelI915YTiled => Ok(I915_FORMAT_MOD_Y_TILED),
+        fimages2::PixelFormatModifier::IntelI915YfTiled => Ok(I915_FORMAT_MOD_YF_TILED),
+        fimages2::PixelFormatModifier::IntelI915YTiledCcs => Ok(I915_FORMAT_MOD_Y_TILED_CCS),
+        fimages2::PixelFormatModifier::IntelI915YfTiledCcs => Ok(I915_FORMAT_MOD_YF_TILED_CCS),
+        _ => Err(anyhow!("Unsupported modifier.")),
     }
 }
 
