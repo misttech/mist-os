@@ -268,4 +268,31 @@ bool verify_mapping_page_attribution(VmMapping* mapping, uint64_t mapping_gen, u
   END_TEST;
 }
 
+// Helper function used by vmo_mapping_page_fault_optimisation_test.
+// Given a mapping, check that a run of consecutive pages are mapped (indicated by
+// expected_mapped_page_count) and that remaining pages are unmapped.
+bool verify_mapped_page_range(vaddr_t base, size_t mapping_size,
+                              size_t expected_mapped_page_count) {
+  BEGIN_TEST;
+
+  // All pages up to expected_mapped_page_count should have been faulted.
+  paddr_t paddr_writable;
+  uint mmu_flags;
+  uint64_t offset = 0;
+  for (; offset < expected_mapped_page_count * PAGE_SIZE; offset += PAGE_SIZE) {
+    ASSERT_OK(Thread::Current::Get()->active_aspace()->arch_aspace().Query(
+        base + offset, &paddr_writable, &mmu_flags));
+    EXPECT_TRUE(mmu_flags & ARCH_MMU_FLAG_PERM_READ);
+  }
+
+  // Remaining pages should not have been faulted in.
+  for (; offset < mapping_size; offset += PAGE_SIZE) {
+    ASSERT_EQ(Thread::Current::Get()->active_aspace()->arch_aspace().Query(
+                  base + offset, &paddr_writable, &mmu_flags),
+              ZX_ERR_NOT_FOUND);
+  }
+
+  END_TEST;
+}
+
 }  // namespace vm_unittest

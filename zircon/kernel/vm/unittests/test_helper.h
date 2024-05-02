@@ -131,6 +131,11 @@ bool verify_object_page_attribution(VmObject* vmo, uint64_t vmo_gen,
 bool verify_mapping_page_attribution(VmMapping* mapping, uint64_t mapping_gen, uint64_t vmo_gen,
                                      VmObject::AttributionCounts pages);
 
+// Helper function used by vmo_mapping_page_fault_optimisation_test.
+// Given a mapping, check that a run of consecutive pages are mapped (indicated by
+// expected_mapped_page_count) and that remaining pages are unmapped.
+bool verify_mapped_page_range(vaddr_t base, size_t mapping_size, size_t expected_mapped_page_count);
+
 // Use the function name as the test name
 #define VM_UNITTEST(fname) UNITTEST(#fname, fname)
 

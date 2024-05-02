@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/fit/defer.h>
+#include <pow2.h>
 #include <zircon/errors.h>
 
 #include <arch/defines.h>
@@ -1590,6 +1591,84 @@ static bool vm_mapping_sparse_mapping_test() {
   END_TEST;
 }
 
+static bool vm_mapping_page_fault_optimisation_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  constexpr size_t alloc_size = 32 * PAGE_SIZE;
+  static const uint8_t align_pow2 = log2_floor(alloc_size);
+
+  // This is duplicating a constant in VmMapping::PageFaultLocked. Optimisation will fault the
+  // minimum of 16 pages and the end of the VMO, protection range.
+  static const size_t max_opportunistic_pages = 16;
+
+  // 32 Page mapped & fully committed VMO.
+  fbl::RefPtr<VmObjectPaged> committed_vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &committed_vmo));
+
+  ktl::unique_ptr<testing::UserMemory> mapping =
+      testing::UserMemory::Create(committed_vmo, 0, align_pow2);
+  ASSERT_NONNULL(mapping);
+
+  committed_vmo->CommitRange(0, alloc_size);
+
+  // Trigger a page fault on the first page in the VMO/Mapping.
+  mapping->put(42);
+
+  // Optimisation will fault the minimum of 16 pages and the end of the VMO, protection
+  // range, mapping or page table. We have ensures that all of these will be > 16 in this case.
+  ASSERT_TRUE(verify_mapped_page_range(mapping->base(), alloc_size, max_opportunistic_pages));
+
+  // 32 Page mapped but not committed VMO.
+  fbl::RefPtr<VmObjectPaged> uncommitted_vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &uncommitted_vmo));
+
+  ktl::unique_ptr<testing::UserMemory> mapping2 =
+      testing::UserMemory::Create(uncommitted_vmo, 0, align_pow2);
+  ASSERT_NONNULL(mapping2);
+
+  // Trigger a page fault on the first page in the VMO/Mapping.
+  mapping2->put(42);
+
+  // As the VMO is uncommitted, only the requested page should have been faulted.
+  ASSERT_TRUE(verify_mapped_page_range(mapping2->base(), alloc_size, 1));
+
+  // 32 Page VMO with a single committed page.
+  fbl::RefPtr<VmObjectPaged> onepage_committed_vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &onepage_committed_vmo));
+
+  ktl::unique_ptr<testing::UserMemory> mapping3 =
+      testing::UserMemory::Create(onepage_committed_vmo, 0, align_pow2);
+  ASSERT_NONNULL(mapping3);
+
+  onepage_committed_vmo->CommitRange(0, PAGE_SIZE);
+
+  // Trigger a page fault on the first page in the VMO/Mapping.
+  mapping3->put(42);
+
+  // Only the requested page should have been faulted.
+  ASSERT_TRUE(verify_mapped_page_range(mapping3->base(), alloc_size, 1));
+
+  // 32 Page VMO with a 4 committed pages.
+  fbl::RefPtr<VmObjectPaged> partially_committed_vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &partially_committed_vmo));
+
+  ktl::unique_ptr<testing::UserMemory> mapping4 =
+      testing::UserMemory::Create(partially_committed_vmo, 0, align_pow2);
+  ASSERT_NONNULL(mapping4);
+
+  partially_committed_vmo->CommitRange(0, 4 * PAGE_SIZE);
+
+  // Trigger a page fault on the first page in the VMO/Mapping.
+  mapping4->put(42);
+
+  // Only the already committed pages should be committed.
+  ASSERT_TRUE(verify_mapped_page_range(mapping4->base(), alloc_size, 4));
+
+  END_TEST;
+}
+
 static bool arch_noncontiguous_map() {
   BEGIN_TEST;
 
@@ -2650,6 +2729,7 @@ VM_UNITTEST(vm_mapping_attribution_commit_decommit_test)
 VM_UNITTEST(vm_mapping_attribution_map_unmap_test)
 VM_UNITTEST(vm_mapping_attribution_merge_test)
 VM_UNITTEST(vm_mapping_sparse_mapping_test)
+VM_UNITTEST(vm_mapping_page_fault_optimisation_test)
 VM_UNITTEST(arch_is_user_accessible_range)
 VM_UNITTEST(validate_user_address_range)
 VM_UNITTEST(arch_noncontiguous_map)
