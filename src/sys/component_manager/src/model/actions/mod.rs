@@ -74,7 +74,7 @@ use {
     fuchsia_async as fasync,
     futures::{
         channel::oneshot,
-        future::{join_all, pending, BoxFuture, FutureExt, Shared},
+        future::{join_all, BoxFuture, FutureExt, Shared},
         task::{Context, Poll},
         Future,
     },
@@ -82,10 +82,7 @@ use {
     std::fmt::Debug,
     std::hash::Hash,
     std::pin::Pin,
-    std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    std::sync::Arc,
 };
 
 /// A action on a component that must eventually be fulfilled.
@@ -117,53 +114,32 @@ pub enum ActionKey {
     Destroy,
 }
 
-/// A set of actions on a component that must be completed.
-///
-/// Each action is mapped to a future that returns when the action is complete.
-pub struct ActionSet {
-    rep: HashMap<ActionKey, ActionNotifier>,
-    history: HashSet<ActionKey>,
-    passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
-}
-
 /// A future bound to a particular action that completes when that action completes.
 ///
 /// Cloning this type will not duplicate the action, but generate another future that waits on the
 /// same action.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ActionNotifier {
-    /// The inner future.
     fut: Shared<BoxFuture<'static, Result<(), ActionError>>>,
-    /// How many clones of this ActionNotifier are live, useful for testing.
-    refcount: Arc<AtomicUsize>,
-    /// If supported, a handle to abort the action.
-    abort_handle: Option<AbortHandle>,
 }
 
 impl ActionNotifier {
-    /// Instantiate an `ActionNotifier` wrapping `fut`.
-    pub fn new(
-        fut: BoxFuture<'static, Result<(), ActionError>>,
-        abort_handle: Option<AbortHandle>,
-    ) -> Self {
-        Self { fut: fut.shared(), refcount: Arc::new(AtomicUsize::new(1)), abort_handle }
-    }
-}
-
-impl Clone for ActionNotifier {
-    fn clone(&self) -> Self {
-        self.refcount.fetch_add(1, Ordering::Relaxed);
+    /// Instantiate an `ActionNotifier` that will complete when a message is received on
+    /// `receiver`.
+    pub fn new(receiver: oneshot::Receiver<Result<(), ActionError>>) -> Self {
         Self {
-            fut: self.fut.clone(),
-            refcount: self.refcount.clone(),
-            abort_handle: self.abort_handle.clone(),
+            fut: receiver
+                .map(|res| res.expect("ActionNotifier sender was unexpectedly closed"))
+                .boxed()
+                .shared(),
         }
     }
-}
 
-impl Drop for ActionNotifier {
-    fn drop(&mut self) {
-        self.refcount.fetch_sub(1, Ordering::Relaxed);
+    /// Returns the number of references that exist to the shared future in this notifier. Returns
+    /// None if the future has completed.
+    #[cfg(test)]
+    pub fn get_reference_count(&self) -> Option<usize> {
+        self.fut.strong_count()
     }
 }
 
@@ -198,6 +174,22 @@ impl ActionTask {
     }
 }
 
+struct ActionController {
+    /// The notifier by which clients will be informed when the action returns.
+    notifier: ActionNotifier,
+    /// If supported, a handle to abort the action.
+    maybe_abort_handle: Option<AbortHandle>,
+}
+
+/// A set of actions on a component that must be completed.
+///
+/// Each action is mapped to a future that returns when the action is complete.
+pub struct ActionSet {
+    rep: HashMap<ActionKey, ActionController>,
+    history: HashSet<ActionKey>,
+    passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
+}
+
 impl ActionSet {
     pub fn new() -> Self {
         ActionSet { rep: HashMap::new(), history: HashSet::new(), passive_waiters: HashMap::new() }
@@ -209,8 +201,10 @@ impl ActionSet {
 
     #[cfg(test)]
     pub fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
-        let notifier = ActionNotifier::new(async move { result }.boxed(), None);
-        self.rep.insert(key, notifier);
+        let (sender, receiver) = oneshot::channel();
+        sender.send(result).unwrap();
+        let notifier = ActionNotifier::new(receiver);
+        self.rep.insert(key, ActionController { notifier, maybe_abort_handle: None });
     }
 
     #[cfg(test)]
@@ -258,7 +252,7 @@ impl ActionSet {
         &mut self,
         component: &Arc<ComponentInstance>,
         action: A,
-    ) -> impl Future<Output = Result<(), ActionError>>
+    ) -> ActionNotifier
     where
         A: Action,
     {
@@ -270,12 +264,12 @@ impl ActionSet {
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
-    pub async fn wait<A>(&self, action: A) -> Option<impl Future<Output = Result<(), ActionError>>>
+    pub async fn wait<A>(&self, action: A) -> Option<ActionNotifier>
     where
         A: Action,
     {
         let key = action.key();
-        self.rep.get(&key).cloned()
+        self.rep.get(&key).map(|controller| controller.notifier.clone())
     }
 
     /// Removes an action from the set, completing it.
@@ -305,8 +299,8 @@ impl ActionSet {
     {
         let key = action.key();
         // If this Action is already running, just subscribe to the result
-        if let Some(rx) = self.rep.get(&key) {
-            return (None, rx.clone());
+        if let Some(action_controller) = self.rep.get(&key) {
+            return (None, action_controller.notifier.clone());
         }
 
         // Otherwise we spin up the new Action
@@ -328,25 +322,13 @@ impl ActionSet {
         }
         .boxed();
 
-        let (tx, rx) = oneshot::channel();
-        let task = ActionTask::new(tx, action_fut);
-        let notifier: ActionNotifier = ActionNotifier::new(
-            async move {
-                match rx.await {
-                    Ok(res) => res,
-                    Err(_) => {
-                        // Normally we won't get here but this can happen if the sender's task
-                        // is cancelled because, for example, component manager exited and the
-                        // executor was torn down.
-                        let () = pending().await;
-                        unreachable!();
-                    }
-                }
-            }
-            .boxed(),
-            maybe_abort_handle,
+        let (notifier_completer, notifier_receiver) = oneshot::channel();
+        let task = ActionTask::new(notifier_completer, action_fut);
+        let notifier = ActionNotifier::new(notifier_receiver);
+        self.rep.insert(
+            key.clone(),
+            ActionController { notifier: notifier.clone(), maybe_abort_handle },
         );
-        self.rep.insert(key.clone(), notifier.clone());
         (Some(task), notifier)
     }
 
@@ -357,16 +339,16 @@ impl ActionSet {
         // Start, Stop, and Shutdown are all serialized with respect to one another.
         match key {
             ActionKey::Shutdown => vec![
-                self.rep.get(&ActionKey::Stop).cloned(),
-                self.rep.get(&ActionKey::Start).cloned(),
+                self.rep.get(&ActionKey::Stop).map(|c| c.notifier.clone()),
+                self.rep.get(&ActionKey::Start).map(|c| c.notifier.clone()),
             ],
             ActionKey::Stop => vec![
-                self.rep.get(&ActionKey::Shutdown).cloned(),
-                self.rep.get(&ActionKey::Start).cloned(),
+                self.rep.get(&ActionKey::Shutdown).map(|c| c.notifier.clone()),
+                self.rep.get(&ActionKey::Start).map(|c| c.notifier.clone()),
             ],
             ActionKey::Start => vec![
-                self.rep.get(&ActionKey::Stop).cloned(),
-                self.rep.get(&ActionKey::Shutdown).cloned(),
+                self.rep.get(&ActionKey::Stop).map(|c| c.notifier.clone()),
+                self.rep.get(&ActionKey::Shutdown).map(|c| c.notifier.clone()),
             ],
             _ => vec![],
         }
@@ -383,12 +365,14 @@ impl ActionSet {
         // Stop and Shutdown will attempt to cancel an in-progress Start.
         match key {
             ActionKey::Shutdown | ActionKey::Stop => {
-                vec![self.rep.get(&ActionKey::Start).map(|notifier| notifier.abort_handle.clone())]
+                vec![self
+                    .rep
+                    .get(&ActionKey::Start)
+                    .and_then(|action_controller| action_controller.maybe_abort_handle.clone())]
             }
             _ => vec![],
         }
         .into_iter()
-        .flatten()
         .flatten()
         .collect()
     }

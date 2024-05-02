@@ -56,7 +56,7 @@ pub mod tests {
         futures::channel::oneshot,
         futures::lock::Mutex,
         moniker::{Moniker, MonikerBase},
-        std::sync::{atomic::Ordering, Weak},
+        std::sync::Weak,
     };
 
     #[fuchsia::test]
@@ -187,8 +187,8 @@ pub mod tests {
         stopped_rx.await.unwrap();
 
         let actions = component_a.lock_actions().await;
-        let action_notifier = &actions.rep[&ActionKey::Stop];
-        assert_eq!(action_notifier.refcount.load(Ordering::Relaxed), 3);
+        let action_controller = &actions.rep[&ActionKey::Stop];
+        assert_eq!(action_controller.notifier.get_reference_count().unwrap(), 3);
         drop(actions);
 
         // Let the stop continue.
