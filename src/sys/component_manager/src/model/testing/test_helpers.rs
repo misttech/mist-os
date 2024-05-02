@@ -458,7 +458,7 @@ impl ActionsTest {
         let collection_ref = fdecl::CollectionRef { name: coll.to_string() };
         let child_decl = ChildDecl {
             name: name.parse().unwrap(),
-            url: format!("test:///{}", name),
+            url: format!("test:///{}", name).parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,

@@ -332,7 +332,7 @@ impl BuiltinEnvironmentBuilder {
 
         let top_instance = self.top_instance.unwrap().clone();
         let params = ModelParams {
-            root_component_url: root_component_url.as_str().to_owned(),
+            root_component_url,
             root_environment: Environment::new_root(
                 &top_instance,
                 RunnerRegistry::new(runner_map),

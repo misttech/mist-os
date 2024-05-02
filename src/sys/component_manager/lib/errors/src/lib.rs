@@ -14,7 +14,7 @@ use {
     cm_config::CompatibilityCheckError,
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_rust::UseDecl,
-    cm_types::Name,
+    cm_types::{Name, Url},
     component_id_index::InstanceId,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{ChildName, Moniker, MonikerError},
@@ -519,14 +519,14 @@ pub enum ResolveActionError {
         err
     )]
     ComponentAddressParseError {
-        url: String,
+        url: Url,
         moniker: Moniker,
         #[source]
         err: ResolverError,
     },
     #[error("resolver error for \"{}\": {}", url, err)]
     ResolverError {
-        url: String,
+        url: Url,
         #[source]
         err: ResolverError,
     },
@@ -556,7 +556,7 @@ pub enum ResolveActionError {
     },
     #[error("ABI compatibility check failed for {url}: {err}")]
     AbiCompatibilityError {
-        url: String,
+        url: Url,
         #[source]
         err: CompatibilityCheckError,
     },

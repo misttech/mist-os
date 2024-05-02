@@ -457,7 +457,7 @@ fn create_event_fidl_objects(event: Event) -> BoxStream<Result<fcomponent::Event
     let header = fcomponent::EventHeader {
         event_type: Some(event_type),
         moniker: Some(moniker_string),
-        component_url: Some(event.event.component_url.clone()),
+        component_url: Some(event.event.component_url.to_string()),
         timestamp: Some(event.event.timestamp.into_nanos()),
         ..Default::default()
     };

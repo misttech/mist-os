@@ -33,6 +33,7 @@ rustc_library("testing") {
     "//src/security/lib/scrutiny/x:*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_rust/testing:*",
+    "//src/sys/lib/component_debug/*",
     "//src/sys/lib/routing/*",
     "//tools/lib/cm_fidl_analyzer/*",
   ]

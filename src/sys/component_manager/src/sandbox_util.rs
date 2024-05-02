@@ -645,7 +645,7 @@ pub mod tests {
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "test:///root".to_string(),
+            "test:///root".parse().unwrap(),
         )
         .await;
         let capability = router
@@ -696,7 +696,7 @@ pub mod tests {
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "test:///root".to_string(),
+            "test:///root".parse().unwrap(),
         )
         .await;
         let capability = router

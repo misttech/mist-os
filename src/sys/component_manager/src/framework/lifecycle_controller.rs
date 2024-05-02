@@ -311,7 +311,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
                         name: "a".parse().unwrap(),
-                        url: "test:///a".to_string(),
+                        url: "test:///a".parse().unwrap(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
@@ -319,7 +319,7 @@ mod tests {
                     })
                     .child(cm_rust::ChildDecl {
                         name: "cant-resolve".parse().unwrap(),
-                        url: "cant-resolve://cant-resolve".to_string(),
+                        url: "cant-resolve://cant-resolve".parse().unwrap(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
@@ -332,7 +332,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
                         name: "b".parse().unwrap(),
-                        url: "test:///b".to_string(),
+                        url: "test:///b".parse().unwrap(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
@@ -387,7 +387,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
                         name: "a".parse().unwrap(),
-                        url: "test:///a".to_string(),
+                        url: "test:///a".parse().unwrap(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,
@@ -400,7 +400,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
                         name: "b".parse().unwrap(),
-                        url: "test:///b".to_string(),
+                        url: "test:///b".parse().unwrap(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
                         on_terminate: None,

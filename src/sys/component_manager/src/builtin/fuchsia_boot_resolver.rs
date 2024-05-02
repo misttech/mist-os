@@ -471,8 +471,8 @@ mod tests {
         .unwrap();
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
-        let url = "fuchsia-boot:///#meta/hello-world-rust.cm";
-        let component = resolver.resolve(&ComponentAddress::from_absolute_url(url)?).await?;
+        let url = "fuchsia-boot:///#meta/hello-world-rust.cm".parse().unwrap();
+        let component = resolver.resolve(&ComponentAddress::from_absolute_url(&url)?).await?;
 
         // Check that both the returned component manifest and the component manifest in
         // the returned package dir match the expected value. This also tests that
@@ -537,8 +537,8 @@ mod tests {
             .await
             .expect("failed to open executable file");
 
-        let url = "fuchsia-boot:///contains/a/package#meta/hello-world-rust.cm";
-        let err = resolver.resolve(&ComponentAddress::from_absolute_url(url)?).await.unwrap_err();
+        let url = "fuchsia-boot:///contains/a/package#meta/hello-world-rust.cm".parse().unwrap();
+        let err = resolver.resolve(&ComponentAddress::from_absolute_url(&url)?).await.unwrap_err();
         assert_matches!(err, ResolverError::PackageNotFound { .. });
         Ok(())
     }
@@ -618,9 +618,9 @@ mod tests {
         let (_task, bootfs) = serve_vfs_dir(root);
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
-        let url = "fuchsia-boot:///#meta/has_config.cm";
+        let url = "fuchsia-boot:///#meta/has_config.cm".parse().unwrap();
         let component =
-            resolver.resolve(&ComponentAddress::from_absolute_url(url).unwrap()).await.unwrap();
+            resolver.resolve(&ComponentAddress::from_absolute_url(&url).unwrap()).await.unwrap();
 
         let ResolvedComponent { resolved_url, decl, config_values, .. } = component;
         assert_eq!(url, resolved_url);
@@ -675,20 +675,23 @@ mod tests {
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-boot:///#meta/root.cm".to_string(),
+            "fuchsia-boot:///#meta/root.cm".parse().unwrap(),
         )
         .await;
 
-        let url = "fuchsia-boot:///#meta/has_config.cm";
-        let err =
-            resolver.resolve(&ComponentAddress::from(url, &root).await.unwrap()).await.unwrap_err();
+        let url = "fuchsia-boot:///#meta/has_config.cm".parse().unwrap();
+        let err = resolver
+            .resolve(&ComponentAddress::from(&url, &root).await.unwrap())
+            .await
+            .unwrap_err();
         assert_matches!(err, ResolverError::ConfigValuesIo { .. });
     }
 
     macro_rules! test_resolve_error {
         ($resolver:ident, $url:expr, $target:ident, $resolver_error_expected:ident) => {
+            let url = $url.parse().unwrap();
             let res =
-                $resolver.resolve(&ComponentAddress::from($url, &$target).await.unwrap()).await;
+                $resolver.resolve(&ComponentAddress::from(&url, &$target).await.unwrap()).await;
             match res.err().expect("unexpected success") {
                 ResolverError::$resolver_error_expected { .. } => {}
                 e => panic!("unexpected error {:?}", e),
@@ -719,7 +722,7 @@ mod tests {
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-boot:///#meta/root.cm".to_string(),
+            "fuchsia-boot:///#meta/root.cm".parse().unwrap(),
         )
         .await;
         test_resolve_error!(resolver, "fuchsia-boot:///#meta/invalid.cm", root, ManifestInvalid);

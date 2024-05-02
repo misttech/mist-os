@@ -7,7 +7,7 @@ use {
     anyhow::format_err,
     async_trait::async_trait,
     cm_rust::ComponentDecl,
-    cm_types::Name,
+    cm_types::{Name, Url},
     errors::ModelError,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -303,7 +303,7 @@ pub struct Event {
     pub target_moniker: ExtendedMoniker,
 
     /// Component url of the component that this event applies to
-    pub component_url: String,
+    pub component_url: Url,
 
     /// Payload of the event
     pub payload: EventPayload,
@@ -327,7 +327,7 @@ impl Event {
         let timestamp = zx::Time::get_monotonic();
         Self::new_internal(
             ExtendedMoniker::ComponentManager,
-            "bin/component_manager".to_string(),
+            "file:///bin/component_manager".parse().unwrap(),
             timestamp,
             payload,
         )
@@ -349,13 +349,13 @@ impl Event {
     #[cfg(test)]
     pub fn new_for_test(
         target_moniker: Moniker,
-        component_url: impl Into<String>,
+        component_url: &str,
         payload: EventPayload,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Self::new_internal(
             ExtendedMoniker::ComponentInstance(target_moniker),
-            component_url.into(),
+            component_url.parse().unwrap(),
             timestamp,
             payload,
         )
@@ -363,7 +363,7 @@ impl Event {
 
     fn new_internal(
         target_moniker: ExtendedMoniker,
-        component_url: String,
+        component_url: Url,
         timestamp: zx::Time,
         payload: EventPayload,
     ) -> Self {

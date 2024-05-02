@@ -361,7 +361,7 @@ async fn use_in_collection() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -374,7 +374,7 @@ async fn use_in_collection() {
         "coll",
         ChildDecl {
             name: "d".parse().unwrap(),
-            url: "test:///d".to_string(),
+            url: "test:///d".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -453,7 +453,7 @@ async fn use_in_collection_not_offered() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -526,7 +526,7 @@ async fn dynamic_offer_from_parent() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -549,7 +549,7 @@ async fn dynamic_offer_from_parent() {
         "coll",
         ChildDecl {
             name: "d".parse().unwrap(),
-            url: "test:///d".to_string(),
+            url: "test:///d".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -612,7 +612,7 @@ async fn dynamic_offer_siblings_same_collection() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -625,7 +625,7 @@ async fn dynamic_offer_siblings_same_collection() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -694,7 +694,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         "source_coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -707,7 +707,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         "target_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -775,7 +775,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -788,7 +788,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -821,7 +821,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -890,7 +890,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -903,7 +903,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -936,7 +936,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1014,7 +1014,7 @@ async fn dynamic_offer_to_static_offer() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1099,7 +1099,7 @@ async fn create_child_with_dict() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1358,7 +1358,7 @@ async fn use_runner_from_environment_in_collection() {
             "coll",
             ChildDecl {
                 name: "b".parse().unwrap(),
-                url: "test:///b".to_string(),
+                url: "test:///b".parse().unwrap(),
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
@@ -1781,7 +1781,7 @@ async fn use_with_destroyed_parent() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,

@@ -835,7 +835,7 @@ pub trait IterablePath: Clone + Send + Sync {
 
 /// A component URL. The URL is validated, but represented as a string to avoid
 /// normalization and retain the original representation.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Url(FlyStr);
 
 impl Url {
@@ -903,6 +903,14 @@ impl Url {
         Ok(())
     }
 
+    pub fn is_relative(&self) -> bool {
+        matches!(url::Url::parse(&self.0), Err(url::ParseError::RelativeUrlWithoutBase))
+    }
+
+    pub fn scheme(&self) -> Option<String> {
+        url::Url::parse(&self.0).ok().map(|u| u.scheme().into())
+    }
+
     pub fn as_str(&self) -> &str {
         &*self.0
     }
@@ -918,7 +926,22 @@ impl FromStr for Url {
 
 impl From<Url> for String {
     fn from(url: Url) -> String {
-        (*url.0).to_owned()
+        url.0.into()
+    }
+}
+
+impl fmt::Display for Url {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl ser::Serialize for Url {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        self.to_string().serialize(serializer)
     }
 }
 
@@ -955,6 +978,18 @@ impl<'de> de::Deserialize<'de> for Url {
             }
         }
         deserializer.deserialize_string(Visitor)
+    }
+}
+
+impl PartialEq<&str> for Url {
+    fn eq(&self, o: &&str) -> bool {
+        &*self.0 == *o
+    }
+}
+
+impl PartialEq<String> for Url {
+    fn eq(&self, o: &String) -> bool {
+        &*self.0 == *o
     }
 }
 

@@ -182,7 +182,7 @@ async fn use_in_collection_from_parent() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -327,7 +327,7 @@ async fn use_in_collection_from_grandparent() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -862,7 +862,7 @@ async fn storage_persistence_moniker_path() {
         "persistent_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -892,7 +892,7 @@ async fn storage_persistence_moniker_path() {
         "persistent_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1039,7 +1039,7 @@ async fn storage_persistence_instance_id_path() {
         "persistent_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1063,7 +1063,7 @@ async fn storage_persistence_instance_id_path() {
         "persistent_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1230,7 +1230,7 @@ async fn storage_persistence_inheritance() {
         "persistent_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1275,7 +1275,7 @@ async fn storage_persistence_inheritance() {
         "lower_coll",
         ChildDecl {
             name: "e".parse().unwrap(),
-            url: "test:///e".to_string(),
+            url: "test:///e".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1464,7 +1464,7 @@ async fn storage_persistence_disablement() {
         "persistent_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1509,7 +1509,7 @@ async fn storage_persistence_disablement() {
         "non_persistent_coll",
         ChildDecl {
             name: "e".parse().unwrap(),
-            url: "test:///e".to_string(),
+            url: "test:///e".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,

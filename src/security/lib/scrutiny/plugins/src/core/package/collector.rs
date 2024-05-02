@@ -206,10 +206,13 @@ impl PackageDataCollector {
             let url = Url::parse(&url.to_string()).with_context(|| {
                 format!("Failed to convert package URL to standard URL: {}", url)
             })?;
+            let component_url = cm_types::Url::new(&url.to_string()).with_context(|| {
+                format!("Failed to convert package URL to component URL: {}", url)
+            })?;
 
             components.insert(
                 url.clone(),
-                Component { id: *component_id, url: url.clone(), source: source.clone() },
+                Component { id: *component_id, url: component_url, source: source.clone() },
             );
 
             let cf_manifest = {
@@ -297,6 +300,8 @@ impl PackageDataCollector {
         let url = BootUrl::new_resource("/".to_string(), file_name.to_string())?;
         let url = Url::parse(&url.to_string())
             .with_context(|| format!("Failed to convert boot URL to standard URL: {}", url))?;
+        let component_url = cm_types::Url::new(&url.to_string())
+            .with_context(|| format!("Failed to convert boot URL to component URL: {}", url))?;
 
         Self::extract_bootfs_data(
             component_id,
@@ -304,6 +309,7 @@ impl PackageDataCollector {
             manifests,
             &zbi.bootfs_files.bootfs_files,
             &url,
+            component_url,
             file_name,
             file_data,
         )
@@ -341,12 +347,17 @@ impl PackageDataCollector {
                             let url = Url::parse(&url.to_string()).with_context(|| {
                                 format!("Failed to convert boot URL to standard URL: {}", url)
                             })?;
+                            let component_url =
+                                cm_types::Url::new(&url.to_string()).with_context(|| {
+                                    format!("Failed to convert boot URL to component URL: {}", url)
+                                })?;
                             Self::extract_bootfs_data(
                                 component_id,
                                 components,
                                 manifests,
                                 &partial_package_def.cvfs,
                                 &url,
+                                component_url,
                                 path_str,
                                 bytes,
                             )?;
@@ -366,6 +377,7 @@ impl PackageDataCollector {
         manifests: &mut Vec<Manifest>,
         cvf_source: &HashMap<String, Vec<u8>>,
         url: &Url,
+        component_url: cm_types::Url,
         file_name: &str,
         file_data: &Vec<u8>,
     ) -> Result<()> {
@@ -400,7 +412,7 @@ impl PackageDataCollector {
                     url.clone(),
                     Component {
                         id: *component_id,
-                        url: url.clone(),
+                        url: component_url,
                         source: ComponentSource::ZbiBootfs,
                     },
                 );
@@ -728,12 +740,12 @@ pub mod tests {
             let mut comps = vec![];
             comps.push(Component {
                 id: 1,
-                url: Url::parse("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/test.component.cm").unwrap(),
+                url: cm_types::Url::new("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/test.component.cm").unwrap(),
                 source: ComponentSource::ZbiBootfs,
             });
             comps.push(Component {
                 id: 1,
-                url: Url::parse("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/foo.bar.cm").unwrap(),
+                url: cm_types::Url::new("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/foo.bar.cm").unwrap(),
                 source: fake_component_src_pkg(),
             });
             model.set(Components { entries: comps }).unwrap();

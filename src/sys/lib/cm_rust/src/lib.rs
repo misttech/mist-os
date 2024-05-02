@@ -7,7 +7,7 @@ use {
         ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl, OfferDeclCommon,
         OfferDeclCommonNoAvailability, UseDeclCommon,
     },
-    cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath},
+    cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath, Url},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
     from_enum::FromEnum,
@@ -109,6 +109,19 @@ impl NativeIntoFidl<Option<String>> for RelativePath {
         } else {
             Some(self.to_string())
         }
+    }
+}
+
+impl FidlIntoNative<Url> for String {
+    fn fidl_into_native(self) -> Url {
+        // cm_fidl_validator should have already validated this
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for Url {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
     }
 }
 
@@ -1192,7 +1205,7 @@ impl CapabilityDecl {
 #[fidl_decl(fidl_table = "fdecl::Child")]
 pub struct ChildDecl {
     pub name: LongName,
-    pub url: String,
+    pub url: Url,
     pub startup: fdecl::StartupMode,
     pub on_terminate: Option<fdecl::OnTerminate>,
     pub environment: Option<Name>,
@@ -3588,7 +3601,7 @@ mod tests {
                     children: vec![
                         ChildDecl {
                             name: "netstack".parse().unwrap(),
-                            url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm".to_string(),
+                            url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm".parse().unwrap(),
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: None,
                             environment: None,
@@ -3596,7 +3609,7 @@ mod tests {
                         },
                         ChildDecl {
                             name: "gtest".parse().unwrap(),
-                            url: "fuchsia-pkg://fuchsia.com/gtest#meta/gtest.cm".to_string(),
+                            url: "fuchsia-pkg://fuchsia.com/gtest#meta/gtest.cm".parse().unwrap(),
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: Some(fdecl::OnTerminate::None),
                             environment: None,
@@ -3604,7 +3617,7 @@ mod tests {
                         },
                         ChildDecl {
                             name: "echo".parse().unwrap(),
-                            url: "fuchsia-pkg://fuchsia.com/echo#meta/echo.cm".to_string(),
+                            url: "fuchsia-pkg://fuchsia.com/echo#meta/echo.cm".parse().unwrap(),
                             startup: fdecl::StartupMode::Eager,
                             on_terminate: Some(fdecl::OnTerminate::Reboot),
                             environment: Some("test_env".parse().unwrap()),

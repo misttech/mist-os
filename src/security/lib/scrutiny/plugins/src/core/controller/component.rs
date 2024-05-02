@@ -162,9 +162,9 @@ mod tests {
         crate::core::collection::{
             testing::fake_component_src_pkg, Component, ComponentSource, Manifest,
         },
+        cm_types::Url,
         scrutiny_testing::fake::*,
         serde_json::json,
-        url::Url,
     };
 
     fn empty_value() -> Value {
@@ -172,7 +172,7 @@ mod tests {
     }
 
     fn make_component(id: i32, url: &str, source: ComponentSource) -> Component {
-        let url = Url::parse(url).unwrap();
+        let url = Url::new(url).unwrap();
         Component { id, url, source }
     }
 

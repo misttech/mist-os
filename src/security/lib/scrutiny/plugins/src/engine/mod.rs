@@ -80,7 +80,6 @@ mod tests {
         scrutiny_testing::fake::*,
         serde_json::json,
         std::collections::HashSet,
-        url::Url,
         uuid::Uuid,
     };
 
@@ -130,7 +129,7 @@ mod tests {
         model
             .set(Components::new(vec![Component {
                 id: 1,
-                url: Url::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap(),
+                url: cm_types::Url::new("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap(),
                 source: ComponentSource::ZbiBootfs,
             }]))
             .unwrap();

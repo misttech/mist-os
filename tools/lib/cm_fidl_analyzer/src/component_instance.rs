@@ -11,7 +11,7 @@ use {
     cm_config::RuntimeConfig,
     cm_moniker::{InstancedChildName, InstancedMoniker},
     cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
-    cm_types::Name,
+    cm_types::{Name, Url},
     config_encoder::ConfigFields,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::{
@@ -38,7 +38,7 @@ pub struct ComponentInstanceForAnalyzer {
     moniker: Moniker,
     pub(crate) decl: ComponentDecl,
     config: Option<ConfigFields>,
-    url: String,
+    url: Url,
     parent: WeakExtendedInstanceInterface<Self>,
     children: RwLock<HashMap<ChildName, Arc<Self>>>,
     pub(crate) environment: Arc<EnvironmentForAnalyzer>,
@@ -56,7 +56,7 @@ impl ComponentInstanceForAnalyzer {
     pub(crate) fn new_root(
         decl: ComponentDecl,
         config: Option<ConfigFields>,
-        url: String,
+        url: Url,
         top_instance: Arc<TopInstanceForAnalyzer>,
         runtime_config: Arc<RuntimeConfig>,
         policy_checker: GlobalPolicyChecker,
@@ -86,7 +86,6 @@ impl ComponentInstanceForAnalyzer {
     // Creates a new non-root component instance as a child of `parent`.
     pub(crate) fn new_for_child(
         child: &Child,
-        absolute_url: String,
         child_component_decl: ComponentDecl,
         config: Option<ConfigFields>,
         parent: Arc<Self>,
@@ -108,7 +107,7 @@ impl ComponentInstanceForAnalyzer {
             moniker,
             decl: child_component_decl,
             config,
-            url: absolute_url,
+            url: child.url.clone(),
             parent: WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(
                 parent,
             )),
@@ -168,7 +167,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         self.moniker.leaf()
     }
 
-    fn url(&self) -> &str {
+    fn url(&self) -> &Url {
         &self.url
     }
 
@@ -243,7 +242,7 @@ impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
     }
 
     fn address(&self) -> ComponentAddress {
-        ComponentAddress::from_absolute_url("none://not_used").unwrap()
+        ComponentAddress::from_absolute_url(&"none://not_used".parse().unwrap()).unwrap()
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {
@@ -289,12 +288,12 @@ mod tests {
     #[test]
     fn lock_resolved_state_is_sync() {
         let decl = ComponentDeclBuilder::new().build();
-        let url = "some_url".to_string();
+        let url = "base://some_url";
 
         let instance = ComponentInstanceForAnalyzer::new_root(
             decl,
             None,
-            url,
+            url.parse().unwrap(),
             TopInstanceForAnalyzer::new(vec![], vec![]),
             Arc::new(RuntimeConfig::default()),
             GlobalPolicyChecker::default(),

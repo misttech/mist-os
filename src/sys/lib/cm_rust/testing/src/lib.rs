@@ -6,7 +6,7 @@ use {
     anyhow::{Context, Error},
     assert_matches::assert_matches,
     cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative},
-    cm_types::{LongName, Name, Path, RelativePath},
+    cm_types::{LongName, Name, Path, RelativePath, Url},
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     std::collections::BTreeMap,
@@ -161,7 +161,7 @@ impl ComponentDeclBuilder {
 #[derivative(Default)]
 pub struct ChildBuilder {
     name: Option<LongName>,
-    url: Option<String>,
+    url: Option<Url>,
     #[derivative(Default(value = "fdecl::StartupMode::Lazy"))]
     startup: fdecl::StartupMode,
     on_terminate: Option<fdecl::OnTerminate>,
@@ -177,13 +177,13 @@ impl ChildBuilder {
     pub fn name(mut self, name: &str) -> Self {
         self.name = Some(name.parse().unwrap());
         if self.url.is_none() {
-            self.url = Some(format!("test:///{name}"));
+            self.url = Some(format!("test:///{name}").parse().unwrap());
         }
         self
     }
 
     pub fn url(mut self, url: &str) -> Self {
-        self.url = Some(url.into());
+        self.url = Some(url.parse().unwrap());
         self
     }
 

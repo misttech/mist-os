@@ -202,6 +202,7 @@ mod tests {
             UseSource,
         },
         cm_rust_testing::*,
+        cm_types::Url,
         component_id_index::InstanceId,
         fidl::persist,
         fidl_fuchsia_component_decl as fdecl,
@@ -213,7 +214,6 @@ mod tests {
         scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
         serde_json::json,
         std::collections::HashMap,
-        url::Url,
     };
 
     static CORE_DEP_STR: &str = "core_dep";
@@ -222,30 +222,12 @@ mod tests {
         fake_data_model()
     }
 
-    fn new_child_decl(name: String, url: String) -> ChildDecl {
-        ChildDecl {
-            name: name.parse().unwrap(),
-            url,
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        }
+    fn new_child_decl(name: &str, url: &str) -> ChildDecl {
+        ChildBuilder::new().name(name).url(url).build()
     }
 
     fn new_component_decl(children: Vec<ChildDecl>) -> ComponentDecl {
-        ComponentDecl {
-            program: None,
-            uses: vec![],
-            exposes: vec![],
-            offers: vec![],
-            capabilities: vec![],
-            children,
-            collections: vec![],
-            facets: None,
-            environments: vec![],
-            config: None,
-        }
+        ComponentDecl { children, ..Default::default() }
     }
 
     fn new_component_with_capabilities(
@@ -254,19 +236,16 @@ mod tests {
         capabilities: Vec<CapabilityDecl>,
         children: Vec<ChildDecl>,
     ) -> ComponentDecl {
-        let mut program = ProgramDecl::default();
-        program.runner = Some("elf".parse().unwrap());
         ComponentDecl {
-            program: Some(program),
+            program: Some(ProgramDecl {
+                runner: Some("elf".parse().unwrap()),
+                ..Default::default()
+            }),
             uses,
-            exposes: vec![],
             offers,
             capabilities,
             children,
-            collections: vec![],
-            facets: None,
-            environments: vec![],
-            config: None,
+            ..Default::default()
         }
     }
 
@@ -339,8 +318,8 @@ mod tests {
         }
     }
 
-    fn make_v2_component(id: i32, url: String) -> Component {
-        let url = Url::parse(&url).unwrap();
+    fn make_v2_component(id: i32, url: &str) -> Component {
+        let url = Url::new(url).unwrap();
         Component { id, url, source: fake_component_src_pkg() }
     }
 
@@ -353,15 +332,15 @@ mod tests {
     // Creates a data model with a ZBI containing one component manifest and the provided component
     // id index.
     fn single_v2_component_model(
-        root_component_url: Option<String>,
-        component_id_index_path: Option<String>,
+        root_component_url: Option<&str>,
+        component_id_index_path: Option<&str>,
         component_id_index: component_id_index::Index,
     ) -> Result<Arc<DataModel>> {
         let model = data_model();
         let root_id = 0;
         let root_component = make_v2_component(
             root_id,
-            root_component_url.clone().unwrap_or(DEFAULT_ROOT_URL.to_string()),
+            root_component_url.clone().unwrap_or(DEFAULT_ROOT_URL.as_str()),
         );
         let root_manifest = make_v2_manifest(root_id, new_component_decl(vec![]))?;
         let deps = hashset! { CORE_DEP_STR.to_string().into() };
@@ -389,21 +368,21 @@ mod tests {
         let bar_id = 2;
         let baz_id = 3;
 
-        let root_url = DEFAULT_ROOT_URL.to_string();
-        let foo_url = "fuchsia-boot:///#meta/foo.cm".to_string();
-        let bar_url = "fuchsia-boot:///#meta/bar.cm".to_string();
-        let baz_url = "fuchsia-boot:///#meta/baz.cm".to_string();
+        let root_url = DEFAULT_ROOT_URL.as_str();
+        let foo_url = "fuchsia-boot:///#meta/foo.cm";
+        let bar_url = "fuchsia-boot:///#meta/bar.cm";
+        let baz_url = "fuchsia-boot:///#meta/baz.cm";
 
         let root_component = make_v2_component(root_id, root_url);
-        let foo_component = make_v2_component(foo_id, foo_url.clone());
-        let bar_component = make_v2_component(bar_id, bar_url.clone());
-        let baz_component = make_v2_component(baz_id, baz_url.clone());
+        let foo_component = make_v2_component(foo_id, foo_url);
+        let bar_component = make_v2_component(bar_id, bar_url);
+        let baz_component = make_v2_component(baz_id, baz_url);
 
         let root_decl = new_component_decl(vec![
-            new_child_decl("foo".to_string(), foo_url),
-            new_child_decl("bar".to_string(), bar_url),
+            new_child_decl("foo", foo_url),
+            new_child_decl("bar", bar_url),
         ]);
-        let foo_decl = new_component_decl(vec![new_child_decl("baz".to_string(), baz_url)]);
+        let foo_decl = new_component_decl(vec![new_child_decl("baz", baz_url)]);
         let bar_decl = new_component_decl(vec![]);
         let baz_decl = new_component_decl(vec![]);
 
@@ -438,7 +417,7 @@ mod tests {
                 cml::compile(&serde_json::from_value(json)?, cml::CompileOptions::default())?
                     .fidl_into_native();
             let manifest = make_v2_manifest(id, decl)?;
-            let component = make_v2_component(id, uri.to_owned());
+            let component = make_v2_component(id, uri);
 
             components.push(component);
             manifests.push(manifest);
@@ -459,8 +438,8 @@ mod tests {
     fn two_instance_component_model() -> Result<Arc<DataModel>> {
         let model = data_model();
 
-        let root_url = &*DEFAULT_ROOT_URL;
-        let child_url = Url::parse("fuchsia-boot:///#meta/child.cm").unwrap();
+        let root_url = DEFAULT_ROOT_URL.clone();
+        let child_url = Url::new("fuchsia-boot:///#meta/child.cm").unwrap();
 
         let child_name = "child".to_string();
         let missing_child_name = "missing_child".to_string();
@@ -503,7 +482,7 @@ mod tests {
                         OfferDecl::Protocol(root_offer_protocol),
                     ],
                     vec![CapabilityDecl::Directory(root_good_dir_decl)],
-                    vec![new_child_decl(child_name, child_url.to_string())],
+                    vec![new_child_decl(&child_name, child_url.as_str())],
                 ),
                 None,
             ),
@@ -525,7 +504,7 @@ mod tests {
             ),
         );
 
-        let build_model_result = ModelBuilderForAnalyzer::new(root_url.clone()).build(
+        let build_model_result = ModelBuilderForAnalyzer::new(DEFAULT_ROOT_URL.clone()).build(
             decls,
             Arc::new(RuntimeConfig::default()),
             Arc::new(component_id_index::Index::default()),
@@ -542,14 +521,14 @@ mod tests {
     }
 
     fn zbi(
-        root_component_url: Option<String>,
-        component_id_index_path: Option<String>,
+        root_component_url: Option<&str>,
+        component_id_index_path: Option<&str>,
         component_id_index: component_id_index::Index,
     ) -> Zbi {
         let mut bootfs_files: HashMap<String, Vec<u8>> = HashMap::default();
         let mut runtime_config = component_internal::Config::default();
-        runtime_config.root_component_url = root_component_url;
-        runtime_config.component_id_index_path = component_id_index_path.clone();
+        runtime_config.root_component_url = root_component_url.map(Into::into);
+        runtime_config.component_id_index_path = component_id_index_path.map(Into::into);
 
         if let Some(path) = component_id_index_path {
             let split_index_path: Vec<&str> = path.split_inclusive("/").collect();
@@ -610,11 +589,7 @@ mod tests {
             index.insert(Moniker::parse_str("a/b/c").unwrap(), iid.clone()).unwrap();
             index
         };
-        let model = single_v2_component_model(
-            None,
-            Some("/boot/index_path".to_string()),
-            component_id_index,
-        )?;
+        let model = single_v2_component_model(None, Some("/boot/index_path"), component_id_index)?;
         V2ComponentModelDataCollector::new().collect(model.clone())?;
 
         let collection =
@@ -1107,12 +1082,9 @@ mod tests {
 
     #[test]
     fn test_map_tree_single_node_custom_url() -> Result<()> {
-        let root_url = "fuchsia-boot:///#meta/foo.cm".to_string();
-        let model = single_v2_component_model(
-            Some(root_url.clone()),
-            None,
-            component_id_index::Index::default(),
-        )?;
+        let root_url = "fuchsia-boot:///#meta/foo.cm";
+        let model =
+            single_v2_component_model(Some(root_url), None, component_id_index::Index::default())?;
         V2ComponentModelDataCollector::new().collect(model.clone())?;
 
         let controller = V2ComponentModelMappingController::default();

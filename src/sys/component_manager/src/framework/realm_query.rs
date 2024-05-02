@@ -17,7 +17,7 @@ use {
     async_trait::async_trait,
     bedrock_error::Explain,
     cm_rust::NativeIntoFidl,
-    cm_types::Name,
+    cm_types::{Name, Url},
     errors::OpenExposedDirError,
     fidl::{
         endpoints::{ClientEnd, ServerEnd},
@@ -246,7 +246,7 @@ pub async fn get_instance(
 
     Ok(fsys::Instance {
         moniker: Some(moniker.to_string()),
-        url: Some(instance.component_url.clone()),
+        url: Some(instance.component_url.to_string()),
         environment: instance.environment().name().map(|n| n.to_string()),
         instance_id: instance_id.map(|id| id.to_string()),
         resolved_info,
@@ -336,8 +336,10 @@ async fn resolve_declaration(
                 .address_for_relative_url(url)
                 .map_err(|_| fsys::GetDeclarationError::BadUrl)?
         } else {
-            ComponentAddress::from_absolute_url(&url)
-                .map_err(|_| fsys::GetDeclarationError::BadUrl)?
+            Url::new(url)
+                .ok()
+                .and_then(|url| ComponentAddress::from_absolute_url(&url).ok())
+                .ok_or(fsys::GetDeclarationError::BadUrl)?
         };
         let collections = resolved_state.collections();
         let collection_decl = collections
@@ -653,7 +655,7 @@ async fn get_fidl_instance_and_children(
     (
         fsys::Instance {
             moniker: Some(moniker.to_string()),
-            url: Some(instance.component_url.clone()),
+            url: Some(instance.component_url.to_string()),
             environment: instance.environment().name().map(|n| n.to_string()),
             instance_id: instance_id.map(|id| id.to_string()),
             resolved_info,

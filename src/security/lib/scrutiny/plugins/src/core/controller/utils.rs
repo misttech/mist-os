@@ -5,19 +5,19 @@
 use {
     crate::core::collection::{Component, Components},
     anyhow::{Context, Error, Result},
+    cm_types::Url,
     scrutiny::model::model::DataModel,
     serde::{Deserialize, Serialize},
     serde_json::value::Value,
     std::io::{self, ErrorKind},
     std::sync::Arc,
-    url::Url,
 };
 
 /// Converts a component_url to an internal component_id.
 pub fn component_from_url(model: Arc<DataModel>, url: &Url) -> Option<Component> {
     if let Ok(components) = model.get::<Components>() {
         for component in components.iter() {
-            if &component.url == url {
+            if component.url == *url {
                 return Some(component.clone());
             }
         }
@@ -40,8 +40,8 @@ impl DefaultComponentRequest {
     /// If duplicates are found the url will always be selected.
     pub fn component_id(&self, model: Arc<DataModel>) -> Result<i64> {
         if let Some(url) = &self.url {
-            let url = Url::parse(url)
-                .with_context(|| format!("Failed to parse component URL: {}", url))?;
+            let url =
+                Url::new(url).with_context(|| format!("Failed to parse component URL: {}", url))?;
             if let Some(component) = component_from_url(model.clone(), &url) {
                 Ok(component.id as i64)
             } else {
@@ -103,13 +103,13 @@ mod tests {
         crate::core::collection::{
             testing::fake_component_src_pkg, Component, ComponentSource, Components,
         },
+        cm_types::Url,
         scrutiny_testing::fake::*,
         serde_json::json,
-        url::Url,
     };
 
     fn make_component(id: i32, url: &str, source: ComponentSource) -> Component {
-        let url = Url::parse(url).unwrap();
+        let url = Url::new(url).unwrap();
         Component { id, url, source }
     }
 

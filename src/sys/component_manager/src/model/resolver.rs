@@ -233,7 +233,7 @@ mod tests {
             &self,
             component_address: &ComponentAddress,
         ) -> Result<ResolvedComponent, ResolverError> {
-            assert_eq!(self.expected_url.as_str(), component_address.url());
+            assert_eq!(&self.expected_url, component_address.url());
             Ok(ResolvedComponent {
                 resolved_url: self.resolved_url.clone(),
                 // MockOkResolver only resolves one component, so it does not
@@ -340,13 +340,13 @@ mod tests {
         environment: Environment,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
-        component_url: String,
+        component_url: &str,
     ) -> Arc<ComponentInstance> {
         let component = ComponentInstance::new_root(
             environment,
             context,
             component_manager_instance,
-            component_url,
+            component_url.parse().unwrap(),
         )
         .await;
         // We don't care about waiting for the discover action to complete, just that it's started.
@@ -361,7 +361,7 @@ mod tests {
     async fn new_discovered_component(
         environment: Arc<Environment>,
         instanced_moniker: InstancedMoniker,
-        component_url: String,
+        component_url: &str,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
         config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
@@ -373,7 +373,7 @@ mod tests {
         let component = ComponentInstance::new(
             environment,
             instanced_moniker,
-            component_url,
+            component_url.parse().unwrap(),
             startup,
             on_terminate,
             config_parent_overrides,
@@ -390,6 +390,17 @@ mod tests {
             .register_no_wait(&component, DiscoverAction::new(ComponentInput::default()))
             .await;
         component
+    }
+
+    fn address_from_absolute_url(url: &str) -> ComponentAddress {
+        ComponentAddress::from_absolute_url(&url.parse().unwrap()).unwrap()
+    }
+
+    async fn address_from(
+        url: &str,
+        instance: &Arc<ComponentInstance>,
+    ) -> Result<ComponentAddress, ResolverError> {
+        ComponentAddress::from(&url.parse().unwrap(), instance).await
     }
 
     #[fuchsia_async::run_until_stalled(test)]
@@ -416,15 +427,12 @@ mod tests {
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-boot:///#meta/root.cm".to_string(),
+            "fuchsia-boot:///#meta/root.cm",
         )
         .await;
 
         // Resolve known scheme that returns success.
-        let component = registry
-            .resolve(&ComponentAddress::from_absolute_url("foo://url").unwrap())
-            .await
-            .unwrap();
+        let component = registry.resolve(&address_from_absolute_url("foo://url")).await.unwrap();
         assert_eq!("foo://resolved", component.resolved_url);
 
         // Resolve a different scheme that produces an error.
@@ -432,10 +440,7 @@ mod tests {
             Err(ResolverError::manifest_not_found(format_err!("not available")));
         assert_eq!(
             format!("{:?}", expected_res),
-            format!(
-                "{:?}",
-                registry.resolve(&ComponentAddress::from_absolute_url("bar://url").unwrap()).await
-            )
+            format!("{:?}", registry.resolve(&address_from_absolute_url("bar://url")).await)
         );
 
         // Resolve an unknown scheme
@@ -443,18 +448,13 @@ mod tests {
             Err(ResolverError::SchemeNotRegistered);
         assert_eq!(
             format!("{:?}", expected_res),
-            format!(
-                "{:?}",
-                registry
-                    .resolve(&ComponentAddress::from_absolute_url("unknown://url").unwrap())
-                    .await
-            ),
+            format!("{:?}", registry.resolve(&address_from_absolute_url("unknown://url")).await),
         );
 
         // Resolve a possible relative path (e.g., subpackage) URL lacking a
         // resolvable parent causes a SchemeNotRegistered.
         assert_matches!(
-            ComponentAddress::from("xxx#meta/comp.cm", &root).await,
+            address_from("xxx#meta/comp.cm", &root).await,
             Err(ResolverError::NoParentContext(_))
         );
     }
@@ -621,12 +621,11 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/package#meta/comp.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
         )
         .await;
 
-        let abs =
-            ComponentAddress::from("fuchsia-pkg://fuchsia.com/package#meta/comp.cm", &root).await?;
+        let abs = address_from("fuchsia-pkg://fuchsia.com/package#meta/comp.cm", &root).await?;
         assert_matches!(abs, ComponentAddress::Absolute { .. });
         assert_eq!(abs.scheme(), "fuchsia-pkg");
         assert_eq!(abs.path(), "/package");
@@ -666,13 +665,13 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/package#meta/comp.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
         )
         .await;
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "subpackage#meta/subcomp.cm".to_string(),
+            "subpackage#meta/subcomp.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -683,24 +682,13 @@ mod tests {
         )
         .await;
 
-        let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
+        let relpath = address_from("subpackage#meta/subcomp.cm", &child).await?;
         assert_matches!(relpath, ComponentAddress::RelativePath { .. });
         assert_eq!(relpath.path(), "subpackage");
         assert_eq!(relpath.resource(), Some("meta/subcomp.cm"));
         assert_eq!(
             relpath.context(),
             &ComponentResolutionContext::new("package_context".as_bytes().to_vec())
-        );
-
-        // Test some error conditions in `ComponentAddress::from(<invalid relative URL>)`
-        assert_matches!(
-            ComponentAddress::from("", &child).await,
-            Err(ResolverError::MalformedUrl(..))
-        );
-
-        assert_matches!(
-            ComponentAddress::from("?query_param=value", &child).await,
-            Err(ResolverError::MalformedUrl(..))
         );
 
         Ok(())
@@ -739,13 +727,13 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-boot:///package#meta/comp.cm".to_string(),
+            "fuchsia-boot:///package#meta/comp.cm",
         )
         .await;
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "subpackage#meta/subcomp.cm".to_string(),
+            "subpackage#meta/subcomp.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -756,7 +744,7 @@ mod tests {
         )
         .await;
 
-        let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
+        let relpath = address_from("subpackage#meta/subcomp.cm", &child).await?;
         assert_matches!(relpath, ComponentAddress::RelativePath { .. });
         assert_eq!(relpath.path(), "subpackage");
         assert_eq!(relpath.resource(), Some("meta/subcomp.cm"));
@@ -800,13 +788,13 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "cast:00000000/package#meta/comp.cm".to_string(),
+            "cast:00000000/package#meta/comp.cm",
         )
         .await;
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "subpackage#meta/subcomp.cm".to_string(),
+            "subpackage#meta/subcomp.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -817,7 +805,7 @@ mod tests {
         )
         .await;
 
-        let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
+        let relpath = address_from("subpackage#meta/subcomp.cm", &child).await?;
         assert_matches!(relpath, ComponentAddress::RelativePath { .. });
         assert_eq!(relpath.path(), "subpackage");
         assert_eq!(relpath.resource(), Some("meta/subcomp.cm"));
@@ -860,14 +848,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
         )
         .await;
 
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "#meta/my-child.cm".to_string(),
+            "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -926,14 +914,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
         )
         .await;
 
         let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "#meta/my-child.cm".to_string(),
+            "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -947,7 +935,7 @@ mod tests {
         let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "#meta/my-child2.cm".to_string(),
+            "#meta/my-child2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1000,14 +988,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-boot:///#meta/my-root.cm".to_string(),
+            "fuchsia-boot:///#meta/my-root.cm",
         )
         .await;
 
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "#meta/my-child.cm".to_string(),
+            "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1060,14 +1048,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "cast:00000000#meta/my-root.cm".to_string(),
+            "cast:00000000#meta/my-root.cm",
         )
         .await;
 
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "#meta/my-child.cm".to_string(),
+            "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1103,14 +1091,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "#meta/my-root.cm".to_string(),
+            "#meta/my-root.cm",
         )
         .await;
 
         let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "#meta/my-child.cm".to_string(),
+            "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1163,14 +1151,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
         )
         .await;
 
         let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "my-subpackage#meta/my-child.cm".to_string(),
+            "my-subpackage#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1184,7 +1172,7 @@ mod tests {
         let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
-            "#meta/my-child2.cm".to_string(),
+            "#meta/my-child2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1247,14 +1235,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
         )
         .await;
 
         let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
-            "my-subpackage#meta/my-child.cm".to_string(),
+            "my-subpackage#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1268,7 +1256,7 @@ mod tests {
         let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
-            "#meta/my-child2.cm".to_string(),
+            "#meta/my-child2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1282,7 +1270,7 @@ mod tests {
         let child_three = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0/child2:0/child3:0")?,
-            "#meta/my-child3.cm".to_string(),
+            "#meta/my-child3.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1358,14 +1346,14 @@ mod tests {
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
         )
         .await;
 
         let realm = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
-            "realm-builder://0/my-realm".to_string(),
+            "realm-builder://0/my-realm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1379,7 +1367,7 @@ mod tests {
         let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
-            "my-subpackage1#meta/sub1.cm".to_string(),
+            "my-subpackage1#meta/sub1.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1393,7 +1381,7 @@ mod tests {
         let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0")?,
-            "#meta/sub1-child.cm".to_string(),
+            "#meta/sub1-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1407,7 +1395,7 @@ mod tests {
         let child_three = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0")?,
-            "my-subpackage2#meta/sub2.cm".to_string(),
+            "my-subpackage2#meta/sub2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -1421,7 +1409,7 @@ mod tests {
         let child_four = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0/child4:0")?,
-            "#meta/sub2-child.cm".to_string(),
+            "#meta/sub2-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,

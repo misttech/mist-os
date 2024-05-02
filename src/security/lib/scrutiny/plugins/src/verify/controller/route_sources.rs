@@ -28,7 +28,6 @@ use {
         sync::Arc,
     },
     thiserror::Error as ThisError,
-    url::Url,
 };
 
 const BAD_REQUEST_CTX: &str = "Failed to parse RouteSourcesController request";
@@ -458,17 +457,13 @@ fn check_pkg_source(
         return Some(RouteSourceError::RouteSegmentAbsMonikerNotFoundInTree(route_segment.clone()));
     }
     let instance = get_instance_result.unwrap();
-    let instance_url_str = instance.url();
-    let instance_url = match Url::parse(instance_url_str) {
-        Ok(url) => url,
-        Err(_) => return Some(RouteSourceError::InvalidUrl(instance_url_str.to_string())),
-    };
+    let instance_url = instance.url();
 
     let matches: Vec<&Component> =
-        components.iter().filter(|component| &component.url == &instance_url).collect();
+        components.iter().filter(|component| component.url == *instance_url).collect();
     if matches.len() == 0 {
         return Some(RouteSourceError::ComponentInstanceLookupByUrlFailed(
-            instance_url_str.to_string(),
+            instance_url.to_string(),
         ));
     }
     if matches.len() > 1 {
@@ -625,13 +620,12 @@ mod tests {
         cm_config::RuntimeConfig,
         cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
         cm_rust::{
-            Availability, CapabilityTypeName, ChildDecl, ComponentDecl, DependencyType,
-            DirectoryDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget, OfferDirectoryDecl,
+            Availability, CapabilityTypeName, DependencyType, DirectoryDecl, ExposeSource,
             OfferSource, ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
         },
         cm_rust_testing::*,
-        cm_types::Path,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+        cm_types::{Path, Url},
+        fidl_fuchsia_io as fio,
         fuchsia_merkle::{Hash, HASH_SIZE},
         maplit::{hashmap, hashset},
         moniker::{Moniker, MonikerBase},
@@ -640,13 +634,12 @@ mod tests {
         scrutiny_testing::fake::fake_data_model,
         serde_json::json,
         std::{str::FromStr, sync::Arc},
-        url::Url,
     };
 
     const TEST_URL_PREFIX: &str = "fuchsia-pkg://test.fuchsia.com";
 
     fn make_test_url(component_name: &str) -> Url {
-        Url::parse(&format!("{}/{}#meta/{}.cm", TEST_URL_PREFIX, component_name, component_name))
+        Url::new(&format!("{}/{}#meta/{}.cm", TEST_URL_PREFIX, component_name, component_name))
             .expect("test URL to parse")
     }
 
@@ -783,115 +776,77 @@ mod tests {
     fn valid_two_instance_two_dir_tree_model(
         data_model: Option<Arc<DataModel>>,
     ) -> Result<Arc<DataModel>> {
-        let root_url = &*DEFAULT_ROOT_URL;
         let two_dir_user_url = make_test_url("two_dir_user");
         let one_dir_provider_url = make_test_url("one_dir_provider");
 
         let data_model = data_model.unwrap_or(fake_data_model());
         let components = hashmap! {
-            root_url.clone() => (ComponentDecl{
-                program: Some(ProgramDecl{ runner: Some("some_runner".parse().unwrap()), ..ProgramDecl::default()}),
-                capabilities: vec![
-                    DirectoryDecl{
-                        name: "root_dir".parse().unwrap(),
-                        source_path: Some(Path::from_str("/data/to/user").unwrap()),
-                        rights: fio::Operations::CONNECT,
-                    }.into(),
-                ],
-                offers: vec![
-                    OfferDirectoryDecl{
-                        source: offer_source_static_child("one_dir_provider"),
-                        source_name: "exposed_by_provider".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("two_dir_user"),
-                        target_name: "routed_from_provider".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: "root_subdir".parse().unwrap(),
-                        availability: Availability::Required,
-                    }.into(),
-                    OfferDirectoryDecl{
-                        source: OfferSource::Self_,
-                        source_name: "root_dir".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: offer_target_static_child("two_dir_user"),
-                        target_name: "routed_from_root".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: "root_subdir".parse().unwrap(),
-                        availability: Availability::Required,
-                    }.into(),
-                ],
-                children: vec![
-                    ChildDecl{
-                        name: "two_dir_user".parse().unwrap(),
-                        url: two_dir_user_url.to_string(),
-                        startup: fdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                    ChildDecl{
-                        name: "one_dir_provider".parse().unwrap(),
-                        url: one_dir_provider_url.to_string(),
-                        startup: fdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
-                ],
-                ..ComponentDecl::default()
-            }, None),
-            two_dir_user_url => (ComponentDecl{
-                uses: vec![
-                    UseDirectoryDecl{
-                        source: UseSource::Parent,
-                        source_name: "routed_from_provider".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_path: Path::from_str("/data/from/provider").unwrap(),
-                        rights: fio::Operations::CONNECT,
-                        subdir: "user_subdir".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }.into(),
-                    UseDirectoryDecl{
-                        source: UseSource::Parent,
-                        source_name: "routed_from_root".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_path: Path::from_str("/data/from/root").unwrap(),
-                        rights: fio::Operations::CONNECT,
-                        subdir: "user_subdir".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }.into(),
-                ],
-                ..ComponentDecl::default()
-            }, None),
-            one_dir_provider_url => (ComponentDecl{
-                program: Some(ProgramDecl{ runner: Some("some_runner".parse().unwrap()), ..ProgramDecl::default()}),
-                capabilities: vec![
-                    DirectoryDecl{
-                        name: "provider_dir".parse().unwrap(),
-                        source_path: Some(Path::from_str("/data/to/user").unwrap()),
-                        rights: fio::Operations::CONNECT,
-                    }.into(),
-                ],
-                exposes: vec![
-                    ExposeDirectoryDecl{
-                        source: ExposeSource::Self_,
-                        source_name: "provider_dir".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: ExposeTarget::Parent,
-                        target_name: "exposed_by_provider".parse().unwrap(),
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: "provider_subdir".parse().unwrap(),
-                        availability: cm_rust::Availability::Required,
-                    }.into(),
-                ],
-                ..ComponentDecl::default()
-            }, None),
+            DEFAULT_ROOT_URL.clone() => (ComponentDeclBuilder::new()
+                .program(ProgramDecl {
+                    runner: Some("some_runner".parse().unwrap()),
+                    ..ProgramDecl::default()
+                })
+                .capability(CapabilityBuilder::directory()
+                    .name("root_dir")
+                    .path("/data/to/user")
+                    .rights(fio::Operations::CONNECT))
+                .offer(OfferBuilder::directory()
+                    .name("exposed_by_provider")
+                    .target_name("routed_from_provider")
+                    .source_static_child("one_dir_provider")
+                    .target_static_child("two_dir_user")
+                    .rights(fio::Operations::CONNECT)
+                    .subdir("root_subdir"))
+                .offer(OfferBuilder::directory()
+                    .name("root_dir")
+                    .target_name("routed_from_root")
+                    .source(OfferSource::Self_)
+                    .target_static_child("two_dir_user")
+                    .rights(fio::Operations::CONNECT)
+                    .subdir("root_subdir"))
+                .child(ChildBuilder::new()
+                    .name("two_dir_user")
+                    .url(two_dir_user_url.as_str()))
+                .child(ChildBuilder::new()
+                    .name("one_dir_provider")
+                    .url(one_dir_provider_url.as_str()))
+                .build(),
+                None,
+            ),
+            two_dir_user_url => (ComponentDeclBuilder::new()
+                .use_(UseBuilder::directory()
+                    .name("routed_from_provider")
+                    .path("/data/from/provider")
+                    .rights(fio::Operations::CONNECT)
+                    .subdir("user_subdir"))
+                .use_(UseBuilder::directory()
+                    .name("routed_from_root")
+                    .path("/data/from/root")
+                    .rights(fio::Operations::CONNECT)
+                    .subdir("user_subdir"))
+                .build(),
+                None,
+            ),
+            one_dir_provider_url => (ComponentDeclBuilder::new()
+                .program(ProgramDecl {
+                    runner: Some("some_runner".parse().unwrap()),
+                    ..ProgramDecl::default()
+                })
+                .capability(CapabilityBuilder::directory()
+                    .name("provider_dir")
+                    .path("/data/to/user")
+                    .rights(fio::Operations::CONNECT))
+                .expose(ExposeBuilder::directory()
+                    .name("provider_dir")
+                    .target_name("exposed_by_provider")
+                    .source(ExposeSource::Self_)
+                    .rights(fio::Operations::CONNECT)
+                    .subdir("provider_subdir"))
+                .build(),
+                None,
+            ),
         };
-        let build_component_model = ModelBuilderForAnalyzer::new(root_url.clone()).build(
+        let build_component_model = ModelBuilderForAnalyzer::new(DEFAULT_ROOT_URL.clone()).build(
             components,
             Arc::new(RuntimeConfig::default()),
             Arc::new(component_id_index::Index::default()),

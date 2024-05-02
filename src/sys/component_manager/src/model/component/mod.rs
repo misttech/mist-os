@@ -35,7 +35,7 @@ use {
     bedrock_error::{BedrockError, Explain},
     cm_moniker::{IncarnationId, InstancedMoniker},
     cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
-    cm_types::Name,
+    cm_types::{Name, Url},
     cm_util::TaskGroup,
     component_id_index::InstanceId,
     config_encoder::ConfigFields,
@@ -225,7 +225,7 @@ pub struct ComponentInstance {
     /// The registry for resolving component URLs within the component instance.
     pub environment: Arc<Environment>,
     /// The component's URL.
-    pub component_url: String,
+    pub component_url: Url,
     /// The mode of startup (lazy or eager).
     pub startup: fdecl::StartupMode,
     /// The policy to apply if the component terminates.
@@ -268,7 +268,7 @@ impl ComponentInstance {
         environment: Environment,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
-        component_url: String,
+        component_url: Url,
     ) -> Arc<Self> {
         Self::new(
             Arc::new(environment),
@@ -290,7 +290,7 @@ impl ComponentInstance {
     pub async fn new(
         environment: Arc<Environment>,
         instanced_moniker: InstancedMoniker,
-        component_url: String,
+        component_url: Url,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
         config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
@@ -1290,7 +1290,7 @@ impl ComponentInstanceInterface for ComponentInstance {
         self.moniker.leaf()
     }
 
-    fn url(&self) -> &str {
+    fn url(&self) -> &Url {
         &self.component_url
     }
 
@@ -2076,7 +2076,7 @@ pub mod tests {
         ComponentInstance::new(
             Arc::new(Environment::empty()),
             InstancedMoniker::root(),
-            "fuchsia-pkg://fuchsia.com/foo#at_root.cm".to_string(),
+            "fuchsia-pkg://fuchsia.com/foo#at_root.cm".parse().unwrap(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,
@@ -2234,7 +2234,7 @@ pub mod tests {
                     None,
                     &ChildDecl {
                         name: "foo".parse().unwrap(),
-                        url: "http://foo".to_string(),
+                        url: "http://foo".parse().unwrap(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
@@ -2375,7 +2375,7 @@ pub mod tests {
                     Some(capabilities),
                     &ChildDecl {
                         name: "foo".parse().unwrap(),
-                        url: "http://foo".to_string(),
+                        url: "http://foo".parse().unwrap(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
                         environment: None,
@@ -2537,7 +2537,11 @@ pub mod tests {
         // Now they can all be found.
         assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, Some(_));
         assert_eq!(
-            root.find_resolved(&vec!["a"].try_into().unwrap()).await.unwrap().component_url,
+            root.find_resolved(&vec!["a"].try_into().unwrap())
+                .await
+                .unwrap()
+                .component_url
+                .as_str(),
             "test:///a",
         );
         assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, Some(_));

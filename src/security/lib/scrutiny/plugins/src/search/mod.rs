@@ -44,7 +44,6 @@ mod tests {
         scrutiny_testing::{fake::fake_data_model, TEST_REPO_URL},
         serde_json::json,
         std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc},
-        url::Url,
     };
 
     fn data_model() -> Arc<DataModel> {
@@ -58,7 +57,7 @@ mod tests {
         model
             .set(Components::new(vec![Component {
                 id: 0,
-                url: Url::parse(
+                url: cm_types::Url::new(
                     &AbsolutePackageUrl::new(
                         TEST_REPO_URL.clone(),
                         PackageName::from_str("foo").unwrap(),

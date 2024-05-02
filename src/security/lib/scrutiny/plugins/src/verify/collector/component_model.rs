@@ -16,7 +16,7 @@ use {
     cm_config::RuntimeConfig,
     cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
-    cm_types::Name,
+    cm_types::{Name, Url},
     config_encoder::ConfigFields,
     fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
@@ -29,13 +29,12 @@ use {
     serde_json5::from_reader,
     std::{collections::HashMap, fs::File, path::PathBuf, sync::Arc},
     tracing::{error, info, warn},
-    url::Url,
 };
 
 // The default root component URL used to identify the root instance of the component model
 // unless the RuntimeConfig specifies a different root URL.
 pub static DEFAULT_ROOT_URL: Lazy<Url> = Lazy::new(|| {
-    Url::parse(
+    Url::new(
         &BootUrl::new_resource("/root".to_string(), ROOT_RESOURCE.to_string()).unwrap().to_string(),
     )
     .unwrap()
