@@ -21,6 +21,7 @@ load("@bazel_skylib//lib:shell.bzl", "shell")
 #   def _my_python_test_impl(ctx):
 #       return [
 #           create_python3_shell_wrapper_provider(
+#               ctx,
 #               ctx.attr.script.short_path,
 #               ctx.attr.script_args,
 #               ctx.runfiles(files = ctx.files.data),
@@ -76,6 +77,7 @@ def create_python3_shell_wrapper_provider(ctx, py3_script_path, args = [], runfi
         def _my_python_test_impl(ctx):
             return [
                 create_python3_shell_wrapper_provider(
+                    ctx,
                     ctx.attr.script.short_path,
                     ctx.attr.script_args,
                     ctx.runfiles(files = ctx.files.data),
