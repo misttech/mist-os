@@ -497,12 +497,6 @@ impl PrivateAnonymousMemoryManager {
         Self { backing, allocation }
     }
 
-    fn release_range(&self, range: std::ops::Range<UserAddress>) {
-        let offset = range.start.ptr() as u64;
-        let delta = (range.end - range.start) as u64;
-        self.backing.op_range(zx::VmoOp::ZERO, offset, delta).unwrap();
-    }
-
     fn read_memory<'a>(
         &self,
         addr: UserAddress,
