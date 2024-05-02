@@ -236,6 +236,11 @@ static const std::vector<fpbus::BootMetadata> usb_boot_metadata{
         .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
         .zbi_extra = MACADDR_WIFI,
     }},
+    {{
+        // Advertise serial number over USB
+        .zbi_type = DEVICE_METADATA_SERIAL_NUMBER,
+        .zbi_extra = 0,
+    }},
 };
 
 static fpbus::Node dwc2_dev = []() {
