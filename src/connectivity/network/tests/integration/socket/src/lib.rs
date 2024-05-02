@@ -1047,7 +1047,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
     // to run. However, if we make it too short, the test will be flaky, because
     // it's possible for the address lifetime to expire before the subsequent
     // SendMsgPreflight call.
-    const VALID_LIFETIME_SECONDS: u32 = 4;
+    const VALID_LIFETIME_SECONDS: u32 = 10;
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
         ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
         false,                                /* on_link_flag */
