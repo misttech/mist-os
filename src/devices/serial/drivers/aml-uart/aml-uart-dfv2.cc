@@ -123,7 +123,7 @@ void AmlUartV2::OnReceivedMetadata(
                        compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
 }
 
-zx_status_t AmlUartV2::GetPowerconfiguration(
+zx_status_t AmlUartV2::GetPowerConfiguration(
     const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
   auto power_broker = incoming()->Connect<fuchsia_power_broker::Topology>();
   if (power_broker.is_error() || !power_broker->is_valid()) {
@@ -197,8 +197,9 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
       std::move(pdev_connection.value()));
 
   if (driver_config_.enable_suspend()) {
-    if (zx_status_t status = GetPowerconfiguration(fidl_pdev); status != ZX_OK) {
+    if (zx_status_t status = GetPowerConfiguration(fidl_pdev); status != ZX_OK) {
       FDF_LOG(INFO, "Could not get power configuration: %s", zx_status_get_string(status));
+      CompleteStart(zx::error(status));
       return;
     }
   }

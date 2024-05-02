@@ -29,7 +29,7 @@ class AmlUartV2 : public fdf::DriverBase {
   fidl::ClientEnd<fuchsia_power_broker::ElementControl>& element_control_for_testing();
 
  private:
-  zx_status_t GetPowerconfiguration(
+  zx_status_t GetPowerConfiguration(
       const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
 
   void OnReceivedMetadata(
