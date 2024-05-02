@@ -128,16 +128,23 @@ class Test:
     execute and categorize tests. Since both pieces of information
     are needed to make sense of tests, this dataclass combines both
     pieces for a test.
+
+    Note that info is added lazily because we need to complete a build before
+    loading a test-list.json. Regenerating the top-level file can be very
+    expensive, so we opt to generate a test-list.json once tests.json and
+    selected tests are built only.
     """
 
     # The test as described by tests.json.
     build: tests_json_file.TestEntry
 
-    # The test as described by test-list.json.
-    info: TestListEntry
+    # The info for this test loaded from test-list.json
+    # This is lazily loaded since we need to build test packages before
+    # test-list.json is generated.
+    _maybe_info: TestListEntry | None = None
 
     def __hash__(self) -> int:
-        return self.info.name.__hash__()
+        return self.build.test.name.__hash__()
 
     def __eq__(self, other: object) -> bool:
         return self.build.__eq__(other)
@@ -148,13 +155,32 @@ class Test:
     def is_host_test(self) -> bool:
         return self.build.test.path is not None
 
+    def join_info(self, entries: dict[str, TestListEntry]) -> None:
+        """Add info from test-list.json to this test.
+
+        This is done is two stages to support lazily creating test-list.json
+        following the build.
+
+        Args:
+            entries (dict[str, TestListEntry]): Result of parsing test-list.json.
+        """
+        self._maybe_info = entries[self.name()]
+
     def name(self) -> str:
         """Return the unique name of this test.
 
         Returns:
             str: This tests name, which is unique among Tests.
         """
-        return self.info.name
+        return self.build.test.name
+
+    @property
+    def info(self) -> TestListEntry:
+        if self._maybe_info is None:
+            raise ValueError(
+                f"Test {self.name()} has not been joined with test-list.json"
+            )
+        return self._maybe_info
 
     def is_e2e_test(self) -> bool:
         """Determine if this test is an E2E test.
@@ -196,15 +222,15 @@ class Test:
         return m[0] if m else None
 
     @classmethod
-    def join_test_descriptions(
-        cls: typing.Type[typing.Self],
-        test_entries: list[tests_json_file.TestEntry],
+    def augment_tests_with_info(
+        _cls,
+        test_entries: list[typing.Self],
         test_list_entries: dict[str, TestListEntry],
-    ) -> list[typing.Self]:
-        """Join the contents of tests.json with the contents of test-list.json.
+    ) -> None:
+        """Augment a list of Tests with info fields.
 
         Args:
-            test_entries (List[TestEntry]): The contents parsed from tests.json.
+            test_entries (list[Test]): A list of Tests to augment.
             test_list_entries (Dict[str, TestListEntry]): The contents parsed from test-list.json
 
         Raises:
@@ -214,12 +240,8 @@ class Test:
             List[Test]: List of joined contents for all tests in tests.json.
         """
         try:
-            ret: list[Test] = [
-                cls(entry, test_list_entries[entry.test.name])
-                for entry in test_entries
-            ]
-            # Ignore type for now. With Python 3.11 we can use typing.Self.
-            return ret  # type:ignore
+            for entry in test_entries:
+                entry.join_info(test_list_entries)
         except KeyError as e:
             raise ValueError(
                 f"Test '{e.args[0]} was found in "

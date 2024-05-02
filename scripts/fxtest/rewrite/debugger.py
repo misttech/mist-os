@@ -62,11 +62,11 @@ def spawn(
         # breakpoints require us to load symbols proactively.
         if not breakpoints:
             attach_args.extend(
-                ["--execute", f"attach --weak --recursive {test.info.name}"]
+                ["--execute", f"attach --weak --recursive {test.name()}"]
             )
         else:
             attach_args.extend(
-                ["--execute", f"attach --recursive {test.info.name}"]
+                ["--execute", f"attach --recursive {test.name()}"]
             )
 
     # If only --breakpoint was specified on the command line (we won't get here if neither

@@ -20,6 +20,7 @@ import args
 import environment
 import event
 import main
+import test_list_file
 import util.command
 
 
@@ -96,6 +97,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             os.path.isfile(os.path.join(self.test_data_path, "test-list.json")),
             f"path was {self.test_data_path} for {__file__}",
         )
+        self.test_list_input = os.path.join(
+            self.test_data_path, "test-list.json"
+        )
         self.assertTrue(
             os.path.isfile(
                 os.path.join(self.test_data_path, "package-repositories.json")
@@ -128,6 +132,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             )
         )
 
+        # Make sure that generated test list is identical to input.
+        self._mock_generate_test_list()
+
         return super().setUp()
 
     def _mock_run_commands_in_parallel(self, stdout: str) -> mock.MagicMock:
@@ -146,6 +153,16 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             )
         )
         patch = mock.patch("main.execution.run_command", m)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return m
+
+    def _mock_generate_test_list(self) -> mock.MagicMock:
+        test_list_entries = test_list_file.TestListFile.entries_from_file(
+            self.test_list_input
+        )
+        m = mock.AsyncMock(return_value=test_list_entries)
+        patch = mock.patch("main.generate_test_list", m)
         patch.start()
         self.addCleanup(patch.stop)
         return m

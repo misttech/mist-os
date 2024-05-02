@@ -83,7 +83,7 @@ class TestExecution:
         Returns:
             str: Name of the test.
         """
-        return self._test.info.name + (
+        return self._test.name() + (
             f" (Run {self._run_suffix})" if self._run_suffix is not None else ""
         )
 
@@ -317,7 +317,7 @@ class TestExecution:
             if not flags.output:
                 # Test failed, print output now.
                 recorder.emit_info_message(
-                    f"\n{statusinfo.error_highlight(self._test.info.name, style=flags.style)}:\n"
+                    f"\n{statusinfo.error_highlight(self._test.name(), style=flags.style)}:\n"
                 )
                 if output.stdout:
                     recorder.emit_verbatim_message(output.stdout)

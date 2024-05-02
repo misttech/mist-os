@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import textwrap
 import typing
 
@@ -341,7 +342,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     if flags.dry:
         recorder.emit_info_message("Selected the following tests:")
         for s in selections.selected:
-            recorder.emit_info_message(f"  {s.info.name}")
+            recorder.emit_info_message(f"  {s.name()}")
         recorder.emit_instruction_message(
             "\nWill not run any tests, --dry specified"
         )
@@ -380,6 +381,25 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             recorder.emit_warning_message(
                 "OTA failed, attempting to run tests anyway"
             )
+
+    # Generate a new test-list.json file based on the built tests.
+    try:
+        test_list_entries = await generate_test_list(
+            exec_env, recorder=recorder
+        )
+    except (ValueError, RuntimeError) as e:
+        recorder.emit_end(f"Failed to generate and load test-list.json: {e}")
+        return 1
+
+    try:
+        test_list_file.Test.augment_tests_with_info(
+            selections.selected, test_list_entries
+        )
+    except ValueError as e:
+        recorder.emit_end(
+            f"Generated test-list.json is inconsistent: {e}.\nThis is a bug."
+        )
+        return 1
 
     # Don't actually run tests if --list was specified, instead gather the
     # list of test cases for each test and output to the user.
@@ -439,31 +459,56 @@ async def load_test_list(
         recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
         raise e
 
-    # Load the test-list.json file.
+    # Wrap contents of test.json in PartialTest, which supports matching but
+    # still needs a lazily created test-list.json to be a full Test.
     try:
-        parse_id = recorder.emit_start_file_parsing(
-            exec_env.relative_to_root(exec_env.test_list_file),
-            exec_env.test_list_file,
-        )
-        test_list_entries = test_list_file.TestListFile.entries_from_file(
-            exec_env.test_list_file
-        )
-        recorder.emit_end(id=parse_id)
-    except (dataparse.DataParseError, json.JSONDecodeError, IOError) as e:
-        recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
-        raise e
-
-    # Join the contents of the two files and return it.
-    try:
-        tests = test_list_file.Test.join_test_descriptions(
-            test_file_entries, test_list_entries
-        )
+        tests = list(map(test_list_file.Test, test_file_entries))
         return tests
     except ValueError as e:
         recorder.emit_end(
             f"tests.json and test-list.json are inconsistent: {e}"
         )
         raise e
+
+
+async def generate_test_list(
+    exec_env: environment.ExecutionEnvironment, recorder: event.EventRecorder
+) -> dict[str, test_list_file.TestListEntry]:
+    with tempfile.TemporaryDirectory() as td:
+        out_path = os.path.join(td, "test-list.json")
+        result = await execution.run_command(
+            "fx",
+            "test_list_tool",
+            "--build-dir",
+            exec_env.out_dir,
+            "--input",
+            exec_env.test_json_file,
+            "--output",
+            out_path,
+            "--test-components",
+            os.path.join(exec_env.out_dir, "test_components.json"),
+            recorder=recorder,
+        )
+        if result is None or result.return_code != 0:
+            if result is not None:
+                suffix = f":\n{result.stdout}\n{result.stderr}"
+            raise RuntimeError(
+                f"Could not generate a new test-list.json{suffix}"
+            )
+
+        # Load the generated test-list.json file.
+        try:
+            parse_id = recorder.emit_start_file_parsing(
+                exec_env.relative_to_root(exec_env.test_list_file),
+                exec_env.test_list_file,
+            )
+            test_list_entries = test_list_file.TestListFile.entries_from_file(
+                exec_env.test_list_file
+            )
+            recorder.emit_end(id=parse_id)
+            return test_list_entries
+        except (dataparse.DataParseError, json.JSONDecodeError, IOError) as e:
+            raise e
 
 
 class SelectionValidationError(Exception):

@@ -13,7 +13,6 @@ import unittest.mock as mock
 
 import debugger
 from test_list_file import Test
-from test_list_file import TestListEntry
 import tests_json_file
 
 
@@ -56,9 +55,8 @@ class TestDebuggerTest(unittest.IsolatedAsyncioTestCase):
         package_name = "fuchsia-pkg://fuchsia.com/foo_test#meta/foo_test.cm"
         test = Test(
             build=tests_json_file.TestEntry(
-                test=tests_json_file.TestSection("", "", ""),  # Unused.
+                test=tests_json_file.TestSection(package_name, "", ""),
             ),
-            info=TestListEntry(name=package_name, tags=[]),
         )
 
         debugger.spawn([test], callback, True, [])
@@ -104,17 +102,15 @@ class TestDebuggerTest(unittest.IsolatedAsyncioTestCase):
         tests.append(
             Test(
                 build=tests_json_file.TestEntry(
-                    test=tests_json_file.TestSection("", "", ""),  # Unused.
+                    test=tests_json_file.TestSection(package_name, "", ""),
                 ),
-                info=TestListEntry(name=package_name, tags=[]),
             )
         )
         tests.append(
             Test(
                 build=tests_json_file.TestEntry(
-                    test=tests_json_file.TestSection("", "", ""),
+                    test=tests_json_file.TestSection(package_name2, "", ""),
                 ),
-                info=TestListEntry(name=package_name2, tags=[]),
             )
         )
 
@@ -161,9 +157,8 @@ class TestDebuggerTest(unittest.IsolatedAsyncioTestCase):
         package_name = "fuchsia-pkg://fuchsia.com/foo_test#meta/foo_test.cm"
         test = Test(
             build=tests_json_file.TestEntry(
-                test=tests_json_file.TestSection("", "", ""),  # Unused.
+                test=tests_json_file.TestSection(package_name, "", ""),
             ),
-            info=TestListEntry(name=package_name, tags=[]),
         )
 
         debugger.spawn([test], callback, False, ["myfile.rs:1234"])
@@ -211,9 +206,8 @@ class TestDebuggerTest(unittest.IsolatedAsyncioTestCase):
         package_name = "fuchsia-pkg://fuchsia.com/foo_test#meta/foo_test.cm"
         test = Test(
             build=tests_json_file.TestEntry(
-                test=tests_json_file.TestSection("", "", ""),  # Unused.
+                test=tests_json_file.TestSection(package_name, "", ""),
             ),
-            info=TestListEntry(name=package_name, tags=[]),
         )
 
         debugger.spawn([test], callback, True, ["myfile.rs:1234"])
@@ -267,9 +261,8 @@ class TestDebuggerTest(unittest.IsolatedAsyncioTestCase):
         package_name = "fuchsia-pkg://fuchsia.com/foo_test#meta/foo_test.cm"
         test = Test(
             build=tests_json_file.TestEntry(
-                test=tests_json_file.TestSection("", "", ""),  # Unused.
+                test=tests_json_file.TestSection(package_name, "", ""),
             ),
-            info=TestListEntry(name=package_name, tags=[]),
         )
 
         debugger.spawn([test], mock_callback, True, [])

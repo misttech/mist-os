@@ -936,11 +936,11 @@ class EventRecorder:
             threshold (float): The score threshold used for selection.
         """
         selected_scores = {
-            item.info.name: selections.best_score[item.info.name]
+            item.name(): selections.best_score[item.name()]
             for item in selections.selected
         }
         selected_but_not_run_scores = {
-            item.info.name: selections.best_score[item.info.name]
+            item.name(): selections.best_score[item.name()]
             for item in selections.selected_but_not_run
         }
         not_selected_scores = {
