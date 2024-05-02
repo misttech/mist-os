@@ -47,8 +47,9 @@ use tracing::{debug, error, trace};
 use crate::{
     algorithm::{self, PortAllocImpl},
     context::{
-        ContextPair, CoreTimerContext, CounterContext, CtxPair, HandleableTimer,
-        InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
+        ContextPair, CoreTimerContext, CounterContext, CtxPair, DeferredResourceRemovalContext,
+        HandleableTimer, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
+        TracingContext,
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
@@ -74,7 +75,7 @@ use crate::{
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, UpdateSharingError,
     },
-    sync::RwLock,
+    sync::{MapRcNotifier, RwLock},
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
         segment::Segment,
@@ -442,12 +443,22 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static 
 ///
 /// TCP timers are scoped by weak device IDs.
 pub trait TcpBindingsContext:
-    Sized + TimerContext + TracingContext + RngContext + TcpBindingsTypes
+    Sized
+    + DeferredResourceRemovalContext
+    + TimerContext
+    + TracingContext
+    + RngContext
+    + TcpBindingsTypes
 {
 }
 
 impl<BC> TcpBindingsContext for BC where
-    BC: TimerContext + TracingContext + RngContext + TcpBindingsTypes + Sized
+    BC: Sized
+        + DeferredResourceRemovalContext
+        + TimerContext
+        + TracingContext
+        + RngContext
+        + TcpBindingsTypes
 {
 }
 
@@ -598,11 +609,6 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         &mut self,
         cb: F,
     ) -> O;
-
-    /// Called whenever a socket has had its destruction deferred.
-    ///
-    /// Used for tests context implementations to forbid deferred destruction.
-    fn socket_destruction_deferred(&mut self, socket: WeakTcpSocketId<I, Self::WeakDeviceId, BC>);
 
     /// Calls the callback once for each currently installed socket.
     fn for_each_socket<
@@ -4188,88 +4194,83 @@ where
     }
 }
 
+/// A type to expose to bindings in the case of deferred resource removal.
+#[derive(Default)]
+struct TcpSocketResource<I: Ip>(IpVersionMarker<I>);
+
 /// Destroys the socket with `id`.
 fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsContext>(
     core_ctx: &mut CC,
-    _bindings_ctx: &mut BC,
+    bindings_ctx: &mut BC,
     id: TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) {
-    let deferred = core_ctx.with_all_sockets_mut(move |all_sockets| {
+    core_ctx.with_all_sockets_mut(move |all_sockets| {
+        let TcpSocketId(rc) = &id;
+        let debug_refs = StrongRc::debug_references(rc);
         let entry = all_sockets.entry(id);
-        let (id, primary) = match entry {
+        let primary = match entry {
             hash_map::Entry::Occupied(o) => match o.get() {
                 TcpSocketSetEntry::DeadOnArrival => {
                     let id = o.key();
-                    let TcpSocketId(rc) = id;
-                    debug!(
-                        "{id:?} destruction skipped, socket is DOA. References={:?}",
-                        StrongRc::debug_references(rc)
-                    );
-                    // Destruction is deferred.
-                    return Some(id.downgrade());
+                    debug!("{id:?} destruction skipped, socket is DOA. References={debug_refs:?}",);
+                    None
                 }
                 TcpSocketSetEntry::Primary(_) => {
-                    assert_matches!(o.remove_entry(), (k, TcpSocketSetEntry::Primary(p)) => (k, p))
+                    assert_matches!(o.remove_entry(), (_, TcpSocketSetEntry::Primary(p)) => Some(p))
                 }
             },
             hash_map::Entry::Vacant(v) => {
                 let id = v.key();
                 let TcpSocketId(rc) = id;
-                let refs = StrongRc::debug_references(rc);
-                let weak = id.downgrade();
                 if StrongRc::marked_for_destruction(rc) {
                     // Socket is already marked for destruction, we've raced
                     // this removal with the addition to the socket set. Mark
                     // the entry as DOA.
                     debug!(
-                        "{id:?} raced with insertion, marking socket as DOA. References={refs:?}",
+                        "{id:?} raced with insertion, marking socket as DOA. \
+                        References={debug_refs:?}",
                     );
                     let _: &mut _ = v.insert(TcpSocketSetEntry::DeadOnArrival);
                 } else {
-                    debug!("{id:?} destruction is already deferred. References={refs:?}");
+                    debug!("{id:?} destruction is already deferred. References={debug_refs:?}");
                 }
-                return Some(weak);
-            }
-        };
-        struct LoggingNotifier<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
-            WeakTcpSocketId<I, D, BT>,
-        );
-
-        impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
-            crate::sync::RcNotifier<ReferenceState<I, D, BT>> for LoggingNotifier<I, D, BT>
-        {
-            fn notify(&mut self, data: ReferenceState<I, D, BT>) {
-                let state = data.into_inner();
-                let Self(weak) = self;
-                debug!("delayed-dropping {weak:?}: {state:?}");
-            }
-        }
-
-        // Keep a weak ref around so we can have nice debug logs.
-        let weak = id.downgrade();
-        core::mem::drop(id);
-        match PrimaryRc::unwrap_or_notify_with(primary, || (LoggingNotifier(weak.clone()), ())) {
-            Ok(state) => {
-                debug!("destroyed {weak:?} {state:?}");
                 None
             }
-            Err(()) => {
-                let WeakTcpSocketId(rc) = &weak;
-                debug!(
-                    "{weak:?} has strong references left. References={:?}",
-                    rc.debug_references()
-                );
-                Some(weak)
+        };
+
+        // There are a number of races that can happen with attempted socket
+        // destruction, but these should not be possible in tests because
+        // they're singlethreaded.
+        #[cfg(test)]
+        let primary = primary.unwrap_or_else(|| {
+            panic!("deferred destruction not allowed in tests. References={debug_refs:?}")
+        });
+        #[cfg(not(test))]
+        let Some(primary) = primary
+        else {
+            return;
+        };
+
+        let weak = PrimaryRc::downgrade(&primary);
+        match PrimaryRc::unwrap_or_notify_with(primary, move || {
+            let (notifier, receiver) =
+                BC::new_reference_notifier::<TcpSocketResource<I>>(debug_refs.into_dyn());
+            let notifier = MapRcNotifier::new(notifier, |_: ReferenceState<_, _, _>| {
+                // Expose a neat and empty type to bindings since we're always
+                // going to delegate this resource removal to it and it has no
+                // use for the internal reference state.
+                TcpSocketResource::<I>::default()
+            });
+            (notifier, receiver)
+        }) {
+            Ok(state) => {
+                debug!("destroyed {weak:?} {state:?}");
+            }
+            Err(receiver) => {
+                bindings_ctx.defer_removal(receiver);
             }
         }
-    });
-
-    if let Some(deferred) = deferred {
-        // Any situation where this is called where the socket is not actually
-        // destroyed is notified back to the context so tests can assert on
-        // correct behavior.
-        core_ctx.socket_destruction_deferred(deferred);
-    }
+    })
 }
 
 /// Closes all sockets in `pending`.
@@ -5028,7 +5029,7 @@ mod tests {
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
                 WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
-            ContextProvider, InstantContext as _,
+            ContextProvider, InstantContext as _, ReferenceNotifiers,
         },
         device::{
             link::LinkDevice,
@@ -5047,7 +5048,7 @@ mod tests {
             testutil::DualStackSendIpPacketMeta,
             HopLimits, IpTransportContext,
         },
-        sync::Mutex,
+        sync::{DynDebugReferences, Mutex},
         testutil::ContextPair,
         testutil::{
             new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
@@ -5352,6 +5353,29 @@ mod tests {
         type DeviceClass = ();
     }
 
+    impl<D: FakeStrongDeviceId> ReferenceNotifiers for TcpBindingsCtx<D> {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            // We don't support deferred destruction, tests are single threaded.
+            panic!(
+                "can't create deferred reference notifiers for type {}: \
+                debug_references={debug_references:?}",
+                core::any::type_name::<T>()
+            );
+        }
+    }
+
+    impl<D: FakeStrongDeviceId> DeferredResourceRemovalContext for TcpBindingsCtx<D> {
+        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+            match receiver {}
+        }
+    }
+
     impl<D: FakeStrongDeviceId> RngContext for TcpBindingsCtx<D> {
         type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng>;
         fn rng(&mut self) -> Self::Rng<'_> {
@@ -5561,17 +5585,6 @@ mod tests {
             cb(&mut self.outer.v6.all_sockets)
         }
 
-        fn socket_destruction_deferred(
-            &mut self,
-            socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
-        ) {
-            let WeakTcpSocketId(rc) = &socket;
-            panic!(
-                "deferred socket {socket:?} destruction, references = {:?}",
-                rc.debug_references()
-            );
-        }
-
         fn for_each_socket<
             F: FnMut(
                 &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
@@ -5637,17 +5650,6 @@ mod tests {
             cb: F,
         ) -> O {
             cb(&mut self.outer.v4.all_sockets)
-        }
-
-        fn socket_destruction_deferred(
-            &mut self,
-            socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
-        ) {
-            let WeakTcpSocketId(rc) = &socket;
-            panic!(
-                "deferred socket {socket:?} destruction, references = {:?}",
-                rc.debug_references()
-            );
         }
 
         fn for_each_socket<
