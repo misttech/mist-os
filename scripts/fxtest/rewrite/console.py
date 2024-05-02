@@ -94,8 +94,6 @@ async def console_printer(
             status bar only if this is set.
     """
 
-    print("")  # To align with the original tool's output.
-
     state = ConsoleState()
     print_queue: asyncio.Queue[list[str]] = asyncio.Queue()
 
@@ -145,11 +143,13 @@ async def console_printer(
         failed_text = fail_format(failed, flags.style)
         skipped_text = skip_format(skipped, flags.style)
 
-        print(f"Results: {passed_text} {failed_text} {skipped_text}")
+        print(
+            f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
+        )
 
     print(
         statusinfo.dim(
-            f"\nCompleted in {state.end_duration:.3f}s [{len(state.complete_durations)}/{len(state.complete_durations)} complete]",
+            f"\nCompleted in {state.end_duration:.3f}s",
             style=flags.style,
         )
     )
@@ -250,17 +250,12 @@ def _create_status_lines_from_state(
             + statusinfo.dim("] ", style=flags.style)
         )
 
-    tasks_status = statusinfo.dim(
-        f"  [tasks: {task_status.tasks_running} running, {task_status.tasks_complete}/{task_status.total_tasks()} complete]",
-        style=flags.style,
-    )
-
     # Print out the duration lines if they are present.
     if status_lines:
         status_lines = [
             statusinfo.green("Status: ", style=flags.style)
             + statusinfo.dim(f"{run_duration}", style=flags.style)
-            + (tasks_status if not pass_fail else pass_fail)
+            + ("" if not pass_fail else pass_fail)
         ] + status_lines
 
     return status_lines
@@ -643,7 +638,10 @@ async def _console_event_loop(
                     elif suite_info.should_buffer_output():
                         # Awaiting timeout, buffer this output.
                         suite_info.buffered_lines.append(data)
-            elif next_event.payload.test_file_loaded is not None:
+            elif (
+                next_event.payload.test_file_loaded is not None
+                and not flags.quiet
+            ):
                 # Print a result to the user when the tests file is parsed.
                 test_info = next_event.payload.test_file_loaded
                 path = (
@@ -654,19 +652,22 @@ async def _console_event_loop(
                 lines_to_print.append(
                     f"\nFound {len(test_info.test_entries)} total tests in {statusinfo.green(path, style=flags.style)}"
                 )
-            elif next_event.payload.test_selections:
+            elif next_event.payload.test_selections and not flags.quiet:
                 # Print a result to the user when tests are selected.
-                count = len(next_event.payload.test_selections.selected)
-                label = statusinfo.highlight(
-                    f"{count} test{'s' if count != 1 else ''}",
-                    style=flags.style,
-                )
-                suffix = statusinfo.highlight(
-                    f" {flags.count} times" if flags.count > 1 else "",
-                    style=flags.style,
-                )
-                lines_to_print.append(f"\nPlan to run {label}{suffix}")
-            elif next_event.payload.build_targets is not None:
+                if not flags.quiet:
+                    count = len(next_event.payload.test_selections.selected)
+                    label = statusinfo.highlight(
+                        f"{count} test{'s' if count != 1 else ''}",
+                        style=flags.style,
+                    )
+                    suffix = statusinfo.highlight(
+                        f" {flags.count} times" if flags.count > 1 else "",
+                        style=flags.style,
+                    )
+                    lines_to_print.append(f"\nPlan to run {label}{suffix}")
+            elif (
+                next_event.payload.build_targets is not None and not flags.quiet
+            ):
                 # Print the number of targets we are refreshing.
                 label = statusinfo.highlight(
                     f"{len(next_event.payload.build_targets)} targets",
@@ -693,7 +694,7 @@ async def _console_event_loop(
                     style=flags.style,
                 )
                 label = statusinfo.green("Running", style=flags.style)
-                lines_to_print.append(f"\n{label} {val}")
+                lines_to_print.append(f"{label} {val}")
             elif next_event.payload.test_suite_started is not None:
                 # Let the user know a test suite is starting.
                 assert next_event.id
@@ -726,7 +727,8 @@ async def _console_event_loop(
                     if next_event.payload.test_suite_started.hermetic
                     else statusinfo.warning("(NOT HERMETIC)", style=flags.style)
                 )
-                lines_to_print.append(f"\n{label} {val} {hermeticity}")
+                if not flags.quiet:
+                    lines_to_print.append(f"\n{label} {val} {hermeticity}")
             elif next_event.payload.test_suite_ended is not None:
                 # Let the user know a test suite has ended, and
                 # what its status is.
@@ -760,12 +762,10 @@ async def _console_event_loop(
                 del test_suite_execution_info[next_event.id]
 
                 suffix = ""
-                if payload.message:
+                if payload.message and not flags.quiet:
                     suffix = "\n" + statusinfo.dim(payload.message) + "\n"
 
-                lines_to_print.append(
-                    f"\n{label}: {finished_test.name}{suffix}"
-                )
+                lines_to_print.append(f"{label}: {finished_test.name}{suffix}")
 
             elif next_event.payload.enumerate_test_cases is not None:
                 cases_payload = next_event.payload.enumerate_test_cases
@@ -781,7 +781,7 @@ async def _console_event_loop(
                     lines_to_print.append(
                         f" {statusinfo.dim(command, style=flags.style)}"
                     )
-            elif next_event.payload.load_config is not None:
+            elif next_event.payload.load_config is not None and not flags.quiet:
                 load_config = next_event.payload.load_config
                 lines_to_print.extend(
                     [
@@ -816,7 +816,7 @@ def pass_format(count: int, style: bool = True) -> str:
     Returns:
         str: Formatted test count.
     """
-    label = f"PASS: {count}"
+    label = f"PASSED: {count}"
     if count > 0:
         return statusinfo.green_highlight(label, style=style)
     else:
@@ -833,7 +833,7 @@ def fail_format(count: int, style: bool = True) -> str:
     Returns:
         str: Formatted test count.
     """
-    label = f"FAIL: {count}"
+    label = f"FAILED: {count}"
     if count > 0:
         return statusinfo.error_highlight(label, style=style)
     else:
@@ -850,7 +850,7 @@ def skip_format(count: int, style: bool = True) -> str:
     Returns:
         str: Formatted test count.
     """
-    label = f"SKIP: {count}"
+    label = f"SKIPPED: {count}"
     if count > 0:
         return label
     else:

@@ -214,14 +214,6 @@ async def async_main(
     # Initialize event recording.
     recorder.emit_init()
 
-    info_first_line = "You are using the new fx test, which is currently ready for general use ✅"
-    info_block = """See details here: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
-To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please file a bug under b/293917801.
-"""
-
-    recorder.emit_info_message(info_first_line)
-    recorder.emit_instruction_message(info_block)
-
     # Try to parse the flags. Emit one event before and another
     # after flag post processing.
     try:
@@ -237,6 +229,10 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     except args.FlagError as e:
         recorder.emit_end(f"Flags are invalid: {e}")
         return 1
+
+    recorder.emit_verbatim_message(
+        statusinfo.highlight("Welcome to fx test 🧪\n", style=flags.style)
+    )
 
     # Initialize status printing at this point, if desired.
     if flags.status and not do_output_to_stdout:
@@ -262,11 +258,12 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         else:
             output_file = gzip.open(exec_env.log_file, "wt")
         tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
+        # TODO(https://fxbug.dev/326214131): Remove log path printing when we support `-pr logpath`.
         recorder.emit_instruction_message(
             f"Logging all output to: {exec_env.log_file}"
         )
         recorder.emit_instruction_message(
-            "Use the `--logpath` argument to specify a log location or `--no-log` to disable\n"
+            "Use the `--logpath` argument to specify a log location or `--no-log` to disable"
         )
 
         # For convenience, display the log output path when the program exits.
@@ -284,12 +281,6 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     if flags.has_debugger():
         recorder.emit_warning_message(
             "🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑"
-        )
-
-    # Print a message for users who want to know how to see all test output.
-    if not flags.output:
-        recorder.emit_instruction_message(
-            f"To show all output, specify the `-o/--output` flag."
         )
 
     # Load the list of tests to execute.
@@ -340,9 +331,9 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     # Don't actually run any tests if --dry was specified, instead just
     # print which tests were selected and exit.
     if flags.dry:
-        recorder.emit_info_message("Selected the following tests:")
+        recorder.emit_verbatim_message("Selected the following tests:")
         for s in selections.selected:
-            recorder.emit_info_message(f"  {s.name()}")
+            recorder.emit_verbatim_message(f"  {s.name()}")
         recorder.emit_instruction_message(
             "\nWill not run any tests, --dry specified"
         )
