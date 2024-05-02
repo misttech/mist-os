@@ -5,7 +5,6 @@
 # keep-sorted start
 load("./cml.star", "register_cml_checks")
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
-load("./cpp.star", "register_cpp_checks")
 load("./dart.star", "register_dart_checks")
 load("./docs.star", "register_doc_checks")
 load("./fidl.star", "register_fidl_checks")
@@ -139,7 +138,6 @@ def register_all_checks():
 
     # keeps-sorted start
     register_cml_checks()
-    register_cpp_checks()
     register_dart_checks()
     register_doc_checks()
     register_fidl_checks()
