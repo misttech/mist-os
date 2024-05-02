@@ -37,6 +37,18 @@ class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle,
         loop_->dispatcher());
   }
 
+  // Schedule a shut down
+  void PostStopTask() {
+    // Verify we don't already have a Stop task scheduled
+    if (shutting_down_) {
+      return;
+    }
+    shutting_down_ = true;
+
+    async::PostTask(loop_->dispatcher(), [this]() { Stop(); });
+  }
+
+  // Shut down immediately
   void Stop() override {
     host_->ShutDown();
     loop_->Shutdown();
@@ -58,6 +70,7 @@ class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle,
   async::Loop* loop_;
   WeakPtr host_;
   fidl::BindingSet<fuchsia::process::lifecycle::Lifecycle> bindings_;
+  bool shutting_down_ = false;
 };
 
 int main() {
@@ -81,8 +94,6 @@ int main() {
     BT_DEBUG_ASSERT(host);
     if (!success) {
       bt_log(ERROR, "bt-host", "Failed to initialize bt-host; shutting down...");
-      // TODO(https://fxbug.dev/42086155): Verify that calling Lifecycler handler's stop function
-      // does not cause use after free in Adapter with integration tests
       lifecycle_handler.Stop();
       return;
     }
@@ -117,11 +128,10 @@ int main() {
   };
 
   auto error_cb = [&lifecycle_handler]() {
-    bt_log(WARN, "bt-host", "Error initializing bt-host; shutting down...");
-    // TODO(https://fxbug.dev/42086155): Verify that calling Lifecycler handler's stop function does
-    // not cause use after free in Adapter with integration tests
-    lifecycle_handler.Stop();
-    return;
+    // The controller has reported an error. Shut down after the currently scheduled tasks finish
+    // executing.
+    bt_log(WARN, "bt-host", "Error in bt-host; shutting down...");
+    lifecycle_handler.PostStopTask();
   };
 
   fuchsia::hardware::bluetooth::VendorHandle vendor_handle =

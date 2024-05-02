@@ -353,6 +353,11 @@ void FidlController::OnError(zx_status_t status) {
 }
 
 void FidlController::CleanUp() {
+  if (shutting_down_) {
+    return;
+  }
+  shutting_down_ = true;
+
   // Waits need to be canceled before the underlying channels are destroyed.
   acl_wait_.Cancel();
   sco_wait_.Cancel();
@@ -395,6 +400,13 @@ void FidlController::OnChannelSignal(const char* chan_name, async::WaitBase* wai
   } else {
     bt_log(WARN, "controllers", "Dropping packet received on %s channel (no rx callback set)",
            chan_name);
+  }
+
+  // The data callback above may trigger the controller to shut down (e.g., if it triggers a write
+  // to a command channel as the response to a received event). Verify that the channel hasn't been
+  // closed before we attempt to wait on it.
+  if (shutting_down_) {
+    return;
   }
 
   // The wait needs to be restarted after every signal.

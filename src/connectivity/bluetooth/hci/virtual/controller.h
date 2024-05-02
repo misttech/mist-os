@@ -4,68 +4,76 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_CONTROLLER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_CONTROLLER_H_
 
-#include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
-#include <lib/ddk/driver.h>
-#include <zircon/types.h>
-
-#include <ddktl/device.h>
-#include <fbl/string_buffer.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include "src/connectivity/bluetooth/hci/virtual/emulator.h"
 #include "src/connectivity/bluetooth/hci/virtual/loopback.h"
 
 namespace bt_hci_virtual {
 
-class VirtualController;
-using VirtualControllerDeviceType =
-    ddk::Device<VirtualController,
-                ddk::Messageable<fuchsia_hardware_bluetooth::VirtualController>::Mixin>;
-
-class VirtualController : public VirtualControllerDeviceType {
+// The VirtualController class implements the fuchsia.bluetooth.test.VirtualController API. It is
+// used to created two devices: the EmulatorDevice and/or the LoopbackDevice. The EmulatorDevice is
+// used for Bluetooth integration tests, and the LoopbackDevice is used by RootCanal for PTS-bot.
+//
+// VirtualController publishes itself as a DFv2 driver and starts a device node to bind to said
+// driver. It can create a EmulatorDevice/LoopbackDevice which can then use the
+// VirtualController's child node |virtual_controller_child_node_| to publish its own
+// children node that would represent the EmulatorDevice/LoopbackDevice.
+//
+// EmulatorDevice/LoopbackDevice then implements and serves the FIDL protocols that their client
+// needs. For more details, refer to go/bluetooth-virtual-driver-doc.
+class VirtualController
+    : public fdf::DriverBase,
+      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
+      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
+      public fidl::WireServer<fuchsia_hardware_bluetooth::VirtualController> {
  public:
-  explicit VirtualController(zx_device_t* parent) : VirtualControllerDeviceType(parent) {}
+  explicit VirtualController(fdf::DriverStartArgs start_args,
+                             fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  zx_status_t Bind() {
-    return DdkAdd(ddk::DeviceAddArgs("bt_hci_virtual").set_flags(DEVICE_ADD_NON_BINDABLE));
-  }
+  // fdf::DriverBase overrides:
+  zx::result<> Start() override;
 
-  // Device Protocol
-  void DdkRelease() { delete this; }
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::Node> metadata) override {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
  private:
-  // FIDL Interface VirtualController.
-  void CreateEmulator(CreateEmulatorCompleter::Sync& completer) override {
-    fbl::StringBuffer<ZX_MAX_NAME_LEN> name;
-    name.AppendPrintf("emulator-%u", num_devices_++);
-    auto dev = std::make_unique<bt_hci_virtual::EmulatorDevice>(zxdev());
-    zx_status_t status = dev->Bind(std::string_view(name));
-    if (status != ZX_OK) {
-      bt_log(ERROR, "virtual", "Failed to bind: %s\n", zx_status_get_string(status));
-      completer.ReplyError(status);
-    } else {
-      // The driver runtime has taken ownership of |dev|.
-      dev.release();
-      completer.ReplySuccess(fidl::StringView::FromExternal(name.data(), name.size()));
-    }
-  }
-
+  // fuchsia_hardware_bluetooth::VirtualController overrides:
+  void CreateEmulator(CreateEmulatorCompleter::Sync& completer) override;
   void CreateLoopbackDevice(CreateLoopbackDeviceRequestView request,
-                            CreateLoopbackDeviceCompleter::Sync& completer) override {
-    // chain new looback device off this device.
-    fbl::StringBuffer<ZX_MAX_NAME_LEN> name;
-    name.AppendPrintf("bt-transport-loopback-%u", num_devices_++);
-    auto dev = std::make_unique<bt_hci_virtual::LoopbackDevice>(zxdev());
-    auto channel = request->channel.release();
-    zx_status_t status = dev->Bind(channel, std::string_view(name));
-    if (status != ZX_OK) {
-      bt_log(ERROR, "virtual", "Failed to bind: %s\n", zx_status_get_string(status));
-    } else {
-      // The driver runtime has taken ownership of |dev|.
-      [[maybe_unused]] bt_hci_virtual::LoopbackDevice* unused = dev.release();
-    }
-  }
+                            CreateLoopbackDeviceCompleter::Sync& completer) override;
 
-  uint32_t num_devices_ = 0;
+  void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::VirtualController> request);
+
+  // Helpers functions to add DFv2 device nodes
+  zx_status_t AddVirtualControllerChildNode(fuchsia_driver_framework::wire::NodeAddArgs args);
+  zx_status_t AddLoopbackChildNode(fuchsia_driver_framework::wire::NodeAddArgs args);
+  zx_status_t AddEmulatorChildNode(fuchsia_driver_framework::wire::NodeAddArgs args,
+                                   EmulatorDevice* emulator_device);
+
+  std::unique_ptr<EmulatorDevice> emulator_device_;
+  std::unique_ptr<LoopbackDevice> loopback_device_;
+
+  // VirtualController
+  fidl::WireClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::Node> virtual_controller_child_node_;
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::VirtualController> devfs_connector_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::VirtualController>
+      virtual_controller_binding_group_;
+
+  // LoopbackDevice
+  fidl::WireClient<fuchsia_driver_framework::NodeController> loopback_node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::Node> loopback_child_node_;
+
+  // EmulatorDevice
+  fidl::WireClient<fuchsia_driver_framework::NodeController> emulator_node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::Node> emulator_child_node_;
 };
 
 }  // namespace bt_hci_virtual

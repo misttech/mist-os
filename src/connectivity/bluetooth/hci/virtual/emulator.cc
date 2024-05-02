@@ -5,17 +5,16 @@
 #include "emulator.h"
 
 #include <fidl/fuchsia.bluetooth.test/cpp/fidl.h>
-#include <fuchsia/hardware/bt/hci/cpp/banjo.h>
-#include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/sync/cpp/completion.h>
-#include <zircon/status.h>
-#include <zircon/types.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
 #include "src/connectivity/bluetooth/hci/vendor/broadcom/packets.h"
+#include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
 
 namespace ftest = fuchsia_bluetooth_test;
 
@@ -25,17 +24,17 @@ using bt::testing::FakeController;
 namespace bt_hci_virtual {
 namespace {
 
-const char* ChannelTypeToString(Channel chan_type) {
+const char* ChannelTypeToString(ChannelType chan_type) {
   switch (chan_type) {
-    case Channel::ACL:
+    case ChannelType::ACL:
       return "ACL";
-    case Channel::EMULATOR:
+    case ChannelType::EMULATOR:
       return "EMULATOR";
-    case Channel::COMMAND:
+    case ChannelType::COMMAND:
       return "COMMAND";
-    case Channel::ISO:
+    case ChannelType::ISO:
       return "ISO";
-    case Channel::SNOOP:
+    case ChannelType::SNOOP:
       return "SNOOP";
   }
 }
@@ -87,106 +86,30 @@ std::optional<fuchsia_bluetooth::AddressType> LeOwnAddressTypeToFidl(
   return res;
 }
 
-constexpr EmulatorDevice* DEV(void* ctx) { return static_cast<EmulatorDevice*>(ctx); }
-
-constexpr zx_protocol_device_t bt_emulator_device_ops = {
-    .version = DEVICE_OPS_VERSION,
-    .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
-      return DEV(ctx)->GetProtocol(proto_id, out_proto);
-    },
-    .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
-    .release = [](void* ctx) { DEV(ctx)->Release(); },
-    .message =
-        [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
-          bt_log(TRACE, "virtual", "EmulatorMessage\n");
-          fidl::WireDispatch<fuchsia_hardware_bluetooth::Emulator>(
-              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
-              ddk::FromDeviceFIDLTransaction(txn));
-        },
-};
-
-// NOTE: We do not implement unbind and release. The lifecycle of the bt-hci
-// device is strictly tied to the bt-emulator device (i.e. it can never out-live
-// bt-emulator). We handle its destruction in the bt_emulator_device_ops
-// messages.
-constexpr zx_protocol_device_t bt_hci_device_ops = {
-    .version = DEVICE_OPS_VERSION,
-    .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
-      return DEV(ctx)->GetProtocol(proto_id, out_proto);
-    },
-    .release = [](void* ctx) { DEV(ctx)->ClearHciDev(); },
-    .message =
-        [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
-          bt_log(TRACE, "virtual", "Vendor Message\n");
-          fidl::WireDispatch<fuchsia_hardware_bluetooth::Vendor>(
-              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
-              ddk::FromDeviceFIDLTransaction(txn));
-        },
-};
-
-constexpr bt_hci_protocol_ops_t hci_protocol_ops = {
-    .open_command_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
-      return DEV(ctx)->OpenChan(Channel::COMMAND, chan);
-    },
-    .open_acl_data_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
-      return DEV(ctx)->OpenChan(Channel::ACL, chan);
-    },
-    .open_sco_channel = [](void* ctx, zx_handle_t channel) -> zx_status_t {
-      zx_handle_close(channel);
-      return ZX_ERR_NOT_SUPPORTED;
-    },
-    .configure_sco = [](void* ctx, sco_coding_format_t coding_format, sco_encoding_t encoding,
-                        sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                        void* cookie) { callback(cookie, ZX_ERR_NOT_SUPPORTED); },
-    .reset_sco = [](void* ctx, bt_hci_reset_sco_callback callback,
-                    void* cookie) { callback(cookie, ZX_ERR_NOT_SUPPORTED); },
-    .open_iso_data_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
-      return DEV(ctx)->OpenChan(Channel::ISO, chan);
-    },
-    .open_snoop_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
-      return DEV(ctx)->OpenChan(Channel::SNOOP, chan);
-    },
-};
-
 }  // namespace
 
-EmulatorDevice::EmulatorDevice(zx_device_t* device)
-    : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      pw_dispatcher_(loop_.dispatcher()),
-      parent_(device),
-      hci_dev_(nullptr),
-      emulator_dev_(nullptr),
-      fake_device_(pw_dispatcher_) {}
+EmulatorDevice::EmulatorDevice()
+    : pw_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+      fake_device_(pw_dispatcher_),
+      emulator_devfs_connector_(fit::bind_member<&EmulatorDevice::ConnectEmulator>(this)),
+      vendor_devfs_connector_(fit::bind_member<&EmulatorDevice::ConnectVendor>(this)) {}
 
-zx_status_t EmulatorDevice::Bind(std::string_view name) {
-  bt_log(TRACE, "virtual", "bind\n");
-
-  device_add_args_t args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = name.data(),
-      .ctx = this,
-      .ops = &bt_emulator_device_ops,
-      .proto_id = ZX_PROTOCOL_BT_EMULATOR,
-      .flags = DEVICE_ADD_NON_BINDABLE,
-  };
-  zx_status_t status = device_add(parent_, &args, &emulator_dev_);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "virtual", "could not add bt-emulator device: %s\n",
-           zx_status_get_string(status));
-    return status;
-  }
+zx_status_t EmulatorDevice::Initialize(std::string_view name, AddChildCallback callback,
+                                       ShutdownCallback shutdown) {
+  shutdown_cb_ = std::move(shutdown);
 
   bt::set_random_generator(&rng_);
 
+  // Initialize |fake_device_|
   auto init_complete_cb = [](pw::Status status) {
     if (!status.ok()) {
+      FDF_LOG(WARNING, "FakeController failed to initialize: %s", pw_StatusString(status));
     }
   };
   auto error_cb = [this](pw::Status status) {
-    bt_log(WARN, "virtual", "FakeController error: %s", pw_StatusString(status));
+    FDF_LOG(WARNING, "FakeController error: %s", pw_StatusString(status));
     UnpublishHci();
   };
-
   fake_device_.Initialize(init_complete_cb, error_cb);
 
   fake_device_.set_controller_parameters_callback(
@@ -196,122 +119,74 @@ zx_status_t EmulatorDevice::Bind(std::string_view name) {
   fake_device_.set_connection_state_callback(
       fit::bind_member<&EmulatorDevice::OnPeerConnectionStateChanged>(this));
 
-  bt_log(INFO, "virtual", "Starting new thread");
-
-  loop_.StartThread("bt_hci_virtual");
-
-  return status;
-}
-
-void EmulatorDevice::Unbind() {
-  bt_log(TRACE, "virtual", "unbind\n");
-  libsync::Completion completion;
-
-  // It is OK to capture a self-reference since this function blocks on the task completion.
-  async::PostTask(loop_.dispatcher(), [this, &completion] {
-    // Stop servicing HciEmulator FIDL messages from higher layers.
-    bindings_.CloseAll(ZX_OK);
-    completion.Signal();
-  });
-
-  // Block here to ensure that UnpublishHci runs before Unbind completion.  We use EventPair instead
-  // of loop_.JoinThreads to block because fake_device_ has tasks on the loop_ that won't complete
-  // until fake_device_ is stopped during Release.
-  completion.Wait();
-
-  device_unbind_reply(emulator_dev_);
-  emulator_dev_ = nullptr;
-}
-
-void EmulatorDevice::Release() {
-  bt_log(TRACE, "virtual", "release\n");
-  // Clean up fake_device_ on the dispatcher thread due to its thread-safety requirements. It is OK
-  // to capture references to members in the task since this function blocks until the dispatcher
-  // loop terminates.
-  // This is done in Release (vs. Unbind) because bt-host, a child of this device's bt-hci child,
-  // has open channels to fake_device_, so fake_device_ cannot be safely shut down until that bt-
-  // host child is released, which is only guaranteed during this Release.
-  async::PostTask(loop_.dispatcher(), [this] {
-    fake_device_.Stop();
-    loop_.Quit();
-    // Clean up all fake peers. This will close their local channels and remove them
-    // from the fake controller.
-    peers_.clear();
-  });
-
-  // Block here until all the shutdown tasks we just posted are completed on the FIDL/emulator
-  // dispatcher thread to guarantee that the operations below don't happen concurrently with them.
-  loop_.JoinThreads();
-  bt_log(TRACE, "virtual", "emulator dispatcher shut down\n");
-
-  delete this;
-}
-
-zx_status_t EmulatorDevice::GetProtocol(uint32_t proto_id, void* out_proto) {
-  // The bt-emulator device doesn't support a non-FIDL protocol.
-  if (proto_id != ZX_PROTOCOL_BT_HCI) {
-    return ZX_ERR_NOT_SUPPORTED;
+  // Create args to add emulator as a child node on behalf of VirtualController
+  zx::result connector =
+      emulator_devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (connector.is_error()) {
+    FDF_LOG(ERROR, "Failed to bind devfs connecter to dispatcher: %u", connector.status_value());
+    return connector.error_value();
   }
 
-  bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol_t*>(out_proto);
-  hci_proto->ctx = this;
-  hci_proto->ops = &hci_protocol_ops;
+  fidl::Arena args_arena;
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
+                   .connector(std::move(connector.value()))
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kController)
+                   .class_name("bt-emulator")
+                   .Build();
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
+                  .name(name.data())
+                  .devfs_args(devfs)
+                  .Build();
+  callback(args);
 
   return ZX_OK;
 }
 
-zx_status_t EmulatorDevice::OpenChan(Channel chan_type, zx_handle_t chan) {
-  bt_log(TRACE, "virtual", "Opening %s HCI channel", ChannelTypeToString(chan_type));
+void EmulatorDevice::Shutdown() {
+  // Closing |bindings_| stops servicing HciEmulator FIDL messages and unpublishes the bt-hci-device
+  bindings_.CloseAll(ZX_OK);
+
+  fake_device_.Stop();
+  peers_.clear();
+
+  if (shutdown_cb_) {
+    shutdown_cb_();
+  }
+}
+
+zx_status_t EmulatorDevice::OpenChannel(ChannelType chan_type, zx_handle_t chan) {
+  FDF_LOG(TRACE, "Opening %s HCI channel", ChannelTypeToString(chan_type));
 
   zx::channel in(chan);
 
-  if (chan_type == Channel::COMMAND) {
-    async::PostTask(loop_.dispatcher(),
-                    [this, in = std::move(in)]() mutable { StartCmdChannel(std::move(in)); });
-  } else if (chan_type == Channel::ACL) {
-    async::PostTask(loop_.dispatcher(),
-                    [this, in = std::move(in)]() mutable { StartAclChannel(std::move(in)); });
-  } else if (chan_type == Channel::EMULATOR) {
-    async::PostTask(loop_.dispatcher(), [this, in = std::move(in)]() mutable {
-      fidl::ServerEnd<ftest::HciEmulator> server_end(std::move(in));
-      StartEmulatorInterface(std::move(server_end));
-    });
-  } else if (chan_type == Channel::ISO) {
-    async::PostTask(loop_.dispatcher(),
-                    [this, in = std::move(in)]() mutable { StartIsoChannel(std::move(in)); });
+  if (chan_type == ChannelType::EMULATOR) {
+    fidl::ServerEnd<ftest::HciEmulator> server_end(std::move(in));
+    StartEmulatorInterface(std::move(server_end));
+  } else if (chan_type == ChannelType::COMMAND) {
+    StartCmdChannel(std::move(in));
+  } else if (chan_type == ChannelType::ACL) {
+    StartAclChannel(std::move(in));
+  } else if (chan_type == ChannelType::ISO) {
+    StartIsoChannel(std::move(in));
   } else {
     return ZX_ERR_NOT_SUPPORTED;
   }
   return ZX_OK;
 }
 
-void EmulatorDevice::StartEmulatorInterface(fidl::ServerEnd<ftest::HciEmulator> request) {
-  bt_log(TRACE, "virtual", "start HciEmulator interface\n");
-
-  if (bindings_.size() > 0) {
-    bt_log(TRACE, "virtual", "HciEmulator channel already bound\n");
-    return;
+void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
+  if (zx_status_t status =
+          OpenChannel(ChannelType::EMULATOR, request->channel.TakeChannel().release());
+      status != ZX_OK) {
+    completer.Close(status);
   }
-
-  // Process HciEmulator messages on a thread that can safely access the FakeController, which is
-  // thread-hostile.
-  auto cb = [this](auto impl, fidl::UnbindInfo info) {
-    bt_log(TRACE, "virtual", "emulator channel closed (status: %s); unpublish device\n",
-           zx_status_get_string(info.status()));
-    UnpublishHci();
-  };
-  bindings_.AddBinding(loop_.dispatcher(), std::move(request), this, std::move(cb));
 }
 
 void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
-  bt_log(TRACE, "virtual", "HciEmulator.Publish\n");
+  FDF_LOG(TRACE, "HciEmulator.Publish\n");
 
-  // Between Device::Unbind & Device::Release, this->hci_dev_ == nullptr, but this->fake_device_
-  // != nullptr. This seems like it might cause issues for this logic; however, because bindings_ is
-  // unbound during Device::Unbind, it is impossible for further messages, including Publish, to be
-  // received during this window.
-  std::lock_guard<std::mutex> lock(hci_dev_lock_);
-  if (hci_dev_) {
+  if (hci_node_controller_.is_valid()) {
+    FDF_LOG(INFO, "bt-hci-device is already published");
     completer.Reply(fit::error(ftest::EmulatorError::kHciAlreadyPublished));
     return;
   }
@@ -319,30 +194,23 @@ void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& co
   FakeController::Settings settings = SettingsFromFidl(request.settings());
   fake_device_.set_settings(settings);
 
-  // Publish the bt-hci device.
-  device_add_args_t args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "bt_hci_virtual",
-      .ctx = this,
-      .ops = &bt_hci_device_ops,
-      .proto_id = ZX_PROTOCOL_BT_HCI,
-  };
-  zx_status_t status = device_add(emulator_dev_, &args, &hci_dev_);
+  zx_status_t status = AddHciDeviceChildNode();
   if (status != ZX_OK) {
-    bt_log(WARN, "virtual", "Failed to publish bt-hci device node");
+    FDF_LOG(WARNING, "Failed to publish bt-hci-device node");
     completer.Reply(fit::error(ftest::EmulatorError::kFailed));
   } else {
-    bt_log(INFO, "virtual", "Successfully published bt-hci device node");
+    FDF_LOG(INFO, "Successfully published bt-hci-device node");
     completer.Reply(fit::success());
   }
 }
 
 void EmulatorDevice::AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
                                       AddLowEnergyPeerCompleter::Sync& completer) {
-  bt_log(TRACE, "virtual", "HciEmulator.AddLowEnergyPeer\n");
+  FDF_LOG(TRACE, "HciEmulator.AddLowEnergyPeer\n");
 
-  auto result = EmulatedPeer::NewLowEnergy(request.parameters(), std::move(request.peer()),
-                                           &fake_device_, loop_.dispatcher());
+  auto result =
+      EmulatedPeer::NewLowEnergy(request.parameters(), std::move(request.peer()), &fake_device_,
+                                 fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (result.is_error()) {
     completer.Reply(fit::error(result.error()));
     return;
@@ -354,10 +222,11 @@ void EmulatorDevice::AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
 
 void EmulatorDevice::AddBredrPeer(AddBredrPeerRequest& request,
                                   AddBredrPeerCompleter::Sync& completer) {
-  bt_log(TRACE, "virtual", "HciEmulator.AddBredrPeer\n");
+  FDF_LOG(TRACE, "HciEmulator.AddBredrPeer\n");
 
-  auto result = EmulatedPeer::NewBredr(request.parameters(), std::move(request.peer()),
-                                       &fake_device_, loop_.dispatcher());
+  auto result =
+      EmulatedPeer::NewBredr(request.parameters(), std::move(request.peer()), &fake_device_,
+                             fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (result.is_error()) {
     completer.Reply(fit::error(result.error()));
     return;
@@ -369,7 +238,7 @@ void EmulatorDevice::AddBredrPeer(AddBredrPeerRequest& request,
 
 void EmulatorDevice::WatchControllerParameters(
     WatchControllerParametersCompleter::Sync& completer) {
-  bt_log(TRACE, "virtual", "HciEmulator.WatchControllerParameters\n");
+  FDF_LOG(TRACE, "HciEmulator.WatchControllerParameters\n");
 
   controller_parameters_completer_.emplace(completer.ToAsync());
   MaybeUpdateControllerParametersChanged();
@@ -381,7 +250,7 @@ void EmulatorDevice::WatchLeScanStates(WatchLeScanStatesCompleter::Sync& complet
 
 void EmulatorDevice::WatchLegacyAdvertisingStates(
     WatchLegacyAdvertisingStatesCompleter::Sync& completer) {
-  bt_log(TRACE, "virtual", "HciEmulator.WatchLegacyAdvertisingState\n");
+  FDF_LOG(TRACE, "HciEmulator.WatchLegacyAdvertisingState\n");
 
   legacy_adv_states_completers_.emplace(completer.ToAsync());
   MaybeUpdateLegacyAdvertisingStates();
@@ -412,8 +281,7 @@ void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
 void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
   if (endpoints.is_error()) {
-    bt_log(ERROR, "virtual", "Failed to create endpoints: %s",
-           zx_status_get_string(endpoints.error_value()));
+    FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
     completer.ReplyError(endpoints.error_value());
     return;
   }
@@ -425,8 +293,166 @@ void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
 void EmulatorDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  bt_log(ERROR, "virtual", "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
+  FDF_LOG(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
+                                        OpenCommandChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChannel(ChannelType::COMMAND, request->channel.release());
+      status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
+}
+
+void EmulatorDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
+                                        OpenAclDataChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChannel(ChannelType::ACL, request->channel.release());
+      status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
+}
+
+void EmulatorDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                                        OpenScoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::ConfigureSco(ConfigureScoRequestView request,
+                                  ConfigureScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::ResetSco(ResetScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                        OpenIsoDataChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChannel(ChannelType::ISO, request->channel.release());
+      status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
+}
+
+void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
+                                      OpenSnoopChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChannel(ChannelType::SNOOP, request->channel.release());
+      status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
+}
+
+void EmulatorDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::ConnectEmulator(
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::Emulator> request) {
+  emulator_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                     std::move(request), this, fidl::kIgnoreBindingClosure);
+}
+
+void EmulatorDevice::ConnectVendor(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+  vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   std::move(request), this, fidl::kIgnoreBindingClosure);
+}
+
+void EmulatorDevice::StartEmulatorInterface(fidl::ServerEnd<ftest::HciEmulator> request) {
+  FDF_LOG(TRACE, "start HciEmulator interface\n");
+
+  if (bindings_.size() > 0) {
+    FDF_LOG(TRACE, "HciEmulator channel already bound\n");
+    return;
+  }
+
+  // Process HciEmulator messages on a thread that can safely access the FakeController, which is
+  // thread-hostile.
+  auto cb = [this](auto impl, fidl::UnbindInfo info) {
+    FDF_LOG(TRACE, "emulator channel closed (status: %s); unpublish device\n",
+            zx_status_get_string(info.status()));
+    UnpublishHci();
+  };
+  bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request), this,
+                       std::move(cb));
+}
+
+zx_status_t EmulatorDevice::AddHciDeviceChildNode() {
+  // Create args to add bt-hci-device as a child node on behalf of VirtualController
+  zx::result connector =
+      vendor_devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (connector.is_error()) {
+    FDF_LOG(ERROR, "Failed to bind devfs connecter to dispatcher: %u", connector.status_value());
+    return connector.error_value();
+  }
+
+  fidl::Arena args_arena;
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
+                   .connector(std::move(connector.value()))
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kController)
+                   .class_name("bt-hci")
+                   .Build();
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
+                  .name("bt-hci-device")
+                  .devfs_args(devfs)
+                  .Build();
+
+  // Create the endpoints of fuchsia_driver_framework::NodeController protocol
+  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (controller_endpoints.is_error()) {
+    FDF_LOG(ERROR, "Create node controller endpoints failed: %s",
+            zx_status_get_string(controller_endpoints.error_value()));
+    return controller_endpoints.error_value();
+  }
+
+  // Create the endpoints of fuchsia_driver_framework::Node protocol for the child node, and hold
+  // the client end of it, because no driver will bind to the child node.
+  auto child_node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (child_node_endpoints.is_error()) {
+    FDF_LOG(ERROR, "Create child node endpoints failed: %s",
+            zx_status_get_string(child_node_endpoints.error_value()));
+    return child_node_endpoints.error_value();
+  }
+
+  // Add bt-hci-device as a child node of the EmulatorDevice
+  ZX_DEBUG_ASSERT(emulator_child_node()->is_valid());
+  auto child_result = emulator_child_node()->sync()->AddChild(
+      std::move(args), std::move(controller_endpoints->server),
+      std::move(child_node_endpoints->server));
+  if (!child_result.ok()) {
+    FDF_LOG(ERROR, "Failed to add bt-hci-device node, FIDL error: %s",
+            child_result.status_string());
+    return child_result.status();
+  }
+
+  if (child_result->is_error()) {
+    FDF_LOG(ERROR, "Failed to add bt-hci-device node: %u",
+            static_cast<uint32_t>(child_result->error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+
+  // |hci_child_node_| does not need to create more child nodes so we do not need an event_handler
+  // and we do not need to worry about it being re-bound
+  hci_child_node_.Bind(std::move(child_node_endpoints->client),
+                       fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  hci_node_controller_.Bind(std::move(controller_endpoints->client),
+                            fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  return ZX_OK;
 }
 
 void EmulatorDevice::EncodeSetAclPriorityCommand(
@@ -457,7 +483,7 @@ void EmulatorDevice::AddPeer(std::unique_ptr<EmulatedPeer> peer) {
 }
 
 void EmulatorDevice::OnControllerParametersChanged() {
-  bt_log(TRACE, "virtual", "HciEmulator.OnControllerParametersChanged\n");
+  FDF_LOG(TRACE, "HciEmulator.OnControllerParametersChanged\n");
 
   ftest::ControllerParameters fidl_value;
   fidl_value.local_name(fake_device_.local_name());
@@ -486,7 +512,7 @@ void EmulatorDevice::MaybeUpdateControllerParametersChanged() {
 }
 
 void EmulatorDevice::OnLegacyAdvertisingStateChanged() {
-  bt_log(TRACE, "virtual", "HciEmulator.OnLegacyAdvertisingStateChanged\n");
+  FDF_LOG(TRACE, "HciEmulator.OnLegacyAdvertisingStateChanged\n");
 
   // We have requests to resolve. Construct the FIDL table for the current state.
   ftest::LegacyAdvertisingState fidl_state;
@@ -534,21 +560,13 @@ void EmulatorDevice::MaybeUpdateLegacyAdvertisingStates() {
   legacy_adv_states_.clear();
 }
 
-void EmulatorDevice::UnpublishHci() {
-  std::lock_guard<std::mutex> lock(hci_dev_lock_);
-  if (hci_dev_) {
-    device_async_remove(hci_dev_);
-    hci_dev_ = nullptr;
-  }
-}
-
-void EmulatorDevice::OnPeerConnectionStateChanged(const bt::DeviceAddress& address,
+void EmulatorDevice::OnPeerConnectionStateChanged(const DeviceAddress& address,
                                                   bt::hci_spec::ConnectionHandle handle,
                                                   bool connected, bool canceled) {
-  bt_log(TRACE, "virtual",
-         "Peer connection state changed: %s (handle: %#.4x) (connected: %s) (canceled: %s):\n",
-         address.ToString().c_str(), handle, (connected ? "true" : "false"),
-         (canceled ? "true" : "false"));
+  FDF_LOG(TRACE,
+          "Peer connection state changed: %s (handle: %#.4x) (connected: %s) (canceled: %s):\n",
+          address.ToString().c_str(), handle, (connected ? "true" : "false"),
+          (canceled ? "true" : "false"));
 
   auto iter = peers_.find(address);
   if (iter != peers_.end()) {
@@ -556,8 +574,14 @@ void EmulatorDevice::OnPeerConnectionStateChanged(const bt::DeviceAddress& addre
   }
 }
 
-// Starts listening for command/event packets on the given channel.
-// Returns false if already listening on a command channel
+void EmulatorDevice::UnpublishHci() {
+  // Unpublishing the bt-hci-device child node shuts down the associated bt-host component
+  auto status = hci_node_controller_->Remove();
+  if (!status.ok()) {
+    FDF_LOG(ERROR, "Could not remove bt-hci-device child node: %s", status.status_string());
+  }
+}
+
 bool EmulatorDevice::StartCmdChannel(zx::channel chan) {
   if (cmd_channel_.is_valid()) {
     return false;
@@ -568,17 +592,15 @@ bool EmulatorDevice::StartCmdChannel(zx::channel chan) {
   cmd_channel_ = std::move(chan);
   cmd_channel_wait_.set_object(cmd_channel_.get());
   cmd_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  zx_status_t status = cmd_channel_wait_.Begin(async_get_default_dispatcher());
+  zx_status_t status = cmd_channel_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (status != ZX_OK) {
     cmd_channel_.reset();
-    bt_log(ERROR, "virtual", "failed to start command channel: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to start command channel: %s", zx_status_get_string(status));
     return false;
   }
   return true;
 }
 
-// Starts listening for acl packets on the given channel.
-// Returns false if already listening on a acl channel
 bool EmulatorDevice::StartAclChannel(zx::channel chan) {
   if (acl_channel_.is_valid()) {
     return false;
@@ -591,10 +613,10 @@ bool EmulatorDevice::StartAclChannel(zx::channel chan) {
   acl_channel_ = std::move(chan);
   acl_channel_wait_.set_object(acl_channel_.get());
   acl_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  zx_status_t status = acl_channel_wait_.Begin(async_get_default_dispatcher());
+  zx_status_t status = acl_channel_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (status != ZX_OK) {
     acl_channel_.reset();
-    bt_log(ERROR, "virtual", "failed to start ACL channel: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to start ACL channel: %s", zx_status_get_string(status));
     return false;
   }
   return true;
@@ -612,10 +634,10 @@ bool EmulatorDevice::StartIsoChannel(zx::channel chan) {
   iso_channel_ = std::move(chan);
   iso_channel_wait_.set_object(iso_channel_.get());
   iso_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  zx_status_t status = iso_channel_wait_.Begin(async_get_default_dispatcher());
+  zx_status_t status = iso_channel_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (status != ZX_OK) {
     iso_channel_.reset();
-    bt_log(ERROR, "virtual", "failed to start ISO channel: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to start ISO channel: %s", zx_status_get_string(status));
     return false;
   }
   return true;
@@ -649,7 +671,7 @@ void EmulatorDevice::SendEvent(pw::span<const std::byte> buffer) {
   zx_status_t status = cmd_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
                                           /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
-    bt_log(WARN, "virtual", "failed to write event");
+    FDF_LOG(WARNING, "failed to write event");
   }
 }
 
@@ -657,7 +679,7 @@ void EmulatorDevice::SendAclPacket(pw::span<const std::byte> buffer) {
   zx_status_t status = acl_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
                                           /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
-    bt_log(WARN, "virtual", "failed to write ACL packet");
+    FDF_LOG(WARNING, "failed to write ACL packet");
   }
 }
 
@@ -665,11 +687,10 @@ void EmulatorDevice::SendIsoPacket(pw::span<const std::byte> buffer) {
   zx_status_t status = iso_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
                                           /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
-    bt_log(WARN, "virtual", "failed to write ISO packet");
+    FDF_LOG(WARNING, "failed to write ISO packet");
   }
 }
 
-// Read and handle packets received over the channels.
 void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                          zx_status_t wait_status,
                                          const zx_packet_signal_t* signal) {
@@ -684,9 +705,9 @@ void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
   if (status < 0) {
     if (status == ZX_ERR_PEER_CLOSED) {
-      bt_log(INFO, "virtual", "command channel was closed");
+      FDF_LOG(INFO, "command channel was closed");
     } else {
-      bt_log(ERROR, "virtual", "failed to read on cmd channel: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "failed to read on cmd channel: %s", zx_status_get_string(status));
     }
     CloseCommandChannel();
     return;
@@ -696,7 +717,7 @@ void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::
 
   status = wait->Begin(dispatcher);
   if (status != ZX_OK) {
-    bt_log(ERROR, "virtual", "failed to wait on cmd channel: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to wait on cmd channel: %s", zx_status_get_string(status));
     CloseCommandChannel();
   }
 }
@@ -711,9 +732,9 @@ void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::Wait
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
   if (status < 0) {
     if (status == ZX_ERR_PEER_CLOSED) {
-      bt_log(INFO, "virtual", "ACL channel was closed");
+      FDF_LOG(INFO, "ACL channel was closed");
     } else {
-      bt_log(ERROR, "virtual", "failed to read on ACL channel: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "failed to read on ACL channel: %s", zx_status_get_string(status));
     }
 
     CloseAclDataChannel();
@@ -721,14 +742,14 @@ void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::Wait
   }
 
   if (read_size < sizeof(bt::hci_spec::ACLDataHeader)) {
-    bt_log(ERROR, "virtual", "malformed ACL packet received");
+    FDF_LOG(ERROR, "malformed ACL packet received");
   } else {
     fake_device_.SendAclData(buffer);
   }
 
   status = wait->Begin(dispatcher);
   if (status != ZX_OK) {
-    bt_log(ERROR, "virtual", "failed to wait on ACL channel: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to wait on ACL channel: %s", zx_status_get_string(status));
     CloseAclDataChannel();
   }
 }
@@ -744,9 +765,9 @@ void EmulatorDevice::HandleIsoPacket(async_dispatcher_t* dispatcher, async::Wait
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
   if (status < 0) {
     if (status == ZX_ERR_PEER_CLOSED) {
-      bt_log(INFO, "virtual", "ISO channel was closed");
+      FDF_LOG(INFO, "ISO channel was closed");
     } else {
-      bt_log(ERROR, "virtual", "failed to read on ISO channel: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "failed to read on ISO channel: %s", zx_status_get_string(status));
     }
 
     CloseIsoDataChannel();
@@ -754,81 +775,16 @@ void EmulatorDevice::HandleIsoPacket(async_dispatcher_t* dispatcher, async::Wait
   }
 
   if (read_size < sizeof(bt::hci_spec::IsoDataHeader)) {
-    bt_log(ERROR, "virtual", "malformed ISO packet received");
+    FDF_LOG(ERROR, "malformed ISO packet received");
   } else {
     fake_device_.SendIsoData(buffer);
   }
 
   status = wait->Begin(dispatcher);
   if (status != ZX_OK) {
-    bt_log(ERROR, "virtual", "failed to wait on ISO channel: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to wait on ISO channel: %s", zx_status_get_string(status));
     CloseIsoDataChannel();
   }
-}
-
-void EmulatorDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
-                                        OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChan(Channel::COMMAND, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                                        OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChan(Channel::ACL, request->channel.release()); status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                        OpenScoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::ConfigureSco(ConfigureScoRequestView request,
-                                  ConfigureScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::ResetSco(ResetScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                        OpenIsoDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChan(Channel::ISO, request->channel.release()); status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                                      OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChan(Channel::SNOOP, request->channel.release()); status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChan(Channel::EMULATOR, request->channel.TakeChannel().release());
-      status != ZX_OK) {
-    completer.Close(status);
-  }
-}
-
-void EmulatorDevice::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
-  bt_log(ERROR, "virtual", "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace bt_hci_virtual

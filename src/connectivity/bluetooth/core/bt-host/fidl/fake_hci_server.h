@@ -59,6 +59,12 @@ class FakeHciServer final : public fhbt::testing::Hci_TestBase {
     return iso_packets_received_;
   }
 
+  bool CloseCommandChannel() {
+    bool was_valid = command_channel_valid();
+    command_channel_.reset();
+    return was_valid;
+  }
+
   bool CloseAclChannel() {
     bool was_valid = acl_channel_.is_valid();
     acl_channel_.reset();

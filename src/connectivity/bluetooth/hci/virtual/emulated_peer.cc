@@ -164,7 +164,10 @@ void EmulatedPeer::EmulateDisconnectionComplete(
 void EmulatedPeer::WatchConnectionStates(WatchConnectionStatesCompleter::Sync& completer) {
   bt_log(TRACE, "virtual", "EmulatedPeer.WatchConnectionState\n");
 
-  connection_states_completers_.emplace(completer.ToAsync());
+  {
+    std::lock_guard<std::mutex> lock(connection_states_lock_);
+    connection_states_completers_.emplace(completer.ToAsync());
+  }
   MaybeUpdateConnectionStates();
 }
 
@@ -177,6 +180,7 @@ void EmulatedPeer::UpdateConnectionState(bool connected) {
 }
 
 void EmulatedPeer::MaybeUpdateConnectionStates() {
+  std::lock_guard<std::mutex> lock(connection_states_lock_);
   if (connection_states_.empty() || connection_states_completers_.empty()) {
     return;
   }
