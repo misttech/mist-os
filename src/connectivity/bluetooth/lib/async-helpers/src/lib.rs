@@ -4,7 +4,6 @@
 
 #![recursion_limit = "512"]
 
-pub mod component_lifecycle;
 pub mod hanging_get;
 pub mod maybe_stream;
 pub mod responding_channel;

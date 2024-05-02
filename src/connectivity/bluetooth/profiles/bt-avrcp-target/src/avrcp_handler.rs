@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    async_helpers::component_lifecycle::ComponentLifecycleServer,
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_bluetooth_avrcp::{
-        PeerManagerMarker, TargetAvcError, TargetHandlerMarker, TargetHandlerRequest,
-        TargetHandlerRequestStream, TargetPassthroughError,
-    },
-    fidl_fuchsia_bluetooth_component::LifecycleState,
-    fuchsia_component::client::connect_to_protocol,
-    futures::TryStreamExt,
-    std::sync::Arc,
-    tracing::{trace, warn},
+use anyhow::anyhow;
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth_avrcp::{
+    PeerManagerMarker, TargetAvcError, TargetHandlerMarker, TargetHandlerRequest,
+    TargetHandlerRequestStream, TargetPassthroughError,
 };
+use fuchsia_component::client::connect_to_protocol;
+use futures::TryStreamExt;
+use std::sync::Arc;
+use tracing::{trace, warn};
 
 use crate::media::media_sessions::MediaSessions;
 
@@ -131,9 +127,7 @@ pub(crate) async fn handle_target_requests(
 /// Spin up task for handling incoming TargetHandler requests.
 pub(crate) async fn process_avrcp_requests(
     media_sessions: Arc<MediaSessions>,
-    mut lifecycle: ComponentLifecycleServer,
 ) -> Result<(), anyhow::Error> {
-    // AVRCP Service Setup
     // Register this target handler with the AVRCP component.
     let avrcp_svc = connect_to_protocol::<PeerManagerMarker>()
         .expect("Failed to connect to Bluetooth AVRCP interface");
@@ -142,9 +136,6 @@ pub(crate) async fn process_avrcp_requests(
     if let Err(e) = avrcp_svc.register_target_handler(target_client).await? {
         return Err(anyhow!("Error registering target handler: {:?}", e));
     }
-    // End AVRCP Service Setup
-
-    lifecycle.set(LifecycleState::Ready).await.expect("lifecycle server to set value");
-
+    trace!("Registered the Target handler");
     handle_target_requests(request_stream, media_sessions).await
 }

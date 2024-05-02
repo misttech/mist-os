@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use async_helpers::component_lifecycle::ComponentLifecycleServer;
-use fuchsia_async as fasync;
-use fuchsia_component::server::ServiceFs;
-use futures::{try_join, FutureExt, StreamExt};
+use futures::{try_join, FutureExt};
 use std::sync::Arc;
 
 mod avrcp_handler;
@@ -23,18 +20,12 @@ use crate::media::media_sessions::MediaSessions;
 
 #[fuchsia::main(logging_tags = ["bt-avrcp-tg"])]
 async fn main() -> Result<(), Error> {
-    let mut fs = ServiceFs::new();
-    let lifecycle = ComponentLifecycleServer::spawn();
-    let _ = fs.dir("svc").add_fidl_service(lifecycle.fidl_service());
-    let _ = fs.take_and_serve_directory_handle().expect("Unable to serve lifecycle requests");
-    fasync::Task::spawn(fs.collect::<()>()).detach();
-
     // Shared state between AVRCP and MediaSession.
     // The current view of the media world.
     let media_state: Arc<MediaSessions> = Arc::new(MediaSessions::create());
 
     let watch_media_sessions_fut = media_state.watch();
-    let avrcp_requests_fut = process_avrcp_requests(media_state.clone(), lifecycle);
+    let avrcp_requests_fut = process_avrcp_requests(media_state.clone());
     // Power integration is optional - the AVRCP-TG component will continue even if power
     // integration is unavailable.
     let battery_client_fut = process_battery_client_requests(media_state.clone()).map(|_| Ok(()));

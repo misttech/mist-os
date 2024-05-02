@@ -13,10 +13,10 @@ shared_deps = [
   "//sdk/fidl/fuchsia.bluetooth.avrcp:fuchsia.bluetooth.avrcp_rust",
   "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
   "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
+  "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
   "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
   "//sdk/fidl/fuchsia.media.sessions2:fuchsia.media.sessions2_rust",
   "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
-  "//src/connectivity/bluetooth/fidl:component_rust",
   "//src/connectivity/bluetooth/lib/async-helpers",
   "//src/connectivity/bluetooth/lib/battery-client",
   "//src/connectivity/bluetooth/lib/bt-a2dp",
@@ -51,7 +51,6 @@ shared_deps = [
 
 shared_sources = [
   "src/avrcp_relay.rs",
-  "src/avrcp_target.rs",
   "src/config.rs",
   "src/encoding.rs",
   "src/latm.rs",

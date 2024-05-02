@@ -5,14 +5,12 @@
 use {
     anyhow::Error,
     fidl_fuchsia_bluetooth_avrcp::{PeerManagerMarker, PeerManagerRequest, TargetHandlerProxy},
-    fidl_fuchsia_bluetooth_component::{LifecycleMarker, LifecycleProxy, LifecycleState},
+    fidl_fuchsia_component::{BinderMarker, BinderProxy},
     fidl_fuchsia_media_sessions2::{DiscoveryMarker, DiscoveryRequest, SessionsWatcherProxy},
     fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequest},
-    fuchsia_async as fasync,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
-    fuchsia_zircon::DurationNum,
     futures::{channel::mpsc, SinkExt, StreamExt},
     realmbuilder_mock_helpers::mock_component,
     std::collections::HashSet,
@@ -33,8 +31,8 @@ enum Event {
     Avrcp(Option<TargetHandlerProxy>),
     /// Media service event.
     Media(Option<SessionsWatcherProxy>),
-    /// Bluetooth Lifecycle event.
-    Lifecycle(Option<LifecycleProxy>),
+    /// Component Framework Binder event.
+    Binder(Option<BinderProxy>),
     /// Battery Manager service connection.
     BatteryManager(Option<BatteryManagerRequest>),
 }
@@ -74,26 +72,13 @@ impl From<BatteryManagerRequest> for Event {
     }
 }
 
-/// Represents a fake AVRCP-TG client that requests the `fuchsia.bluetooth.component.Lifecycle`
-/// service.
+/// Represents a fake AVRCP-TG client that requests the `fuchsia.component.Binder` service.
 async fn mock_avrcp_target_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let lifecycle_svc = handles.connect_to_protocol::<LifecycleMarker>()?;
-    fasync::Task::local(async move {
-        let lifecycle = lifecycle_svc.clone();
-        loop {
-            match lifecycle_svc.get_state().await.unwrap() {
-                LifecycleState::Initializing => {}
-                LifecycleState::Ready => break,
-            }
-            fasync::Timer::new(fasync::Time::after(1_i64.millis())).await;
-        }
-        info!("Client successfully connected to Lifecycle service");
-        sender.send(Event::Lifecycle(Some(lifecycle))).await.expect("failed sending ack to test");
-    })
-    .detach();
+    let binder_svc = handles.connect_to_protocol::<BinderMarker>()?;
+    sender.send(Event::Binder(Some(binder_svc))).await.expect("failed sending ack to test");
     Ok(())
 }
 
@@ -151,7 +136,7 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
         )
         .await
         .expect("Failed adding battery manager mock to topology");
-    // Mock AVRCP-Target client that will request the Lifecycle service.
+    // Mock AVRCP-Target client that will request the `Binder` service.
     let fake_avrcp_target_client = builder
         .add_local_child(
             "fake-avrcp-target-client",
@@ -191,16 +176,16 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
                 .to(&avrcp_target),
         )
         .await
-        .expect("Failed adding route for Discovery service");
+        .expect("Failed adding route for BatteryManager service");
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<LifecycleMarker>())
+                .capability(Capability::protocol::<BinderMarker>())
                 .from(&avrcp_target)
                 .to(&fake_avrcp_target_client),
         )
         .await
-        .expect("Failed adding route for Lifecycle service");
+        .expect("Failed adding route for Binder service");
     builder
         .add_route(
             Route::new()
@@ -218,7 +203,7 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
 
     // If the routing is correctly configured, we expect four events: `bt-avrcp-target` connecting
     // to the PeerManager, Discovery, & BatteryManager services and the fake client connecting to
-    // the Lifecycle service that is provided by `bt-avrcp-target`.
+    // the Binder service that is provided by `bt-avrcp-target`.
     let mut events = Vec::new();
     let expected_number_of_events = 4;
     for i in 0..expected_number_of_events {
@@ -235,7 +220,7 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
             Event::Avrcp(None),
             Event::Media(None),
             Event::BatteryManager(None),
-            Event::Lifecycle(None),
+            Event::Binder(None),
         ]
         .iter()
         .map(std::mem::discriminant),

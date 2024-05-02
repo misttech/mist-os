@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    anyhow::Error,
-    fidl::{client::QueryResponseFut, endpoints::create_proxy_and_stream},
-    fidl_fuchsia_bluetooth_avrcp::*,
-    fidl_fuchsia_media_sessions2::*,
-    fuchsia_async as fasync,
-    futures::{task::Poll, TryStreamExt},
-    std::pin::pin,
-};
+use super::*;
+
+use anyhow::Error;
+use fidl::{client::QueryResponseFut, endpoints::create_proxy_and_stream};
+use fidl_fuchsia_bluetooth_avrcp::*;
+use fidl_fuchsia_media_sessions2::*;
+use fuchsia_async as fasync;
+use futures::{task::Poll, StreamExt, TryStreamExt};
+use std::pin::pin;
 
 use crate::avrcp_handler::handle_target_requests;
 use crate::media::media_sessions::MediaSessionId;
