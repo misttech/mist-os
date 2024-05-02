@@ -127,7 +127,7 @@ def spawn(
 
         try:
             os.remove(fifo)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             # The tests for this don't actually create a file for the fifo, and we don't want to
             # throw an exception, since we were trying to remove the file anyway.
             pass

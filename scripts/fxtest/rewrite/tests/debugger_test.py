@@ -7,13 +7,11 @@ import io
 import os
 import signal
 import subprocess
-import sys
 import typing
 import unittest
 import unittest.mock as mock
 
 import debugger
-
 from test_list_file import Test
 from test_list_file import TestListEntry
 import tests_json_file

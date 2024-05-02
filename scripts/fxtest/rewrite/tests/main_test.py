@@ -762,8 +762,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_log_to_stdout(self, _termout_mock: mock.Mock) -> None:
         """Test that we can log everything to stdout, and it parses as JSON lines"""
 
-        _command_mock = self._mock_run_command(0)
-        _subprocess_mock = self._mock_subprocess_call(0)
+        self._mock_run_command(0)
+        self._mock_subprocess_call(0)
         self._mock_has_device_connected(True)
         self._mock_has_tests_in_base([])
 
