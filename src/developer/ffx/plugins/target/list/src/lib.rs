@@ -8,10 +8,12 @@ use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
-use ffx_target::TargetInfoQuery;
+use ffx_target::{KnockError, TargetInfoQuery};
 use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
-use futures::TryStreamExt;
+use fuchsia_async::TimeoutExt;
+use futures::{future::join_all, TryStreamExt};
+use std::time::Duration;
 
 mod target_formatter;
 
@@ -96,23 +98,92 @@ async fn show_targets(
     Ok(())
 }
 
-fn handle_to_info(handle: discovery::TargetHandle) -> ffx::TargetInfo {
+const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
+
+async fn try_get_target_info(
+    spec: String,
+    context: &EnvironmentContext,
+) -> Result<(Option<String>, Option<String>), KnockError> {
+    let conn = ffx_target::DirectConnection::new(spec, context).await?;
+    let _ = conn.knock_rcs().await?;
+    let rcs = conn.rcs_proxy().await?;
+    let (pc, bc) = match rcs.identify_host().await {
+        Ok(Ok(id_result)) => (id_result.product_config, id_result.board_config),
+        _ => (None, None),
+    };
+    Ok((pc, bc))
+}
+
+#[tracing::instrument]
+async fn get_target_info(
+    context: &EnvironmentContext,
+    addrs: &[addr::TargetAddr],
+) -> Result<(ffx::RemoteControlState, Option<String>, Option<String>)> {
+    let ssh_timeout: u64 =
+        ffx_config::get("target.host_pipe_ssh_timeout").await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+    let ssh_timeout = Duration::from_millis(ssh_timeout);
+    for addr in addrs {
+        // An address is, conveniently, a valid target spec as well
+        let spec =
+            if addr.port() == 0 { format!("{addr}") } else { format!("{addr}:{}", addr.port()) };
+        tracing::debug!("Trying to make a connection to spec {spec:?}");
+
+        match try_get_target_info(spec, context)
+            .on_timeout(ssh_timeout, || {
+                Err(KnockError::NonCriticalError(anyhow::anyhow!("knock_rcs() timed out")))
+            })
+            .await
+        {
+            Ok((product_config, board_config)) => {
+                return Ok((ffx::RemoteControlState::Up, product_config, board_config));
+            }
+            Err(KnockError::NonCriticalError(e)) => {
+                tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                continue;
+            }
+            e => {
+                tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                return Ok((ffx::RemoteControlState::Unknown, None, None));
+            }
+        }
+    }
+    Ok((ffx::RemoteControlState::Down, None, None))
+}
+
+async fn handle_to_info(
+    context: &EnvironmentContext,
+    handle: discovery::TargetHandle,
+) -> Result<ffx::TargetInfo> {
     let (target_state, addresses) = match handle.state {
         discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        discovery::TargetState::Product(target_addrs) => (
-            ffx::TargetState::Product,
-            Some(target_addrs.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>()),
-        ),
+        discovery::TargetState::Product(target_addrs) => {
+            (ffx::TargetState::Product, Some(target_addrs))
+        }
         discovery::TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
         discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
     };
-    ffx::TargetInfo {
+    // Temporarily have an override to disable this functionality by default. Enable on ffx builders only
+    let connect_to_target = ffx_config::get("ffx.target-list.local-connect").await.unwrap_or(false);
+    let (rcs_state, product_config, board_config) = if connect_to_target {
+        if let Some(ref target_addrs) = addresses {
+            get_target_info(context, target_addrs).await?
+        } else {
+            (ffx::RemoteControlState::Unknown, None, None)
+        }
+    } else {
+        (ffx::RemoteControlState::Unknown, None, None)
+    };
+    let addresses =
+        addresses.map(|ta| ta.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>());
+    Ok(ffx::TargetInfo {
         nodename: handle.node_name,
         addresses,
-        rcs_state: Some(ffx::RemoteControlState::Unknown),
+        rcs_state: Some(rcs_state),
         target_state: Some(target_state),
+        board_config,
+        product_config,
         ..Default::default()
-    }
+    })
 }
 
 async fn local_list_targets(
@@ -122,7 +193,11 @@ async fn local_list_targets(
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
     let handles = ffx_target::resolve_target_query(query, ctx).await?;
-    let targets = handles.into_iter().map(|t| handle_to_info(t)).collect::<Vec<_>>();
+    // Connect to all targets in parallel
+    let targets =
+        join_all(handles.into_iter().map(|t| async { handle_to_info(ctx, t).await })).await;
+    // Fail if any results are Err
+    let targets = targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
 
     Ok(targets)
 }

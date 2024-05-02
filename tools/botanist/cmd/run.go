@@ -167,8 +167,9 @@ func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func()
 	extraConfigs := ffxutil.ConfigSettings{
 		Level: "global",
 		Settings: map[string]any{
-			"daemon.autostart":       false,
-			"discovery.mdns.enabled": false,
+			"daemon.autostart":              false,
+			"discovery.mdns.enabled":        false,
+			"ffx.target-list.local-connect": r.ffxExperimentLevel >= 2,
 		},
 	}
 	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", "", ffxOutputsDir, extraConfigs)

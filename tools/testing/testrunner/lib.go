@@ -173,11 +173,6 @@ var ffxInstance = func(
 				return ffxInstance, err
 			}
 		}
-		// Print the list of available targets for debugging purposes.
-		// TODO(ihuh): Remove when not needed.
-		if err := ffxInstance.List(ctx); err != nil {
-			return ffxInstance, err
-		}
 		// Print the config for debugging purposes.
 		// TODO(ihuh): Remove when not needed.
 		if err := ffxInstance.GetConfig(ctx); err != nil {
