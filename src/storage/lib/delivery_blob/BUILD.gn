@@ -11,7 +11,7 @@ rustc_library("delivery_blob") {
   name = "delivery_blob"
   version = "0.1.0"
   visibility = [
-    "//src/storage/*",
+    "//src/security/lib/scrutiny/*",
     "//src/storage/*",
     "//src/sys/lib/fidl-fuchsia-pkg-ext/*",
     "//src/sys/pkg/*",

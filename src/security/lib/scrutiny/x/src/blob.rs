@@ -5,11 +5,11 @@
 use super::api;
 use super::data_source as ds;
 use super::hash::Hash;
+use delivery_blob::DeliveryBlobType;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use fuchsia_hash::ParseHashError as FuchsiaParseHashError;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
-use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fs;
@@ -214,6 +214,10 @@ impl api::Blob for CompositeBlob {
         self.blob.reader_seeker()
     }
 
+    fn read(&self) -> Result<Vec<u8>, api::BlobError> {
+        self.blob.read()
+    }
+
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
         Box::new(self.data_sources.clone().into_iter())
     }
@@ -247,6 +251,10 @@ impl api::Blob for VerifiedMemoryBlob {
 
     fn reader_seeker(&self) -> Result<Box<dyn api::ReaderSeeker>, api::BlobError> {
         Ok(Box::new(io::Cursor::new(self.0.bytes.clone())))
+    }
+
+    fn read(&self) -> Result<Vec<u8>, api::BlobError> {
+        Ok(self.0.bytes.clone())
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
@@ -300,9 +308,13 @@ pub enum BlobDirectoryError {
     ReadBlobError(io::Error),
     #[error("hash mismatch: hash from path: {hash_from_path}; computed hash: {computed_hash}")]
     HashMismatch { hash_from_path: Box<dyn api::Hash>, computed_hash: Box<dyn api::Hash> },
+    #[error("failed to decompress delivery blob: {0:?}")]
+    DeliveryBlobDecompressError(delivery_blob::DecompressError),
+    #[error("invalid delivery blob type: {0:?}")]
+    InvalidDeliveryBlobType(delivery_blob::DeliveryBlobError),
 }
 
-/// [`Blob`] implementation for a blobs backed by a [`BlobDirectory`].
+/// [`Blob`] implementation for a delivery blob file backed by a [`BlobDirectory`].
 #[derive(Clone)]
 pub(crate) struct FileBlob {
     hash: Box<dyn api::Hash>,
@@ -321,13 +333,19 @@ impl api::Blob for FileBlob {
     }
 
     fn reader_seeker(&self) -> Result<Box<dyn api::ReaderSeeker>, api::BlobError> {
-        let hash = format!("{}", self.hash());
-        let path = self.blob_set.directory().as_ref().as_ref().join(&hash);
-        Ok(Box::new(fs::File::open(&path).map_err(|error| api::BlobError::Io {
+        Ok(Box::new(io::Cursor::new(self.read()?)))
+    }
+
+    fn read(&self) -> Result<Vec<u8>, api::BlobError> {
+        let path = self.blob_set.blob_path(self.hash());
+        let delivery_blob = fs::read(&path).map_err(|error| api::BlobError::Io {
             hash: self.hash(),
             directory: self.blob_set.directory().clone(),
             io_error_string: format!("{}", error),
-        })?))
+        })?;
+        let decompressed_blob = delivery_blob::decompress(&delivery_blob)
+            .map_err(api::BlobError::DeliveryBlobDecompressError)?;
+        Ok(decompressed_blob)
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
@@ -378,41 +396,29 @@ impl BlobDirectory {
     pub fn new(
         mut parent_data_source: Option<ds::DataSource>,
         directory: Box<dyn api::Path>,
+        delivery_blob_type: DeliveryBlobType,
     ) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
-        let paths =
-            fs::read_dir(directory.as_ref().as_ref()).map_err(BlobDirectoryError::ListError)?;
-
-        // TODO(b/312722138): Support verification of delivery blobs once the delivery-blob library
-        // supports it. For now, we filter out subdirectories containing delivery blobs.
-        let paths = paths.filter_map(|entry| {
-            let entry = entry.map_err(BlobDirectoryError::DirEntryError);
-            if let Ok(entry) = entry {
-                match entry.file_type().map_err(BlobDirectoryError::ListError) {
-                    Ok(entry_type) => {
-                        return if entry_type.is_dir() { None } else { Some(Ok(entry)) };
-                    }
-                    Err(e) => return Some(Err(e)),
-                }
-            }
-            Some(entry)
-        });
-        let dir_entries: Vec<_> = paths.collect::<Result<Vec<_>, _>>()?;
+        let path = directory.as_ref().as_ref().join(u32::from(delivery_blob_type).to_string());
+        let dir_entries = if path.exists() {
+            fs::read_dir(path)
+                .map_err(BlobDirectoryError::ListError)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(BlobDirectoryError::DirEntryError)?
+        } else {
+            vec![]
+        };
 
         let mut blob_ids = dir_entries
             .into_par_iter()
             .map(|dir_entry| {
                 let file_name = dir_entry.file_name();
-                let file_name = file_name.to_str().ok_or_else(|| {
-                    BlobDirectoryError::PathStringError(String::from(file_name.to_string_lossy()))
-                })?;
                 let hash_from_path =
                     parse_path_as_hash(file_name).map_err(BlobDirectoryError::PathError)?;
 
-                let mut blob_file =
-                    fs::File::open(dir_entry.path()).map_err(BlobDirectoryError::ReadBlobError)?;
-                let fuchsia_hash = FuchsiaMerkleTree::from_reader(&mut blob_file)
-                    .map_err(BlobDirectoryError::ReadBlobError)?
-                    .root();
+                let delivery_blob =
+                    fs::read(dir_entry.path()).map_err(BlobDirectoryError::ReadBlobError)?;
+                let fuchsia_hash = delivery_blob::calculate_digest(&delivery_blob)
+                    .map_err(BlobDirectoryError::DeliveryBlobDecompressError)?;
                 let computed_hash: Box<dyn api::Hash> = Box::new(Hash::from(fuchsia_hash));
                 if hash_from_path.as_ref() != computed_hash.as_ref() {
                     Err(BlobDirectoryError::HashMismatch { hash_from_path, computed_hash })
@@ -433,7 +439,12 @@ impl BlobDirectory {
             parent_data_source.add_child(data_source.clone());
         }
 
-        Ok(Box::new(Self(Rc::new(BlobDirectoryData { directory, blob_ids, data_source }))))
+        Ok(Box::new(Self(Rc::new(BlobDirectoryData {
+            directory,
+            blob_ids,
+            data_source,
+            delivery_blob_type,
+        }))))
     }
 
     /// Gets the path to this blobs directory.
@@ -444,6 +455,13 @@ impl BlobDirectory {
     /// Gets the hashes in this blobs directory.
     fn blob_ids(&self) -> &Vec<Box<dyn api::Hash>> {
         &self.0.blob_ids
+    }
+
+    fn blob_path(&self, hash: Box<dyn api::Hash>) -> path::PathBuf {
+        self.directory()
+            .as_ref()
+            .as_ref()
+            .join(format!("{}/{hash}", u32::from(self.0.delivery_blob_type)))
     }
 }
 
@@ -476,6 +494,7 @@ struct BlobDirectoryData {
 
     /// Data source associated with blob directory.
     data_source: ds::DataSource,
+    delivery_blob_type: DeliveryBlobType,
 }
 
 #[cfg(test)]
@@ -551,11 +570,11 @@ mod tests {
     use super::super::hash::Hash;
     use super::BlobDirectory;
     use super::BlobOpenError;
+    use delivery_blob::DeliveryBlobType;
     use fuchsia_hash::HASH_SIZE as FUCHSIA_HASH_SIZE;
     use fuchsia_merkle::Hash as FuchsiaMerkleHash;
     use maplit::hashmap;
     use std::fs;
-    use std::io::Write as _;
     use tempfile::tempdir;
 
     macro_rules! assert_ref_eq {
@@ -578,9 +597,7 @@ mod tests {
             let expected_data_sources: Vec<_> = $blob_set.data_sources().collect();
             let actual_data_sources: Vec<_> = $blob.data_sources().collect();
             assert_eq!(expected_data_sources, actual_data_sources);
-            let mut blob_reader_seeker = $blob.reader_seeker().expect("blob reader-seeker");
-            let mut blob_contents = vec![];
-            blob_reader_seeker.read_to_end(&mut blob_contents).expect("read blob to end");
+            let blob_contents = $blob.read().expect("blob read");
             assert_ref_eq!($bytes, blob_contents.as_slice());
         };
     }
@@ -594,14 +611,16 @@ mod tests {
         };
     }
 
-    macro_rules! mk_temp_dir {
+    macro_rules! mk_blob_dir {
         ($file_hash_map:expr) => {{
             let temp_dir = tempdir().expect("create temporary directory");
-            let dir_path = temp_dir.path();
+            let dir_path = temp_dir.path().join("1");
             for (name, contents) in $file_hash_map.into_iter() {
                 let path = dir_path.join(format!("{}", &name));
-                let mut file = fs::File::create(&path).expect("create blob file");
-                file.write_all(&contents).expect("write blob to file");
+                fs::create_dir_all(path.parent().unwrap()).expect("create blob directory");
+                let file = fs::File::create(&path).expect("create blob file");
+                delivery_blob::generate_to(DeliveryBlobType::Type1, &contents, file)
+                    .expect("write blob to file");
             }
             let temp_dir_path: Box<dyn api::Path> = Box::new(temp_dir.path().to_path_buf());
             (temp_dir, temp_dir_path)
@@ -612,7 +631,8 @@ mod tests {
     fn empty_blobs_dir() {
         let temp_dir = tempdir().unwrap();
         let temp_dir_path = Box::new(temp_dir.path().to_path_buf());
-        BlobDirectory::new(None, temp_dir_path).expect("blob set from empty directory");
+        BlobDirectory::new(None, temp_dir_path, DeliveryBlobType::Type1)
+            .expect("blob set from empty directory");
     }
 
     #[fuchsia::test]
@@ -620,11 +640,11 @@ mod tests {
         let blob_data = "Hello, World!";
 
         // Target directory contains one well-formed blob entry.
-        let (_temp_dir, temp_dir_path): (_, Box<dyn api::Path>) = mk_temp_dir!(hashmap! {
+        let (_temp_dir, temp_dir_path): (_, Box<dyn api::Path>) = mk_blob_dir!(hashmap! {
             fuchsia_hash!(blob_data.as_bytes()) => blob_data.as_bytes(),
         });
-        let blob_set =
-            BlobDirectory::new(None, temp_dir_path.clone()).expect("single-blob directory");
+        let blob_set = BlobDirectory::new(None, temp_dir_path.clone(), DeliveryBlobType::Type1)
+            .expect("single-blob directory");
 
         let hash_not_in_set: Box<dyn api::Hash> =
             Box::new(Hash::from(FuchsiaMerkleHash::from([0u8; FUCHSIA_HASH_SIZE])));
@@ -661,9 +681,9 @@ mod tests {
             fuchsia_hash!(blob_data[0].as_bytes()) => blob_data[0].as_bytes(),
             fuchsia_hash!(blob_data[1].as_bytes()) => blob_data[1].as_bytes(),
         };
-        let (_temp_dir, temp_dir_path): (_, Box<dyn api::Path>) = mk_temp_dir!(&temp_dir_map);
-        let blob_set =
-            BlobDirectory::new(None, temp_dir_path.clone()).expect("multi-blob directory");
+        let (_temp_dir, temp_dir_path): (_, Box<dyn api::Path>) = mk_blob_dir!(&temp_dir_map);
+        let blob_set = BlobDirectory::new(None, temp_dir_path.clone(), DeliveryBlobType::Type1)
+            .expect("multi-blob directory");
 
         let hash_not_in_set: Box<dyn api::Hash> =
             Box::new(Hash::from(FuchsiaMerkleHash::from([0u8; FUCHSIA_HASH_SIZE])));

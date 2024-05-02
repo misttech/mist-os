@@ -261,9 +261,7 @@ impl api::Package for Package {
     > {
         let mut components = vec![];
         for (path, meta_blob) in self.meta_blobs() {
-            let mut meta_blob_reader = meta_blob.reader_seeker()?;
-            let mut bytes = vec![];
-            meta_blob_reader.read_to_end(&mut bytes)?;
+            let bytes = meta_blob.read()?;
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let component = manifest.fidl_into_native();
                 components.push((path, component));
@@ -271,9 +269,7 @@ impl api::Package for Package {
         }
 
         for (path, content_blob) in self.content_blobs() {
-            let mut content_blob_reader = content_blob.reader_seeker()?;
-            let mut bytes = vec![];
-            content_blob_reader.read_to_end(&mut bytes)?;
+            let bytes = content_blob.read()?;
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let component = manifest.fidl_into_native();
                 components.push((path, component));
@@ -330,6 +326,10 @@ impl api::Blob for MetaBlob {
     }
 
     fn reader_seeker(&self) -> Result<Box<dyn api::ReaderSeeker>, api::BlobError> {
+        Ok(Box::new(io::Cursor::new(self.read()?)))
+    }
+
+    fn read(&self) -> Result<Vec<u8>, api::BlobError> {
         let mut far_reader = self.far_reader.borrow_mut();
         let path = self.data.path.as_ref().as_ref();
         let contents = far_reader
@@ -343,7 +343,7 @@ impl api::Blob for MetaBlob {
                 data_sources: self.data.data_sources.clone(),
                 error,
             })?;
-        Ok(Box::new(io::Cursor::new(contents)))
+        Ok(contents)
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
@@ -366,6 +366,13 @@ impl api::Blob for ContentBlob {
             .blob(self.data.hash.clone())
             .map_err(|error| api::BlobError::Open { error })?
             .reader_seeker()
+    }
+
+    fn read(&self) -> Result<Vec<u8>, api::BlobError> {
+        self.content_blob_set
+            .blob(self.data.hash.clone())
+            .map_err(|error| api::BlobError::Open { error })?
+            .read()
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
@@ -642,8 +649,7 @@ mod tests {
         // Remove elements from map and check equality of underlying data.
         for (path, blob) in package.meta_blobs() {
             let expected_bytes = meta_blobs_contents.remove(&path).unwrap();
-            let mut actual_bytes = vec![];
-            blob.reader_seeker().unwrap().read_to_end(&mut actual_bytes).unwrap();
+            let actual_bytes = blob.read().unwrap();
             assert_eq!(expected_bytes, actual_bytes.as_slice());
 
             let expected_hash: Box<dyn api::Hash> =
@@ -680,8 +686,7 @@ mod tests {
         // Remove elements from map and check equality of underlying data.
         for (path, blob) in package.content_blobs() {
             let expected_bytes = content_blobs_contents.remove(&path).unwrap();
-            let mut actual_bytes = vec![];
-            blob.reader_seeker().unwrap().read_to_end(&mut actual_bytes).unwrap();
+            let actual_bytes = blob.read().unwrap();
             assert_eq!(expected_bytes, actual_bytes.as_slice());
 
             let expected_hash: Box<dyn api::Hash> =

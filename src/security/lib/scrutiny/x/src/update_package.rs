@@ -14,7 +14,6 @@ use cm_rust::ComponentDecl;
 use fuchsia_url::PackageUrl;
 use fuchsia_url::PinnedAbsolutePackageUrl;
 use std::io;
-use std::io::Read as _;
 use thiserror::Error;
 
 /// Errors that may occur constructing an [`UpdatePackage`].
@@ -69,9 +68,7 @@ impl UpdatePackage {
                 packages_json_path: packages_json,
                 update_package_hash,
             })?;
-        let mut packages_json_reader = packages_json_blob.reader_seeker()?;
-        let mut packages_json_contents = vec![];
-        packages_json_reader.read_to_end(&mut packages_json_contents)?;
+        let packages_json_contents = packages_json_blob.read()?;
         Ok(Self {
             package,
             packages_json: update_package::parse_packages_json(packages_json_contents.as_slice())?,

@@ -428,6 +428,9 @@ pub trait Blob {
     /// Some blob sources may not support concurrent invocations of `Blob::reader_seeker`.
     fn reader_seeker(&self) -> Result<Box<dyn ReaderSeeker>, BlobError>;
 
+    /// Gets the entire content of the blob.
+    fn read(&self) -> Result<Vec<u8>, BlobError>;
+
     /// Iterate over the data sources that provide this blob.
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn DataSource>>>;
 }
@@ -449,6 +452,8 @@ pub enum BlobError {
         data_sources: Vec<Box<dyn DataSource>>,
         error: fuchsia_archive::Error,
     },
+    #[error("error decompressing delivery blob: {0:?}")]
+    DeliveryBlobDecompressError(delivery_blob::DecompressError),
 }
 
 /// A type that can be reduced to a byte sequence, such as a hash digest.

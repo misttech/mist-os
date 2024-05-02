@@ -35,9 +35,7 @@ impl Zbi {
         path: Box<dyn api::Path>,
         blob: Box<dyn api::Blob>,
     ) -> Result<Self, Error> {
-        let mut buffer = vec![];
-        blob.reader_seeker()?.read_to_end(&mut buffer)?;
-        let buffer = buffer;
+        let buffer = blob.read()?;
         let mut zbi_reader = ZbiReader::new(buffer);
         let zbi_sections = zbi_reader.parse()?;
 
