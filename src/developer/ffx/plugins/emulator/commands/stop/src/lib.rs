@@ -1,14 +1,18 @@
-use std::path::PathBuf;
-
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use emulator_instance::{EmulatorInstanceInfo, EmulatorInstances};
-use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_stop_args::StopCommand;
-use fho::{bug, FfxMain, FfxTool, SimpleWriter};
+use fho::{
+    bug, return_user_error, user_error, Error, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter,
+};
+use schemars::JsonSchema;
+use serde::Serialize;
+use std::io::Write;
+use std::path::PathBuf;
 
 /// Sub-sub tool for `emu stop`
 #[derive(FfxTool)]
@@ -16,6 +20,17 @@ pub struct EmuStopTool {
     #[command]
     cmd: StopCommand,
     context: EnvironmentContext,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandStatus {
+    /// Successful execution with informational strings.
+    Ok { messages: Vec<String> },
+    /// Unexpected error with string.
+    UnexpectedError { message: String },
+    /// A known kind of error that can be reported usefully to the user
+    UserError { message: String },
 }
 
 // Since this is a part of a legacy plugin, add
@@ -26,9 +41,31 @@ fho::embedded_plugin!(EmuStopTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for EmuStopTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<CommandStatus>;
+    async fn main(self, mut writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        match self.stop_impl(&mut writer).await {
+            Ok(errors) => writer
+                .machine(&CommandStatus::Ok {
+                    messages: errors.into_iter().map(|e| e.to_string()).collect(),
+                })
+                .map_err(|e| bug!(e)),
+            Err(Error::User(e)) => {
+                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
+                Err(Error::User(e))
+            }
+            Err(e) => {
+                writer.machine(&CommandStatus::UnexpectedError { message: e.to_string() })?;
+                Err(e)
+            }
+        }
+    }
+}
 
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+impl EmuStopTool {
+    async fn stop_impl(
+        self,
+        writer: &mut <EmuStopTool as fho::FfxMain>::Writer,
+    ) -> fho::Result<Vec<Error>> {
         let mut names = vec![self.cmd.name];
         let instance_dir: PathBuf = self
             .context
@@ -40,9 +77,12 @@ impl FfxMain for EmuStopTool {
         if self.cmd.all {
             names = match emu_instances.get_all_instances() {
                 Ok(list) => list.into_iter().map(|v| Some(v.get_name().to_string())).collect(),
-                Err(e) => ffx_bail!("Error encountered looking up emulator instances: {:?}", e),
+                Err(e) => {
+                    return_user_error!("Error encountered loading emulator instances: {e}");
+                }
             };
         }
+        let mut errors: Vec<Error> = vec![];
         for mut some_name in names {
             let builder = EngineBuilder::new(emu_instances.clone());
             let engine = builder.get_engine_by_name(&mut some_name);
@@ -50,36 +90,53 @@ impl FfxMain for EmuStopTool {
                 // This happens when the program doesn't know which instance to use. The
                 // get_engine_by_name returns a good error message, and the loop should terminate
                 // early.
-                ffx_bail!("{:?}", engine.err().unwrap());
+                return_user_error!(engine.err().unwrap());
             }
             let name = some_name.unwrap_or("<unspecified>".to_string());
             match engine {
-                Err(e) => eprintln!(
-                    "Couldn't deserialize engine '{name}' from disk. Continuing stop, \
+                Err(e) => {
+                    let message = format!(
+                        "Couldn't deserialize engine '{name}' from disk. Continuing stop, \
                     but you may need to terminate the emulator process manually: {e:?}"
-                ),
+                    );
+                    write!(writer.stderr(), "{message}").map_err(|e| bug!(e))?;
+                    if writer.is_machine() {
+                        errors.push(user_error!(message))
+                    }
+                }
                 Ok(None) => {
-                    ffx_bail!("{name} does not exist.");
+                    return_user_error!("{name} does not exist.");
                 }
                 Ok(Some(mut engine)) => {
-                    println!("Stopping emulator '{name}'...");
+                    if !writer.is_machine() {
+                        writeln!(writer, "Stopping emulator '{name}'...").map_err(|e| bug!(e))?;
+                    }
                     if let Err(e) = engine.stop().await {
-                        eprintln!("Failed with the following error: {:?}", e);
+                        let err = bug!("Failed with the following error: {e}");
+                        writeln!(writer.stderr(), "{err}").map_err(|e| bug!(e))?;
+                        if writer.is_machine() {
+                            errors.push(err);
+                        }
                     }
                 }
             }
             if !self.cmd.persist {
                 let cleanup = emu_instances.clean_up_instance_dir(&name);
                 if cleanup.is_err() {
-                    eprintln!(
+                    let message = format!(
                         "Cleanup of '{}' failed with the following error: {:?}",
                         name,
                         cleanup.unwrap_err()
                     );
+
+                    writeln!(writer.stderr(), "{message}").map_err(|e| bug!(e))?;
+                    if writer.is_machine() {
+                        errors.push(bug!(message));
+                    }
                 }
             }
         }
-        Ok(())
+        Ok(errors)
     }
 }
 
@@ -110,7 +167,9 @@ mod tests {
         write_to_disk(&data, &instance_dir).unwrap();
 
         let tool = EmuStopTool { cmd, context: env.context.clone() };
-        tool.main(SimpleWriter::new()).await.expect("unexpected error");
+        tool.main(<EmuStopTool as fho::FfxMain>::Writer::new(None))
+            .await
+            .expect("unexpected error");
     }
 
     #[fuchsia::test]
@@ -119,7 +178,10 @@ mod tests {
         let cmd = StopCommand { name: Some("unknown_instance".to_string()), ..Default::default() };
         let tool = EmuStopTool { cmd, context: env.context.clone() };
         let expected_phrase = "unknown_instance does not exist";
-        let err = tool.main(SimpleWriter::new()).await.expect_err("expected error");
+        let err = tool
+            .main(<EmuStopTool as fho::FfxMain>::Writer::new(None))
+            .await
+            .expect_err("expected error");
         assert!(err.to_string().contains(expected_phrase), "expected '{expected_phrase}' in {err}");
     }
 
@@ -144,7 +206,10 @@ mod tests {
 
         let tool = EmuStopTool { cmd, context: env.context.clone() };
         let expected_phrase = "Multiple emulators are running";
-        let err = tool.main(SimpleWriter::new()).await.expect_err("expected error");
+        let err = tool
+            .main(<EmuStopTool as fho::FfxMain>::Writer::new(None))
+            .await
+            .expect_err("expected error");
         assert!(err.to_string().contains(expected_phrase), "expected '{expected_phrase}' in {err}");
     }
 
@@ -168,7 +233,9 @@ mod tests {
         write_to_disk(&data2, &instance_dir2).unwrap();
 
         let tool = EmuStopTool { cmd, context: env.context.clone() };
-        tool.main(SimpleWriter::new()).await.expect("unexpected error");
+        tool.main(<EmuStopTool as fho::FfxMain>::Writer::new(None))
+            .await
+            .expect("unexpected error");
     }
 
     #[fuchsia::test]
@@ -188,6 +255,8 @@ mod tests {
         cmd.name = Some("one_instance".to_string());
 
         let tool = EmuStopTool { cmd, context: env.context.clone() };
-        tool.main(SimpleWriter::new()).await.expect("unexpected error");
+        tool.main(<EmuStopTool as fho::FfxMain>::Writer::new(None))
+            .await
+            .expect("unexpected error");
     }
 }
