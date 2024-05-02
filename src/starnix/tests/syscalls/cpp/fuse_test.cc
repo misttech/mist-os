@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/xattr.h>
 #include <unistd.h>
+#include <zircon/compiler.h>
 
 #include <algorithm>
 #include <condition_variable>
@@ -138,32 +139,52 @@ class Node {
  public:
   virtual ~Node() {}
 
-  void PopulateAttr(fuse_attr& attr) {
+  uint64_t UpdateNodeid(uint64_t id) {
+    std::lock_guard guard(mtx_);
+    std::swap(id, id_);
+    return id;
+  }
+
+  void IncrementGeneration() {
+    std::lock_guard guard(mtx_);
+    generation_++;
+  }
+
+  void PopulateAttrLocked(fuse_attr& attr) __TA_REQUIRES(mtx_) {
     attr = {
         .ino = id_,
         .mode = type_ | S_IRWXU | S_IRWXG | S_IRWXO,
     };
   }
 
+  void PopulateAttr(fuse_attr& attr) {
+    std::lock_guard guard(mtx_);
+    PopulateAttrLocked(attr);
+  }
+
   void PopulateEntry(fuse_entry_out& entry_out) {
+    std::lock_guard guard(mtx_);
     entry_out = {
         .nodeid = id_,
-        .generation = 1,
+        .generation = generation_,
     };
-    PopulateAttr(entry_out.attr);
+    PopulateAttrLocked(entry_out.attr);
   }
 
  protected:
-  Node(uint64_t id, uint32_t type) : id_(id), type_(type) {}
+  Node(uint32_t type, uint64_t id) : type_(type), id_(id) {}
 
  private:
-  uint64_t id_;
   uint32_t type_;
+
+  std::mutex mtx_;
+  uint64_t id_ __TA_GUARDED(mtx_);
+  uint64_t generation_ __TA_GUARDED(mtx_) = 1;
 };
 
 class Directory : public Node {
  public:
-  Directory(uint64_t id) : Node(id, S_IFDIR) {}
+  Directory(uint64_t id) : Node(S_IFDIR, id) {}
 
   void AddChild(const std::string& name, std::shared_ptr<Node> node) { children_[name] = node; }
 
@@ -181,14 +202,24 @@ class Directory : public Node {
 
 class File : public Node {
  public:
-  File(uint64_t id) : Node(id, S_IFREG) {}
+  File(uint64_t id) : Node(S_IFREG, id) {}
 };
 
 class FileSystem {
  public:
   FileSystem() {
     root_ = std::shared_ptr<Directory>(new Directory(FUSE_ROOT_ID));
+
+    std::lock_guard guard(mtx_);
     nodes_[FUSE_ROOT_ID] = root_;
+  }
+
+  void UpdateNodeId(const std::shared_ptr<Node>& node) {
+    std::lock_guard guard(mtx_);
+    uint64_t new_nodeid = AllocateNodeIdLocked();
+    nodes_[new_nodeid] = node;
+    uint64_t old_nodeid = node->UpdateNodeid(new_nodeid);
+    EXPECT_EQ(nodes_.erase(old_nodeid), 1u);
   }
 
   const std::shared_ptr<Directory>& RootDir() const { return root_; }
@@ -196,7 +227,8 @@ class FileSystem {
   template <class T, typename F>
   std::shared_ptr<T> AddNodeAt(const std::shared_ptr<Directory>& at, const std::string& name,
                                F builder) {
-    uint64_t nodeid = next_nodeid_++;
+    std::lock_guard guard(mtx_);
+    uint64_t nodeid = AllocateNodeIdLocked();
     std::shared_ptr<T> node = builder(nodeid);
     nodes_[nodeid] = node;
     at->AddChild(name, node);
@@ -223,6 +255,7 @@ class FileSystem {
   }
 
   std::shared_ptr<Node> Lookup(uint64_t nodeid) {
+    std::lock_guard guard(mtx_);
     auto it = nodes_.find(nodeid);
     if (it == nodes_.end()) {
       return nullptr;
@@ -231,9 +264,13 @@ class FileSystem {
   }
 
  private:
-  uint64_t next_nodeid_ = FUSE_ROOT_ID + 1;
+  uint64_t AllocateNodeIdLocked() __TA_REQUIRES(mtx_) { return next_nodeid_++; }
+
   std::shared_ptr<Directory> root_;
-  std::unordered_map<uint64_t, std::shared_ptr<Node>> nodes_;
+
+  std::mutex mtx_;
+  uint64_t next_nodeid_ __TA_GUARDED(mtx_) = FUSE_ROOT_ID + 1;
+  std::unordered_map<uint64_t, std::shared_ptr<Node>> nodes_ __TA_GUARDED(mtx_);
 };
 
 class FuseServer {
@@ -1425,3 +1462,78 @@ INSTANTIATE_TEST_SUITE_P(
             .lookup_attr_timeout = 0,
             .getattr_attr_timeout = std::numeric_limits<uint64_t>::max(),
             .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kOncePerFile}));
+
+struct PathWalkRefreshDirEntryTestCase {
+  bool modify_nodeid;
+  bool modify_generation;
+  uint64_t expected_extra_lookups;
+};
+
+class FusePathWalkRefreshDirEntryTest
+    : public FuseServerTest,
+      public testing::WithParamInterface<PathWalkRefreshDirEntryTestCase> {};
+
+TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
+  const PathWalkRefreshDirEntryTestCase& test_case = GetParam();
+
+  std::shared_ptr<CountingFuseServer> server(new CountingFuseServer(0, 0));
+  FileSystem& fs = server->fs();
+  std::shared_ptr<Directory> dir1 = fs.AddDirAtRoot("dir1");
+  std::shared_ptr<Directory> dir2 = fs.AddDirAt(dir1, "dir2");
+  std::shared_ptr<File> file = fs.AddFileAt(dir2, "file");
+  ASSERT_TRUE(Mount(server));
+  EXPECT_EQ(server->LookupCount(), 0u);
+
+  constexpr uint64_t kNumberOfNodesInPath = 3;
+  std::string filename = GetMountDir() + "/dir1/dir2/file";
+
+  auto check_open = [&]() {
+    test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR));
+    ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+  };
+
+  ASSERT_NO_FATAL_FAILURE(check_open());
+  EXPECT_EQ(server->LookupCount(), kNumberOfNodesInPath);
+
+  ASSERT_NO_FATAL_FAILURE(check_open());
+  EXPECT_EQ(server->LookupCount(), 2 * kNumberOfNodesInPath);
+
+  // When the kernel attempts to refresh the entry and sees a node ID or generation
+  // different from what the kernel has cached for the same name, the kernel will
+  // discard the cached entry and perform a fresh lookup to create a new entry
+  // for the node with a different ID/generation pair but with the same name. Note
+  // that different ID/generation pairs are interpreted as a completely different
+  // nodes, but no two nodes may have the same ID, even if nodes have the same name
+  // in the same directory.
+  if (test_case.modify_nodeid) {
+    fs.UpdateNodeId(dir2);
+  }
+  if (test_case.modify_generation) {
+    dir2->IncrementGeneration();
+  }
+  ASSERT_NO_FATAL_FAILURE(check_open());
+  EXPECT_EQ(server->LookupCount(), 3 * kNumberOfNodesInPath + test_case.expected_extra_lookups);
+}
+
+INSTANTIATE_TEST_SUITE_P(FusePathWalkRefreshDirEntryTest, FusePathWalkRefreshDirEntryTest,
+                         testing::Values(
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = false,
+                                 .modify_generation = false,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = false,
+                                 .modify_generation = true,
+                                 .expected_extra_lookups = 1,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = true,
+                                 .modify_generation = false,
+                                 .expected_extra_lookups = 1,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = true,
+                                 .modify_generation = true,
+                                 .expected_extra_lookups = 1,
+                             }));
