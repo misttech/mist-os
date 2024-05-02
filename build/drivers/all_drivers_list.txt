@@ -179,7 +179,6 @@
 //src/devices/serial/drivers/aml-uart:aml-uart-driver
 //src/devices/serial/drivers/ftdi:ftdi-driver
 //src/devices/serial/drivers/ftdi:ftdi-fake-usb-driver
-//src/devices/serial/drivers/serial-async:serial-async-driver
 //src/devices/serial/drivers/serial:serial-driver
 //src/devices/serial/drivers/uart16550:uart16550-driver
 //src/devices/serial/drivers/usb-cdc-acm:fake-usb-cdc-acm-driver

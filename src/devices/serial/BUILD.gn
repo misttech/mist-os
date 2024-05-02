@@ -10,7 +10,6 @@ group("drivers") {
     "drivers/ftdi:ftdi",
     "drivers/ftdi:ftdi-fake-usb",
     "drivers/serial",
-    "drivers/serial-async",
     "drivers/uart16550",
     "drivers/usb-cdc-acm:fake-usb-cdc-acm",
     "drivers/usb-cdc-acm:usb-cdc-acm",

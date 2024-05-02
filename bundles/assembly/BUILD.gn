@@ -257,10 +257,6 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/serial.cm" ]
     },
     {
-      package_target = "//src/devices/serial/drivers/serial-async:package"
-      driver_components = [ "meta/serial-async.cm" ]
-    },
-    {
       package_target = "//src/devices/serial/drivers/usb-cdc-acm:package"
       driver_components = [ "meta/usb-cdc-acm.cm" ]
     },

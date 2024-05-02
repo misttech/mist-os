@@ -620,3 +620,9 @@
   available_in_git: 'd22f6edd4bd2570858a0bd39d52e32783ec4b9d5'
   areas: ['WLAN']
   path: '/src/connectivity/wlan/drivers/third_party/nxp/nxpfmac'
+- short_description: 'serial-async driver'
+  deletion_reason: 'Obsolete, replaced by serial driver'
+  gerrit_change_id: '1040315'
+  available_in_git: 'd60145af7b3e75ada3b25eb4c24d49bd9636c19f'
+  areas: ['Serial']
+  path: '/src/devices/serial/drivers/serial-async'
