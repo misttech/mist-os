@@ -24,8 +24,7 @@ fidl("linux") {
   ]
 
   # Order matters! It needs to match linux syscall numbers.
-  # NOSORT
-  sources = [ "fs.fidl" ]
+  sources = [ "syscall.fidl" ]
   if (!exclude_testonly_syscalls) {
     sources += [ "syscall.test.fidl" ]
   }

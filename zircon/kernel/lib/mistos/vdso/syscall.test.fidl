@@ -6,7 +6,7 @@ library linux;
 
 @no_protocol_prefix
 @transport("Syscall")
-closed protocol Syscall {
+closed protocol Test {
     /// ## Summary
     ///
     /// TODO(https://fxbug.dev/42108078)

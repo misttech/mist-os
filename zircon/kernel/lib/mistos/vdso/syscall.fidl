@@ -1,0 +1,892 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library linux;
+
+@no_protocol_prefix
+@transport("Syscall")
+closed protocol Syscall {
+    /// SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+    strict Read(resource struct {
+        fd uint32;
+        @out
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
+
+    /// SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf, size_t, count)
+    strict Write(resource struct {
+        fd uint32;
+        @in
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
+
+    /// SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+    strict Open(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        flags int32;
+        mode uint16;
+    }) -> () error int64;
+
+    /// SYSCALL_DEFINE1(close, unsigned int, fd)
+    strict Close(resource struct {
+        fd uint32;
+    }) -> () error int64;
+
+    ///STUB 4
+    strict Stat() -> () error int64;
+    ///STUB 5
+    strict Fstat() -> () error int64;
+    ///STUB 6
+    strict Lstat() -> () error int64;
+    ///STUB 7
+    strict Poll() -> () error int64;
+    ///STUB 8
+    strict Lseek() -> () error int64;
+    ///STUB 9
+    strict Mmap() -> () error int64;
+    ///STUB 10
+    strict Mprotect() -> () error int64;
+    ///STUB 11
+    strict Munmap() -> () error int64;
+    ///STUB 12
+    strict Brk() -> () error int64;
+    ///STUB 13
+    strict RtSigaction() -> () error int64;
+    ///STUB 14
+    strict RtSigprocmask() -> () error int64;
+    ///STUB 15
+    strict RtSigreturn() -> () error int64;
+    ///STUB 16
+    strict Ioctl() -> () error int64;
+    ///STUB 17
+    strict Pread64() -> () error int64;
+    ///STUB 18
+    strict Pwrite64() -> () error int64;
+    ///STUB 19
+    strict Readv() -> () error int64;
+    ///STUB 20
+    strict Writev() -> () error int64;
+    ///STUB 21
+    strict Access() -> () error int64;
+    ///STUB 22
+    strict Pipe() -> () error int64;
+    ///STUB 23
+    strict Select() -> () error int64;
+    ///STUB 24
+    strict SchedYield() -> () error int64;
+    ///STUB 25
+    strict Mremap() -> () error int64;
+    ///STUB 26
+    strict Msync() -> () error int64;
+    ///STUB 27
+    strict Mincore() -> () error int64;
+    ///STUB 28
+    strict Madvise() -> () error int64;
+    ///STUB 29
+    strict Shmget() -> () error int64;
+    ///STUB 30
+    strict Shmat() -> () error int64;
+    ///STUB 31
+    strict Shmctl() -> () error int64;
+    ///STUB 32
+    strict Dup() -> () error int64;
+    ///STUB 33
+    strict Dup2() -> () error int64;
+    ///STUB 34
+    strict Pause() -> () error int64;
+    ///STUB 35
+    strict Nanosleep() -> () error int64;
+    ///STUB 36
+    strict Getitimer() -> () error int64;
+    ///STUB 37
+    strict Alarm() -> () error int64;
+    ///STUB 38
+    strict Setitimer() -> () error int64;
+    ///STUB 39
+    strict Getpid() -> () error int64;
+    ///STUB 40
+    strict Sendfile() -> () error int64;
+    ///STUB 41
+    strict Socket() -> () error int64;
+    ///STUB 42
+    strict Connect() -> () error int64;
+    ///STUB 43
+    strict Accept() -> () error int64;
+    ///STUB 44
+    strict Sendto() -> () error int64;
+    ///STUB 45
+    strict Recvfrom() -> () error int64;
+    ///STUB 46
+    strict Sendmsg() -> () error int64;
+    ///STUB 47
+    strict Recvmsg() -> () error int64;
+    ///STUB 48
+    strict Shutdown() -> () error int64;
+    ///STUB 49
+    strict Bind() -> () error int64;
+    ///STUB 50
+    strict Listen() -> () error int64;
+    ///STUB 51
+    strict Getsockname() -> () error int64;
+    ///STUB 52
+    strict Getpeername() -> () error int64;
+    ///STUB 53
+    strict Socketpair() -> () error int64;
+    ///STUB 54
+    strict Setsockopt() -> () error int64;
+    ///STUB 55
+    strict Getsockopt() -> () error int64;
+    ///STUB 56
+    strict Clone() -> () error int64;
+    ///STUB 57
+    strict Fork() -> () error int64;
+    ///STUB 58
+    strict Vfork() -> () error int64;
+    ///STUB 59
+    strict Execve() -> () error int64;
+    ///STUB 60
+    strict Exit() -> () error int64;
+    ///STUB 61
+    strict Wait4() -> () error int64;
+    ///STUB 62
+    strict Kill() -> () error int64;
+    ///STUB 63
+    strict Uname() -> () error int64;
+    ///STUB 64
+    strict Semget() -> () error int64;
+    ///STUB 65
+    strict Semop() -> () error int64;
+    ///STUB 66
+    strict Semctl() -> () error int64;
+    ///STUB 67
+    strict Shmdt() -> () error int64;
+    ///STUB 68
+    strict Msgget() -> () error int64;
+    ///STUB 69
+    strict Msgsnd() -> () error int64;
+    ///STUB 70
+    strict Msgrcv() -> () error int64;
+    ///STUB 71
+    strict Msgctl() -> () error int64;
+    ///STUB 72
+    strict Fcntl() -> () error int64;
+    ///STUB 73
+    strict Flock() -> () error int64;
+    ///STUB 74
+    strict Fsync() -> () error int64;
+    ///STUB 75
+    strict Fdatasync() -> () error int64;
+    ///STUB 76
+    strict Truncate() -> () error int64;
+    ///STUB 77
+    strict Ftruncate() -> () error int64;
+    ///STUB 78
+    strict Getdents() -> () error int64;
+    ///STUB 79
+    strict Getcwd() -> () error int64;
+    ///STUB 80
+    strict Chdir() -> () error int64;
+    ///STUB 81
+    strict Fchdir() -> () error int64;
+    ///STUB 82
+    strict Rename() -> () error int64;
+    ///STUB 83
+    strict Mkdir() -> () error int64;
+    ///STUB 84
+    strict Rmdir() -> () error int64;
+    ///STUB 85
+    strict Creat() -> () error int64;
+    ///STUB 86
+    strict Link() -> () error int64;
+    ///STUB 87
+    strict Unlink() -> () error int64;
+    ///STUB 88
+    strict Symlink() -> () error int64;
+    ///STUB 89
+    strict Readlink() -> () error int64;
+    ///STUB 90
+    strict Chmod() -> () error int64;
+    ///STUB 91
+    strict Fchmod() -> () error int64;
+    ///STUB 92
+    strict Chown() -> () error int64;
+    ///STUB 93
+    strict Fchown() -> () error int64;
+    ///STUB 94
+    strict Lchown() -> () error int64;
+    ///STUB 95
+    strict Umask() -> () error int64;
+    ///STUB 96
+    strict Gettimeofday() -> () error int64;
+    ///STUB 97
+    strict Getrlimit() -> () error int64;
+    ///STUB 98
+    strict Getrusage() -> () error int64;
+    ///STUB 99
+    strict Sysinfo() -> () error int64;
+    ///STUB 100
+    strict Times() -> () error int64;
+    ///STUB 101
+    strict Ptrace() -> () error int64;
+    ///STUB 102
+    strict Getuid() -> () error int64;
+    ///STUB 103
+    strict Syslog() -> () error int64;
+    ///STUB 104
+    strict Getgid() -> () error int64;
+    ///STUB 105
+    strict Setuid() -> () error int64;
+    ///STUB 106
+    strict Setgid() -> () error int64;
+    ///STUB 107
+    strict Geteuid() -> () error int64;
+    ///STUB 108
+    strict Getegid() -> () error int64;
+    ///STUB 109
+    strict Setpgid() -> () error int64;
+    ///STUB 110
+    strict Getppid() -> () error int64;
+    ///STUB 111
+    strict Getpgrp() -> () error int64;
+    ///STUB 112
+    strict Setsid() -> () error int64;
+    ///STUB 113
+    strict Setreuid() -> () error int64;
+    ///STUB 114
+    strict Setregid() -> () error int64;
+    ///STUB 115
+    strict Getgroups() -> () error int64;
+    ///STUB 116
+    strict Setgroups() -> () error int64;
+    ///STUB 117
+    strict Setresuid() -> () error int64;
+    ///STUB 118
+    strict Getresuid() -> () error int64;
+    ///STUB 119
+    strict Setresgid() -> () error int64;
+    ///STUB 120
+    strict Getresgid() -> () error int64;
+    ///STUB 121
+    strict Getpgid() -> () error int64;
+    ///STUB 122
+    strict Setfsuid() -> () error int64;
+    ///STUB 123
+    strict Setfsgid() -> () error int64;
+    ///STUB 124
+    strict Getsid() -> () error int64;
+    ///STUB 125
+    strict Capget() -> () error int64;
+    ///STUB 126
+    strict Capset() -> () error int64;
+    ///STUB 127
+    strict RtSigpending() -> () error int64;
+    ///STUB 128
+    strict RtSigtimedwait() -> () error int64;
+    ///STUB 129
+    strict RtSigqueueinfo() -> () error int64;
+    ///STUB 130
+    strict RtSigsuspend() -> () error int64;
+    ///STUB 131
+    strict Sigaltstack() -> () error int64;
+    ///STUB 132
+    strict Utime() -> () error int64;
+    ///STUB 133
+    strict Mknod() -> () error int64;
+    ///STUB 134
+    strict Uselib() -> () error int64;
+    ///STUB 135
+    strict Personality() -> () error int64;
+    ///STUB 136
+    strict Ustat() -> () error int64;
+    ///STUB 137
+    strict Statfs() -> () error int64;
+    ///STUB 138
+    strict Fstatfs() -> () error int64;
+    ///STUB 139
+    strict Sysfs() -> () error int64;
+    ///STUB 140
+    strict Getpriority() -> () error int64;
+    ///STUB 141
+    strict Setpriority() -> () error int64;
+    ///STUB 142
+    strict SchedSetparam() -> () error int64;
+    ///STUB 143
+    strict SchedGetparam() -> () error int64;
+    ///STUB 144
+    strict SchedSetscheduler() -> () error int64;
+    ///STUB 145
+    strict SchedGetscheduler() -> () error int64;
+    ///STUB 146
+    strict SchedGetPriorityMax() -> () error int64;
+    ///STUB 147
+    strict SchedGetPriorityMin() -> () error int64;
+    ///STUB 148
+    strict SchedRrGetInterval() -> () error int64;
+    ///STUB 149
+    strict Mlock() -> () error int64;
+    ///STUB 150
+    strict Munlock() -> () error int64;
+    ///STUB 151
+    strict Mlockall() -> () error int64;
+    ///STUB 152
+    strict Munlockall() -> () error int64;
+    ///STUB 153
+    strict Vhangup() -> () error int64;
+    ///STUB 154
+    strict ModifyLdt() -> () error int64;
+    ///STUB 155
+    strict PivotRoot() -> () error int64;
+    ///STUB 157
+    strict Prctl() -> () error int64;
+    ///STUB 158
+    strict ArchPrctl() -> () error int64;
+    ///STUB 159
+    strict Adjtimex() -> () error int64;
+    ///STUB 160
+    strict Setrlimit() -> () error int64;
+    ///STUB 161
+    strict Chroot() -> () error int64;
+    ///STUB 162
+    strict Sync() -> () error int64;
+    ///STUB 163
+    strict Acct() -> () error int64;
+    ///STUB 164
+    strict Settimeofday() -> () error int64;
+    ///STUB 165
+    strict Mount() -> () error int64;
+    ///STUB 167
+    strict Swapon() -> () error int64;
+    ///STUB 168
+    strict Swapoff() -> () error int64;
+    ///STUB 169
+    strict Reboot() -> () error int64;
+    ///STUB 170
+    strict Sethostname() -> () error int64;
+    ///STUB 171
+    strict Setdomainname() -> () error int64;
+    ///STUB 172
+    strict Iopl() -> () error int64;
+    ///STUB 173
+    strict Ioperm() -> () error int64;
+    ///STUB 175
+    strict InitModule() -> () error int64;
+    ///STUB 176
+    strict DeleteModule() -> () error int64;
+    ///STUB 179
+    strict Quotactl() -> () error int64;
+    ///STUB 186
+    strict Gettid() -> () error int64;
+    ///STUB 187
+    strict Readahead() -> () error int64;
+    ///STUB 188
+    strict Setxattr() -> () error int64;
+    ///STUB 189
+    strict Lsetxattr() -> () error int64;
+    ///STUB 190
+    strict Fsetxattr() -> () error int64;
+    ///STUB 191
+    strict Getxattr() -> () error int64;
+    ///STUB 192
+    strict Lgetxattr() -> () error int64;
+    ///STUB 193
+    strict Fgetxattr() -> () error int64;
+    ///STUB 194
+    strict Listxattr() -> () error int64;
+    ///STUB 195
+    strict Llistxattr() -> () error int64;
+    ///STUB 196
+    strict Flistxattr() -> () error int64;
+    ///STUB 197
+    strict Removexattr() -> () error int64;
+    ///STUB 198
+    strict Lremovexattr() -> () error int64;
+    ///STUB 199
+    strict Fremovexattr() -> () error int64;
+    ///STUB 200
+    strict Tkill() -> () error int64;
+    ///STUB 201
+    strict Time() -> () error int64;
+    ///STUB 202
+    strict Futex() -> () error int64;
+    ///STUB 203
+    strict SchedSetaffinity() -> () error int64;
+    ///STUB 204
+    strict SchedGetaffinity() -> () error int64;
+    ///STUB 205
+    strict SetThreadArea() -> () error int64;
+    ///STUB 206
+    strict IoSetup() -> () error int64;
+    ///STUB 207
+    strict IoDestroy() -> () error int64;
+    ///STUB 208
+    strict IoGetevents() -> () error int64;
+    ///STUB 209
+    strict IoSubmit() -> () error int64;
+    ///STUB 210
+    strict IoCancel() -> () error int64;
+    ///STUB 211
+    strict GetThreadArea() -> () error int64;
+    ///STUB 213
+    strict EpollCreate() -> () error int64;
+    ///STUB 216
+    strict RemapFilePages() -> () error int64;
+    ///STUB 217
+    strict Getdents64() -> () error int64;
+    ///STUB 218
+    strict SetTidAddress() -> () error int64;
+    ///STUB 219
+    strict RestartSyscall() -> () error int64;
+    ///STUB 220
+    strict Semtimedop() -> () error int64;
+    ///STUB 221
+    strict Fadvise64() -> () error int64;
+    ///STUB 222
+    strict TimerCreate() -> () error int64;
+    ///STUB 223
+    strict TimerSettime() -> () error int64;
+    ///STUB 224
+    strict TimerGettime() -> () error int64;
+    ///STUB 225
+    strict TimerGetoverrun() -> () error int64;
+    ///STUB 226
+    strict TimerDelete() -> () error int64;
+    ///STUB 227
+    strict ClockSettime() -> () error int64;
+    ///STUB 228
+    strict ClockGettime() -> () error int64;
+    ///STUB 229
+    strict ClockGetres() -> () error int64;
+    ///STUB 230
+    strict ClockNanosleep() -> () error int64;
+    ///STUB 231
+    strict ExitGroup() -> () error int64;
+    ///STUB 232
+    strict EpollWait() -> () error int64;
+    ///STUB 233
+    strict EpollCtl() -> () error int64;
+    ///STUB 234
+    strict Tgkill() -> () error int64;
+    ///STUB 235
+    strict Utimes() -> () error int64;
+    ///STUB 237
+    strict Mbind() -> () error int64;
+    ///STUB 238
+    strict SetMempolicy() -> () error int64;
+    ///STUB 239
+    strict GetMempolicy() -> () error int64;
+    ///STUB 240
+    strict MqOpen() -> () error int64;
+    ///STUB 241
+    strict MqUnlink() -> () error int64;
+    ///STUB 242
+    strict MqTimedsend() -> () error int64;
+    ///STUB 243
+    strict MqTimedreceive() -> () error int64;
+    ///STUB 244
+    strict MqNotify() -> () error int64;
+    ///STUB 245
+    strict MqGetsetattr() -> () error int64;
+    ///STUB 246
+    strict KexecLoad() -> () error int64;
+    ///STUB 247
+    strict Waitid() -> () error int64;
+    ///STUB 248
+    strict AddKey() -> () error int64;
+    ///STUB 249
+    strict RequestKey() -> () error int64;
+    ///STUB 250
+    strict Keyctl() -> () error int64;
+    ///STUB 251
+    strict IoprioSet() -> () error int64;
+    ///STUB 252
+    strict IoprioGet() -> () error int64;
+    ///STUB 253
+    strict InotifyInit() -> () error int64;
+    ///STUB 254
+    strict InotifyAddWatch() -> () error int64;
+    ///STUB 255
+    strict InotifyRmWatch() -> () error int64;
+    ///STUB 256
+    strict MigratePages() -> () error int64;
+    ///STUB 257
+    strict Openat() -> () error int64;
+    ///STUB 258
+    strict Mkdirat() -> () error int64;
+    ///STUB 259
+    strict Mknodat() -> () error int64;
+    ///STUB 260
+    strict Fchownat() -> () error int64;
+    ///STUB 261
+    strict Futimesat() -> () error int64;
+    ///STUB 262
+    strict Newfstatat() -> () error int64;
+    ///STUB 263
+    strict Unlinkat() -> () error int64;
+    ///STUB 264
+    strict Renameat() -> () error int64;
+    ///STUB 265
+    strict Linkat() -> () error int64;
+    ///STUB 266
+    strict Symlinkat() -> () error int64;
+    ///STUB 267
+    strict Readlinkat() -> () error int64;
+    ///STUB 268
+    strict Fchmodat() -> () error int64;
+    ///STUB 269
+    strict Faccessat() -> () error int64;
+    ///STUB 270
+    strict Pselect6() -> () error int64;
+    ///STUB 271
+    strict Ppoll() -> () error int64;
+    ///STUB 272
+    strict Unshare() -> () error int64;
+    ///STUB 273
+    strict SetRobustList() -> () error int64;
+    ///STUB 274
+    strict GetRobustList() -> () error int64;
+    ///STUB 275
+    strict Splice() -> () error int64;
+    ///STUB 276
+    strict Tee() -> () error int64;
+    ///STUB 277
+    strict SyncFileRange() -> () error int64;
+    ///STUB 278
+    strict Vmsplice() -> () error int64;
+    ///STUB 279
+    strict MovePages() -> () error int64;
+    ///STUB 280
+    strict Utimensat() -> () error int64;
+    ///STUB 281
+    strict EpollPwait() -> () error int64;
+    ///STUB 282
+    strict Signalfd() -> () error int64;
+    ///STUB 283
+    strict TimerfdCreate() -> () error int64;
+    ///STUB 284
+    strict Eventfd() -> () error int64;
+    ///STUB 285
+    strict Fallocate() -> () error int64;
+    ///STUB 286
+    strict TimerfdSettime() -> () error int64;
+    ///STUB 287
+    strict TimerfdGettime() -> () error int64;
+    ///STUB 288
+    strict Accept4() -> () error int64;
+    ///STUB 289
+    strict Signalfd4() -> () error int64;
+    ///STUB 290
+    strict Eventfd2() -> () error int64;
+    ///STUB 291
+    strict EpollCreate1() -> () error int64;
+    ///STUB 292
+    strict Dup3() -> () error int64;
+    ///STUB 293
+    strict Pipe2() -> () error int64;
+    ///STUB 294
+    strict InotifyInit1() -> () error int64;
+    ///STUB 295
+    strict Preadv() -> () error int64;
+    ///STUB 296
+    strict Pwritev() -> () error int64;
+    ///STUB 297
+    strict RtTgsigqueueinfo() -> () error int64;
+    ///STUB 298
+    strict PerfEventOpen() -> () error int64;
+    ///STUB 299
+    strict Recvmmsg() -> () error int64;
+    ///STUB 300
+    strict FanotifyInit() -> () error int64;
+    ///STUB 301
+    strict FanotifyMark() -> () error int64;
+    ///STUB 302
+    strict Prlimit64() -> () error int64;
+    ///STUB 303
+    strict NameToHandleAt() -> () error int64;
+    ///STUB 304
+    strict OpenByHandleAt() -> () error int64;
+    ///STUB 305
+    strict ClockAdjtime() -> () error int64;
+    ///STUB 306
+    strict Syncfs() -> () error int64;
+    ///STUB 307
+    strict Sendmmsg() -> () error int64;
+    ///STUB 308
+    strict Setns() -> () error int64;
+    ///STUB 309
+    strict Getcpu() -> () error int64;
+    ///STUB 310
+    strict ProcessVmReadv() -> () error int64;
+    ///STUB 311
+    strict ProcessVmWritev() -> () error int64;
+    ///STUB 312
+    strict Kcmp() -> () error int64;
+    ///STUB 313
+    strict FinitModule() -> () error int64;
+    ///STUB 314
+    strict SchedSetattr() -> () error int64;
+    ///STUB 315
+    strict SchedGetattr() -> () error int64;
+    ///STUB 316
+    strict Renameat2() -> () error int64;
+    ///STUB 317
+    strict Seccomp() -> () error int64;
+    ///STUB 318
+    strict Getrandom() -> () error int64;
+    ///STUB 319
+    strict MemfdCreate() -> () error int64;
+    ///STUB 320
+    strict KexecFileLoad() -> () error int64;
+    ///STUB 321
+    strict Bpf() -> () error int64;
+    ///STUB 322
+    strict Execveat() -> () error int64;
+    ///STUB 323
+    strict Userfaultfd() -> () error int64;
+    ///STUB 324
+    strict Membarrier() -> () error int64;
+    ///STUB 325
+    strict Mlock2() -> () error int64;
+    ///STUB 326
+    strict CopyFileRange() -> () error int64;
+    ///STUB 327
+    strict Preadv2() -> () error int64;
+    ///STUB 328
+    strict Pwritev2() -> () error int64;
+    ///STUB 329
+    strict PkeyMprotect() -> () error int64;
+    ///STUB 330
+    strict PkeyAlloc() -> () error int64;
+    ///STUB 331
+    strict PkeyFree() -> () error int64;
+    ///STUB 332
+    strict Statx() -> () error int64;
+    ///STUB 333
+    strict IoPgetevents() -> () error int64;
+    ///STUB 334
+    strict Rseq() -> () error int64;
+    ///STUB Dont use numbers 387
+    strict DontUseNumbers_387() -> () error int64;
+    ///STUB Dont use numbers 388
+    strict DontUseNumbers_388() -> () error int64;
+    ///STUB Dont use numbers 389
+    strict DontUseNumbers_389() -> () error int64;
+    ///STUB Dont use numbers 390
+    strict DontUseNumbers_390() -> () error int64;
+    ///STUB Dont use numbers 391
+    strict DontUseNumbers_391() -> () error int64;
+    ///STUB Dont use numbers 392
+    strict DontUseNumbers_392() -> () error int64;
+    ///STUB Dont use numbers 393
+    strict DontUseNumbers_393() -> () error int64;
+    ///STUB Dont use numbers 394
+    strict DontUseNumbers_394() -> () error int64;
+    ///STUB Dont use numbers 395
+    strict DontUseNumbers_395() -> () error int64;
+    ///STUB Dont use numbers 396
+    strict DontUseNumbers_396() -> () error int64;
+    ///STUB Dont use numbers 397
+    strict DontUseNumbers_397() -> () error int64;
+    ///STUB Dont use numbers 398
+    strict DontUseNumbers_398() -> () error int64;
+    ///STUB Dont use numbers 399
+    strict DontUseNumbers_399() -> () error int64;
+    ///STUB Dont use numbers 400
+    strict DontUseNumbers_400() -> () error int64;
+    ///STUB Dont use numbers 401
+    strict DontUseNumbers_401() -> () error int64;
+    ///STUB Dont use numbers 402
+    strict DontUseNumbers_402() -> () error int64;
+    ///STUB Dont use numbers 403
+    strict DontUseNumbers_403() -> () error int64;
+    ///STUB Dont use numbers 404
+    strict DontUseNumbers_404() -> () error int64;
+    ///STUB Dont use numbers 405
+    strict DontUseNumbers_405() -> () error int64;
+    ///STUB Dont use numbers 406
+    strict DontUseNumbers_406() -> () error int64;
+    ///STUB Dont use numbers 407
+    strict DontUseNumbers_407() -> () error int64;
+    ///STUB Dont use numbers 408
+    strict DontUseNumbers_408() -> () error int64;
+    ///STUB Dont use numbers 409
+    strict DontUseNumbers_409() -> () error int64;
+    ///STUB Dont use numbers 410
+    strict DontUseNumbers_410() -> () error int64;
+    ///STUB Dont use numbers 411
+    strict DontUseNumbers_411() -> () error int64;
+    ///STUB Dont use numbers 412
+    strict DontUseNumbers_412() -> () error int64;
+    ///STUB Dont use numbers 413
+    strict DontUseNumbers_413() -> () error int64;
+    ///STUB Dont use numbers 414
+    strict DontUseNumbers_414() -> () error int64;
+    ///STUB Dont use numbers 415
+    strict DontUseNumbers_415() -> () error int64;
+    ///STUB Dont use numbers 416
+    strict DontUseNumbers_416() -> () error int64;
+    ///STUB Dont use numbers 417
+    strict DontUseNumbers_417() -> () error int64;
+    ///STUB Dont use numbers 418
+    strict DontUseNumbers_418() -> () error int64;
+    ///STUB Dont use numbers 419
+    strict DontUseNumbers_419() -> () error int64;
+    ///STUB Dont use numbers 420
+    strict DontUseNumbers_420() -> () error int64;
+    ///STUB Dont use numbers 421
+    strict DontUseNumbers_421() -> () error int64;
+    ///STUB Dont use numbers 422
+    strict DontUseNumbers_422() -> () error int64;
+    ///STUB Dont use numbers 423
+    strict DontUseNumbers_423() -> () error int64;
+    ///STUB 424
+    strict PidfdSendSignal() -> () error int64;
+    ///STUB 425
+    strict IoUringSetup() -> () error int64;
+    ///STUB 426
+    strict IoUringEnter() -> () error int64;
+    ///STUB 427
+    strict IoUringRegister() -> () error int64;
+    ///STUB 428
+    strict OpenTree() -> () error int64;
+    ///STUB 429
+    strict MoveMount() -> () error int64;
+    ///STUB 430
+    strict Fsopen() -> () error int64;
+    ///STUB 431
+    strict Fsconfig() -> () error int64;
+    ///STUB 432
+    strict Fsmount() -> () error int64;
+    ///STUB 433
+    strict Fspick() -> () error int64;
+    ///STUB 434
+    strict PidfdOpen() -> () error int64;
+    ///STUB 435
+    strict Clone3() -> () error int64;
+    ///STUB 436
+    strict CloseRange() -> () error int64;
+    ///STUB 437
+    strict Openat2() -> () error int64;
+    ///STUB 438
+    strict PidfdGetfd() -> () error int64;
+    ///STUB 439
+    strict Faccessat2() -> () error int64;
+    ///STUB 440
+    strict ProcessMadvise() -> () error int64;
+    ///STUB 441
+    strict EpollPwait2() -> () error int64;
+    ///STUB 442
+    strict MountSetattr() -> () error int64;
+    ///STUB 443
+    strict QuotactlFd() -> () error int64;
+    ///STUB 444
+    strict LandlockCreateRuleset() -> () error int64;
+    ///STUB 445
+    strict LandlockAddRule() -> () error int64;
+    ///STUB 446
+    strict LandlockRestrictSelf() -> () error int64;
+    ///STUB 447
+    strict MemfdSecret() -> () error int64;
+    ///STUB 448
+    strict ProcessMrelease() -> () error int64;
+    ///STUB 449
+    strict FutexWaitv() -> () error int64;
+    ///STUB 450
+    strict SetMempolicyHomeNode() -> () error int64;
+    ///STUB 451
+    strict Cachestat() -> () error int64;
+    ///STUB 452
+    strict Fchmodat2() -> () error int64;
+    ///STUB 453
+    strict MapShadowStack() -> () error int64;
+    ///STUB 454
+    strict FutexWake() -> () error int64;
+    ///STUB 455
+    strict FutexWait() -> () error int64;
+    ///STUB 456
+    strict FutexRequeue() -> () error int64;
+    ///STUB 457
+    strict Statmount() -> () error int64;
+    ///STUB 458
+    strict Listmount() -> () error int64;
+    ///STUB 459
+    strict LsmGetSelfAttr() -> () error int64;
+    ///STUB 460
+    strict LsmSetSelfAttr() -> () error int64;
+    ///STUB 461
+    strict LsmListModules() -> () error int64;
+    ///STUB 512
+    strict CompatRtSigaction() -> () error int64;
+    ///STUB 513
+    strict CompatRtSigreturn() -> () error int64;
+    ///STUB 514
+    strict CompatIoctl() -> () error int64;
+    ///STUB 515
+    strict CompatReadv() -> () error int64;
+    ///STUB 516
+    strict CompatWritev() -> () error int64;
+    ///STUB 517
+    strict CompatRecvfrom() -> () error int64;
+    ///STUB 518
+    strict CompatSendmsg() -> () error int64;
+    ///STUB 519
+    strict CompatRecvmsg() -> () error int64;
+    ///STUB 520
+    strict CompatExecve() -> () error int64;
+    ///STUB 521
+    strict CompatPtrace() -> () error int64;
+    ///STUB 522
+    strict CompatRtSigpending() -> () error int64;
+    ///STUB 523
+    strict CompatRtSigtimedwait() -> () error int64;
+    ///STUB 524
+    strict CompatRtSigqueueinfo() -> () error int64;
+    ///STUB 525
+    strict CompatSigaltstack() -> () error int64;
+    ///STUB 526
+    strict CompatTimerCreate() -> () error int64;
+    ///STUB 527
+    strict CompatMqNotify() -> () error int64;
+    ///STUB 528
+    strict CompatKexecLoad() -> () error int64;
+    ///STUB 529
+    strict CompatWaitid() -> () error int64;
+    ///STUB 530
+    strict CompatSetRobustList() -> () error int64;
+    ///STUB 531
+    strict CompatGetRobustList() -> () error int64;
+    ///STUB 532
+    strict CompatVmsplice() -> () error int64;
+    ///STUB 533
+    strict CompatMovePages() -> () error int64;
+    ///STUB 534
+    strict CompatPreadv() -> () error int64;
+    ///STUB 535
+    strict CompatPwritev() -> () error int64;
+    ///STUB 536
+    strict CompatRtTgsigqueueinfo() -> () error int64;
+    ///STUB 537
+    strict CompatRecvmmsg() -> () error int64;
+    ///STUB 538
+    strict CompatSendmmsg() -> () error int64;
+    ///STUB 539
+    strict CompatProcessVmReadv() -> () error int64;
+    ///STUB 540
+    strict CompatProcessVmWritev() -> () error int64;
+    ///STUB 541
+    strict CompatSetsockopt() -> () error int64;
+    ///STUB 542
+    strict CompatGetsockopt() -> () error int64;
+    ///STUB 543
+    strict CompatIoSetup() -> () error int64;
+    ///STUB 544
+    strict CompatIoSubmit() -> () error int64;
+    ///STUB 545
+    strict CompatExecveat() -> () error int64;
+    ///STUB 546
+    strict CompatPreadv2() -> () error int64;
+    ///STUB 547
+    strict CompatPwritev2() -> () error int64;
+};
