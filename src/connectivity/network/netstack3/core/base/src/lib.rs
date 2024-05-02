@@ -23,7 +23,8 @@ pub use context::ContextPair;
 pub use counters::Counter;
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use resource_references::{
-    ReferenceNotifiers, RemoveResourceResult, RemoveResourceResultWithContext,
+    DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
+    RemoveResourceResultWithContext,
 };
 pub use time::{
     local_timer_heap::LocalTimerHeap, CoreTimerContext, HandleableTimer, Instant,

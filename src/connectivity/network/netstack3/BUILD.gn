@@ -104,6 +104,7 @@ common_sources = [
   "src/bindings/name_worker.rs",
   "src/bindings/neighbor_worker.rs",
   "src/bindings/netdevice_worker.rs",
+  "src/bindings/resource_removal.rs",
   "src/bindings/root_fidl_worker.rs",
   "src/bindings/routes.rs",
   "src/bindings/routes/admin.rs",

@@ -63,8 +63,9 @@ use crate::{
             FakeInstant, FakeTimerCtx, FakeTimerCtxExt, PureIpDeviceAndIpVersion,
             WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerBindingsTypes,
-        TimerContext, TimerHandler, TracingContext, UnlockedCoreCtx,
+        DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
+        ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
+        TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -914,7 +915,7 @@ impl TcpBindingsTypes for FakeBindingsCtx {
     }
 }
 
-impl crate::ReferenceNotifiers for FakeBindingsCtx {
+impl ReferenceNotifiers for FakeBindingsCtx {
     type ReferenceReceiver<T: 'static> = Never;
 
     type ReferenceNotifier<T: Send + 'static> = Never;
@@ -930,6 +931,12 @@ impl crate::ReferenceNotifiers for FakeBindingsCtx {
             debug_references={debug_references:?}",
             core::any::type_name::<T>()
         );
+    }
+}
+
+impl DeferredResourceRemovalContext for FakeBindingsCtx {
+    fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+        match receiver {}
     }
 }
 

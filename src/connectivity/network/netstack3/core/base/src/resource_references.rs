@@ -25,6 +25,37 @@ pub trait ReferenceNotifiers {
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
 }
 
+/// A context trait that allows core to defer observing proper resource cleanup
+/// to bindings.
+///
+/// This trait exists as a debug utility to expose resources that are not
+/// removed from the system as expected.
+pub trait DeferredResourceRemovalContext: ReferenceNotifiers {
+    /// Defers the removal of some resource `T` to bindings.
+    ///
+    /// Bindings can watch `receiver` and notify when resource removal is not
+    /// completing in a timely manner.
+    fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>);
+
+    /// A shorthand for [`defer_removal`] that takes a `ReferenceReceiver` from
+    /// the `Deferred` variant of a [`RemoveResourceResult`].
+    ///
+    /// The default implementation is `track_caller` when the `instrumented`
+    /// feature is available so implementers can track the caller location when
+    /// needed.
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn defer_removal_result<T: Send + 'static>(
+        &mut self,
+        result: RemoveResourceResultWithContext<T, Self>,
+    ) {
+        match result {
+            // We don't need to do anything for synchronously removed resources.
+            RemoveResourceResult::Removed(_) => (),
+            RemoveResourceResult::Deferred(d) => self.defer_removal(d),
+        }
+    }
+}
+
 /// The result of removing some reference-counted resource from core.
 #[derive(Debug)]
 pub enum RemoveResourceResult<R, D> {
@@ -38,18 +69,6 @@ pub enum RemoveResourceResult<R, D> {
 }
 
 impl<R, D> RemoveResourceResult<R, D> {
-    /// Unwraps the `Removed` variant.
-    ///
-    /// Panics if the variant is `Deferred`.
-    // TODO(https://fxbug.dev/336291808): Delete this method when we expose
-    // deferred resources to bindings.
-    pub fn unwrap_removed(self) -> R {
-        match self {
-            Self::Removed(r) => r,
-            Self::Deferred(_) => panic!("unexpected deferred removal"),
-        }
-    }
-
     /// Maps the `Removed` variant to a different type.
     pub fn map_removed<N, F: FnOnce(R) -> N>(self, f: F) -> RemoveResourceResult<N, D> {
         match self {

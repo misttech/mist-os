@@ -237,10 +237,8 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             config,
         )
         .map(|(addr_sub, config, result)| {
-            // TODO(https://fxbug.dev/336291808): Expose deferred removals to
-            // bindings.
-            let _ = result.unwrap_removed();
             assert_eq!(&addr_sub.addr(), addr);
+            bindings_ctx.defer_removal_result(result);
             match config {
                 Ipv6AddrConfig::Slaac(s) => (addr_sub, s),
                 Ipv6AddrConfig::Manual(_manual_config) => {

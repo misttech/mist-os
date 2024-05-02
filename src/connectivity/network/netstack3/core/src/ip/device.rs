@@ -39,8 +39,8 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
-        EventContext, HandleableTimer, InstantBindingsTypes, InstantContext, RngContext,
-        TimerContext, TimerHandler,
+        DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
+        InstantContext, RngContext, TimerContext, TimerHandler,
     },
     device::{self, AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
@@ -479,6 +479,7 @@ impl<
 /// The bindings execution context for IP devices.
 pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
     IpDeviceStateBindingsTypes
+    + DeferredResourceRemovalContext
     + TimerContext
     + RngContext
     + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>
@@ -488,6 +489,7 @@ impl<
         D: device::StrongId,
         I: IpDeviceIpExt,
         BC: IpDeviceStateBindingsTypes
+            + DeferredResourceRemovalContext
             + TimerContext
             + RngContext
             + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>,
@@ -598,11 +600,6 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: IpDeviceStateBindingsTypes>
     ) -> Result<Self::AddressId, ExistsError>;
 
     /// Removes an address from the device identified by the ID.
-    // TODO(https://fxbug.dev/336291808): This function must return whether the
-    // resource has been destroyed synchronously or if destruction is deferred
-    // to account for other strong references to `addr`. That can be bubbled up
-    // to bindings for a safe wait on user-initiated removals or signaled for
-    // internal removals.
     fn remove_ip_address(
         &mut self,
         device_id: &Self::DeviceId,
@@ -1027,9 +1024,7 @@ impl<
                 AddressRemovedReason::DadFailed,
             ) {
                 Ok(result) => {
-                    // TODO(https://fxbug.dev/336291808): Expose deferred
-                    // removals to bindings.
-                    let _ = result.unwrap_removed();
+                    bindings_ctx.defer_removal_result(result);
                     IpAddressState::Tentative
                 }
                 Err(NotFoundError) => {
@@ -1258,9 +1253,7 @@ fn disable_ipv6_device_with_config<
                     device_config,
                 )
                 .map(|remove_result| {
-                    // TODO(https://fxbug.dev/336291808): Expose deferred
-                    // removals to bindings.
-                    let _ = remove_result.unwrap_removed();
+                    bindings_ctx.defer_removal_result(remove_result);
                 })
                 .unwrap_or_else(|NotFoundError| {
                     // We're not holding locks on the addresses anymore we must

@@ -50,8 +50,9 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    ContextPair, CoreTimerContext, HandleableTimer, InstantBindingsTypes, InstantContext,
-    NestedIntoCoreTimerCtx, ReferenceNotifiers, TimerBindingsTypes, TimerContext, TimerHandler,
+    ContextPair, CoreTimerContext, DeferredResourceRemovalContext, HandleableTimer,
+    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers,
+    TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -706,7 +707,7 @@ pub(crate) mod testutil {
         type Notifier = FakeLinkResolutionNotifier<D>;
     }
 
-    impl<Id, Event: Debug, State, FrameMeta> crate::ReferenceNotifiers
+    impl<Id, Event: Debug, State, FrameMeta> ReferenceNotifiers
         for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         type ReferenceReceiver<T: 'static> = Never;
@@ -724,6 +725,14 @@ pub(crate) mod testutil {
                 debug_references={debug_references:?}",
                 core::any::type_name::<T>()
             );
+        }
+    }
+
+    impl<Id, Event: Debug, State, FrameMeta> DeferredResourceRemovalContext
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
+        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+            match receiver {}
         }
     }
 

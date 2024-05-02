@@ -700,6 +700,7 @@ fn debug_refs(
 
 /// Provides a [`Debug`] implementation that contains information helpful for
 /// debugging dangling references.
+#[derive(Clone)]
 pub struct DebugReferences<T>(alloc::sync::Weak<Inner<T>>);
 
 impl<T> core::fmt::Debug for DebugReferences<T> {
@@ -722,6 +723,7 @@ impl<T: Send + Sync + 'static> DebugReferences<T> {
 }
 
 /// Like [`DebugReferences`], but type-erases the contained type.
+#[derive(Clone)]
 pub struct DynDebugReferences(alloc::sync::Weak<dyn ExposeRefs>);
 
 impl core::fmt::Debug for DynDebugReferences {
