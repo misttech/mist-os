@@ -48,9 +48,9 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    ContextPair, CoreTimerContext, DeferredResourceRemovalContext, HandleableTimer,
-    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers, RngContext,
-    TimerBindingsTypes, TimerContext, TimerHandler,
+    ContextPair, CoreEventContext, CoreTimerContext, DeferredResourceRemovalContext, EventContext,
+    HandleableTimer, InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx,
+    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -128,16 +128,6 @@ pub trait ResourceCounterContext<R, T>: CounterContext<T> {
         self.with_per_resource_counters(resource, |counters| cb(counters).increment());
         self.with_counters(|counters| cb(counters).increment());
     }
-}
-
-/// A context for emitting events.
-///
-/// `EventContext` encodes the common pattern for emitting atomic events of type
-/// `T` from core. An implementation of `EventContext` must guarantee that
-/// events are processed in the order they are emitted.
-pub trait EventContext<T> {
-    /// Handles `event`.
-    fn on_event(&mut self, event: T);
 }
 
 /// A context for emitting tracing data.
@@ -353,7 +343,7 @@ pub(crate) mod testutil {
     };
 
     pub use netstack3_base::testutil::{
-        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
+        FakeEventCtx, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
         WithFakeTimerContext,
     };
 
@@ -418,46 +408,6 @@ pub(crate) mod testutil {
             let buffer = frame.serialize_vec_outer().map_err(|(_err, s)| s)?;
             self.push(metadata, buffer.as_ref().to_vec());
             Ok(())
-        }
-    }
-
-    /// A fake [`EventContext`].
-    pub struct FakeEventCtx<E: Debug> {
-        events: Vec<E>,
-        must_watch_all_events: bool,
-    }
-
-    impl<E: Debug> EventContext<E> for FakeEventCtx<E> {
-        fn on_event(&mut self, event: E) {
-            self.events.push(event)
-        }
-    }
-
-    impl<E: Debug> Drop for FakeEventCtx<E> {
-        fn drop(&mut self) {
-            if self.must_watch_all_events {
-                assert!(
-                    self.events.is_empty(),
-                    "dropped context with unacknowledged events: {:?}",
-                    self.events
-                );
-            }
-        }
-    }
-
-    impl<E: Debug> Default for FakeEventCtx<E> {
-        fn default() -> Self {
-            Self { events: Default::default(), must_watch_all_events: false }
-        }
-    }
-
-    impl<E: Debug> FakeEventCtx<E> {
-        #[cfg(test)]
-        pub(crate) fn take(&mut self) -> Vec<E> {
-            // Any client that calls `take()` is opting into watching events
-            // and must watch them all.
-            self.must_watch_all_events = true;
-            core::mem::take(&mut self.events)
         }
     }
 

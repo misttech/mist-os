@@ -52,7 +52,7 @@ use crate::{
                 IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
                 Ipv6DeviceConfigurationUpdate,
             },
-            dad::{DadEvent, DadHandler, DadTimerId},
+            dad::{DadHandler, DadTimerId},
             nud::NudIpHandler,
             route_discovery::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler,
@@ -455,25 +455,6 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
         /// `true` if IP was enabled on the device; `false` if IP was disabled.
         ip_enabled: bool,
     },
-}
-
-impl<
-        DeviceId,
-        BC: InstantBindingsTypes + EventContext<IpDeviceEvent<DeviceId, Ipv6, BC::Instant>>,
-    > EventContext<DadEvent<DeviceId>> for BC
-{
-    fn on_event(&mut self, event: DadEvent<DeviceId>) {
-        match event {
-            DadEvent::AddressAssigned { device, addr } => BC::on_event(
-                self,
-                IpDeviceEvent::AddressStateChanged {
-                    device,
-                    addr: addr.into_specified(),
-                    state: IpAddressState::Assigned,
-                },
-            ),
-        }
-    }
 }
 
 /// The bindings execution context for IP devices.

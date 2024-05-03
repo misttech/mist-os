@@ -15,6 +15,7 @@ extern crate fakealloc as alloc;
 mod context;
 mod counters;
 mod data_structures;
+mod event;
 mod inspect;
 mod resource_references;
 mod rng;
@@ -22,6 +23,7 @@ mod time;
 
 pub use context::ContextPair;
 pub use counters::Counter;
+pub use event::{CoreEventContext, EventContext};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
@@ -59,6 +61,7 @@ pub mod sync {
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
+    pub use crate::event::testutil::FakeEventCtx;
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
         FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,

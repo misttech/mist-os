@@ -32,7 +32,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CoreTimerContext, CounterContext},
+    context::{CoreEventContext, CoreTimerContext, CounterContext},
     device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
@@ -40,7 +40,10 @@ use crate::{
         self,
         device::{
             self, add_ip_addr_subnet_with_config,
-            dad::{DadAddressContext, DadAddressStateRef, DadContext, DadHandler, DadStateRef},
+            dad::{
+                DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler,
+                DadStateRef,
+            },
             del_ip_addr_inner, get_ipv6_hop_limit, is_ip_device_enabled, is_ip_forwarding_enabled,
             join_ip_multicast_with_config, leave_ip_multicast_with_config,
             nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
@@ -60,8 +63,8 @@ use crate::{
                 Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
             },
             AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
-            IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceStateContext,
-            IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
+            IpAddressState, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceEvent, IpDeviceIpExt,
+            IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
         },
         gmp::{
             self,
@@ -814,6 +817,24 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
             multicast_addr,
             config,
         )
+    }
+}
+
+impl<'a, Config, BC, L> CoreEventContext<DadEvent<DeviceId<BC>>>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+where
+    BC: BindingsContext,
+{
+    type OuterEvent = IpDeviceEvent<DeviceId<BC>, Ipv6, BC::Instant>;
+
+    fn convert_event(event: DadEvent<DeviceId<BC>>) -> Self::OuterEvent {
+        match event {
+            DadEvent::AddressAssigned { device, addr } => IpDeviceEvent::AddressStateChanged {
+                device,
+                addr: addr.into_specified(),
+                state: IpAddressState::Assigned,
+            },
+        }
     }
 }
 
