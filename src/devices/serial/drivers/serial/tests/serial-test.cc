@@ -35,16 +35,6 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
   size_t total_written_bytes() const { return total_written_bytes_; }
 
   // Test utility methods.
-  void set_state_and_notify(fuchsia_hardware_serialimpl::SerialState state) {
-    state_ = state;
-
-    bindings_.ForEachBinding([this](const auto& binding) {
-      fdf::Arena arena('FTDI');
-      [[maybe_unused]] auto status =
-          fdf::WireSendEvent(binding).buffer(arena)->OnSerialStateChanged(state_);
-    });
-  }
-
   zx_status_t wait_for_write(zx::time deadline, zx_signals_t* pending) {
     return write_event_.wait_one(kEventWrittenSignal, deadline, pending);
   }
@@ -70,10 +60,6 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
   }
 
   void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override {
-    if (!(state_ & fuchsia_hardware_serialimpl::SerialState::kReadable)) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_SHOULD_WAIT);
-    }
-
     fidl::VectorView<uint8_t> buffer(arena, kBufferLength);
     size_t i;
 
@@ -82,20 +68,11 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
     }
     buffer.set_count(i);
 
-    if (i == kBufferLength || !read_buffer_[i]) {
-      // Simply reset the state, no advanced state machine.
-      set_state_and_notify({});
-    }
-
     completer.buffer(arena).ReplySuccess(buffer);
   }
 
   void Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request, fdf::Arena& arena,
              WriteCompleter::Sync& completer) override {
-    if (!(state_ & fuchsia_hardware_serialimpl::SerialState::kWritable)) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_SHOULD_WAIT);
-    }
-
     size_t i;
 
     for (i = 0; i < request->data.count() && i < kBufferLength; ++i) {
@@ -124,8 +101,6 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
 
  private:
   bool enabled_;
-
-  fuchsia_hardware_serialimpl::SerialState state_;
 
   uint8_t read_buffer_[kBufferLength];
   uint8_t write_buffer_[kBufferLength];
@@ -239,7 +214,6 @@ TEST_F(SerialDeviceTest, Read) {
   // Test set up.
   serial_impl().SyncCall([&data](FakeSerialImpl* serial_impl) {
     *std::copy(data.begin(), data.end(), serial_impl->read_buffer()) = 0;
-    serial_impl->set_state_and_notify(fuchsia_hardware_serialimpl::SerialState::kReadable);
   });
 
   // Test.
@@ -264,11 +238,6 @@ TEST_F(SerialDeviceTest, Write) {
   constexpr std::string_view data = "test";
   uint8_t payload[data.size()];
   std::copy(data.begin(), data.end(), payload);
-
-  // Test set up.
-  serial_impl().SyncCall([](FakeSerialImpl* serial_impl) {
-    serial_impl->set_state_and_notify(fuchsia_hardware_serialimpl::SerialState::kWritable);
-  });
 
   // Test.
   client->Write(fidl::VectorView<uint8_t>::FromExternal(payload))

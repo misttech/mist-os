@@ -35,12 +35,6 @@ const SERIAL_FLOW_CTRL_MASK uint32 = 0x20;
 const SERIAL_SET_BAUD_RATE_ONLY uint32 = 0x80000000;
 
 // End of `flags` that can be passed to Config.
-
-type SerialState = strict bits : uint32 {
-    READABLE = 0x1;
-    WRITABLE = 0x2;
-};
-
 @transport("Driver")
 open protocol Device {
     flexible GetInfo() -> (struct {
@@ -57,32 +51,40 @@ open protocol Device {
     /// Enable or disable the device.
     /// If already enabled and `enable` is true, this is a no-op and returns successfully.
     /// If already disabled and `enable` is false, this is a no-op and returns successfully.
+    ///
+    /// + request `enable` true to enable the device, or false to disable it.
+    /// * error one of the following values:
+    /// *     `ZX_ERR_BAD_STATE`: `enable` was false, and a `Read()` or `Write()` call was pending.
     flexible Enable(struct {
         enable bool;
     }) -> () error zx.Status;
 
-    /// Do a read operation. If there is already one in progress this returns a
-    /// ZX_ERR_NOT_SUPPORTED.
-    /// The `CancelAll` method can be used to cancel a Read, which will result in a
-    /// ZX_ERR_CANCELED error to be returned.
-    /// Returns the read data when the read is completed successfully.
+    /// Perform a read operation. Returns immediately if data has been received since the last call;
+    /// otherwise the request is completed the next time data is received (clients can use the
+    /// hanging-get pattern to be notified of new data).
+    ///
+    /// - response `data` the bytes read from the device.
+    /// * error one of the following values:
+    /// *     `ZX_ERR_BAD_STATE`: The device was not enabled.
+    /// *     `ZX_ERR_CANCELED`: The call was canceled by `CancelAll()`.
+    /// *     `ZX_ERR_ALREADY_BOUND`: Another `Read()` call was already pending.
+    /// *     Other values may be returned for driver- or device-specific errors.
     flexible Read() -> (struct {
         data vector<uint8>:MAX;
     }) error zx.Status;
 
-    /// Do a write operation. If there is already one in progress this returns a
-    /// ZX_ERR_NOT_SUPPORTED.
-    /// The `CancelAll` method can be used to cancel a Write, which will result in a
-    /// ZX_ERR_CANCELED error to be returned.
-    /// Returns when the write is completed successfully.
+    /// Perform a write operation. Returns when all bytes have been written, or when an error is
+    /// encountered.
+    ///
+    /// + request `data` the bytes to write to the device.
+    /// * error one of the following values:
+    /// *     `ZX_ERR_BAD_STATE`: The device was not enabled.
+    /// *     `ZX_ERR_CANCELED`: The call was canceled by `CancelAll()`.
+    /// *     `ZX_ERR_ALREADY_BOUND`: Another `Write()` call was already pending.
+    /// *     Other values may be returned for driver- or device-specific errors.
     flexible Write(struct {
         data vector<uint8>:MAX;
     }) -> () error zx.Status;
-
-    /// Event for notification of readable/writeable state changes
-    flexible -> OnSerialStateChanged(struct {
-        state SerialState;
-    });
 
     /// Immediately cancels all outstanding asynchronous I/O
     flexible CancelAll() -> ();
