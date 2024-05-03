@@ -194,7 +194,12 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
 
   size_t size = crashlog.Recover(nullptr);
   fbl::RefPtr<VmObjectPaged> crashlog_vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size, &crashlog_vmo);
+  size_t aligned_size;
+  zx_status_t status = VmObject::RoundSize(size, &aligned_size);
+  if (status != ZX_OK) {
+    return status;
+  }
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, aligned_size, &crashlog_vmo);
 
   if (status != ZX_OK) {
     return status;

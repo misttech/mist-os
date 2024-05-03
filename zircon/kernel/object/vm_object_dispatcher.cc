@@ -48,6 +48,10 @@ zx::result<VmObjectDispatcher::CreateStats> VmObjectDispatcher::parse_create_sys
   if (flags & ZX_VMO_UNBOUNDED) {
     flags &= ~ZX_VMO_UNBOUNDED;
     res.size = VmObjectPaged::max_size();
+  } else {
+    if (zx_status_t status = VmObject::RoundSize(size, &res.size); status != ZX_OK) {
+      return zx::error(status);
+    }
   }
 
   if (flags) {

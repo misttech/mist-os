@@ -415,8 +415,8 @@ static bool vmo_multiple_pin_contiguous_test() {
   END_TEST;
 }
 
-// Creates a vm object, commits odd sized memory.
-static bool vmo_odd_size_commit_test() {
+// Checks that VMOs must be page aligned sizes.
+static bool vmo_unaligned_size_test() {
   BEGIN_TEST;
 
   AutoVmScannerDisable scanner_disable;
@@ -424,13 +424,8 @@ static bool vmo_odd_size_commit_test() {
   static const size_t alloc_size = 15;
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, alloc_size, &vmo);
-  ASSERT_EQ(status, ZX_OK, "vmobject creation\n");
-  ASSERT_TRUE(vmo, "vmobject creation\n");
+  ASSERT_EQ(status, ZX_ERR_INVALID_ARGS, "vmobject creation\n");
 
-  auto ret = vmo->CommitRange(0, alloc_size);
-  EXPECT_EQ(ZX_OK, ret, "committing vm object\n");
-  EXPECT_EQ(ROUNDUP_PAGE_SIZE(alloc_size), PAGE_SIZE * vmo->AttributedPages().uncompressed,
-            "committing vm object\n");
   END_TEST;
 }
 
@@ -4252,7 +4247,7 @@ VM_UNITTEST(vmo_multiple_pin_test)
 VM_UNITTEST(vmo_multiple_pin_contiguous_test)
 VM_UNITTEST(vmo_commit_test)
 VM_UNITTEST(vmo_commit_compressed_pages_test)
-VM_UNITTEST(vmo_odd_size_commit_test)
+VM_UNITTEST(vmo_unaligned_size_test)
 VM_UNITTEST(vmo_reference_attribution_commit_test)
 VM_UNITTEST(vmo_create_physical_test)
 VM_UNITTEST(vmo_physical_pin_test)

@@ -680,6 +680,15 @@ class VmObject : public VmHierarchyBase,
 
   uint32_t num_children() const;
 
+  // Helper to round to the VMO size multiple (which is PAGE_SIZE) without overflowing.
+  static zx_status_t RoundSize(uint64_t size, uint64_t* out_size) {
+    *out_size = ROUNDUP_PAGE_SIZE(size);
+    if (*out_size < size) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    return ZX_OK;
+  }
+
   // Calls the provided |func(const VmObject&)| on every VMO in the system,
   // from oldest to newest. Stops if |func| returns an error, returning the
   // error value.
@@ -739,8 +748,6 @@ class VmObject : public VmHierarchyBase,
   // The user-friendly VMO name. For debug purposes only. That
   // is, there is no mechanism to get access to a VMO via this name.
   fbl::Name<ZX_MAX_NAME_LEN> name_;
-
-  static zx_status_t RoundSize(uint64_t size, uint64_t* out_size);
 
   static constexpr uint64_t MAX_SIZE = VmPageList::MAX_SIZE;
   // Ensure that MAX_SIZE + PAGE_SIZE doesn't overflow so no VmObjects

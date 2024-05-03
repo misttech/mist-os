@@ -241,9 +241,11 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   fbl::AllocChecker ac;
@@ -261,8 +263,8 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   fbl::RefPtr<VmCowPages> cow_pages;
-  status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
-                              ktl::move(discardable), &cow_pages);
+  zx_status_t status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
+                                          ktl::move(discardable), &cow_pages);
   if (status != ZX_OK) {
     return status;
   }
@@ -329,9 +331,11 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
                                             fbl::RefPtr<VmObjectPaged>* obj) {
   DEBUG_ASSERT(alignment_log2 < sizeof(uint64_t) * 8);
   // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   fbl::AllocChecker ac;
@@ -350,7 +354,8 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
   auto* page_source_ptr = page_source.get();
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size, &vmo);
+  zx_status_t status =
+      CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size, &vmo);
   if (status != ZX_OK) {
     // Ensure to close the page source we created, as it will not get closed by the VmCowPages since
     // that creation failed.
@@ -469,9 +474,11 @@ zx_status_t VmObjectPaged::CreateExternal(fbl::RefPtr<PageSource> src, uint32_t 
   }
 
   // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // External VMOs always support delayed PMM allocations, since they already have to tolerate
@@ -540,9 +547,11 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   }
 
   // Make sure size is page aligned.
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // Slice must be wholly contained. |size()| will read the size holding the lock. This is extra
@@ -585,7 +594,7 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     vmo->cache_policy_ = cache_policy_;
 
     fbl::RefPtr<VmCowPages> cow_pages;
-    status = cow_pages_locked()->CreateChildSliceLocked(offset, size, &cow_pages);
+    zx_status_t status = cow_pages_locked()->CreateChildSliceLocked(offset, size, &cow_pages);
     if (status != ZX_OK) {
       return status;
     }
@@ -724,10 +733,12 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  // size must be page aligned and not too large.
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   uint32_t options = 0;
@@ -755,7 +766,8 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     }
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
-    status = cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
+    zx_status_t status =
+        cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
     if (status != ZX_OK) {
       return status;
     }
@@ -1338,15 +1350,17 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
     return ZX_ERR_UNAVAILABLE;
   }
 
-  // round up the size to the next page size boundary and make sure we don't wrap
-  zx_status_t status = RoundSize(s, &s);
-  if (status != ZX_OK) {
-    return status;
+  // ensure the size is valid and that we will not wrap.
+  if (!IS_PAGE_ALIGNED(s)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (s > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   Guard<CriticalMutex> guard{lock()};
 
-  status = cow_pages_locked()->ResizeLocked(s);
+  zx_status_t status = cow_pages_locked()->ResizeLocked(s);
   if (status != ZX_OK) {
     return status;
   }
