@@ -3722,7 +3722,7 @@ fn slow_resolve_races_with_capability_requested() {
     let mut test_body = Box::pin(async move {
         // Add a hook that delays component resolution.
         let (blocking_resolved_hook, resolved_hook_sender) = BlockingResolvedHook::new();
-        test.model.root().hooks.install_front(blocking_resolved_hook.hooks()).await;
+        test.model.root().hooks.install_front_for_test(blocking_resolved_hook.hooks()).await;
 
         // Resolve root.
         resolved_hook_sender.unbounded_send(Moniker::root()).unwrap();

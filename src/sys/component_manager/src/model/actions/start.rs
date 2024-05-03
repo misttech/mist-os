@@ -9,7 +9,7 @@ use {
         actions::{Action, ActionKey},
         component::instance::{InstanceState, StartedInstanceState},
         component::{ComponentInstance, IncomingCapabilities, StartReason},
-        hooks::{Event, EventPayload, RuntimeInfo},
+        hooks::{EventPayload, RuntimeInfo},
         namespace::create_namespace,
         routing::{open_capability, RouteRequest},
     },
@@ -380,16 +380,14 @@ async fn start_component(
     //
     component
         .hooks
-        .dispatch(&Event::new_with_timestamp(
-            component,
+        .dispatch(&component.new_event_with_timestamp(
             EventPayload::Started { runtime: runtime_info, component_decl: decl },
             timestamp,
         ))
         .await;
     component
         .hooks
-        .dispatch(&Event::new_with_timestamp(
-            component,
+        .dispatch(&component.new_event_with_timestamp(
             EventPayload::DebugStarted {
                 runtime_dir,
                 break_on_start: Arc::new(break_on_start_right),
@@ -576,6 +574,7 @@ mod tests {
             actions::{ActionsManager, ShutdownAction, ShutdownType, StopAction},
             component::instance::{ResolvedInstanceState, UnresolvedInstanceState},
             component::{Component, WeakComponentInstance},
+            hooks::Event,
             hooks::{EventType, Hook, HooksRegistration},
             structured_dict::ComponentInput,
             testing::{

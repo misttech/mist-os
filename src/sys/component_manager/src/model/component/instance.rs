@@ -20,7 +20,7 @@ use {
             context::ModelContext,
             environment::Environment,
             escrow::{self, EscrowedState},
-            hooks::{CapabilityReceiver, Event, EventPayload},
+            hooks::{CapabilityReceiver, EventPayload},
             namespace::create_namespace,
             routing::{
                 self,
@@ -1264,14 +1264,11 @@ impl Routable for CapabilityRequestedHook {
         let source = self.source.upgrade().map_err(RoutingError::from)?;
         let target = request.target.upgrade().map_err(RoutingError::from)?;
         let (receiver, sender) = CapabilityReceiver::new();
-        let event = Event::new(
-            &target,
-            EventPayload::CapabilityRequested {
-                source_moniker: source.moniker.clone(),
-                name: self.name.to_string(),
-                receiver: receiver.clone(),
-            },
-        );
+        let event = target.new_event(EventPayload::CapabilityRequested {
+            source_moniker: source.moniker.clone(),
+            name: self.name.to_string(),
+            receiver: receiver.clone(),
+        });
         // TODO(https://fxbug.dev/320698181): Before dispatching events we need to wait for any
         // in-progress resolve actions to end. See https://fxbug.dev/320698181#comment21 for why.
         {

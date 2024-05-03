@@ -688,15 +688,12 @@ impl ComponentInstance {
             }
 
             let stop_time = zx::Time::get_monotonic();
-            let event = Event::new(
-                self,
-                EventPayload::Stopped {
-                    status: outcome.component_exit_status,
-                    stop_time,
-                    execution_duration: stop_time - start_time,
-                    requested_escrow,
-                },
-            );
+            let event = self.new_event(EventPayload::Stopped {
+                status: outcome.component_exit_status,
+                stop_time,
+                execution_duration: stop_time - start_time,
+                requested_escrow,
+            });
             self.hooks.dispatch(&event).await;
         }
 
@@ -1256,6 +1253,19 @@ impl ComponentInstance {
         let component = self.find_and_maybe_resolve(moniker).await?;
         component.start(reason, None, IncomingCapabilities::default()).await?;
         Ok(component)
+    }
+
+    pub fn new_event(&self, payload: EventPayload) -> Event {
+        self.new_event_with_timestamp(payload, zx::Time::get_monotonic())
+    }
+
+    pub fn new_event_with_timestamp(&self, payload: EventPayload, timestamp: zx::Time) -> Event {
+        Event {
+            target_moniker: self.moniker.clone().into(),
+            component_url: self.component_url.clone(),
+            timestamp,
+            payload,
+        }
     }
 }
 

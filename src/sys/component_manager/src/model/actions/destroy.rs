@@ -9,7 +9,7 @@ use {
         },
         component::instance::InstanceState,
         component::ComponentInstance,
-        hooks::{Event, EventPayload},
+        hooks::EventPayload,
         structured_dict::ComponentInput,
     },
     ::routing::component_instance::ExtendedInstanceInterface,
@@ -128,7 +128,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         component.lock_state().await.set(InstanceState::Destroyed);
 
         // Send the Destroyed event for the component
-        let event = Event::new(&component, EventPayload::Destroyed);
+        let event = component.new_event(EventPayload::Destroyed);
         component.hooks.dispatch(&event).await;
 
         // Remove this component from the parent's list of children

@@ -10,7 +10,7 @@ use {
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
         component::{Component, WeakComponentInstance},
-        hooks::{Event, EventPayload},
+        hooks::EventPayload,
         resolver::Resolver,
     },
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
@@ -167,13 +167,10 @@ async fn do_resolve(
         return Ok(());
     }
 
-    let event = Event::new(
-        component,
-        EventPayload::Resolved {
-            component: WeakComponentInstance::from(component),
-            decl: component_info.decl.clone(),
-        },
-    );
+    let event = component.new_event(EventPayload::Resolved {
+        component: WeakComponentInstance::from(component),
+        decl: component_info.decl.clone(),
+    });
     component.hooks.dispatch(&event).await;
     Ok(())
 }

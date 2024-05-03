@@ -7,7 +7,7 @@ use {
         actions::{shutdown::do_shutdown, Action, ActionKey, ShutdownType},
         component::instance::InstanceState,
         component::ComponentInstance,
-        hooks::{Event, EventPayload},
+        hooks::EventPayload,
     },
     async_trait::async_trait,
     errors::{ActionError, UnresolveActionError},
@@ -83,7 +83,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     component.execution_scope.wait().await;
     component.execution_scope.resurrect();
 
-    let event = Event::new(&component, EventPayload::Unresolved);
+    let event = component.new_event(EventPayload::Unresolved);
     component.hooks.dispatch(&event).await;
     Ok(())
 }

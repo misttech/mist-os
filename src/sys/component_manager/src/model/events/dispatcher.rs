@@ -195,15 +195,16 @@ mod tests {
     ) -> Result<(), Error> {
         let (_, capability_server_end) = zx::Channel::create();
         let (receiver, sender) = CapabilityReceiver::new();
-        let event = ComponentEvent::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root/a/b/c",
-            EventPayload::CapabilityRequested {
+        let event = ComponentEvent {
+            target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
+            component_url: "fuchsia-pkg://root".parse().unwrap(),
+            payload: EventPayload::CapabilityRequested {
                 source_moniker: source_moniker.clone(),
                 name: "foo".to_string(),
                 receiver,
             },
-        );
+            timestamp: zx::Time::get_monotonic(),
+        };
         sender.send(Message { channel: capability_server_end }).unwrap();
         dispatcher.dispatch(&event).await
     }

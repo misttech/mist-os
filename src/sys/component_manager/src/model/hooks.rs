@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::component::{ComponentInstance, WeakComponentInstance},
+    crate::model::component::WeakComponentInstance,
     anyhow::format_err,
     async_trait::async_trait,
     cm_rust::ComponentDecl,
@@ -313,61 +313,13 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn new(component: &Arc<ComponentInstance>, payload: EventPayload) -> Self {
-        let timestamp = zx::Time::get_monotonic();
-        Self::new_internal(
-            component.moniker.clone().into(),
-            component.component_url.clone(),
-            timestamp,
-            payload,
-        )
-    }
-
     pub fn new_builtin(payload: EventPayload) -> Self {
-        let timestamp = zx::Time::get_monotonic();
-        Self::new_internal(
-            ExtendedMoniker::ComponentManager,
-            "file:///bin/component_manager".parse().unwrap(),
-            timestamp,
+        Self {
+            target_moniker: ExtendedMoniker::ComponentManager,
+            component_url: "file:///bin/component_manager".parse().unwrap(),
             payload,
-        )
-    }
-
-    pub fn new_with_timestamp(
-        component: &Arc<ComponentInstance>,
-        payload: EventPayload,
-        timestamp: zx::Time,
-    ) -> Self {
-        Self::new_internal(
-            component.moniker.clone().into(),
-            component.component_url.clone(),
-            timestamp,
-            payload,
-        )
-    }
-
-    #[cfg(test)]
-    pub fn new_for_test(
-        target_moniker: Moniker,
-        component_url: &str,
-        payload: EventPayload,
-    ) -> Self {
-        let timestamp = zx::Time::get_monotonic();
-        Self::new_internal(
-            ExtendedMoniker::ComponentInstance(target_moniker),
-            component_url.parse().unwrap(),
-            timestamp,
-            payload,
-        )
-    }
-
-    fn new_internal(
-        target_moniker: ExtendedMoniker,
-        component_url: Url,
-        timestamp: zx::Time,
-        payload: EventPayload,
-    ) -> Self {
-        Self { target_moniker, component_url, timestamp, payload }
+            timestamp: zx::Time::get_monotonic(),
+        }
     }
 }
 
@@ -452,7 +404,7 @@ impl Hooks {
     /// This is test-only because in general it shouldn't matter what order hooks are executed
     /// in. This is useful for tests that need guarantees about hook execution order.
     #[cfg(test)]
-    pub async fn install_front(&self, hooks: Vec<HooksRegistration>) {
+    pub async fn install_front_for_test(&self, hooks: Vec<HooksRegistration>) {
         let mut hooks_map = self.hooks_map.lock().await;
         for hook in hooks {
             for event in hook.events {
@@ -498,15 +450,16 @@ mod tests {
     #[fuchsia::test]
     async fn capability_requested_transfer() {
         let (receiver, _sender) = CapabilityReceiver::new();
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRequested {
+        let event = Event {
+            target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
+            component_url: "fuchsia-pkg://root".parse().unwrap(),
+            payload: EventPayload::CapabilityRequested {
                 source_moniker: Moniker::root(),
                 name: "foo".to_string(),
                 receiver,
             },
-        );
+            timestamp: zx::Time::get_monotonic(),
+        };
 
         // Verify the transferred event carries the capability.
         let transferred_event = event.transfer().await;

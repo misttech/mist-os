@@ -341,7 +341,7 @@ impl TestEnvironmentBuilder {
         let model = builtin_environment.lock().await.model.clone();
 
         model.root().hooks.install(self.hooks).await;
-        model.root().hooks.install_front(self.front_hooks).await;
+        model.root().hooks.install_front_for_test(self.front_hooks).await;
         builtin_environment.lock().await.discover_root_component().await;
 
         // Host framework service for `moniker`, if requested.
