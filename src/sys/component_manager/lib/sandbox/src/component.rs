@@ -36,6 +36,6 @@ impl WeakComponentToken {
     }
 
     pub fn register(self, koid: zx::Koid, server: zx::EventPair) {
-        crate::registry::spawn_task(self.into(), koid, WeakComponentToken::serve(server));
+        crate::registry::insert(self.into(), koid, WeakComponentToken::serve(server));
     }
 }

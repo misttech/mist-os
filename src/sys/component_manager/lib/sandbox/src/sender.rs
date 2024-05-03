@@ -81,7 +81,7 @@ impl CapabilityTrait for Sender {
 impl From<Sender> for fsandbox::SenderCapability {
     fn from(value: Sender) -> Self {
         let (watcher, token) = zx::EventPair::create();
-        registry::spawn_task(
+        registry::insert(
             value.into(),
             token.basic_info().unwrap().koid,
             fasync::OnSignals::new(watcher, zx::Signals::OBJECT_PEER_CLOSED).map(|_| ()),

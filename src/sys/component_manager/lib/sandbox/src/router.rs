@@ -146,7 +146,7 @@ impl Router {
         let router = self.clone();
 
         // Move this capability into the registry.
-        crate::registry::spawn_task(self.into(), koid, async move {
+        crate::registry::insert(self.into(), koid, async move {
             router.serve_router(stream).await.expect("failed to serve Router");
         });
     }

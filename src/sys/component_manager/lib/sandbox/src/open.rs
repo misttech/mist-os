@@ -131,7 +131,7 @@ impl Open {
         let open = self.clone();
 
         // Move this capability into the registry.
-        registry::spawn_task(self.into(), koid, async move {
+        registry::insert(self.into(), koid, async move {
             let scope = ExecutionScope::new();
             while let Ok(Some(request)) = stream.try_next().await {
                 match request {
