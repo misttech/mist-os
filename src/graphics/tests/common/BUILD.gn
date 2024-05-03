@@ -34,6 +34,14 @@ if (is_fuchsia) {
       ":config",
     ]
   }
+
+  source_set("gtest_main") {
+    sources = [ "gtest_main.cc" ]
+    public_deps = [
+      # This library is used by code in the SDK, so it can't be testonly.
+      "//third_party/googletest:gtest_no_testonly",
+    ]
+  }
 }
 
 executable("vkcontext_bin") {

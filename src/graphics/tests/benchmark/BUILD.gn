@@ -97,6 +97,7 @@ fuchsia_structured_config_values("default_config") {
   cm_label = ":vkcopy_child_manifest"
   values = {
     gpu_vendor_id = 0
+    disabled_test_pattern = ""
   }
 }
 

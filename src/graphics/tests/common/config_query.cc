@@ -7,15 +7,22 @@
 #include "src/graphics/tests/common/config.h"
 #include "vulkan_context.h"
 
-std::optional<uint32_t> GetGpuVendorId() {
-  static std::optional<uint32_t> gpu_vendor_id = ([]() {
-    auto c = config::Config::TakeFromStartupHandle();
-    uint32_t vendor_id_int = c.gpu_vendor_id();
-    if (vendor_id_int != 0) {
-      return std::optional<uint32_t>{vendor_id_int};
-    }
-    return std::optional<uint32_t>{};
-  })();
+namespace {
 
-  return gpu_vendor_id;
+config::Config& GetConfig() {
+  static auto config = config::Config::TakeFromStartupHandle();
+  return config;
 }
+}  // namespace
+
+std::optional<uint32_t> GetGpuVendorId() {
+  auto& c = GetConfig();
+  uint32_t vendor_id_int = c.gpu_vendor_id();
+  if (vendor_id_int != 0) {
+    return std::optional<uint32_t>{vendor_id_int};
+  }
+
+  return std::optional<uint32_t>{};
+}
+
+std::string DisabledTestPattern() { return GetConfig().disabled_test_pattern(); }
