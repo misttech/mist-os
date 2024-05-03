@@ -5,13 +5,15 @@
 #ifndef SRC_DEVICES_SERIAL_DRIVERS_USB_CDC_ACM_USB_CDC_ACM_H_
 #define SRC_DEVICES_SERIAL_DRIVERS_USB_CDC_ACM_USB_CDC_ACM_H_
 
-#include <fuchsia/hardware/serialimpl/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
+#include <lib/stdcompat/span.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/types.h>
 
 #include <thread>
+#include <vector>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
@@ -19,12 +21,14 @@
 #include <usb/usb-request.h>
 #include <usb/usb.h>
 
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
+
 namespace usb_cdc_acm_serial {
 
 class UsbCdcAcmDevice;
 using DeviceType = ddk::Device<UsbCdcAcmDevice, ddk::Unbindable>;
 class UsbCdcAcmDevice : public DeviceType,
-                        public ddk::SerialImplProtocol<UsbCdcAcmDevice, ddk::base_protocol> {
+                        public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   explicit UsbCdcAcmDevice(zx_device_t* parent) : DeviceType(parent), usb_client_(parent) {}
   ~UsbCdcAcmDevice() = default;
@@ -34,27 +38,50 @@ class UsbCdcAcmDevice : public DeviceType,
   // |ddk::Device| mix-in implementations.
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
-  // ddk::SerialImpl implementations.
-  zx_status_t SerialImplGetInfo(serial_port_info_t* info);
-  zx_status_t SerialImplConfig(uint32_t baud_rate, uint32_t flags);
-  zx_status_t SerialImplEnable(bool enable);
-  zx_status_t SerialImplRead(uint8_t* data, size_t len, size_t* actual);
-  zx_status_t SerialImplWrite(const uint8_t* buf, size_t length, size_t* actual);
-  zx_status_t SerialImplSetNotifyCallback(const serial_notify_t* cb);
 
  private:
+  struct WriteContext {
+    WriteContext(WriteCompleter::Async completer, cpp20::span<const uint8_t> data,
+                 size_t pending_requests)
+        : completer(std::move(completer)), data(data), pending_requests(pending_requests) {}
+
+    void Complete(fdf::Arena& arena) {
+      if (cancel_all_completer) {
+        cancel_all_completer->buffer(arena).Reply();
+      }
+      completer.buffer(arena).Reply(zx::make_result(status));
+    }
+
+    WriteCompleter::Async completer;
+    cpp20::span<const uint8_t> data;
+    size_t pending_requests;
+    zx_status_t status = ZX_OK;
+    std::optional<CancelAllCompleter::Async> cancel_all_completer;
+  };
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device> implementations.
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override;
+  void Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override;
+  void Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override;
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override;
+  void Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request, fdf::Arena& arena,
+             WriteCompleter::Sync& completer) override;
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
   void ReadComplete(usb_request_t* request);
   void WriteComplete(usb_request_t* request);
+  static size_t CopyFromRequest(usb::Request<>& request, size_t request_offset,
+                                cpp20::span<uint8_t> buffer);
+  // Writes as much data as possible with a single USB request, and returns a subspan pointing to
+  // the remaining data that did not fit into the request.
+  cpp20::span<const uint8_t> QueueWriteRequest(cpp20::span<const uint8_t> data, usb::Request<> req);
   zx_status_t ConfigureDevice(uint32_t baud_rate, uint32_t flags);
-
-  // Notifies |notify_cb_| if the state is updated (|need_to_notify_cb_| is true), and
-  // resets |need_to_notify_cb_| to false.
-  void NotifyCallback() __TA_EXCLUDES(lock_);
-
-  // Checks the readable and writeable state of the systemand updates |state_| and
-  // |need_to_notify_cb_|. Any caller of this is responsible for calling NotifyCallback
-  // once the lock is released.
-  void CheckStateLocked() __TA_REQUIRES(lock_);
+  void CancelAll(std::optional<CancelAllCompleter::Async> completer = std::nullopt);
 
   fbl::Mutex lock_;
 
@@ -70,17 +97,11 @@ class UsbCdcAcmDevice : public DeviceType,
   usb::RequestQueue<> free_write_queue_ __TA_GUARDED(lock_);
   usb::RequestQueue<> completed_reads_queue_ __TA_GUARDED(lock_);
 
-  // SerialImpl readable/writeable and enabled state.
-  uint32_t state_ = 0;
-  bool enabled_ = false;
-
   // Current offset into the first completed read request.
   size_t read_offset_ = 0;
 
   // SerialImpl port info and callback.
-  serial_port_info_t serial_port_info_ __TA_GUARDED(lock_);
-  bool need_to_notify_cb_ = false;
-  serial_notify_t notify_cb_ = {};
+  fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_ __TA_GUARDED(lock_);
 
   // Thread to cancel requests if the device is unbound.
   std::thread cancel_thread_;
@@ -100,6 +121,14 @@ class UsbCdcAcmDevice : public DeviceType,
           },
       .ctx = this,
   };
+
+  std::optional<ReadCompleter::Async> read_completer_ __TA_GUARDED(lock_);
+
+  std::vector<uint8_t> write_buffer_ __TA_GUARDED(lock_);
+  std::optional<WriteContext> write_context_ __TA_GUARDED(lock_);
+
+  fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> bindings_;
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace usb_cdc_acm_serial

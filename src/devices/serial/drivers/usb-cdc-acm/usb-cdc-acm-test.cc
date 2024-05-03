@@ -127,26 +127,6 @@ TEST_F(UsbCdcAcmTest, ReadAndWriteTest) {
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     ASSERT_NO_FATAL_FAILURE(assert_read_with_timeout(cpp20::span(write_data)));
   }
-
-  {
-    // Writing just "0" to the fake USB driver will cause an empty response to be queued.
-    uint8_t write_data[] = {'0'};
-    const fidl::WireResult result =
-        fidl::WireCall(client_end)->Write(fidl::VectorView<uint8_t>::FromExternal(write_data));
-    ASSERT_OK(result.status());
-    const fit::result response = result.value();
-    ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-
-    for (zx::time deadline = zx::deadline_after(zx::sec(5));
-         zx::clock::get_monotonic() < deadline;) {
-      const fidl::WireResult result = fidl::WireCall(client_end)->Read();
-      ASSERT_OK(result.status());
-      const fit::result response = result.value();
-      ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-      cpp20::span data = response.value()->data.get();
-      ASSERT_TRUE(data.empty(), "%zu", data.size());
-    }
-  }
 }
 
 }  // namespace
