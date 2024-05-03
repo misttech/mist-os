@@ -144,6 +144,8 @@ static_assert((sizeof(struct pthread) - offsetof(struct pthread, head)) == ABI_T
 #if defined(__x86_64__) || defined(__aarch64__)
 // The tlsdesc.s assembly code assumes this, though it's not part of the ABI.
 static_assert(TP_OFFSETOF(head.dtv) == 8, "dtv misplaced in struct pthread");
+#elif defined(__riscv)
+static_assert(TP_OFFSETOF(head.dtv) == -24, "dtv misplaced in struct pthread");
 #endif
 
 static_assert(TP_OFFSETOF(abi.stack_guard) == ZX_TLS_STACK_GUARD_OFFSET,
