@@ -36,7 +36,7 @@ workbench_platform_config = {
         "back_off_time_between_pull_samples_sec": 86400,
     },
     "media": {
-        "audio_device_registry_enabled": True,
+        "audio": "partial_stack",
     },
     "starnix": {
         "enabled": True,
