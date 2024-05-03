@@ -5,9 +5,12 @@
 pub mod component;
 
 use {
-    fidl::endpoints::ServerEnd, fidl_fuchsia_component_runner as fcrunner,
+    fidl::endpoints::{ClientEnd, ServerEnd},
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fuchsia_zircon as zx, std::path::Path, thiserror::Error,
+    fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+    std::path::Path,
+    thiserror::Error,
 };
 
 const ARGS_KEY: &str = "args";
@@ -346,6 +349,11 @@ pub struct StartInfo {
     ///
     /// The token is invalidated when the component instance is destroyed.
     pub component_instance: Option<zx::Event>,
+
+    /// A dictionary containing data and handles that the component has escrowed
+    /// during its previous execution via
+    /// `fuchsia.component.runner/ComponentController.OnEscrow`.
+    pub escrowed_dictionary: Option<ClientEnd<fsandbox::DictionaryMarker>>,
 }
 
 impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
@@ -364,6 +372,7 @@ impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
             encoded_config: start_info.encoded_config,
             break_on_start: start_info.break_on_start,
             component_instance: start_info.component_instance,
+            escrowed_dictionary: start_info.escrowed_dictionary,
         })
     }
 }

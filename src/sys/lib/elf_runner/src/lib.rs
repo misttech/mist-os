@@ -382,6 +382,14 @@ impl ElfRunner {
         // Add any external numbered handles.
         handle_infos.extend(start_info.numbered_handles);
 
+        // If the program escrowed a dictionary, give it back via `numbered_handles`.
+        if let Some(escrowed_dictionary) = start_info.escrowed_dictionary {
+            handle_infos.push(fproc::HandleInfo {
+                handle: escrowed_dictionary.into_channel().into(),
+                id: HandleInfo::new(HandleType::EscrowedDictionary, 0).as_raw(),
+            });
+        }
+
         // Configure the process launcher.
         let proc_job_dup = job
             .proc()
