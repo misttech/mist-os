@@ -938,7 +938,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::StopAction,
+            actions::{test_utils::MockAction, StopAction},
             component::StartReason,
             testing::{
                 test_helpers::{
@@ -2463,23 +2463,23 @@ mod tests {
         let component = test.model.root().clone();
         let mut action_set = component.lock_actions().await;
 
-        // Register some actions, and get notifications. Use `register_inner` so we can register
-        // the action without immediately running it.
-        let (task1, nf1) = action_set.register_inner(ShutdownAction::new(ShutdownType::Instance));
-        let (task2, nf2) = action_set.register_inner(StopAction::new(false));
+        let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
+
+        // Register some actions, and get notifications.
+        let shutdown_notifier = action_set.register_no_wait(mock_shutdown_action).await;
+        let stop_notifier = action_set.register_no_wait(StopAction::new(false)).await;
 
         drop(action_set);
 
-        // Complete actions, while checking futures.
-        component.lock_actions().await.finish(&ActionKey::Shutdown);
+        // The stop action should be blocked on the shutdown action completing.
+        assert!(stop_notifier.fut.peek().is_none());
 
-        // nf2 should be blocked on task1 completing.
-        assert!(nf1.fut.peek().is_none());
-        assert!(nf2.fut.peek().is_none());
-        task1.unwrap().tx.send(Ok(())).unwrap();
-        task2.unwrap().spawn();
-        nf1.await.unwrap();
-        nf2.await.unwrap();
+        // allow the shutdown action to finish running
+        mock_shutdown_barrier.send(Ok(())).unwrap();
+        shutdown_notifier.await.expect("shutdown failed unexpectedly");
+
+        // The stop action should now finish running.
+        stop_notifier.await.expect("stop failed unexpectedly");
     }
 
     #[fuchsia::test]
@@ -2487,27 +2487,26 @@ mod tests {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
         let mut action_set = component.lock_actions().await;
+        let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
 
-        // Register some actions, and get notifications. Use `register_inner` so we can register
-        // the action without immediately running it.
-        let (task1, nf1) = action_set.register_inner(ShutdownAction::new(ShutdownType::Instance));
-        let (task2, nf2) = action_set.register_inner(StopAction::new(false));
-        let (task3, nf3) = action_set.register_inner(StopAction::new(false));
+        // Register some actions, and get notifications.
+        let shutdown_notifier = action_set.register_no_wait(mock_shutdown_action).await;
+        let stop_notifier_1 = action_set.register_no_wait(StopAction::new(false)).await;
+        let stop_notifier_2 = action_set.register_no_wait(StopAction::new(false)).await;
 
         drop(action_set);
 
-        // Complete actions, while checking notifications.
-        component.lock_actions().await.finish(&ActionKey::Shutdown);
+        // The stop action should be blocked on the shutdown action completing.
+        assert!(stop_notifier_1.fut.peek().is_none());
+        assert!(stop_notifier_2.fut.peek().is_none());
 
-        // nf2 and nf3 should be blocked on task1 completing.
-        assert!(nf1.fut.peek().is_none());
-        assert!(nf2.fut.peek().is_none());
-        task1.unwrap().tx.send(Ok(())).unwrap();
-        task2.unwrap().spawn();
-        assert!(task3.is_none());
-        nf1.await.unwrap();
-        nf2.await.unwrap();
-        nf3.await.unwrap();
+        // allow the shutdown action to finish running
+        mock_shutdown_barrier.send(Ok(())).unwrap();
+        shutdown_notifier.await.expect("shutdown failed unexpectedly");
+
+        // The stop actions should now finish running.
+        stop_notifier_1.await.expect("stop failed unexpectedly");
+        stop_notifier_2.await.expect("stop failed unexpectedly");
     }
 
     #[fuchsia::test]

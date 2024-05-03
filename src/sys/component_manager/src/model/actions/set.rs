@@ -236,25 +236,17 @@ pub mod tests {
     async fn register_action_in_new_task<A>(
         action: A,
         component: Arc<ComponentInstance>,
+        action_set: &mut ActionSet,
         responder: oneshot::Sender<Result<(), ActionError>>,
         res: Result<(), ActionError>,
     ) where
         A: Action,
     {
-        let (starter_tx, starter_rx) = oneshot::channel();
+        // Register action, and get the future. Use `register_inner` so that we can control
+        // when to notify the listener.
+        let (task, rx) = action_set.register_inner(&component, action);
+
         fasync::Task::spawn(async move {
-            let mut action_set = component.lock_actions().await;
-
-            // Register action, and get the future. Use `register_inner` so that we can control
-            // when to notify the listener.
-            let (task, rx) = action_set.register_inner(action);
-
-            // Signal to test that action is registered.
-            starter_tx.send(()).unwrap();
-
-            // Drop `action_set` to release the lock.
-            drop(action_set);
-
             if let Some(task) = task {
                 // Notify the listeners, but don't actually run the action since this test tests
                 // action registration and not the actions themselves.
@@ -266,7 +258,6 @@ pub mod tests {
             responder.send(res).expect("failed to send response");
         })
         .detach();
-        starter_rx.await.expect("Unable to receive start signal");
     }
 
     #[fuchsia::test]
@@ -274,25 +265,46 @@ pub mod tests {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
 
+        // It's not possible to get at the action set used for a given component, so we create a
+        // new one here. This works because no actions are scheduled on the component's `Actions`
+        // and thus collisions are avoided, making our action set here the de-facto only action set
+        // for the component, .
+        let mut action_set = ActionSet::new();
+
         let (tx1, rx1) = oneshot::channel();
-        register_action_in_new_task(DestroyAction::new(), component.clone(), tx1, Ok(())).await;
+        register_action_in_new_task(
+            DestroyAction::new(),
+            component.clone(),
+            &mut action_set,
+            tx1,
+            Ok(()),
+        )
+        .await;
         let (tx2, rx2) = oneshot::channel();
         register_action_in_new_task(
             ShutdownAction::new(ShutdownType::Instance),
             component.clone(),
+            &mut action_set,
             tx2,
             Err(ActionError::StopError { err: StopActionError::GetParentFailed }), // Some random error.
         )
         .await;
         let (tx3, rx3) = oneshot::channel();
-        register_action_in_new_task(DestroyAction::new(), component.clone(), tx3, Ok(())).await;
+        register_action_in_new_task(
+            DestroyAction::new(),
+            component.clone(),
+            &mut action_set,
+            tx3,
+            Ok(()),
+        )
+        .await;
 
         // Complete actions, while checking notifications.
-        component.lock_actions().await.finish(&ActionKey::Destroy);
+        action_set.finish(&ActionKey::Destroy);
         assert_matches!(rx1.await.expect("Unable to receive result of Notification"), Ok(()));
         assert_matches!(rx3.await.expect("Unable to receive result of Notification"), Ok(()));
 
-        component.lock_actions().await.finish(&ActionKey::Shutdown);
+        action_set.finish(&ActionKey::Shutdown);
         assert_matches!(
             rx2.await.expect("Unable to receive result of Notification"),
             Err(ActionError::StopError { err: StopActionError::GetParentFailed })

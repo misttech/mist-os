@@ -226,35 +226,57 @@ impl ActionsManager {
     fn finish<'a>(&mut self, key: &'a ActionKey) {
         self.action_set.finish(key)
     }
-
-    /// Registers, but does not execute, an action.
-    ///
-    /// Returns:
-    /// - An object that implements the action if it was scheduled for the first time. The caller
-    ///   should call spawn() on it.
-    /// - A future to listen on the completion of the action.
-    #[cfg(test)]
-    pub(crate) fn register_inner<'a, A>(
-        &'a mut self,
-        action: A,
-    ) -> (Option<set::ActionTask>, ActionNotifier)
-    where
-        A: Action,
-    {
-        let component =
-            self.component.upgrade().expect("tried to register action on nonexistent component");
-        self.action_set.register_inner(&component, action)
-    }
 }
 
 #[cfg(test)]
 pub(crate) mod test_utils {
     use {
+        super::*,
         crate::model::component::instance::InstanceState,
-        crate::model::component::ComponentInstance,
         moniker::{ChildName, MonikerBase},
         routing::component_instance::ComponentInstanceInterface,
     };
+
+    /// A mock action, which can be scheduled on a component. The mock action will wait until it
+    /// receives a message over a given oneshot, and then use the received value as the return
+    /// value for the action.
+    ///
+    /// Note that the action coordinator will panic if an action returns `Ok(())` and does not
+    /// change the component's state into the expected target state of that action key, and mock
+    /// actions are incapable of changing the component's state.
+    pub struct MockAction {
+        key: ActionKey,
+        completion_waiter: oneshot::Receiver<Result<(), ActionError>>,
+    }
+
+    #[async_trait]
+    impl Action for MockAction {
+        async fn handle(self, _component: Arc<ComponentInstance>) -> Result<(), ActionError> {
+            match self.completion_waiter.await {
+                // If we successfully received a value, return it.
+                Ok(result) => result,
+
+                // If we fail to receive a value, then we never will. Let's leave this action as
+                // pending indefinitely.
+                Err(_) => std::future::pending().await,
+            }
+        }
+
+        fn key(&self) -> ActionKey {
+            self.key
+        }
+
+        fn abort_handle(&self) -> Option<AbortHandle> {
+            None
+        }
+    }
+
+    impl MockAction {
+        pub fn new(key: ActionKey) -> (oneshot::Sender<Result<(), ActionError>>, Self) {
+            let (sender, completion_waiter) = oneshot::channel();
+            (sender, Self { key, completion_waiter })
+        }
+    }
 
     /// Verifies that a child component is deleted by checking its InstanceState and verifying that
     /// it does not exist in the InstanceState of its parent. Assumes the parent is not destroyed

@@ -202,7 +202,8 @@ pub mod tests {
                     .root()
                     .lock_actions()
                     .await
-                    .register_inner(ShutdownAction::new(ShutdownType::Instance));
+                    .register_no_wait(ShutdownAction::new(ShutdownType::Instance))
+                    .await;
                 Ok(())
             }
         }
