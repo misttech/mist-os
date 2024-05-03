@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_ui_composition as fland,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_framebuffer::{
-        sysmem2::{minimum_row_bytes, BufferCollectionAllocator},
+        sysmem::{minimum_row_bytes, BufferCollectionAllocator},
         FrameUsage,
     },
     fuchsia_scenic::{duplicate_buffer_collection_import_token, BufferCollectionTokenPair},

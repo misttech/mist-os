@@ -30,7 +30,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy};
 use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata};
 use fuchsia_async::{self as fasync, OnSignals};
-use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
+use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{
     self as zx, AsHandleRef, Duration, Event, HandleBased, Signals, Status, Time,

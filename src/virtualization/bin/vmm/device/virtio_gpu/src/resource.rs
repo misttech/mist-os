@@ -15,7 +15,7 @@ use {
     anyhow::Context,
     fidl_fuchsia_ui_composition::{AllocatorMarker, RegisterBufferCollectionArgs},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameUsage},
+    fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage},
     fuchsia_scenic::BufferCollectionTokenPair,
 };
 

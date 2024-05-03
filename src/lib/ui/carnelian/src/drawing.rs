@@ -727,7 +727,7 @@ mod tests {
     };
     use euclid::{approxeq::ApproxEq, size2, vec2};
     use fuchsia_async::{self as fasync, Time, TimeoutExt};
-    use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameUsage};
+    use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
     use once_cell::sync::Lazy;
 
     const DEFAULT_TIMEOUT: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(5);

@@ -5,118 +5,99 @@
 use crate::FrameUsage;
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints::{create_endpoints, ClientEnd, Proxy};
-use fidl_fuchsia_sysmem::{
-    BufferCollectionConstraints, BufferMemoryConstraints, BufferUsage, ColorSpace, ColorSpaceType,
-    FormatModifier, HeapType, ImageFormatConstraints, PixelFormat as SysmemPixelFormat,
-    PixelFormatType,
+use fidl_fuchsia_images2::{ColorSpace, PixelFormat, PixelFormatModifier};
+use fidl_fuchsia_sysmem2::{
+    AllocatorAllocateSharedCollectionRequest, AllocatorBindSharedCollectionRequest,
+    AllocatorMarker, AllocatorProxy, AllocatorSetDebugClientInfoRequest,
+    BufferCollectionConstraints, BufferCollectionInfo, BufferCollectionMarker,
+    BufferCollectionProxy, BufferCollectionSetConstraintsRequest,
+    BufferCollectionTokenDuplicateRequest, BufferCollectionTokenMarker, BufferCollectionTokenProxy,
+    BufferMemoryConstraints, BufferUsage, ImageFormatConstraints, NodeSetNameRequest,
+    CPU_USAGE_READ_OFTEN, CPU_USAGE_WRITE_OFTEN, NONE_USAGE,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, AsHandleRef, Status};
+use fuchsia_zircon::AsHandleRef;
 use std::cmp;
 
 fn linear_image_format_constraints(
     width: u32,
     height: u32,
-    pixel_type: PixelFormatType,
+    pixel_type: PixelFormat,
 ) -> ImageFormatConstraints {
     ImageFormatConstraints {
-        pixel_format: SysmemPixelFormat {
-            type_: pixel_type,
-            has_format_modifier: true,
-            format_modifier: FormatModifier { value: fidl_fuchsia_sysmem::FORMAT_MODIFIER_LINEAR },
-        },
-        color_spaces_count: 1,
-        color_space: [ColorSpace { type_: ColorSpaceType::Srgb }; 32],
-        min_coded_width: 0,
-        max_coded_width: 0,
-        min_coded_height: 0,
-        max_coded_height: 0,
-        min_bytes_per_row: 0,
-        max_bytes_per_row: 0,
-        max_coded_width_times_coded_height: 0,
-        layers: 0,
-        coded_width_divisor: 0,
-        coded_height_divisor: 0,
-        bytes_per_row_divisor: 0,
-        start_offset_divisor: 0,
-        display_width_divisor: 0,
-        display_height_divisor: 0,
-        required_min_coded_width: width,
-        required_max_coded_width: width,
-        required_min_coded_height: height,
-        required_max_coded_height: height,
-        required_min_bytes_per_row: 0,
-        required_max_bytes_per_row: 0,
+        pixel_format: Some(pixel_type),
+        pixel_format_modifier: Some(PixelFormatModifier::Linear),
+        color_spaces: Some(vec![ColorSpace::Srgb]),
+        required_min_size: Some(fidl_fuchsia_math::SizeU { width, height }),
+        required_max_size: Some(fidl_fuchsia_math::SizeU { width, height }),
+        ..Default::default()
     }
 }
 
 fn buffer_memory_constraints(width: u32, height: u32) -> BufferMemoryConstraints {
     BufferMemoryConstraints {
-        min_size_bytes: width * height * 4,
-        max_size_bytes: std::u32::MAX,
-        physically_contiguous_required: false,
-        secure_required: false,
-        ram_domain_supported: true,
-        cpu_domain_supported: true,
-        inaccessible_domain_supported: false,
-        heap_permitted_count: 0,
-        heap_permitted: [HeapType::SystemRam; 32],
+        min_size_bytes: Some(width as u64 * height as u64 * 4u64),
+        physically_contiguous_required: Some(false),
+        secure_required: Some(false),
+        ram_domain_supported: Some(true),
+        cpu_domain_supported: Some(true),
+        inaccessible_domain_supported: Some(false),
+        ..Default::default()
     }
 }
 
 fn buffer_collection_constraints(
     width: u32,
     height: u32,
-    pixel_type: PixelFormatType,
+    pixel_format: PixelFormat,
     buffer_count: u32,
     frame_usage: FrameUsage,
 ) -> BufferCollectionConstraints {
-    let (usage, has_buffer_memory_constraints, image_format_constraints_count) = match frame_usage {
+    let (usage, has_buffer_memory_constraints, has_image_format_constraints) = match frame_usage {
         FrameUsage::Cpu => (
             BufferUsage {
-                none: 0,
-                cpu: fidl_fuchsia_sysmem::CPU_USAGE_WRITE_OFTEN
-                    | fidl_fuchsia_sysmem::CPU_USAGE_READ_OFTEN,
-                vulkan: 0,
-                display: 0,
-                video: 0,
+                cpu: Some(CPU_USAGE_WRITE_OFTEN | CPU_USAGE_READ_OFTEN),
+                ..Default::default()
             },
             true,
-            1,
+            true,
         ),
         FrameUsage::Gpu => {
-            (BufferUsage { none: 1, cpu: 0, vulkan: 0, display: 0, video: 0 }, false, 0)
+            (BufferUsage { none: Some(NONE_USAGE), ..Default::default() }, false, false)
         }
     };
     BufferCollectionConstraints {
-        usage: usage,
-        min_buffer_count_for_camping: 0,
-        min_buffer_count_for_dedicated_slack: 0,
-        min_buffer_count_for_shared_slack: 0,
-        min_buffer_count: buffer_count,
-        max_buffer_count: std::u32::MAX,
-        has_buffer_memory_constraints: has_buffer_memory_constraints,
-        buffer_memory_constraints: buffer_memory_constraints(width, height),
-        image_format_constraints_count: image_format_constraints_count,
-        image_format_constraints: [linear_image_format_constraints(width, height, pixel_type); 32],
+        usage: Some(usage),
+        min_buffer_count: Some(buffer_count),
+        buffer_memory_constraints: if has_buffer_memory_constraints {
+            Some(buffer_memory_constraints(width, height))
+        } else {
+            None
+        },
+        image_format_constraints: if has_image_format_constraints {
+            Some(vec![linear_image_format_constraints(width, height, pixel_format)])
+        } else {
+            None
+        },
+        ..Default::default()
     }
 }
 
 // See ImageFormatStrideBytesPerWidthPixel
-fn stride_bytes_per_width_pixel(pixel_type: PixelFormatType) -> Result<u32, Error> {
+fn stride_bytes_per_width_pixel(pixel_type: PixelFormat) -> Result<u32, Error> {
     match pixel_type {
-        PixelFormatType::R8G8B8A8 => Ok(4),
-        PixelFormatType::Bgra32 => Ok(4),
-        PixelFormatType::Bgr24 => Ok(3),
-        PixelFormatType::I420 => Ok(1),
-        PixelFormatType::M420 => Ok(1),
-        PixelFormatType::Nv12 => Ok(1),
-        PixelFormatType::Yuy2 => Ok(2),
-        PixelFormatType::Yv12 => Ok(1),
-        PixelFormatType::Rgb565 => Ok(2),
-        PixelFormatType::Rgb332 => Ok(1),
-        PixelFormatType::Rgb2220 => Ok(1),
-        PixelFormatType::L8 => Ok(1),
+        PixelFormat::R8G8B8A8 => Ok(4),
+        PixelFormat::B8G8R8A8 => Ok(4),
+        PixelFormat::B8G8R8 => Ok(3),
+        PixelFormat::I420 => Ok(1),
+        PixelFormat::M420 => Ok(1),
+        PixelFormat::Nv12 => Ok(1),
+        PixelFormat::Yuy2 => Ok(2),
+        PixelFormat::Yv12 => Ok(1),
+        PixelFormat::R5G6B5 => Ok(2),
+        PixelFormat::R3G3B2 => Ok(1),
+        PixelFormat::R2G2B2X2 => Ok(1),
+        PixelFormat::L8 => Ok(1),
         _ => return Err(format_err!("Unsupported format")),
     }
 }
@@ -130,59 +111,68 @@ fn round_up_to_align(x: u32, align: u32) -> u32 {
 }
 
 // See ImageFormatMinimumRowBytes
-pub fn minimum_row_bytes(constraints: ImageFormatConstraints, width: u32) -> Result<u32, Error> {
-    if width < constraints.min_coded_width || width > constraints.max_coded_width {
+pub fn minimum_row_bytes(constraints: &ImageFormatConstraints, width: u32) -> Result<u32, Error> {
+    if width < constraints.min_size.ok_or("missing min_size").unwrap().width
+        || width > constraints.max_size.ok_or("missing max_size").unwrap().width
+    {
         return Err(format_err!("Invalid width for constraints"));
     }
 
-    let bytes_per_pixel = stride_bytes_per_width_pixel(constraints.pixel_format.type_)?;
+    let bytes_per_pixel = stride_bytes_per_width_pixel(
+        constraints.pixel_format.ok_or("missing pixel_format").unwrap(),
+    )?;
     Ok(round_up_to_align(
-        cmp::max(bytes_per_pixel * width, constraints.min_bytes_per_row),
-        constraints.bytes_per_row_divisor,
+        cmp::max(
+            bytes_per_pixel * width,
+            constraints.min_bytes_per_row.ok_or("missing min_bytes_per_row").unwrap(),
+        ),
+        constraints.bytes_per_row_divisor.ok_or("missing bytes_per_row_divisor").unwrap(),
     ))
 }
 
 pub struct BufferCollectionAllocator {
-    token: Option<fidl_fuchsia_sysmem::BufferCollectionTokenProxy>,
+    token: Option<BufferCollectionTokenProxy>,
     width: u32,
     height: u32,
-    pixel_type: PixelFormatType,
+    pixel_format: PixelFormat,
     usage: FrameUsage,
     buffer_count: usize,
-    sysmem: fidl_fuchsia_sysmem::AllocatorProxy,
-    collection_client: Option<fidl_fuchsia_sysmem::BufferCollectionProxy>,
+    sysmem: AllocatorProxy,
+    collection_client: Option<BufferCollectionProxy>,
 }
 
-pub fn set_allocator_name(
-    sysmem_client: &fidl_fuchsia_sysmem::AllocatorProxy,
-) -> Result<(), Error> {
-    let name = fuchsia_runtime::process_self().get_name()?;
-    let koid = fuchsia_runtime::process_self().get_koid()?;
-    Ok(sysmem_client.set_debug_client_info(name.to_str()?, koid.raw_koid())?)
+pub fn set_allocator_name(sysmem_client: &AllocatorProxy) -> Result<(), Error> {
+    Ok(sysmem_client.set_debug_client_info(&AllocatorSetDebugClientInfoRequest {
+        name: Some(fuchsia_runtime::process_self().get_name()?.into_string()?),
+        id: Some(fuchsia_runtime::process_self().get_koid()?.raw_koid()),
+        ..Default::default()
+    })?)
 }
 
 impl BufferCollectionAllocator {
     pub fn new(
         width: u32,
         height: u32,
-        pixel_type: PixelFormatType,
+        pixel_format: PixelFormat,
         usage: FrameUsage,
         buffer_count: usize,
     ) -> Result<BufferCollectionAllocator, Error> {
-        let sysmem = connect_to_protocol::<fidl_fuchsia_sysmem::AllocatorMarker>()?;
+        let sysmem = connect_to_protocol::<AllocatorMarker>()?;
 
         let _ = set_allocator_name(&sysmem);
 
-        let (local_token, local_token_request) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>();
+        let (local_token, local_token_request) = create_endpoints::<BufferCollectionTokenMarker>();
 
-        sysmem.allocate_shared_collection(local_token_request)?;
+        sysmem.allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
+            token_request: Some(local_token_request),
+            ..Default::default()
+        })?;
 
         Ok(BufferCollectionAllocator {
             token: Some(local_token.into_proxy()?),
             width,
             height,
-            pixel_type,
+            pixel_format,
             usage,
             buffer_count,
             sysmem,
@@ -191,67 +181,82 @@ impl BufferCollectionAllocator {
     }
 
     pub fn set_name(&mut self, priority: u32, name: &str) -> Result<(), Error> {
-        Ok(self.token.as_ref().expect("token in set_name").set_name(priority, name)?)
+        Ok(self.token.as_ref().expect("token in set_name").set_name(&NodeSetNameRequest {
+            priority: Some(priority),
+            name: Some(name.into()),
+            ..Default::default()
+        })?)
     }
 
-    pub fn set_pixel_type(&mut self, pixel_type: PixelFormatType) {
-        self.pixel_type = pixel_type;
+    pub fn set_pixel_type(&mut self, pixel_format: PixelFormat) {
+        self.pixel_format = pixel_format;
     }
 
     pub async fn allocate_buffers(
         &mut self,
         set_constraints: bool,
-    ) -> Result<fidl_fuchsia_sysmem::BufferCollectionInfo2, Error> {
+    ) -> Result<BufferCollectionInfo, Error> {
         let token = self.token.take().expect("token in allocate_buffers");
-        let (collection_client, collection_request) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionMarker>();
-        self.sysmem.bind_shared_collection(
-            ClientEnd::new(token.into_channel().unwrap().into_zx_channel()),
-            collection_request,
-        )?;
+        let (collection_client, collection_request) = create_endpoints::<BufferCollectionMarker>();
+        self.sysmem.bind_shared_collection(AllocatorBindSharedCollectionRequest {
+            token: Some(token.into_client_end().unwrap()),
+            buffer_collection_request: Some(collection_request),
+            ..Default::default()
+        })?;
         let collection_client = collection_client.into_proxy()?;
         self.allocate_buffers_proxy(collection_client, set_constraints).await
     }
 
     async fn allocate_buffers_proxy(
         &mut self,
-        collection_client: fidl_fuchsia_sysmem::BufferCollectionProxy,
+        collection_client: BufferCollectionProxy,
         set_constraints: bool,
-    ) -> Result<fidl_fuchsia_sysmem::BufferCollectionInfo2, Error> {
+    ) -> Result<BufferCollectionInfo, Error> {
         let buffer_collection_constraints = buffer_collection_constraints(
             self.width,
             self.height,
-            self.pixel_type,
+            self.pixel_format,
             self.buffer_count as u32,
             self.usage,
         );
         collection_client
-            .set_constraints(set_constraints, &buffer_collection_constraints)
+            .set_constraints(BufferCollectionSetConstraintsRequest {
+                constraints: if set_constraints {
+                    Some(buffer_collection_constraints)
+                } else {
+                    None
+                },
+                ..Default::default()
+            })
             .context("Sending buffer constraints to sysmem")?;
-
-        let (status, buffers) = collection_client.wait_for_buffers_allocated().await?;
+        let wait_result = collection_client.wait_for_all_buffers_allocated().await;
         self.collection_client = Some(collection_client);
-        if status != zx::sys::ZX_OK {
-            return Err(format_err!(
-                "Failed to wait for buffers {}({})",
-                Status::from_raw(status),
-                status
-            ));
+        if wait_result.is_err() {
+            let error: fidl::Error = wait_result.unwrap_err();
+            return Err(format_err!("Failed to wait for buffers {}", error));
         }
+        if wait_result.as_ref().unwrap().is_err() {
+            let error: fidl_fuchsia_sysmem2::Error = wait_result.unwrap().unwrap_err();
+            return Err(format_err!("Wait for buffers failed {:?}", error));
+        }
+        let buffers = wait_result.unwrap().unwrap().buffer_collection_info.unwrap();
         Ok(buffers)
     }
 
     pub async fn duplicate_token(
         &mut self,
-    ) -> Result<ClientEnd<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>, Error> {
+    ) -> Result<ClientEnd<BufferCollectionTokenMarker>, Error> {
         let (requested_token, requested_token_request) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>();
+            create_endpoints::<BufferCollectionTokenMarker>();
 
-        self.token
-            .as_ref()
-            .expect("token in duplicate_token[duplicate]")
-            .duplicate(std::u32::MAX, requested_token_request)?;
-        self.token.as_ref().expect("tokenin duplicate_token[sync]").sync().await?;
+        self.token.as_ref().expect("token in duplicate_token[duplicate]").duplicate(
+            BufferCollectionTokenDuplicateRequest {
+                rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+                token_request: Some(requested_token_request),
+                ..Default::default()
+            },
+        )?;
+        self.token.as_ref().expect("token in duplicate_token_2[sync]").sync().await?;
         Ok(requested_token)
     }
 }
@@ -260,8 +265,8 @@ impl Drop for BufferCollectionAllocator {
     fn drop(&mut self) {
         if let Some(collection_client) = self.collection_client.as_mut() {
             collection_client
-                .close()
-                .unwrap_or_else(|err| eprintln!("collection_client.close failed with {}", err));
+                .release()
+                .unwrap_or_else(|err| eprintln!("collection_client.release failed with {}", err));
         }
     }
 }
@@ -269,10 +274,9 @@ impl Drop for BufferCollectionAllocator {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_sysmem::{
-        AllocatorMarker, AllocatorProxy, BufferCollectionInfo2, BufferCollectionMarker,
-        BufferCollectionProxy, BufferCollectionRequest, BufferMemorySettings, CoherencyDomain,
-        SingleBufferSettings, VmoBuffer,
+    use fidl_fuchsia_sysmem2::{
+        BufferCollectionRequest, BufferCollectionWaitForAllBuffersAllocatedResponse,
+        BufferMemorySettings, CoherencyDomain, Heap, SingleBufferSettings, VmoBuffer,
     };
     use fuchsia_async as fasync;
     use futures::prelude::*;
@@ -297,106 +301,46 @@ mod test {
             let mut stored_constraints = None;
             while let Some(req) = stream.try_next().await.expect("Failed to get request") {
                 match req {
-                    BufferCollectionRequest::SetConstraints {
-                        has_constraints,
-                        constraints,
-                        control_handle: _,
-                    } => {
-                        if has_constraints {
-                            stored_constraints = Some(constraints);
-                        } else {
-                            stored_constraints = None;
-                        }
+                    BufferCollectionRequest::SetConstraints { payload, control_handle: _ } => {
+                        stored_constraints = payload.constraints;
                     }
-                    BufferCollectionRequest::WaitForBuffersAllocated { responder } => {
+                    BufferCollectionRequest::WaitForAllBuffersAllocated { responder } => {
                         let constraints =
-                            stored_constraints.take().expect("Expected a BufferCollectionRequest!");
-                        let response = BufferCollectionInfo2 {
-                            buffer_count: constraints.min_buffer_count,
-                            // Everything below here is unused
-                            settings: SingleBufferSettings {
-                                buffer_settings: BufferMemorySettings {
-                                    size_bytes: 0,
-                                    is_physically_contiguous: false,
-                                    is_secure: false,
-                                    coherency_domain: CoherencyDomain::Cpu,
-                                    heap: HeapType::SystemRam,
-                                },
-                                has_image_format_constraints: false,
-                                image_format_constraints: linear_image_format_constraints(
+                            stored_constraints.take().expect("Expected SetConstraints first");
+                        let mut buffers: Vec<VmoBuffer> = vec![];
+                        for _ in 0..*constraints.min_buffer_count.as_ref().unwrap() {
+                            buffers.push(fidl_fuchsia_sysmem2::VmoBuffer { ..Default::default() });
+                        }
+                        let buffer_collection_info = BufferCollectionInfo {
+                            settings: Some(SingleBufferSettings {
+                                buffer_settings: Some(BufferMemorySettings {
+                                    size_bytes: Some(0),
+                                    is_physically_contiguous: Some(false),
+                                    is_secure: Some(false),
+                                    coherency_domain: Some(CoherencyDomain::Cpu),
+                                    heap: Some(Heap {
+                                        heap_type: Some(
+                                            bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM.into(),
+                                        ),
+                                        ..Default::default()
+                                    }),
+                                    ..Default::default()
+                                }),
+                                image_format_constraints: Some(linear_image_format_constraints(
                                     0,
                                     0,
-                                    PixelFormatType::Invalid,
-                                ),
-                            },
-                            buffers: [
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                                VmoBuffer { vmo: None, vmo_usable_start: 0 },
-                            ],
+                                    PixelFormat::Invalid,
+                                )),
+                                ..Default::default()
+                            }),
+                            buffers: Some(buffers),
+                            ..Default::default()
                         };
-                        responder.send(zx::sys::ZX_OK, response).expect("Failed to send");
+                        let response = BufferCollectionWaitForAllBuffersAllocatedResponse {
+                            buffer_collection_info: Some(buffer_collection_info),
+                            ..Default::default()
+                        };
+                        responder.send(Ok(response)).expect("Failed to send");
                     }
                     _ => panic!("Unexpected request"),
                 }
@@ -417,7 +361,7 @@ mod test {
             token: None,
             width: 200,
             height: 200,
-            pixel_type: PixelFormatType::Bgra32,
+            pixel_format: PixelFormat::B8G8R8A8,
             usage: FrameUsage::Cpu,
             buffer_count: BUFFER_COUNT,
             sysmem: alloc_proxy,
@@ -425,7 +369,7 @@ mod test {
         };
 
         let buffers = bca.allocate_buffers_proxy(buf_proxy, true).await?;
-        assert_eq!(buffers.buffer_count, BUFFER_COUNT as u32);
+        assert_eq!(buffers.buffers.unwrap().len(), BUFFER_COUNT);
 
         Ok(())
     }

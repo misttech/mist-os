@@ -29,7 +29,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_sync,
 };
-use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameUsage};
+use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
 use futures::{

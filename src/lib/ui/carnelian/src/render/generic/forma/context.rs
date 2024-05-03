@@ -17,7 +17,7 @@ use fidl_fuchsia_sysmem2::{
     BufferUsage, CoherencyDomain, ImageFormatConstraints, CPU_USAGE_WRITE_OFTEN,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_framebuffer::sysmem2::set_allocator_name;
+use fuchsia_framebuffer::sysmem::set_allocator_name;
 use fuchsia_trace::{duration_begin, duration_end};
 use fuchsia_zircon::sys;
 

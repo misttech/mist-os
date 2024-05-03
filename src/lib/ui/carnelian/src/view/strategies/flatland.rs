@@ -31,7 +31,7 @@ use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_views::ViewRef;
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_framebuffer::{sysmem2::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
+use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{self as zx, Event, HandleBased, Signals, Time};
