@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_POWER_SYSTEM_ACTIVITY_GOVERNOR_INTEGRATION_TESTING_FAKE_SUSPEND_CONTROL_SERVER_H_
-#define SRC_POWER_SYSTEM_ACTIVITY_GOVERNOR_INTEGRATION_TESTING_FAKE_SUSPEND_CONTROL_SERVER_H_
+#ifndef SRC_POWER_TESTING_FAKE_SUSPEND_CONTROL_SERVER_H_
+#define SRC_POWER_TESTING_FAKE_SUSPEND_CONTROL_SERVER_H_
 
 #include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
 #include <fidl/test.suspendcontrol/cpp/fidl.h>
@@ -46,4 +46,4 @@ class ControlServer : public fidl::Server<test_suspendcontrol::Device>, public S
 
 }  // namespace fake_suspend
 
-#endif  // SRC_POWER_SYSTEM_ACTIVITY_GOVERNOR_INTEGRATION_TESTING_FAKE_SUSPEND_CONTROL_SERVER_H_
+#endif  // SRC_POWER_TESTING_FAKE_SUSPEND_CONTROL_SERVER_H_

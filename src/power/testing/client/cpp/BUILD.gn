@@ -1,0 +1,21 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("cpp") {
+  sources = [
+    "client.cc",
+    "client.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_cpp",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
+    "//src/power/broker:component",
+    "//src/power/system-activity-governor/fake:component",
+    "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
+    "//src/power/testing/client:client_includes",
+    "//src/power/testing/client:test-suspend",
+    "//src/power/testing/fake-suspend:test.suspendcontrol_cpp",
+  ]
+  deps = [ "//sdk/lib/component/incoming/cpp" ]
+}

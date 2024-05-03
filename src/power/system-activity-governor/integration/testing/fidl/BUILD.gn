@@ -4,19 +4,11 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("test.suspendcontrol") {
-  sources = [ "suspendcontrol.test.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.suspend",
-    "//zircon/vdso/zx",
-  ]
-}
-
 fidl("test.systemactivitygovernor") {
   testonly = true
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
-    ":test.suspendcontrol",
     "//sdk/fidl/fuchsia.testing.harness",
+    "//src/power/testing/fake-suspend:test.suspendcontrol",
   ]
 }

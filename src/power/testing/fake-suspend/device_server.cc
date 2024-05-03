@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "device_server.h"
+#include "src/power/testing/fake-suspend/device_server.h"
 
 #include <optional>
+#include <utility>
 
 namespace fake_suspend {
 
@@ -13,7 +14,7 @@ using fuchsia_hardware_suspend::SuspenderSuspendResponse;
 
 DeviceServer::DeviceServer(
     std::shared_ptr<std::vector<fuchsia_hardware_suspend::SuspendState>> suspend_states)
-    : suspend_states_(suspend_states) {}
+    : suspend_states_(std::move(suspend_states)) {}
 
 void DeviceServer::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   completer.Reply(zx::ok(SuspenderGetSuspendStatesResponse().suspend_states(*suspend_states_)));

@@ -1,0 +1,64 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "test-system-activity-governor",
+            url: "#meta/fake-system-activity-governor.cm",
+        },
+        {
+            name: "test-power-broker",
+            url: "#meta/power-broker.cm",
+        },
+        {
+            name: "test-suspend",
+            url: "#meta/test-suspend.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+                "test.sagcontrol.State",
+            ],
+            from: "#test-system-activity-governor",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#test-power-broker",
+        },
+        {
+            directory: "dev-class-suspend",
+            from: "#test-suspend",
+            rights: [ "r*" ],
+            path: "/dev/class/suspend",
+        },
+        {
+            directory: "dev-class-test",
+            from: "#test-suspend",
+            rights: [ "r*" ],
+            path: "/dev/class/test",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "#test-power-broker",
+            to: "#test-system-activity-governor",
+        },
+        {
+            directory: "dev-class-suspend",
+            from: "#test-suspend",
+            to: "#test-system-activity-governor",
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-class-test",
+            from: "#test-suspend",
+            to: "#test-system-activity-governor",
+            rights: [ "r*" ],
+        },
+    ],
+}

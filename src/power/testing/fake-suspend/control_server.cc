@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "control_server.h"
+#include "src/power/testing/fake-suspend/control_server.h"
 
 #include <zircon/errors.h>
+
+#include <utility>
 
 namespace fake_suspend {
 
@@ -12,7 +14,7 @@ using test_suspendcontrol::DeviceAwaitSuspendResponse;
 
 ControlServer::ControlServer(
     std::shared_ptr<std::vector<fuchsia_hardware_suspend::SuspendState>> suspend_states)
-    : suspend_states_(suspend_states) {}
+    : suspend_states_(std::move(suspend_states)) {}
 
 void ControlServer::SetSuspendStates(SetSuspendStatesRequest& request,
                                      SetSuspendStatesCompleter::Sync& completer) {
