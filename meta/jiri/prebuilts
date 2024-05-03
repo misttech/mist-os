@@ -2,10 +2,13 @@
 <manifest>
   <!--
   Configuration of prebuilt packages needed by the stem.
+
   The CIPD version hashes in this manifest are updated automatically by Fuchsia Global Integration bots.
+
   To manually fetch packages after local edits to this file, please regenerate
   the corresponding lock files first by running:
   `//integration/update-lockfiles.sh`
+
   Then fetch the packages:
   `jiri fetch-packages -local-manifest=true`
   -->
@@ -13,6 +16,7 @@
     <localimport file="toolchain"/>
   </imports>
   <packages>
+
     <!--
         ************************************************************
         Third-party tools and data used to build and test.

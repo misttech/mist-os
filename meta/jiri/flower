@@ -2,6 +2,6 @@
 <manifest>
   <imports>
     <localimport file="stem"/>
-    <localimport file="third_party/manifest"/>
+    <localimport file="third_party/flower"/>
   </imports>
 </manifest>

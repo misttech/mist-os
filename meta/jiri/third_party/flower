@@ -15,7 +15,7 @@
              gitsubmoduleof="fuchsia"
              path="third_party/llvm-libc/src"
              remote="https://llvm.googlesource.com/llvm-project/libc"
-             revision="467035771dc7c2c9978cfe5ae25691912b71af3a"/>
+             revision="b81dff3d825ba247d3da6e775724f597056a0218"/>
     <project name="third_party/lz4"
              gitsubmoduleof="fuchsia"
              path="third_party/lz4"
@@ -38,7 +38,7 @@
              gitsubmoduleof="fuchsia"
              path="third_party/scudo/src"
              remote="https://llvm.googlesource.com/scudo"
-             revision="ee227e72cdf45e610d4c6c37a439a424153ea58f"/>
+             revision="a5768ad407d3f8cf76105aa3cfd718c1beb243d3"/>
     <project name="gwp-asan"
              gitsubmoduleof="fuchsia"
              path="third_party/scudo/gwp_asan"

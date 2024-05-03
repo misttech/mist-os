@@ -24,7 +24,7 @@
          TODO(mcgrathr): repo/bot link about provenance
     -->
     <package name="fuchsia/third_party/clang/${platform}"
-             version="git_revision:a2692ac23f1421097f0d51c7325045ed38db6408"
+             version="git_revision:145176dc0c93566ce4aef721044d49ab8ba50f87"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/clang/{{.OS}}-{{.Arch}}"/>
 
@@ -40,7 +40,7 @@
          TODO(phosek): repo/bot link about provenance
     -->
     <package name="fuchsia/go/${platform}"
-             version="git_revision:ae287a22599190c2a20136bede0687451c5d1f3e"
+             version="git_revision:102344630374bcd53f767f4b408092ab1d97acd0"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/go/{{.OS}}-{{.Arch}}"/>
 
