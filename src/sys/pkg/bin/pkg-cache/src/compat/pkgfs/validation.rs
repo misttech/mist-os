@@ -49,7 +49,7 @@ impl Validation {
 
         let mut missing = self
             .blobfs
-            .filter_to_missing_blobs(&self.base_blobs, None)
+            .filter_to_missing_blobs(&self.base_blobs)
             .await
             .into_iter()
             .collect::<Vec<_>>();
