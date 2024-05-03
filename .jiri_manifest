@@ -1,5 +1,5 @@
 <manifest>
   <imports>
-    <localimport file="meta/jiri/manifest"/>
+    <localimport file="meta/jiri/flower"/>
   </imports>
 </manifest>
