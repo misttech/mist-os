@@ -196,6 +196,38 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             logs_duration=mock.ANY,
         )
 
+    def test_suspend_resume_with_not_supported_suspend_mode(self) -> None:
+        """Test case for SystemPowerStateController.suspend_resume() raising
+        NotSupportedError for invalid suspend operation."""
+        with self.assertRaises(errors.NotSupportedError):
+            self.system_power_state_controller_obj.suspend_resume(
+                suspend_state="invalid",  # type: ignore[arg-type]
+                resume_mode=system_power_state_controller_interface.AutomaticResume(),
+            )
+
+    def test_suspend_resume_with_not_supported_resume_mode(self) -> None:
+        """Test case for SystemPowerStateController.suspend_resume() raising
+        NotSupportedError for unsupported resume operation."""
+        with self.assertRaises(errors.NotSupportedError):
+            self.system_power_state_controller_obj.suspend_resume(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.ButtonPressResume(),
+            )
+
+    def test_suspend_resume_with_timer_resume_invalid_duration(self) -> None:
+        """Test case for SystemPowerStateController.suspend_resume() raising
+        ValueError when called for TimerResume with invalid duration."""
+        with self.assertRaisesRegex(
+            ValueError, "Set the timer value less than"
+        ):
+            self.system_power_state_controller_obj.suspend_resume(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.TimerResume(
+                    duration=system_power_state_controller_interface.AutomaticResume.duration
+                    + 1
+                ),
+            )
+
     @mock.patch.object(
         starnix_system_power_state_controller.SystemPowerStateController,
         "_perform_idle_suspend",
@@ -211,15 +243,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         )
 
         mock_perform_idle_suspend.assert_called_once_with(mock.ANY)
-
-    def test_suspend_with_not_supported_suspend_mode(self) -> None:
-        """Test case for SystemPowerStateController._suspend() raising
-        NotSupportedError for suspend operation."""
-
-        with self.assertRaises(errors.NotSupportedError):
-            self.system_power_state_controller_obj._suspend(
-                suspend_state="invalid",  # type: ignore[arg-type]
-            )
 
     @mock.patch.object(
         starnix_system_power_state_controller.SystemPowerStateController,
@@ -304,15 +327,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             proc=mock.ANY,
             resume_mode=resume_mode,
         )
-
-    def test_set_resume_mode_with_not_supported_resume_mode(self) -> None:
-        """Test case for SystemPowerStateController._set_resume_mode() raising
-        NotSupportedError for resume operation."""
-        with self.assertRaises(errors.NotSupportedError):
-            with self.system_power_state_controller_obj._set_resume_mode(
-                resume_mode=system_power_state_controller_interface.ButtonPressResume(),
-            ):
-                pass
 
     def test_set_timer(self) -> None:
         """Test case for SystemPowerStateController._set_timer() success case."""
