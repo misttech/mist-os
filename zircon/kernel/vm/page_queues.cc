@@ -1056,20 +1056,20 @@ void PageQueues::MoveToAnonymous(vm_page_t* page) {
 #endif
 }
 
-void PageQueues::SetPagerBacked(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
+void PageQueues::SetReclaim(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
   DEBUG_ASSERT(object);
   SetQueueBacklinkLocked(page, object, page_offset, mru_gen_to_queue(), dps);
 }
 
-void PageQueues::MoveToPagerBacked(vm_page_t* page) {
+void PageQueues::MoveToReclaim(vm_page_t* page) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
   MoveToQueueLocked(page, mru_gen_to_queue(), dps);
 }
 
-void PageQueues::MoveToPagerBackedDontNeed(vm_page_t* page) {
+void PageQueues::MoveToReclaimDontNeed(vm_page_t* page) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
   MoveToQueueLocked(page, PageQueueReclaimDontNeed, dps);
@@ -1337,11 +1337,11 @@ bool PageQueues::DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue
   return validator(cow_pages);
 }
 
-bool PageQueues::DebugPageIsPagerBacked(const vm_page_t* page, size_t* queue) const {
+bool PageQueues::DebugPageIsReclaim(const vm_page_t* page, size_t* queue) const {
   return DebugPageIsSpecificReclaim(page, [](auto cow) { return cow->can_evict(); }, queue);
 }
 
-bool PageQueues::DebugPageIsPagerBackedDontNeed(const vm_page_t* page) const {
+bool PageQueues::DebugPageIsReclaimDontNeed(const vm_page_t* page) const {
   return DebugPageIsSpecificQueue(page, PageQueueReclaimDontNeed,
                                   [](auto cow) { return cow->can_evict(); });
 }

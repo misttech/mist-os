@@ -2100,7 +2100,7 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
       // If we are expecting a pending Add[New]PageLocked, we can defer updating the page queue.
       if (!is_pending_add) {
         // Move to evictable pager backed queue to start tracking age information.
-        pmm_page_queues()->MoveToPagerBacked(page);
+        pmm_page_queues()->MoveToReclaim(page);
       }
       break;
     case DirtyState::Dirty:
@@ -3774,7 +3774,7 @@ void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
         // reclaimable, place in the high priority queue instead.
         pq->MoveToHighPriority(page);
       } else {
-        pq->MoveToPagerBacked(page);
+        pq->MoveToReclaim(page);
       }
     } else {
       DEBUG_ASSERT(!page->is_loaned());
@@ -3810,7 +3810,7 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
         // reclaimable, place in the high priority queue instead.
         pq->SetHighPriority(page, this, offset);
       } else {
-        pq->SetPagerBacked(page, this, offset);
+        pq->SetReclaim(page, this, offset);
       }
     } else {
       DEBUG_ASSERT(!page->is_loaned());
@@ -3872,7 +3872,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
       // Note that this does not unset the always_need bit if it has been previously set. The
       // always_need hint is sticky.
       if (page->object.get_object() == root && page->object.pin_count == 0 && is_page_clean(page)) {
-        pmm_page_queues()->MoveToPagerBackedDontNeed(page);
+        pmm_page_queues()->MoveToReclaimDontNeed(page);
         vm_vmo_dont_need.Add(1);
       }
     }
