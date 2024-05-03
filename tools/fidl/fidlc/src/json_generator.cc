@@ -29,55 +29,45 @@ void JSONGenerator::Generate(const ConstantValue& value) {
   switch (value.kind) {
     case ConstantValue::Kind::kUint8:
     case ConstantValue::Kind::kZxUchar: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<uint8_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<uint8_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kUint16: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<uint16_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<uint16_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kUint32: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<uint32_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<uint32_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kUint64:
     case ConstantValue::Kind::kZxUsize64:
     case ConstantValue::Kind::kZxUintptr64: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<uint64_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<uint64_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kInt8: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<int8_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<int8_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kInt16: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<int16_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<int16_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kInt32: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<int32_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<int32_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kInt64: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<int64_t>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<int64_t>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kFloat32: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<float>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<float>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kFloat64: {
-      auto& numeric_constant = static_cast<const NumericConstantValue<double>&>(value);
-      EmitNumeric(numeric_constant.value, kAsString);
+      EmitNumeric(value.AsNumeric<double>(), kAsString);
       break;
     }
     case ConstantValue::Kind::kBool: {
@@ -195,8 +185,7 @@ void JSONGenerator::Generate(const Type* value) {
         const auto* type = static_cast<const HandleType*>(value);
         GenerateObjectMember("obj_type", static_cast<uint32_t>(type->subtype));
         GenerateObjectMember("subtype", type->subtype);
-        GenerateObjectMember(
-            "rights", static_cast<const NumericConstantValue<uint32_t>*>(type->rights)->value);
+        GenerateObjectMember("rights", type->rights->AsNumeric<uint32_t>());
         GenerateObjectMember("nullable", type->nullability);
         GenerateObjectMember("resource_identifier", FullyQualifiedName(type->resource_decl->name));
         break;
@@ -446,9 +435,7 @@ void JSONGenerator::GenerateEndpointImplementationLocations(const std::string_vi
                                                             Position position) {
   auto arg = discoverable->GetArg(endpoint);
   if (arg) {
-    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
-    auto locations = ParseImplementationLocations(
-        static_cast<const StringConstantValue&>(arg->value->Value()).value);
+    auto locations = ParseImplementationLocations(arg->value->Value().AsString());
     ZX_ASSERT(locations.has_value());
     GenerateObjectMember(endpoint, locations.value(), position);
   } else {

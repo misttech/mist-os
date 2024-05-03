@@ -385,22 +385,19 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
 static bool DiscoverableConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                    const Attribute* attr, const Element* element) {
   if (auto arg = attr->GetArg("name")) {
-    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
-    auto name = static_cast<const StringConstantValue&>(arg->value->Value()).value;
+    auto name = arg->value->Value().AsString();
     if (!IsValidDiscoverableName(name)) {
       return reporter->Fail(ErrInvalidDiscoverableName, arg->span, name);
     }
   }
   if (auto arg = attr->GetArg("client")) {
-    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
-    auto locations = static_cast<const StringConstantValue&>(arg->value->Value()).value;
+    auto locations = arg->value->Value().AsString();
     if (!IsValidImplementationLocations(locations)) {
       return reporter->Fail(ErrInvalidDiscoverableLocation, arg->span, locations);
     }
   }
   if (auto arg = attr->GetArg("server")) {
-    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
-    auto locations = static_cast<const StringConstantValue&>(arg->value->Value()).value;
+    auto locations = arg->value->Value().AsString();
     if (!IsValidImplementationLocations(locations)) {
       return reporter->Fail(ErrInvalidDiscoverableLocation, arg->span, locations);
     }
@@ -412,10 +409,7 @@ static bool TransportConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                 const Attribute* attribute, const Element* element) {
   ZX_ASSERT(element);
   ZX_ASSERT(element->kind == Element::Kind::kProtocol);
-
-  auto arg = attribute->GetArg(AttributeArg::kDefaultAnonymousName);
-  auto value = static_cast<const StringConstantValue&>(arg->value->Value()).value;
-
+  auto value = attribute->GetArg(AttributeArg::kDefaultAnonymousName)->value->Value().AsString();
   if (!Transport::FromTransportName(value)) {
     return reporter->Fail(ErrInvalidTransportType, attribute->span, value,
                           Transport::AllTransportNames());

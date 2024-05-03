@@ -429,16 +429,16 @@ bool CompileStep::ResolveLiteralConstant(LiteralConstant* literal_constant,
           uint64_t raw_value;
           switch (value.kind) {
             case ConstantValue::Kind::kUint8:
-              raw_value = static_cast<const NumericConstantValue<uint8_t>&>(value).value;
+              raw_value = value.AsNumeric<uint8_t>();
               break;
             case ConstantValue::Kind::kUint16:
-              raw_value = static_cast<const NumericConstantValue<uint16_t>&>(value).value;
+              raw_value = value.AsNumeric<uint16_t>();
               break;
             case ConstantValue::Kind::kUint32:
-              raw_value = static_cast<const NumericConstantValue<uint32_t>&>(value).value;
+              raw_value = value.AsNumeric<uint32_t>();
               break;
             case ConstantValue::Kind::kUint64:
-              raw_value = static_cast<const NumericConstantValue<uint64_t>&>(value).value;
+              raw_value = value.AsNumeric<uint64_t>();
               break;
             default:
               return false;
@@ -1047,7 +1047,7 @@ void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
   if (auto attr = method->attributes->Get("selector")) {
     if (auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName)) {
       if (auto& constant = arg->value; constant && constant->IsResolved()) {
-        auto value = static_cast<const StringConstantValue&>(constant->Value()).value;
+        auto value = constant->Value().AsString();
         if (IsValidFullyQualifiedMethodIdentifier(value)) {
           selector = value;
         } else if (IsValidIdentifierComponent(value)) {
@@ -1394,8 +1394,7 @@ bool CompileStep::ValidateMembers(DeclType* decl, MemberValidator<MemberType> va
       continue;
     }
 
-    MemberType value =
-        static_cast<const NumericConstantValue<MemberType>&>(member.value->Value()).value;
+    MemberType value = member.value->Value().template AsNumeric<MemberType>();
     const auto value_result = value_scope.Insert(value, member.name);
     if (!value_result.ok()) {
       const auto previous_span = value_result.previous_occurrence();
@@ -1462,8 +1461,7 @@ bool CompileStep::ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl,
       if (explicit_unknown_value.has_value()) {
         return reporter()->Fail(ErrUnknownAttributeOnMultipleEnumMembers, member.name);
       }
-      explicit_unknown_value =
-          static_cast<const NumericConstantValue<MemberType>&>(member.value->Value()).value;
+      explicit_unknown_value = member.value->Value().AsNumeric<MemberType>();
     }
   }
 
