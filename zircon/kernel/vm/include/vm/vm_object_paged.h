@@ -118,15 +118,16 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->ReclamationEventCountLocked();
   }
 
-  AttributionCounts AttributedPagesInRange(uint64_t offset, uint64_t len) const override {
+  AttributionCounts GetAttributedMemoryInRange(uint64_t offset_bytes,
+                                               uint64_t len_bytes) const override {
     Guard<CriticalMutex> guard{lock()};
-    return AttributedPagesInRangeLocked(offset, len);
+    return GetAttributedMemoryInRangeLocked(offset_bytes, len_bytes);
   }
 
-  AttributionCounts AttributedPagesInReferenceOwner() const override {
+  AttributionCounts GetAttributedMemoryInReferenceOwner() const override {
     DEBUG_ASSERT(is_reference());
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->AttributedPagesInRangeLocked(0, size_locked());
+    return cow_pages_locked()->GetAttributedMemoryInRangeLocked(0, size_locked());
   }
 
   zx_status_t CommitRange(uint64_t offset, uint64_t len) override {
@@ -254,20 +255,20 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->DebugValidatePageSplitsLocked();
   }
 
-  // Used to cache the page attribution count for this VMO. Also tracks the hierarchy generation
-  // count at the time of caching the attributed page count.
-  struct CachedPageAttribution {
+  // Used to cache the memory attribution counts for this VMO. Also tracks the hierarchy
+  // generation count at the time of caching the attribution counts.
+  struct CachedMemoryAttribution {
     uint64_t generation_count = 0;
-    AttributionCounts page_counts;
+    AttributionCounts attribution_counts;
   };
 
   // Exposed for testing.
-  CachedPageAttribution GetCachedPageAttribution() const {
+  CachedMemoryAttribution GetCachedMemoryAttribution() const {
     Guard<CriticalMutex> guard{lock()};
-    return cached_page_attribution_;
+    return cached_memory_attribution_;
   }
 
-  // Called from VmMapping to cache page attribution counts.
+  // Called from VmMapping to cache memory attribution counts.
   uint64_t GetHierarchyGenerationCount() const {
     Guard<CriticalMutex> guard{lock()};
     return GetHierarchyGenerationCountLocked();
@@ -341,9 +342,9 @@ class VmObjectPaged final : public VmObject {
   // Internal decommit range helper that expects the lock to be held.
   zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
-  // see AttributedPagesInRange
-  AttributionCounts AttributedPagesInRangeLocked(uint64_t offset, uint64_t len) const
-      TA_REQ(lock());
+  // see GetAttributedMemoryInRange
+  AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
+                                                     uint64_t len_bytes) const TA_REQ(lock());
 
   // internal read/write routine that takes a templated copy function to help share some code
   template <typename T>
@@ -398,8 +399,8 @@ class VmObjectPaged final : public VmObject {
   // once they want to go away.
   VmObjectPaged* parent_ TA_GUARDED(lock()) = nullptr;
 
-  // Tracks the last cached page attribution count.
-  mutable CachedPageAttribution cached_page_attribution_ TA_GUARDED(lock()) = {};
+  // Tracks the last cached attribution counts.
+  mutable CachedMemoryAttribution cached_memory_attribution_ TA_GUARDED(lock()) = {};
 
   // Our VmCowPages may be null during object initialization in the internal Create routines. As a
   // consequence if this is null it implies that the VMO is *not* in the global list. Otherwise it

@@ -216,12 +216,8 @@ bool fill_and_test_user(user_inout_ptr<void> ptr, size_t len) {
   END_TEST;
 }
 
-// Helper function used by the vmo_attribution_* tests.
-// Verifies that the current generation count is |vmo_gen| and the current page attribution count is
-// |pages|. Also verifies that the cached page attribution has the expected generation and page
-// counts after the call to AttributedPages().
-bool verify_object_page_attribution(VmObject* vmo, uint64_t vmo_gen,
-                                    VmObject::AttributionCounts pages) {
+bool verify_object_memory_attribution(VmObject* vmo, uint64_t vmo_gen,
+                                      VmObject::AttributionCounts expected_counts) {
   BEGIN_TEST;
 
   auto vmo_paged = static_cast<VmObjectPaged*>(vmo);
@@ -230,40 +226,38 @@ bool verify_object_page_attribution(VmObject* vmo, uint64_t vmo_gen,
   // Test equality of both the fields and the structs. The former gives better error messages, but
   // the latter is also done in case any additional fields are added.
   {
-    VmObject::AttributionCounts attr = vmo->AttributedPages();
-    EXPECT_EQ(pages.uncompressed, attr.uncompressed);
-    EXPECT_EQ(pages.compressed, attr.compressed);
-    EXPECT_TRUE(pages == attr);
+    VmObject::AttributionCounts vmo_counts = vmo->GetAttributedMemory();
+    EXPECT_EQ(expected_counts.uncompressed_bytes, vmo_counts.uncompressed_bytes);
+    EXPECT_EQ(expected_counts.compressed_bytes, vmo_counts.compressed_bytes);
+    EXPECT_TRUE(expected_counts == vmo_counts);
   }
 
   {
-    VmObjectPaged::CachedPageAttribution attr = vmo_paged->GetCachedPageAttribution();
-    EXPECT_EQ(vmo_gen, attr.generation_count);
-    EXPECT_EQ(pages.uncompressed, attr.page_counts.uncompressed);
-    EXPECT_EQ(pages.compressed, attr.page_counts.compressed);
-    EXPECT_TRUE(pages == attr.page_counts);
+    VmObjectPaged::CachedMemoryAttribution vmo_cached_counts =
+        vmo_paged->GetCachedMemoryAttribution();
+    EXPECT_EQ(vmo_gen, vmo_cached_counts.generation_count);
+    EXPECT_EQ(expected_counts.uncompressed_bytes,
+              vmo_cached_counts.attribution_counts.uncompressed_bytes);
+    EXPECT_EQ(expected_counts.compressed_bytes,
+              vmo_cached_counts.attribution_counts.compressed_bytes);
+    EXPECT_TRUE(expected_counts == vmo_cached_counts.attribution_counts);
   }
 
   END_TEST;
 }
 
-// Helper function used by the vm_mapping_attribution_* tests.
-// Verifies that the mapping generation count is |mapping_gen| and the current page attribution
-// count is |pages|. Also verifies that the cached page attribution has |mapping_gen| as the
-// mapping generation count, |vmo_gen| as the VMO generation count and |pages| as the page count
-// after the call to AllocatedPages().
-bool verify_mapping_page_attribution(VmMapping* mapping, uint64_t mapping_gen, uint64_t vmo_gen,
-                                     VmObject::AttributionCounts pages) {
+bool verify_mapping_memory_attribution(VmMapping* mapping, uint64_t mapping_gen, uint64_t vmo_gen,
+                                       VmObject::AttributionCounts expected_counts) {
   BEGIN_TEST;
 
   EXPECT_EQ(mapping_gen, mapping->GetMappingGenerationCount());
 
-  EXPECT_TRUE(pages == mapping->AllocatedPages());
+  EXPECT_TRUE(expected_counts == mapping->GetAttributedMemory());
 
-  VmMapping::CachedPageAttribution attr = mapping->GetCachedPageAttribution();
-  EXPECT_EQ(mapping_gen, attr.mapping_generation_count);
-  EXPECT_EQ(vmo_gen, attr.vmo_generation_count);
-  EXPECT_TRUE(pages == attr.page_counts);
+  VmMapping::CachedMemoryAttribution cached_counts = mapping->GetCachedMemoryAttribution();
+  EXPECT_EQ(mapping_gen, cached_counts.mapping_generation_count);
+  EXPECT_EQ(vmo_gen, cached_counts.vmo_generation_count);
+  EXPECT_TRUE(expected_counts == cached_counts.attribution_counts);
 
   END_TEST;
 }

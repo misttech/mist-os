@@ -210,7 +210,7 @@ class ProcessDispatcher final
   // The following two methods can be slow and inaccurate and should only be
   // called from diagnostics code.
   uint32_t ThreadCount() const;
-  VmObject::AttributionCounts PageCount() const;
+  VmObject::AttributionCounts GetAttributedMemory() const;
 
   // Look up a process given its koid.
   // Returns nullptr if not found.
@@ -324,7 +324,7 @@ class ProcessDispatcher final
   // The diagnostic code is allow to know about the internals of this code.
   friend void DumpProcessList();
   friend void KillProcess(zx_koid_t id);
-  friend void DumpProcessMemoryUsage(const char* prefix, size_t min_pages);
+  friend void DumpProcessMemoryUsage(const char* prefix, size_t min_bytes);
 
   ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shareable_state,
                     fbl::RefPtr<JobDispatcher> job, ktl::string_view name, uint32_t flags);

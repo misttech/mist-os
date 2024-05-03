@@ -41,9 +41,9 @@
 
 namespace {
 
-KCOUNTER(vmo_attribution_queries, "vm.attributed_pages.object.queries")
-KCOUNTER(vmo_attribution_cache_hits, "vm.attributed_pages.object.cache_hits")
-KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_pages.object.cache_misses")
+KCOUNTER(vmo_attribution_queries, "vm.attributed_memory.object.queries")
+KCOUNTER(vmo_attribution_cache_hits, "vm.attributed_memory.object.cache_hits")
+KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_memory.object.cache_misses")
 
 }  // namespace
 
@@ -827,50 +827,51 @@ void VmObjectPaged::DumpLocked(uint depth, bool verbose) const {
   cow_pages_locked()->DumpLocked(depth, verbose);
 }
 
-VmObject::AttributionCounts VmObjectPaged::AttributedPagesInRangeLocked(uint64_t offset,
-                                                                        uint64_t len) const {
-  uint64_t new_len;
-  if (!TrimRange(offset, len, size_locked(), &new_len)) {
+VmObject::AttributionCounts VmObjectPaged::GetAttributedMemoryInRangeLocked(
+    uint64_t offset_bytes, uint64_t len_bytes) const {
+  uint64_t new_len_bytes;
+  if (!TrimRange(offset_bytes, len_bytes, size_locked(), &new_len_bytes)) {
     return AttributionCounts{};
   }
 
   vmo_attribution_queries.Add(1);
 
-  // A reference never has pages attributed to it. It points to the parent's VmCowPages, and we need
-  // to hold the invariant that every page is attributed to a single VMO.
+  // A reference never has memory attributed to it. It points to the parent's VmCowPages, and we
+  // need to hold the invariant that we don't double-count attributed memory.
   //
-  // TODO(https://fxbug.dev/42069078): Consider attributing pages to the current VmCowPages backlink
-  // for the case where the parent has gone away.
+  // TODO(https://fxbug.dev/42069078): Consider attributing memory to the current VmCowPages
+  // backlink for the case where the parent has gone away.
   if (is_reference()) {
     return AttributionCounts{};
   }
 
   uint64_t gen_count;
   bool update_cached_attribution = false;
-  // Use cached value if generation count has not changed since the last time we attributed pages.
+  // Use cached value if generation count has not changed since the last time we attributed memory.
   // Only applicable for attribution over the entire VMO, not a partial range.
-  if (offset == 0 && new_len == size_locked()) {
+  if (offset_bytes == 0 && new_len_bytes == size_locked()) {
     gen_count = GetHierarchyGenerationCountLocked();
 
-    if (cached_page_attribution_.generation_count == gen_count) {
+    if (cached_memory_attribution_.generation_count == gen_count) {
       vmo_attribution_cache_hits.Add(1);
-      return cached_page_attribution_.page_counts;
+      return cached_memory_attribution_.attribution_counts;
     } else {
       vmo_attribution_cache_misses.Add(1);
       update_cached_attribution = true;
     }
   }
 
-  AttributionCounts page_counts = cow_pages_locked()->AttributedPagesInRangeLocked(offset, new_len);
+  AttributionCounts counts =
+      cow_pages_locked()->GetAttributedMemoryInRangeLocked(offset_bytes, new_len_bytes);
 
   if (update_cached_attribution) {
-    // Cache attributed page count along with current generation count.
-    DEBUG_ASSERT(cached_page_attribution_.generation_count != gen_count);
-    cached_page_attribution_.generation_count = gen_count;
-    cached_page_attribution_.page_counts = page_counts;
+    // Cache attribution counts along with current generation count.
+    DEBUG_ASSERT(cached_memory_attribution_.generation_count != gen_count);
+    cached_memory_attribution_.generation_count = gen_count;
+    cached_memory_attribution_.attribution_counts = counts;
   }
 
-  return page_counts;
+  return counts;
 }
 
 zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bool pin,
@@ -1933,9 +1934,10 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
   // 3) vmo has no mappings
   // 4) vmo has no children
   // 5) vmo is not a child
-  // Counting attributed pages does a sufficient job of checking for committed pages since we also
+  // Counting attributed memory does a sufficient job of checking for committed pages since we also
   // require no children and no parent, so attribution == precisely our pages.
-  if (cow_pages_locked()->AttributedPagesInRangeLocked(0, size_locked()) != AttributionCounts{} &&
+  if (cow_pages_locked()->GetAttributedMemoryInRangeLocked(0, size_locked()) !=
+          AttributionCounts{} &&
       cache_policy_ != ARCH_MMU_FLAG_CACHED) {
     // We forbid to transitioning committed pages from any kind of uncached->cached policy as we do
     // not currently have a story for dealing with the speculative loads that may have happened

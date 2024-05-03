@@ -427,7 +427,7 @@ fbl::RefPtr<VmAddressRegionOrMapping> VmAddressRegion::FindRegionLocked(vaddr_t 
   return fbl::RefPtr(subregions_.FindRegion(addr));
 }
 
-VmObject::AttributionCounts VmAddressRegion::AllocatedPagesLocked() {
+VmObject::AttributionCounts VmAddressRegion::GetAttributedMemoryLocked() {
   canary_.Assert();
 
   AttributionCounts page_counts;
@@ -437,7 +437,7 @@ VmObject::AttributionCounts VmAddressRegion::AllocatedPagesLocked() {
       0, UINT64_MAX, [](VmAddressRegion* vmar, uint depth) { return true; },
       [&page_counts](VmMapping* map, const VmAddressRegion* vmar, uint depth) {
         AssertHeld(map->lock_ref());
-        page_counts += map->AllocatedPagesLocked();
+        page_counts += map->GetAttributedMemoryLocked();
         return true;
       });
 

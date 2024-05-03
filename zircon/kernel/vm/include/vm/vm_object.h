@@ -99,7 +99,7 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   void DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) TA_EXCL(lock());
 
   // This should be called whenever a change is made to the VMO tree or the VMO's page list, that
-  // could result in page attribution counts to change for any VMO in this tree.
+  // could result in memory attribution counts to change for any VMO in this tree.
   void IncrementHierarchyGenerationCountLocked() TA_REQ(lock()) {
     DEBUG_ASSERT(hierarchy_generation_count_ != 0);
     hierarchy_generation_count_++;
@@ -120,11 +120,11 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
   // - either in the VMO tree, or the page lists of VMO's.
   //
-  // The generation count is used to implement caching for page attribution counts, which get
-  // queried frequently to periodically track memory usage on the system. Attributing pages to a
-  // VMO is an expensive operation and involves walking the VMO tree, quite often multiple times.
-  // If the generation count does not change between two successive queries, we can avoid
-  // re-counting attributed pages, and simply return the previously cached value.
+  // The generation count is used to implement caching for memory attribution counts, which get
+  // periodically track memory usage on the system. Attributing memory to a VMO is an expensive
+  // operation and involves walking the VMO tree, quite often multiple times. If the generation
+  // counts for the vmo *and* the mapping do not change between two successive queries, we can avoid
+  // re-counting attributed memory, and simply return the previously cached value.
   //
   // The generation count starts at 1 to ensure that there can be no cached values initially; the
   // cached generation count starts at 0.
@@ -323,35 +323,38 @@ class VmObject : public VmHierarchyBase,
   virtual void mark_modified_locked() TA_REQ(lock()) {}
 
   struct AttributionCounts {
-    size_t uncompressed = 0;
-    size_t compressed = 0;
+    size_t uncompressed_bytes = 0;
+    size_t compressed_bytes = 0;
 
     const AttributionCounts& operator+=(const AttributionCounts& other) {
-      uncompressed += other.uncompressed;
-      compressed += other.compressed;
+      uncompressed_bytes += other.uncompressed_bytes;
+      compressed_bytes += other.compressed_bytes;
       return *this;
     }
 
     bool operator==(const AttributionCounts& other) const {
-      return uncompressed == other.uncompressed && compressed == other.compressed;
+      return uncompressed_bytes == other.uncompressed_bytes &&
+             compressed_bytes == other.compressed_bytes;
     }
 
     bool operator!=(const AttributionCounts& other) const { return !(*this == other); }
   };
 
-  // Returns the number of physical pages currently attributed to the
-  // object where (offset <= page_offset < offset+len).
-  // |offset| and |len| are in bytes.
-  virtual AttributionCounts AttributedPagesInRange(uint64_t offset, uint64_t len) const {
+  // Returns the number of physical bytes currently attributed to a range of this VMO.
+  // The range is `[offset_bytes, offset_bytes+len_bytes)`.
+  virtual AttributionCounts GetAttributedMemoryInRange(uint64_t offset_bytes,
+                                                       uint64_t len_bytes) const {
     return AttributionCounts{};
   }
 
-  // Returns the number of phsyical pages currently attributed to the VMO that is the owner of a
-  // reference.
-  virtual AttributionCounts AttributedPagesInReferenceOwner() const { return AttributionCounts{}; }
+  // Returns the number of physical bytes currently attributed to this VMO's parent when this VMO
+  // is a reference.
+  virtual AttributionCounts GetAttributedMemoryInReferenceOwner() const {
+    return AttributionCounts{};
+  }
 
-  // Returns the number of physical pages currently attributed to the object.
-  AttributionCounts AttributedPages() const { return AttributedPagesInRange(0, size()); }
+  // Returns the number of physical bytes currently attributed to this VMO.
+  AttributionCounts GetAttributedMemory() const { return GetAttributedMemoryInRange(0, size()); }
 
   // find physical pages to back the range of the object
   // May block on user pager requests and must be called without locks held.

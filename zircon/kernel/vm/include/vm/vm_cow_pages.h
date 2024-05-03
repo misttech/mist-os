@@ -173,7 +173,7 @@ class VmCowPages final : public VmHierarchyBase,
     return high_priority_count_ != 0;
   }
 
-  // When attributing pages hidden nodes must be attributed to either their left or right
+  // When attributing memory hidden nodes must be attributed to either their left or right
   // descendants. The attribution IDs of all involved determine where attribution goes. For
   // historical and practical reasons actual user ids are used, although any consistent naming
   // scheme will have the same effect.
@@ -436,10 +436,10 @@ class VmCowPages final : public VmHierarchyBase,
   // would be read as zero. Requested offset must be page aligned and within range.
   bool PageWouldReadZeroLocked(uint64_t page_offset) TA_REQ(lock());
 
-  // see VmObjectPaged::AttributedPagesInRange
+  // see VmObject::GetAttributedMemoryInRange
   using AttributionCounts = VmObject::AttributionCounts;
-  AttributionCounts AttributedPagesInRangeLocked(uint64_t offset, uint64_t len) const
-      TA_REQ(lock());
+  AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
+                                                     uint64_t len_bytes) const TA_REQ(lock());
 
   enum class EvictionHintAction : uint8_t {
     Follow,
@@ -865,14 +865,14 @@ class VmCowPages final : public VmHierarchyBase,
   // internal check if any pages in a range are pinned
   bool AnyPagesPinnedLocked(uint64_t offset, size_t len) TA_REQ(lock());
 
-  // Helper function for ::AllocatedPagesInRangeLocked. Counts the number of pages in ancestor's
-  // vmos that should be attributed to this vmo for the specified range. It is an error to pass in a
-  // range that does not need attributing (i.e. offset must be < parent_limit_), although |len| is
-  // permitted to be sized such that the range exceeds parent_limit_.
-  // The return value is the length of the processed region, which will be <= |size| and is
-  // guaranteed to be > 0. The |count| is the number of pages in this region that should be
-  // attributed to this vmo, versus some other vmo.
-  uint64_t CountAttributedAncestorPagesLocked(uint64_t offset, uint64_t size,
+  // Helper function for ::GetAttributedMemoryInRangeLocked. Counts the number of bytes in
+  // ancestor's vmos that should be attributed to this vmo for the specified range. It is an error
+  // to pass in a range that does not need attributing (i.e. offset must be < parent_limit_),
+  // although |len| is permitted to be sized such that the range exceeds parent_limit_. The return
+  // value is the length of the processed region, which will be <= |size| and is guaranteed to be >
+  // 0. The |count| is the number of bytes in this region that should be attributed to this vmo,
+  // versus some other vmo.
+  uint64_t CountAttributedAncestorBytesLocked(uint64_t offset, uint64_t size,
                                               AttributionCounts* count) const TA_REQ(lock());
 
   // Searches for the the initial content for |this| at |offset|. The result could be used to

@@ -160,10 +160,10 @@ static bool out_of_memory() {
   END_TEST;
 }
 
-// Test helper. Counts the number of committed and uncommitted pages in the
+// Test helper. Counts the number of committed and uncommitted bytes in the
 // range. Returns {*committed, *uncommitted} = {0, 0} if |start| doesn't
 // correspond to a live VmMapping.
-static bool count_committed_pages(vaddr_t start, vaddr_t end, size_t* committed,
+static bool count_committed_bytes(vaddr_t start, vaddr_t end, size_t* committed,
                                   size_t* uncommitted) {
   BEGIN_TEST;  // Not a test, but we need these guards to use ASSERT_*
   *committed = 0;
@@ -189,12 +189,12 @@ static bool count_committed_pages(vaddr_t start, vaddr_t end, size_t* committed,
     end_off = ROUNDUP(end, PAGE_SIZE) - mapping->base_locked();
     mapping_offset = mapping->object_offset_locked();
   }
-  const VmObject::AttributionCounts page_counts =
-      mapping->vmo()->AttributedPagesInRange(start_off + mapping_offset, end_off - start_off);
+  const VmObject::AttributionCounts counts =
+      mapping->vmo()->GetAttributedMemoryInRange(start_off + mapping_offset, end_off - start_off);
   // Our pages are mapped into the kernel, meaning they should always be real pinned pages.
-  ASSERT_EQ(page_counts.compressed, 0u);
-  *committed = page_counts.uncompressed;
-  *uncommitted = (end_off - start_off) / PAGE_SIZE - *committed;
+  ASSERT_EQ(counts.compressed_bytes, 0u);
+  *committed = counts.uncompressed_bytes;
+  *uncommitted = (end_off - start_off) - *committed;
   END_TEST;
 }
 
@@ -211,7 +211,7 @@ static bool committing_tests() {
   // Nothing is allocated yet, so no pages should be committed.
   size_t committed;
   size_t uncommitted;
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
   EXPECT_EQ(0u, committed);
   EXPECT_GT(uncommitted, 0u);
 
@@ -223,13 +223,13 @@ static bool committing_tests() {
   // The page containing the object should be committed.
   auto ps = ROUNDDOWN(obj, PAGE_SIZE);
   auto pe = ROUNDUP(obj + sizeof(TestObj), PAGE_SIZE);
-  EXPECT_TRUE(count_committed_pages(ps, pe, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(ps, pe, &committed, &uncommitted));
   EXPECT_GT(committed, 0u);
   EXPECT_EQ(0u, uncommitted);
 
   // The first handful of pages should also become committed, but the rest
   // should stay ucommitted.
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
   EXPECT_GT(committed, 0u);
   EXPECT_GT(uncommitted, 0u);
 
@@ -237,18 +237,18 @@ static bool committing_tests() {
   // shouldn't change.
   auto orig_committed = committed;
   auto orig_uncommitted = uncommitted;
-  while (atotal + sizeof(TestObj) <= orig_committed * PAGE_SIZE) {
+  while (atotal + sizeof(TestObj) <= orig_committed) {
     EXPECT_NONNULL(arena.Alloc());
     atotal += sizeof(TestObj);
   }
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
   EXPECT_EQ(orig_committed, committed);
   EXPECT_EQ(orig_uncommitted, uncommitted);
 
   // Allocating one more object should cause more pages to be committed.
   EXPECT_NONNULL(arena.Alloc());
   atotal += sizeof(TestObj);
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
   EXPECT_LT(orig_committed, committed);
   EXPECT_GT(orig_uncommitted, uncommitted);
 
@@ -298,8 +298,8 @@ static bool uncommitting_tests() {
   // Nothing is allocated yet, so no control pages should be committed.
   size_t committed;
   size_t uncommitted;
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
   EXPECT_EQ(0u, committed);
   EXPECT_GT(uncommitted, 0u);
 
@@ -318,8 +318,8 @@ static bool uncommitting_tests() {
 
   // We still shouldn't see any control pages committed, becase no objects
   // have been freed yet.
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
   EXPECT_EQ(0u, committed);
   EXPECT_GT(uncommitted, 0u);
 
@@ -331,8 +331,8 @@ static bool uncommitting_tests() {
   arena.Free(*--top);
 
   // We should now see some committed pages inside the control pool.
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
   EXPECT_GT(committed, 0u);
   EXPECT_GT(uncommitted, 0u);
 
@@ -342,9 +342,9 @@ static bool uncommitting_tests() {
   }
 
   // All of the control pages should be committed.
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
-  EXPECT_EQ(committed, num_pages);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
+  EXPECT_EQ(committed, num_pages * PAGE_SIZE);
   EXPECT_EQ(uncommitted, 0u);
 
   // Allocate half of the data objects, freeing up half of the free nodes
@@ -359,8 +359,8 @@ static bool uncommitting_tests() {
   }
 
   // The number of committed pages should have dropped.
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
   EXPECT_LT(committed, orig_committed);
   EXPECT_GT(uncommitted, 0u);
 
@@ -373,7 +373,7 @@ static bool uncommitting_tests() {
     *top++ = arena.Alloc();
     EXPECT_NONNULL(top[-1], msg);
 
-    EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+    EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
     if (committed != orig_committed) {
       break;
     }
@@ -381,12 +381,12 @@ static bool uncommitting_tests() {
   EXPECT_GT(orig_committed, committed);
 
   // Allocating one more control slot (by freeing a data object) should not
-  // cause the number of committed pages to change: there should be some
+  // cause the number of committed bytes to change: there should be some
   // hysteresis built into the system to avoid flickering back and forth.
   orig_committed = committed;
   arena.Free(*--top);
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
   EXPECT_EQ(committed, orig_committed);
   EXPECT_GT(uncommitted, 0u);
 
@@ -394,8 +394,8 @@ static bool uncommitting_tests() {
   // objects).
   *top++ = arena.Alloc();
   *top++ = arena.Alloc();
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
-  EXPECT_EQ(num_pages, committed + uncommitted);
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
+  EXPECT_EQ(num_pages * PAGE_SIZE, committed + uncommitted);
   EXPECT_EQ(committed, orig_committed);
   EXPECT_GT(uncommitted, 0u);
 
@@ -422,16 +422,16 @@ static bool memory_cleanup() {
     EXPECT_NONNULL(arena->Alloc(), msg);
   }
 
-  // Should see some committed pages.
+  // Should see some committed bytes.
   size_t committed;
   size_t uncommitted;
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
   EXPECT_GT(committed, 0u);
 
   // Destroying the Arena should destroy the underlying VmMapping,
   // along with all of its pages.
   delete arena;
-  EXPECT_TRUE(count_committed_pages(start, end, &committed, &uncommitted));
+  EXPECT_TRUE(count_committed_bytes(start, end, &committed, &uncommitted));
   // 0/0 means "no mapping at this address".
   // FLAKY: Another thread could could come in and allocate a mapping at the
   // old location.
