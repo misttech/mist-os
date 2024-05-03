@@ -62,7 +62,7 @@ template("_hermetic_code_blob") {
     # TODO(https://fxbug.dev/42079915): LLD lets --no-pie trump the code generation
     # switches, but this needs to be compiled as PIC though linked differently.
     if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
-        toolchain_variant.tags) {
+        toolchain_variant.tags || optimize == "size_lto") {
       ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
     }
 
