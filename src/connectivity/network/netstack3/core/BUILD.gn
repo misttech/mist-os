@@ -156,7 +156,6 @@ rustc_library_with_features("netstack3-core") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-subscriber",
   ]
@@ -220,7 +219,6 @@ rustc_library_with_features("netstack3-core") {
       ]
 
       deps += _core_deps
-      deps += [ "//third_party/rust_crates:rand_xorshift" ]
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - _core_deps
@@ -239,10 +237,7 @@ rustc_library_with_features("netstack3-core") {
         "sync:netstack3-sync",
       ]
       deps += _core_deps
-      deps += [
-        "//third_party/rust_crates:criterion",
-        "//third_party/rust_crates:rand_xorshift",
-      ]
+      deps += [ "//third_party/rust_crates:criterion" ]
       deps += test_deps
 
       # Guard against bad crate variants.
@@ -269,7 +264,6 @@ rustc_library_with_features("netstack3-core") {
           "sync:netstack3-sync-loom",
         ]
         deps += _core_deps
-        deps += [ "//third_party/rust_crates:rand_xorshift" ]
 
         # Guard against bad crate variants.
         assert_no_deps = _all_core_crates - _core_deps

@@ -40,7 +40,6 @@ use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug};
 use lock_order::Unlocked;
 
 use packet::{BufferMut, Serializer};
-use rand::{CryptoRng, RngCore};
 
 use crate::{
     counters::Counter,
@@ -50,7 +49,7 @@ use crate::{
 
 pub use netstack3_base::{
     ContextPair, CoreTimerContext, DeferredResourceRemovalContext, HandleableTimer,
-    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers,
+    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers, RngContext,
     TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
@@ -64,31 +63,6 @@ pub use netstack3_base::{
 pub(crate) trait NonTestCtxMarker {}
 
 impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
-
-// NOTE:
-// - Code in this crate is required to only obtain random values through an
-//   `RngContext`. This allows a deterministic RNG to be provided when useful
-//   (for example, in tests).
-// - The CSPRNG requirement exists so that random values produced within the
-//   network stack are not predictable by outside observers. This helps prevent
-//   certain kinds of fingerprinting and denial of service attacks.
-
-/// A context that provides a random number generator (RNG).
-pub trait RngContext {
-    // TODO(joshlf): If the CSPRNG requirement becomes a performance problem,
-    // introduce a second, non-cryptographically secure, RNG.
-
-    /// The random number generator (RNG) provided by this `RngContext`.
-    ///
-    /// The provided RNG must be cryptographically secure, and users may rely on
-    /// that property for their correctness and security.
-    type Rng<'a>: RngCore + CryptoRng
-    where
-        Self: 'a;
-
-    /// Gets the random number generator (RNG).
-    fn rng(&mut self) -> Self::Rng<'_>;
-}
 
 /// A context for receiving frames.
 pub trait RecvFrameContext<BC, Meta> {
@@ -359,10 +333,10 @@ pub(crate) mod testutil {
 
     use derivative::Derivative;
     use net_types::ip::IpVersion;
+    use netstack3_base::testutil::FakeCryptoRng;
 
     #[cfg(test)]
     use packet::Buf;
-    use rand_xorshift::XorShiftRng;
 
     use super::*;
     use crate::{
@@ -370,7 +344,6 @@ pub(crate) mod testutil {
         filter::FilterBindingsTypes,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
         sync::{DynDebugReferences, Mutex},
-        testutil::FakeCryptoRng,
     };
     #[cfg(test)]
     use crate::{
@@ -508,7 +481,7 @@ pub(crate) mod testutil {
 
     /// A test helper used to provide an implementation of a bindings context.
     pub(crate) struct FakeBindingsCtx<TimerId, Event: Debug, State, FrameMeta> {
-        pub(crate) rng: FakeCryptoRng<XorShiftRng>,
+        pub(crate) rng: FakeCryptoRng,
         pub(crate) timers: FakeTimerCtx<TimerId>,
         pub(crate) events: FakeEventCtx<Event>,
         pub(crate) frames: FakeFrameCtx<FrameMeta>,
@@ -592,7 +565,7 @@ pub(crate) mod testutil {
     impl<TimerId, Event: Debug, State, FrameMeta> RngContext
         for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
     {
-        type Rng<'a> = FakeCryptoRng<XorShiftRng> where Self: 'a;
+        type Rng<'a> = FakeCryptoRng where Self: 'a;
 
         fn rng(&mut self) -> Self::Rng<'_> {
             self.rng.clone()

@@ -5019,7 +5019,6 @@ mod tests {
         tcp::{TcpParseArgs, TcpSegment},
     };
     use rand::Rng as _;
-    use rand_xorshift::XorShiftRng;
     use test_case::test_case;
 
     use crate::{
@@ -5276,7 +5275,7 @@ mod tests {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct TcpBindingsCtx<D: FakeStrongDeviceId> {
-        rng: FakeCryptoRng<XorShiftRng>,
+        rng: FakeCryptoRng,
         timers: FakeTimerCtx<TimerId<D::Weak, Self>>,
     }
 
@@ -5326,8 +5325,8 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsRef<FakeCryptoRng<XorShiftRng>> for TcpBindingsCtx<D> {
-        fn as_ref(&self) -> &FakeCryptoRng<XorShiftRng> {
+    impl<D: FakeStrongDeviceId> AsRef<FakeCryptoRng> for TcpBindingsCtx<D> {
+        fn as_ref(&self) -> &FakeCryptoRng {
             &self.rng
         }
     }
@@ -5377,7 +5376,7 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> RngContext for TcpBindingsCtx<D> {
-        type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng>;
+        type Rng<'a> = &'a mut FakeCryptoRng;
         fn rng(&mut self) -> Self::Rng<'_> {
             &mut self.rng
         }

@@ -17,6 +17,7 @@ mod counters;
 mod data_structures;
 mod inspect;
 mod resource_references;
+mod rng;
 mod time;
 
 pub use context::ContextPair;
@@ -26,6 +27,7 @@ pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
     RemoveResourceResultWithContext,
 };
+pub use rng::RngContext;
 pub use time::{
     local_timer_heap::LocalTimerHeap, CoreTimerContext, HandleableTimer, Instant,
     InstantBindingsTypes, InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx,
@@ -57,6 +59,7 @@ pub mod sync {
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
+    pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
         FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
         WithFakeTimerContext,
