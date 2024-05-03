@@ -104,7 +104,7 @@ zx_status_t get_vmo(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_s
   fbl::AllocChecker ac;
   auto storage = fbl::MakeRefCountedChecked<zx::VmoStorage>(
       &ac, ktl::move(vmo), ktl::move(content_size_manager),
-      zx::VmoStorage::InitialMutability::kMutable);
+      VmObjectDispatcher::InitialMutability::kMutable);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

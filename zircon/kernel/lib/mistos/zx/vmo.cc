@@ -27,47 +27,8 @@ static_assert(ZX_CACHE_POLICY_MASK == ARCH_MMU_FLAG_CACHE_MASK,
 
 namespace zx {
 
-namespace {
-
-struct CreateStats {
-  uint32_t flags;
-  size_t size;
-};
-
-zx::result<CreateStats> parse_create_syscall_flags(uint32_t flags, size_t size) {
-  CreateStats res = {0, size};
-
-  if (flags & ZX_VMO_RESIZABLE) {
-    if (flags & ZX_VMO_UNBOUNDED) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    res.flags |= VmObjectPaged::kResizable;
-    flags &= ~ZX_VMO_RESIZABLE;
-  }
-  if (flags & ZX_VMO_DISCARDABLE) {
-    res.flags |= VmObjectPaged::kDiscardable;
-    flags &= ~ZX_VMO_DISCARDABLE;
-  }
-  if (flags & ZX_VMO_UNBOUNDED) {
-    flags &= ~ZX_VMO_UNBOUNDED;
-    res.size = VmObjectPaged::max_size();
-  } else {
-    if (zx_status_t status = VmObject::RoundSize(size, &res.size); status != ZX_OK) {
-      return zx::error(status);
-    }
-  }
-
-  if (flags) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  return zx::ok(res);
-}
-
-}  // namespace
-
 VmoStorage::VmoStorage(fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager> content_size_mgr,
-                       InitialMutability initial_mutability)
+                       VmObjectDispatcher::InitialMutability initial_mutability)
     : koid_(KernelObjectId::Generate()),
       vmo_(std::move(vmo)),
       content_size_mgr_(std::move(content_size_mgr)),
@@ -81,11 +42,12 @@ VmoStorage::VmoStorage(fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager
 zx_status_t vmo::create(uint64_t size, uint32_t options, vmo* out) {
   LTRACEF("size %#" PRIx64 "\n", size);
 
-  zx::result<CreateStats> parse_result = parse_create_syscall_flags(options, size);
+  zx::result<VmObjectDispatcher::CreateStats> parse_result =
+      VmObjectDispatcher::parse_create_syscall_flags(options, size);
   if (parse_result.is_error()) {
     return parse_result.error_value();
   }
-  CreateStats stats = parse_result.value();
+  VmObjectDispatcher::CreateStats stats = parse_result.value();
 
   // create a vm object
   fbl::RefPtr<VmObjectPaged> vmo;
@@ -103,7 +65,7 @@ zx_status_t vmo::create(uint64_t size, uint32_t options, vmo* out) {
   fbl::AllocChecker ac;
   auto storage =
       fbl::MakeRefCountedChecked<VmoStorage>(&ac, std::move(vmo), std::move(content_size_manager),
-                                             VmoStorage::InitialMutability::kMutable);
+                                             VmObjectDispatcher::InitialMutability::kMutable);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -198,9 +160,9 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
   // "upgraded" to a snapshot. However this behavior is not guaranteed at the API level.
   // A choice was made to conservatively only mark VMOs as immutable when the user explicitly
   // creates a VMO in a way that is guaranteed at the API level to always output an immutable VMO.
-  auto initial_mutability = VmoStorage::InitialMutability::kMutable;
+  auto initial_mutability = VmObjectDispatcher::InitialMutability::kMutable;
   if (no_write && (options & ZX_VMO_CHILD_SNAPSHOT)) {
-    initial_mutability = VmoStorage::InitialMutability::kImmutable;
+    initial_mutability = VmObjectDispatcher::InitialMutability::kImmutable;
   }
 
   fbl::RefPtr<ContentSizeManager> content_size_manager;
@@ -460,7 +422,7 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
 
 zx_info_vmo_t vmo::get_vmo_info(zx_rights_t rights) const {
   zx_info_vmo_t info = VmoToInfoEntry(get()->vmo_.get(), VmoOwnership::kHandle, rights);
-  if (get()->initial_mutability_ == VmoStorage::InitialMutability::kImmutable) {
+  if (get()->initial_mutability_ == VmObjectDispatcher::InitialMutability::kImmutable) {
     info.flags |= ZX_INFO_VMO_IMMUTABLE;
   }
   return info;

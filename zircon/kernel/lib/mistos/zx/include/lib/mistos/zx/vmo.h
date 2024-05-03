@@ -14,6 +14,7 @@
 #include <utility>
 
 #include <fbl/ref_ptr.h>
+#include <object/vm_object_dispatcher.h>
 #include <vm/content_size_manager.h>
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
@@ -24,10 +25,9 @@ class vmo;
 
 class VmoStorage : public fbl::RefCounted<VmoStorage> {
  public:
-  enum class InitialMutability { kMutable, kImmutable };
-
-  explicit VmoStorage(fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager> content_size_mgr,
-                      /*zx_koid_t pager_koid,*/ InitialMutability initial_mutability);
+  explicit VmoStorage(
+      fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager> content_size_mgr,
+      /*zx_koid_t pager_koid,*/ VmObjectDispatcher::InitialMutability initial_mutability);
 
   const fbl::RefPtr<VmObject>& vmo() const { return vmo_; }
 
@@ -48,7 +48,7 @@ class VmoStorage : public fbl::RefCounted<VmoStorage> {
   fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
 
   // Indicates whether the VMO was immutable at creation time.
-  const InitialMutability initial_mutability_;
+  const VmObjectDispatcher::InitialMutability initial_mutability_;
 };
 
 enum class VmoOwnership { kHandle, kMapping, kIoBuffer };
