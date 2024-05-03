@@ -1,14 +1,18 @@
-# Use the debugger to automatically debug tests
+# Debug tests using zxdb
 
-`zxdb` may be used in conjunction with [`fx test`][fx-test] using the
-`--break-on-failure` or `--breakpoint` flags.
+This pages provides details and examples related to using the Fuchsia
+debugger (`zxdb`) with the [`fx test`][fx-test] command.
 
-If your test uses a compatible test runner (gTest, gUnit, or Rust today),
-then test failures will pause test execution for that suite and show you the
-debugger prompt, for example:
+## Entering the debugger from fx test {:#entering-the-debugger-from-fx-test}
+
+The `fx test` command supports the `--break-on-failure` and `--breakpoint`
+flags, which allows you to debug tests using `zxdb`. If your test uses a
+compatible test runner (that is, gTest, gUnit, or Rust today), adding the
+`--break-on-failure` flag will cause test failures to pause test execution
+and enter the `zxdb` debug environment, for example:
 
 ```none {:.devsite-disable-click-to-copy}
-=>  fx test --break-on-failure rust_crasher_test.cm
+$ fx test --break-on-failure rust_crasher_test.cm
 
 <...fx test startup...>
 
@@ -35,61 +39,71 @@ Status: [duration: 13.3s]  [tasks: 3 running, 15/18 complete]
 [zxdb]
 ```
 
-From this point, you may use `zxdb` as normal. Since the thread is already in a
-fatal exception, typical execution commands (for example `step`, `next`, and
-`until`) will not be available.
+From this point, you may use `zxdb` as normal. However, since the thread
+is already in a fatal exception, typical execution commands such as `step`,
+`next`, and `until` are not available. Inspection commands such as `print`,
+`frame`, and `backtrace` are available for the duration of the debugging
+session.
 
-Inspection commands such as `print`, `frame`, and `backtrace` will be available
-for the duration of the debugging session.
+## Executing test cases in parallel {:#executing-test-cases-in-parallel}
 
-## Test failures in parallel {:#test-failures-in-parallel}
+Depending on the options given to `fx test` or test runner default
+configurations, multiple test cases may fail in parallel. Supported test
+runners all spawn an individual process for each test case, and the default
+configuration may allow for multiple test processes to be running at the
+same time.
 
-Sometimes multiple test cases may fail in parallel, depending on the options
-given to `fx test` or test runner default configurations. Supported test runners
-all spawn an individual process for each test case, and the default
-configuration may allow for multiple test processes to be running at the same
-time.
+When running with `fx test`, `zxdb` attaches to _all_ processes in your
+test's realm. A test case failure will stop _only_ that particular process.
 
-When running with `fx test`, `zxdb` will attach to _all_ processes in your
-test's realm, and any test case failures will stop _only_ that particular
-process. Parallel execution will only stop if and only if the number of test
-case failures is equal to the number of allowed parallel test cases. When any
-processes is detached from `zxdb`, another test case process will begin
+Parallel execution will only stop if and only if the number of test case
+failures is equal to the number of allowed parallel test cases. Once any
+process is detached from `zxdb`, another test case process will begin
 immediately.
 
-`zxdb` is designed to handle multi-process debugging well. You can inspect the
-currently attached processes and their current execution states with the
-`process` noun, or simply with the `status` command. The currently "active"
-process will be indicated with a "▶". Find more detailed information about the
-[interaction model][interaction-model] or via the `help` command.
+`zxdb` is designed to handle multi-process debugging. You can inspect the
+current attached processes and their execution states with the `process` noun
+or with the `status` command. The currently "active" process is marked with
+a "▶" sign.
 
-## Closing the debugger
+For more detailed information, see [Interaction model][interaction-model] (or
+use the `help` command).
 
-When you're finished inspecting your test, you can continue by detaching from
-your test in any way (for example, `kill`, `detach`, and `continue`).
+## Closing the debugger {:#closing-the-debugger}
 
-As discussed [above][#test-failures-in-parallel], multiple test cases may fail
-in parallel. If you do not explicitly detach from all attached processes, `zxdb`
-will remain in the foreground. You can see all attached processes using the
-`process` noun.
+After inspecting your test failure, you resume the test execution by detaching
+from your test process, for example, using `kill`, `detach`, or `continue`.
 
-Certain commands will detach from everything (for example, `quit`, `detach *`,
-and `ctrl+d`) and resume execution of the test suite immediately.
+As discussed in the previous section, multiple test cases may fail in parallel.
+If you do not explicitly detach from all attached processes, `zxdb` remains in
+the foreground. You can see all attached processes using the `process` noun.
 
-## Examples
+You can also use certain commands to detach from all processes (for example,
+`quit`, `detach *`, and `ctrl+d`) and resume execution of the test suite
+immediately.
 
-### Setup and background
+## Tutorial
+
+This tutorial walks through a debugging workflow using the `fx test` command
+and the Fuchsia debugger (`zxdb`).
+
+### 1. Understand test cases {:#understand-test-cases}
+
+Note: In most test cases, no additional setup is necessary in the code to run
+the `fx test` command with `zxdb`.
 
 * {Rust}
 
-  Rust tests are executed by the [Rust test runner][rust-test-runner]. Unlike gTest or gUnit runners
-  for C++ tests, the Rust test runner defaults to running test cases in parallel. This creates a
-  different experience while using the `--break-on-failure` feature. See the section for debugging
-  [parallel processes][#test-failures-in-parallel] about expectations while debugging parallel test
-  processes. This case is supported, and will function well with zxdb.
+  Rust tests are executed by the [Rust test runner][rust-test-runner]. Unlike
+  gTest or gUnit runners for C++ tests, the Rust test runner defaults to running
+  test cases in parallel. This creates a different experience while using the
+  `--break-on-failure` feature. See the section for debugging
+  [parallel processes](#executing-test-casess-in-parallel) about expectations
+  while debugging parallel test processes. This case is supported, and will
+  function well with `zxdb`.
 
-  Here's some sample [rust test code][archivist-test-example] (modified from the original),
-  abbreviated for brevity:
+  Here's some sample [rust test code][archivist-test-example] (modified from
+  the original), abbreviated for brevity:
 
   ```rust
   ...
@@ -108,10 +122,12 @@ and `ctrl+d`) and resume execution of the test suite immediately.
 
 * {C++}
 
-  The gTest test runner by default executes test cases serially, so only one test failure will be
-  debugged at a time. Executing test cases in parallel is supported, and may be done by adding the
-  `--parallel-cases` flag to the `fx test` command line. Let's look at some sample [C++ test
-  code][debug-agent-test-example] using gTest (abbreviated for brevity):
+  The gTest test runner by default executes test cases serially, so only one
+  test failure will be debugged at a time. Executing test cases in parallel
+  is supported, and may be done by adding the `--parallel-cases` flag to the
+  `fx test` command. Let's look at some sample
+  [C++ test code][debug-agent-test-example] using gTest (abbreviated for
+  brevity):
 
   ```cpp
   // Inject 1 process.
@@ -134,24 +150,24 @@ and `ctrl+d`) and resume execution of the test suite immediately.
   ...
   ```
 
-### Executing your tests
-
-We execute the tests with the `fx test --break-on-failure` command, for example:
+### 2. Execute tests {:#execute-tests}
 
 * {Rust}
 
+  Execute the tests with the `fx test --break-on-failure` command, for example:
+
   ```none {:.devsite-disable-click-to-copy}
-  =>  fx test -o --break-on-failure archivist-unittests
+  $ fx test -o --break-on-failure archivist-unittests
 
   <...fx test startup...>
 
   Running 1 tests
 
-  Starting: fuchsia-pkg://fuchsia.com/archivist-tests#meta/archivist-unittests.cm 
+  Starting: fuchsia-pkg://fuchsia.com/archivist-tests#meta/archivist-unittests.cm
   Command: fx ffx test run --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/archivist-tests?hash=9a531e48fe82d86edef22f86f7e9b819d18a7d678f0823912d9224dd91f8926f#meta/archivist-unittests.cm
   Running test 'fuchsia-pkg://fuchsia.com/archivist-tests?hash=9a531e48fe82d86edef22f86f7e9b819d18a7d678f0823912d9224dd91f8926f#meta/archivist-unittests.cm'
 
-  [RUNNING]	archivist::tests::can_log_and_retrive_log
+  [RUNNING] archivist::tests::can_log_and_retrive_log
   [101430.272555][5631048][5631050][<root>][can_log_and_retrive_log] WARN: Failed to create event source for log sink requests err=Error connecting to protocol path: /events/log_sink_requested_event_stream
 
   Caused by:
@@ -166,9 +182,9 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   👋 zxdb is loading symbols to debug test failure in archivist-unittests.cm, please wait.
   ⚠️  test failure in archivist-unittests.cm, type `frame` or `help` to get started.
      11 namespace LIBC_NAMESPACE {
-     12 
+     12
    ▶ 13 LLVM_LIBC_FUNCTION(void, abort, ()) { CRASH_WITH_UNIQUE_BACKTRACE(); }
-     14 
+     14
      15 }  // namespace LIBC_NAMESPACE
   ══════════════════════════
    Invalid opcode exception
@@ -180,15 +196,18 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   [zxdb]
   ```
 
-  Notice that the output from the test is mixed up, this is because the rust test
-  runner runs test cases in [parallel by default][rust-test-runner-parallel-default].
-  You can avoid this by using this `--parallel-cases` option to `fx test`, for
-  example: `fx test --parallel-cases 1 --break-on-failure archivist-unittests`
+  Notice that the output from the test is mixed up, this is because
+  the rust test runner runs test cases in
+  [parallel by default][rust-test-runner-parallel-default]. You can avoid
+  this by using this `--parallel-cases` option to `fx test`, for example:
+  `fx test --parallel-cases 1 --break-on-failure archivist-unittests`
 
 * {C++}
 
+  Execute the tests with the `fx test --break-on-failure` command, for example:
+
   ```none {:.devsite-disable-click-to-copy}
-  =>  fx test -o --break-on-failure debug_agent_unit_tests
+  $ fx test -o --break-on-failure debug_agent_unit_tests
 
   <...fx test startup...>
 
@@ -207,29 +226,29 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   [zxdb]
   ```
 
-### Examine the failure
+### 3. Examine failures {:#examine-failures}
 
 * {Rust}
 
-  We caught a test failure, Rust tests issue an `abort` on failure, which zxdb
-  notices and reports. We can view the code of the current frame with `list`, for
-  example:
+  We caught a test failure, Rust tests issue an `abort` on failure, which `zxdb`
+  notices and reports. We can view the code of the current frame with `list`,
+  for example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list
-      8 
+      8
       9 #include "src/__support/common.h"
-     10 
+     10
      11 namespace LIBC_NAMESPACE {
-     12 
+     12
    ▶ 13 LLVM_LIBC_FUNCTION(void, abort, ()) { CRASH_WITH_UNIQUE_BACKTRACE(); }
-     14 
+     14
      15 }  // namespace LIBC_NAMESPACE
-  [zxdb] 
+  [zxdb]
   ```
 
-  But that's not the code we're interested in. When we look at a stack trace, we
-  see code from our test is in frame #17:
+  But that's not the code we're interested in. When we look at a stack trace,
+  we see code from our test is in frame #17:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame
@@ -266,34 +285,35 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   [zxdb]
   ```
 
-  We can view our test's source code by using the `frame` noun with an index as a
-  prefix to our `list` command, for example:
+  We can view our test's source code by using the `frame` noun with an index
+  as a prefix to our `list` command, for example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame 17 list
      539         expected.sort();
-     540 
+     540
      541         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
      542         actual.sort();
-     543 
+     543
    ▶ 544         assert_eq!(expected, actual);
-     545 
+     545
      546         // can log after killing log sink proxy
      547         log_helper.kill_log_sink();
      548         log_helper.write_log("my msg1");
      549         log_helper.write_log("my msg2");
-     550 
+     550
      551         assert_eq!(
      552             expected,
      553             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
      554         );
   ```
 
-  That's inconvenient, we have to type `frame 17` before every command to interact
-  with the part of our code we're interested in. Notice the "▶" from the output of
-  `frame`. It points to frame 0, indicating that it is the "active" frame.
-  Let's select our frame as the "active" frame with just the `frame` noun with the
-  frame's index from above so we can work directly with what we want to look at:
+  That's inconvenient, we have to type `frame 17` before every command to
+  interact with the part of our code we're interested in. Notice the "▶"
+  from the output of `frame`. It points to frame 0, indicating that it is
+  the "active" frame. Let's select our frame as the "active" frame with
+  just the `frame` noun with the frame's index from above so we can work
+  directly with what we want to look at:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame 17
@@ -311,38 +331,39 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   ...
   ```
 
-  Now, all commands we run will be in the context of frame #17. Let's list the
-  source code again to be sure, with a little bit of additional context:
+  Now, all commands we run will be in the context of frame #17. Let's list
+  the source code again to be sure, with a little bit of additional context:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list -c 10
      534         let mut log_helper2 = LogSinkHelper::new(&directory);
      535         log_helper2.write_log("my msg1");
      536         log_helper.write_log("my msg2");
-     537 
+     537
      538         let mut expected = vec!["my msg1".to_owned(), "my msg3".to_owned()];
      539         expected.sort();
-     540 
+     540
      541         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
      542         actual.sort();
-     543 
+     543
    ▶ 544         assert_eq!(expected, actual);
-     545 
+     545
      546         // can log after killing log sink proxy
      547         log_helper.kill_log_sink();
      548         log_helper.write_log("my msg1");
      549         log_helper.write_log("my msg2");
-     550 
+     550
      551         assert_eq!(
      552             expected,
      553             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
      554         );
   ```
 
-  Great! Now, why did the test fail? Let's print out some variables to see what's
-  going on. We have a local variable in this frame, `actual`, which should have
-  some strings that we added by calling `write_log` on our `log_helper` and
-  `log_helper2` instances and by receiving them with the mpsc channel `recv_logs`:
+  Great! Now, why did the test fail? Let's print out some variables to see
+  what's going on. We have a local variable in this frame, `actual`, which
+  should have some strings that we added by calling `write_log` on our
+  `log_helper` and `log_helper2` instances and by receiving them with the
+  mpsc channel `recv_logs`:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] print expected
@@ -351,10 +372,10 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   vec!["my msg1", "my msg2"]
   ```
 
-  Aha, our test's expectation is slightly wrong. We expected `"my msg3"` to be the
-  second string, but actually logged `"my msg2"`. We can correct the test to
-  expect `"my msg2"`. We can now detach from our tests to continue and complete
-  the test suite:
+  Aha, our test's expectation is slightly wrong. We expected `"my msg3"` to
+  be the second string, but actually logged `"my msg2"`. We can correct the
+  test to expect `"my msg2"`. We can now detach from our tests to continue
+  and complete the test suite:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] quit
@@ -391,57 +412,58 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   and run the tests again:
 
   ```none {:.devsite-disable-click-to-copy}
-  =>  fx test --break-on-failure archivist-unittests
+  $ fx test --break-on-failure archivist-unittests
 
   <...fx test startup...>
 
   Running 1 tests
 
-  Starting: fuchsia-pkg://fuchsia.com/archivist-tests#meta/archivist-unittests.cm 
+  Starting: fuchsia-pkg://fuchsia.com/archivist-tests#meta/archivist-unittests.cm
   Command: fx ffx test run --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/archivist-tests?hash=454897cb1be6b88c2aeb4b5abf474894b629d30ca50f7dfaa23497fd3848a566#meta/archivist-unittests.cm
   Running test 'fuchsia-pkg://fuchsia.com/archivist-tests?hash=454897cb1be6b88c2aeb4b5abf474894b629d30ca50f7dfaa23497fd3848a566#meta/archivist-unittests.cm'
-  [RUNNING]	accessor::tests::accessor_skips_invalid_selectors
-  [RUNNING]	accessor::tests::batch_iterator_on_ready_is_called
-  [RUNNING]	accessor::tests::batch_iterator_terminates_on_client_disconnect
-  [RUNNING]	accessor::tests::buffered_iterator_handles_peer_closed
-  [RUNNING]	accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
-  [RUNNING]	accessor::tests::logs_only_accept_basic_component_selectors
-  [RUNNING]	accessor::tests::socket_writer_does_not_handle_cbor
-  [RUNNING]	accessor::tests::socket_writer_handles_closed_socket
-  [RUNNING]	accessor::tests::socket_writer_handles_text
-  [RUNNING]	archivist::tests::can_log_and_retrive_log
-  [PASSED]	accessor::tests::socket_writer_handles_text
-  [RUNNING]	archivist::tests::log_from_multiple_sock
-  [PASSED]	accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
+  [RUNNING] accessor::tests::accessor_skips_invalid_selectors
+  [RUNNING] accessor::tests::batch_iterator_on_ready_is_called
+  [RUNNING] accessor::tests::batch_iterator_terminates_on_client_disconnect
+  [RUNNING] accessor::tests::buffered_iterator_handles_peer_closed
+  [RUNNING] accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
+  [RUNNING] accessor::tests::logs_only_accept_basic_component_selectors
+  [RUNNING] accessor::tests::socket_writer_does_not_handle_cbor
+  [RUNNING] accessor::tests::socket_writer_handles_closed_socket
+  [RUNNING] accessor::tests::socket_writer_handles_text
+  [RUNNING] archivist::tests::can_log_and_retrive_log
+  [PASSED]  accessor::tests::socket_writer_handles_text
+  [RUNNING] archivist::tests::log_from_multiple_sock
+  [PASSED]  accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
   <...lots of tests...>
-  [RUNNING]	logs::tests::unfiltered_stats
-  [PASSED]	logs::tests::test_debuglog_drainer
-  [RUNNING]	utils::tests::drop_test
-  [PASSED]	logs::tests::test_filter_by_pid
-  [PASSED]	logs::tests::test_filter_by_min_severity
-  [PASSED]	logs::tests::test_filter_by_tags
-  [PASSED]	logs::tests::test_filter_by_tid
-  [PASSED]	logs::tests::test_log_manager_dump
-  [PASSED]	logs::tests::test_log_manager_simple
-  [PASSED]	logs::tests::unfiltered_stats
-  [PASSED]	logs::tests::test_structured_log
-  [PASSED]	logs::tests::attributed_inspect_two_mixed_streams_different_identities
-  [PASSED]	utils::tests::drop_test
+  [RUNNING] logs::tests::unfiltered_stats
+  [PASSED]  logs::tests::test_debuglog_drainer
+  [RUNNING] utils::tests::drop_test
+  [PASSED]  logs::tests::test_filter_by_pid
+  [PASSED]  logs::tests::test_filter_by_min_severity
+  [PASSED]  logs::tests::test_filter_by_tags
+  [PASSED]  logs::tests::test_filter_by_tid
+  [PASSED]  logs::tests::test_log_manager_dump
+  [PASSED]  logs::tests::test_log_manager_simple
+  [PASSED]  logs::tests::unfiltered_stats
+  [PASSED]  logs::tests::test_structured_log
+  [PASSED]  logs::tests::attributed_inspect_two_mixed_streams_different_identities
+  [PASSED]  utils::tests::drop_test
 
   123 out of 123 tests passed...
   fuchsia-pkg://fuchsia.com/archivist-tests?hash=454897cb1be6b88c2aeb4b5abf474894b629d30ca50f7dfaa23497fd3848a566#meta/archivist-unittests.cm completed with result: PASSED
   Deleting 1 files at /tmp/tmpho9yjjz9: ffx_logs/ffx.log
   To keep these files, set --ffx-output-directory.
 
-  Status: [duration: 36.4s] [tests: PASS: 1 FAIL: 0 SKIP: 0] 
-    Running 1 tests                            [====================================================================================================================]            100.0% 
+  Status: [duration: 36.4s] [tests: PASS: 1 FAIL: 0 SKIP: 0]
+    Running 1 tests                            [====================================================================================================================]            100.0%
   ```
 
 * {C++}
 
-  We caught a test failure, gTest has an option to insert a software breakpoint in
-  the path of a test failure, which is inlined into our test. We can view the code
-  of the current frame with `list`, for example:
+  We caught a test failure, gTest has an option to insert a software
+  breakpoint in the path of a test failure, which is inlined into our
+  test. We can view the code of the current frame with `list`, for
+  example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list
@@ -454,8 +476,8 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   ...
   ```
 
-  But that's not the code we're interested in. When we look at a stack trace, we
-  see code from our test is in frame #2:
+  But that's not the code we're interested in. When we look at a stack
+  trace, we see code from our test is in frame #2:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame
@@ -477,8 +499,8 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   [zxdb]
   ```
 
-  We can view our test's source code by using the `frame` noun with an index as a
-  prefix to our `list` command, for example:
+  We can view our test's source code by using the `frame` noun with
+  an index as a prefix to our `list` command, for example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame 2 list
@@ -500,11 +522,12 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
      115   EXPECT_EQ(reply.processes[1].threads[0].id.process, kProcessKoid2);
   ```
 
-  That's inconvenient, we have to type `frame 2` before every command to interact
-  with the part of our code we're interested in. Notice the "▶" from the output of
-  `frame`. It points to frame 0, indicating that it is the "active" frame.
-  Let's select our frame as the "active" frame with just the `frame` noun with the
-  frame's index from above so we can work directly with what we want to look at:
+  That's inconvenient, we have to type `frame 2` before every command
+  to interact with the part of our code we're interested in. Notice
+  the "▶" from the output of `frame`. It points to frame 0, indicating
+  that it is the "active" frame. Let's select our frame as the "active"
+  frame with just the `frame` noun with the frame's index from above so
+  we can work directly with what we want to look at:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame 2
@@ -527,8 +550,8 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
     14…17 «libc startup» (-r expands)
   ```
 
-  Now, all commands we run will be in the context of frame #2. Let's list the
-  source code again to be sure:
+  Now, all commands we run will be in the context of frame #2. Let's
+  list the source code again to be sure:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list
@@ -550,9 +573,10 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
      115   EXPECT_EQ(reply.processes[1].threads[0].id.process, kProcessKoid2);
   ```
 
-  Cool! Now, why did the test fail? Let's print out some variables to see what's
-  going on. We have a local variable in this frame, `reply`, which should have
-  been populated by the function call to `remote_api->OnStatus`:
+  Cool! Now, why did the test fail? Let's print out some variables to
+  see what's going on. We have a local variable in this frame, `reply`,
+  which should have been populated by the function call to
+  `remote_api->OnStatus`:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] print reply
@@ -603,11 +627,12 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   }
   ```
 
-  Okay, so the `reply` variable has been filled in with some information, the
-  expectation is that the size of the `processes` vector should be equal to 3.
-  Let's just print that member variable of `reply` to get a clearer picture. We
-  can also print the size method of that vector (general function calling
-  support is not implemented yet):
+  Okay, so the `reply` variable has been filled in with some
+  information, the expectation is that the size of the `processes`
+  vector should be equal to 3. Let's just print that member variable
+  of `reply` to get a clearer picture. We can also print the size
+  method of that vector (general function calling support is not
+  implemented yet):
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] print reply.processes
@@ -655,9 +680,10 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   2
   ```
 
-  Aha, so the test expectation is wrong, we only injected 2 mock processes in our
-  test, but expected there to be 3. The test simply needs to be updated to expect
-  the size of the `reply.processes` vector to be 2 instead of 3. We can close the
+  Aha, so the test expectation is wrong, we only injected 2 mock
+  processes in our test, but expected there to be 3. The test
+  simply needs to be updated to expect the size of the
+  `reply.processes` vector to be 2 instead of 3. We can close the
   debugger now to finish up the tests and then fix our test:
 
   ```none {:.devsite-disable-click-to-copy}
@@ -684,7 +710,7 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
   and run `fx test` again:
 
   ```none {:.devsite-disable-click-to-copy}
-  =>  fx test --break-on-failure debug_agent_unit_tests
+  $ fx test --break-on-failure debug_agent_unit_tests
 
   You are using the new fx test, which is currently ready for general use ✅
   See details here: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
@@ -722,14 +748,10 @@ We execute the tests with the `fx test --break-on-failure` command, for example:
 
   Status: [duration: 16.9s] [tests: PASS: 1 FAIL: 0 SKIP: 0]
     Running 1 tests                      [=====================================================================================================]         100.0%
-  =>
   ```
 
-The debugger no longer appears, because we don't have any other test failures!
-Woohoo \o/
-
-
-
+  The debugger no longer appears, because we don't have any other
+  test failures! Woohoo \o/
 
 <!-- Reference links -->
 
