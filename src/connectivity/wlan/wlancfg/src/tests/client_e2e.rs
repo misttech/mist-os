@@ -26,7 +26,8 @@ use {
     fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,
     fidl_fuchsia_wlan_device_service::DeviceWatcherEvent,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::{self as fasync, TestExecutor},
     fuchsia_inspect::{self as inspect},
     fuchsia_zircon as zx,
@@ -2133,6 +2134,200 @@ fn test_scan_recovery(
             scan_result.clone(),
         );
     }
+
+    // Recovery should now recommend that the interface be destroyed.
+    expect_destroy_iface_request_and_reply(
+        &mut exec,
+        &mut test_values,
+        TEST_CLIENT_IFACE_ID,
+        zx::sys::ZX_OK,
+    );
+
+    // Inform the internals that the interface was removed.  The internals will then recreate the
+    // interface.
+    let _ = inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
+        &mut exec,
+        &mut test_values,
+        TEST_PHY_ID,
+        TEST_CLIENT_IFACE_ID,
+    );
+}
+
+// This function manages interactions from IfaceManager and a client state machine as wlancfg
+// attempts to get a client interface connected to a network.  In the process, it injects fake scan
+// results and positively acknowledges disconnect requests, but all connection requests are
+// rejected.
+fn reject_connect_requests(
+    exec: &mut TestExecutor,
+    test_values: &mut TestValues,
+    iface_manager_sme_stream: &mut fidl_sme::ClientSmeRequestStream,
+    state_machine_sme_stream: &mut Option<fidl_sme::ClientSmeRequestStream>,
+    scan_results: Vec<fidl_sme::ScanResult>,
+    connection_failures_to_inject: usize,
+) {
+    // The network selection process will scan and the client state machine will make connect and
+    // disconnect requests.  The order here doesn't matter, but the scan and disconnects must be
+    // allowed to succeed so that the process can continue while the connect requests should all
+    // result in failure to instigate the recovery process.
+    //
+    // Note that the scans will come from the IfaceManager's SME while disconnect and connect
+    // requests will come from the state machine's SME.  This is slightly complicated since the
+    // state machine SME proxy is dropped and recreated every time the state machine exits.
+    let mut connect_failures = 0;
+    loop {
+        // Once the connect failure threshold has been hit, break out to validate the recovery
+        // process.
+        if connect_failures == connection_failures_to_inject {
+            break;
+        }
+
+        // Progress the internal futures to run the iface manager, client state machine, scan
+        // manager, and network selection logic.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+            Poll::Pending
+        );
+
+        // Check if there are any new SME proxy requests.  If there are, this indicates that a new
+        // state machine is being created and we should no longer care about the old state machine
+        // client interface.
+        if let Poll::Ready(req) = exec
+            .run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next())
+        {
+            match req {
+                Some(Ok(
+                    fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+                        sme_server,
+                        responder,
+                        ..
+                    },
+                )) => {
+                    assert!(responder.send(Ok(())).is_ok());
+                    *state_machine_sme_stream =
+                        Some(sme_server.into_stream().expect("failed to create new SME stream"));
+                }
+                other => panic!("Unexpected DeviceMonitor operation: {:?}", other),
+            }
+            continue;
+        }
+
+        // Check if there are any scan requests from the IfaceManager SME.  This indicates that
+        // network selection is in progress.
+        if let Poll::Ready(req) = exec.run_until_stalled(&mut iface_manager_sme_stream.next()) {
+            match req {
+                Some(Ok(fidl_sme::ClientSmeRequest::Scan { responder, .. })) => {
+                    let vmo = write_vmo(scan_results.clone()).expect("failed to write VMO");
+                    responder.send(Ok(vmo)).expect("failed to send scan data");
+                }
+                other => panic!("Only scans were expected from the IfaceManager SME: {:?}", other),
+            }
+
+            continue;
+        }
+
+        // Check for any disconnect or connect requests from the state machine.
+        if let Some(mut sme_stream) = state_machine_sme_stream.take() {
+            if let Poll::Ready(req) = exec.run_until_stalled(&mut sme_stream.next()) {
+                match req {
+                    Some(Ok(fidl_sme::ClientSmeRequest::Connect { txn, .. })) => {
+                        // If there is a connect request, send back a failure.
+                        let (_, connect_txn_handle) = txn
+                            .expect("connect txn unused")
+                            .into_stream_and_control_handle()
+                            .expect("error accessing control handle");
+
+                        connect_txn_handle
+                            .send_on_connect_result(&fidl_sme::ConnectResult {
+                                code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                                is_credential_rejected: false,
+                                is_reconnect: false,
+                            })
+                            .expect("failed to send connect response");
+
+                        // Increment the number of connect failures.
+                        connect_failures += 1;
+
+                        // Wait for the connect backoff timer to expire.
+                        let _ = exec.wake_next_timer();
+                    }
+                    Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { responder, .. })) => {
+                        responder.send().expect("failed to send disconnect response");
+                    }
+                    other => panic!("Unexpected SME operation: {:?}", other),
+                }
+                *state_machine_sme_stream = Some(sme_stream);
+                continue;
+            }
+        }
+    }
+}
+
+#[fuchsia::test]
+fn test_connect_failure_recovery() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_THRESHOLDED_RECOVERY, true);
+
+    // For the purpose of this test, use a mock open network.
+    let network_id = fidl_policy::NetworkIdentifier {
+        ssid: TEST_SSID.to_vec(),
+        type_: fidl_policy::SecurityType::None,
+    };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(TEST_CREDS.none.policy.clone()),
+        ..Default::default()
+    };
+    let scan_results = vec![fidl_sme::ScanResult {
+        compatibility: Some(Box::new(fidl_sme::Compatibility {
+            mutual_security_protocols: vec![fidl_common_security::Protocol::Open],
+        })),
+        timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+        bss_description: random_fidl_bss_description!(
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(fidl_sme::Protection::Open),
+            bssid: [0, 0, 0, 0, 0, 0],
+            ssid: TEST_SSID.clone(),
+            rssi_dbm: 10,
+            snr_db: 10,
+            channel: types::WlanChan::new(1, types::Cbw::Cbw20),
+        ),
+    }];
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Enable client connections.
+    let mut iface_manager_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Save the network
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
+    let save_fut = pin!(save_fut);
+
+    // Begin processing the save request and the stash write from the save
+    process_stash_write(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
+
+    // Continue processing the save request. Connect process starts, and save request returns once
+    // the scan has been queued.
+    let save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
+
+    // Reject connect requests until the recovery threshold has been hit.
+    let mut state_machine_sme_stream = None;
+    reject_connect_requests(
+        &mut exec,
+        &mut test_values,
+        &mut iface_manager_sme_stream,
+        &mut state_machine_sme_stream,
+        scan_results.clone(),
+        recovery::CONNECT_FAILURE_RECOVERY_THRESHOLD,
+    );
 
     // Recovery should now recommend that the interface be destroyed.
     expect_destroy_iface_request_and_reply(
