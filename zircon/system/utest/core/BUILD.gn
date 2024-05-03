@@ -224,11 +224,8 @@ if (is_fuchsia) {
 
     # LTO for this target requires a massive amount of memory,
     # and thus, should be run less concurrently with other large jobs.
-    # See https://fxbug.dev/42062387 for context.
-    if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
-        toolchain_variant.tags ||
-        toolchain_variant.tags + [ "thinlto" ] - [ "thinlto" ] !=
-        toolchain_variant.tags) {
+    # See https://fxbug.dev/338504187 for context.
+    if (is_lto_variant || optimize == "size_lto") {
       pool = "//build/config:highmem($default_toolchain)"
       if (link_rbe_enable) {
         # OOM on RBE workers
