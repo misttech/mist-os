@@ -293,6 +293,9 @@ pub enum RoutingError {
     #[error("Item {name} is not present in dictionary")]
     BedrockNotPresentInDictionary { name: String },
 
+    #[error("Routed capability was the wrong type. Was: {actual}, expected: {expected}")]
+    BedrockWrongCapabilityType { actual: String, expected: String },
+
     #[error("There was an error remoting a capability")]
     BedrockRemoteCapability,
 
@@ -369,6 +372,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockNotPresentInDictionary { .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
+            | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }

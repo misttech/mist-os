@@ -61,36 +61,50 @@ pub enum Capability {
 impl Capability {
     pub fn to_dictionary(self) -> Option<crate::Dict> {
         match self {
-            Capability::Dictionary(d) => Some(d),
+            Self::Dictionary(d) => Some(d),
             _ => None,
         }
     }
 
     pub fn into_fidl(self) -> fsandbox::Capability {
         match self {
-            Capability::Sender(s) => s.into_fidl(),
-            Capability::Open(s) => s.into_fidl(),
-            Capability::Router(s) => s.into_fidl(),
-            Capability::Dictionary(s) => s.into_fidl(),
-            Capability::Data(s) => s.into_fidl(),
-            Capability::Unit(s) => s.into_fidl(),
-            Capability::Directory(s) => s.into_fidl(),
-            Capability::OneShotHandle(s) => s.into_fidl(),
-            Capability::Component(s) => s.into_fidl(),
+            Self::Sender(s) => s.into_fidl(),
+            Self::Open(s) => s.into_fidl(),
+            Self::Router(s) => s.into_fidl(),
+            Self::Dictionary(s) => s.into_fidl(),
+            Self::Data(s) => s.into_fidl(),
+            Self::Unit(s) => s.into_fidl(),
+            Self::Directory(s) => s.into_fidl(),
+            Self::OneShotHandle(s) => s.into_fidl(),
+            Self::Component(s) => s.into_fidl(),
         }
     }
 
     pub fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
-            Capability::Sender(s) => s.try_into_directory_entry(),
-            Capability::Open(s) => s.try_into_directory_entry(),
-            Capability::Router(s) => s.try_into_directory_entry(),
-            Capability::Dictionary(s) => s.try_into_directory_entry(),
-            Capability::Data(s) => s.try_into_directory_entry(),
-            Capability::Unit(s) => s.try_into_directory_entry(),
-            Capability::Directory(s) => s.try_into_directory_entry(),
-            Capability::OneShotHandle(s) => s.try_into_directory_entry(),
-            Capability::Component(s) => s.try_into_directory_entry(),
+            Self::Sender(s) => s.try_into_directory_entry(),
+            Self::Open(s) => s.try_into_directory_entry(),
+            Self::Router(s) => s.try_into_directory_entry(),
+            Self::Dictionary(s) => s.try_into_directory_entry(),
+            Self::Data(s) => s.try_into_directory_entry(),
+            Self::Unit(s) => s.try_into_directory_entry(),
+            Self::Directory(s) => s.try_into_directory_entry(),
+            Self::OneShotHandle(s) => s.try_into_directory_entry(),
+            Self::Component(s) => s.try_into_directory_entry(),
+        }
+    }
+
+    pub fn debug_typename(&self) -> &'static str {
+        match self {
+            Self::Sender(_) => "Sender",
+            Self::Open(_) => "Open",
+            Self::Router(_) => "Router",
+            Self::Dictionary(_) => "Dictionary",
+            Self::Data(_) => "Data",
+            Self::Unit(_) => "Unit",
+            Self::Directory(_) => "Directory",
+            Self::OneShotHandle(_) => "Handle",
+            Self::Component(_) => "Component",
         }
     }
 }

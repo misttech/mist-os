@@ -31,6 +31,19 @@ pub struct Request {
     pub target: WeakComponentToken,
 }
 
+impl From<Request> for fsandbox::RouteRequest {
+    fn from(request: Request) -> Self {
+        let availability = from_cm_type(request.availability);
+        let (token, server) = zx::EventPair::create();
+        request.target.register(token.get_koid().unwrap(), server);
+        fsandbox::RouteRequest {
+            availability: Some(availability),
+            requesting: Some(fsandbox::ComponentToken { token }),
+            ..Default::default()
+        }
+    }
+}
+
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
 /// asynchronously. [`Router`] is the object capability representation of [`Routable`].
 ///
@@ -111,21 +124,21 @@ impl Router {
         async fn do_route(
             router: &Router,
             payload: fsandbox::RouteRequest,
-        ) -> Result<fsandbox::Capability, fsandbox::BedrockError> {
+        ) -> Result<fsandbox::Capability, fsandbox::RouterError> {
             let Some(availability) = payload.availability else {
-                return Err(fsandbox::BedrockError::InvalidArgs);
+                return Err(fsandbox::RouterError::InvalidArgs);
             };
             let Some(token) = payload.requesting else {
-                return Err(fsandbox::BedrockError::InvalidArgs);
+                return Err(fsandbox::RouterError::InvalidArgs);
             };
             let capability = crate::registry::get(token.token.as_handle_ref().get_koid().unwrap());
             let component = match capability {
                 Some(crate::Capability::Component(c)) => c,
-                Some(_) => return Err(fsandbox::BedrockError::InvalidArgs),
-                None => return Err(fsandbox::BedrockError::InvalidArgs),
+                Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
+                None => return Err(fsandbox::RouterError::InvalidArgs),
             };
             let request = Request { availability: to_cm_type(availability), target: component };
-            router.route(request).await.map(Into::into).map_err(|_| fsandbox::BedrockError::Routing)
+            router.route(request).await.map(Into::into).map_err(|_| fsandbox::RouterError::Routing)
         }
 
         while let Ok(Some(request)) = stream.try_next().await {
@@ -191,6 +204,15 @@ fn to_cm_type(value: fsandbox::Availability) -> cm_types::Availability {
         fsandbox::Availability::Optional => cm_types::Availability::Optional,
         fsandbox::Availability::SameAsTarget => cm_types::Availability::SameAsTarget,
         fsandbox::Availability::Transitional => cm_types::Availability::Transitional,
+    }
+}
+
+fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
+    match value {
+        cm_types::Availability::Required => fsandbox::Availability::Required,
+        cm_types::Availability::Optional => fsandbox::Availability::Optional,
+        cm_types::Availability::SameAsTarget => fsandbox::Availability::SameAsTarget,
+        cm_types::Availability::Transitional => fsandbox::Availability::Transitional,
     }
 }
 
@@ -282,7 +304,7 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+        assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
 
         let component = FakeComponentToken::new();
         let (component_client, server) = zx::EventPair::create();
@@ -298,7 +320,7 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+        assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
     }
 
     #[fuchsia::test]
@@ -320,6 +342,6 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+        assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
     }
 }

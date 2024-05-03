@@ -1325,7 +1325,7 @@ async fn extend_from_child() {
 async fn extend_from_program() {
     // Tests extending a dictionary, when the source dictionary is provided by the program.
 
-    const GETTER_PATH: &str = "svc/fuchsia.component.sandbox.DictionaryGetter";
+    const ROUTER_PATH: &str = "svc/fuchsia.component.sandbox.Router";
     let components = vec![
         (
             "root",
@@ -1333,7 +1333,7 @@ async fn extend_from_program() {
                 .capability(
                     CapabilityBuilder::dictionary()
                         .name("dict")
-                        .source_dictionary(DictionarySource::Program, GETTER_PATH),
+                        .source_dictionary(DictionarySource::Program, ROUTER_PATH),
                 )
                 .offer(
                     OfferBuilder::dictionary()
@@ -1384,25 +1384,25 @@ async fn extend_from_program() {
         }
     });
 
-    // Serve the DictionaryGetter protocol from the root's out dir. Its implementation calls
-    // Dictionary/Clone and returns the handle.
+    // Serve the Router protocol from the root's out dir. Its implementation calls Dictionary/Clone
+    // and returns the handle.
     let mut root_out_dir = OutDir::new();
     let dict_clone = Clone::clone(&dict);
     root_out_dir.add_entry(
-        format!("/{GETTER_PATH}").parse().unwrap(),
+        format!("/{ROUTER_PATH}").parse().unwrap(),
         vfs::service::endpoint(move |scope, channel| {
-            let server_end: ServerEnd<fsandbox::DictionaryGetterMarker> =
-                channel.into_zx_channel().into();
+            let server_end: ServerEnd<fsandbox::RouterMarker> = channel.into_zx_channel().into();
             let mut stream = server_end.into_stream().unwrap();
             let dict = Clone::clone(&dict_clone);
             scope.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {
                     match request {
-                        fsandbox::DictionaryGetterRequest::Get { responder } => {
+                        fsandbox::RouterRequest::Route { payload: _, responder } => {
                             let client_end = dict.clone().await.unwrap();
-                            let _ = responder.send(client_end);
+                            let capability = fsandbox::Capability::Dictionary(client_end);
+                            let _ = responder.send(Ok(capability));
                         }
-                        fsandbox::DictionaryGetterRequest::_UnknownMethod { .. } => {
+                        fsandbox::RouterRequest::_UnknownMethod { .. } => {
                             unimplemented!()
                         }
                     }

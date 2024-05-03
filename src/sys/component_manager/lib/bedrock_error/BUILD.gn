@@ -9,6 +9,7 @@ rustc_library("bedrock_error") {
   with_unit_tests = false
 
   deps = [
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//third_party/rust_crates:thiserror",
   ]

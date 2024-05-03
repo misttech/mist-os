@@ -9,7 +9,6 @@ use {
             component::instance::ResolvedInstanceState,
             component::{ComponentInstance, WeakComponentInstance},
             routing::router_ext::RouterExt,
-            routing::router_ext::WeakComponentTokenExt,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
@@ -33,7 +32,6 @@ use {
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::Routable,
-    sandbox::WeakComponentToken,
     sandbox::{Capability, Dict, Request, Router, Unit},
     std::{collections::HashMap, fmt::Debug, sync::Arc},
     tracing::warn,
@@ -262,7 +260,7 @@ fn extend_dict_with_dictionary(
                 }
                 #[async_trait]
                 impl Routable for ProgramRouter {
-                    async fn route(&self, _request: Request) -> Result<Capability, BedrockError> {
+                    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
                         fn open_error(e: OpenOutgoingDirError) -> OpenError {
                             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
                         }
@@ -274,8 +272,8 @@ fn extend_dict_with_dictionary(
                         })?;
                         let open = component.get_outgoing();
 
-                        let (getter, server_end) =
-                            endpoints::create_proxy::<fsandbox::DictionaryGetterMarker>().unwrap();
+                        let (inner_router, server_end) =
+                            endpoints::create_proxy::<fsandbox::RouterMarker>().unwrap();
                         open.open(
                             ExecutionScope::new(),
                             fio::OpenFlags::empty(),
@@ -283,14 +281,19 @@ fn extend_dict_with_dictionary(
                                 .expect("path must be valid"),
                             server_end.into_channel(),
                         );
-                        let client_end = getter
-                            .get()
+                        let cap = inner_router
+                            .route(request.into())
                             .await
-                            .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?;
-                        // Internalize the Dictionary `client_end`
-                        let cap = fsandbox::Capability::Dictionary(client_end);
+                            .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
+                            .map_err(BedrockError::from)?;
                         let cap = Capability::try_from(cap)
                             .map_err(|_| RoutingError::BedrockRemoteCapability)?;
+                        if !matches!(cap, Capability::Dictionary(_)) {
+                            Err(RoutingError::BedrockWrongCapabilityType {
+                                actual: cap.debug_typename().into(),
+                                expected: "Dictionary".into(),
+                            })?;
+                        }
                         Ok(cap)
                     }
                 }
@@ -300,7 +303,7 @@ fn extend_dict_with_dictionary(
                 })
             }
         };
-        router = make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router);
+        router = make_dict_extending_router(dict.clone(), source_dict_router);
     } else {
         router = Router::new_ok(dict.clone());
     }
@@ -369,25 +372,26 @@ fn build_environment(
 /// [Dict] returned by `source_dict_router`.
 ///
 /// This algorithm returns a new [Dict] each time, leaving `dict` unmodified.
-fn make_dict_extending_router(
-    component: WeakComponentInstance,
-    dict: Dict,
-    source_dict_router: Router,
-) -> Router {
-    let route_fn = move |_request: Request| {
+fn make_dict_extending_router(dict: Dict, source_dict_router: Router) -> Router {
+    let route_fn = move |request: Request| {
         let source_dict_router = source_dict_router.clone();
         let dict = dict.clone();
-        let component = component.clone();
         async move {
-            let source_request = Request {
-                availability: cm_types::Availability::Required,
-                target: WeakComponentToken::new(component),
-            };
-            let Capability::Dictionary(source_dict) =
-                source_dict_router.route(source_request).await?
-            else {
-                unreachable!("source_dict_router must return a Dict");
-            };
+            let source_dict;
+            match source_dict_router.route(request).await? {
+                Capability::Dictionary(d) => {
+                    source_dict = d;
+                }
+                // Optional from void.
+                cap @ Capability::Unit(_) => return Ok(cap),
+                cap => {
+                    return Err(RoutingError::BedrockWrongCapabilityType {
+                        actual: cap.debug_typename().into(),
+                        expected: "Dictionary".into(),
+                    }
+                    .into())
+                }
+            }
             let mut out_dict = dict.shallow_copy();
             for (source_key, source_value) in source_dict.enumerate() {
                 if let Err(_) = out_dict.insert(source_key.clone(), source_value.clone()) {
