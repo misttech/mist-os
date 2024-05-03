@@ -300,7 +300,7 @@ impl ComponentInstance {
         persistent_storage: bool,
     ) -> Arc<Self> {
         let moniker = instanced_moniker.without_instance_ids();
-        Arc::new(Self {
+        let self_ = Arc::new(Self {
             environment,
             instanced_moniker,
             moniker,
@@ -316,7 +316,9 @@ impl ComponentInstance {
             nonblocking_task_group: TaskGroup::new(),
             persistent_storage,
             execution_scope: ExecutionScope::new(),
-        })
+        });
+        self_.lock_actions().await.set_component_reference(WeakComponentInstance::new(&self_));
+        self_
     }
 
     /// Locks and returns the instance's mutable state.

@@ -385,7 +385,7 @@ pub mod tests {
         // Spawn a mock action on 'a' that stalls
         let action_notifier = {
             let mut actions = component_a.lock_actions().await;
-            actions.register_no_wait(&component_a, mock_action).await
+            actions.register_no_wait(mock_action).await
         };
 
         // Spawn a task to destroy the child `a` under root.
@@ -492,7 +492,7 @@ pub mod tests {
         // Spawn a mock action on 'a' that stalls
         let action_notifier = {
             let mut actions = component_a.lock_actions().await;
-            actions.register_no_wait(&component_a, mock_action).await
+            actions.register_no_wait(mock_action).await
         };
 
         // Spawn a task to destroy the child `a` under root.

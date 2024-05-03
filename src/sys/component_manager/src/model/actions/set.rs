@@ -251,7 +251,7 @@ pub mod tests {
 
             // Register action, and get the future. Use `register_inner` so that we can control
             // when to notify the listener.
-            let (task, rx) = action_set.register_inner(&component, action);
+            let (task, rx) = action_set.register_inner(action);
 
             // Signal to test that action is registered.
             starter_tx.send(()).unwrap();

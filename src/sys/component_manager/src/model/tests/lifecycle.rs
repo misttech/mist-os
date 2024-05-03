@@ -144,10 +144,11 @@ async fn bind_concurrent() {
     let first_start = {
         let mut actions = system_component.lock_actions().await;
         actions
-            .register_no_wait(
-                &system_component,
-                StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
-            )
+            .register_no_wait(StartAction::new(
+                StartReason::Debug,
+                None,
+                IncomingCapabilities::default(),
+            ))
             .await
     };
 
@@ -156,10 +157,11 @@ async fn bind_concurrent() {
     let second_start = {
         let mut actions = system_component.lock_actions().await;
         actions
-            .register_no_wait(
-                &system_component,
-                StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
-            )
+            .register_no_wait(StartAction::new(
+                StartReason::Debug,
+                None,
+                IncomingCapabilities::default(),
+            ))
             .await
     };
 

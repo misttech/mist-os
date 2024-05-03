@@ -68,7 +68,7 @@ pub use {
 };
 
 use {
-    crate::model::component::ComponentInstance,
+    crate::model::component::{ComponentInstance, WeakComponentInstance},
     async_trait::async_trait,
     cm_util::AbortHandle,
     errors::ActionError,
@@ -152,11 +152,18 @@ impl Future for ActionNotifier {
 
 pub struct ActionsManager {
     action_set: set::ActionSet,
+    component: WeakComponentInstance,
 }
 
 impl ActionsManager {
     pub fn new() -> Self {
-        Self { action_set: set::ActionSet::new() }
+        Self { action_set: set::ActionSet::new(), component: WeakComponentInstance::invalid() }
+    }
+
+    /// Sets the component reference against which actions on this component will be run. If an
+    /// action is registered on this component before this function is called, it will panic.
+    pub fn set_component_reference(&mut self, component: WeakComponentInstance) {
+        self.component = component;
     }
 
     pub async fn contains(&self, key: ActionKey) -> bool {
@@ -192,7 +199,7 @@ impl ActionsManager {
     {
         let rx = {
             let mut actions = component.lock_actions().await;
-            actions.register_no_wait(&component, action).await
+            actions.register_no_wait(action).await
         };
         rx.await
     }
@@ -202,15 +209,13 @@ impl ActionsManager {
     /// already registered.
     ///
     /// REQUIRES: `self` is the `ActionSet` contained in `component`.
-    pub async fn register_no_wait<A>(
-        &mut self,
-        component: &Arc<ComponentInstance>,
-        action: A,
-    ) -> ActionNotifier
+    pub async fn register_no_wait<A>(&mut self, action: A) -> ActionNotifier
     where
         A: Action,
     {
-        self.action_set.register_no_wait(component, action).await
+        let component =
+            self.component.upgrade().expect("tried to register action on nonexistent component");
+        self.action_set.register_no_wait(&component, action).await
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
@@ -234,13 +239,14 @@ impl ActionsManager {
     #[cfg(test)]
     pub(crate) fn register_inner<'a, A>(
         &'a mut self,
-        component: &Arc<ComponentInstance>,
         action: A,
     ) -> (Option<set::ActionTask>, ActionNotifier)
     where
         A: Action,
     {
-        self.action_set.register_inner(component, action)
+        let component =
+            self.component.upgrade().expect("tried to register action on nonexistent component");
+        self.action_set.register_inner(&component, action)
     }
 }
 

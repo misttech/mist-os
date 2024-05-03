@@ -197,11 +197,12 @@ pub mod tests {
                 if event.target_moniker != "bad-scheme".parse::<Moniker>().unwrap().into() {
                     return Ok(());
                 }
-                let _ =
-                    self.model.root().lock_actions().await.register_inner(
-                        &self.model.root,
-                        ShutdownAction::new(ShutdownType::Instance),
-                    );
+                let _ = self
+                    .model
+                    .root()
+                    .lock_actions()
+                    .await
+                    .register_inner(ShutdownAction::new(ShutdownType::Instance));
                 Ok(())
             }
         }

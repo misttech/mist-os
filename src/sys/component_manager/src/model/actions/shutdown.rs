@@ -2465,9 +2465,8 @@ mod tests {
 
         // Register some actions, and get notifications. Use `register_inner` so we can register
         // the action without immediately running it.
-        let (task1, nf1) =
-            action_set.register_inner(&component, ShutdownAction::new(ShutdownType::Instance));
-        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false));
+        let (task1, nf1) = action_set.register_inner(ShutdownAction::new(ShutdownType::Instance));
+        let (task2, nf2) = action_set.register_inner(StopAction::new(false));
 
         drop(action_set);
 
@@ -2491,10 +2490,9 @@ mod tests {
 
         // Register some actions, and get notifications. Use `register_inner` so we can register
         // the action without immediately running it.
-        let (task1, nf1) =
-            action_set.register_inner(&component, ShutdownAction::new(ShutdownType::Instance));
-        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false));
-        let (task3, nf3) = action_set.register_inner(&component, StopAction::new(false));
+        let (task1, nf1) = action_set.register_inner(ShutdownAction::new(ShutdownType::Instance));
+        let (task2, nf2) = action_set.register_inner(StopAction::new(false));
+        let (task3, nf3) = action_set.register_inner(StopAction::new(false));
 
         drop(action_set);
 

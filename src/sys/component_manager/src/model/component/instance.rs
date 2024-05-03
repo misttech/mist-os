@@ -807,7 +807,7 @@ impl ResolvedInstanceState {
             .clone()
             .lock_actions()
             .await
-            .register_no_wait(&child, DiscoverAction::new(input))
+            .register_no_wait(DiscoverAction::new(input))
             .await
             .boxed();
         Ok((child, discover_fut))
@@ -1115,7 +1115,7 @@ impl ProgramRuntime {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
                 let mut actions = component.lock_actions().await;
-                let stop_nf = actions.register_no_wait(&component, StopAction::new(false)).await;
+                let stop_nf = actions.register_no_wait(StopAction::new(false)).await;
                 drop(actions);
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
                     let _ = stop_nf.await.map_err(
