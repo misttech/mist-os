@@ -180,7 +180,9 @@ bool Vmo::PollPopulatedBytes(size_t expected_bytes) const {
     if (info.populated_bytes == expected_bytes) {
       return true;
     }
-    printf("polling again. page count %zu\n", info.populated_bytes / zx_system_get_page_size());
+    printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
+           info.populated_bytes, info.populated_bytes / zx_system_get_page_size(), expected_bytes,
+           expected_bytes / zx_system_get_page_size());
     zx::nanosleep(zx::deadline_after(zx::msec(50)));
   }
 }
