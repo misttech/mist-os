@@ -366,16 +366,6 @@ void Decl::ForEachMember(const fit::function<void(Element*)>& fn) {
   }  // switch
 }
 
-void Decl::ForEachMemberFlattened(const fit::function<void(Element*)>& fn) {
-  if (kind == Kind::kProtocol) {
-    for (auto& item : static_cast<Protocol*>(this)->all_methods) {
-      fn(item.method);
-    }
-  } else {
-    ForEachMember(fn);
-  }
-}
-
 template <typename T>
 static T* StoreDecl(std::unique_ptr<Decl> decl, std::multimap<std::string_view, Decl*>* all,
                     std::vector<std::unique_ptr<T>>* declarations) {

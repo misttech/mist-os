@@ -410,7 +410,7 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
       GenerateTypeAndFromAlias(TypeKind::kResponsePayload, value.maybe_response.get(),
                                Position::kSubsequent);
     }
-    GenerateObjectMember("is_composed", method_with_info.is_composed);
+    GenerateObjectMember("is_composed", method_with_info.composed != nullptr);
     GenerateObjectMember("has_error", value.has_error);
     if (auto type_ctor = value.result_success_type_ctor)
       GenerateObjectMember("maybe_response_success_type", type_ctor->type);

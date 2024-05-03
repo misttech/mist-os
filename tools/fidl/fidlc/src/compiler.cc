@@ -287,7 +287,7 @@ class CalcDependencies {
           auto method = method_with_info.method;
           // Make sure we insert libraries for all transitive composed
           // protocols, even if they have no methods with payloads.
-          deps_.insert(method->owning_protocol->name.library());
+          deps_.insert(method_with_info.owning_protocol->name.library());
           if (auto request = method->maybe_request.get()) {
             VisitTypeConstructorAndStructFields(request);
           }

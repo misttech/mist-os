@@ -398,14 +398,15 @@ constexpr ErrorDef<201, const Library *, Platform> ErrPlatformVersionNotSelected
 constexpr RetiredDef<202> ErrTransitionalNotAllowed;
 constexpr ErrorDef<203> ErrRemovedAndReplaced(
     "the @available arguments 'removed' and 'replaced' are mutually exclusive");
-constexpr ErrorDef<204, Element::Kind> ErrCannotBeReplaced(
-    "the @available argument 'replaced' cannot be used on a {0}; used 'removed' instead");
-constexpr ErrorDef<205, std::string_view, Version, SourceSpan> ErrRemovedWithReplacement(
-    "element '{0}' is marked removed={1}, but there is a replacement marked "
-    "added={1} at {2}; change the removed={1} to replaced={1}");
-constexpr ErrorDef<206, std::string_view, Version> ErrReplacedWithoutReplacement(
-    "element '{0}' is marked replaced={1}, but there is no replacement marked "
-    "added={1}; change the replaced={1} to removed={1}");
+constexpr ErrorDef<204> ErrLibraryReplaced(
+    "the @available argument 'replaced' cannot be used on the library "
+    "declaration; used 'removed' instead");
+constexpr ErrorDef<205, const Element *, Version, SourceSpan> ErrRemovedWithReplacement(
+    "{0} is marked removed={1}, but there is a replacement marked added={1} at {2}; "
+    "either change removed={1} to replaced={1}, or delete the replacement");
+constexpr ErrorDef<206, const Element *, Version> ErrReplacedWithoutReplacement(
+    "{0} is marked replaced={1}, but there is no replacement marked added={1}; "
+    "either change replaced={1} to removed={1}, or define a replacement");
 constexpr ErrorDef<207, uint32_t, char, uint32_t> ErrTypeShapeIntegerOverflow(
     "cannot calculate type shape because of integer overflow in {0} {1} {2}");
 constexpr ErrorDef<208, Platform> ErrReservedPlatform(
@@ -631,7 +632,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0201 */ &ErrPlatformVersionNotSelected,
     /* fi-0202 */ &ErrTransitionalNotAllowed,
     /* fi-0203 */ &ErrRemovedAndReplaced,
-    /* fi-0204 */ &ErrCannotBeReplaced,
+    /* fi-0204 */ &ErrLibraryReplaced,
     /* fi-0205 */ &ErrRemovedWithReplacement,
     /* fi-0206 */ &ErrReplacedWithoutReplacement,
     /* fi-0207 */ &ErrTypeShapeIntegerOverflow,

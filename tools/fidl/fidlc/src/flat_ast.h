@@ -154,10 +154,6 @@ struct Decl : public Element {
   // unlike Library::TraverseElements, it does not call `fn(this)`.
   void ForEachMember(const fit::function<void(Element*)>& fn);
 
-  // Like ForEachMember, but when the decl is a protocol, instead of visiting
-  // `composed_protocols` and `methods`, visits `all_methods`.
-  void ForEachMemberFlattened(const fit::function<void(Element*)>& fn);
-
   // Returns a clone of this decl for the given range, only including members
   // that intersect the range. Narrows the returned decl's availability, and its
   // members' availabilities, to the range.
@@ -693,21 +689,12 @@ struct Protocol final : public Decl {
     bool has_response;
     std::unique_ptr<TypeConstructor> maybe_response;
     bool has_error;
-    Protocol* owning_protocol = nullptr;
 
     // Set during compilation
     uint64_t ordinal = 0;
     const Union* result_union = nullptr;
     const TypeConstructor* result_success_type_ctor = nullptr;
     const TypeConstructor* result_domain_error_type_ctor = nullptr;
-  };
-
-  // Used to keep track of a all methods (i.e. including composed methods).
-  // Method pointers here are set after composed_protocols are compiled, and
-  // are owned by the corresponding composed_protocols.
-  struct MethodWithInfo {
-    Method* method;
-    const bool is_composed;
   };
 
   struct ComposedProtocol : public Element {
@@ -719,16 +706,22 @@ struct Protocol final : public Decl {
     Reference reference;
   };
 
+  // Used to keep track of all methods, including composed methods.
+  struct MethodWithInfo {
+    // Pointer into owning_protocol->methods.
+    const Method* method;
+    const Protocol* owning_protocol;
+    // Pointer into this->composed_protocols, or null if not composed.
+    // In the transitive case A -> B -> C, this is A's `compose B;`.
+    const ComposedProtocol* composed;
+  };
+
   Protocol(std::unique_ptr<AttributeList> attributes, Openness openness, Name name,
            std::vector<ComposedProtocol> composed_protocols, std::vector<Method> methods)
       : Decl(Kind::kProtocol, std::move(attributes), std::move(name)),
         openness(openness),
         composed_protocols(std::move(composed_protocols)),
-        methods(std::move(methods)) {
-    for (auto& method : this->methods) {
-      method.owning_protocol = this;
-    }
-  }
+        methods(std::move(methods)) {}
 
   Openness openness;
   std::vector<ComposedProtocol> composed_protocols;

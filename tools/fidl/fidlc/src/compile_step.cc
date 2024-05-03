@@ -945,20 +945,17 @@ static void SetResultUnionFields(Protocol::Method* method) {
 // Populates protocol->all_methods by recursively visiting composed protocols.
 class PopulateAllMethods {
  public:
-  PopulateAllMethods(Protocol* protocol, Reporter* reporter)
-      : original_protocol_(protocol), reporter_(reporter) {}
+  PopulateAllMethods(std::vector<Protocol::MethodWithInfo>* all_methods, Reporter* reporter)
+      : all_methods_(all_methods), reporter_(reporter) {}
 
-  void Run() { Visit(original_protocol_); }
-
- private:
-  void Visit(Protocol* protocol) {
+  void Visit(Protocol* protocol, const Protocol::ComposedProtocol* composed = nullptr) {
     for (const auto& member : protocol->composed_protocols) {
       auto target = member.reference.resolved().element();
       if (target->kind != Element::Kind::kProtocol)
         continue;
-      auto composed = static_cast<Protocol*>(target);
-      if (auto [it, inserted] = seen_.insert(composed); inserted)
-        Visit(composed);
+      auto target_protocol = static_cast<Protocol*>(target);
+      if (auto [it, inserted] = seen_.insert(target_protocol); inserted)
+        Visit(target_protocol, composed ? composed : &member);
     }
     for (auto& method : protocol->methods) {
       auto original_name = method.name.data();
@@ -979,12 +976,13 @@ class PopulateAllMethods {
           reporter_->Fail(ErrDuplicateMethodOrdinal, method.name, result.previous_occurrence());
         }
       }
-      original_protocol_->all_methods.push_back(
-          {.method = &method, .is_composed = protocol != original_protocol_});
+      all_methods_->push_back(
+          {.method = &method, .owning_protocol = protocol, .composed = composed});
     }
   }
 
-  Protocol* original_protocol_;
+ private:
+  std::vector<Protocol::MethodWithInfo>* all_methods_;
   Reporter* reporter_;
   Scope<std::string> canonical_names_;
   Ordinal64Scope ordinals_;
@@ -1037,7 +1035,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     }
   }
 
-  PopulateAllMethods(protocol_declaration, reporter()).Run();
+  PopulateAllMethods(&protocol_declaration->all_methods, reporter()).Visit(protocol_declaration);
 }
 
 void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,

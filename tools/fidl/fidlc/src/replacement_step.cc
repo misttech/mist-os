@@ -13,56 +13,40 @@ namespace {
 Version Start(const Element* element) { return element->availability.range().pair().first; }
 Version End(const Element* element) { return element->availability.range().pair().second; }
 
-// Helper for checking `removed` and `replaced` arguments. Usage:
-//
-// 1. Insert() all potentially removed/replaced elements.
-// 2. Check() all potential replacement elements.
-// 3. Finish().
-//
-// For `removed`, it fails if there IS a replacement matching the key.
-// For `replaced`, it fails if there IS NOT a replacement matching the key.
-template <typename Key>
-class Checker {
+// A wrapper around Element used to special case composed methods.
+class Member {
  public:
-  explicit Checker(Reporter* reporter) : reporter_(reporter) {}
-
-  void Insert(Key key, const Element* element) {
-    switch (element->availability.ending()) {
-      case Availability::Ending::kRemoved:
-        removed_map_.try_emplace(key, element);
-        break;
-      case Availability::Ending::kReplaced:
-        replaced_map_.try_emplace(key, element);
-        break;
-      case Availability::Ending::kNone:
-      case Availability::Ending::kInherited:
-      case Availability::Ending::kSplit:
-        break;
+  explicit Member(const Element* element) : element_(element) {}
+  explicit Member(Protocol::MethodWithInfo info) : element_(info.method) {
+    if (info.composed) {
+      if (info.composed->availability.ending() == Availability::Ending::kSplit &&
+          End(info.composed) == End(info.method)) {
+        source_ = info.method;
+      } else {
+        source_ = info.composed;
+      }
     }
   }
 
-  void Check(Key key, const Element* element) {
-    if (auto it = removed_map_.find(key); it != removed_map_.end()) {
-      const Element* original = it->second;
-      auto span = original->attributes->Get("available")->GetArg("removed")->span;
-      reporter_->Fail(ErrRemovedWithReplacement, span, original->GetName(), End(original),
-                      element->GetNameSource());
-    }
-    replaced_map_.erase(key);
-  }
-
-  void Finish() {
-    for (auto& [key, element] : replaced_map_) {
-      auto span = element->attributes->Get("available")->GetArg("replaced")->span;
-      reporter_->Fail(ErrReplacedWithoutReplacement, span, element->GetName(), End(element));
-    }
-  }
+  const Element* element() { return element_; }
+  Availability::Ending ending() { return source_->availability.ending(); }
+  const AttributeList* attributes() { return source_->attributes.get(); }
 
  private:
-  Reporter* reporter_;
-  std::map<Key, const Element*> removed_map_;
-  std::map<Key, const Element*> replaced_map_;
+  const Element* element_;
+  // The @available attribute of source_ determines how element_ is removed or
+  // replaced. This is either the same as element_, or a `compose` member.
+  const Element* source_ = element_;
 };
+
+void ForEachMember(Decl* decl, const fit::function<void(Member)> callback) {
+  if (decl->kind == Decl::Kind::kProtocol) {
+    for (auto& info : static_cast<Protocol*>(decl)->all_methods)
+      callback(Member(info));
+  } else {
+    decl->ForEachMember([&](Element* element) { callback(Member(element)); });
+  }
+}
 
 }  // namespace
 
@@ -72,34 +56,77 @@ void ReplacementStep::RunImpl() {
 }
 
 void ReplacementStep::CheckDecls() {
-  // Compare decls with the same name whose start/end version coincide.
+  // Goal: Compare decls with the same name whose start/end version coincide.
+  using Key = std::pair<std::string_view, Version>;
   auto& declarations = library()->declarations.all;
-  Checker<std::pair<std::string_view, Version>> checker(reporter());
-  for (auto& [name, decl] : declarations)
-    checker.Insert({name, End(decl)}, decl);
-  for (auto& [name, decl] : declarations)
-    checker.Check({name, Start(decl)}, decl);
-  checker.Finish();
+  // Step 1: Populate maps for removed and replaced decls.
+  std::map<Key, const Decl*> removed, replaced;
+  for (auto& [name, decl] : declarations) {
+    if (decl->availability.ending() == Availability::Ending::kRemoved) {
+      removed.try_emplace({name, End(decl)}, decl);
+    } else if (decl->availability.ending() == Availability::Ending::kReplaced) {
+      replaced.try_emplace({name, End(decl)}, decl);
+    }
+  }
+  // Step 2: Do a second pass to match up replacement decls.
+  for (auto& [name, decl] : declarations) {
+    Key key = {name, Start(decl)};
+    if (auto it = removed.find(key); it != removed.end()) {
+      const Decl* old = it->second;
+      auto span = old->attributes->Get("available")->GetArg("removed")->span;
+      reporter()->Fail(ErrRemovedWithReplacement, span, old, key.second, decl->GetNameSource());
+    }
+    replaced.erase(key);
+  }
+  // Step 3: Report errors for replaced decls where Step 2 found no replacement.
+  for (auto& [key, decl] : replaced) {
+    auto span = decl->attributes->Get("available")->GetArg("replaced")->span;
+    reporter()->Fail(ErrReplacedWithoutReplacement, span, decl, key.second);
+  }
 }
 
 void ReplacementStep::CheckMembers() {
-  // Removed/replaced members will have caused the decl to be split, so for each
-  // split decl compare the members before and after.
+  // Goal: Compare members with the same name whose start/end version coincide.
+  // Since removed/replaced members cause their decl to be split by ResolveStep,
+  // we compare members from the two halves of each split.
   auto& declarations = library()->declarations.all;
   for (auto it = declarations.begin(); it != declarations.end(); ++it) {
-    Decl* before = it->second;
-    if (before->availability.ending() != Availability::Ending::kSplit)
+    Decl* old_decl = it->second;
+    if (old_decl->availability.ending() != Availability::Ending::kSplit)
       continue;
+    // The new decl comes next because std::multimap preserves insertion order.
     auto next = std::next(it);
     ZX_ASSERT(next != declarations.end());
-    Decl* after = next->second;
-    ZX_ASSERT_MSG(End(before) == Start(after), "multimap should preserve insertion order");
-    Checker<std::string_view> checker(reporter());
-    before->ForEachMemberFlattened(
-        [&](const Element* member) { checker.Insert(member->GetName(), member); });
-    after->ForEachMemberFlattened(
-        [&](const Element* member) { checker.Check(member->GetName(), member); });
-    checker.Finish();
+    Decl* new_decl = next->second;
+    ZX_ASSERT(old_decl->GetName() == new_decl->GetName());
+    ZX_ASSERT(old_decl->kind == new_decl->kind);
+    Version version = End(old_decl);
+    ZX_ASSERT(Start(new_decl) == version);
+    // Step 1: Populate maps for removed and replaced members.
+    std::map<std::string_view, Member> removed, replaced;
+    ForEachMember(old_decl, [&](Member member) {
+      if (member.ending() == Availability::Ending::kRemoved) {
+        removed.try_emplace(member.element()->GetName(), member);
+      } else if (member.ending() == Availability::Ending::kReplaced) {
+        replaced.try_emplace(member.element()->GetName(), member);
+      }
+    });
+    // Step 2: Do a second pass to match up replacement members.
+    ForEachMember(new_decl, [&](Member member) {
+      auto name = member.element()->GetName();
+      if (auto it = removed.find(name); it != removed.end()) {
+        Member old = it->second;
+        auto span = old.attributes()->Get("available")->GetArg("removed")->span;
+        reporter()->Fail(ErrRemovedWithReplacement, span, old.element(), version,
+                         member.element()->GetNameSource());
+      }
+      replaced.erase(name);
+    });
+    // Step 3: Report errors for replaced members where Step 2 found no replacement.
+    for (auto& [name, member] : replaced) {
+      auto span = member.attributes()->Get("available")->GetArg("replaced")->span;
+      reporter()->Fail(ErrReplacedWithoutReplacement, span, member.element(), version);
+    }
   }
 }
 
