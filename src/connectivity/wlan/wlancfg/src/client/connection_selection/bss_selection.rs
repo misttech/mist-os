@@ -6,7 +6,6 @@ use {
     crate::{
         client::{connection_selection::scoring_functions, types},
         telemetry::{TelemetryEvent, TelemetrySender},
-        util::pseudo_energy::SignalData,
     },
     fuchsia_inspect_contrib::{
         auto_persist::AutoPersist, inspect_insert, inspect_log, log::InspectList,
@@ -16,17 +15,6 @@ use {
     std::{cmp::Reverse, sync::Arc},
     tracing::{error, info},
 };
-
-const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
-const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
-const LOCAL_ROAM_THRESHOLD_SNR_2G: f64 = 20.0;
-const LOCAL_ROAM_THRESHOLD_SNR_5G: f64 = 17.0;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum RoamReason {
-    RssiBelowThreshold,
-    SnrBelowThreshold,
-}
 
 /// BSS selection. Selects the best from a list of candidates that are available for
 /// connection.
@@ -90,36 +78,11 @@ pub async fn select_bss(
     }
 }
 
-// Returns a set of RoamReasons and a score (for metrics).
-pub fn evaluate_current_bss(
-    signal_data: SignalData,
-    channel: types::WlanChan,
-) -> (Vec<RoamReason>, u8) {
-    let mut roam_reasons: Vec<RoamReason> = vec![];
-
-    let (rssi_threshold, snr_threshold) = if channel.is_5ghz() {
-        (LOCAL_ROAM_THRESHOLD_RSSI_5G, LOCAL_ROAM_THRESHOLD_SNR_5G)
-    } else {
-        (LOCAL_ROAM_THRESHOLD_RSSI_2G, LOCAL_ROAM_THRESHOLD_SNR_2G)
-    };
-
-    if signal_data.ewma_rssi.get() <= rssi_threshold {
-        roam_reasons.push(RoamReason::RssiBelowThreshold)
-    }
-    if signal_data.ewma_snr.get() <= snr_threshold {
-        roam_reasons.push(RoamReason::SnrBelowThreshold)
-    }
-
-    let signal_score = scoring_functions::score_current_connection_signal_data(signal_data);
-    return (roam_reasons, signal_score);
-}
-
 #[cfg(test)]
 mod test {
     use {
         super::*,
         crate::{
-            client::connection_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
             config_management::{ConnectFailure, FailureReason},
             util::testing::{
                 create_inspect_persistence_channel, generate_channel,
@@ -135,7 +98,7 @@ mod test {
         futures::channel::mpsc,
         ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
         rand::Rng,
-        wlan_common::{assert_variant, channel, random_fidl_bss_description},
+        wlan_common::{assert_variant, random_fidl_bss_description},
     };
 
     struct TestValues {
@@ -187,16 +150,6 @@ mod test {
             time: fasync::Time::INFINITE,
             bssid,
         }
-    }
-
-    #[fuchsia::test]
-    fn test_evaluate_trivial_roam_reasons() {
-        // Low RSSI and SNR
-        let weak_signal = SignalData::new(-90, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let (roam_reasons, _) =
-            evaluate_current_bss(weak_signal, channel::Channel::new(11, channel::Cbw::Cbw20));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
     }
 
     #[fuchsia::test]
