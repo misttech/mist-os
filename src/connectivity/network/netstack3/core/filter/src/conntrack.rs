@@ -36,6 +36,14 @@ const CONNECTION_EXPIRY_TIME_ESTABLISHED: Duration = Duration::from_secs(12 * 60
 /// handshake or DNS query).
 const CONNECTION_EXPIRY_TIME_UNESTABLISHED: Duration = Duration::from_secs(60);
 
+/// The maximum number of connections in the conntrack table.
+const MAXIMUM_CONNECTIONS: usize = 10_000;
+
+/// The maximum size of the conntrack table. We double the table size limit
+/// because each connection is inserted into the table twice, once for the
+/// original tuple and again for the reply tuple.
+const TABLE_SIZE_LIMIT: usize = MAXIMUM_CONNECTIONS * 2;
+
 /// Implements a connection tracking subsystem.
 ///
 /// The `E` parameter is for external data that is stored in the [`Connection`]
@@ -110,6 +118,28 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
 
         let mut guard = self.inner.lock();
         let table = &mut guard.table;
+
+        // We multiply the table size limit because each connection is inserted
+        // into the table twice, once for the original tuple and again for the
+        // reply tuple.
+        if table.len() >= TABLE_SIZE_LIMIT {
+            if let Some((original_tuple, reply_tuple)) = table
+                .iter()
+                .filter_map(|(_, conn)| {
+                    if conn.state.lock().established {
+                        None
+                    } else {
+                        Some((conn.inner.original_tuple.clone(), conn.inner.reply_tuple.clone()))
+                    }
+                })
+                .next()
+            {
+                assert!(table.remove(&original_tuple).is_some());
+                assert!(table.remove(&reply_tuple).is_some());
+            } else {
+                return Err(FinalizeConnectionError::TableFull);
+            }
+        }
 
         // The expected case here is that there isn't a conflict.
         //
@@ -293,6 +323,9 @@ pub(crate) enum FinalizeConnectionError {
     /// There is a conflicting connection already tracked by conntrack. The
     /// to-be-finalized connection was not inserted into the table.
     Conflict,
+
+    /// The table has reached the hard size cap and no room could be made.
+    TableFull,
 }
 
 /// An error returned from [`Connection::update`].
@@ -969,8 +1002,9 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
 
-        // T=GC_INTERVAL a packet for just the second connection comes in in the reply
-        // direction, which causes the connection to be marked established.
+        // T=GC_INTERVAL a packet for just the second connection comes in in the
+        // reply direction, which causes the connection to be marked
+        // established.
         let conn = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet_reply)
@@ -1022,5 +1056,93 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), false);
+    }
+
+    #[ip_test]
+    #[test_case(true; "existing connections established")]
+    #[test_case(false; "existing connections unestablished")]
+    fn table_size_limit<I: Ip + IpExt + TestIpExt>(established: bool) {
+        fn make_packets<I: IpExt + TestIpExt>(
+            index: usize,
+        ) -> (FakeIpPacket<I, FakeTcpSegment>, FakeIpPacket<I, FakeTcpSegment>) {
+            // This ensures that, no matter what size MAXIMUM_CONNECTIONS is
+            // (under 2^32, at least), we'll always have unique src and dst
+            // ports, and thus unique connections.
+            assert!(index < u32::MAX as usize);
+            let src = (index % (u16::MAX as usize)) as u16;
+            let dst = (index / (u16::MAX as usize)) as u16;
+
+            let packet = FakeIpPacket::<I, _> {
+                src_ip: I::SRC_ADDR,
+                dst_ip: I::DST_ADDR,
+                body: FakeTcpSegment { src_port: src, dst_port: dst },
+            };
+            let reply_packet = FakeIpPacket::<I, _> {
+                src_ip: I::DST_ADDR,
+                dst_ip: I::SRC_ADDR,
+                body: FakeTcpSegment { src_port: dst, dst_port: src },
+            };
+
+            (packet, reply_packet)
+        }
+
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        bindings_ctx.sleep(Duration::from_secs(1));
+        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        // Fill up the table so that the next insertion will fail.
+        for i in 0..MAXIMUM_CONNECTIONS {
+            let (packet, reply_packet) = make_packets(i);
+            let conn = table
+                .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                .expect("packet should be valid");
+            assert!(table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"));
+
+            // Whether to update the connection to be established by sending
+            // through the reply packet.
+            if established {
+                let conn = table
+                    .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
+                    .expect("packet should be valid");
+                assert!(!table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection finalize should succeed"));
+            }
+        }
+
+        // The table should be full whether or not the connections are
+        // established since finalize_connection always inserts the connection
+        // under the original and reply tuples.
+        assert_eq!(table.inner.lock().table.len(), TABLE_SIZE_LIMIT);
+
+        let (packet, _) = make_packets(MAXIMUM_CONNECTIONS);
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
+
+        if established {
+            // Inserting a new connection should fail because it would grow the
+            // table.
+            assert_matches!(
+                table.finalize_connection(&mut bindings_ctx, conn),
+                Err(FinalizeConnectionError::TableFull)
+            );
+
+            // Inserting an existing connection again should succeed because
+            // it's not growing the table.
+            let (packet, _) = make_packets(MAXIMUM_CONNECTIONS - 1);
+            let conn = table
+                .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                .expect("packet should be valid");
+            assert!(!table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"));
+        } else {
+            assert!(table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"));
+        }
     }
 }
