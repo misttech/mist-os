@@ -47,7 +47,7 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    ContextPair, CoreEventContext, CoreTimerContext, CounterContext,
+    ContextPair, ContextProvider, CoreEventContext, CoreTimerContext, CounterContext, CtxPair,
     DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
     InstantContext, NestedIntoCoreTimerCtx, NonTestCtxMarker, ReferenceNotifiers,
     ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
@@ -109,33 +109,6 @@ pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 
 pub(crate) use locked::Locked;
 
-/// A type that provides a context implementation.
-///
-/// This trait allows for [`CtxPair`] to hold context implementations
-/// agnostically of the storage method and how they're implemented. For example,
-/// tests usually create API structs with a mutable borrow to contexts, while
-/// the core context exposed to bindings is implemented on an owned [`CoreCtx`]
-/// type.
-///
-/// The shape of this trait is equivalent to [`core::ops::DerefMut`] but we
-/// decide against using that because of the automatic dereferencing semantics
-/// the compiler provides around implementers of `DerefMut`.
-pub trait ContextProvider {
-    /// The context provided by this `ContextProvider`.
-    type Context: Sized;
-
-    /// Gets a mutable borrow to this context.
-    fn context(&mut self) -> &mut Self::Context;
-}
-
-impl<'a, T: Sized> ContextProvider for &'a mut T {
-    type Context = T;
-
-    fn context(&mut self) -> &mut Self::Context {
-        &mut *self
-    }
-}
-
 impl<'a, BT, L> ContextProvider for CoreCtx<'a, BT, L>
 where
     BT: BindingsTypes,
@@ -144,31 +117,6 @@ where
 
     fn context(&mut self) -> &mut Self::Context {
         self
-    }
-}
-
-/// A concrete implementation of [`ContextPair`].
-///
-///
-/// `CtxPair` provides a [`ContextPair`] implementation when `CC` and `BC` are
-/// [`ContextProvider`] and using their respective targets as the `CoreContext`
-/// and `BindingsContext` associated types.
-pub struct CtxPair<CC, BC> {
-    pub(crate) core_ctx: CC,
-    pub(crate) bindings_ctx: BC,
-}
-
-impl<CC, BC> ContextPair for CtxPair<CC, BC>
-where
-    CC: ContextProvider,
-    BC: ContextProvider,
-{
-    type CoreContext = CC::Context;
-    type BindingsContext = BC::Context;
-
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
-        let Self { core_ctx, bindings_ctx } = self;
-        (core_ctx.context(), bindings_ctx.context())
     }
 }
 
