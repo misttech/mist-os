@@ -60,6 +60,7 @@ template("generated_assembly_inputs") {
     forward_variables_from(invoker,
                            [
                              "deps",
+                             "metadata",
                              "testonly",
                              "visibility",
                            ])

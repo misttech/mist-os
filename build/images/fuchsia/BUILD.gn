@@ -209,11 +209,6 @@ if (is_fuchsia) {
         # `package_list_from_assembly()` GN template.
         package_barrier = [ ":update" ]
       }
-      assembly_inputs = [
-        {
-          path = rebase_path(files.assembly_inputs, root_build_dir)
-        },
-      ]
     }
   }
 
@@ -359,16 +354,24 @@ if (is_fuchsia) {
         delivery_blob_type = delivery_blob_type
       }
     }
+  }
 
-    generated_assembly_inputs("assembly_inputs") {
-      testonly = fuchsia_zbi_testonly
-      output_path = files.assembly_inputs
+  generated_assembly_inputs("assembly_inputs") {
+    testonly = fuchsia_zbi_testonly
+    output_path = files.assembly_inputs
 
-      # Add the legacy AIB for the assemblies. The platform AIBs are added
-      # automatically from the build_api_module("assembly_input_archives")
-      sources = [ "${files.outdir}/legacy" ]
+    # Add the legacy AIB for the assemblies. The platform AIBs are added
+    # automatically from the build_api_module("assembly_input_archives")
+    sources = [ "${files.outdir}/legacy" ]
 
-      deps = [ ":fuchsia.legacy_input_bundle" ]
+    deps = [ ":fuchsia.legacy_input_bundle" ]
+
+    metadata = {
+      assembly_inputs = [
+        {
+          path = rebase_path(files.assembly_inputs, root_build_dir)
+        },
+      ]
     }
   }
 
