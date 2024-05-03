@@ -144,13 +144,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 Ok(any)
             }
             fsandbox::Capability::Directory(client_end) => {
-                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
-                match &any {
-                    Capability::Directory(_) => (),
-                    _ => panic!(
-                        "BUG: registry has a non-Directory capability under a Directory koid"
-                    ),
-                };
                 Ok(crate::Directory::new(client_end).into())
             }
             fsandbox::Capability::Router(client_end) => {

@@ -14,13 +14,6 @@ lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry::default());
 }
 
-/// Inserts a capability into the global registry.
-pub(crate) fn insert(capability: Capability, koid: zx::Koid) {
-    let mut registry = REGISTRY.lock().unwrap();
-    let existing = registry.insert(koid, Entry { capability, task: None });
-    assert!(existing.is_none());
-}
-
 /// Registers a capability with a task.
 pub(crate) fn spawn_task(
     capability: Capability,
