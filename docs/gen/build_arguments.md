@@ -2721,7 +2721,7 @@ From //BUILD.gn:75
 List of GN paths to source files to NOT instrument by `profile` variants.
 These take precedence over `profile_source_files`.
 
-**Current value (from the default):** `[]`
+**Current value (from the default):** `["//prebuilt/*"]`
 
 From //build/config/profile/config.gni:15
 
@@ -5453,7 +5453,7 @@ Profile data path that is used by PGO.
 
 **Current value (from the default):** `""`
 
-From //build/config/profile/config.gni:27
+From //build/config/profile/config.gni:29
 
 ### platform_enable_user_pci
 
@@ -5573,7 +5573,7 @@ and functions to be instrumented by `profile` variants.
 
 **Current value (from the default):** `[]`
 
-From //build/config/profile/config.gni:24
+From //build/config/profile/config.gni:26
 
 ### proprietary_codecs
 
