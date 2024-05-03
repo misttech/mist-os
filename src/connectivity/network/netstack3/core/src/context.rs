@@ -46,7 +46,6 @@ use crate::{
     counters::Counter,
     marker::{BindingsContext, BindingsTypes},
     state::StackState,
-    Instant,
 };
 
 pub use netstack3_base::{
@@ -65,36 +64,6 @@ pub use netstack3_base::{
 pub(crate) trait NonTestCtxMarker {}
 
 impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
-
-/// An [`InstantContext`] which stores a cached value for the current time.
-///
-/// `CachedInstantCtx`s are constructed via [`new_cached_instant_context`].
-pub(crate) struct CachedInstantCtx<I>(I);
-
-impl<I: Instant + 'static> InstantBindingsTypes for CachedInstantCtx<I> {
-    type Instant = I;
-}
-
-impl<I: Instant + 'static> InstantContext for CachedInstantCtx<I> {
-    fn now(&self) -> I {
-        self.0.clone()
-    }
-}
-
-/// Construct a new `CachedInstantCtx` from the current time.
-///
-/// This is a hack until we figure out a strategy for splitting context objects.
-/// Currently, since most context methods take a `&mut self` argument, lifetimes
-/// which don't need to conflict in principle - such as the lifetime of state
-/// obtained mutably from [`StateContext`] and the lifetime required to call the
-/// [`InstantContext::now`] method on the same object - do conflict, and thus
-/// cannot overlap. Until we figure out an approach to deal with that problem,
-/// this exists as a workaround.
-pub(crate) fn new_cached_instant_context<I: InstantContext + ?Sized>(
-    bindings_ctx: &I,
-) -> CachedInstantCtx<I::Instant> {
-    CachedInstantCtx(bindings_ctx.now())
-}
 
 // NOTE:
 // - Code in this crate is required to only obtain random values through an
