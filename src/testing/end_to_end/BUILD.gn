@@ -132,10 +132,7 @@ if (is_host) {
 
   group_with_no_dir_target_deps("core_vim3_stable_tests") {
     testonly = true
-    public_deps = [
-      "honeydew/tests/functional_tests:core_vim3_stable_tests",
-      "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
-    ]
+    public_deps = [ "honeydew/tests/functional_tests:core_vim3_stable_tests" ]
   }
 
   group_with_no_dir_target_deps("core_vim3_unstable_sl4f_tests") {
@@ -173,10 +170,8 @@ if (is_host) {
   # Note - workbench does not support SL4F
   group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     testonly = true
-    public_deps = [
-      "honeydew/tests/functional_tests:workbench_vim3_stable_tests",
-      "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
-    ]
+    public_deps =
+        [ "honeydew/tests/functional_tests:workbench_vim3_stable_tests" ]
   }
 
   group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
