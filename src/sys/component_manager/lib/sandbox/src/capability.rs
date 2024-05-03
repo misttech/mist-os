@@ -1,9 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+use bedrock_error::Explain;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
-use fuchsia_zircon::{AsHandleRef, HandleRef};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
 use std::{fmt::Debug, sync::Arc};
 use thiserror::Error;
 use vfs::directory::entry::DirectoryEntry;
@@ -32,6 +34,15 @@ pub enum RemoteError {
 
     #[error("unregistered capability; only capabilities created by sandbox are allowed")]
     Unregistered,
+}
+
+impl Explain for RemoteError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            RemoteError::UnknownVariant => zx::Status::NOT_SUPPORTED,
+            RemoteError::Unregistered => zx::Status::INVALID_ARGS,
+        }
+    }
 }
 
 #[derive(FromEnum, Debug, Clone)]
@@ -90,7 +101,7 @@ impl Capability {
 /// Returns [RemoteError::Unregistered] if the capability is not in the registry.
 fn try_from_handle_in_registry<'a>(handle_ref: HandleRef<'_>) -> Result<Capability, RemoteError> {
     let koid = handle_ref.get_koid().unwrap();
-    let capability = crate::registry::remove(koid).ok_or(RemoteError::Unregistered)?;
+    let capability = crate::registry::get(koid).ok_or(RemoteError::Unregistered)?;
     Ok(capability)
 }
 
@@ -124,8 +135,8 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 };
                 Ok(any)
             }
-            fsandbox::Capability::Sender(client_end) => {
-                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+            fsandbox::Capability::Sender(sender) => {
+                let any = try_from_handle_in_registry(sender.token.as_handle_ref())?;
                 match &any {
                     Capability::Sender(_) => (),
                     _ => panic!("BUG: registry has a non-Sender capability under a Sender koid"),

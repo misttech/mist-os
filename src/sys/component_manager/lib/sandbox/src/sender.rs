@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{registry, CapabilityTrait, ConversionError, Open};
-use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
+use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{channel::mpsc, TryStreamExt};
+use futures::{channel::mpsc, FutureExt};
 use std::{fmt::Debug, sync::Arc};
-use tracing::warn;
 use vfs::directory::entry::DirectoryEntry;
 
 #[derive(Debug)]
@@ -55,38 +54,6 @@ impl Sender {
     pub fn send(&self, msg: Message) -> Result<(), ()> {
         self.inner.send(msg)
     }
-
-    async fn serve_sender(self, mut stream: fsandbox::SenderRequestStream) {
-        while let Ok(Some(request)) = stream.try_next().await {
-            match request {
-                fsandbox::SenderRequest::Send_ { channel, control_handle: _ } => {
-                    if let Err(_err) = self.send_channel(channel) {
-                        stream.control_handle().shutdown_with_epitaph(zx::Status::PEER_CLOSED);
-                        return;
-                    }
-                }
-                fsandbox::SenderRequest::Clone2 { request, control_handle: _ } => {
-                    // The clone is registered under the koid of the client end.
-                    let koid = request.basic_info().unwrap().related_koid;
-                    let server_end: ServerEnd<fsandbox::SenderMarker> =
-                        request.into_channel().into();
-                    let stream = server_end.into_stream().unwrap();
-                    self.clone().serve_and_register(stream, koid);
-                }
-                fsandbox::SenderRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!("Received unknown Sender request with ordinal {ordinal}");
-                }
-            }
-        }
-    }
-
-    /// Serves the `fuchsia.sandbox.Sender` protocol for this Sender and moves it into the registry.
-    pub fn serve_and_register(self, stream: fsandbox::SenderRequestStream, koid: zx::Koid) {
-        let sender = self.clone();
-
-        // Move this capability into the registry.
-        registry::spawn_task(self.into(), koid, sender.serve_sender(stream));
-    }
 }
 
 impl From<Sender> for Open {
@@ -111,13 +78,15 @@ impl CapabilityTrait for Sender {
     }
 }
 
-impl From<Sender> for ClientEnd<fsandbox::SenderMarker> {
-    /// Serves the `fuchsia.sandbox.Sender` protocol for this Sender and moves it into the registry.
-    fn from(sender: Sender) -> ClientEnd<fsandbox::SenderMarker> {
-        let (client_end, sender_stream) =
-            create_request_stream::<fsandbox::SenderMarker>().unwrap();
-        sender.serve_and_register(sender_stream, client_end.get_koid().unwrap());
-        client_end
+impl From<Sender> for fsandbox::SenderCapability {
+    fn from(value: Sender) -> Self {
+        let (watcher, token) = zx::EventPair::create();
+        registry::spawn_task(
+            value.into(),
+            token.basic_info().unwrap().koid,
+            fasync::OnSignals::new(watcher, zx::Signals::OBJECT_PEER_CLOSED).map(|_| ()),
+        );
+        fsandbox::SenderCapability { token }
     }
 }
 
@@ -132,15 +101,15 @@ mod tests {
     use super::*;
     use crate::Receiver;
     use assert_matches::assert_matches;
-    use fidl::endpoints::create_endpoints;
+    use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_unknown as funknown;
     use futures::StreamExt;
     use vfs::execution_scope::ExecutionScope;
+    use zx::HandleBased;
 
     // NOTE: sending-and-receiving tests are written in `receiver.rs`.
 
-    /// Tests that a Sender can be cloned via `fuchsia.unknown/Cloneable.Clone2`
+    /// Tests that a Sender can be cloned by cloning its FIDL token.
     /// and capabilities sent to the original and clone arrive at the same Receiver.
     #[fuchsia::test]
     async fn fidl_clone() {
@@ -150,20 +119,22 @@ mod tests {
         let (ch1, _ch2) = zx::Channel::create();
         sender.send_channel(ch1).unwrap();
 
-        // Convert the Sender to a FIDL proxy.
-        let client_end: ClientEnd<fsandbox::SenderMarker> = sender.into();
-        let sender_proxy = client_end.into_proxy().unwrap();
+        // Convert the Sender to a FIDL token.
+        let fidl_sender: fsandbox::SenderCapability = sender.into();
 
-        // Clone the Sender with `Clone2`.
-        let (clone_client_end, clone_server_end) = create_endpoints::<funknown::CloneableMarker>();
-        let _ = sender_proxy.clone2(clone_server_end);
-        let clone_client_end: ClientEnd<fsandbox::SenderMarker> =
-            clone_client_end.into_channel().into();
-        let clone_proxy = clone_client_end.into_proxy().unwrap();
+        // Clone the Sender by cloning the token.
+        let token_clone = fsandbox::SenderCapability {
+            token: fidl_sender.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+        };
+        let sender_clone =
+            match crate::Capability::try_from(fsandbox::Capability::Sender(token_clone)).unwrap() {
+                crate::Capability::Sender(sender) => sender,
+                capability @ _ => panic!("wrong type {capability:?}"),
+            };
 
         // Send a channel through the cloned Sender.
         let (ch1, _ch2) = zx::Channel::create();
-        clone_proxy.send_(ch1).unwrap();
+        sender_clone.send_channel(ch1).unwrap();
 
         // The Receiver should receive two channels, one from each sender.
         for _ in 0..2 {

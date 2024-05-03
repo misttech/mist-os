@@ -39,12 +39,10 @@ pub(crate) fn spawn_task(
     assert!(existing.is_none());
 }
 
-/// Removes a capability from the global registry and returns it, if it exists.
-///
-/// The associated task is dropped, if any.
-pub(crate) fn remove(koid: zx::Koid) -> Option<Capability> {
-    let mut registry = REGISTRY.lock().unwrap();
-    registry.remove(koid).map(|entry| entry.capability)
+/// Get a capability from the global registry and returns it, if it exists.
+pub(crate) fn get(koid: zx::Koid) -> Option<Capability> {
+    let registry = REGISTRY.lock().unwrap();
+    registry.get(koid).map(|entry| entry.capability.clone())
 }
 
 pub struct Entry {
@@ -78,6 +76,11 @@ impl Registry {
     pub(crate) fn remove(&mut self, koid: zx::Koid) -> Option<Entry> {
         self.entries.remove(&koid)
     }
+
+    /// Gets an entry from the registry, if one with a matching koid exists.
+    pub(crate) fn get(&self, koid: zx::Koid) -> Option<&Entry> {
+        self.entries.get(&koid)
+    }
 }
 
 #[cfg(test)]
@@ -89,7 +92,7 @@ mod tests {
 
     /// Tests that a capability can be inserted and retrieved from a Registry.
     #[test]
-    fn insert_remove() {
+    fn insert_get_remove() {
         let mut registry = Registry::default();
 
         // Insert a Unit capability into the registry.
@@ -97,10 +100,17 @@ mod tests {
         let unit = Unit::default();
         assert!(registry.insert(koid, Entry { capability: unit.into(), task: None }).is_none());
 
+        // Get a capability with the same koid. It should be a Unit.
+        let entry = registry.get(koid).unwrap();
+        let got_unit = entry.capability.clone();
+        assert_matches!(got_unit, Capability::Unit(_));
+
         // Remove a capability with the same koid. It should be a Unit.
         let entry = registry.remove(koid).unwrap();
         let got_unit = entry.capability;
         assert_matches!(got_unit, Capability::Unit(_));
+
+        assert!(registry.remove(koid).is_none());
     }
 
     /// Tests that a capability added with a [remove_when_done] task is removed
@@ -125,6 +135,6 @@ mod tests {
         let _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
 
         // Remove a capability with the same koid. It should not exist.
-        assert!(remove(koid).is_none());
+        assert!(get(koid).is_none());
     }
 }

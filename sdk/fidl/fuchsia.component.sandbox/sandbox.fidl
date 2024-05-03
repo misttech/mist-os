@@ -32,12 +32,17 @@ type DataCapability = flexible union {
 };
 
 @available(added=HEAD)
+type SenderCapability = resource struct {
+    token zx.Handle:EVENTPAIR;
+};
+
+@available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
     2: handle client_end:HandleCapability;
     3: data DataCapability;
     4: dictionary client_end:Dictionary;
-    5: sender client_end:Sender;
+    5: sender SenderCapability;
     6: directory client_end:fuchsia.io.Directory;
     7: router client_end:Router;
 };
@@ -70,7 +75,7 @@ type DictionaryError = flexible enum {
 
     /// The Capability is invalid.
     ///
-    /// Capabilites must be created by sandbox, via
+    /// Capabilities must be created by sandbox, via
     /// `fuchsia.component.sandbox.Factory` or returned from other
     /// Component Framework APIs.
     BAD_CAPABILITY = 3;
@@ -168,8 +173,6 @@ open protocol DictionaryIterator {
 @discoverable
 @available(added=HEAD)
 open protocol Sender {
-    compose fuchsia.unknown.Cloneable;
-
     /// Sends a channel over this sender.
     flexible Send(ProtocolPayload);
 };
@@ -229,15 +232,30 @@ type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
 };
 
-/// Entrypoint for instantiation of sandbox types.
+/// The [`Factory`] protocol handles:
+///
+/// - Instantiation of sandbox types.
+/// - Controlling sandbox objects given tokens.
+///
 @discoverable
 @available(added=HEAD)
 open protocol Factory {
+    /// Operate on the provided sender capability.
+    ///
+    /// Consumes a token referencing a bedrock object and serves the
+    /// corresponding FIDL representation on `server_end`. The peer of the
+    /// `server_end` is another reference to the bedrock object. Dropping the
+    /// control channel decreases one reference on the object.
+    flexible ConnectToSender(resource struct {
+        capability SenderCapability;
+        server_end server_end:Sender;
+    });
+
     /// Creates a `Sender` from a client served `Receiver`.
     flexible CreateSender(resource struct {
         receiver client_end:Receiver;
     }) -> (resource struct {
-        sender client_end:Sender;
+        capability SenderCapability;
     });
 
     /// Creates a new empty [`Dictionary`].

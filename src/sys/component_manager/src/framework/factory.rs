@@ -9,6 +9,7 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
+    bedrock_error::Explain,
     cm_types::Name,
     cm_util::TaskGroup,
     fidl::endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd},
@@ -79,9 +80,26 @@ impl FactoryCapabilityHost {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
+            fsandbox::FactoryRequest::ConnectToSender {
+                capability,
+                server_end,
+                control_handle: _,
+            } => match sandbox::Capability::try_from(fsandbox::Capability::Sender(capability)) {
+                Ok(capability) => match capability {
+                    sandbox::Capability::Sender(sender) => {
+                        let server_end: ServerEnd<fsandbox::SenderMarker> = server_end.into();
+                        self.tasks.spawn(serve_sender(sender, server_end.into_stream().unwrap()));
+                    }
+                    _ => unreachable!(),
+                },
+                Err(err) => {
+                    warn!("Error converting token to capability: {err:?}");
+                    _ = server_end.close_with_epitaph(err.as_zx_status());
+                }
+            },
             fsandbox::FactoryRequest::CreateSender { receiver, responder } => {
-                let client_end = self.create_sender(receiver);
-                responder.send(client_end)?;
+                let sender = self.create_sender(receiver);
+                responder.send(sender)?;
             }
             fsandbox::FactoryRequest::CreateDictionary { responder } => {
                 let client_end = self.create_dictionary();
@@ -101,15 +119,12 @@ impl FactoryCapabilityHost {
     fn create_sender(
         &self,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
-    ) -> ClientEnd<fsandbox::SenderMarker> {
-        let (sender_client, sender_server) = endpoints::create_endpoints();
+    ) -> fsandbox::SenderCapability {
         let (receiver, sender) = Receiver::new();
         self.tasks.spawn(async move {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
         });
-        let sender_client_end_koid = sender_server.basic_info().unwrap().related_koid;
-        sender.serve_and_register(sender_server.into_stream().unwrap(), sender_client_end_koid);
-        sender_client
+        fsandbox::SenderCapability::from(sender)
     }
 
     fn create_directory(
@@ -128,6 +143,21 @@ impl FactoryCapabilityHost {
         let client_end_koid = server_end.basic_info().unwrap().related_koid;
         dict.serve_and_register(server_end.into_stream().unwrap(), client_end_koid);
         client_end
+    }
+}
+
+async fn serve_sender(sender: sandbox::Sender, mut stream: fsandbox::SenderRequestStream) {
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            fsandbox::SenderRequest::Send_ { channel, control_handle: _ } => {
+                if let Err(_err) = sender.send(sandbox::Message { channel }) {
+                    return;
+                }
+            }
+            fsandbox::SenderRequest::_UnknownMethod { ordinal, .. } => {
+                warn!("Received unknown Sender request with ordinal {ordinal}");
+            }
+        }
     }
 }
 
@@ -177,7 +207,10 @@ mod tests {
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
         let sender = factory_proxy.create_sender(receiver_client_end).await.unwrap();
-        let sender = sender.into_proxy().unwrap();
+        let (sender_client, sender_server) =
+            fidl::endpoints::create_endpoints::<fsandbox::SenderMarker>();
+        factory_proxy.connect_to_sender(sender, sender_server.into()).unwrap();
+        let sender = sender_client.into_proxy().unwrap();
 
         let (ch1, _ch2) = zx::Channel::create();
         let expected_koid = ch1.get_koid().unwrap();
