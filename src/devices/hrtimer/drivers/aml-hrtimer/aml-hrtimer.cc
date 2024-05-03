@@ -5,6 +5,7 @@
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer.h"
 
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 #include <zircon/syscalls-next.h>
 
@@ -48,10 +49,9 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::result lessor_endpoints = fidl::CreateEndpoints<fuchsia_power_broker::Lessor>();
-  auto result_add_element =
-      fdf_power::AddElement(power_broker.value(), config, std::move(tokens.value()), {}, {}, {},
-                            std::move(lessor_endpoints->server));
+  fdf_power::ElementDesc description =
+      fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+  auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
   if (result_add_element.is_error()) {
     FDF_LOG(ERROR, "Failed to add power element: %u",
             static_cast<uint8_t>(result_add_element.error_value()));
@@ -60,7 +60,7 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
 
   PowerConfiguration response;
   response.element_control_client = std::move(result_add_element->element_control_channel());
-  response.lessor_client = std::move(lessor_endpoints->client);
+  response.lessor_client = std::move(description.lessor_client_.value());
   return zx::ok(std::move(response));
 }
 
