@@ -1085,6 +1085,7 @@ compiled_action("test-list") {
   deps = [
     ":test_components",
     ":tests",
+    "//tools/test_list_tool:install($host_toolchain)",
   ]
 
   args = [
