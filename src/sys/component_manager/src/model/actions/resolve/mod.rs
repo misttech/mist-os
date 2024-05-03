@@ -184,8 +184,8 @@ pub mod tests {
         crate::model::{
             actions::test_utils::{is_resolved, is_stopped},
             actions::{
-                Action, ActionsManager, ResolveAction, ShutdownAction, ShutdownType, StartAction,
-                StopAction,
+                Action, ActionKey, ActionsManager, ResolveAction, ShutdownAction, ShutdownType,
+                StartAction, StopAction,
             },
             component::{IncomingCapabilities, StartReason},
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -260,7 +260,7 @@ pub mod tests {
         let resolve_abort_handle = resolve_action.abort_handle().unwrap();
         let resolve_fut = component_a.lock_actions().await.register_no_wait(resolve_action).await;
         let resolve_fut_2 =
-            component_a.lock_actions().await.wait(ResolveAction::new()).await.unwrap();
+            component_a.lock_actions().await.wait(ActionKey::Resolve).await.unwrap();
 
         // Wait until routing reaches resolution.
         let _ = resolved_rx.await.unwrap();

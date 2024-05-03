@@ -187,7 +187,7 @@ pub mod tests {
         stopped_rx.await.unwrap();
 
         let actions = component_a.lock_actions().await;
-        let action_notifier = actions.wait(StopAction::new(false)).await.unwrap();
+        let action_notifier = actions.wait(ActionKey::Stop).await.unwrap();
         assert_eq!(action_notifier.get_reference_count().unwrap(), 4);
         drop(actions);
 

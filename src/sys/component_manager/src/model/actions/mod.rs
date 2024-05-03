@@ -219,11 +219,8 @@ impl ActionsManager {
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
-    pub async fn wait<A>(&self, action: A) -> Option<ActionNotifier>
-    where
-        A: Action,
-    {
-        self.action_set.wait(action).await
+    pub async fn wait(&self, action_key: ActionKey) -> Option<ActionNotifier> {
+        self.action_set.wait(action_key)
     }
 
     fn finish<'a>(&mut self, key: &'a ActionKey) {

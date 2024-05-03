@@ -5,11 +5,10 @@
 use {
     crate::model::{
         actions::{
-            Action, ActionKey, ActionsManager, DiscoverAction, ResolveAction, ShutdownAction,
-            ShutdownType, StartAction,
+            Action, ActionKey, ActionsManager, DiscoverAction, ShutdownAction, ShutdownType,
         },
         component::instance::InstanceState,
-        component::{ComponentInstance, IncomingCapabilities, StartReason},
+        component::ComponentInstance,
         hooks::{Event, EventPayload},
         structured_dict::ComponentInput,
     },
@@ -112,16 +111,8 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         let start_shutdown;
         {
             let actions = component.lock_actions().await;
-            resolve_shutdown = wait(actions.wait(ResolveAction::new()).await);
-            start_shutdown = wait(
-                actions
-                    .wait(StartAction::new(
-                        StartReason::Debug,
-                        None,
-                        IncomingCapabilities::default(),
-                    ))
-                    .await,
-            );
+            resolve_shutdown = wait(actions.wait(ActionKey::Resolve).await);
+            start_shutdown = wait(actions.wait(ActionKey::Start).await);
         }
         let execution_scope = &component.execution_scope;
         execution_scope.shutdown();
@@ -170,6 +161,7 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::test_utils::{is_child_deleted, is_destroyed},
+            component::StartReason,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, execution_is_shut_down, get_incarnation_id,
@@ -404,7 +396,7 @@ pub mod tests {
             let refcount = action_notifier.get_reference_count().unwrap();
 
             // expected reference count:
-            // - 1 for the Actions that owns the notifier
+            // - 1 for the ActionsManager that owns the notifier
             // - 1 for destroy action to wait on the mock action
             // - 1 for the notifier we're holding to check the reference count
             if refcount == 3 {
@@ -511,7 +503,7 @@ pub mod tests {
             let refcount = action_notifier.get_reference_count().unwrap();
 
             // expected reference count:
-            // - 1 for the Actions that owns the notifier
+            // - 1 for the ActionsManager that owns the notifier
             // - 1 for destroy action to wait on the mock action
             // - 1 for the notifier we're holding to check the reference count
             if refcount == 3 {

@@ -113,12 +113,8 @@ impl ActionSet {
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
-    pub async fn wait<A>(&self, action: A) -> Option<ActionNotifier>
-    where
-        A: Action,
-    {
-        let key = action.key();
-        self.rep.get(&key).map(|controller| controller.notifier.clone())
+    pub fn wait(&self, action_key: ActionKey) -> Option<ActionNotifier> {
+        self.rep.get(&action_key).map(|controller| controller.notifier.clone())
     }
 
     /// Removes an action from the set, completing it.
