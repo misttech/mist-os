@@ -118,8 +118,9 @@ pub mod filter {
     };
     pub(crate) use netstack3_filter::{
         ConntrackConnection, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
-        FilterIpMetadata, ForwardedPacket, IngressVerdict, IpPacket, MaybeTransportPacket,
-        NestedWithInnerIpPacket, RxPacket, State, TransportPacketSerializer, TxPacket, Verdict,
+        FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket,
+        MaybeTransportPacket, NestedWithInnerIpPacket, RxPacket, State, TransportPacketSerializer,
+        TxPacket, Verdict,
     };
 }
 

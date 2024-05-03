@@ -479,8 +479,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<TimerId, Event: Debug, State, FrameMeta> FilterBindingsTypes
-        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+    impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta>
+        FilterBindingsTypes for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
     {
         type DeviceClass = ();
     }

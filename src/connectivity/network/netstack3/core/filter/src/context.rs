@@ -5,7 +5,7 @@
 use core::fmt::Debug;
 
 use net_types::ip::{Ipv4, Ipv6};
-use netstack3_base::{InstantBindingsTypes, InstantContext};
+use netstack3_base::{InstantBindingsTypes, TimerBindingsTypes, TimerContext};
 use packet_formats::ip::IpExt;
 
 use crate::state::State;
@@ -15,14 +15,14 @@ use crate::state::State;
 /// Allows rules that match on device class to be installed, storing the
 /// [`FilterBindingsTypes::DeviceClass`] type at rest, while allowing Netstack3
 /// Core to have Bindings provide the type since it is platform-specific.
-pub trait FilterBindingsTypes: InstantBindingsTypes {
+pub trait FilterBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {
     /// The device class type for devices installed in the netstack.
     type DeviceClass: Clone + Debug;
 }
 
 /// Trait aggregating functionality required from bindings.
-pub trait FilterBindingsContext: InstantContext + FilterBindingsTypes {}
-impl<BC: InstantContext + FilterBindingsTypes> FilterBindingsContext for BC {}
+pub trait FilterBindingsContext: TimerContext + FilterBindingsTypes {}
+impl<BC: TimerContext + FilterBindingsTypes> FilterBindingsContext for BC {}
 
 /// The IP version-specific execution context for packet filtering.
 ///
@@ -51,12 +51,17 @@ pub trait FilterContext<BT: FilterBindingsTypes> {
 pub(crate) mod testutil {
     use core::time::Duration;
 
-    use netstack3_base::testutil::FakeInstant;
+    use net_types::ip::Ip;
+    use netstack3_base::{
+        testutil::{FakeInstant, FakeTimerCtx, WithFakeTimerContext},
+        InstantContext, IntoCoreTimerCtx,
+    };
 
     use super::*;
     use crate::{
         conntrack,
-        state::{validation::ValidRoutines, IpRoutines, Routines},
+        logic::FilterTimerId,
+        state::{validation::ValidRoutines, ConntrackExternalData, IpRoutines, Routines},
     };
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -65,34 +70,32 @@ pub(crate) mod testutil {
         Wlan,
     }
 
-    pub enum FakeBindingsTypes {}
+    pub struct FakeCtx<I: IpExt>(State<I, FakeBindingsCtx<I>>);
 
-    impl InstantBindingsTypes for FakeBindingsTypes {
-        type Instant = FakeInstant;
-    }
-
-    impl FilterBindingsTypes for FakeBindingsTypes {
-        type DeviceClass = FakeDeviceClass;
-    }
-
-    pub struct FakeCtx<I: IpExt, BT: FilterBindingsTypes>(State<I, BT>);
-
-    impl<I: IpExt, BT: FilterBindingsTypes> FakeCtx<I, BT> {
-        #[allow(dead_code)]
-        pub fn with_ip_routines(routines: IpRoutines<I, BT::DeviceClass, ()>) -> Self {
+    impl<I: IpExt> FakeCtx<I> {
+        pub fn with_ip_routines(
+            bindings_ctx: &mut FakeBindingsCtx<I>,
+            routines: IpRoutines<I, FakeDeviceClass, ()>,
+        ) -> Self {
             let (installed_routines, uninstalled_routines) =
                 ValidRoutines::new(Routines { ip: routines, ..Default::default() })
                     .expect("invalid state");
             Self(State {
                 installed_routines,
                 uninstalled_routines,
-                conntrack: conntrack::Table::new(),
+                conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
             })
+        }
+
+        pub fn conntrack(
+            &mut self,
+        ) -> &conntrack::Table<I, FakeBindingsCtx<I>, ConntrackExternalData> {
+            &self.0.conntrack
         }
     }
 
-    impl<I: IpExt> FilterIpContext<I, FakeBindingsTypes> for FakeCtx<I, FakeBindingsTypes> {
-        fn with_filter_state<O, F: FnOnce(&State<I, FakeBindingsTypes>) -> O>(
+    impl<I: IpExt> FilterIpContext<I, FakeBindingsCtx<I>> for FakeCtx<I> {
+        fn with_filter_state<O, F: FnOnce(&State<I, FakeBindingsCtx<I>>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
@@ -101,33 +104,77 @@ pub(crate) mod testutil {
         }
     }
 
-    #[derive(Debug)]
-    pub struct FakeBindingsCtx {
-        time_elapsed: Duration,
+    pub struct FakeBindingsCtx<I: Ip> {
+        pub timer_ctx: FakeTimerCtx<FilterTimerId<I>>,
     }
 
-    #[allow(dead_code)]
-    impl FakeBindingsCtx {
+    impl<I: Ip> FakeBindingsCtx<I> {
         pub(crate) fn new() -> Self {
-            Self { time_elapsed: Duration::from_secs(0) }
+            Self { timer_ctx: Default::default() }
         }
 
-        pub(crate) fn set_time_elapsed(&mut self, time_elapsed: Duration) {
-            self.time_elapsed = time_elapsed;
+        pub(crate) fn sleep(&mut self, time_elapsed: Duration) {
+            self.timer_ctx.instant.sleep(time_elapsed)
         }
     }
 
-    impl InstantBindingsTypes for FakeBindingsCtx {
+    impl<I: Ip> InstantBindingsTypes for FakeBindingsCtx<I> {
         type Instant = FakeInstant;
     }
 
-    impl FilterBindingsTypes for FakeBindingsCtx {
+    impl<I: Ip> FilterBindingsTypes for FakeBindingsCtx<I> {
         type DeviceClass = FakeDeviceClass;
     }
 
-    impl InstantContext for FakeBindingsCtx {
+    impl<I: Ip> InstantContext for FakeBindingsCtx<I> {
         fn now(&self) -> Self::Instant {
-            Self::Instant { offset: self.time_elapsed }
+            self.timer_ctx.now()
+        }
+    }
+
+    impl<I: Ip> TimerBindingsTypes for FakeBindingsCtx<I> {
+        type Timer = <FakeTimerCtx<FilterTimerId<I>> as TimerBindingsTypes>::Timer;
+
+        type DispatchId = <FakeTimerCtx<FilterTimerId<I>> as TimerBindingsTypes>::DispatchId;
+    }
+
+    impl<I: Ip> TimerContext for FakeBindingsCtx<I> {
+        fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
+            self.timer_ctx.new_timer(id)
+        }
+
+        fn schedule_timer_instant(
+            &mut self,
+            time: Self::Instant,
+            timer: &mut Self::Timer,
+        ) -> Option<Self::Instant> {
+            self.timer_ctx.schedule_timer_instant(time, timer)
+        }
+
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timer_ctx.cancel_timer(timer)
+        }
+
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timer_ctx.scheduled_instant(timer)
+        }
+    }
+
+    impl<I: Ip> WithFakeTimerContext<FilterTimerId<I>> for FakeBindingsCtx<I> {
+        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<FilterTimerId<I>>) -> O>(
+            &self,
+            f: F,
+        ) -> O {
+            let Self { timer_ctx } = self;
+            f(timer_ctx)
+        }
+
+        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<FilterTimerId<I>>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            let Self { timer_ctx } = self;
+            f(timer_ctx)
         }
     }
 }

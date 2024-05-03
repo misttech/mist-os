@@ -13,10 +13,16 @@ use core::{
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
-use netstack3_base::{Inspectable, Inspector as _};
+use netstack3_base::{CoreTimerContext, Inspectable, Inspector as _};
 use packet_formats::ip::IpExt;
 
-use crate::{conntrack, context::FilterBindingsTypes, matchers::PacketMatcher, ValidRoutines};
+use crate::{
+    conntrack,
+    context::{FilterBindingsContext, FilterBindingsTypes},
+    logic::FilterTimerId,
+    matchers::PacketMatcher,
+    state::validation::ValidRoutines,
+};
 
 /// The action to take on a packet.
 #[derive(Derivative)]
@@ -279,7 +285,7 @@ pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
 }
 
 /// Data stored in [`conntrack::Connection`] that is only needed by filtering.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ConntrackExternalData {}
 
 /// IP version-specific filtering routine state.
@@ -294,8 +300,6 @@ pub struct Routines<I: IpExt, DeviceClass, RuleInfo> {
 }
 
 /// IP version-specific filtering state.
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
 pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// Routines used for filtering packets that are installed on hooks.
     pub installed_routines: ValidRoutines<I, BT::DeviceClass>,
@@ -308,6 +312,17 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// Connection tracking state.
     #[allow(dead_code)]
     pub(crate) conntrack: conntrack::Table<I, BT, ConntrackExternalData>,
+}
+
+impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
+    /// Create a new State.
+    pub fn new<CC: CoreTimerContext<FilterTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
+        Self {
+            installed_routines: Default::default(),
+            uninstalled_routines: Default::default(),
+            conntrack: conntrack::Table::new::<CC>(bindings_ctx),
+        }
+    }
 }
 
 impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {

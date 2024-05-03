@@ -49,8 +49,8 @@ use crate::{
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
-        FilterHandlerProvider, FilterIpMetadata, ForwardedPacket, IngressVerdict, IpPacket,
-        MaybeTransportPacket, NestedWithInnerIpPacket,
+        FilterHandlerProvider, FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict,
+        IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
     },
     inspect::{Inspectable, Inspector},
     ip::{
@@ -1276,7 +1276,9 @@ impl Ipv4StateBuilder {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
-            filter: RwLock::new(crate::filter::State::default()),
+            filter: RwLock::new(crate::filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+            )),
         }
     }
 }
@@ -1302,7 +1304,9 @@ impl Ipv6StateBuilder {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
-            filter: RwLock::new(crate::filter::State::default()),
+            filter: RwLock::new(crate::filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+            )),
         }
     }
 }
@@ -1655,6 +1659,10 @@ pub enum IpLayerTimerId {
     PmtuTimeoutv4(PmtuTimerId<Ipv4>),
     /// A timer event for IPv6 path MTU discovery.
     PmtuTimeoutv6(PmtuTimerId<Ipv6>),
+    /// A timer event for IPv4 filtering timers.
+    FilterTimerv4(FilterTimerId<Ipv4>),
+    /// A timer event for IPv6 filtering timers.
+    FilterTimerv6(FilterTimerId<Ipv6>),
 }
 
 impl<I: Ip> From<FragmentTimerId<I>> for IpLayerTimerId {
@@ -1669,12 +1677,20 @@ impl<I: Ip> From<PmtuTimerId<I>> for IpLayerTimerId {
     }
 }
 
+impl<I: Ip> From<FilterTimerId<I>> for IpLayerTimerId {
+    fn from(timer: FilterTimerId<I>) -> IpLayerTimerId {
+        I::map_ip(timer, IpLayerTimerId::FilterTimerv4, IpLayerTimerId::FilterTimerv6)
+    }
+}
+
 impl<CC, BC> HandleableTimer<CC, BC> for IpLayerTimerId
 where
     CC: TimerHandler<BC, FragmentTimerId<Ipv4>>
         + TimerHandler<BC, FragmentTimerId<Ipv6>>
         + TimerHandler<BC, PmtuTimerId<Ipv4>>
-        + TimerHandler<BC, PmtuTimerId<Ipv6>>,
+        + TimerHandler<BC, PmtuTimerId<Ipv6>>
+        + TimerHandler<BC, FilterTimerId<Ipv4>>
+        + TimerHandler<BC, FilterTimerId<Ipv6>>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
         match self {
@@ -1682,6 +1698,8 @@ where
             IpLayerTimerId::ReassemblyTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id),
             IpLayerTimerId::PmtuTimeoutv4(id) => core_ctx.handle_timer(bindings_ctx, id),
             IpLayerTimerId::PmtuTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::FilterTimerv4(id) => core_ctx.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::FilterTimerv6(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }

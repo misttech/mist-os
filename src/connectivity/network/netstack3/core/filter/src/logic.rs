@@ -3,15 +3,16 @@
 // found in the LICENSE file.
 
 use core::num::NonZeroU16;
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use netstack3_base::HandleableTimer;
 use packet_formats::ip::IpExt;
 use tracing::error;
 
 use crate::{
-    context::{FilterBindingsTypes, FilterIpContext},
+    context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext},
     matchers::InterfaceProperties,
-    packets::{IpPacket, TransportPacket},
-    state::{Action, Hook, Routine, Rule, TransparentProxy},
-    FilterIpMetadata, MaybeTransportPacket,
+    packets::{IpPacket, MaybeTransportPacket, TransportPacket},
+    state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentProxy},
 };
 
 /// The final result of packet processing at a given filtering hook.
@@ -369,6 +370,26 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     }
 }
 
+/// A timer ID for the filtering crate.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, GenericOverIp, Hash)]
+#[generic_over_ip(I, Ip)]
+pub enum FilterTimerId<I: Ip> {
+    /// A trigger for the conntrack module to perform garbage collection.
+    ConntrackGc(IpVersionMarker<I>),
+}
+
+impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> HandleableTimer<CC, BC>
+    for FilterTimerId<I>
+{
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        match self {
+            FilterTimerId::ConntrackGc(_) => core_ctx.with_filter_state(|state| {
+                state.conntrack.perform_gc(bindings_ctx);
+            }),
+        }
+    }
+}
+
 #[cfg(feature = "testutils")]
 pub mod testutil {
     use super::*;
@@ -446,12 +467,12 @@ mod tests {
     use alloc::{vec, vec::Vec};
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use net_types::ip::{Ipv4, Ipv6};
     use test_case::test_case;
 
     use super::*;
     use crate::{
-        context::testutil::{FakeCtx, FakeDeviceClass},
+        context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass},
         matchers::{
             testutil::{ethernet_interface, wlan_interface, FakeDeviceId},
             InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher,
@@ -776,15 +797,20 @@ mod tests {
             Hook { routines: vec![Routine { rules: vec![Rule::new(matcher, Action::Drop)] }] }
         }
 
+        let mut bindings_ctx = FakeBindingsCtx::new();
+
         // Ingress hook should use ingress routines and check the input
         // interface.
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            ingress: drop_all_traffic(PacketMatcher {
-                in_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                ingress: drop_all_traffic(PacketMatcher {
+                    in_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        });
+            },
+        );
         assert_eq!(
             FilterImpl(&mut ctx).ingress_hook(
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
@@ -796,13 +822,16 @@ mod tests {
 
         // Local ingress hook should use local ingress routines and check the
         // input interface.
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            local_ingress: drop_all_traffic(PacketMatcher {
-                in_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                local_ingress: drop_all_traffic(PacketMatcher {
+                    in_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        });
+            },
+        );
         assert_eq!(
             FilterImpl(&mut ctx).local_ingress_hook(
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
@@ -814,14 +843,17 @@ mod tests {
 
         // Forwarding hook should use forwarding routines and check both the
         // input and output interfaces.
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            forwarding: drop_all_traffic(PacketMatcher {
-                in_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
-                out_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Ethernet)),
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                forwarding: drop_all_traffic(PacketMatcher {
+                    in_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+                    out_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Ethernet)),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        });
+            },
+        );
         assert_eq!(
             FilterImpl(&mut ctx).forwarding_hook(
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
@@ -834,13 +866,16 @@ mod tests {
 
         // Local egress hook should use local egress routines and check the
         // output interface.
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            local_egress: drop_all_traffic(PacketMatcher {
-                out_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                local_egress: drop_all_traffic(PacketMatcher {
+                    out_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        });
+            },
+        );
         assert_eq!(
             FilterImpl(&mut ctx).local_egress_hook(
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
@@ -852,13 +887,16 @@ mod tests {
 
         // Egress hook should use egress routines and check the output
         // interface.
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            egress: drop_all_traffic(PacketMatcher {
-                out_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                egress: drop_all_traffic(PacketMatcher {
+                    out_interface: Some(InterfaceMatcher::DeviceClass(FakeDeviceClass::Wlan)),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        });
+            },
+        );
         assert_eq!(
             FilterImpl(&mut ctx)
                 .egress_hook(
@@ -928,10 +966,15 @@ mod tests {
             }
         }
 
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            local_ingress: Hook { routines: vec![default_filter_rules()] },
-            ..Default::default()
-        });
+        let mut bindings_ctx = FakeBindingsCtx::new();
+
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                local_ingress: Hook { routines: vec![default_filter_rules()] },
+                ..Default::default()
+            },
+        );
 
         FilterImpl(&mut ctx).local_ingress_hook(
             &mut FakeIpPacket::<I, _> {
@@ -962,10 +1005,15 @@ mod tests {
             }
         }
 
-        let mut ctx = FakeCtx::with_ip_routines(IpRoutines {
-            local_ingress: Hook { routines: vec![drop_wlan_traffic()] },
-            ..Default::default()
-        });
+        let mut bindings_ctx = FakeBindingsCtx::new();
+
+        let mut ctx = FakeCtx::with_ip_routines(
+            &mut bindings_ctx,
+            IpRoutines {
+                local_ingress: Hook { routines: vec![drop_wlan_traffic()] },
+                ..Default::default()
+            },
+        );
 
         FilterImpl(&mut ctx).local_ingress_hook(
             &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),

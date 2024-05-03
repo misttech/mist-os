@@ -22,7 +22,9 @@ pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, state::Conntr
 
 pub use api::FilterApi;
 pub use context::{FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext};
-pub use logic::{FilterHandler, FilterImpl, IngressVerdict, ProofOfEgressCheck, Verdict};
+pub use logic::{
+    FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,
+};
 pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,
     PortMatcher, TransportProtocolMatcher,
