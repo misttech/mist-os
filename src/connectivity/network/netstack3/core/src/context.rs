@@ -35,7 +35,7 @@
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
 
-use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug};
+use core::{convert::Infallible as Never, fmt::Debug};
 
 use lock_order::Unlocked;
 
@@ -50,7 +50,7 @@ pub use netstack3_base::{
     ContextPair, CoreEventContext, CoreTimerContext, CounterContext,
     DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
     InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers, ResourceCounterContext, RngContext,
-    TimerBindingsTypes, TimerContext, TimerHandler,
+    TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -101,21 +101,6 @@ pub trait SendFrameContext<BC, Meta> {
     where
         S: Serializer,
         S::Buffer: BufferMut;
-}
-
-/// A context for emitting tracing data.
-pub trait TracingContext {
-    /// The scope of a trace duration.
-    ///
-    /// Its lifetime corresponds to the beginning and end of the duration.
-    type DurationScope;
-
-    /// Writes a duration event which ends when the returned scope is dropped.
-    ///
-    /// Durations describe work which is happening synchronously on one thread.
-    /// Care should be taken to avoid a duration's scope spanning an `await`
-    /// point in asynchronous code.
-    fn duration(&self, name: &'static CStr) -> Self::DurationScope;
 }
 
 /// Provides access to core context implementations.
@@ -316,8 +301,8 @@ pub(crate) mod testutil {
     };
 
     pub use netstack3_base::testutil::{
-        FakeEventCtx, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
-        WithFakeTimerContext,
+        FakeEventCtx, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTracingCtx,
+        InstantAndData, WithFakeTimerContext,
     };
 
     /// A fake [`FrameContext`].
@@ -382,16 +367,6 @@ pub(crate) mod testutil {
             self.push(metadata, buffer.as_ref().to_vec());
             Ok(())
         }
-    }
-
-    /// A fake [`TracingContext`].
-    #[derive(Default)]
-    pub struct FakeTracingCtx;
-
-    impl TracingContext for FakeTracingCtx {
-        type DurationScope = ();
-
-        fn duration(&self, _: &'static CStr) {}
     }
 
     /// A tuple of device ID and IP version.
@@ -563,7 +538,7 @@ pub(crate) mod testutil {
     {
         type DurationScope = ();
 
-        fn duration(&self, _: &'static CStr) {}
+        fn duration(&self, _: &'static core::ffi::CStr) {}
     }
 
     impl<D: LinkDevice, Id, Event: Debug, State, FrameMeta> LinkResolutionContext<D>

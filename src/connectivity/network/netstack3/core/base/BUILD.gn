@@ -23,6 +23,7 @@ rustc_library_with_features("netstack3-base") {
     "src/time.rs",
     "src/time/local_timer_heap.rs",
     "src/time/testutil.rs",
+    "src/trace.rs",
   ]
   deps = [
     "//src/connectivity/lib/net-types",

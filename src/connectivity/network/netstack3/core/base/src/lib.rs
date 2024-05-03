@@ -20,6 +20,7 @@ mod inspect;
 mod resource_references;
 mod rng;
 mod time;
+mod trace;
 
 pub use context::ContextPair;
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
@@ -35,6 +36,7 @@ pub use time::{
     InstantBindingsTypes, InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx,
     TimerBindingsTypes, TimerContext, TimerHandler,
 };
+pub use trace::TracingContext;
 
 /// Reference counted hash map data structure.
 pub mod ref_counted_hash_map {
@@ -67,4 +69,5 @@ pub mod testutil {
         FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
         WithFakeTimerContext,
     };
+    pub use crate::trace::testutil::FakeTracingCtx;
 }
