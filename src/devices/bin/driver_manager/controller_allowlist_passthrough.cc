@@ -34,7 +34,15 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/sample-driver.cm",  // device_controller_fidl
          "driver_runner_test",  // driver-runner-test
      }},
-    {"ConnectToDeviceFidl", {kAllowAllUses}},
+    {"ConnectToDeviceFidl",
+     {
+         "block",               // Allow qemu to boot
+         "driver_runner_test",  // driver_runner_death_test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/fvm.cm",  // paver-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///fvm#meta/fvm.cm",  // installer_test.sh
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/nand-broker.cm",  // nand-broker-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/sample-driver.cm",
+     }},
     {"Bind", {kAllowAllUses}},
     {"Rebind", {kAllowAllUses}},
     {"UnbindChildren", {kAllowAllUses}},

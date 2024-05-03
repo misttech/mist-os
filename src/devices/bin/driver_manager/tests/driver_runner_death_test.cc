@@ -76,4 +76,22 @@ TEST_F(DriverRunnerDeathTest, AllowlistCausesConnectToControllerToFail) {
                "Undeclared DEVFS_USAGE detected");
 }
 
+void TryConnectToDeviceFidl(fidl::WireClient<fuchsia_device::Controller>& controller,
+                            async::TestLoop& loop) {
+  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
+  fidl::OneWayStatus result =
+      controller->ConnectToDeviceFidl(controller_endpoints.server.TakeChannel());
+  ASSERT_TRUE(loop.RunUntilIdle());
+  ASSERT_EQ(result.status(), ZX_OK);
+}
+
+// This just verifies that the call was able to be made and now blocked by the allowlist.  It does
+// not check that the device actually connected an interface.
+TEST_F(DriverRunnerDeathTest, AllowlistCausesConnectToDeviceFidlToFail) {
+  TryConnectToDeviceFidl(allowed_controller_, test_loop());
+
+  ASSERT_DEATH(TryConnectToDeviceFidl(banned_controller_, test_loop()),
+               "Undeclared DEVFS_USAGE detected");
+}
+
 }  // namespace driver_runner
