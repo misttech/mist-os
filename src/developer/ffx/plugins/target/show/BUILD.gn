@@ -23,7 +23,6 @@ ffx_plugin("ffx_target_show") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:termion",
     "//third_party/rust_crates:tracing",
   ]
@@ -31,6 +30,7 @@ ffx_plugin("ffx_target_show") {
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:serde_json",
   ]
 
   args_sources = [ "src/args.rs" ]

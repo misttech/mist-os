@@ -26,22 +26,6 @@
       "short": null,
       "description": "display label of entries",
       "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--json",
-      "short": null,
-      "description": "formats output as json objects",
-      "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--version",
-      "short": null,
-      "description": "display version",
-      "hidden": false
     }
   ],
   "notes": [

@@ -510,12 +510,6 @@ pub fn output_for_human<W: Write>(
     output_list(0, &entries, args, writer)
 }
 
-/// Write output in JSON for easy parsing by other tools.
-pub fn output_for_machine<W: Write>(showes: &TargetShowInfo, writer: &mut W) -> Result<()> {
-    let entries = showes.to_show_entries();
-    Ok(write!(writer, "{}", serde_json::to_string(&entries)?)?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

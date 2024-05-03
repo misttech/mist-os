@@ -16,7 +16,7 @@ use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
-use std::{io::Write, net::IpAddr, time::Duration};
+use std::{net::IpAddr, time::Duration};
 use timeout::timeout;
 
 mod show;
@@ -55,11 +55,6 @@ impl FfxMain for ShowTool {
 
 impl ShowTool {
     async fn show_cmd(self, writer: &mut <ShowTool as fho::FfxMain>::Writer) -> Result<()> {
-        if self.cmd.version && !writer.is_machine() {
-            eprintln!("WARNING: `--version` is deprecated since it is meaningless");
-            writeln!(writer, "ffx target show version 0.1")?;
-            return Ok(());
-        }
         // To add more show information, add a `gather_*_show(*) call to this
         // list, as well as the labels in the Ok() and vec![] just below.
         let show = match futures::try_join!(
@@ -77,9 +72,6 @@ impl ShowTool {
         };
         if writer.is_machine() {
             writer.machine(&show)?;
-        } else if self.cmd.json {
-            eprintln!("WARNING: `--json` is deprecated. Use `--machine json`");
-            show::output_for_machine(&show, writer)?;
         } else {
             show::output_for_human(&show, &self.cmd, writer)?;
         }
@@ -374,7 +366,7 @@ mod tests {
         let buffers = TestBuffers::default();
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
         let tool = ShowTool {
-            cmd: args::TargetShow { json: false, ..Default::default() },
+            cmd: args::TargetShow { ..Default::default() },
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(),
             board_proxy: setup_fake_board_server(),

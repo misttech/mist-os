@@ -31,12 +31,4 @@ pub struct TargetShow {
     /// display label of entries
     #[argh(switch)]
     pub label: bool,
-
-    /// formats output as json objects
-    #[argh(switch)]
-    pub json: bool,
-
-    /// display version
-    #[argh(switch)]
-    pub version: bool,
 }
