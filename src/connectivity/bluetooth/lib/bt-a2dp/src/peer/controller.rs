@@ -466,7 +466,7 @@ mod tests {
             create_proxy_and_stream::<ProfileMarker>().expect("test proxy pair creation");
         let (remote, signaling) = Channel::create();
         let avdtp_peer = AvdtpPeer::new(signaling);
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, EndpointType::Source),

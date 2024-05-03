@@ -2,49 +2,88 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    bt_a2dp::{codec::MediaCodecConfig, media_task::*},
-    bt_avdtp::{self as avdtp, MediaStream},
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_media as media, fidl_fuchsia_media_sessions2 as sessions2,
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId},
-    fuchsia_inspect::Node,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_trace as trace,
-    futures::{
-        channel::oneshot,
-        future::{BoxFuture, Fuse, Future, Shared},
-        select, FutureExt, StreamExt, TryFutureExt,
-    },
-    thiserror::Error,
-    tracing::{debug, info, trace, warn},
-};
+use anyhow::Error;
+use bt_a2dp::{codec::MediaCodecConfig, media_task::*};
+use bt_avdtp::{self as avdtp, MediaStream};
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
+use fidl_fuchsia_media as media;
+use fidl_fuchsia_media_sessions2 as sessions2;
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId};
+use fuchsia_inspect::Node;
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_trace as trace;
+use futures::channel::oneshot;
+use futures::future::{BoxFuture, Fuse, Future, Shared};
+use futures::{select, FutureExt, StreamExt, TryFutureExt};
+use thiserror::Error;
+use tracing::{debug, info, trace, warn};
 
 use crate::avrcp_relay::AvrcpRelay;
-use crate::player;
+use crate::media::player;
 
 #[derive(Clone)]
-pub struct SinkTaskBuilder {
+pub struct Builder {
     metrics_logger: bt_metrics::MetricsLogger,
     publisher: sessions2::PublisherProxy,
     audio_consumer_factory: media::SessionAudioConsumerFactoryProxy,
     domain: String,
+    aac_available: bool,
 }
 
-impl SinkTaskBuilder {
+fn build_sbc_sink() -> MediaCodecConfig {
+    use bt_a2dp::media_types::*;
+    let sbc_codec_info = SbcCodecInfo::new(
+        SbcSamplingFrequency::MANDATORY_SNK,
+        SbcChannelMode::MANDATORY_SNK,
+        SbcBlockCount::MANDATORY_SNK,
+        SbcSubBands::MANDATORY_SNK,
+        SbcAllocation::MANDATORY_SNK,
+        SbcCodecInfo::BITPOOL_MIN,
+        53, // Recommended max bitpool value from A2DP 1.4 Table 4.7
+    )
+    .unwrap();
+
+    let codec_cap = avdtp::ServiceCapability::MediaCodec {
+        media_type: avdtp::MediaType::Audio,
+        codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+        codec_extra: sbc_codec_info.to_bytes().to_vec(),
+    };
+    (&codec_cap).try_into().unwrap()
+}
+
+fn build_aac_sink(bitrate: u32) -> MediaCodecConfig {
+    use bt_a2dp::media_types::*;
+    let aac_codec_info = AacCodecInfo::new(
+        AacObjectType::MANDATORY_SNK,
+        AacSamplingFrequency::MANDATORY_SNK,
+        AacChannels::MANDATORY_SNK,
+        true,
+        bitrate,
+    )
+    .unwrap();
+    (&avdtp::ServiceCapability::MediaCodec {
+        media_type: avdtp::MediaType::Audio,
+        codec_type: avdtp::MediaCodecType::AUDIO_AAC,
+        codec_extra: aac_codec_info.to_bytes().to_vec(),
+    })
+        .try_into()
+        .unwrap()
+}
+impl Builder {
     pub fn new(
         metrics_logger: bt_metrics::MetricsLogger,
         publisher: sessions2::PublisherProxy,
         audio_consumer_factory: media::SessionAudioConsumerFactoryProxy,
         domain: String,
+        aac_available: bool,
     ) -> Self {
-        Self { metrics_logger, publisher, audio_consumer_factory, domain }
+        Self { metrics_logger, publisher, audio_consumer_factory, domain, aac_available }
     }
 }
 
-impl MediaTaskBuilder for SinkTaskBuilder {
+impl MediaTaskBuilder for Builder {
     fn configure(
         &self,
         peer_id: &PeerId,
@@ -59,6 +98,24 @@ impl MediaTaskBuilder for SinkTaskBuilder {
             peer_id,
         )))
     }
+
+    fn direction(&self) -> avdtp::EndpointType {
+        avdtp::EndpointType::Sink
+    }
+
+    fn supported_configs(
+        &self,
+        _peer_id: &PeerId,
+        _offload: Option<AudioOffloadExtProxy>,
+    ) -> BoxFuture<'static, Result<Vec<MediaCodecConfig>, MediaTaskError>> {
+        let media_configs = if self.aac_available {
+            // 0 = Unknown constant bitrate support (A2DP Sec. 4.5.2.4)
+            vec![build_aac_sink(0), build_sbc_sink()]
+        } else {
+            vec![build_sbc_sink()]
+        };
+        futures::future::ready(Ok(media_configs)).boxed()
+    }
 }
 
 struct ConfiguredSinkTask {
@@ -67,7 +124,7 @@ struct ConfiguredSinkTask {
     /// The ID of the peer that this is configured for.
     peer_id: PeerId,
     /// A clone of the Builder at the time this was configured.
-    builder: SinkTaskBuilder,
+    builder: Builder,
     /// Future that will return the Session ID for Media, if we have started the session.
     session_id_fut: Option<Shared<oneshot::Receiver<u64>>>,
     /// Session Task (AVRCP relay) if it is started.
@@ -77,7 +134,7 @@ struct ConfiguredSinkTask {
 }
 
 impl ConfiguredSinkTask {
-    fn new(codec_config: MediaCodecConfig, builder: SinkTaskBuilder, peer_id: PeerId) -> Self {
+    fn new(codec_config: MediaCodecConfig, builder: Builder, peer_id: PeerId) -> Self {
         Self {
             codec_config,
             builder,
@@ -153,7 +210,11 @@ impl Inspect for &mut ConfiguredSinkTask {
 }
 
 impl MediaTaskRunner for ConfiguredSinkTask {
-    fn start(&mut self, stream: MediaStream) -> Result<Box<dyn MediaTask>, MediaTaskError> {
+    fn start(
+        &mut self,
+        stream: MediaStream,
+        _offload: Option<AudioOffloadExtProxy>,
+    ) -> Result<Box<dyn MediaTask>, MediaTaskError> {
         let codec_config = self.codec_config.clone();
         let audio_factory = self.builder.audio_consumer_factory.clone();
         let mut stream_inspect = DataStreamInspect::default();
@@ -348,29 +409,25 @@ fn report_stream_metrics(
 mod tests {
     use super::*;
 
-    use {
-        async_test_helpers::run_while,
-        async_utils::PollExt,
-        bt_metrics::respond_to_metrics_req_for_test,
-        diagnostics_assertions::assert_data_tree,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_media::{
-            AudioConsumerRequest, AudioConsumerStatus, SessionAudioConsumerFactoryMarker,
-            StreamSinkRequest,
-        },
-        fidl_fuchsia_media_sessions2::{PublisherMarker, PublisherRequest},
-        fidl_fuchsia_metrics as cobalt,
-        fuchsia_bluetooth::types::Channel,
-        fuchsia_inspect as inspect,
-        fuchsia_inspect_derive::WithInspect,
-        fuchsia_sync::Mutex,
-        fuchsia_zircon::DurationNum,
-        futures::{channel::mpsc, io::AsyncWriteExt, task::Poll},
-        std::{
-            pin::pin,
-            sync::{Arc, RwLock},
-        },
+    use async_test_helpers::run_while;
+    use async_utils::PollExt;
+    use bt_metrics::respond_to_metrics_req_for_test;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_media::{
+        AudioConsumerRequest, AudioConsumerStatus, SessionAudioConsumerFactoryMarker,
+        StreamSinkRequest,
     };
+    use fidl_fuchsia_media_sessions2::{PublisherMarker, PublisherRequest};
+    use fidl_fuchsia_metrics as cobalt;
+    use fuchsia_bluetooth::types::Channel;
+    use fuchsia_inspect as inspect;
+    use fuchsia_inspect_derive::WithInspect;
+    use fuchsia_sync::Mutex;
+    use fuchsia_zircon::DurationNum;
+    use futures::{channel::mpsc, io::AsyncWriteExt, task::Poll};
+    use std::pin::pin;
+    use std::sync::{Arc, RwLock};
 
     fn fake_cobalt_sender() -> (bt_metrics::MetricsLogger, cobalt::MetricEventLoggerRequestStream) {
         let (c, s) = fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>()
@@ -386,11 +443,12 @@ mod tests {
         let (audio_consumer_factory_proxy, mut audio_factory_requests) =
             create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
                 .expect("proxy pair creation");
-        let builder = SinkTaskBuilder::new(
+        let builder = Builder::new(
             bt_metrics::MetricsLogger::default(),
             proxy,
             audio_consumer_factory_proxy,
             "Tests".to_string(),
+            false,
         );
 
         let sbc_config = MediaCodecConfig::min_sbc();
@@ -404,7 +462,7 @@ mod tests {
         let stream =
             MediaStream::new(Arc::new(fuchsia_sync::Mutex::new(true)), Arc::downgrade(&local));
 
-        let mut running_task = runner.start(stream).expect("task should start");
+        let mut running_task = runner.start(stream, None).expect("task should start");
 
         // Should try to publish the session now.
         match exec.run_until_stalled(&mut session_requests.next()) {
@@ -442,11 +500,12 @@ mod tests {
         let (audio_consumer_factory_proxy, _audio_factory_requests) =
             create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
                 .expect("proxy pair creation");
-        let builder = SinkTaskBuilder::new(
+        let builder = Builder::new(
             metrics_logger,
             proxy,
             audio_consumer_factory_proxy,
             "Tests".to_string(),
+            false,
         );
 
         let sbc_config = MediaCodecConfig::min_sbc();
@@ -460,7 +519,7 @@ mod tests {
         let stream =
             MediaStream::new(Arc::new(fuchsia_sync::Mutex::new(true)), Arc::downgrade(&local));
 
-        let mut running_task = runner.start(stream).expect("media task should start");
+        let mut running_task = runner.start(stream, None).expect("media task should start");
 
         running_task.stop().expect("task to stop with okay");
         drop(running_task);

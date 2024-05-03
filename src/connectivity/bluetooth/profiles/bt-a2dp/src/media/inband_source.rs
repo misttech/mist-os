@@ -2,40 +2,82 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    bt_a2dp::{codec::MediaCodecConfig, media_task::*},
-    bt_avdtp::MediaStream,
-    fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat},
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId},
-    fuchsia_inspect::Node,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_trace as trace,
-    futures::{
-        channel::oneshot,
-        future::{BoxFuture, Shared, WeakShared},
-        AsyncWriteExt, FutureExt, TryFutureExt, TryStreamExt,
-    },
-    std::time::Duration,
-    tracing::{info, trace, warn},
-};
+use anyhow::Error;
+use bt_a2dp::{codec::MediaCodecConfig, media_task::*};
+use bt_avdtp::MediaStream;
+use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
+use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat};
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId};
+use fuchsia_inspect::Node;
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_trace as trace;
+use futures::channel::oneshot;
+use futures::future::{BoxFuture, Shared, WeakShared};
+use futures::{AsyncWriteExt, FutureExt, TryFutureExt, TryStreamExt};
+use std::time::Duration;
+use tracing::{info, trace, warn};
 
+use super::sources;
 use crate::encoding::EncodedStream;
-use crate::sources;
 
-/// SourceTaskBuilder is a MediaTaskBuilder will build `ConfiguredSourceTask`s when configured.
+/// Builder is a MediaTaskBuilder will build `ConfiguredTask`s when configured.
 /// `source_type` determines where the source of audio is provided.
+/// `aac_available` determines whether AAC is advertised as supported.
 /// When configured, a test stream is created to confirm that it is possible to stream audio using
 /// the configuration.  This stream is discarded and the stream is restarted when the resulting
-/// `ConfiguredSourceTask` is started.
+/// `ConfiguredTask` is started.
+/// TODO(https://fxbug.dev/42145257): Avoid this creation / destruction on configure
 #[derive(Clone)]
-pub struct SourceTaskBuilder {
+pub struct Builder {
     /// The type of source audio.
     source_type: sources::AudioSourceType,
+    /// Whether AAC has been detected to be available
+    aac_available: bool,
 }
 
-impl MediaTaskBuilder for SourceTaskBuilder {
+fn build_sbc_source() -> MediaCodecConfig {
+    use bt_a2dp::media_types::*;
+    let sbc_codec_info = SbcCodecInfo::new(
+        SbcSamplingFrequency::FREQ48000HZ,
+        SbcChannelMode::JOINT_STEREO,
+        SbcBlockCount::MANDATORY_SRC,
+        SbcSubBands::MANDATORY_SRC,
+        SbcAllocation::MANDATORY_SRC,
+        SbcCodecInfo::BITPOOL_MIN,
+        51, // Recommended bitpool value for 48khz Joint Stereo High Quality acccording to A2DP 1.4 Table 4.7
+    )
+    .unwrap();
+
+    let codec_cap = bt_avdtp::ServiceCapability::MediaCodec {
+        media_type: bt_avdtp::MediaType::Audio,
+        codec_type: bt_avdtp::MediaCodecType::AUDIO_SBC,
+        codec_extra: sbc_codec_info.to_bytes().to_vec(),
+    };
+
+    (&codec_cap).try_into().unwrap()
+}
+
+fn build_aac_source(bitrate: u32) -> MediaCodecConfig {
+    use bt_a2dp::media_types::*;
+    let codec_info = AacCodecInfo::new(
+        AacObjectType::MANDATORY_SRC,
+        AacSamplingFrequency::FREQ48000HZ,
+        AacChannels::TWO,
+        true,
+        bitrate,
+    )
+    .unwrap();
+    (&bt_avdtp::ServiceCapability::MediaCodec {
+        media_type: bt_avdtp::MediaType::Audio,
+        codec_type: bt_avdtp::MediaCodecType::AUDIO_AAC,
+        codec_extra: codec_info.to_bytes().to_vec(),
+    })
+        .try_into()
+        .unwrap()
+}
+
+impl MediaTaskBuilder for Builder {
     fn configure(
         &self,
         peer_id: &PeerId,
@@ -44,20 +86,38 @@ impl MediaTaskBuilder for SourceTaskBuilder {
         let res = self.configure_task(peer_id, codec_config);
         Ok::<Box<dyn MediaTaskRunner>, _>(Box::new(res?))
     }
+
+    fn direction(&self) -> bt_avdtp::EndpointType {
+        bt_avdtp::EndpointType::Source
+    }
+
+    fn supported_configs(
+        &self,
+        _peer_id: &PeerId,
+        _offload: Option<AudioOffloadExtProxy>,
+    ) -> BoxFuture<'static, Result<Vec<MediaCodecConfig>, MediaTaskError>> {
+        // SBC is required to be supported to use this Builder
+        let media_configs = if self.aac_available {
+            vec![build_aac_source(crate::MAX_BITRATE_AAC), build_sbc_source()]
+        } else {
+            vec![build_sbc_source()]
+        };
+        futures::future::ready(Ok(media_configs)).boxed()
+    }
 }
 
-impl SourceTaskBuilder {
+impl Builder {
     /// Make a new builder that will source audio from `source_type`.  See `sources::build_stream`
     /// for documentation on the types of streams that are available.
-    pub fn new(source_type: sources::AudioSourceType) -> Self {
-        Self { source_type }
+    pub fn new(source_type: sources::AudioSourceType, aac_available: bool) -> Self {
+        Self { source_type, aac_available }
     }
 
     pub(crate) fn configure_task(
         &self,
         peer_id: &PeerId,
         codec_config: &MediaCodecConfig,
-    ) -> Result<ConfiguredSourceTask, MediaTaskError> {
+    ) -> Result<ConfiguredTask, MediaTaskError> {
         let channel_map = match codec_config.channel_count() {
             Ok(1) => vec![AudioChannelId::Cf],
             Ok(2) => vec![AudioChannelId::Lf, AudioChannelId::Rf],
@@ -69,25 +129,21 @@ impl SourceTaskBuilder {
             frames_per_second: codec_config.sampling_frequency()?,
             channel_map,
         };
-        let source_stream = sources::build_stream(
-            &peer_id,
-            pcm_format.clone(),
-            self.source_type,
-            Duration::ZERO,
-            None,
-        )
-        .map_err(|_e| MediaTaskError::NotSupported)?;
+        let source_stream = self
+            .source_type
+            .build(&peer_id, pcm_format.clone(), Duration::ZERO, &mut Default::default())
+            .map_err(|_e| MediaTaskError::NotSupported)?;
         if let Err(e) = EncodedStream::build(pcm_format.clone(), source_stream, codec_config) {
-            trace!("SourceTaskBuilder: can't build encoded stream: {:?}", e);
-            return Err(MediaTaskError::Other(format!("Can't build encoded stream: {}", e)));
+            trace!("inband_source::Builder: can't build encoded stream: {e:?}");
+            return Err(MediaTaskError::Other(format!("Can't build encoded stream: {e}")));
         }
-        Ok(ConfiguredSourceTask::build(pcm_format, self.source_type, peer_id.clone(), codec_config))
+        Ok(ConfiguredTask::build(pcm_format, self.source_type, peer_id.clone(), codec_config))
     }
 }
 
 /// Provides audio from this to the MediaStream when started.  Streams are created and started when
 /// this task is started, and destroyed when stopped.
-pub(crate) struct ConfiguredSourceTask {
+pub(crate) struct ConfiguredTask {
     /// The type of source audio.
     source_type: sources::AudioSourceType,
     /// Format the source audio should be produced in.
@@ -106,9 +162,9 @@ pub(crate) struct ConfiguredSourceTask {
     inspect: fuchsia_inspect::Node,
 }
 
-impl ConfiguredSourceTask {
-    /// Build a new ConfiguredSourceTask.  Usually only called by SourceTaskBuilder.
-    /// `ConfiguredSourceTask::start` will only return errors if the settings here cannot produce a
+impl ConfiguredTask {
+    /// Build a new ConfiguredTask.  Usually only called by Builder.
+    /// `ConfiguredTask::start` will only return errors if the settings here cannot produce a
     /// stream.  No checks are done when building.
     pub(crate) fn build(
         pcm_format: PcmFormat,
@@ -133,7 +189,7 @@ impl ConfiguredSourceTask {
     }
 }
 
-impl Inspect for &mut ConfiguredSourceTask {
+impl Inspect for &mut ConfiguredTask {
     fn iattach(
         self,
         parent: &fuchsia_inspect::Node,
@@ -145,22 +201,22 @@ impl Inspect for &mut ConfiguredSourceTask {
     }
 }
 
-impl MediaTaskRunner for ConfiguredSourceTask {
-    fn start(&mut self, stream: MediaStream) -> Result<Box<dyn MediaTask>, MediaTaskError> {
-        let source_stream = sources::build_stream(
-            &self.peer_id,
-            self.pcm_format.clone(),
-            self.source_type,
-            self.delay.into(),
-            Some(&self.inspect),
-        )
-        .map_err(|e| MediaTaskError::Other(format!("Building stream: {}", e)))?;
+impl MediaTaskRunner for ConfiguredTask {
+    fn start(
+        &mut self,
+        stream: MediaStream,
+        _offload: Option<AudioOffloadExtProxy>,
+    ) -> Result<Box<dyn MediaTask>, MediaTaskError> {
+        let source_stream = self
+            .source_type
+            .build(&self.peer_id, self.pcm_format.clone(), self.delay.into(), &mut self.inspect)
+            .map_err(|e| MediaTaskError::Other(format!("Building stream: {}", e)))?;
         let encoded_stream =
             EncodedStream::build(self.pcm_format.clone(), source_stream, &self.codec_config)
                 .map_err(|e| MediaTaskError::Other(format!("Can't build encoded stream: {}", e)))?;
         let mut data_stream_inspect = DataStreamInspect::default();
         let _ = data_stream_inspect.iattach(&self.inspect, "data_stream");
-        let stream_task = RunningSourceTask::build(
+        let stream_task = RunningTask::build(
             self.codec_config.clone(),
             encoded_stream,
             stream,
@@ -187,12 +243,12 @@ impl MediaTaskRunner for ConfiguredSourceTask {
     }
 }
 
-struct RunningSourceTask {
+struct RunningTask {
     stream_task: Option<fasync::Task<()>>,
     result_fut: Shared<BoxFuture<'static, Result<(), MediaTaskError>>>,
 }
 
-impl RunningSourceTask {
+impl RunningTask {
     /// The main streaming task. Reads encoded audio from the encoded_stream and packages into RTP
     /// packets, sending the resulting RTP packets using `media_stream`.
     async fn stream_task(
@@ -252,7 +308,7 @@ impl RunningSourceTask {
     }
 }
 
-impl MediaTask for RunningSourceTask {
+impl MediaTask for RunningTask {
     fn finished(&mut self) -> BoxFuture<'static, Result<(), MediaTaskError>> {
         self.result_fut.clone().boxed()
     }
@@ -284,7 +340,7 @@ mod tests {
     #[fuchsia::test]
     fn configures_source_from_codec_config() {
         let _exec = fasync::TestExecutor::new();
-        let builder = SourceTaskBuilder::new(sources::AudioSourceType::BigBen);
+        let builder = Builder::new(sources::AudioSourceType::BigBen, false);
 
         // Minimum SBC requirements are mono, 48kHz
         let mono_config = MediaCodecConfig::min_sbc();
@@ -315,7 +371,7 @@ mod tests {
     #[fuchsia::test]
     fn source_media_stream_stats() {
         let mut exec = fasync::TestExecutor::new();
-        let builder = SourceTaskBuilder::new(sources::AudioSourceType::BigBen);
+        let builder = Builder::new(sources::AudioSourceType::BigBen, false);
 
         let inspector = inspect::component::inspector();
         let root = inspector.root();
@@ -330,7 +386,7 @@ mod tests {
         let weak_local = Arc::downgrade(&local);
         let stream = MediaStream::new(Arc::new(Mutex::new(true)), weak_local);
 
-        let _running_task = task.start(stream).expect("media should start");
+        let _running_task = task.start(stream, None).expect("media should start");
 
         let _ = exec.run_singlethreaded(remote.next()).expect("some packet");
 

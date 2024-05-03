@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    bt_avdtp::{
-        self as avdtp, ErrorCode, ServiceCapability, ServiceCategory, StreamEndpoint,
-        StreamEndpointId,
-    },
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    futures::{future::BoxFuture, FutureExt, TryFutureExt},
-    std::{collections::HashMap, fmt, sync::Arc, time::Duration},
-    tracing::{info, warn},
+use anyhow::Error;
+use bt_avdtp::{
+    self as avdtp, ErrorCode, ServiceCapability, ServiceCategory, StreamEndpoint, StreamEndpointId,
 };
+use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
+use tracing::{info, warn};
 
-use crate::codec::MediaCodecConfig;
+use crate::codec::{CodecNegotiation, MediaCodecConfig};
 use crate::media_task::{MediaTask, MediaTaskBuilder, MediaTaskError, MediaTaskRunner};
 
 /// Manages a local StreamEndpoint and its associated media task, starting and stopping the
@@ -63,13 +61,10 @@ impl Inspect for &mut Stream {
 }
 
 impl Stream {
-    pub fn build(
-        endpoint: StreamEndpoint,
-        media_task_builder: impl MediaTaskBuilder + 'static,
-    ) -> Self {
+    pub fn build(endpoint: StreamEndpoint, media_task_builder: Box<dyn MediaTaskBuilder>) -> Self {
         Self {
             endpoint,
-            media_task_builder: Arc::new(Box::new(media_task_builder)),
+            media_task_builder: Arc::new(media_task_builder),
             media_task_runner: None,
             media_task: None,
             peer_id: None,
@@ -197,7 +192,7 @@ impl Stream {
         };
         let transport = self.endpoint.take_transport().ok_or(ErrorCode::BadState)?;
         let _ = self.endpoint.start()?;
-        let mut task = match self.media_runner_ref()?.start(transport) {
+        let mut task = match self.media_runner_ref()?.start(transport, None) {
             Ok(media_task) => media_task,
             Err(_e) => {
                 let _ = self.endpoint.suspend()?;
@@ -245,6 +240,137 @@ fn find_codec_capability(capabilities: &[ServiceCapability]) -> Option<&ServiceC
     capabilities.iter().find(|cap| cap.category() == ServiceCategory::MediaCodec)
 }
 
+/// Iterator which generates SEIDs.  Used by StreamsBuilder to get valid SEIDs.
+#[derive(Clone, Debug)]
+struct SeidRangeFrom {
+    from: u8,
+}
+
+impl Default for SeidRangeFrom {
+    fn default() -> Self {
+        Self { from: 1 }
+    }
+}
+
+impl Iterator for SeidRangeFrom {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.from;
+        if self.from == 0x3E {
+            self.from = 0x01;
+        } else {
+            self.from += 1;
+        }
+        Some(res)
+    }
+}
+
+/// Builds a set of streams, based on the capabilities of a set of MediaTaskBuilders that are
+/// supported and configured by the system.
+pub struct StreamsBuilder {
+    builders: Vec<Box<dyn MediaTaskBuilder>>,
+    seid_range: SeidRangeFrom,
+    node: inspect::Node,
+}
+
+impl Default for StreamsBuilder {
+    fn default() -> Self {
+        Self {
+            builders: Default::default(),
+            seid_range: SeidRangeFrom { from: Self::START_SEID },
+            node: Default::default(),
+        }
+    }
+}
+
+impl Clone for StreamsBuilder {
+    fn clone(&self) -> Self {
+        Self {
+            builders: self.builders.clone(),
+            node: Default::default(),
+            seid_range: self.seid_range.clone(),
+        }
+    }
+}
+
+impl StreamsBuilder {
+    // Randomly chosen by fair dice roll
+    // TODO(https://fxbug.dev/337321738): Do better for randomizing this maybe
+    const START_SEID: u8 = 8;
+
+    /// Add a builder to the set of builders used to generate streams.
+    pub fn add_builder(&mut self, builder: impl MediaTaskBuilder + 'static) {
+        self.builders.push(Box::new(builder));
+        self.node.record_uint("builders", self.builders.len() as u64);
+    }
+
+    pub async fn peer_streams(
+        &self,
+        peer_id: &PeerId,
+        offload: Option<AudioOffloadExtProxy>,
+    ) -> Result<Streams, MediaTaskError> {
+        let mut streams = Streams::default();
+        let mut seid_range = self.seid_range.clone();
+        for builder in &self.builders {
+            let endpoint_type = builder.direction();
+            let supported_res = builder.supported_configs(peer_id, offload.clone()).await;
+            let Ok(supported) = supported_res else {
+                info!(e = ?supported_res.err().unwrap(), "Failed to get supported configs from builder, skipping");
+                continue;
+            };
+            let codec_caps = supported.iter().map(ServiceCapability::from);
+            for codec_cap in codec_caps {
+                let capabilities = match endpoint_type {
+                    avdtp::EndpointType::Source => vec![
+                        ServiceCapability::MediaTransport,
+                        ServiceCapability::DelayReporting,
+                        codec_cap,
+                    ],
+                    avdtp::EndpointType::Sink => {
+                        vec![ServiceCapability::MediaTransport, codec_cap]
+                    }
+                };
+                let endpoint = avdtp::StreamEndpoint::new(
+                    seid_range.next().unwrap(),
+                    avdtp::MediaType::Audio,
+                    endpoint_type,
+                    capabilities,
+                )?;
+                streams.insert(Stream::build(endpoint, builder.clone()));
+            }
+        }
+        Ok(streams)
+    }
+
+    pub async fn negotiation(
+        &self,
+        peer_id: &PeerId,
+        offload: Option<AudioOffloadExtProxy>,
+        preferred_direction: avdtp::EndpointType,
+    ) -> Result<CodecNegotiation, Error> {
+        let mut caps_available = Vec::new();
+        for builder in &self.builders {
+            caps_available.extend(
+                builder
+                    .supported_configs(peer_id, offload.clone())
+                    .await?
+                    .iter()
+                    .map(ServiceCapability::from),
+            );
+        }
+        Ok(CodecNegotiation::build(caps_available, preferred_direction)?)
+    }
+}
+
+impl Inspect for &mut StreamsBuilder {
+    fn iattach(self, parent: &inspect::Node, name: impl AsRef<str>) -> Result<(), AttachError> {
+        self.node = parent.create_child(name.as_ref());
+        self.node.record_uint("builders", self.builders.len() as u64);
+        Ok(())
+    }
+}
+
 /// A set of streams, indexed by their local endpoint ID.
 #[derive(Default)]
 pub struct Streams {
@@ -253,11 +379,6 @@ pub struct Streams {
 }
 
 impl Streams {
-    /// A new empty set of streams, initially detached from the inspect tree.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Makes a copy of this set of streams, but with all streams copied with their states set to
     /// idle.
     pub fn as_new(&self) -> Self {
@@ -371,7 +492,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn streams_basic_functionality() {
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
 
         streams.insert(make_stream(1));
         streams.insert(make_stream(6));

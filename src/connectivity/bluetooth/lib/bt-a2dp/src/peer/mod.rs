@@ -1101,7 +1101,7 @@ mod tests {
     }
 
     fn build_test_streams() -> Streams {
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let source = Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
             TestMediaTaskBuilder::new_delayable().builder(),
@@ -1129,7 +1129,7 @@ mod tests {
             )
             .expect("endpoint creation should succeed")
         }
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let source = Stream::build(
             with_delay(1, avdtp::EndpointType::Source),
             TestMediaTaskBuilder::new_delayable().builder(),
@@ -1241,7 +1241,7 @@ mod tests {
         let peer = Peer::create(
             id,
             avdtp,
-            Streams::new(),
+            Streams::default(),
             None,
             proxy,
             bt_metrics::MetricsLogger::default(),
@@ -2086,7 +2086,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Setup peers with only one Source Stream.
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let source = Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
             TestMediaTaskBuilder::new().builder(),
@@ -2356,7 +2356,7 @@ mod tests {
     fn peer_as_acceptor() {
         let mut exec = fasync::TestExecutor::new();
 
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let mut test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
@@ -2455,7 +2455,7 @@ mod tests {
     fn peer_set_config_reject_first() {
         let mut exec = fasync::TestExecutor::new();
 
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
@@ -2506,7 +2506,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
 
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let mut test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
@@ -2580,7 +2580,7 @@ mod tests {
     fn needs_permit_to_start_streams() {
         let mut exec = fasync::TestExecutor::new();
 
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let mut test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Sink),
@@ -2792,7 +2792,7 @@ mod tests {
     fn permits_can_be_revoked_and_reinstated_all() {
         let mut exec = fasync::TestExecutor::new();
 
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let mut test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Sink),
@@ -2885,7 +2885,7 @@ mod tests {
     fn permits_can_be_revoked_one_at_a_time() {
         let mut exec = fasync::TestExecutor::new();
 
-        let mut streams = Streams::new();
+        let mut streams = Streams::default();
         let mut test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Sink),

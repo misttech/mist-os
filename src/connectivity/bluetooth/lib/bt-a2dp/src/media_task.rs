@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bt_avdtp::MediaStream;
+use bt_avdtp::{EndpointType, MediaStream};
+use dyn_clone::DynClone;
+use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::Node;
 use fuchsia_inspect_derive::AttachError;
@@ -40,16 +42,35 @@ impl From<bt_avdtp::Error> for MediaTaskError {
 /// dropped or stopped.
 ///
 /// A builder that will make media task runners from requested configurations.
-pub trait MediaTaskBuilder: Send + Sync {
-    /// Set up to stream based on the given `codec_config` parameters.
-    /// Returns a MediaTaskRunner if the configuration is supported, and
+pub trait MediaTaskBuilder: Send + Sync + DynClone {
+    /// Configure a new stream based on the given `codec_config` parameters.
+    /// Returns a MediaTaskRunner if the configuration is supported, an
     /// MediaTaskError::NotSupported otherwise.
     fn configure(
         &self,
         peer_id: &PeerId,
         codec_config: &MediaCodecConfig,
     ) -> Result<Box<dyn MediaTaskRunner>, MediaTaskError>;
+
+    /// Return the direction of tasks created by this builder.
+    /// Source tasks provide local encoded audio to a peer.
+    /// Sink tasks consume encoded audio from a peer.
+    fn direction(&self) -> EndpointType;
+
+    /// Provide a set of encoded media configurations that this task can support.
+    /// This can vary based on current system capabilities, and should be checked before
+    /// communicating capabilities to each peer.
+    /// `offload` is a proxy to the offload capabilities of the controller for this peer.
+    /// Returns a future that resolves to the set of MediaCodecConfigs that this builder supports,
+    /// typically one config per MediaCodecType, or an error if building the configs failed.
+    fn supported_configs(
+        &self,
+        peer_id: &PeerId,
+        offload: Option<AudioOffloadExtProxy>,
+    ) -> BoxFuture<'static, Result<Vec<MediaCodecConfig>, MediaTaskError>>;
 }
+
+dyn_clone::clone_trait_object!(MediaTaskBuilder);
 
 /// MediaTaskRunners represent an ability of the media system to start streaming media.
 /// They are configured for a specific codec by `MediaTaskBuilder::configure`
@@ -61,7 +82,11 @@ pub trait MediaTaskRunner: Send {
     /// error occurs, and can be stopped using `MediaTask::stop` or by dropping the MediaTask.
     /// This can fail with MediaTaskError::ResourcesInUse if a MediaTask cannot be started because
     /// one is already running.
-    fn start(&mut self, stream: MediaStream) -> Result<Box<dyn MediaTask>, MediaTaskError>;
+    fn start(
+        &mut self,
+        stream: MediaStream,
+        offload: Option<AudioOffloadExtProxy>,
+    ) -> Result<Box<dyn MediaTask>, MediaTaskError>;
 
     /// Try to reconfigure the MediaTask to accept a new configuration.  This differs from
     /// `MediaTaskBuilder::configure` as it attempts to preserve the same configured session.
@@ -222,7 +247,11 @@ pub mod tests {
     }
 
     impl MediaTaskRunner for TestMediaTaskRunner {
-        fn start(&mut self, stream: MediaStream) -> Result<Box<dyn MediaTask>, MediaTaskError> {
+        fn start(
+            &mut self,
+            stream: MediaStream,
+            _offload: Option<AudioOffloadExtProxy>,
+        ) -> Result<Box<dyn MediaTask>, MediaTaskError> {
             let task = TestMediaTask::new(
                 self.peer_id.clone(),
                 self.codec_config.clone(),
@@ -261,6 +290,8 @@ pub mod tests {
         receiver: mpsc::Receiver<TestMediaTask>,
         reconfigurable: bool,
         supports_set_delay: bool,
+        configs: Result<Vec<MediaCodecConfig>, MediaTaskError>,
+        direction: EndpointType,
     }
 
     impl TestMediaTaskBuilder {
@@ -271,7 +302,22 @@ pub mod tests {
                 receiver,
                 reconfigurable: false,
                 supports_set_delay: false,
+                configs: Ok(vec![crate::codec::MediaCodecConfig::min_sbc()]),
+                direction: EndpointType::Sink,
             }
+        }
+
+        pub fn with_configs(
+            &mut self,
+            configs: Result<Vec<MediaCodecConfig>, MediaTaskError>,
+        ) -> &mut Self {
+            self.configs = configs;
+            self
+        }
+
+        pub fn with_direction(&mut self, direction: EndpointType) -> &mut Self {
+            self.direction = direction;
+            self
         }
 
         pub fn new_reconfigurable() -> Self {
@@ -283,13 +329,15 @@ pub mod tests {
         }
 
         /// Returns a type that implements MediaTaskBuilder.  When a MediaTask is built using
-        /// configure(), it will be avialable from `next_task`.
-        pub fn builder(&self) -> impl MediaTaskBuilder {
-            TestMediaTaskBuilderBuilder(
-                self.sender.lock().expect("locking").clone(),
-                self.reconfigurable,
-                self.supports_set_delay,
-            )
+        /// configure(), it will be available from `next_task`.
+        pub fn builder(&self) -> Box<dyn MediaTaskBuilder> {
+            Box::new(TestMediaTaskBuilderBuilder {
+                sender: self.sender.lock().expect("locking").clone(),
+                reconfigurable: self.reconfigurable,
+                supports_set_delay: self.supports_set_delay,
+                configs: self.configs.clone(),
+                direction: self.direction,
+            })
         }
 
         /// Gets a future that will return a handle to the next TestMediaTask that gets started
@@ -309,7 +357,14 @@ pub mod tests {
         }
     }
 
-    struct TestMediaTaskBuilderBuilder(mpsc::Sender<TestMediaTask>, bool, bool);
+    #[derive(Clone)]
+    struct TestMediaTaskBuilderBuilder {
+        sender: mpsc::Sender<TestMediaTask>,
+        reconfigurable: bool,
+        supports_set_delay: bool,
+        configs: Result<Vec<MediaCodecConfig>, MediaTaskError>,
+        direction: EndpointType,
+    }
 
     impl MediaTaskBuilder for TestMediaTaskBuilderBuilder {
         fn configure(
@@ -320,12 +375,24 @@ pub mod tests {
             let runner = TestMediaTaskRunner {
                 peer_id: peer_id.clone(),
                 codec_config: codec_config.clone(),
-                sender: self.0.clone(),
-                reconfigurable: self.1,
-                supports_set_delay: self.2,
+                sender: self.sender.clone(),
+                reconfigurable: self.reconfigurable,
+                supports_set_delay: self.supports_set_delay,
                 set_delay: None,
             };
             Ok::<Box<dyn MediaTaskRunner>, _>(Box::new(runner))
+        }
+
+        fn direction(&self) -> EndpointType {
+            self.direction
+        }
+
+        fn supported_configs(
+            &self,
+            _peer_id: &PeerId,
+            _offload: Option<AudioOffloadExtProxy>,
+        ) -> BoxFuture<'static, Result<Vec<MediaCodecConfig>, MediaTaskError>> {
+            futures::future::ready(self.configs.clone()).boxed()
         }
     }
 }
