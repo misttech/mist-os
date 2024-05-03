@@ -9,7 +9,7 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
-#include <fbl/auto_lock.h>
+#include <mutex>
 
 #include "src/devices/block/drivers/block-verity/block-loader-interface.h"
 #include "src/devices/block/drivers/block-verity/constants.h"
@@ -48,7 +48,7 @@ BlockVerifier::~BlockVerifier() {
 zx_status_t BlockVerifier::PrepareAsync(void* cookie, BlockVerifierCallback callback) {
   {
     // Scoped so we don't hold mtx_ while calling LoadIntegrityBlocks.
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
 
     ZX_ASSERT(state_ == kInitial);
 
@@ -86,7 +86,7 @@ void BlockVerifier::LoadIntegrityBlocks() {
 
 void BlockVerifier::OnIntegrityDataLoaded(zx_status_t status) {
   {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     ZX_ASSERT(state_ == kLoading);
     if (status == ZX_OK) {
       state_ = kReady;
@@ -117,7 +117,7 @@ zx_status_t BlockVerifier::VerifyDataBlockSync(uint64_t data_block_index,
   {
     // Since `kReady` is a terminal state, we can release the lock as soon as
     // we're done checking state.
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     if (state_ != kReady) {
       return ZX_ERR_BAD_STATE;
     }

@@ -56,7 +56,7 @@
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/driver.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
@@ -168,7 +168,7 @@ zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, B
   }
   const Collections& collections = collection_map_it->second;
 
-  zx::result<DriverImageId> result = controller_->driver()->ImportImage(
+  zx::result<DriverImageId> result = controller_->engine_driver_client()->ImportImage(
       image_metadata, collections.driver_buffer_collection_id, buffer_id.buffer_index);
   if (result.is_error()) {
     return result.error_value();
@@ -244,7 +244,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
 
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       controller_->GetNextDriverBufferCollectionId();
-  zx::result<> import_result = controller_->driver()->ImportBufferCollection(
+  zx::result<> import_result = controller_->engine_driver_client()->ImportBufferCollection(
       driver_buffer_collection_id, std::move(request->buffer_collection_token));
   if (import_result.is_error()) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
@@ -269,7 +269,8 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
   }
 
   [[maybe_unused]] zx::result<> result =
-      controller_->driver()->ReleaseBufferCollection(it->second.driver_buffer_collection_id);
+      controller_->engine_driver_client()->ReleaseBufferCollection(
+          it->second.driver_buffer_collection_id);
   if (result.is_error()) {
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   }
@@ -290,7 +291,7 @@ void Client::SetBufferCollectionConstraints(
   auto& collections = it->second;
 
   const ImageBufferUsage image_buffer_usage = ToImageBufferUsage(request->buffer_usage);
-  zx::result<> result = controller_->driver()->SetBufferCollectionConstraints(
+  zx::result<> result = controller_->engine_driver_client()->SetBufferCollectionConstraints(
       image_buffer_usage, collections.driver_buffer_collection_id);
   if (result.is_error()) {
     zxlogf(WARNING,
@@ -773,8 +774,9 @@ zx_status_t Client::ImportImageForCapture(const ImageMetadata& image_metadata, B
     return ZX_ERR_INVALID_ARGS;
   }
   const Client::Collections& collections = it->second;
-  zx::result<DriverCaptureImageId> import_result = controller_->driver()->ImportImageForCapture(
-      collections.driver_buffer_collection_id, buffer_id.buffer_index);
+  zx::result<DriverCaptureImageId> import_result =
+      controller_->engine_driver_client()->ImportImageForCapture(
+          collections.driver_buffer_collection_id, buffer_id.buffer_index);
   if (import_result.is_error()) {
     return import_result.error_value();
   }
@@ -782,7 +784,7 @@ zx_status_t Client::ImportImageForCapture(const ImageMetadata& image_metadata, B
   auto release_image = fit::defer([this, driver_capture_image_id]() {
     // TODO(https://fxbug.dev/42180237): Consider handling the error instead of ignoring it.
     [[maybe_unused]] zx::result<> result =
-        controller_->driver()->ReleaseCapture(driver_capture_image_id);
+        controller_->engine_driver_client()->ReleaseCapture(driver_capture_image_id);
   });
 
   fbl::AllocChecker alloc_checker;
@@ -829,7 +831,8 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   capture_fence_id_ = ToEventId(request->signal_event_id);
-  zx::result<> result = controller_->driver()->StartCapture(image->driver_capture_image_id());
+  zx::result<> result =
+      controller_->engine_driver_client()->StartCapture(image->driver_capture_image_id());
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
     return;
@@ -849,7 +852,7 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
     completer.ReplyError(ZX_ERR_NOT_CONNECTED);
     return;
   }
-  zx::result<> result = controller_->driver()->SetMinimumRgb(request->minimum_rgb);
+  zx::result<> result = controller_->engine_driver_client()->SetMinimumRgb(request->minimum_rgb);
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
     return;
@@ -861,7 +864,8 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
   const DisplayId display_id = ToDisplayId(request->display_id);
-  zx::result<> result = controller_->driver()->SetDisplayPower(display_id, request->power_on);
+  zx::result<> result =
+      controller_->engine_driver_client()->SetDisplayPower(display_id, request->power_on);
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
     return;
@@ -965,7 +969,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   }
 
   size_t client_composition_opcodes_count_actual;
-  uint32_t display_cfg_result = controller_->driver()->CheckConfiguration(
+  uint32_t display_cfg_result = controller_->engine_driver_client()->CheckConfiguration(
       configs, config_idx, client_composition_opcodes, client_composition_opcodes_count,
       &client_composition_opcodes_count_actual);
 
@@ -1045,7 +1049,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 }
 
 void Client::ApplyConfig() {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig");
 
   bool config_missing_image = false;
@@ -1110,7 +1114,7 @@ void Client::ApplyConfig() {
 }
 
 void Client::SetOwnership(bool is_owner) {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
   is_owner_ = is_owner;
 
   fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
@@ -1128,7 +1132,7 @@ void Client::SetOwnership(bool is_owner) {
 
 void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                                cpp20::span<const DisplayId> removed_display_ids) {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
 
   controller_->AssertMtxAliasHeld(controller_->mtx());
   for (DisplayId added_display_id : added_display_ids) {
@@ -1232,30 +1236,26 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
       info.pixel_format[pixel_format_index] = config->pixel_formats_[pixel_format_index].ToFidl();
     }
 
-    const char* manufacturer_name = "";
-    const char* monitor_name = "";
-    const char* monitor_serial = "";
-    if (!controller_->GetDisplayIdentifiers(added_display_id, &manufacturer_name, &monitor_name,
-                                            &monitor_serial)) {
-      zxlogf(ERROR, "Failed to get display identifiers");
+    const bool found_display_info =
+        controller_->FindDisplayInfo(added_display_id, [&](const DisplayInfo& display_info) {
+          info.manufacturer_name =
+              fidl::StringView::FromExternal(display_info.GetManufacturerName());
+          info.monitor_name = fidl::StringView::FromExternal(display_info.GetMonitorName());
+          info.monitor_serial = fidl::StringView::FromExternal(display_info.GetMonitorSerial());
+          info.horizontal_size_mm = display_info.GetHorizontalSizeMm();
+          info.vertical_size_mm = display_info.GetVerticalSizeMm();
+        });
+    if (!found_display_info) {
+      zxlogf(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());
       ZX_DEBUG_ASSERT(false);
     }
 
     info.using_fallback_size = false;
-    if (!controller_->GetDisplayPhysicalDimensions(added_display_id, &info.horizontal_size_mm,
-                                                   &info.vertical_size_mm)) {
-      zxlogf(ERROR, "Failed to get display physical dimensions");
-      ZX_DEBUG_ASSERT(false);
-    }
     if (info.horizontal_size_mm == 0 || info.vertical_size_mm == 0) {
       info.horizontal_size_mm = kFallbackHorizontalSizeMm;
       info.vertical_size_mm = kFallbackVerticalSizeMm;
       info.using_fallback_size = true;
     }
-
-    info.manufacturer_name = fidl::StringView::FromExternal(manufacturer_name);
-    info.monitor_name = fidl::StringView::FromExternal(monitor_name);
-    info.monitor_serial = fidl::StringView::FromExternal(monitor_serial);
 
     coded_configs.push_back(info);
   }
@@ -1314,7 +1314,7 @@ void Client::CaptureCompleted() {
 }
 
 void Client::TearDown() {
-  ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
+  ZX_DEBUG_ASSERT(controller_->IsRunningOnDispatcher());
   pending_config_valid_ = false;
 
   // Teardown stops events from the channel, but not from the ddk, so we
@@ -1350,7 +1350,7 @@ void Client::TearDown() {
   for (const auto& [k, v] : collection_map_) {
     // TODO(https://fxbug.dev/42180237): Consider handling the error instead of ignoring it.
     [[maybe_unused]] zx::result<> result =
-        controller_->driver()->ReleaseBufferCollection(v.driver_buffer_collection_id);
+        controller_->engine_driver_client()->ReleaseBufferCollection(v.driver_buffer_collection_id);
   }
   collection_map_.clear();
 
@@ -1478,8 +1478,8 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
     client->proxy_->OnClientDead();
   };
 
-  auto binding = fidl::BindServer(controller_->loop().dispatcher(), std::move(server_end), this,
-                                  std::move(cb));
+  auto binding =
+      fidl::BindServer(controller_->async_dispatcher(), std::move(server_end), this, std::move(cb));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_state_.SetBound(binding);
 
@@ -1492,7 +1492,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       proxy_(proxy),
       priority_(priority),
       id_(client_id),
-      fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {
+      fences_(controller->async_dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
@@ -1503,7 +1503,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       priority_(priority),
       id_(client_id),
       running_(true),
-      fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
+      fences_(controller->async_dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
       binding_state_(std::move(server_end)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
@@ -1533,7 +1533,7 @@ void ClientProxy::SetOwnership(bool is_owner) {
     mtx_unlock(&this->task_mtx_);
   });
   mtx_lock(&task_mtx_);
-  if (task->Post(controller_->loop().dispatcher()) == ZX_OK) {
+  if (task->Post(controller_->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
   mtx_unlock(&task_mtx_);
@@ -1547,7 +1547,8 @@ void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_i
 void ClientProxy::ReapplySpecialConfigs() {
   ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
 
-  zx::result<> result = controller_->driver()->SetMinimumRgb(handler_.GetMinimumRgb());
+  zx::result<> result =
+      controller_->engine_driver_client()->SetMinimumRgb(handler_.GetMinimumRgb());
   if (!result.is_ok()) {
     zxlogf(ERROR, "Failed to reapply minimum RGB value: %s", result.status_string());
   }
@@ -1576,7 +1577,7 @@ void ClientProxy::ReapplyConfig() {
     mtx_unlock(&this->task_mtx_);
   });
   mtx_lock(&task_mtx_);
-  if (task->Post(controller_->loop().dispatcher()) == ZX_OK) {
+  if (task->Post(controller_->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
   mtx_unlock(&task_mtx_);
@@ -1750,7 +1751,7 @@ void ClientProxy::CloseOnControllerLoop() {
     client_handler->TearDown();
     delete task;
   });
-  if (task->Post(controller_->loop().dispatcher()) != ZX_OK) {
+  if (task->Post(controller_->async_dispatcher()) != ZX_OK) {
     // Tasks only fail to post if the looper is dead. That can happen if the controller is unbinding
     // and shutting down active clients, but if it does then it's safe to call Reset on this thread
     // anyway.

@@ -154,6 +154,13 @@ pub enum HandleType {
     /// Equivalent to PA_DIRECTORY_REQUEST.
     DirectoryRequest = 0x3B,
 
+    /// A |fuchsia.component.sandbox/Dictionary| client endpoint where the process
+    /// may find a dictionary that it has stowed away earlier via
+    /// |fuchsia.process.Lifecycle/OnEscrow|.
+    ///
+    /// Equivalent to PA_ESCROWED_DICTIONARY.
+    EscrowedDictionary = 0x3C,
+
     /// A Handle to a resource object. Used by devcoordinator and devhosts.
     ///
     /// Equivalent to PA_RESOURCE.

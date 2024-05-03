@@ -22,6 +22,8 @@
 std::shared_ptr<vk::Device> MakeSharedDevice(const vk::PhysicalDevice& physical_device,
                                              uint32_t* queue_family_index) {
   vkp::Device vkp_device(physical_device);
+  vkp_device.set_swapchain_enabled(false);
+
   EXPECT_TRUE(vkp_device.Init()) << "Logical device initialization failed\n";
   *queue_family_index = vkp_device.queue_family_index();
 
@@ -134,8 +136,11 @@ TEST(VkProtoDriverTest, LargeVAAllocation) {
   for (size_t i = 0; i < kIterations; i++) {
     // INSTANCE
     const bool kEnableValidation = true;
-    vkp::Instance vkp_instance(kEnableValidation);
-    ASSERT_TRUE(vkp_instance.Init()) << "Instance Initialization Failed.\n";
+    vkp::Instance vkp_instance(vkp::Instance::Builder()
+                                   .set_validation_layers_enabled(kEnableValidation)
+                                   .set_swapchain_enabled(false)
+                                   .Build());
+    ASSERT_TRUE(vkp_instance.initialized()) << "Instance Initialization Failed.\n";
 
     // DEBUG MESSENGER
     vkp::DebugUtilsMessenger vkp_debug_messenger(vkp_instance.shared());
@@ -143,6 +148,7 @@ TEST(VkProtoDriverTest, LargeVAAllocation) {
 
     // PHYSICAL DEVICE
     vkp::PhysicalDevice vkp_physical_device(vkp_instance.shared());
+    vkp_physical_device.set_swapchain_enabled(false);
     ASSERT_TRUE(vkp_physical_device.Init()) << "Physical device initialization failed\n";
 
     // LOGICAL DEVICE

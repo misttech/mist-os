@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/cli"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 )
 
 type config struct {
+	ffxConfig                  *cli.FfxConfig
 	archiveConfig              *cli.ArchiveConfig
 	installerConfig            *cli.InstallerConfig
 	deviceConfig               *cli.DeviceConfig
@@ -23,9 +23,6 @@ type config struct {
 	paveTimeout                time.Duration
 	cycleCount                 uint
 	cycleTimeout               time.Duration
-	beforeInitScript           string
-	afterInitScript            string
-	afterTestScript            string
 	useFlash                   bool
 	downgradeOTAAttempts       uint
 	bootfsCompression          string
@@ -39,6 +36,7 @@ type config struct {
 func newConfig(fs *flag.FlagSet) (*config, error) {
 	testDataPath := filepath.Join(filepath.Dir(os.Args[0]), "test_data", "system-tests")
 
+	ffxConfig := cli.NewFfxConfig(fs)
 	installerConfig, err := cli.NewInstallerConfig(fs, testDataPath)
 	if err != nil {
 		return nil, err
@@ -47,6 +45,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
 	c := &config{
+		ffxConfig:          ffxConfig,
 		archiveConfig:      archiveConfig,
 		deviceConfig:       deviceConfig,
 		installerConfig:    installerConfig,
@@ -56,9 +55,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.DurationVar(&c.paveTimeout, "pave-timeout", 5*time.Minute, "Err if a pave takes longer than this time (default is 5 minutes)")
 	fs.UintVar(&c.cycleCount, "cycle-count", 1, "How many cycles to run the test before completing (default is 1)")
 	fs.DurationVar(&c.cycleTimeout, "cycle-timeout", 20*time.Minute, "Err if a test cycle takes longer than this time (default is 10 minutes)")
-	fs.StringVar(&c.beforeInitScript, "before-init-script", "", "Run this script before initializing device for testing")
-	fs.StringVar(&c.afterInitScript, "after-init-script", "", "Run this script after initializing device for testing")
-	fs.StringVar(&c.afterTestScript, "after-test-script", "", "Run this script after a test step")
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
 	fs.UintVar(&c.downgradeOTAAttempts, "downgrade-ota-attempts", 1, "Number of times to try to OTA from the downgrade build to the upgrade build before failing.")
 	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd.max", "compress storage images, default is zstd.max")
@@ -76,19 +72,15 @@ func (c *config) validate() error {
 		return fmt.Errorf("-cycle-count must be >= 1")
 	}
 
+	if err := c.ffxConfig.Validate(); err != nil {
+		return err
+	}
+
 	if err := c.deviceConfig.Validate(); err != nil {
 		return err
 	}
 
 	if err := c.installerConfig.Validate(); err != nil {
-		return err
-	}
-
-	if err := util.ValidatePath(c.afterInitScript); err != nil {
-		return err
-	}
-
-	if err := util.ValidatePath(c.afterTestScript); err != nil {
 		return err
 	}
 

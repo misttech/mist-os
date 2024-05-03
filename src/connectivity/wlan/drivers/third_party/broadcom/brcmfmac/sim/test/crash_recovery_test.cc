@@ -129,6 +129,33 @@ TEST_F(CrashRecoveryTest, DeviceDestroyOnCrash) {
   WaitForDeviceCount(dev_count);
 }
 
+TEST_F(CrashRecoveryTest, DestroyIfaceAfterIfaceDestroyed) {
+  // Upper layers depend on returning a very specific error code when attempting to destroy an
+  // already destroyed interface. If the wrong code is returned the interface won't be re-created.
+  Init();
+  uint32_t dev_count = DeviceCount();
+
+  ScheduleCrash(zx::msec(10));
+  env_->Run(kTestDuration);
+
+  // Since we currently have one client interface, that should have gotten destroyed.
+  WaitForDeviceCount(dev_count - 1);
+
+  // Notify sim framework that the interface was destroyed and wait for the destruction to complete.
+  SimTest::InterfaceDestroyed(&client_ifc_);
+  // A second call to destroy the interface must return ZX_ERR_NOT_FOUND, any other error code will
+  // prevent interface re-creation. We cannot use SimTest::DeleteInterface here because it will
+  // return early because it has no knowledge of the interface after it was first destroyed.
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(test_arena_);
+  builder.iface_id(client_ifc_.iface_id_);
+  auto result = client_.buffer(test_arena_)->DestroyIface(builder.Build());
+  // The FIDL part of the call must succeed.
+  ASSERT_TRUE(result.ok());
+  // But the result of the operation must be an error with a ZX_ERR_NOT_FOUND error value.
+  ASSERT_TRUE(result->is_error());
+  EXPECT_EQ(result->error_value(), ZX_ERR_NOT_FOUND);
+}
+
 // Verify that an association can be done correctly after a crash and a recovery happen after a scan
 // is started.
 TEST_F(CrashRecoveryTest, ConnectAfterCrashDuringScan) {

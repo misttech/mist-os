@@ -1938,6 +1938,7 @@ pub fn any_ref_to_decl(
         AnyRef::Debug => fdecl::Ref::Debug(fdecl::DebugRef {}),
         AnyRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         AnyRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
+        AnyRef::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         AnyRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
         AnyRef::Dictionary(d) => {
             if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
@@ -1960,6 +1961,7 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
         }
         RootDictionaryRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         RootDictionaryRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
+        RootDictionaryRef::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
     };
     (root, Some(d.path.to_string()))
 }
@@ -4659,7 +4661,7 @@ mod tests {
                     },
                     {
                         "dictionary": "dict2",
-                        "extends": "parent/in/a",
+                        "extends": "program/in/a",
                     },
                     {
                         "dictionary": "dict3",
@@ -4760,7 +4762,7 @@ mod tests {
                     fdecl::Capability::Dictionary (
                         fdecl::Dictionary {
                             name: Some("dict2".into()),
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            source: Some(fdecl::Ref::Program(fdecl::ProgramRef {})),
                             source_dictionary: Some("in/a".into()),
                             ..Default::default()
                         }

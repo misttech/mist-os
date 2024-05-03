@@ -80,33 +80,35 @@ zx_status_t VnodeDir::Readdir(fs::VdirCookie* cookie, void* data, size_t len, si
   return ZX_OK;
 }
 
-// postcondition: reference taken on vn returned through "out"
-zx_status_t VnodeDir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode>* out) {
-  zx_status_t status;
-  if ((status = CanCreate(name)) != ZX_OK) {
-    return status;
+zx::result<fbl::RefPtr<fs::Vnode>> VnodeDir::Create(std::string_view name, fs::CreationType type) {
+  if (zx_status_t status = CanCreate(name); status != ZX_OK) {
+    return zx::error(status);
   }
 
   fbl::AllocChecker ac;
   fbl::RefPtr<memfs::Vnode> vn;
-  {
-    if (S_ISDIR(mode)) {
+  bool is_dir = false;
+  switch (type) {
+    case fs::CreationType::kDirectory: {
       vn = fbl::AdoptRef(new (&ac) memfs::VnodeDir(memfs_));
-    } else {
+      is_dir = true;
+      break;
+    }
+    case fs::CreationType::kFile: {
       vn = fbl::AdoptRef(new (&ac) memfs::VnodeFile(memfs_));
+      break;
     }
   }
 
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  if ((status = AttachVnode(vn, name, S_ISDIR(mode))) != ZX_OK) {
-    return status;
+  if (zx_status_t status = AttachVnode(vn, name, is_dir); status != ZX_OK) {
+    return zx::error(status);
   }
-  *out = std::move(vn);
 
-  return ZX_OK;
+  return zx::ok(std::move(vn));
 }
 
 zx_status_t VnodeDir::Unlink(std::string_view name, bool must_be_dir) {

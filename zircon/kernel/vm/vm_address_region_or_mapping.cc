@@ -53,10 +53,10 @@ VmAddressRegionOrMapping::~VmAddressRegionOrMapping() {
   DEBUG_ASSERT(memory_priority_ == MemoryPriority::DEFAULT);
 }
 
-VmObject::AttributionCounts VmAddressRegionOrMapping::AllocatedPages() {
+VmObject::AttributionCounts VmAddressRegionOrMapping::GetAttributedMemory() {
   Guard<CriticalMutex> guard{aspace_->lock()};
   if (state_ != LifeCycleState::ALIVE) {
     return AttributionCounts{};
   }
-  return AllocatedPagesLocked();
+  return GetAttributedMemoryLocked();
 }

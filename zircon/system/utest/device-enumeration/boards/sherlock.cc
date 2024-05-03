@@ -50,12 +50,12 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:04:13/aml_pdm/sherlock-audio-pdm-in",
       "sys/platform/05:04:12:1/aml_tdm/sherlock-audio-i2s-out",
-      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c-1-56/focaltech_touch",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:04:1:1/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
       "sys/platform/00:00:36/sherlock-buttons/buttons",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:04:1a/aml_securemem/aml-securemem",
       "sys/platform/05:04:1d/aml-pwm-device/pwm-4/pwm_init",
       "sys/platform/05:04:24/ram",
@@ -86,15 +86,15 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       // TODO(b/324598947): Re-enable once we figure out how to get them to stop flaking
       // in device-enumeration-test. The device nodes show up, but the device-enumeration-test
       // sometimes fail to wait for them.
-      // "sys/platform/05_00_2/i2c-0/aml-i2c/i2c/i2c-0-111/audio-tas5720-woofer",
-      // "sys/platform/05_00_2/i2c-0/aml-i2c/i2c/i2c-0-108/audio-tas5720-left-tweeter",
-      // "sys/platform/05_00_2/i2c-0/aml-i2c/i2c/i2c-0-109/audio-tas5720-right-tweeter",
+      // "sys/platform/05_00_2/i2c-0/aml-i2c/i2c-0-111/audio-tas5720-woofer",
+      // "sys/platform/05_00_2/i2c-0/aml-i2c/i2c-0-108/audio-tas5720-left-tweeter",
+      // "sys/platform/05_00_2/i2c-0/aml-i2c/i2c-0-109/audio-tas5720-right-tweeter",
 
       // LCD Bias
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-62",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-62",
 
       // Touchscreen
-      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
 
 #ifdef include_packaged_drivers
 

@@ -171,7 +171,7 @@ mod tests {
                     TemporarySlaacConfig,
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
-                IpAddressId as _, IpDeviceBindingsContext, Ipv6DeviceAddr,
+                IpAddressId as _, IpDeviceBindingsContext, IpDeviceStateContext, Ipv6DeviceAddr,
                 Ipv6DeviceConfigurationContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -218,7 +218,7 @@ mod tests {
                                 Ipv6Scope::Global => Some(GlobalIpv6Addr {
                                     addr_sub,
                                     flags: *flags,
-                                    config: *config,
+                                    config: config.unwrap(),
                                 }),
                                 Ipv6Scope::InterfaceLocal
                                 | Ipv6Scope::LinkLocal
@@ -529,13 +529,20 @@ mod tests {
     }
 
     fn dad_timer_id(
+        ctx: &mut crate::testutil::FakeCtx,
         id: EthernetDeviceId<FakeBindingsCtx>,
         addr: Ipv6DeviceAddr,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(
             Ipv6DeviceTimerId::Dad(crate::ip::device::dad::DadTimerId {
-                device_id: id.into(),
-                addr: addr.get(),
+                device_id: id.downgrade().into(),
+                addr: IpDeviceStateContext::<Ipv6, _>::get_address_id(
+                    &mut ctx.core_ctx(),
+                    &id.into(),
+                    addr.into_specified(),
+                )
+                .unwrap()
+                .downgrade(),
             })
             .into(),
         ))
@@ -600,7 +607,7 @@ mod tests {
         net.with_context("local", |ctx| {
             assert_eq!(
                 ctx.trigger_next_timer().unwrap(),
-                dad_timer_id(local_eth_device_id, local_ip())
+                dad_timer_id(ctx, local_eth_device_id, local_ip())
             );
         });
 
@@ -742,7 +749,7 @@ mod tests {
         for _ in 0..3 {
             assert_eq!(
                 ctx.trigger_next_timer().unwrap(),
-                dad_timer_id(eth_dev_id.clone(), local_ip())
+                dad_timer_id(&mut ctx, eth_dev_id.clone(), local_ip())
             );
         }
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip(),), Some(true));
@@ -785,9 +792,9 @@ mod tests {
                 .unwrap();
         });
 
-        let expected_timer_id = dad_timer_id(local_eth_device_id, local_ip());
         // During the first and second period, the remote host is still down.
         net.with_context("local", |ctx| {
+            let expected_timer_id = dad_timer_id(ctx, local_eth_device_id, local_ip());
             assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
             assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
         });
@@ -907,7 +914,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Send another NS.
-        let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
+        let local_timer_id = dad_timer_id(&mut ctx, eth_dev_id.clone(), local_ip());
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
@@ -921,7 +928,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Run to the end for DAD for local ip
-        let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
+        let remote_timer_id = dad_timer_id(&mut ctx, eth_dev_id, remote_ip());
         assert_eq!(
             ctx.trigger_timers_for(Duration::from_secs(2)),
             [
@@ -979,16 +986,14 @@ mod tests {
 
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
+        let addr_sub = AddrSubnet::new(local_ip().into(), 128).unwrap();
         // Add an IP.
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
-            .unwrap();
+        ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&dev_id, addr_sub).unwrap();
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Send another NS.
-        let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
+        let local_timer_id = dad_timer_id(&mut ctx, eth_dev_id.clone(), local_ip());
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
@@ -1002,7 +1007,7 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Run 1s
-        let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
+        let remote_timer_id = dad_timer_id(&mut ctx, eth_dev_id, remote_ip());
         assert_eq!(
             ctx.trigger_timers_for(Duration::from_secs(1)),
             [local_timer_id, remote_timer_id.clone()]
@@ -1012,10 +1017,14 @@ mod tests {
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame1, _frame2]);
 
         // Remove local ip
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .del_ip_addr(&dev_id, local_ip().into_specified())
-            .unwrap();
+        assert_eq!(
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .del_ip_addr(&dev_id, local_ip().into_specified())
+                .unwrap()
+                .into_removed(),
+            addr_sub
+        );
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), None);
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
@@ -1669,7 +1678,7 @@ mod tests {
             )
             .unwrap();
 
-        let expected_timer_id = dad_timer_id(device_id, remote_ip());
+        let expected_timer_id = dad_timer_id(&mut ctx, device_id, remote_ip());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
         assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
         assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
@@ -3163,7 +3172,7 @@ mod tests {
         let dad_timer_ids = get_matching_slaac_address_entries(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
         })
-        .map(|entry| dad_timer_id(eth_device_id.clone(), entry.addr_sub().addr()))
+        .map(|entry| dad_timer_id(&mut ctx, eth_device_id.clone(), entry.addr_sub().addr()))
         .collect::<Vec<_>>();
         ctx.trigger_timers_until_and_expect_unordered(before_regen, dad_timer_ids);
 
@@ -3511,10 +3520,15 @@ mod tests {
         );
 
         // Deleting the address should cancel its SLAAC timers.
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .del_ip_addr(&device, expected_addr.into_specified())
-            .unwrap();
+        let expected_addr_sub = AddrSubnet::new(expected_addr.get(), prefix_length).unwrap();
+        assert_eq!(
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .del_ip_addr(&device, expected_addr.into_specified())
+                .unwrap()
+                .into_removed(),
+            expected_addr_sub
+        );
         assert_empty(get_global_ipv6_addrs(&ctx, &device));
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
@@ -3527,11 +3541,16 @@ mod tests {
         let (mut ctx, device, expected_addr) =
             test_host_generate_temporary_slaac_address(INFINITE_LIFETIME, INFINITE_LIFETIME);
 
+        let expected_addr_sub = AddrSubnet::new(expected_addr.get(), 64).unwrap();
         // Deleting the address should cancel its SLAAC timers.
-        ctx.core_api()
-            .device_ip::<Ipv6>()
-            .del_ip_addr(&device, expected_addr.into_specified())
-            .unwrap();
+        assert_eq!(
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .del_ip_addr(&device, expected_addr.into_specified())
+                .unwrap()
+                .into_removed(),
+            expected_addr_sub
+        );
         assert_empty(get_global_ipv6_addrs(&ctx, &device).into_iter().filter(|e| match e.config {
             Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
             Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,

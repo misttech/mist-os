@@ -22,7 +22,7 @@ namespace bt::gap {
 namespace {
 
 using namespace inspect::testing;
-namespace hci_android = hci_spec::vendor::android;
+namespace android_hci = hci_spec::vendor::android;
 using testing::FakeController;
 using testing::FakePeer;
 using TestingBase = testing::FakeDispatcherControllerTest<FakeController>;
@@ -206,7 +206,7 @@ TEST_F(AdapterTest,
   test_device()->set_settings(settings);
 
   test_device()->SetDefaultResponseStatus(
-      hci_android::kLEGetVendorCapabilities,
+      android_hci::kLEGetVendorCapabilities,
       pw::bluetooth::emboss::StatusCode::COMMAND_DISALLOWED);
   InitializeAdapter(std::move(init_cb));
   EXPECT_FALSE(success);
@@ -1428,6 +1428,50 @@ TEST_F(AdapterTest, BufferSizesRecordedInState) {
                 .low_energy_state.iso_data_buffer_info()
                 .max_num_packets(),
             8u);
+}
+
+TEST_F(AdapterTest, LEReadMaximumAdvertisingDataLengthNotSupported) {
+  FakeController::Settings settings;
+  settings.AddBREDRSupportedCommands();
+  settings.AddLESupportedCommands();
+  settings.lmp_features_page0 |=
+      static_cast<uint64_t>(hci_spec::LMPFeature::kLESupportedHost);
+  settings.le_acl_data_packet_length = 0x1B;
+  settings.le_total_num_acl_data_packets = 2;
+  test_device()->set_settings(settings);
+
+  const LowEnergyState& low_energy_state = adapter()->state().low_energy_state;
+  bool success = false;
+  auto init_cb = [&](bool cb_success) { success = cb_success; };
+  InitializeAdapter(std::move(init_cb));
+  EXPECT_TRUE(success);
+  EXPECT_EQ(hci_spec::kMaxLEAdvertisingDataLength,
+            low_energy_state.max_advertising_data_length());
+}
+
+TEST_F(AdapterTest, LEReadMaximumAdvertisingDataLengthSupported) {
+  FakeController::Settings settings;
+  settings.AddBREDRSupportedCommands();
+  settings.AddLESupportedCommands();
+  settings.lmp_features_page0 |=
+      static_cast<uint64_t>(hci_spec::LMPFeature::kLESupportedHost);
+  settings.le_acl_data_packet_length = 0x1B;
+  settings.le_total_num_acl_data_packets = 2;
+
+  constexpr size_t octet = 36;
+  settings.supported_commands[octet] |= static_cast<uint8_t>(
+      hci_spec::SupportedCommand::kLEReadMaximumAdvertisingDataLength);
+  test_device()->set_settings(settings);
+  test_device()->set_maximum_advertising_data_length(
+      hci_spec::kMaxLEExtendedAdvertisingDataLength);
+
+  const LowEnergyState& low_energy_state = adapter()->state().low_energy_state;
+  bool success = false;
+  auto init_cb = [&](bool cb_success) { success = cb_success; };
+  InitializeAdapter(std::move(init_cb));
+  EXPECT_TRUE(success);
+  EXPECT_EQ(hci_spec::kMaxLEExtendedAdvertisingDataLength,
+            low_energy_state.max_advertising_data_length());
 }
 
 TEST_F(AdapterTest, ScoDataChannelInitializedSuccessfully) {

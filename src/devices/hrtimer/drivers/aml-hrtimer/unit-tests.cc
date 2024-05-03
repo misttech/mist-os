@@ -374,7 +374,11 @@ TEST_F(DriverTest, Properties) {
     ASSERT_EQ(resolutions[1].duration().value(), 10'000);
     ASSERT_EQ(resolutions[2].duration().value(), 100'000);
     ASSERT_EQ(resolutions[3].duration().value(), 1'000'000);
-    ASSERT_EQ(timers[i].max_ticks().value(), 0xffffULL);
+    if (i >= 5 && i <= 8) {
+      ASSERT_EQ(timers[i].max_ticks().value(), 0xffff'ffff'ffff'ffffULL);  // extended max ticks.
+    } else {
+      ASSERT_EQ(timers[i].max_ticks().value(), 0xffffULL);
+    }
     ASSERT_TRUE(timers[i].supports_event().value());
   }
 
@@ -437,11 +441,8 @@ TEST_F(DriverTest, StartTimerMaxTicks) {
     ASSERT_FALSE(result2.is_error());
   }
 
-  // Timers id 0 to 8 inclusive, but not 4 error on 0xffff+1 ticks.
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  // Timers id 0 to 3 inclusive error on 0xffff+1 ticks.
+  for (uint64_t i = 0; i < 4; ++i) {
     auto result =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0x1'0000});
     ASSERT_TRUE(result.is_error());
@@ -459,6 +460,13 @@ TEST_F(DriverTest, StartTimerMaxTicks) {
       client_->Start({4ULL, fuchsia_hardware_hrtimer::Resolution::WithDuration(100'000ULL),
                       0xffff'ffff'ffff'ffffULL});
   ASSERT_FALSE(result2.is_error());
+
+  // Timers id 5 to 8 inclusive have no error on 0xffff+1 ticks.
+  for (uint64_t i = 5; i < 9; ++i) {
+    auto result =
+        client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0x1'0000});
+    ASSERT_FALSE(result.is_error());
+  }
 }
 
 TEST_F(DriverTest, StartStop) {
@@ -487,62 +495,6 @@ TEST_F(DriverTest, StartStop) {
   });
 }
 
-TEST_F(DriverTest, GetTicks) {
-  constexpr uint32_t kArbitraryCount16bits = 0x1234;
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.platform_device().mmio()[0x3c51] = kArbitraryCount16bits << 16;  // Timer A.
-    env.platform_device().mmio()[0x3c52] = kArbitraryCount16bits << 16;  // Timer B.
-    env.platform_device().mmio()[0x3c53] = kArbitraryCount16bits << 16;  // Timer C.
-    env.platform_device().mmio()[0x3c54] = kArbitraryCount16bits << 16;  // Timer D.
-    // Gap and no timer E.
-    env.platform_device().mmio()[0x3c65] = kArbitraryCount16bits << 16;  // Timer F.
-    env.platform_device().mmio()[0x3c66] = kArbitraryCount16bits << 16;  // Timer G.
-    env.platform_device().mmio()[0x3c67] = kArbitraryCount16bits << 16;  // Timer H.
-    env.platform_device().mmio()[0x3c68] = kArbitraryCount16bits << 16;  // Timer I.
-  });
-  // Timers id 0 to 8 inclusive but not 4 support only 16 bits.
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
-    auto result_stop = client_->Stop(i);
-    ASSERT_FALSE(result_stop.is_error());
-
-    auto result = client_->GetTicksLeft(i);
-    ASSERT_FALSE(result.is_error());
-    ASSERT_EQ(result->ticks(), kArbitraryCount16bits);
-  }
-
-  // Timer id 4 support 64 bits.
-  constexpr uint64_t kArbitraryTicksRequest = 0xffff'ffff'ffff'ffff;
-  constexpr uint64_t kArbitraryCount64bits = 0xffff'ffff'ffff'fff0;
-  // Request a number of ticks first since this timer counts up so the driver subtracts.
-  auto result_start = client_->Start(
-      {4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
-  ASSERT_FALSE(result_start.is_error());
-  // We set the amount read after starting the timer since starting the timer writes to the register
-  // we read upon GetTicksLeft.
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.platform_device().mmio()[0x3c62] =
-        static_cast<uint32_t>(kArbitraryCount64bits);  // Timer E.
-    env.platform_device().mmio()[0x3c63] =
-        static_cast<uint32_t>(kArbitraryCount64bits >> 32);  // Timer E High.
-  });
-  auto result_ticks = client_->GetTicksLeft(4);
-  ASSERT_FALSE(result_ticks.is_error());
-  ASSERT_EQ(result_ticks->ticks(), kArbitraryTicksRequest - kArbitraryCount64bits);
-
-  // Since we can't really stop the timer 4 from ticking after a Stop(), GetTicksLeft() starts
-  // to return 0.
-  auto result_stop = client_->Stop(4);
-  ASSERT_FALSE(result_stop.is_error());
-  {
-    auto result_ticks = client_->GetTicksLeft(4);
-    ASSERT_FALSE(result_ticks.is_error());
-    ASSERT_EQ(result_ticks->ticks(), 0ULL);
-  }
-}
-
 TEST_F(DriverTest, EventTriggering) {
   // Timers id 0 to 8 inclusive but not 4 support events (via IRQ notification).
   zx::event events[9];
@@ -568,6 +520,216 @@ TEST_F(DriverTest, EventTriggering) {
     }
     zx_signals_t signals = {};
     ASSERT_EQ(events[i].wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals), ZX_OK);
+  }
+}
+
+TEST_F(DriverTest, GetTicksTimers0123) {
+  // Can start up to 16 bits.
+  constexpr uint64_t kArbitraryTicksRequest = 0xffff;
+
+  constexpr uint32_t kArbitraryCount16bits0 = 0x1234;
+  constexpr uint32_t kArbitraryCount16bits1 = 0x5678;
+  constexpr uint32_t kArbitraryCount16bits2 = 0x90ab;
+  constexpr uint32_t kArbitraryCount16bits3 = 0xcdef;
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.platform_device().mmio()[0x3c51] = kArbitraryCount16bits0 << 16;  // Timer A.
+    env.platform_device().mmio()[0x3c52] = kArbitraryCount16bits1 << 16;  // Timer B.
+    env.platform_device().mmio()[0x3c53] = kArbitraryCount16bits2 << 16;  // Timer C.
+    env.platform_device().mmio()[0x3c54] = kArbitraryCount16bits3 << 16;  // Timer D.
+  });
+  for (uint64_t i = 0; i < 4; ++i) {
+    auto result_start = client_->Start(
+        {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
+    ASSERT_FALSE(result_start.is_error());
+  }
+
+  // Reads from the registers.
+  {
+    auto result = client_->GetTicksLeft(0);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryCount16bits0);
+  }
+  {
+    auto result = client_->GetTicksLeft(1);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryCount16bits1);
+  }
+  {
+    auto result = client_->GetTicksLeft(2);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryCount16bits2);
+  }
+  {
+    auto result = client_->GetTicksLeft(3);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryCount16bits3);
+  }
+}
+
+TEST_F(DriverTest, GetTicksTimer4) {
+  // Can start up to 64 bits.
+  constexpr uint64_t kArbitraryTicksRequest = 0x1234'5678'90ab'cdef;
+
+  auto result_start = client_->Start(
+      {4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
+  ASSERT_FALSE(result_start.is_error());
+  // We set the amount read after starting the timer since starting the timer writes to the register
+  // we read upon GetTicksLeft.
+  constexpr uint64_t kArbitraryCount64bits = 0x1234'5678'0000'0000;
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.platform_device().mmio()[0x3c62] =
+        static_cast<uint32_t>(kArbitraryCount64bits);  // Timer E.
+    env.platform_device().mmio()[0x3c63] =
+        static_cast<uint32_t>(kArbitraryCount64bits >> 32);  // Timer E High.
+  });
+  auto result_ticks = client_->GetTicksLeft(4);
+  ASSERT_FALSE(result_ticks.is_error());
+  // This timer counts up so the driver subtracts the read from the registers.
+  ASSERT_EQ(result_ticks->ticks(), kArbitraryTicksRequest - kArbitraryCount64bits);
+
+  // Since we can't really stop the timer 4 from ticking after a Stop(), GetTicksLeft() starts
+  // to return 0.
+  auto result_stop = client_->Stop(4);
+  ASSERT_FALSE(result_stop.is_error());
+  {
+    auto result_ticks = client_->GetTicksLeft(4);
+    ASSERT_FALSE(result_ticks.is_error());
+    ASSERT_EQ(result_ticks->ticks(), 0ULL);
+  }
+}
+
+TEST_F(DriverTest, GetTicksTimers5678TicksStayAtRequested) {
+  // Can start up to 64 bits because they support ticks extension.
+  constexpr uint64_t kArbitraryTicksRequest = 0x1234'5678'90ab'cdef;
+
+  // The count starts at max for the register since the request goes beyond the register max.
+  constexpr uint64_t kMaxCount = 0xffff;
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.platform_device().mmio()[0x3c65] = kMaxCount << 16;  // Timer F.
+    env.platform_device().mmio()[0x3c66] = kMaxCount << 16;  // Timer G.
+    env.platform_device().mmio()[0x3c67] = kMaxCount << 16;  // Timer H.
+    env.platform_device().mmio()[0x3c68] = kMaxCount << 16;  // Timer I.
+  });
+  for (uint64_t i = 5; i < 9; ++i) {
+    auto result_start = client_->Start(
+        {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
+    ASSERT_FALSE(result_start.is_error());
+
+    // Ticks left stay at the ticks requested since the register reads 0xffff.
+    auto result = client_->GetTicksLeft(i);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryTicksRequest);
+  }
+}
+
+TEST_F(DriverTest, GetTicksTimers5678TicksDownBy0xffff) {
+  // Can start up to 64 bits because they support ticks extension.
+  constexpr uint64_t kArbitraryTicksRequest = 0x1234'5678'90ab'cdef;
+
+  // The count has decreased by 0xffff to 0.
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.platform_device().mmio()[0x3c65] = 0 << 16;  // Timer F.
+    env.platform_device().mmio()[0x3c66] = 0 << 16;  // Timer G.
+    env.platform_device().mmio()[0x3c67] = 0 << 16;  // Timer H.
+    env.platform_device().mmio()[0x3c68] = 0 << 16;  // Timer I.
+  });
+  for (uint64_t i = 5; i < 9; ++i) {
+    auto result_start = client_->Start(
+        {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
+    ASSERT_FALSE(result_start.is_error());
+
+    // Ticks have decreased by 0xffff since the register reads 0.
+    auto result = client_->GetTicksLeft(i);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryTicksRequest - 0xffff);
+  }
+}
+
+TEST_F(DriverTest, GetTicksTimers5678ArbitraryCount) {
+  // Can start up to 64 bits because they support ticks extension.
+  constexpr uint64_t kArbitraryTicksRequest = 0x1234'5678'90ab'cdef;
+
+  constexpr uint64_t kArbitraryCount5 = 0x1234;
+  constexpr uint64_t kArbitraryCount6 = 0x5678;
+  constexpr uint64_t kArbitraryCount7 = 0x90ab;
+  constexpr uint64_t kArbitraryCount8 = 0xcdef;
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.platform_device().mmio()[0x3c65] = kArbitraryCount5 << 16;  // Timer F.
+    env.platform_device().mmio()[0x3c66] = kArbitraryCount6 << 16;  // Timer G.
+    env.platform_device().mmio()[0x3c67] = kArbitraryCount7 << 16;  // Timer H.
+    env.platform_device().mmio()[0x3c68] = kArbitraryCount8 << 16;  // Timer I.
+  });
+  for (uint64_t i = 5; i < 9; ++i) {
+    auto result_start = client_->Start(
+        {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
+    ASSERT_FALSE(result_start.is_error());
+  }
+
+  // Ticks have decreased by 0xffff - kArbitraryCount (register read).
+  {
+    auto result = client_->GetTicksLeft(5);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryTicksRequest - (0xffff - kArbitraryCount5));
+  }
+  {
+    auto result = client_->GetTicksLeft(6);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryTicksRequest - (0xffff - kArbitraryCount6));
+  }
+  {
+    auto result = client_->GetTicksLeft(7);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryTicksRequest - (0xffff - kArbitraryCount7));
+  }
+  {
+    auto result = client_->GetTicksLeft(8);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryTicksRequest - (0xffff - kArbitraryCount8));
+  }
+}
+
+TEST_F(DriverTest, GetTicksTimers5678ArbitraryCountWithIrq) {
+  // Can start up to 64 bits because they support ticks extension.
+  constexpr uint64_t kTicksRequestEnoughFor2Irqs = 0x1'1235;
+
+  constexpr uint64_t kArbitraryCount = 0x1234;
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.platform_device().mmio()[0x3c65] = kArbitraryCount << 16;  // Timer F.
+    env.platform_device().mmio()[0x3c66] = kArbitraryCount << 16;  // Timer G.
+    env.platform_device().mmio()[0x3c67] = kArbitraryCount << 16;  // Timer H.
+    env.platform_device().mmio()[0x3c68] = kArbitraryCount << 16;  // Timer I.
+  });
+  for (uint64_t i = 5; i < 9; ++i) {
+    auto result_start =
+        client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL),
+                        kTicksRequestEnoughFor2Irqs});
+    ASSERT_FALSE(result_start.is_error());
+
+    // Because the requested ticks is biggger than 0xffff, before any IRQ triggers we'll get
+    // a decrease of 0xffff - kArbitraryCount (register read).
+    auto result = client_->GetTicksLeft(i);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kTicksRequestEnoughFor2Irqs - (0xffff - kArbitraryCount));
+  }
+
+  // Trigger IRQs, indicates that the first 0xffff passed.
+  RunInEnvironmentTypeContext([](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
+
+  for (uint64_t i = 5; i < 9; ++i) {
+    // Wait until after the IRQ is handled and start ticks left fit in the hardware capabilities.
+    bool start_ticks_left_fit = false;
+    while (!start_ticks_left_fit) {
+      RunInDriverContext([i, &start_ticks_left_fit](AmlHrtimer& driver) {
+        start_ticks_left_fit = driver.StartTicksLeftFitInHardware(i);
+      });
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+
+    // Now that we have received at least an IRQ for the first 0xffff passed, GetTicksLeft starts
+    // returning the read from the register.
+    auto result = client_->GetTicksLeft(i);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(result->ticks(), kArbitraryCount);
   }
 }
 

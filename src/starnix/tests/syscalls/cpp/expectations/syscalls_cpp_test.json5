@@ -54,16 +54,6 @@
                 "OverlayFs/FsMountTest.OpenWithTruncAndCreatWithExistingFileSucceeds/0",
                 "OverlayFs/FsMountTest.OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS/0",
 
-                // TODO(https://fxbug.dev/331965660)
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/0",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/1",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/2",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/3",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/8",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/9",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/10",
-                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/11",
-
                 // TODO(https://fxbug.dev/335701084)
                 "VmspliceTest.FileInPipe",
                 "VmspliceTest.ModifyBufferInPipe",
@@ -72,14 +62,8 @@
                 "VmspliceTest.RemapSharedBufferInPipeThenModify",
                 "VmspliceTest/VmspliceUnmapBufferAfterVmsplicingRemappedBufferTest.UnmapBufferAfterVmsplicingRemappedBuffer/*",
 
-                // TODO(https://fxbug.dev/334365844)
-                "Task.BrkIsZeroedAfterShrinkAndRegrow",
-
-                // TODO(https://fxbug.dev/333450691)
-                "Task.BrkIsOutOfRange",
-
-                // TODO(https://fxbug.dev/333435783)
-                "Task.BrkShrinkUnmapsAnonMmap",
+                // TODO(https://fxbug.dev/331965426)
+                "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/*",
             ],
         },
     ],

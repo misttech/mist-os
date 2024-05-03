@@ -28,7 +28,6 @@ test("dl-unittests") {
   ]
   if (is_elf) {
     sources += [
-      "dl-impl-tests.cc",
       "dl-impl-tests.h",
       "dl-load-tests-base.cc",
       "dl-load-tests-base.h",
@@ -44,7 +43,10 @@ test("dl-unittests") {
     ]
 
     if (is_fuchsia) {
-      sources += [ "dl-load-zircon-tests-base.h" ]
+      sources += [
+        "dl-load-zircon-tests-base.cc",
+        "dl-load-zircon-tests-base.h",
+      ]
     }
 
     # Plumb in the switch to set cflags, such as the libprefix for test files.

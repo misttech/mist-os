@@ -8,7 +8,8 @@ use {
     anyhow::Error,
     ash::{extensions::ext, vk},
     fidl::endpoints::{create_endpoints, ClientEnd, Proxy},
-    fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_ui_composition as fland,
+    fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
+    fidl_fuchsia_ui_composition as fland,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_scenic::{
         duplicate_buffer_collection_import_token, duplicate_buffer_collection_token,
@@ -24,7 +25,7 @@ pub const ENGINE_VERSION: u32 = vk::make_api_version(0, 1, 0, 0);
 pub const API_VERSION: u32 = vk::make_api_version(0, 1, 3, 92);
 // SRGB is the only color space compatible with R8G8B8A8_UNORM.
 pub const FRAMEBUFFER_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
-pub const FRAMEBUFFER_COLOR_SPACE: fsysmem::ColorSpaceType = fsysmem::ColorSpaceType::Srgb;
+pub const FRAMEBUFFER_COLOR_SPACE: fimages2::ColorSpace = fimages2::ColorSpace::Srgb;
 
 // Holds the state needed to implement the `crate::render::Renderer` trait.
 pub struct VulkanRenderer {
@@ -415,22 +416,28 @@ impl VulkanRenderer {
         height: u32,
         image_count: usize,
     ) -> Result<(Vec<ImageMemory>, fland::BufferCollectionImportToken), Error> {
-        let sysmem_allocator = connect_to_protocol::<fsysmem::AllocatorMarker>()?;
-        sysmem_allocator.set_debug_client_info(
-            "flatland-view-provider example",
-            fuchsia_runtime::process_self().get_koid()?.raw_koid(),
-        )?;
+        let sysmem_allocator = connect_to_protocol::<fsysmem2::AllocatorMarker>()?;
+        sysmem_allocator.set_debug_client_info(&fsysmem2::AllocatorSetDebugClientInfoRequest {
+            name: Some("flatland-view-provider example".to_string()),
+            id: Some(fuchsia_runtime::process_self().get_koid()?.raw_koid()),
+            ..Default::default()
+        })?;
 
         let (buffer_collection_token, buffer_collection_token_server_end) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>();
-        sysmem_allocator.allocate_shared_collection(buffer_collection_token_server_end)?;
+            create_endpoints::<fidl_fuchsia_sysmem2::BufferCollectionTokenMarker>();
+        sysmem_allocator.allocate_shared_collection(
+            fsysmem2::AllocatorAllocateSharedCollectionRequest {
+                token_request: Some(buffer_collection_token_server_end),
+                ..Default::default()
+            },
+        )?;
 
         // Temporarily transform this from a `ClientEnd` to a `Proxy` in order to make a duplicate.
         let mut buffer_collection_token = buffer_collection_token.into_proxy()?;
         let buffer_collection_token_for_vulkan =
             duplicate_buffer_collection_token(&mut buffer_collection_token).await?;
 
-        let buffer_collection_token = ClientEnd::<fsysmem::BufferCollectionTokenMarker>::new(
+        let buffer_collection_token = ClientEnd::<fsysmem2::BufferCollectionTokenMarker>::new(
             buffer_collection_token.into_channel().unwrap().into_zx_channel(),
         );
 
@@ -440,7 +447,13 @@ impl VulkanRenderer {
 
             let args = fland::RegisterBufferCollectionArgs {
                 export_token: Some(import_export_tokens.export_token),
-                buffer_collection_token: Some(buffer_collection_token),
+                // Sysmem token channels serve both sysmem(1) and sysmem2 token protocols, so we can
+                // convert here until flatland has a sysmem2 token field.
+                buffer_collection_token: Some(ClientEnd::<
+                    fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
+                >::new(
+                    buffer_collection_token.into_channel()
+                )),
                 ..Default::default()
             };
             // Two possible errors here:
@@ -474,7 +487,7 @@ impl VulkanRenderer {
 
         // Also used to set buffer collection constraints.
         let p_color_spaces = [vk::SysmemColorSpaceFUCHSIA::builder()
-            .color_space(FRAMEBUFFER_COLOR_SPACE as u32)
+            .color_space(FRAMEBUFFER_COLOR_SPACE.into_primitive())
             .build()];
 
         // Also used to set buffer collection constraints.

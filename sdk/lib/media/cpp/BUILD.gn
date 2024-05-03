@@ -9,6 +9,7 @@ sdk_source_set("cpp") {
   category = "partner"
 
   sdk_name = "media_cpp"
+  stable = true
 
   sources = [
     "type_converters.cc",

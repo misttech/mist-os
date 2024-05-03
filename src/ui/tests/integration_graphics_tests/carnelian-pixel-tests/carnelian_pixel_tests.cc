@@ -4,6 +4,7 @@
 
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
@@ -41,6 +42,7 @@ class CarnelianPixelTest : public ui_testing::PortableUITest {
     realm_builder().AddRoute(
         {.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
                           Protocol{fuchsia::sysmem::Allocator::Name_},
+                          Protocol{fuchsia::sysmem2::Allocator::Name_},
                           Protocol{fuchsia::tracing::provider::Registry::Name_},
                           Protocol{fuchsia::vulkan::loader::Loader::Name_}},
          .source = ParentRef(),

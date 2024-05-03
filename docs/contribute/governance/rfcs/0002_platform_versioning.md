@@ -5,6 +5,11 @@
 
 ## Summary
 
+Note: [RFC-0239: Platform Versioning in Practice][RFC-0239] amended, extended,
+and provided more context for the concepts introduced in this RFC. If you're
+reading this RFC to understand the current state of the world, RFC-0239 may be a
+better place to start.
+
 This document proposes the notion of an *API level* and an *ABI revision* to
 the Fuchsia platform. End-developers build against a *target API level*, which
 determines which declarations are visible to the application. The
@@ -92,6 +97,9 @@ might implicate the same ABI revision.
 
 #### API level
 
+Note: The definition of an API level has been updated by both [RFC-0083] and
+[RFC-0246]. As of [RFC-0246], they are **32-bit** integers.
+
 A Fuchsia *API level* denotes a set of APIs available when building an
 application. A given release of the [Fuchsia IDK] typically supports multiple
 API levels. The APIs available at a given supported API level should be
@@ -103,7 +111,7 @@ library. The API defines that set of functions, which means two IDK releases
 should expose the same set of functions in the `fit` library at the same API
 level.
 
-Syntactically, a Fuchsia *API level* is an unsigned, 64-bit integer[^1]. 
+Syntactically, a Fuchsia *API level* is an unsigned, 64-bit integer.
 As the platform evolves (see *Evolution* below), API levels are assigned in
 increasing order and are intended to be understood by human beings, including end-developers.
 
@@ -462,12 +470,11 @@ semantics from the platform.
 Apple has used these mechanisms successfully to migrate applications for these
 operating systems from older APIs to newer APIs.
 
-[^1]: [RFC-0083: FIDL Versioning][rfc-0083] amends this, restricting
-    API levels to 63 bits in order to reserve the high bit for other uses.
-
 [Fuchsia System Interface]: /docs/concepts/packages/system.md
 [Fuchsia IDK]: /docs/development/idk/README.md
 [`uses-sdk`]: https://developer.android.com/guide/topics/manifest/uses-sdk-element
 [`SupportedOS`]: https://docs.microsoft.com/en-us/windows/win32/win7appqual/compatibility---application-manifest#leveraging-feature-capabilities
 [`API_AVAILABLE`]: https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/marking_api_availability_in_objective-c
 [rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
+[rfc-0239]: /docs/contribute/governance/rfcs/0239_platform_versioning_in_practice.md
+[rfc-0246]: /docs/contribute/governance/rfcs/0246_api_levels_are_32_bits.md

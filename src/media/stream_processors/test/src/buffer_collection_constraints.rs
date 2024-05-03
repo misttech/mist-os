@@ -2,60 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_sysmem::*;
+use fidl_fuchsia_images2 as fimages2;
+use fidl_fuchsia_sysmem2 as fsysmem2;
 
-pub const IMAGE_FORMAT_CONSTRAINTS_DEFAULT: ImageFormatConstraints = ImageFormatConstraints {
-    pixel_format: PixelFormat {
-        type_: PixelFormatType::Nv12,
-        has_format_modifier: false,
-        format_modifier: FormatModifier { value: 0 },
-    },
-    color_spaces_count: 0,
-    color_space: [ColorSpace { type_: ColorSpaceType::Invalid }; 32],
-    min_coded_width: 0,
-    max_coded_width: 0,
-    min_coded_height: 0,
-    max_coded_height: 0,
-    min_bytes_per_row: 0,
-    max_bytes_per_row: 0,
-    max_coded_width_times_coded_height: 0,
-    layers: 0,
-    coded_width_divisor: 0,
-    coded_height_divisor: 0,
-    bytes_per_row_divisor: 0,
-    start_offset_divisor: 0,
-    display_width_divisor: 0,
-    display_height_divisor: 0,
-    required_min_coded_width: 0,
-    required_max_coded_width: 0,
-    required_min_coded_height: 0,
-    required_max_coded_height: 0,
-    required_min_bytes_per_row: 0,
-    required_max_bytes_per_row: 0,
-};
+pub fn image_format_constraints_default() -> fsysmem2::ImageFormatConstraints {
+    fsysmem2::ImageFormatConstraints {
+        pixel_format: Some(fimages2::PixelFormat::Nv12),
+        ..Default::default()
+    }
+}
 
-pub const BUFFER_MEMORY_CONSTRAINTS_DEFAULT: BufferMemoryConstraints = BufferMemoryConstraints {
-    min_size_bytes: 0,
-    max_size_bytes: std::u32::MAX,
-    physically_contiguous_required: false,
-    secure_required: false,
-    ram_domain_supported: false,
-    cpu_domain_supported: true,
-    inaccessible_domain_supported: false,
-    heap_permitted_count: 0,
-    heap_permitted: [HeapType::SystemRam; 32],
-};
+pub fn buffer_memory_constraints_default() -> fsysmem2::BufferMemoryConstraints {
+    fsysmem2::BufferMemoryConstraints { ..Default::default() }
+}
 
-pub const BUFFER_COLLECTION_CONSTRAINTS_DEFAULT: BufferCollectionConstraints =
-    BufferCollectionConstraints {
-        usage: BufferUsage { none: 0, cpu: 1, vulkan: 0, display: 0, video: 1 },
-        min_buffer_count_for_camping: 0,
-        min_buffer_count_for_dedicated_slack: 0,
-        min_buffer_count_for_shared_slack: 0,
-        min_buffer_count: 0,
-        max_buffer_count: 0,
-        has_buffer_memory_constraints: false,
-        buffer_memory_constraints: BUFFER_MEMORY_CONSTRAINTS_DEFAULT,
-        image_format_constraints_count: 0,
-        image_format_constraints: [IMAGE_FORMAT_CONSTRAINTS_DEFAULT; 32],
-    };
+pub fn buffer_collection_constraints_default() -> fsysmem2::BufferCollectionConstraints {
+    fsysmem2::BufferCollectionConstraints {
+        usage: Some(fsysmem2::BufferUsage {
+            cpu: Some(fsysmem2::CPU_USAGE_READ),
+            video: Some(fsysmem2::VIDEO_USAGE_HW_DECODER),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}

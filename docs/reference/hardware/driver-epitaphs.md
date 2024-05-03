@@ -11,9 +11,13 @@ Since this page is generated from on a template, the full page is best viewed at
 http://www.fuchsia.dev/fuchsia-src/reference/hardware/driver-epitaphs
 {% endcomment %}
 
-This page lists drivers that are deprecated. In order to deprecate a driver, it must be
-deleted from the Fuchsia source tree according to the instructions at
+This page lists drivers that are deprecated. In order to deprecate a driver, it
+must be deleted from the Fuchsia source tree according to the instructions at
 [Deleting Drivers](/docs/development/drivers/best_practices/deleting.md).
+
+Driver epitaphs are records of drivers that are no longer supported and have
+been removed from the Fuchsia source tree. In other words, a driver epitaph
+indicates that a driver is deprecated.
 
 For the drivers in the Fuchsia source tree, see [Fuchsia hardware drivers](drivers.md).
 

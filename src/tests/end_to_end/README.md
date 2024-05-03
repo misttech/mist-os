@@ -40,6 +40,9 @@ build group the new test belongs to
     Foundation Infra team) to include this newly created group in
     [Lacewing User Tests Infra Groups]. If your test depends on target side
     packages, make sure to include the appropriate `*_packages` group.
+* Update the test case's `python_mobly_test` rule in BUILD.gn to include
+  appropriate BOARDS (based on what all the boards this test need to be run in
+  infra) in `environments` field ([example](../../testing/end_to_end/examples/test_soft_reboot/BUILD.gn))
 * Add yourself to `lacewing-builder-users@google.com` group so that you will be
   notified whenever any of the tests in the builder is failed. You can then
   check for your test result in that run and triage if it has failed.

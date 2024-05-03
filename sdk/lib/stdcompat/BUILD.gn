@@ -12,6 +12,7 @@ group("tests") {
 zx_library("stdcompat") {
   sdk = "source"
   sdk_publishable = "partner"
+  stable = true
 
   sdk_headers = [
     "lib/stdcompat/algorithm.h",

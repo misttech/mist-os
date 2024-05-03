@@ -5,6 +5,7 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
+use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
@@ -34,6 +35,7 @@ type StatsPublisher = Publisher<fsuspend::SuspendStats, fsuspend::StatsWatchResp
 enum IncomingRequest {
     ActivityGovernor(fsystem::ActivityGovernorRequestStream),
     Stats(fsuspend::StatsRequestStream),
+    ElementInfoProviderService(fbroker::ElementInfoProviderServiceRequest),
 }
 
 #[derive(Copy, Clone)]
@@ -355,6 +357,9 @@ pub struct SystemActivityGovernor {
     execution_state_manager: Rc<ExecutionStateManager>,
     /// The context used to manage the boot_control power element.
     boot_control: PowerElementContext,
+    /// The collection of information about PowerElements managed
+    /// by system-activity-governor.
+    element_power_level_names: Vec<fbroker::ElementPowerLevelNames>,
 }
 
 impl SystemActivityGovernor {
@@ -363,6 +368,8 @@ impl SystemActivityGovernor {
         inspect_root: fuchsia_inspect::Node,
         suspender: Option<fhsuspend::SuspenderProxy>,
     ) -> Result<Rc<Self>> {
+        let mut element_power_level_names: Vec<fbroker::ElementPowerLevelNames> = Vec::new();
+
         let execution_state = PowerElementContext::builder(
             topology,
             "execution_state",
@@ -375,6 +382,15 @@ impl SystemActivityGovernor {
         .build()
         .await
         .expect("PowerElementContext encountered error while building execution_state");
+
+        element_power_level_names.push(generate_element_power_level_names(
+            "execution_state",
+            vec![
+                (ExecutionStateLevel::Inactive.into_primitive(), "Inactive".to_string()),
+                (ExecutionStateLevel::WakeHandling.into_primitive(), "WakeHandling".to_string()),
+                (ExecutionStateLevel::Active.into_primitive(), "Active".to_string()),
+            ],
+        ));
 
         let application_activity = PowerElementContext::builder(
             topology,
@@ -394,6 +410,14 @@ impl SystemActivityGovernor {
         .await
         .expect("PowerElementContext encountered error while building application_activity");
 
+        element_power_level_names.push(generate_element_power_level_names(
+            "application_activity",
+            vec![
+                (ApplicationActivityLevel::Inactive.into_primitive(), "Inactive".to_string()),
+                (ApplicationActivityLevel::Active.into_primitive(), "Active".to_string()),
+            ],
+        ));
+
         let full_wake_handling = PowerElementContext::builder(
             topology,
             "full_wake_handling",
@@ -411,6 +435,14 @@ impl SystemActivityGovernor {
         .build()
         .await
         .expect("PowerElementContext encountered error while building full_wake_handling");
+
+        element_power_level_names.push(generate_element_power_level_names(
+            "full_wake_handling",
+            vec![
+                (FullWakeHandlingLevel::Inactive.into_primitive(), "Inactive".to_string()),
+                (FullWakeHandlingLevel::Active.into_primitive(), "Active".to_string()),
+            ],
+        ));
 
         let wake_handling = PowerElementContext::builder(
             topology,
@@ -430,6 +462,14 @@ impl SystemActivityGovernor {
         .await
         .expect("PowerElementContext encountered error while building wake_handling");
 
+        element_power_level_names.push(generate_element_power_level_names(
+            "wake_handling",
+            vec![
+                (WakeHandlingLevel::Inactive.into_primitive(), "Inactive".to_string()),
+                (WakeHandlingLevel::Active.into_primitive(), "Active".to_string()),
+            ],
+        ));
+
         let boot_control = PowerElementContext::builder(
             topology,
             "boot_control",
@@ -443,10 +483,28 @@ impl SystemActivityGovernor {
         }])
         .build()
         .await
-        .expect("PowerElementContext encountered error while building wake_handling");
+        .expect("PowerElementContext encountered error while building boot_control");
+
+        element_power_level_names.push(generate_element_power_level_names(
+            "boot_control",
+            vec![
+                (BootControlLevel::Inactive.into(), "Inactive".to_string()),
+                (BootControlLevel::Active.into(), "Active".to_string()),
+            ],
+        ));
 
         let resume_latency_ctx = if let Some(suspender) = &suspender {
-            Some(Rc::new(ResumeLatencyContext::new(suspender, topology).await?))
+            let resume_latency_ctx = ResumeLatencyContext::new(suspender, topology).await?;
+            element_power_level_names.push(generate_element_power_level_names(
+                "execution_resume_latency",
+                resume_latency_ctx
+                    .resume_latencies
+                    .iter()
+                    .enumerate()
+                    .map(|(i, val)| (i as u8, format!("{val} ns")))
+                    .collect(),
+            ));
+            Some(Rc::new(resume_latency_ctx))
         } else {
             None
         };
@@ -466,6 +524,7 @@ impl SystemActivityGovernor {
                 suspender,
             )),
             boot_control,
+            element_power_level_names,
         }))
     }
 
@@ -551,6 +610,7 @@ impl SystemActivityGovernor {
         let application_activity_node = inspect_node.create_child("application_activity");
         let booting_node = Rc::new(root_node.create_bool("booting", false));
         let this = self.clone();
+        let this_clone = self.clone();
 
         fasync::Task::local(async move {
             let update_fn = Rc::new(basic_update_fn_factory(&this.application_activity));
@@ -563,6 +623,10 @@ impl SystemActivityGovernor {
                 .await
                 .expect("Failed to acquire boot control lease");
             booting_node.set(true);
+            let res = this.boot_control.current_level.update(BootControlLevel::Active.into()).await;
+            if let Err(error) = res {
+                tracing::warn!(?error, "update boot_control level to active failed");
+            }
             let boot_control_lease = Rc::new(RefCell::new(Some(boot_control_lease)));
 
             run_power_element(
@@ -574,6 +638,7 @@ impl SystemActivityGovernor {
                     let update_fn = update_fn.clone();
                     let boot_control_lease = boot_control_lease.clone();
                     let booting_node = booting_node.clone();
+                    let this = this_clone.clone();
 
                     async move {
                         update_fn(new_power_level).await;
@@ -586,6 +651,17 @@ impl SystemActivityGovernor {
                             tracing::info!("System has booted. Dropping boot control lease.");
                             boot_control_lease.borrow_mut().take();
                             booting_node.set(false);
+                            let res = this
+                                .boot_control
+                                .current_level
+                                .update(BootControlLevel::Inactive.into())
+                                .await;
+                            if let Err(error) = res {
+                                tracing::warn!(
+                                    ?error,
+                                    "update boot_control level to inactive failed"
+                                );
+                            }
                         }
                     }
                     .boxed_local()
@@ -647,7 +723,11 @@ impl SystemActivityGovernor {
         service_fs
             .dir("svc")
             .add_fidl_service(IncomingRequest::ActivityGovernor)
-            .add_fidl_service(IncomingRequest::Stats);
+            .add_fidl_service(IncomingRequest::Stats)
+            .add_unified_service_instance(
+                "system_activity_governor",
+                IncomingRequest::ElementInfoProviderService,
+            );
         service_fs
             .take_and_serve_directory_handle()
             .context("failed to serve outgoing namespace")?;
@@ -664,11 +744,51 @@ impl SystemActivityGovernor {
                         IncomingRequest::Stats(stream) => {
                             fasync::Task::local(sag.handle_stats_request(stream)).detach()
                         }
+                        IncomingRequest::ElementInfoProviderService(
+                            fbroker::ElementInfoProviderServiceRequest::StatusProvider(stream),
+                        ) => fasync::Task::local(sag.handle_element_info_provider_request(stream))
+                            .detach(),
                     }
                 }
             })
             .await;
         Ok(())
+    }
+
+    async fn get_status_endpoints(&self) -> Vec<fbroker::ElementStatusEndpoint> {
+        let mut endpoints = Vec::new();
+
+        register_element_status_endpoint(
+            "execution_state",
+            &self.execution_state_manager.inner.lock().await.execution_state,
+            &mut endpoints,
+        );
+
+        register_element_status_endpoint(
+            "application_activity",
+            &self.application_activity,
+            &mut endpoints,
+        );
+
+        register_element_status_endpoint(
+            "full_wake_handling",
+            &self.full_wake_handling,
+            &mut endpoints,
+        );
+
+        register_element_status_endpoint("wake_handling", &self.wake_handling, &mut endpoints);
+
+        register_element_status_endpoint("boot_control", &self.boot_control, &mut endpoints);
+
+        if let Some(resume_latency_ctx) = &self.resume_latency_ctx {
+            register_element_status_endpoint(
+                "execution_resume_latency",
+                &resume_latency_ctx.execution_resume_latency,
+                &mut endpoints,
+            );
+        }
+
+        endpoints
     }
 
     async fn handle_activity_governor_request(
@@ -748,6 +868,37 @@ impl SystemActivityGovernor {
                 }
                 fsuspend::StatsRequest::_UnknownMethod { ordinal, .. } => {
                     tracing::warn!(?ordinal, "Unknown StatsRequest method");
+                }
+            }
+        }
+    }
+
+    async fn handle_element_info_provider_request(
+        self: Rc<Self>,
+        mut stream: fbroker::ElementInfoProviderRequestStream,
+    ) {
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                fbroker::ElementInfoProviderRequest::GetElementPowerLevelNames { responder } => {
+                    let result = responder.send(Ok(&self.element_power_level_names));
+                    if let Err(error) = result {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to GetElementPowerLevelNames request"
+                        );
+                    }
+                }
+                fbroker::ElementInfoProviderRequest::GetStatusEndpoints { responder } => {
+                    let result = responder.send(Ok(self.get_status_endpoints().await));
+                    if let Err(error) = result {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to GetStatusEndpoints request"
+                        );
+                    }
+                }
+                fbroker::ElementInfoProviderRequest::_UnknownMethod { ordinal, .. } => {
+                    tracing::warn!(?ordinal, "Unknown ElementInfoProviderRequest method");
                 }
             }
         }
@@ -890,5 +1041,46 @@ impl ResumeLatencyContext {
             .await;
         })
         .detach();
+    }
+}
+
+fn register_element_status_endpoint(
+    name: &str,
+    element: &PowerElementContext,
+    endpoints: &mut Vec<fbroker::ElementStatusEndpoint>,
+) {
+    let (status_client, status_server) = create_endpoints::<fbroker::StatusMarker>();
+    match element.element_control.open_status_channel(status_server) {
+        Ok(_) => {
+            endpoints.push(fbroker::ElementStatusEndpoint {
+                identifier: Some(name.into()),
+                status: Some(status_client),
+                ..Default::default()
+            });
+        }
+        Err(error) => {
+            tracing::warn!(?error, "Failed to register a Status channel for {}", name)
+        }
+    }
+}
+
+fn generate_element_power_level_names(
+    element_name: &str,
+    power_levels_names: Vec<(fbroker::PowerLevel, String)>,
+) -> fbroker::ElementPowerLevelNames {
+    fbroker::ElementPowerLevelNames {
+        identifier: Some(element_name.into()),
+        levels: Some(
+            power_levels_names
+                .iter()
+                .cloned()
+                .map(|(level, name)| fbroker::PowerLevelName {
+                    level: Some(level),
+                    name: Some(name.into()),
+                    ..Default::default()
+                })
+                .collect(),
+        ),
+        ..Default::default()
     }
 }

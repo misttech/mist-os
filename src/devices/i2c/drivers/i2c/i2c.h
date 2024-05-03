@@ -5,35 +5,32 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_I2C_I2C_H_
 #define SRC_DEVICES_I2C_DRIVERS_I2C_I2C_H_
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
-#include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/fidl.h>
+#include <lib/ddk/metadata.h>
+#include <lib/driver/component/cpp/driver_base.h>
 
-#include <memory>
-#include <vector>
-
-#include <ddktl/device.h>
+#include "src/devices/i2c/drivers/i2c/i2c-child-server.h"
 
 namespace i2c {
 
-class I2cDevice;
-using I2cDeviceType = ddk::Device<I2cDevice>;
+class I2cChildServer;
 
-class I2cDevice : public I2cDeviceType {
- public:
+class I2cDriver : public fdf::DriverBase {
   using TransferRequestView = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferRequestView;
   using TransferCompleter = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferCompleter;
 
-  I2cDevice(zx_device_t* parent, uint64_t max_transfer_size,
-            fdf::ClientEnd<fuchsia_hardware_i2cimpl::Device> i2c)
-      : I2cDeviceType(parent), i2c_(std::move(i2c)), max_transfer_(max_transfer_size) {
+  static constexpr std::string_view kDriverName = "i2c";
+
+ public:
+  I2cDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {
     impl_ops_.resize(kInitialOpCount);
     read_vectors_.resize(kInitialOpCount);
     read_buffer_.resize(kInitialReadBufferSize);
   }
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  void DdkRelease() { delete this; }
+  zx::result<> Start() override;
 
   void Transact(uint16_t address, TransferRequestView request, TransferCompleter::Sync& completer);
 
@@ -41,20 +38,24 @@ class I2cDevice : public I2cDeviceType {
   static constexpr size_t kInitialOpCount = 16;
   static constexpr size_t kInitialReadBufferSize = 512;
 
-  zx_status_t Init(const fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata& metadata);
+  zx::result<> AddI2cChildren(fuchsia_hardware_i2c_businfo::I2CBusMetadata metadata);
   void SetSchedulerRole();
 
   zx_status_t GrowContainersIfNeeded(
       const fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>& transactions);
 
-  fdf::WireSyncClient<fuchsia_hardware_i2cimpl::Device> i2c_;
-  const uint64_t max_transfer_;
+  uint64_t max_transfer_;
 
   // Ops and read data/vectors to be used in Transact(). Set to the initial capacities specified
   // above; more space is dyamically allocated if needed.
   std::vector<fuchsia_hardware_i2cimpl::wire::I2cImplOp> impl_ops_;
   std::vector<fidl::VectorView<uint8_t>> read_vectors_;
   std::vector<uint8_t> read_buffer_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fdf::WireSyncClient<fuchsia_hardware_i2cimpl::Device> i2c_;
+
+  std::vector<std::unique_ptr<I2cChildServer>> child_servers_;
 };
 
 }  // namespace i2c

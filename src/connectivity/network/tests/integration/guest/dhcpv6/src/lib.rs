@@ -80,6 +80,7 @@ async fn gets_dns_servers(name: &str) {
                     non_temporary_address_config: Default::default(),
                     prefix_delegation_config: None,
                 },
+                duid: None,
             }
             .into(),
             server_end,
@@ -240,7 +241,7 @@ fn assert_prefix(
 }
 
 #[track_caller]
-fn start_dhcpv6_client(
+fn start_stateful_dhcpv6_client(
     client_provider: &fnet_dhcpv6::ClientProviderProxy,
     interface_id: u64,
     addr: net_types::ip::Ipv6Addr,
@@ -258,6 +259,7 @@ fn start_dhcpv6_client(
                     zone_index: interface_id,
                 },
                 config: client_config,
+                duid: Some(fnet_dhcpv6::Duid::Uuid(uuid::Uuid::new_v4().into_bytes())),
             }
             .into(),
             server_end,
@@ -331,7 +333,7 @@ async fn stateful_renew(name: &str) {
     let config = Dhcpv6ServerConfig::new(SERVER_ID1, PrefixCount::One);
     start_server(&guest_controller, config).await;
 
-    let dhcpv6_client = start_dhcpv6_client(
+    let dhcpv6_client = start_stateful_dhcpv6_client(
         &client_provider,
         iface.id(),
         addr,
@@ -376,7 +378,7 @@ async fn stateful_alternative_server_while_rebinding(name: &str) {
         start_server(&guest_controller, config2)
     );
 
-    let dhcpv6_client = start_dhcpv6_client(
+    let dhcpv6_client = start_stateful_dhcpv6_client(
         &client_provider,
         iface.id(),
         addr,
@@ -426,7 +428,7 @@ async fn stateful_client_restart(name: &str, prefix_count: PrefixCount) {
     start_server(&guest_controller, config).await;
 
     let want_prefix_after_restart = {
-        let dhcpv6_client = start_dhcpv6_client(
+        let dhcpv6_client = start_stateful_dhcpv6_client(
             &client_provider,
             iface.id(),
             addr,
@@ -460,7 +462,7 @@ async fn stateful_client_restart(name: &str, prefix_count: PrefixCount) {
     };
 
     {
-        let dhcpv6_client = start_dhcpv6_client(
+        let dhcpv6_client = start_stateful_dhcpv6_client(
             &client_provider,
             iface.id(),
             addr,

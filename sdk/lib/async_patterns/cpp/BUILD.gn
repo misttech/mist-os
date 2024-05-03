@@ -7,6 +7,7 @@ import("//build/cpp/sdk_source_set.gni")
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "async_patterns_cpp"
+  stable = true
   include_base = "//sdk"
 
   sources = [

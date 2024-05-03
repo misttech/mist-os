@@ -25,7 +25,7 @@ void FakeController::HandleSubmission(size_t queue_id, size_t index, nvme::Submi
   // Try and find the command handler. If it is found, run it, otherwise, return an error.
   CommandHandler cmd_handler;
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     auto& command_set = (queue_id == kAdminQueueId) ? admin_commands_ : io_commands_;
     auto cmd = command_set.find(static_cast<uint8_t>(submission.opcode()));
     if (cmd != command_set.end()) {
@@ -48,7 +48,7 @@ void FakeController::HandleSubmission(size_t queue_id, size_t index, nvme::Submi
 
 FakeController::QueueState& FakeController::GetQueueState(
     size_t queue_id, std::unordered_map<size_t, QueueState>* queues) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto iter = queues->find(queue_id);
   ZX_ASSERT(iter != queues->end());
   ZX_ASSERT(iter->second.queue);
@@ -76,12 +76,12 @@ void FakeController::SubmitCompletion(nvme::Completion& completion) {
     queue.phase ^= 1;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   irqs_.find(0)->second.Trigger();
 }
 
 zx::result<zx::interrupt> FakeController::GetOrCreateInterrupt(size_t index) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto value = irqs_.find(index);
   zx::unowned_interrupt to_clone;
   if (value != irqs_.end()) {
@@ -112,7 +112,7 @@ void FakeController::SetConfig(nvme::ControllerConfigReg& cfg) {
 }
 
 void FakeController::UpdateIrqMask(bool enable, nvme::InterruptReg& state) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   uint32_t val = state.reg_value();
   for (size_t i = 0; i < 32; i++) {
     if ((val >> i) & 1) {

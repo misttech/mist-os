@@ -31,6 +31,7 @@ rustc_test("dhcpv6") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:uuid",
   ]
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

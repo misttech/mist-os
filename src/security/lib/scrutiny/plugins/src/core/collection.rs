@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::core::{
-        util::jsons::{deserialize_url, serialize_url},
-        DataCollection,
-    },
+    crate::core::DataCollection,
+    cm_types::Url,
     core::slice::Iter,
     fuchsia_merkle::Hash,
     fuchsia_url::{PackageName, PackageVariant},
@@ -16,7 +14,6 @@ use {
         collections::{HashMap, HashSet},
         path::PathBuf,
     },
-    url::Url,
 };
 
 /// Captures metadata about where a component was loaded from.
@@ -39,7 +36,6 @@ pub enum ComponentSource {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct Component {
     pub id: i32,
-    #[serde(serialize_with = "serialize_url", deserialize_with = "deserialize_url")]
     pub url: Url,
     pub source: ComponentSource,
 }

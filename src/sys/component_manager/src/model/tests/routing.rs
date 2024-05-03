@@ -361,7 +361,7 @@ async fn use_in_collection() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -374,7 +374,7 @@ async fn use_in_collection() {
         "coll",
         ChildDecl {
             name: "d".parse().unwrap(),
-            url: "test:///d".to_string(),
+            url: "test:///d".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -453,7 +453,7 @@ async fn use_in_collection_not_offered() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -526,7 +526,7 @@ async fn dynamic_offer_from_parent() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -549,7 +549,7 @@ async fn dynamic_offer_from_parent() {
         "coll",
         ChildDecl {
             name: "d".parse().unwrap(),
-            url: "test:///d".to_string(),
+            url: "test:///d".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -612,7 +612,7 @@ async fn dynamic_offer_siblings_same_collection() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -625,7 +625,7 @@ async fn dynamic_offer_siblings_same_collection() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -694,7 +694,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         "source_coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -707,7 +707,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         "target_coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -775,7 +775,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -788,7 +788,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -821,7 +821,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -890,7 +890,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -903,7 +903,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -936,7 +936,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1014,7 +1014,7 @@ async fn dynamic_offer_to_static_offer() {
         "coll",
         ChildDecl {
             name: "c".parse().unwrap(),
-            url: "test:///c".to_string(),
+            url: "test:///c".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1068,7 +1068,7 @@ async fn create_child_with_dict() {
     ];
 
     // Create a dictionary with a sender for the `hippo` protocol.
-    let dict = sandbox::Dict::new();
+    let mut dict = sandbox::Dict::new();
 
     let (receiver, sender) = sandbox::Receiver::new();
 
@@ -1089,9 +1089,7 @@ async fn create_child_with_dict() {
 
     // CreateChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
-    dict.lock_entries()
-        .insert("hippo".parse().unwrap(), sender.into())
-        .expect("dict entry already exists");
+    dict.insert("hippo".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
     let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
 
@@ -1101,7 +1099,7 @@ async fn create_child_with_dict() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -1360,7 +1358,7 @@ async fn use_runner_from_environment_in_collection() {
             "coll",
             ChildDecl {
                 name: "b".parse().unwrap(),
-                url: "test:///b".to_string(),
+                url: "test:///b".parse().unwrap(),
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
                 on_terminate: None,
@@ -1783,7 +1781,7 @@ async fn use_with_destroyed_parent() {
         "coll",
         ChildDecl {
             name: "b".parse().unwrap(),
-            url: "test:///b".to_string(),
+            url: "test:///b".parse().unwrap(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
             on_terminate: None,
@@ -3017,17 +3015,14 @@ async fn use_filtered_service_from_sibling() {
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("c")
-                        .source_instance_filter(vec!["variantinstance".to_string()]),
+                        .source_instance_filter(["variantinstance"]),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("d")
-                        .renamed_instances(vec![NameMapping {
-                            source_name: "default".to_string(),
-                            target_name: "renamed_default".to_string(),
-                        }]),
+                        .renamed_instances([("default", "renamed_default")]),
                 )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))
@@ -3155,18 +3150,15 @@ async fn use_filtered_aggregate_service_from_sibling() {
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("c")
-                        .source_instance_filter(vec!["variantinstance".to_string()]),
+                        .source_instance_filter(["variantinstance"]),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source_static_child("b")
                         .target_static_child("c")
-                        .source_instance_filter(vec!["renamed_default".to_string()])
-                        .renamed_instances(vec![NameMapping {
-                            source_name: "default".to_string(),
-                            target_name: "renamed_default".to_string(),
-                        }]),
+                        .source_instance_filter(["renamed_default"])
+                        .renamed_instances([("default", "renamed_default")]),
                 )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))

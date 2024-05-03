@@ -142,9 +142,9 @@ void FileTester::Lookup(VnodeF2fs *parent, std::string_view name, fbl::RefPtr<fs
   *out = std::move(vn);
 }
 
-void FileTester::CreateChild(Dir *vn, uint32_t mode, std::string_view name) {
-  fbl::RefPtr<fs::Vnode> tmp_child;
-  ASSERT_EQ(vn->Create(name, mode, &tmp_child), ZX_OK);
+void FileTester::CreateChild(Dir *vn, umode_t mode, std::string_view name) {
+  zx::result tmp_child = vn->CreateWithMode(name, mode);
+  ASSERT_TRUE(tmp_child.is_ok()) << tmp_child.status_string();
   ASSERT_EQ(tmp_child->Close(), ZX_OK);
 }
 
@@ -162,11 +162,10 @@ void FileTester::CreateChildren(F2fs *fs, std::vector<fbl::RefPtr<VnodeF2fs>> &v
                                 std::vector<uint32_t> &inos, fbl::RefPtr<Dir> &parent,
                                 std::string name, uint32_t inode_cnt) {
   for (uint32_t i = 0; i < inode_cnt; ++i) {
-    fbl::RefPtr<fs::Vnode> test_file;
-
     std::string file_name = name + std::to_string(i);
-    ASSERT_EQ(parent->Create(file_name, S_IFREG, &test_file), ZX_OK);
-    fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+    zx::result test_file = parent->Create(file_name, fs::CreationType::kFile);
+    ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+    fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
 
     inos.push_back(test_file_vn->Ino());
     vnodes.push_back(std::move(test_file_vn));
@@ -183,13 +182,13 @@ void FileTester::DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
   ASSERT_EQ(deleted_file_cnt, inode_cnt);
 }
 
-void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2fs> &vnode) {
+void FileTester::VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2fs> &vnode) {
   nid_t inode_nid;
   auto nid_or = fs->GetNodeManager().AllocNid();
   ASSERT_TRUE(nid_or.is_ok());
   inode_nid = *nid_or;
 
-  VnodeF2fs::Allocate(fs, inode_nid, static_cast<umode_t>(mode), &vnode);
+  VnodeF2fs::Allocate(fs, inode_nid, mode, &vnode);
   ASSERT_EQ(vnode->Open(nullptr), ZX_OK);
   vnode->InitTime();
   vnode->InitFileCache();

@@ -614,6 +614,11 @@ class VolApp {
 }  // namespace media
 
 int main(int argc, const char** argv) {
+  printf(
+      "WARNING: vol is deprecated. Please use `ffx audio device`\n"
+      "to set device gain/mute/AGC settings. For more information, run \n"
+      "`ffx audio device --help`\n\n");
+
   fuchsia_logging::SetTags({"vol_util"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

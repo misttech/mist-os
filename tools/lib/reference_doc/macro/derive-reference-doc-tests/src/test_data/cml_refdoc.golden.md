@@ -475,6 +475,9 @@ This supports the following additional fields:
     - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
     - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
     - `self/<relative_path>`: A path to a dictionary defined by this component.
+    - `program/<relative_path>`: A path to a dictionary served by this component's program.
+      <relative_path> is a path in the program's outgoing directory to a
+      fuchsia.component.sandbox/DictionaryGetter protocol.
     `<relative_path>` may be either a name, identifying a dictionary capability), or
     a path with multiple parts, identifying a nested dictionary.
 - `backing_dir`: (_optional `string`_) (`storage` only) The [name](#name) of the directory capability backing the storage. The

@@ -55,7 +55,7 @@ pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
         width,
         height,
         pixel_format,
-        color_space: fidl_fuchsia_sysmem::ColorSpaceType::Srgb,
+        color_space: fidl_fuchsia_images2::ColorSpace::Srgb,
         name: Some("display-tool vsync layer".to_string()),
     };
     let image =

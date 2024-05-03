@@ -151,7 +151,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/sdhci.cm",
     "#meta/sdmmc.cm",
     "#meta/selina_radar.cm",
-    "#meta/serial-async.cm",
     "#meta/sherlock-camera-controller_driver_component.cm",
     "#meta/simple.amd-kaveri.cm",
     "#meta/simple.bochs.cm",

@@ -118,8 +118,7 @@ impl Router {
             let Some(token) = payload.requesting else {
                 return Err(fsandbox::BedrockError::InvalidArgs);
             };
-            let capability =
-                crate::registry::remove(token.token.as_handle_ref().get_koid().unwrap());
+            let capability = crate::registry::get(token.token.as_handle_ref().get_koid().unwrap());
             let component = match capability {
                 Some(crate::Capability::Component(c)) => c,
                 Some(_) => return Err(fsandbox::BedrockError::InvalidArgs),

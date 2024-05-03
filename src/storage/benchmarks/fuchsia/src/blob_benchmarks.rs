@@ -6,8 +6,8 @@ use {
     async_trait::async_trait,
     delivery_blob::CompressionMode,
     fidl_fuchsia_io as fio,
-    fuchia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
     fuchsia_pkg_testing::PackageBuilder,
+    fuchsia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
     fuchsia_zircon as zx,
     futures::stream::{self, StreamExt},
     rand::{
@@ -397,7 +397,7 @@ async fn page_in_blob_benchmark(
 mod tests {
     use {
         super::*,
-        fuchia_storage_benchmarks_lib::{
+        fuchsia_storage_benchmarks_lib::{
             block_devices::RamdiskFactory,
             filesystems::{Blobfs, Fxblob, PkgDirTest},
         },

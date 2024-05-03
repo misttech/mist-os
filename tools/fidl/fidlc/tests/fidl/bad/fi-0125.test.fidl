@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 library test.bad.fi0125;
 
-@discoverable(value="example.Bar")
+@transport(value="Driver")
 protocol Foo {};

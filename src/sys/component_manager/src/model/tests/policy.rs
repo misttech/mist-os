@@ -40,7 +40,7 @@ impl GlobalPolicyCheckerTest<ComponentInstance> for GlobalPolicyCheckerTestForCm
                 DebugRegistry::default(),
             )),
             instanced_moniker,
-            "test:///bar".into(),
+            "test:///bar".parse().unwrap(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
             None,

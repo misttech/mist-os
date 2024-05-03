@@ -12,23 +12,7 @@ use {
     },
 };
 
-mod packages;
 mod validation;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DirentType {
-    Directory,
-    File,
-}
-
-impl Into<fio::DirentType> for DirentType {
-    fn into(self) -> fio::DirentType {
-        match self {
-            Self::Directory => fio::DirentType::Directory,
-            Self::File => fio::DirentType::File,
-        }
-    }
-}
 
 // Helper for implementing vfs::directory::entry_container::Directory::read_dirents.
 // `entries` keys are the names of the directory entries.
@@ -39,7 +23,7 @@ impl Into<fio::DirentType> for DirentType {
 // call and `entries` is not the same as on the previous call, clients are not guaranteed to see
 // a consistent snapshot of the directory contents.
 async fn read_dirents<'a>(
-    entries: &'a BTreeMap<String, DirentType>,
+    entries: &'a BTreeMap<String, fio::DirentType>,
     pos: &'a TraversalPosition,
     mut sink: Box<(dyn vfs::directory::dirents_sink::Sink + 'static)>,
 ) -> Result<
@@ -75,7 +59,7 @@ async fn read_dirents<'a>(
     };
 
     for (next, dirent_type) in remaining {
-        match sink.append(&EntryInfo::new(fio::INO_UNKNOWN, (*dirent_type).into()), next) {
+        match sink.append(&EntryInfo::new(fio::INO_UNKNOWN, *dirent_type), next) {
             AppendResult::Ok(new_sink) => sink = new_sink,
             AppendResult::Sealed(sealed) => {
                 // Ran out of response buffer space. Pick up on this item next time.
@@ -90,7 +74,6 @@ async fn read_dirents<'a>(
 /// Make the pkgfs compatibility directory, which has the following structure:
 ///   ./
 ///     system/
-///     packages/
 ///     ctl/
 ///       validation/
 ///         missing
@@ -101,10 +84,6 @@ pub fn make_dir(
     system_image: Option<system_image::SystemImage>,
 ) -> Result<Arc<dyn DirectoryEntry>, anyhow::Error> {
     let dir = vfs::pseudo_directory! {
-        "packages" => packages::PkgfsPackages::new(
-            base_packages.clone(),
-            blobfs.clone(),
-        ),
         "ctl" => vfs::pseudo_directory! {
             "validation" => validation::Validation::new(
                 blobfs,
@@ -208,9 +187,9 @@ mod testing {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn read_dirents_one_entry_at_a_time_yields_expected_entries() {
         let entries = BTreeMap::from([
-            ("dir0".to_string(), DirentType::Directory),
-            ("dir1".to_string(), DirentType::Directory),
-            ("file".to_string(), DirentType::File),
+            ("dir0".to_string(), fio::DirentType::Directory),
+            ("dir1".to_string(), fio::DirentType::Directory),
+            ("file".to_string(), fio::DirentType::File),
         ]);
 
         let expected_entries = vec![
@@ -254,8 +233,8 @@ mod testing {
     async fn read_dirents_pagination_may_encounter_temporal_anomalies() {
         // First ReadDirents when directory contains [., a, c].
         let mut entries = BTreeMap::from([
-            ("a".to_string(), DirentType::File),
-            ("c".to_string(), DirentType::File),
+            ("a".to_string(), fio::DirentType::File),
+            ("c".to_string(), fio::DirentType::File),
         ]);
 
         let (pos, sealed) =
@@ -266,8 +245,8 @@ mod testing {
         let mut results = FakeSink::from_sealed(sealed).entries;
 
         // Add [b, d] to directory.
-        entries.insert("b".to_string(), DirentType::File);
-        entries.insert("d".to_string(), DirentType::File);
+        entries.insert("b".to_string(), fio::DirentType::File);
+        entries.insert("d".to_string(), fio::DirentType::File);
 
         // Finish ReadDirents.
         let (pos, sealed) = read_dirents(&entries, &pos, Box::new(FakeSink::new(10)))

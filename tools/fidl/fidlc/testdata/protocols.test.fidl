@@ -82,8 +82,11 @@ closed protocol DiscoverableProtocol {
     strict Method();
 };
 
-@discoverable("fake.library.FakeProtocol")
+@discoverable(name="fake.library.FakeProtocol")
 closed protocol AnotherDiscoverableProtocol {};
+
+@discoverable(server="platform")
+closed protocol PlatformServer {};
 
 closed protocol HandleRightsProtocol {
     strict NoResponseMethod(resource struct {

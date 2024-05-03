@@ -15,7 +15,7 @@
 namespace serial {
 
 class AmlUartV1;
-using DeviceType = ddk::Device<AmlUartV1, ddk::GetProtocolable, ddk::Unbindable>;
+using DeviceType = ddk::Device<AmlUartV1, ddk::Unbindable>;
 
 class AmlUartV1 : public DeviceType {
  public:
@@ -30,10 +30,8 @@ class AmlUartV1 : public DeviceType {
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
-  // ddk::GetProtocolable
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-
-  zx_status_t Init(ddk::PDevFidl pdev, const serial_port_info_t& serial_port_info,
+  zx_status_t Init(ddk::PDevFidl pdev,
+                   const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
                    fdf::MmioBuffer mmio);
 
   // Used by the unit test to access the device.

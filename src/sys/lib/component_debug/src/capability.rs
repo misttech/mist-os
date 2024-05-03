@@ -151,7 +151,7 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use cm_rust::*;
-    use fidl_fuchsia_component_decl as fdecl;
+    use cm_rust_testing::*;
     use std::collections::HashMap;
 
     fn create_realm_query() -> fsys::RealmQueryProxy {
@@ -169,51 +169,27 @@ mod tests {
             }],
             HashMap::from([(
                 "./my_foo".to_string(),
-                ComponentDecl {
-                    children: vec![ChildDecl {
-                        name: "my_bar".parse().unwrap(),
-                        url: "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm".to_string(),
-                        startup: fdecl::StartupMode::Lazy,
-                        environment: None,
-                        config_overrides: None,
-                        on_terminate: None,
-                    }],
-                    uses: vec![UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target_path: "/svc/fuchsia.foo.bar".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    })],
-                    exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: ExposeTarget::Parent,
-                        target_name: "fuchsia.foo.bar".parse().unwrap(),
-                        availability: Availability::Required,
-                    })],
-                    offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Self_,
-                        source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_dictionary: Default::default(),
-                        target: OfferTarget::Child(ChildRef {
-                            name: "my_bar".parse().unwrap(),
-                            collection: None,
-                        }),
-                        target_name: "fuchsia.foo.bar".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    })],
-                    capabilities: vec![CapabilityDecl::Protocol(ProtocolDecl {
-                        name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_path: Some("/svc/fuchsia.foo.bar".parse().unwrap()),
-                        delivery: Default::default(),
-                    })],
-                    ..ComponentDecl::default()
-                }
-                .native_into_fidl(),
+                ComponentDeclBuilder::new()
+                    .child(
+                        ChildBuilder::new()
+                            .name("my_bar")
+                            .url("fuchsia-pkg://fuchsia.com/bar#meta/bar.cm"),
+                    )
+                    .protocol_default("fuchsia.foo.bar")
+                    .use_(UseBuilder::protocol().name("fuchsia.foo.bar"))
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("fuchsia.foo.bar")
+                            .source(ExposeSource::Self_),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("fuchsia.foo.bar")
+                            .source(OfferSource::Self_)
+                            .target_static_child("my_bar"),
+                    )
+                    .build()
+                    .native_into_fidl(),
             )]),
             HashMap::new(),
             HashMap::new(),

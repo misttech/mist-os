@@ -100,6 +100,20 @@ async fn show_targets(
 
 const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 
+async fn try_get_target_info(
+    spec: String,
+    context: &EnvironmentContext,
+) -> Result<(Option<String>, Option<String>), KnockError> {
+    let conn = ffx_target::DirectConnection::new(spec, context).await?;
+    let _ = conn.knock_rcs().await?;
+    let rcs = conn.rcs_proxy().await?;
+    let (pc, bc) = match rcs.identify_host().await {
+        Ok(Ok(id_result)) => (id_result.product_config, id_result.board_config),
+        _ => (None, None),
+    };
+    Ok((pc, bc))
+}
+
 #[tracing::instrument]
 async fn get_target_info(
     context: &EnvironmentContext,
@@ -113,21 +127,15 @@ async fn get_target_info(
         let spec =
             if addr.port() == 0 { format!("{addr}") } else { format!("{addr}:{}", addr.port()) };
         tracing::debug!("Trying to make a connection to spec {spec:?}");
-        let conn = ffx_target::DirectConnection::new(spec, context).await?;
-        match conn
-            .knock_rcs()
+
+        match try_get_target_info(spec, context)
             .on_timeout(ssh_timeout, || {
                 Err(KnockError::NonCriticalError(anyhow::anyhow!("knock_rcs() timed out")))
             })
             .await
         {
-            Ok(_) => {
-                let rcs = conn.rcs_proxy().await?;
-                let (pc, bc) = match rcs.identify_host().await {
-                    Ok(Ok(id_result)) => (id_result.product_config, id_result.board_config),
-                    _ => (None, None),
-                };
-                return Ok((ffx::RemoteControlState::Up, pc, bc));
+            Ok((product_config, board_config)) => {
+                return Ok((ffx::RemoteControlState::Up, product_config, board_config));
             }
             Err(KnockError::NonCriticalError(e)) => {
                 tracing::debug!("Could not connect to {addr:?}: {e:?}");
@@ -154,8 +162,14 @@ async fn handle_to_info(
         discovery::TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
         discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
     };
-    let (rcs_state, product_config, board_config) = if let Some(ref target_addrs) = addresses {
-        get_target_info(context, target_addrs).await?
+    // Temporarily have an override to disable this functionality by default. Enable on ffx builders only
+    let connect_to_target = ffx_config::get("ffx.target-list.local-connect").await.unwrap_or(false);
+    let (rcs_state, product_config, board_config) = if connect_to_target {
+        if let Some(ref target_addrs) = addresses {
+            get_target_info(context, target_addrs).await?
+        } else {
+            (ffx::RemoteControlState::Unknown, None, None)
+        }
     } else {
         (ffx::RemoteControlState::Unknown, None, None)
     };

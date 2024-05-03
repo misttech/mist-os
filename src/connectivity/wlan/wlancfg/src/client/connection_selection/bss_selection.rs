@@ -5,7 +5,6 @@
 use {
     crate::{
         client::{connection_selection::scoring_functions, types},
-        config_management::network_config::PastConnectionList,
         telemetry::{TelemetryEvent, TelemetrySender},
         util::pseudo_energy::SignalData,
     },
@@ -27,28 +26,6 @@ const LOCAL_ROAM_THRESHOLD_SNR_5G: f64 = 17.0;
 pub enum RoamReason {
     RssiBelowThreshold,
     SnrBelowThreshold,
-}
-
-/// Aggregated information about the current BSS's connection quality, used for evaluation.
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
-pub struct BssQualityData {
-    pub signal_data: SignalData,
-    pub channel: types::WlanChan,
-    // TX and RX rate, respectively.
-    pub phy_rates: (u32, u32),
-    // Connection data  of past successful connections to this BSS.
-    pub past_connections_list: PastConnectionList,
-}
-
-impl BssQualityData {
-    pub fn new(
-        signal_data: SignalData,
-        channel: types::WlanChan,
-        past_connections_list: PastConnectionList,
-    ) -> Self {
-        BssQualityData { signal_data, channel, phy_rates: (0, 0), past_connections_list }
-    }
 }
 
 /// BSS selection. Selects the best from a list of candidates that are available for
@@ -114,23 +91,26 @@ pub async fn select_bss(
 }
 
 // Returns a set of RoamReasons and a score (for metrics).
-pub fn evaluate_current_bss(bss: &BssQualityData) -> (Vec<RoamReason>, u8) {
+pub fn evaluate_current_bss(
+    signal_data: SignalData,
+    channel: types::WlanChan,
+) -> (Vec<RoamReason>, u8) {
     let mut roam_reasons: Vec<RoamReason> = vec![];
 
-    let (rssi_threshold, snr_threshold) = if bss.channel.is_5ghz() {
+    let (rssi_threshold, snr_threshold) = if channel.is_5ghz() {
         (LOCAL_ROAM_THRESHOLD_RSSI_5G, LOCAL_ROAM_THRESHOLD_SNR_5G)
     } else {
         (LOCAL_ROAM_THRESHOLD_RSSI_2G, LOCAL_ROAM_THRESHOLD_SNR_2G)
     };
 
-    if bss.signal_data.ewma_rssi.get() <= rssi_threshold {
+    if signal_data.ewma_rssi.get() <= rssi_threshold {
         roam_reasons.push(RoamReason::RssiBelowThreshold)
     }
-    if bss.signal_data.ewma_snr.get() <= snr_threshold {
+    if signal_data.ewma_snr.get() <= snr_threshold {
         roam_reasons.push(RoamReason::SnrBelowThreshold)
     }
 
-    let signal_score = scoring_functions::score_current_connection_signal_data(bss.signal_data);
+    let signal_score = scoring_functions::score_current_connection_signal_data(signal_data);
     return (roam_reasons, signal_score);
 }
 
@@ -212,12 +192,9 @@ mod test {
     #[fuchsia::test]
     fn test_evaluate_trivial_roam_reasons() {
         // Low RSSI and SNR
-        let weak_signal_bss = BssQualityData::new(
-            SignalData::new(-90, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR),
-            channel::Channel::new(11, channel::Cbw::Cbw20),
-            PastConnectionList::default(),
-        );
-        let (roam_reasons, _) = evaluate_current_bss(&weak_signal_bss);
+        let weak_signal = SignalData::new(-90, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let (roam_reasons, _) =
+            evaluate_current_bss(weak_signal, channel::Channel::new(11, channel::Cbw::Cbw20));
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
     }

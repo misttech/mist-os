@@ -584,4 +584,5 @@ INSTANTIATE_TEST_SUITE_P(
                     MakeSockOptParam("mcast-hops", "15", IPPROTO_IPV6, IPV6_MULTICAST_HOPS, 15),
                     MakeSockOptParam("mcast-loop6", "1", IPPROTO_IPV6, IPV6_MULTICAST_LOOP, 1),
                     MakeSockOptParam("mcast-if6", "1", IPPROTO_IPV6, IPV6_MULTICAST_IF, 1),
-                    MakeSockOptParam("ipv6-only", "1", IPPROTO_IPV6, IPV6_V6ONLY, 1)));
+                    MakeSockOptParam("ipv6-only", "1", IPPROTO_IPV6, IPV6_V6ONLY, 1),
+                    MakeSockOptParam("ip-hdrincl", "1", IPPROTO_IP, IP_HDRINCL, 1)));

@@ -386,6 +386,7 @@ void JSONGenerator::Generate(const Protocol& value) {
     GenerateObjectMember("openness", value.openness);
     GenerateObjectMember("composed_protocols", value.composed_protocols);
     GenerateObjectMember("methods", value.all_methods);
+    GenerateProtocolImplementationLocations(value);
   });
 }
 
@@ -427,6 +428,33 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
     if (auto type_ctor = value.result_domain_error_type_ctor)
       GenerateObjectMember("maybe_response_err_type", type_ctor->type);
   });
+}
+void JSONGenerator::GenerateProtocolImplementationLocations(const Protocol& value) {
+  auto discoverable = value.attributes->Get("discoverable");
+  if (discoverable && (discoverable->GetArg("client") || discoverable->GetArg("server"))) {
+    GenerateObjectPunctuation(Position::kSubsequent);
+    EmitObjectKey("implementation_locations");
+    GenerateObject([&]() {
+      GenerateEndpointImplementationLocations("client", discoverable, Position::kFirst);
+      GenerateEndpointImplementationLocations("server", discoverable, Position::kSubsequent);
+    });
+  }
+}
+
+void JSONGenerator::GenerateEndpointImplementationLocations(const std::string_view& endpoint,
+                                                            const Attribute* discoverable,
+                                                            Position position) {
+  auto arg = discoverable->GetArg(endpoint);
+  if (arg) {
+    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
+    auto locations = ParseImplementationLocations(
+        static_cast<const StringConstantValue&>(arg->value->Value()).value);
+    ZX_ASSERT(locations.has_value());
+    GenerateObjectMember(endpoint, locations.value(), position);
+  } else {
+    static const std::vector<std::string_view> all_locations{"platform", "external"};
+    GenerateObjectMember(endpoint, all_locations, position);
+  }
 }
 
 void JSONGenerator::GenerateTypeAndFromAlias(const TypeConstructor* value, Position position) {

@@ -6,8 +6,8 @@ import("//build/components.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 fuchsia_component_manifest("config-manifest") {
-  component_name = "vkloop_test_child"
-  manifest = "meta/vkloop_child.cml"
+  component_name = "vkloop-test-child"
+  manifest = "meta/vkloop-test-child.cml"
 }
 
 fuchsia_structured_config_cpp_elf_lib("config") {
@@ -54,7 +54,7 @@ fuchsia_structured_config_values("default_config") {
 
 fuchsia_component("vkloop_cmp") {
   cm_label = ":config-manifest"
-  component_name = "vkloop_test"
+  component_name = "vkloop-test-child"
   testonly = true
   deps = [
     ":shaders",
@@ -64,7 +64,7 @@ fuchsia_component("vkloop_cmp") {
 }
 
 fuchsia_package("vkloop-child-package") {
-  package_name = "vkloop_test"
+  package_name = "vkloop-test"
   deps = [
     ":default_config",
     ":vkloop_cmp",

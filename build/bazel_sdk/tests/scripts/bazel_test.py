@@ -323,9 +323,9 @@ def main():
         metavar="LOG",
     )
     parser.add_argument(
-        "--bazel-exec-log-json",
+        "--bazel-exec-log-compact",
         type=Path,
-        help="Output path to JSON-formatted action execution log file",
+        help="Output path to zstd-compressed action execution log file (protobuf: spawn.proto)",
         metavar="LOG",
     )
     parser.add_argument("extra_args", nargs=argparse.REMAINDER)
@@ -682,10 +682,13 @@ def main():
 
     # Bazel action execution log.
     # This contains records of local and remote executions.
-    if args.bazel_exec_log_json:
-        args.bazel_exec_log_json.parent.mkdir(parents=True, exist_ok=True)
+    # Same as --config=exec_log from template.bazelrc
+    if args.bazel_exec_log_compact:
+        args.bazel_exec_log_compact.parent.mkdir(parents=True, exist_ok=True)
         bazel_test_args += [
-            "--execution_log_json_file=%s" % args.bazel_exec_log_json.resolve()
+            "--experimental_execution_log_compact_file=%s"
+            % args.bazel_exec_log_compact.resolve(),
+            "--remote_build_event_upload=all",
         ]
 
     if args.clean:

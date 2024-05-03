@@ -232,6 +232,7 @@ fn process_flag_template_inner(
     handlebars.register_helper("di", Box::new(DiskImageHelper {}));
     let json = handlebars.render_template(&template_text, &emu_config)?;
 
+    tracing::trace!("Processed template ====\n {json}\n ======");
     // Deserialize and return the flags from the template.
     let flags = serde_json::from_str(&json)?;
     Ok(flags)

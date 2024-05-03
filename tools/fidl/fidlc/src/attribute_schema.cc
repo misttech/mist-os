@@ -257,15 +257,18 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
 
   ConstantValue::Kind kind;
   if (auto special_case = std::get_if<SpecialCase>(&type_)) {
-    ZX_ASSERT_MSG(*special_case == SpecialCase::kVersion, "unhandled special case");
-    kind = ConstantValue::Kind::kUint64;
-    if (constant->kind == Constant::Kind::kIdentifier) {
-      if (TryResolveAsHead(step, static_cast<IdentifierConstant*>(constant)->reference)) {
-        constant->ResolveTo(
-            std::make_unique<NumericConstantValue<uint64_t>>(Version::Head().ordinal()),
-            step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint64));
-        return;
-      }
+    switch (*special_case) {
+      case SpecialCase::kVersion:
+        kind = ConstantValue::Kind::kUint64;
+        if (constant->kind == Constant::Kind::kIdentifier) {
+          if (TryResolveAsHead(step, static_cast<IdentifierConstant*>(constant)->reference)) {
+            constant->ResolveTo(
+                std::make_unique<NumericConstantValue<uint64_t>>(Version::Head().ordinal()),
+                step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint64));
+            return;
+          }
+        }
+        break;
     }
   } else {
     kind = std::get<ConstantValue::Kind>(type_);
@@ -381,14 +384,26 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
 
 static bool DiscoverableConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                    const Attribute* attr, const Element* element) {
-  auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName);
-  if (!arg) {
-    return true;
+  if (auto arg = attr->GetArg("name")) {
+    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
+    auto name = static_cast<const StringConstantValue&>(arg->value->Value()).value;
+    if (!IsValidDiscoverableName(name)) {
+      return reporter->Fail(ErrInvalidDiscoverableName, arg->span, name);
+    }
   }
-  ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
-  auto name = static_cast<const StringConstantValue&>(arg->value->Value()).value;
-  if (!IsValidDiscoverableName(name)) {
-    return reporter->Fail(ErrInvalidDiscoverableName, arg->span, name);
+  if (auto arg = attr->GetArg("client")) {
+    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
+    auto locations = static_cast<const StringConstantValue&>(arg->value->Value()).value;
+    if (!IsValidImplementationLocations(locations)) {
+      return reporter->Fail(ErrInvalidDiscoverableLocation, arg->span, locations);
+    }
+  }
+  if (auto arg = attr->GetArg("server")) {
+    ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
+    auto locations = static_cast<const StringConstantValue&>(arg->value->Value()).value;
+    if (!IsValidImplementationLocations(locations)) {
+      return reporter->Fail(ErrInvalidDiscoverableLocation, arg->span, locations);
+    }
   }
   return true;
 }
@@ -418,9 +433,19 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
       .RestrictTo({
           Element::Kind::kProtocol,
       })
-      .AddArg(AttributeArgSchema(ConstantValue::Kind::kString,
-                                 AttributeArgSchema::Optionality::kOptional))
+      .AddArg("name", AttributeArgSchema(ConstantValue::Kind::kString,
+                                         AttributeArgSchema::Optionality::kOptional))
+      .AddArg("client", AttributeArgSchema(ConstantValue::Kind::kString,
+                                           AttributeArgSchema::Optionality::kOptional))
+      .AddArg("server", AttributeArgSchema(ConstantValue::Kind::kString,
+                                           AttributeArgSchema::Optionality::kOptional))
       .Constrain(DiscoverableConstraint);
+  map["serializable"]
+      .RestrictTo({Element::Kind::kStruct, Element::Kind::kTable, Element::Kind::kUnion})
+      .AddArg("read", AttributeArgSchema(ConstantValue::Kind::kString,
+                                         AttributeArgSchema::Optionality::kOptional))
+      .AddArg("write", AttributeArgSchema(ConstantValue::Kind::kString,
+                                          AttributeArgSchema::Optionality::kOptional));
   map[std::string(Attribute::kDocCommentName)].AddArg(
       AttributeArgSchema(ConstantValue::Kind::kString));
   map["generated_name"]

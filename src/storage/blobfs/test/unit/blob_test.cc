@@ -96,9 +96,8 @@ namespace {
 
 TEST_P(BlobTest, TruncateWouldOverflow) {
   fbl::RefPtr root = OpenRoot();
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(kEmptyBlobName, 0, &file), ZX_OK);
-
+  zx::result file = root->Create(kEmptyBlobName, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   EXPECT_EQ(file->Truncate(UINT64_MAX), ZX_ERR_OUT_OF_RANGE);
 }
 
@@ -109,9 +108,8 @@ TEST_P(BlobTest, SyncBehavior) {
 
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
-
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   size_t out_actual = 0;
   EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
 
@@ -151,14 +149,14 @@ TEST_P(BlobTest, ReadingBlobZerosTail) {
   uint64_t block;
   {
     auto root = OpenRoot();
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
     EXPECT_EQ(out_actual, info->size_data);
     {
-      auto blob = fbl::RefPtr<Blob>::Downcast(file);
+      auto blob = fbl::RefPtr<Blob>::Downcast(*file);
       block = blobfs()->GetNode(blob->Ino())->extents[0].Start() + DataStartBlock(blobfs()->Info());
     }
   }
@@ -232,9 +230,9 @@ TEST_P(BlobTest, WriteBlobWithSharedBlockInCompactFormat) {
           CreateMerkleTree(info->data.get(), info->size_data, /*use_compact_format=*/true);
       EXPECT_EQ(info->size_data + merkle_tree->merkle_tree_size, digest::kDefaultNodeSize * 3);
     }
-    fbl::RefPtr<fs::Vnode> file;
     auto root = OpenRoot();
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -263,8 +261,8 @@ TEST_P(BlobTest, WriteErrorsAreFused) {
   std::unique_ptr<BlobInfo> info =
       GenerateRandomBlob("", static_cast<size_t>(kTestDeviceBlockSize) * kTestDeviceNumBlocks);
   auto root = OpenRoot();
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
   uint64_t out_actual;
   EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_ERR_NO_SPACE);
@@ -272,8 +270,8 @@ TEST_P(BlobTest, WriteErrorsAreFused) {
   EXPECT_EQ(file->Write(info->data.get(), 1, 0, &out_actual), ZX_ERR_NO_SPACE);
 
   // Whilst we have the failed file still open, we should be able to try again immediately.
-  fbl::RefPtr<fs::Vnode> file2;
-  ASSERT_EQ(root->Create(info->path, 0, &file2), ZX_OK);
+  zx::result file2 = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file2.is_ok()) << file2.status_string();
   ASSERT_EQ(file2->Truncate(info->size_data), ZX_OK);
 }
 
@@ -283,8 +281,8 @@ TEST_P(BlobTest, UnlinkBlocksUntilNoVmoChildren) {
 
   // Write the blob
   {
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -323,8 +321,8 @@ TEST_P(BlobTest, VmoChildDeletedTriggersPurging) {
 
   // Write the blob
   {
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -382,8 +380,8 @@ TEST_P(BlobTest, ReadErrorsTemporary) {
 
   // Write the blob
   {
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -444,8 +442,8 @@ TEST_P(BlobTest, VmoNameActiveWhileFdOpen) {
   const std::string inactive_name =
       std::string("inactive-blob-").append(std::string_view(info->path, 8));
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   size_t out_actual = 0;
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
   ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -453,7 +451,7 @@ TEST_P(BlobTest, VmoNameActiveWhileFdOpen) {
   loop().RunUntilIdle();
   ASSERT_EQ(file->Close(), ZX_OK);
   ASSERT_EQ(file->Open(nullptr), ZX_OK);
-  auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
+  auto blob = fbl::RefPtr<Blob>::Downcast(*std::move(file));
 
   // Blobfs lazily creates the data VMO on first read.
   EXPECT_FALSE(GetPagedVmo(*blob));
@@ -479,8 +477,8 @@ TEST_P(BlobTest, VmoNameActiveWhileVmoClonesExist) {
   const std::string inactive_name =
       std::string("inactive-blob-").append(std::string_view(info->path, 8));
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   size_t out_actual = 0;
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
   ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -488,7 +486,7 @@ TEST_P(BlobTest, VmoNameActiveWhileVmoClonesExist) {
   loop().RunUntilIdle();
   ASSERT_EQ(file->Close(), ZX_OK);
   ASSERT_EQ(file->Open(nullptr), ZX_OK);
-  auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
+  auto blob = fbl::RefPtr<Blob>::Downcast(*std::move(file));
 
   zx::vmo vmo;
   ASSERT_EQ(blob->GetVmo(fio::wire::VmoFlags::kRead, &vmo), ZX_OK);
@@ -529,15 +527,15 @@ TEST_P(BlobTest, GetAttributes) {
   {
     auto root = OpenRoot();
 
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
 
     size_t out_actual;
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
     ASSERT_EQ(out_actual, info->size_data);
 
-    auto blob = fbl::RefPtr<Blob>::Downcast(file);
+    auto blob = fbl::RefPtr<Blob>::Downcast(*file);
     inode = blob->Ino();
     block_count = blobfs()->GetNode(inode)->block_count;
 
@@ -560,8 +558,8 @@ TEST_P(BlobTest, AppendSetsOutEndCorrectly) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
   auto root = OpenRoot();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
 
   size_t out_end;
@@ -579,8 +577,8 @@ TEST_P(BlobTest, WritesToArbitraryOffsetsFails) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
   auto root = OpenRoot();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
 
   size_t out_actual;
@@ -597,14 +595,14 @@ TEST_P(BlobTest, WrittenBlobsArePagedOutWhenClosed) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
   auto root = OpenRoot();
   {
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
     EXPECT_EQ(out_actual, info->size_data);
 
-    auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
+    auto blob = fbl::RefPtr<Blob>::Downcast(*std::move(file));
     // Blobfs lazily creates the data VMO on first read.
     char c;
     size_t actual;
@@ -636,8 +634,8 @@ TEST_P(BlobTest, WriteBlobChunked) {
   // Write the blob in chunks.
   constexpr size_t kWriteLength = 100;
   {
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     size_t bytes_written = 0;
     while (bytes_written < info->size_data) {

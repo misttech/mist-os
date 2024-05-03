@@ -27,13 +27,13 @@ rustc_binary("blackout-minfs-tree-target-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/blackout/target/lib:blackout-target",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
-    "//tools/blackout/blackout-target",
   ]
   source_root = "src/target.rs"
   sources = [ "src/target.rs" ]
@@ -67,13 +67,13 @@ rustc_binary("blackout-fxfs-tree-target-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/blackout/target/lib:blackout-target",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
-    "//tools/blackout/blackout-target",
   ]
   data_deps = [
     "//src/storage/fxfs",

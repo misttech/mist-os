@@ -222,9 +222,9 @@ pub trait IcmpEchoBindingsContext<I: IpExt, D: device::StrongId>: IcmpEchoBindin
 /// edge in fake tests bindings contexts that are already parameterized on I
 /// themselves. This is still better than relying on `Box<dyn Any>` to keep the
 /// external data in our references so we take the rough edge.
-pub trait IcmpEchoBindingsTypes: Sized {
+pub trait IcmpEchoBindingsTypes: Sized + 'static {
     /// Opaque bindings data held by core for a given IP version.
-    type ExternalData<I: Ip>: Debug + Send + Sync;
+    type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 }
 
 /// A Context that provides access to the sockets' states.

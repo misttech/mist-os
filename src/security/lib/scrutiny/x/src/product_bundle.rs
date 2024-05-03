@@ -67,9 +67,8 @@ impl ProductBundle {
         ));
         let repositories = product_bundle
             .repositories
-            .iter()
+            .into_iter()
             .map(|repository| {
-                let name = repository.name.clone();
                 let blobs_directory: Box<dyn api::Path> = Box::new(
                     directory.as_ref().as_ref().to_path_buf().join(&repository.blobs_path),
                 );
@@ -80,14 +79,19 @@ impl ProductBundle {
                     api::DataSourceVersion::Unknown,
                 ));
                 product_bundle_data_source.add_child(repository_data_source.clone());
-                Repository::new(name, blobs_directory, repository_data_source)
+                Repository::new(
+                    repository.name,
+                    blobs_directory,
+                    repository_data_source,
+                    repository.delivery_blob_type,
+                )
             })
             .collect::<Vec<_>>();
         Ok(Self(Rc::new(ProductBundleData {
             directory,
             data_source: product_bundle_data_source,
             update_package_hash,
-            repositories: repositories.clone(),
+            repositories,
             blobs: OnceCell::new(),
         })))
     }
@@ -154,11 +158,29 @@ impl Repository {
     }
 
     fn init_blobs(&self) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
-        BlobDirectory::new(Some(self.0.data_source.clone()), self.0.blobs_directory.clone())
+        BlobDirectory::new(
+            Some(self.0.data_source.clone()),
+            self.0.blobs_directory.clone(),
+            self.0
+                .delivery_blob_type
+                .try_into()
+                .map_err(BlobDirectoryError::InvalidDeliveryBlobType)?,
+        )
     }
 
-    fn new(name: String, blobs_directory: Box<dyn api::Path>, data_source: ds::DataSource) -> Self {
-        Self(Rc::new(RepositoryData { name, blobs_directory, data_source, blobs: OnceCell::new() }))
+    fn new(
+        name: String,
+        blobs_directory: Box<dyn api::Path>,
+        data_source: ds::DataSource,
+        delivery_blob_type: u32,
+    ) -> Self {
+        Self(Rc::new(RepositoryData {
+            name,
+            blobs_directory,
+            data_source,
+            blobs: OnceCell::new(),
+            delivery_blob_type,
+        }))
     }
 }
 
@@ -170,6 +192,7 @@ struct RepositoryData {
     data_source: ds::DataSource,
     #[derivative(Debug = "ignore")]
     blobs: OnceCell<Box<dyn BlobSet>>,
+    delivery_blob_type: u32,
 }
 
 #[cfg(test)]
@@ -417,7 +440,7 @@ mod tests {
         .into_iter()
         .map(|blob_directory| {
             let directory = temp_dir.path().join(blob_directory);
-            fs::create_dir_all(&directory).expect("create blobs directory");
+            fs::create_dir_all(&directory.join("1")).expect("create blobs directory");
             directory
         })
         .collect::<Vec<_>>();
@@ -430,18 +453,24 @@ mod tests {
         let b_blob = "b\n".as_bytes();
         let br_blob = "br\n".as_bytes();
         let r_blob = "r\n".as_bytes();
-        fs::write(blob_directories[0].join(blob_path(a_blob)), a_blob).expect("write blob");
-        fs::write(blob_directories[0].join(blob_path(ab_blob)), ab_blob).expect("write blob");
-        fs::write(blob_directories[1].join(blob_path(ab_blob)), ab_blob).expect("write blob");
-        fs::write(blob_directories[0].join(blob_path(abr_blob)), abr_blob).expect("write blob");
-        fs::write(blob_directories[1].join(blob_path(abr_blob)), abr_blob).expect("write blob");
-        fs::write(blob_directories[2].join(blob_path(abr_blob)), abr_blob).expect("write blob");
-        fs::write(blob_directories[0].join(blob_path(ar_blob)), ar_blob).expect("write blob");
-        fs::write(blob_directories[2].join(blob_path(ar_blob)), ar_blob).expect("write blob");
-        fs::write(blob_directories[1].join(blob_path(b_blob)), b_blob).expect("write blob");
-        fs::write(blob_directories[1].join(blob_path(br_blob)), br_blob).expect("write blob");
-        fs::write(blob_directories[2].join(blob_path(br_blob)), br_blob).expect("write blob");
-        fs::write(blob_directories[2].join(blob_path(r_blob)), r_blob).expect("write blob");
+        let write_blob = |directory: &Path, blob| {
+            let path = directory.join("1").join(blob_path(blob));
+            let file = fs::File::create(&path).expect("create blob file");
+            delivery_blob::generate_to(delivery_blob::DeliveryBlobType::Type1, blob, file)
+                .expect("generate delivery blob");
+        };
+        write_blob(&blob_directories[0], a_blob);
+        write_blob(&blob_directories[0], ab_blob);
+        write_blob(&blob_directories[1], ab_blob);
+        write_blob(&blob_directories[0], abr_blob);
+        write_blob(&blob_directories[1], abr_blob);
+        write_blob(&blob_directories[2], abr_blob);
+        write_blob(&blob_directories[0], ar_blob);
+        write_blob(&blob_directories[2], ar_blob);
+        write_blob(&blob_directories[1], b_blob);
+        write_blob(&blob_directories[1], br_blob);
+        write_blob(&blob_directories[2], br_blob);
+        write_blob(&blob_directories[2], r_blob);
 
         // Write product bundle manifest.
         v2_sdk_abr_product_bundle(temp_dir.path())

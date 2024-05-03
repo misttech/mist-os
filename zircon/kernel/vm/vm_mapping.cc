@@ -35,9 +35,9 @@
 
 namespace {
 
-KCOUNTER(vm_mapping_attribution_queries, "vm.attributed_pages.mapping.queries")
-KCOUNTER(vm_mapping_attribution_cache_hits, "vm.attributed_pages.mapping.cache_hits")
-KCOUNTER(vm_mapping_attribution_cache_misses, "vm.attributed_pages.mapping.cache_misses")
+KCOUNTER(vm_mapping_attribution_queries, "vm.attributed_memory.mapping.queries")
+KCOUNTER(vm_mapping_attribution_cache_hits, "vm.attributed_memory.mapping.cache_hits")
+KCOUNTER(vm_mapping_attribution_cache_misses, "vm.attributed_memory.mapping.cache_misses")
 KCOUNTER(vm_mappings_merged, "vm.aspace.mapping.merged_neighbors")
 KCOUNTER(vm_mappings_protect_no_write, "vm.aspace.mapping.protect_without_write")
 
@@ -71,7 +71,7 @@ fbl::RefPtr<VmObject> VmMapping::vmo() const {
   return vmo_locked();
 }
 
-VmMapping::AttributionCounts VmMapping::AllocatedPagesLocked() {
+VmMapping::AttributionCounts VmMapping::GetAttributedMemoryLocked() {
   canary_.Assert();
 
   if (state_ != LifeCycleState::ALIVE) {
@@ -81,7 +81,7 @@ VmMapping::AttributionCounts VmMapping::AllocatedPagesLocked() {
   vm_mapping_attribution_queries.Add(1);
 
   if (!object_->is_paged()) {
-    return object_->AttributedPagesInRange(object_offset_locked(), size_);
+    return object_->GetAttributedMemoryInRange(object_offset_locked(), size_);
   }
 
   // If |object_| is a VmObjectPaged, check if the previously cached value still holds.
@@ -89,26 +89,26 @@ VmMapping::AttributionCounts VmMapping::AllocatedPagesLocked() {
   uint64_t vmo_gen_count = object_paged->GetHierarchyGenerationCount();
   uint64_t mapping_gen_count = GetMappingGenerationCountLocked();
 
-  // Return the cached page count if the mapping's generation count and the vmo's generation count
-  // have not changed.
-  if (cached_page_attribution_.mapping_generation_count == mapping_gen_count &&
-      cached_page_attribution_.vmo_generation_count == vmo_gen_count) {
+  // Return the cached attribution counts if the mapping's generation count and the vmo's
+  // generation count have not changed.
+  if (cached_memory_attribution_.mapping_generation_count == mapping_gen_count &&
+      cached_memory_attribution_.vmo_generation_count == vmo_gen_count) {
     vm_mapping_attribution_cache_hits.Add(1);
-    return cached_page_attribution_.page_counts;
+    return cached_memory_attribution_.attribution_counts;
   }
 
   vm_mapping_attribution_cache_misses.Add(1);
 
-  AttributionCounts page_counts =
-      object_paged->AttributedPagesInRange(object_offset_locked(), size_);
+  AttributionCounts counts =
+      object_paged->GetAttributedMemoryInRange(object_offset_locked(), size_);
 
-  DEBUG_ASSERT(cached_page_attribution_.mapping_generation_count != mapping_gen_count ||
-               cached_page_attribution_.vmo_generation_count != vmo_gen_count);
-  cached_page_attribution_.mapping_generation_count = mapping_gen_count;
-  cached_page_attribution_.vmo_generation_count = vmo_gen_count;
-  cached_page_attribution_.page_counts = page_counts;
+  DEBUG_ASSERT(cached_memory_attribution_.mapping_generation_count != mapping_gen_count ||
+               cached_memory_attribution_.vmo_generation_count != vmo_gen_count);
+  cached_memory_attribution_.mapping_generation_count = mapping_gen_count;
+  cached_memory_attribution_.vmo_generation_count = vmo_gen_count;
+  cached_memory_attribution_.attribution_counts = counts;
 
-  return page_counts;
+  return counts;
 }
 
 void VmMapping::DumpLocked(uint depth, bool verbose) const {
@@ -130,10 +130,10 @@ void VmMapping::DumpLocked(uint depth, bool verbose) const {
   for (uint i = 0; i < depth + 1; ++i) {
     printf("  ");
   }
-  AttributionCounts page_counts = object_->AttributedPagesInRange(object_offset_locked(), size_);
-  printf("vmo %p/k%" PRIu64 " off %#" PRIx64 " pages (%zu/%zu) ref %d '%s'\n", object_.get(),
-         object_->user_id(), object_offset_locked(), page_counts.uncompressed,
-         page_counts.compressed, ref_count_debug(), vmo_name);
+  AttributionCounts counts = object_->GetAttributedMemoryInRange(object_offset_locked(), size_);
+  printf("vmo %p/k%" PRIu64 " off %#" PRIx64 " bytes (%zu/%zu) ref %d '%s'\n", object_.get(),
+         object_->user_id(), object_offset_locked(), counts.uncompressed_bytes,
+         counts.compressed_bytes, ref_count_debug(), vmo_name);
   if (verbose) {
     object_->Dump(depth + 1, false);
   }
@@ -917,7 +917,7 @@ zx_status_t VmMapping::DestroyLocked() {
 
   // Clear the cached attribution count.
   // The generation count should already have been incremented by UnmapLocked above.
-  cached_page_attribution_ = {};
+  cached_memory_attribution_ = {};
 
   // detach from any object we have mapped. Note that we are holding the aspace_->lock() so we
   // will not race with other threads calling vmo()

@@ -61,6 +61,15 @@ zx::result<> ValidateDirent(Dirent* de, size_t bytes_read, size_t off) {
   return zx::ok();
 }
 
+uint32_t VfsTypeToMinfsType(fs::CreationType type) {
+  switch (type) {
+    case fs::CreationType::kFile:
+      return kMinfsTypeFile;
+    case fs::CreationType::kDirectory:
+      return kMinfsTypeDir;
+  }
+}
+
 }  // namespace
 
 Directory::Directory(Minfs* fs) : VnodeMinfs(fs) {}
@@ -626,15 +635,16 @@ zx_status_t Directory::Readdir(fs::VdirCookie* cookie, void* dirents, size_t len
   });
 }
 
-zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode>* out) {
+zx::result<fbl::RefPtr<fs::Vnode>> Directory::Create(std::string_view name,
+                                                     fs::CreationType vfs_type) {
   TRACE_DURATION("minfs", "Directory::Create", "name", name);
 
   if (!fs::IsValidName(name)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (IsUnlinked()) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   DirArgs args;
@@ -645,15 +655,15 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
     TRACE_DURATION("minfs", "Directory::Create::ExistenceCheck");
     zx::result<bool> found_or = ForEachDirent(&args, DirentCallbackFind);
     if (found_or.is_error()) {
-      return found_or.error_value();
+      return found_or.take_error();
     }
     if (found_or.value()) {
-      return ZX_ERR_ALREADY_EXISTS;
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
   }
 
   // Creating a directory?
-  uint32_t type = S_ISDIR(mode) ? kMinfsTypeDir : kMinfsTypeFile;
+  uint32_t type = VfsTypeToMinfsType(vfs_type);
 
   // Ensure that we have enough space to write the new vnode's direntry
   // before updating any other metadata.
@@ -663,11 +673,11 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
     args.reclen = static_cast<uint32_t>(DirentSize(static_cast<uint8_t>(name.length())));
     zx::result<bool> found_or = ForEachDirent(&args, DirentCallbackFindSpace);
     if (found_or.is_error()) {
-      return found_or.error_value();
+      return found_or.take_error();
     }
     if (!found_or.value()) {
       FX_LOGS(WARNING) << "Directory::Create: Can't find a dirent to put this file.";
-      return ZX_ERR_NO_SPACE;
+      return zx::error(ZX_ERR_NO_SPACE);
     }
   }
 
@@ -675,7 +685,7 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
   // of the new direntry (Assuming that the offset is the current size of the directory).
   auto reserve_blocks_or = GetRequiredBlockCount(GetSize(), args.reclen, Vfs()->BlockSize());
   if (reserve_blocks_or.is_error()) {
-    return reserve_blocks_or.error_value();
+    return reserve_blocks_or.take_error();
   }
 
   // Reserve 1 additional block for the new directory's initial . and .. entries.
@@ -687,13 +697,13 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
   // In addition to reserve_blocks, reserve 1 inode for the vnode to be created.
   auto transaction_or = Vfs()->BeginTransaction(1, reserve_blocks);
   if (transaction_or.is_error()) {
-    return transaction_or.error_value();
+    return transaction_or.take_error();
   }
 
   // mint a new inode and vnode for it
   auto vn_or = Vfs()->VnodeNew(transaction_or.value().get(), type);
   if (vn_or.is_error()) {
-    return vn_or.error_value();
+    return vn_or.take_error();
   }
 
   // If the new node is a directory, fill it with '.' and '..'.
@@ -705,7 +715,7 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
     if (auto status = vn_or->WriteExactInternal(transaction_or.value().get(), bdata, expected, 0);
         status.is_error()) {
       FX_LOGS(ERROR) << "Create: Failed to initialize empty directory: " << status.status_value();
-      return ZX_ERR_IO;
+      return zx::error(ZX_ERR_IO);
     }
     vn_or->InodeSync(transaction_or.value().get(), kMxFsSyncDefault);
   }
@@ -714,7 +724,7 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
   args.ino = vn_or->GetIno();
   args.transaction = transaction_or.value().get();
   if (auto status = AppendDirent(&args); status.is_error()) {
-    return status.error_value();
+    return status.take_error();
   }
 
   transaction_or->PinVnode(fbl::RefPtr(this));
@@ -723,10 +733,9 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
 
   status = vn_or->Open(nullptr);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
-  *out = std::move(vn_or.value());
-  return ZX_OK;
+  return zx::ok(std::move(vn_or.value()));
 }
 
 zx_status_t Directory::Unlink(std::string_view name, bool must_be_dir) {

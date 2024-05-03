@@ -93,6 +93,7 @@ sdk_source_set("trace-headersonly") {
 trace_library("trace") {
   sdk_publishable = "partner"
   sdk = "source"
+  stable = true
   public_deps = [ "//zircon/system/ulib/trace-engine" ]
   deps = [ "//zircon/system/ulib/trace-engine" ]
   configs += [

@@ -6,12 +6,12 @@
 pub mod test {
     use crate::{
         new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
-        NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
-        BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
-        BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
-        BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM,
-        BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG, BPF_ST,
-        BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
+        MemoryParameterSize, NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND,
+        BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
+        BPF_FETCH, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
+        BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX,
+        BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM,
+        BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::{iterators::Pair, Parser};
@@ -494,11 +494,11 @@ pub mod test {
         d: BpfValue,
         e: BpfValue,
     ) -> BpfValue {
-        let a = a.as_u64() & 0xff;
-        let b = b.as_u64() & 0xff;
-        let c = c.as_u64() & 0xff;
-        let d = d.as_u64() & 0xff;
-        let e = e.as_u64() & 0xff;
+        let a = u64::from(a) & 0xff;
+        let b = u64::from(b) & 0xff;
+        let c = u64::from(c) & 0xff;
+        let d = u64::from(d) & 0xff;
+        let e = u64::from(e) & 0xff;
         BpfValue::from((a << 32) | (b << 24) | (c << 16) | (d << 8) | e)
     }
 
@@ -537,7 +537,7 @@ pub mod test {
         _: BpfValue,
         _: BpfValue,
     ) -> BpfValue {
-        BpfValue::from((v.as_u64() as f64).sqrt() as u64)
+        BpfValue::from((u64::from(v) as f64).sqrt() as u64)
     }
 
     fn strcmp_ext(
@@ -577,6 +577,32 @@ pub mod test {
         _: BpfValue,
     ) -> BpfValue {
         s1
+    }
+
+    fn read_only(
+        _context: &mut (),
+        s1: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        let s1 = s1.as_ptr::<u64>();
+        let v1 = unsafe { *s1 };
+        v1.into()
+    }
+
+    fn write_only(
+        _context: &mut (),
+        s1: BpfValue,
+        s2: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        let s1 = s1.as_ptr::<u64>();
+        unsafe { *s1 = s2.into() };
+        0.into()
     }
 
     pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
@@ -730,9 +756,12 @@ pub mod test {
     #[test_case(ubpf_test_data!("stxh.data"))]
     #[test_case(ubpf_test_data!("stxw.data"))]
     #[test_case(ubpf_test_data!("subnet.data"))]
+    #[test_case(local_test_data!("err-read-only-helper.data"))]
     #[test_case(local_test_data!("err-write-r10.data"))]
     #[test_case(local_test_data!("null-checks-propagated.data"))]
+    #[test_case(local_test_data!("read-only-helper.data"))]
     #[test_case(local_test_data!("stack-access.data"))]
+    #[test_case(local_test_data!("write-only-helper.data"))]
     fn test_ebpf_conformance(content: &str) {
         let Some(mut test_case) = TestCase::parse(content) else {
             // Special case that only test the test framework.
@@ -780,7 +809,11 @@ pub mod test {
                 function_pointer: Arc::new(memfrob),
                 signature: FunctionSignature {
                     args: vec![
-                        Type::MemoryParameter { memory_length_index: 1 },
+                        Type::MemoryParameter {
+                            size: MemoryParameterSize::Reference { index: 1 },
+                            input: true,
+                            output: true,
+                        },
                         Type::ScalarValueParameter,
                     ],
                     return_value: Type::AliasParameter { parameter_index: 0 },
@@ -836,6 +869,41 @@ pub mod test {
                     return_value: Type::NullOrParameter(Box::new(
                         Type::unknown_written_scalar_value(),
                     )),
+                    invalidate_array_bounds: false,
+                },
+            })
+            .expect("register");
+        builder
+            .register(&EbpfHelper {
+                index: 101,
+                name: "read_only",
+                function_pointer: Arc::new(read_only),
+                signature: FunctionSignature {
+                    args: vec![Type::MemoryParameter {
+                        size: MemoryParameterSize::Value(8),
+                        input: true,
+                        output: false,
+                    }],
+                    return_value: Type::unknown_written_scalar_value(),
+                    invalidate_array_bounds: false,
+                },
+            })
+            .expect("register");
+        builder
+            .register(&EbpfHelper {
+                index: 102,
+                name: "write_only",
+                function_pointer: Arc::new(write_only),
+                signature: FunctionSignature {
+                    args: vec![
+                        Type::MemoryParameter {
+                            size: MemoryParameterSize::Value(8),
+                            input: false,
+                            output: true,
+                        },
+                        Type::ScalarValueParameter,
+                    ],
+                    return_value: Type::unknown_written_scalar_value(),
                     invalidate_array_bounds: false,
                 },
             })

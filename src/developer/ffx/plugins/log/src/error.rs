@@ -36,6 +36,8 @@ pub enum LogError {
     RealmQueryConnectionFailed { error: i32 },
     #[error(transparent)]
     SymbolizerError(#[from] ReadError),
+    #[error("Daemon connection was lost and retries are disabled.")]
+    DaemonRetriesDisabled,
 }
 
 impl From<log_command::LogError> for LogError {
@@ -74,6 +76,7 @@ impl From<LogError> for fho::Error {
             IOError(err) => fho::Error::Unexpected(err.into()),
             ConfigError(err) => fho::Error::Unexpected(err.into()),
             SymbolizerError(err) => fho::Error::Unexpected(err.into()),
+            DaemonRetriesDisabled => fho::Error::Unexpected(value.into()),
         }
     }
 }

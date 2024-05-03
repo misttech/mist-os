@@ -145,20 +145,20 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
 
   // A collection of memory usage counts.
   struct vm_usage_t {
-    // A count of pages covered by VmMapping ranges.
-    size_t mapped_pages;
+    // A count of bytes covered by VmMapping ranges.
+    size_t mapped_bytes;
 
-    // For the fields below, a page is considered committed if a VmMapping
-    // covers a range of a VmObject that contains that page, and that page
+    // For the fields below, a bytes is considered committed if a VmMapping
+    // covers a range of a VmObject that contains that byte's page, and the page
     // has physical memory allocated to it.
 
-    // A count of committed pages that are only mapped into this address
+    // A count of committed bytes that are only mapped into this address
     // space.
-    size_t private_pages;
+    size_t private_bytes;
 
-    // A count of committed pages that are mapped into this and at least
+    // A count of committed bytes that are mapped into this and at least
     // one other address spaces.
-    size_t shared_pages;
+    size_t shared_bytes;
 
     // A number that estimates the fraction of shared_pages that this
     // address space is responsible for keeping alive.

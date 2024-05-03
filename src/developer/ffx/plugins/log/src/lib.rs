@@ -5,8 +5,9 @@
 use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
+use fho::{daemon_protocol, FfxMain, FfxTool, FhoEnvironment, MachineWriter, ToolIO, TryFromEnv};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_developer_ffx::{TargetCollectionMarker, TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
@@ -22,7 +23,7 @@ use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
 // NOTE: This is required for the legacy ffx toolchain
 // which automatically adds ffx_core even though we don't use it.
-use ffx_core as _;
+use ffx_core::{self as _, FfxInjectorError};
 
 mod condition_variable;
 mod error;
@@ -41,6 +42,7 @@ pub struct LogTool {
     rcs_proxy: RemoteControlProxy,
     #[command]
     cmd: LogCommand,
+    connector: FfxConnector,
 }
 
 struct NoOpSymoblizer;
@@ -52,6 +54,47 @@ impl Symbolize for NoOpSymoblizer {
     }
 }
 
+/// Production implementation of ffx connector.
+/// We can't use Connector because we need access to a
+/// daemon protocol.
+pub struct FfxConnector {
+    env: FhoEnvironment,
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for FfxConnector {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self, fho::Error> {
+        Ok(Self { env: env.clone() })
+    }
+}
+
+impl FfxConnector {
+    async fn connect(&self) -> Result<TargetCollectionProxy, LogError> {
+        loop {
+            let maybe_err = self.env.injector.daemon_factory().await;
+            let daemon_proxy = match maybe_err {
+                Err(FfxInjectorError::DaemonAutostartDisabled) => {
+                    return Err(LogError::DaemonRetriesDisabled);
+                }
+                Ok(daemon_proxy) => daemon_proxy,
+                _ => continue,
+            };
+            let (tc_proxy, server_end) = fidl::endpoints::create_proxy::<TargetCollectionMarker>()
+                .expect("Could not create FIDL proxy");
+            let Ok(Ok(())) = daemon_proxy
+                .connect_to_protocol(
+                    TargetCollectionMarker::PROTOCOL_NAME,
+                    server_end.into_channel(),
+                )
+                .await
+            else {
+                continue;
+            };
+            return Ok(tc_proxy);
+        }
+    }
+}
+
 fho::embedded_plugin!(LogTool);
 
 #[async_trait::async_trait(?Send)]
@@ -59,7 +102,8 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_impl(writer, self.rcs_proxy, self.target_collection, self.cmd).await?;
+        log_impl(writer, self.rcs_proxy, self.target_collection, self.cmd, Some(self.connector))
+            .await?;
         Ok(())
     }
 }
@@ -70,6 +114,7 @@ pub async fn log_impl(
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
+    connector: Option<FfxConnector>,
 ) -> Result<(), LogError> {
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     // TODO(b/333908164): We have 3 different flags that all do the same thing.
@@ -89,6 +134,7 @@ pub async fn log_impl(
             )?)
         },
         instance_getter,
+        connector,
     )
     .await
 }
@@ -101,6 +147,7 @@ async fn log_main<W>(
     cmd: LogCommand,
     symbolizer: Option<impl Symbolize>,
     instance_getter: impl InstanceGetter,
+    connector: Option<FfxConnector>,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write + 'static,
@@ -108,8 +155,16 @@ where
     let node_name = rcs_proxy.identify_host().await??.nodename;
     let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
     let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
-    log_loop(target_collection_proxy, target_query, cmd, formatter, symbolizer, &instance_getter)
-        .await?;
+    log_loop(
+        target_collection_proxy,
+        target_query,
+        cmd,
+        formatter,
+        symbolizer,
+        &instance_getter,
+        connector,
+    )
+    .await?;
     Ok(())
 }
 
@@ -189,12 +244,13 @@ async fn connect_to_rcs(
 }
 
 async fn log_loop<W>(
-    target_collection_proxy: TargetCollectionProxy,
+    mut target_collection_proxy: TargetCollectionProxy,
     target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
     symbolizer: Option<impl Symbolize>,
     realm_query: &impl InstanceGetter,
+    connector: Option<FfxConnector>,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
@@ -231,7 +287,16 @@ where
             if backoff > 10 {
                 backoff = 10;
             }
-            let err = format!("{}", anyhow::Error::from(maybe_connection.err().unwrap()));
+            let err = maybe_connection.err().unwrap();
+            if matches!(err, LogError::FidlError(fidl::Error::ClientChannelClosed { .. })) {
+                let Some(connector) = connector.as_ref() else {
+                    return Err(LogError::DaemonRetriesDisabled);
+                };
+                eprintln!("Lost connection to ffx daemon, attempting to reconnect.");
+                target_collection_proxy = connector.connect().await?;
+                continue;
+            }
+            let err = format!("{:?}", err);
             if matches!(&last_error, Some(value) if *value == err) {
                 eprintln!("Error connecting to device, retrying in {backoff} seconds.");
             } else {
@@ -300,7 +365,6 @@ mod tests {
     use chrono::{Local, TimeZone};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_developer_ffx::TargetCollectionMarker;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_async::Task;
@@ -360,6 +424,7 @@ mod tests {
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -422,6 +487,7 @@ mod tests {
                 cmd,
                 Some(symbolizer),
                 getter,
+                None,
             )
             .await
             .expect_err("log_main succeeded")
@@ -476,6 +542,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             getter,
+            None,
         )
         .await
         .expect("log_main failed");
@@ -514,6 +581,7 @@ ffx log --force-select.
                 cmd,
                 Some(symbolizer),
                 FakeInstanceGetter::default(),
+                None,
             )
             .await,
             Err(LogError::DumpWithSinceNow)
@@ -547,6 +615,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -586,6 +655,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -626,6 +696,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -677,6 +748,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -751,6 +823,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -819,6 +892,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         ));
 
         // Run the stream until we get the expected message.
@@ -900,6 +974,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         ));
 
         // Run the stream until we get the expected message.
@@ -1024,6 +1099,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1099,6 +1175,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1150,6 +1227,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1204,6 +1282,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1255,6 +1334,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1307,6 +1387,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1359,6 +1440,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1399,6 +1481,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1453,6 +1536,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");
@@ -1508,6 +1592,7 @@ ffx log --force-select.
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
+            None,
         )
         .await
         .expect("log_main failed");

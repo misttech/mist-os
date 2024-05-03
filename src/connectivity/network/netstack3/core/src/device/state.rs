@@ -7,21 +7,20 @@
 use alloc::sync::Arc;
 use core::fmt::Debug;
 
-use net_types::ip::Ipv6;
+use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
-    context::{CoreTimerContext, TimerContext2},
+    context::{CoreTimerContext, TimerContext},
     device::{
         self, socket::HeldDeviceSockets, Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes,
         OriginTracker,
     },
     inspect::Inspectable,
     ip::{
-        device::{state::DualStackIpDeviceState, IpDeviceTimerId},
+        device::{state::DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
         types::RawMetric,
     },
-    sync::RwLock,
-    sync::WeakRc,
+    sync::{RwLock, WeakRc},
 };
 
 /// Provides the specifications for device state held by [`BaseDeviceId`] in
@@ -41,7 +40,7 @@ pub trait DeviceStateSpec: Device + Sized + Send + Sync + 'static {
     /// Creates a new link state from the given properties.
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
-        BC: DeviceLayerTypes + TimerContext2,
+        BC: DeviceLayerTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         self_id: CC::WeakDeviceId,
@@ -88,17 +87,22 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
     pub(super) counters: DeviceCounters,
 }
 
-impl<T, BC: DeviceLayerTypes + TimerContext2> IpLinkDeviceStateInner<T, BC> {
+impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
-    pub(super) fn new<D: device::StrongId, CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>>(
+    pub(super) fn new<
+        D: device::WeakId,
+        A: IpAddressIdSpec,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,
+    >(
         bindings_ctx: &mut BC,
-        device_id: D::Weak,
+        device_id: D,
         link: T,
         metric: RawMetric,
         origin: OriginTracker,
     ) -> Self {
         Self {
-            ip: DualStackIpDeviceState::new::<_, CC>(bindings_ctx, device_id, metric),
+            ip: DualStackIpDeviceState::new::<D, A, CC>(bindings_ctx, device_id, metric),
             link,
             origin,
             sockets: RwLock::new(HeldDeviceSockets::default()),

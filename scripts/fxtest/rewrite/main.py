@@ -16,6 +16,8 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+import textwrap
 import typing
 
 import args
@@ -54,7 +56,14 @@ def main() -> None:
 
     # Special utility mode handling
     if real_flags.print_logs:
-        sys.exit(do_print_logs(real_flags))
+        assert_no_selection(real_flags, "-pr log")
+        warning_message = "WARNING: --print-logs is deprecated and will be removed. Use `--previous log`"
+        print(warning_message, "\n")
+        ret = do_print_logs(real_flags)
+        print(warning_message)
+        sys.exit(ret)
+    if real_flags.previous is not None:
+        sys.exit(do_process_previous(real_flags))
 
     # No special modes, proceed with async execution.
     fut = asyncio.ensure_future(
@@ -111,6 +120,48 @@ async def async_main_wrapper(
     return ret
 
 
+def assert_no_selection(flags: args.Flags, suggested_args: str) -> None:
+    """Assert that flags do not have any selections, and print an
+       error message if they do.
+
+    Args:
+        flags (args.Flags): Command flags
+        suggested_args (str): Suggestion for what the user should
+            run after executing their tests.
+    """
+    if flags.selection:
+        selection_args = " ".join(flags.selection)
+        print(
+            f"ERROR: --previous mode does not support running tests, it only displays information from your previous run.\nTry running `fx test {selection_args}` and then `fx test {suggested_args}`"
+        )
+        sys.exit(1)
+
+
+def do_process_previous(flags: args.Flags) -> int:
+    assert_no_selection(flags, f"-pr {flags.previous}")
+    if flags.previous is args.PrevOption.LOG:
+        return do_print_logs(flags)
+    if flags.previous is args.PrevOption.HELP:
+        print("--previous options:")
+        for arg in args.PrevOption:
+            prefix = f"{arg:>8}: "
+            print(
+                "\n".join(
+                    textwrap.wrap(
+                        prefix + arg.help(),
+                        width=70,
+                        initial_indent="  ",
+                        subsequent_indent="  " + " " * len(prefix),
+                    )
+                )
+                + "\n"
+            )
+        return 0
+    else:
+        print(f"Unknown --previous option {flags.previous}")
+        return 1
+
+
 def do_print_logs(flags: args.Flags) -> int:
     env = environment.ExecutionEnvironment.initialize_from_args(
         flags, create_log_file=False
@@ -163,14 +214,6 @@ async def async_main(
     # Initialize event recording.
     recorder.emit_init()
 
-    info_first_line = "You are using the new fx test, which is currently ready for general use ✅"
-    info_block = """See details here: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
-To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please file a bug under b/293917801.
-"""
-
-    recorder.emit_info_message(info_first_line)
-    recorder.emit_instruction_message(info_block)
-
     # Try to parse the flags. Emit one event before and another
     # after flag post processing.
     try:
@@ -186,6 +229,10 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     except args.FlagError as e:
         recorder.emit_end(f"Flags are invalid: {e}")
         return 1
+
+    recorder.emit_verbatim_message(
+        statusinfo.highlight("Welcome to fx test 🧪\n", style=flags.style)
+    )
 
     # Initialize status printing at this point, if desired.
     if flags.status and not do_output_to_stdout:
@@ -211,11 +258,12 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         else:
             output_file = gzip.open(exec_env.log_file, "wt")
         tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
+        # TODO(https://fxbug.dev/326214131): Remove log path printing when we support `-pr logpath`.
         recorder.emit_instruction_message(
             f"Logging all output to: {exec_env.log_file}"
         )
         recorder.emit_instruction_message(
-            "Use the `--logpath` argument to specify a log location or `--no-log` to disable\n"
+            "Use the `--logpath` argument to specify a log location or `--no-log` to disable"
         )
 
         # For convenience, display the log output path when the program exits.
@@ -233,12 +281,6 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     if flags.has_debugger():
         recorder.emit_warning_message(
             "🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑"
-        )
-
-    # Print a message for users who want to know how to see all test output.
-    if not flags.output:
-        recorder.emit_instruction_message(
-            f"To show all output, specify the `-o/--output` flag."
         )
 
     # Load the list of tests to execute.
@@ -289,9 +331,9 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     # Don't actually run any tests if --dry was specified, instead just
     # print which tests were selected and exit.
     if flags.dry:
-        recorder.emit_info_message("Selected the following tests:")
+        recorder.emit_verbatim_message("Selected the following tests:")
         for s in selections.selected:
-            recorder.emit_info_message(f"  {s.info.name}")
+            recorder.emit_verbatim_message(f"  {s.name()}")
         recorder.emit_instruction_message(
             "\nWill not run any tests, --dry specified"
         )
@@ -330,6 +372,25 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             recorder.emit_warning_message(
                 "OTA failed, attempting to run tests anyway"
             )
+
+    # Generate a new test-list.json file based on the built tests.
+    try:
+        test_list_entries = await generate_test_list(
+            exec_env, recorder=recorder
+        )
+    except (ValueError, RuntimeError) as e:
+        recorder.emit_end(f"Failed to generate and load test-list.json: {e}")
+        return 1
+
+    try:
+        test_list_file.Test.augment_tests_with_info(
+            selections.selected, test_list_entries
+        )
+    except ValueError as e:
+        recorder.emit_end(
+            f"Generated test-list.json is inconsistent: {e}.\nThis is a bug."
+        )
+        return 1
 
     # Don't actually run tests if --list was specified, instead gather the
     # list of test cases for each test and output to the user.
@@ -389,31 +450,56 @@ async def load_test_list(
         recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
         raise e
 
-    # Load the test-list.json file.
+    # Wrap contents of test.json in PartialTest, which supports matching but
+    # still needs a lazily created test-list.json to be a full Test.
     try:
-        parse_id = recorder.emit_start_file_parsing(
-            exec_env.relative_to_root(exec_env.test_list_file),
-            exec_env.test_list_file,
-        )
-        test_list_entries = test_list_file.TestListFile.entries_from_file(
-            exec_env.test_list_file
-        )
-        recorder.emit_end(id=parse_id)
-    except (dataparse.DataParseError, json.JSONDecodeError, IOError) as e:
-        recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
-        raise e
-
-    # Join the contents of the two files and return it.
-    try:
-        tests = test_list_file.Test.join_test_descriptions(
-            test_file_entries, test_list_entries
-        )
+        tests = list(map(test_list_file.Test, test_file_entries))
         return tests
     except ValueError as e:
         recorder.emit_end(
             f"tests.json and test-list.json are inconsistent: {e}"
         )
         raise e
+
+
+async def generate_test_list(
+    exec_env: environment.ExecutionEnvironment, recorder: event.EventRecorder
+) -> dict[str, test_list_file.TestListEntry]:
+    with tempfile.TemporaryDirectory() as td:
+        out_path = os.path.join(td, "test-list.json")
+        result = await execution.run_command(
+            "fx",
+            "test_list_tool",
+            "--build-dir",
+            exec_env.out_dir,
+            "--input",
+            exec_env.test_json_file,
+            "--output",
+            out_path,
+            "--test-components",
+            os.path.join(exec_env.out_dir, "test_components.json"),
+            recorder=recorder,
+        )
+        if result is None or result.return_code != 0:
+            if result is not None:
+                suffix = f":\n{result.stdout}\n{result.stderr}"
+            raise RuntimeError(
+                f"Could not generate a new test-list.json{suffix}"
+            )
+
+        # Load the generated test-list.json file.
+        try:
+            parse_id = recorder.emit_start_file_parsing(
+                exec_env.relative_to_root(exec_env.test_list_file),
+                exec_env.test_list_file,
+            )
+            test_list_entries = test_list_file.TestListFile.entries_from_file(
+                exec_env.test_list_file
+            )
+            recorder.emit_end(id=parse_id)
+            return test_list_entries
+        except (dataparse.DataParseError, json.JSONDecodeError, IOError) as e:
+            raise e
 
 
 class SelectionValidationError(Exception):

@@ -283,7 +283,7 @@ int Sdhci::IrqThread() {
     zxlogf(DEBUG, "got irq 0x%08x en 0x%08x", status.reg_value(),
            InterruptSignalEnable::Get().ReadFrom(&regs_mmio_buffer_).reg_value());
 
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     if (pending_request_.is_pending()) {
       HandleTransferInterrupt(status);
     }
@@ -382,7 +382,7 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
                                              dma_boundary_alignment_, bti_.borrow());
 
   {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
 
     // one command at a time
     if (pending_request_.is_pending()) {
@@ -397,7 +397,7 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
   sync_completion_wait(&req_completion_, ZX_TIME_INFINITE);
   sync_completion_reset(&req_completion_);
 
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   return FinishRequest(*req, out_response);
 }
 
@@ -618,7 +618,7 @@ zx_status_t Sdhci::SdmmcHostInfo(sdmmc_host_info_t* out_info) {
 }
 
 zx_status_t Sdhci::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   // Validate the controller supports the requested voltage
   if ((voltage == SDMMC_VOLTAGE_V330) && !(info_.caps & SDMMC_HOST_CAP_VOLTAGE_330)) {
@@ -666,7 +666,7 @@ zx_status_t Sdhci::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
 }
 
 zx_status_t Sdhci::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   if ((bus_width == SDMMC_BUS_WIDTH_EIGHT) && !(info_.caps & SDMMC_HOST_CAP_BUS_WIDTH_8)) {
     zxlogf(DEBUG, "sdhci: 8-bit bus width not supported");
@@ -698,7 +698,7 @@ zx_status_t Sdhci::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
 }
 
 zx_status_t Sdhci::SdmmcSetBusFreq(uint32_t bus_freq) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   zx_status_t st = WaitForInhibit(
       PresentState::Get().FromValue(0).set_command_inhibit_cmd(1).set_command_inhibit_dat(1));
@@ -732,7 +732,7 @@ zx_status_t Sdhci::SdmmcSetBusFreq(uint32_t bus_freq) {
 }
 
 zx_status_t Sdhci::SdmmcSetTiming(sdmmc_timing_t timing) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   auto ctrl1 = HostControl1::Get().ReadFrom(&regs_mmio_buffer_);
 
@@ -779,7 +779,7 @@ zx_status_t Sdhci::SdmmcSetTiming(sdmmc_timing_t timing) {
 }
 
 zx_status_t Sdhci::SdmmcHwReset() {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   sdhci_.HwReset();
   return ZX_OK;
 }
@@ -791,7 +791,7 @@ zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {
   auto ctrl2 = HostControl2::Get().FromValue(0);
 
   {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     blocksize = static_cast<uint16_t>(
         HostControl1::Get().ReadFrom(&regs_mmio_buffer_).extended_data_transfer_width() ? 128 : 64);
     ctrl2.ReadFrom(&regs_mmio_buffer_).set_execute_tuning(1).WriteTo(&regs_mmio_buffer_);
@@ -815,12 +815,12 @@ zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {
       return st;
     }
 
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     ctrl2.ReadFrom(&regs_mmio_buffer_);
   }
 
   {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     ctrl2.ReadFrom(&regs_mmio_buffer_);
   }
 
@@ -832,7 +832,7 @@ zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {
 }
 
 zx_status_t Sdhci::SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   interrupt_cb_ = ddk::InBandInterruptProtocolClient(interrupt_cb);
 
@@ -854,7 +854,7 @@ zx_status_t Sdhci::SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol
 }
 
 void Sdhci::SdmmcAckInBandInterrupt() {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   InterruptStatusEnable::Get()
       .ReadFrom(&regs_mmio_buffer_)
       .set_card_interrupt(1)
@@ -1043,7 +1043,7 @@ zx_status_t Sdhci::Init() {
 
   // Disable all interrupts
   {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     DisableInterrupts();
   }
 

@@ -17,7 +17,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:14/clocks/clock-init",
       "sys/platform/05:00:2/i2c-0/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-50",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-50",
       "sys/platform/05:06:37/audio-composite-composite-spec/aml-g12-audio-composite",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
       "sys/platform/00:00:35/function-button/adc-buttons",
@@ -95,18 +95,18 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:40/ddr-temp-sensor/aml-trip-device",  // DDR Temperature Sensor
 
       // GPIO
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-107",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-107",
 
       // Touch panel
       //
       // i2c device
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-56",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c-2-56",
       // interrupt pin
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-21",
       // reset pin
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-106",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-106",
 
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/mcu-composite/vim3-mcu",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-24/mcu-composite/vim3-mcu",
 
       // Suspend HAL
       "sys/platform/05:06:41/aml-suspend-device",
@@ -120,7 +120,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 #ifdef include_packaged_drivers
 
       // RTC
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-81/rtc",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c-0-81/rtc",
 
       // WLAN
       "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",

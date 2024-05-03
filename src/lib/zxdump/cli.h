@@ -34,7 +34,7 @@ class CommandLineHelper {
   // After argument parsing, these can be called to ensure the TaskHolder has
   // the necessary data access.
 
-  void NeedRootResource(bool need = true);
+  void NeedInfoResource(bool need = true);
 
   void NeedSystem(bool need = true);
 

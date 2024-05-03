@@ -16,8 +16,9 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <mutex>
+
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 #include "pci-bus.h"
 #include "sata.h"
@@ -97,7 +98,7 @@ void Controller::PrepareStop(fdf::PrepareStopCompleter completer) {
 }
 
 bool Controller::ShouldExit() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return shutdown_;
 }
 
@@ -277,7 +278,7 @@ zx_status_t Controller::LaunchIrqAndWorkerDispatchers() {
 
 void Controller::Shutdown() {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     shutdown_ = true;
   }
 

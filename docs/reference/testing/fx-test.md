@@ -127,10 +127,11 @@ You can then add the necessary packages to your build.
 
 `fx test` stores its output in log files for later analysis. You
 can view a summary of this log file in text form using the
-`--print-logs` argument:
+`-pr/--previous` argument. For example, to see test logs from the
+previous run:
 
 ```bash {:.devsite-disable-click-to-copy}
-$ fx test --print-logs
+$ fx test -pr log
 previous-log-file.json.gz:
 
 4 tests were run
@@ -140,9 +141,12 @@ previous-log-file.json.gz:
 [END first_test]
 ```
 
-By default this command prints the most recent log stored in your Fuchsia
-output directory, but you may pass `--logpath` to choose a specific
-log.
+For a full list of options for processing previous log files, run
+`fx test -pr help`.
+
+By default this command processes the most recent log stored in
+your Fuchsia output directory, but you may pass `--logpath` to
+choose a specific log.
 
 This command is resilient to corrupt or incomplete log files,
 so it should still work even if you terminate the `fx test` command
@@ -242,10 +246,16 @@ It outputs the appropriate command line to run each individual case.
 Note that this does require access to a Fuchsia device or emulator
 because cases are enumerated by Test Manager on device.
 
-**`--print-logs`** will provide a human-readable summary of a log
-file. Rather than executing tests, this command prints the command
-line and output for each test recorded in a log file. It also
-respects `--logpath` to specify a log file location.
+**`-pr/--prev/--previous COMMAND`** will process the log file from
+a previous execution of `fx test`, and will print information
+depending on the value of `COMMAND`. No new tests are executed.
+This command respects `--logpath` to specify the log to read from.
+
+The following `COMMAND`s are implemented:
+
+- `log` prints the command line and output for each test recorded
+in the log file.
+- `help` prints a summary of available commands.
 
 ### Build options
 

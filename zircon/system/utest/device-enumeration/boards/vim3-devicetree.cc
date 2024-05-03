@@ -25,8 +25,8 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
-      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
-      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c-0-24",
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
 
@@ -63,7 +63,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/pt/dt-root",
       "sys/platform/pt/suspend",
       "sys/platform/pwm-ffd1b000/aml-pwm-device",
+      "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-0/pwm_a-regulator_group/pwm_vreg_big",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-4/pwm-init_group/aml-pwm-init",
+      "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-9/pwm_a0_d-regulator_group/pwm_vreg_little",
       "sys/platform/register-controller-1000",
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
   };

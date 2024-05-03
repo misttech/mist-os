@@ -266,19 +266,36 @@ func (f *FFXInstance) CommandWithTarget(args ...string) *exec.Cmd {
 	return f.Command(args...)
 }
 
-// Run runs ffx with the associated config and provided args.
-func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
+// RunWithTimeout runs ffx with the associated config and provided args.
+func (f *FFXInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
 	cmd := f.Command(args...)
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
 	if err := f.runner.RunCommand(ctx, cmd); err != nil {
-		return fmt.Errorf("%s: %w", constants.CommandFailedMsg, err)
+		return fmt.Errorf("%s (%s): %w", constants.CommandFailedMsg, cmd.String(), err)
 	}
 	return nil
+}
+
+// Run runs ffx with the associated config and provided args.
+func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
+	// By default, runs ffx commands with 5 minutes timeout.
+	return f.RunWithTimeout(ctx, 5*time.Minute, args...)
 }
 
 // RunWithTarget runs ffx with the associated target.
 func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 	args = append([]string{"--target", f.target}, args...)
 	return f.Run(ctx, args...)
+}
+
+// RunWithTargetAndTimeout runs ffx with the associated target and timeout.
+func (f *FFXInstance) RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	args = append([]string{"--target", f.target}, args...)
+	return f.RunWithTimeout(ctx, timeout, args...)
 }
 
 // RunAndGetOutput runs ffx with the provided args and returns the stdout.
@@ -306,17 +323,14 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 		f.stderr = origStderr
 	}()
 	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 3), func() error {
-		return f.Run(ctx, "daemon", "echo")
+		return f.RunWithTimeout(ctx, 0, "daemon", "echo")
 	}, nil)
 }
 
 // Stop stops the daemon.
 func (f *FFXInstance) Stop() error {
-	// Use a new context for Stop() to give it time to complete.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	// Wait up to 4000ms for daemon to shut down.
-	return f.Run(ctx, "daemon", "stop", "-t", "4000")
+	return f.Run(context.Background(), "daemon", "stop", "-t", "4000")
 }
 
 // BootloaderBoot RAM boots the target.
@@ -328,7 +342,7 @@ func (f *FFXInstance) BootloaderBoot(ctx context.Context, serialNum, productBund
 	}
 	args = append(args, "--product-bundle", productBundle)
 	args = append(args, "boot")
-	return f.Run(ctx, args...)
+	return f.RunWithTimeout(ctx, 0, args...)
 }
 
 // List lists all available targets.
@@ -359,8 +373,9 @@ func (f *FFXInstance) Test(
 	// Create a new subdirectory within outDir to pass to --output-directory which is expected to be
 	// empty.
 	testOutputDir := filepath.Join(outDir, "test-outputs")
-	f.RunWithTarget(
+	f.RunWithTargetAndTimeout(
 		ctx,
+		0,
 		append(
 			[]string{
 				"test",

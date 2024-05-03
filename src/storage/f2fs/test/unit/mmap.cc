@@ -97,9 +97,9 @@ TEST_F(MmapTest, GetVmoZeroSize) {
 TEST_F(MmapTest, GetVmoOnDirectory) {
   zx::vmo vmo;
   {
-    fbl::RefPtr<fs::Vnode> test_vnode;
-    ASSERT_EQ(root_dir_->Create("dir", S_IFDIR, &test_vnode), ZX_OK);
-    fbl::RefPtr<Dir> test_dir = fbl::RefPtr<Dir>::Downcast(std::move(test_vnode));
+    zx::result test_vnode = root_dir_->Create("dir", fs::CreationType::kDirectory);
+    ASSERT_TRUE(test_vnode.is_ok()) << test_vnode.status_string();
+    fbl::RefPtr<Dir> test_dir = fbl::RefPtr<Dir>::Downcast(*std::move(test_vnode));
     ASSERT_EQ(
         test_dir->GetVmo(
             fuchsia_io::wire::VmoFlags::kPrivateClone | fuchsia_io::wire::VmoFlags::kRead, &vmo),

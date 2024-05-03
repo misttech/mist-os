@@ -1163,7 +1163,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTimestamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
-                // When we support NAT, we should return the original address.
+                // TODO(https://fxbug.dev/338042280): when we support destination NAT, we should
+                // return the original address.
                 responder
                     .send(Err(fposix::Errno::Enoent))
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
@@ -1578,6 +1579,18 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 responder
                     .send(result)
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::StreamSocketRequest::SetMark { domain: _, mark: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+            }
+            fposix_socket::StreamSocketRequest::GetMark { domain: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
             }
         }
         ControlFlow::Continue(None)

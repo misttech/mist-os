@@ -23,7 +23,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 std::ostream& operator<<(std::ostream& os, const fs::VnodeConnectionOptions& options);
-
+std::ostream& operator<<(std::ostream& os, fs::CreationType type);
 namespace fs::debug_internal {
 
 inline void PrintEach(std::ostream& stream) {}

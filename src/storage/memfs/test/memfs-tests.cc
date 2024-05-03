@@ -290,8 +290,8 @@ TEST(MemfsTest, CreateFile) {
   zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
   ASSERT_TRUE(result.is_ok()) << result.status_string();
   auto& [vfs, root] = result.value();
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_OK(root->Create("foobar", S_IFREG, &file));
+  zx::result file = root->Create("foobar", fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   auto directory = static_cast<fbl::RefPtr<fs::Vnode>>(root);
   fs::VnodeAttributes directory_attr, file_attr;
   ASSERT_OK(directory->GetAttributes(&directory_attr));
@@ -311,14 +311,14 @@ TEST(MemfsTest, SubdirectoryUpdateTime) {
   zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
   ASSERT_TRUE(result.is_ok()) << result.status_string();
   auto& [vfs, root] = result.value();
-  fbl::RefPtr<fs::Vnode> index;
-  ASSERT_OK(root->Create("index", S_IFREG, &index));
-  fbl::RefPtr<fs::Vnode> subdirectory;
-  ASSERT_OK(root->Create("subdirectory", S_IFDIR, &subdirectory));
+  zx::result index = root->Create("index", fs::CreationType::kFile);
+  ASSERT_TRUE(index.is_ok()) << index.status_string();
+  zx::result subdirectory = root->Create("subdirectory", fs::CreationType::kDirectory);
+  ASSERT_TRUE(subdirectory.is_ok()) << subdirectory.status_string();
 
   // Write a file at "subdirectory/file".
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_OK(subdirectory->Create("file", S_IFREG, &file));
+  zx::result file = subdirectory->Create("file", fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   file->DidModifyStream();
 
   // Overwrite a file at "index".
@@ -421,8 +421,8 @@ TEST(MemfsTest, TruncateZerosTail) {
   ASSERT_TRUE(result.is_ok()) << result.status_string();
   auto& [vfs, root] = result.value();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_OK(root->Create("file", S_IFREG, &file));
+  zx::result file = root->Create("file", fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
 
   zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE);
   ASSERT_TRUE(stream.is_ok()) << stream.status_string();
@@ -457,8 +457,8 @@ TEST(MemfsTest, WriteMaxFileSize) {
   ASSERT_TRUE(result.is_ok()) << result.status_string();
   auto& [vfs, root] = result.value();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_OK(root->Create("file", S_IFREG, &file));
+  zx::result file = root->Create("file", fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
 
   zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE);
   ASSERT_TRUE(stream.is_ok()) << stream.status_string();
@@ -487,9 +487,8 @@ TEST(MemfsTest, TruncateToMaxFileSize) {
   ASSERT_TRUE(result.is_ok()) << result.status_string();
   auto& [vfs, root] = result.value();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_OK(root->Create("file", S_IFREG, &file));
-
+  zx::result file = root->Create("file", fs::CreationType::kFile);
+  ASSERT_OK(file.status_value());
   ASSERT_OK(file->Truncate(kMaxFileSize));
   fs::VnodeAttributes attributes;
   ASSERT_OK(file->GetAttributes(&attributes));

@@ -4,6 +4,8 @@
 
 use crate::{index::PolicyIndex, CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, UserId};
 
+use bstr::BString;
+use std::cmp::Ordering;
 use thiserror::Error;
 
 /// The security context, a variable-length string associated with each SELinux object in the
@@ -31,14 +33,16 @@ impl SecurityContext {
     // TODO(b/319232900): Validate that the specified fields are consistent
     // in the context of the supplied policy.
     pub(crate) fn new<PS: ParseStrategy>(
-        _policy: &PolicyIndex<PS>,
+        policy: &PolicyIndex<PS>,
         user: UserId,
         role: RoleId,
         type_: TypeId,
         low_level: SecurityLevel,
         high_level: Option<SecurityLevel>,
     ) -> Result<Self, SecurityContextError> {
-        Ok(Self { user, role, type_, low_level, high_level })
+        let context = Self { user, role, type_, low_level, high_level };
+        context.validate(policy)?;
+        Ok(context)
     }
 
     /// Returns the user component of the security context.
@@ -127,17 +131,17 @@ impl SecurityContext {
         let user = policy_index
             .parsed_policy()
             .user_by_name(user)
-            .ok_or_else(|| SecurityContextError::UnknownUser { name: user.to_owned() })?
+            .ok_or_else(|| SecurityContextError::UnknownUser { name: user.into() })?
             .id();
         let role = policy_index
             .parsed_policy()
             .role_by_name(role)
-            .ok_or_else(|| SecurityContextError::UnknownRole { name: role.to_owned() })?
+            .ok_or_else(|| SecurityContextError::UnknownRole { name: role.into() })?
             .id();
         let type_ = policy_index
             .parsed_policy()
             .type_by_name(type_)
-            .ok_or_else(|| SecurityContextError::UnknownType { name: type_.to_owned() })?
+            .ok_or_else(|| SecurityContextError::UnknownType { name: type_.into() })?
             .id();
 
         Self::new(
@@ -164,6 +168,72 @@ impl SecurityContext {
             levels.as_slice(),
         ];
         parts.join(b":".as_ref())
+    }
+
+    fn validate<PS: ParseStrategy>(
+        &self,
+        policy_index: &PolicyIndex<PS>,
+    ) -> Result<(), SecurityContextError> {
+        let user = policy_index.parsed_policy().user(self.user);
+
+        // Validate that the selected role is valid for this user.
+        //
+        // Roles have meaning for processes, with resources (e.g. files) normally having the
+        // well-known "object_r" role.  Validation therefore implicitly allows the "object_r"
+        // role, in addition to those defined for the user.
+        //
+        // TODO(b/335399404): Identifiers are 1-based, while the roles bitmap is 0-based.
+        if self.role != policy_index.object_role() && !user.roles().is_set(self.role.0.get() - 1) {
+            return Err(SecurityContextError::InvalidRoleForUser {
+                role: policy_index.parsed_policy().role(self.role).name_bytes().into(),
+                user: user.name_bytes().into(),
+            });
+        }
+
+        // Validate that the MLS range fits within that defined for the user.
+        let valid_low = user.mls_range().low();
+        let valid_high = user.mls_range().high().as_ref().unwrap_or(valid_low);
+
+        // 1. Validate that the low sensitivity is within the permitted range.
+        if self.low_level.sensitivity < valid_low.sensitivity()
+            || self.low_level.sensitivity > valid_high.sensitivity()
+        {
+            return Err(SecurityContextError::InvalidSensitivityForUser {
+                sensitivity: Self::sensitivity_name(policy_index, self.low_level.sensitivity),
+                user: user.name_bytes().into(),
+            });
+        }
+        if let Some(high_level) = &self.high_level {
+            // 2. Validate that the high sensitivity is within the permitted range.
+            if high_level.sensitivity < valid_low.sensitivity()
+                || high_level.sensitivity > valid_high.sensitivity()
+            {
+                return Err(SecurityContextError::InvalidSensitivityForUser {
+                    sensitivity: Self::sensitivity_name(policy_index, high_level.sensitivity),
+                    user: user.name_bytes().into(),
+                });
+            }
+
+            // 3. Validate that the high level is not less-than the low level.
+            if *high_level < self.low_level {
+                return Err(SecurityContextError::InvalidSecurityRange {
+                    low: self.low_level.serialize(policy_index).into(),
+                    high: high_level.serialize(policy_index).into(),
+                });
+            }
+        }
+
+        // TODO(b/319232900): Determine whether additional validations should be performed here, e.g:
+        // - That the categories are valid for the sensitivity levels.
+
+        Ok(())
+    }
+
+    fn sensitivity_name<PS: ParseStrategy>(
+        policy_index: &PolicyIndex<PS>,
+        sensitivity: SensitivityId,
+    ) -> BString {
+        policy_index.parsed_policy().sensitivity(sensitivity).name_bytes().into()
     }
 }
 
@@ -201,9 +271,7 @@ impl SecurityLevel {
         let sensitivity = policy_index
             .parsed_policy()
             .sensitivity_by_name(sensitivity)
-            .ok_or_else(|| SecurityContextError::UnknownSensitivity {
-                name: sensitivity.to_owned(),
-            })?
+            .ok_or_else(|| SecurityContextError::UnknownSensitivity { name: sensitivity.into() })?
             .id();
         let mut categories = Vec::new();
         if let Some(categories_str) = categories_item {
@@ -248,8 +316,15 @@ impl SecurityLevel {
         Ok(policy_index
             .parsed_policy()
             .category_by_name(name)
-            .ok_or_else(|| SecurityContextError::UnknownCategory { name: name.to_owned() })?
+            .ok_or_else(|| SecurityContextError::UnknownCategory { name: name.into() })?
             .id())
+    }
+}
+
+impl PartialOrd for SecurityLevel {
+    fn partial_cmp(&self, other: &SecurityLevel) -> Option<Ordering> {
+        // TODO(b/319232900): Take category-set ordering into account!
+        self.sensitivity.partial_cmp(&other.sensitivity)
     }
 }
 
@@ -283,15 +358,21 @@ pub enum SecurityContextError {
     #[error("security context syntax is invalid")]
     InvalidSyntax,
     #[error("sensitivity {name:?} not defined by policy")]
-    UnknownSensitivity { name: String },
+    UnknownSensitivity { name: BString },
     #[error("category {name:?} not defined by policy")]
-    UnknownCategory { name: String },
+    UnknownCategory { name: BString },
     #[error("user {name:?} not defined by policy")]
-    UnknownUser { name: String },
+    UnknownUser { name: BString },
     #[error("role {name:?} not defined by policy")]
-    UnknownRole { name: String },
+    UnknownRole { name: BString },
     #[error("type {name:?} not defined by policy")]
-    UnknownType { name: String },
+    UnknownType { name: BString },
+    #[error("role {role:?} not valid for {user:?}")]
+    InvalidRoleForUser { role: BString, user: BString },
+    #[error("sensitivity {sensitivity:?} not valid for {user:?}")]
+    InvalidSensitivityForUser { sensitivity: BString, user: BString },
+    #[error("high security level {high:?} lower than low level {low:?}")]
+    InvalidSecurityRange { low: BString, high: BString },
 }
 
 #[cfg(test)]
@@ -497,7 +578,7 @@ mod tests {
         {
             assert_eq!(
                 policy.parse_security_context(invalid_label.as_bytes()),
-                Err(SecurityContextError::UnknownSensitivity { name: "s_invalid".to_string() }),
+                Err(SecurityContextError::UnknownSensitivity { name: "s_invalid".into() }),
                 "validating {:?}",
                 invalid_label
             );
@@ -512,7 +593,7 @@ mod tests {
         {
             assert_eq!(
                 policy.parse_security_context(invalid_label.as_bytes()),
-                Err(SecurityContextError::UnknownCategory { name: "c_invalid".to_string() }),
+                Err(SecurityContextError::UnknownCategory { name: "c_invalid".into() }),
                 "validating {:?}",
                 invalid_label
             );
@@ -527,14 +608,15 @@ mod tests {
         // categories that the high level does not.
         assert!(policy.parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4-s1").is_ok());
 
-        // TODO(b/319232900): Should fail validation because the sensitivity is not
-        // valid for the user.
+        // Fails validation because the sensitivity is not valid for the user.
+        assert!(policy.parse_security_context(b"user1:object_r:type0:s0").is_err());
 
-        assert!(policy.parse_security_context(b"user0:object_r:type0:s1").is_ok());
+        // Fails validation because the role is not valid for the user.
+        assert!(policy.parse_security_context(b"user0:subject_r:type0:s0").is_err());
 
-        // TODO(b/319232900): Should fail validation because the role is not valid for
-        // user.
-        assert!(policy.parse_security_context(b"user0:subject_r:type0:s0").is_ok());
+        // Passes validation even though the role is not explicitly allowed for the user,
+        // because it is the special "object_r" role, used when labelling resources.
+        assert!(policy.parse_security_context(b"user1:object_r:type0:s1").is_ok());
     }
 
     #[test]

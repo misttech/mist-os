@@ -5,8 +5,9 @@
 //! Hashes video frames.
 
 use async_trait::async_trait;
+use fidl_fuchsia_images2 as images2;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem as sysmem;
+use fuchsia_image_format::images2_image_format_from_sysmem_image_format;
 use hex::encode;
 use mundane::hash::{Digest, Hasher, Sha256};
 use std::{convert::*, fmt};
@@ -17,7 +18,7 @@ use thiserror::Error;
 pub enum Error {
     DataTooSmallToBeFrame { expected_size: usize, actual_size: usize },
     FormatDetailsNotUncompressedVideo,
-    UnsupportedPixelFormat(sysmem::PixelFormatType),
+    UnsupportedPixelFormat(images2::PixelFormat),
     FormatHasNoPlane { plane_requested: usize, planes_in_format: usize },
 }
 
@@ -29,16 +30,19 @@ impl fmt::Display for Error {
 
 struct Frame<'a> {
     data: &'a [u8],
-    format: sysmem::ImageFormat2,
+    format: images2::ImageFormat,
 }
 
 trait Subsample420 {
     const CHROMA_SUBSAMPLE_RATIO: usize = 2;
 
-    fn frame_size(format: &sysmem::ImageFormat2) -> usize {
+    fn frame_size(format: &images2::ImageFormat) -> usize {
         // For 4:2:0 YUV, the UV data is 1/2 the size of the Y data,
         // so the size of the frame is 3/2 the size of the Y plane.
-        (format.bytes_per_row * format.coded_height * 3 / 2) as usize
+        *format.bytes_per_row.as_ref().unwrap() as usize
+            * format.size.as_ref().unwrap().height as usize
+            * 3
+            / 2
     }
 }
 
@@ -51,9 +55,11 @@ impl<'a> Subsample420 for Yv12Frame<'a> {}
 impl<'a> Yv12Frame<'a> {
     /// Returns an iterator over the display data in Yv12 format.
     fn yv12_iter(&self) -> impl Iterator<Item = u8> + 'a {
-        let luminance_plane_stride = self.frame.format.bytes_per_row as usize;
-        let luminance_plane_display_height = self.frame.format.display_height as usize;
-        let luminance_plane_display_width = self.frame.format.display_width as usize;
+        let luminance_plane_stride = *self.frame.format.bytes_per_row.as_ref().unwrap() as usize;
+        let luminance_plane_display_height =
+            self.frame.format.display_rect.as_ref().unwrap().height as usize;
+        let luminance_plane_display_width =
+            self.frame.format.display_rect.as_ref().unwrap().width as usize;
         let luminance = self
             .frame
             .data
@@ -62,7 +68,7 @@ impl<'a> Yv12Frame<'a> {
             .flat_map(move |row| row.iter().take(luminance_plane_display_width));
 
         let luminance_plane_coded_size =
-            luminance_plane_stride * (self.frame.format.coded_height as usize);
+            luminance_plane_stride * self.frame.format.size.as_ref().unwrap().height as usize;
         let chroma_plane_display_height =
             luminance_plane_display_height / Self::CHROMA_SUBSAMPLE_RATIO;
         let chroma_plane_display_width =
@@ -78,7 +84,7 @@ impl<'a> Yv12Frame<'a> {
             .flat_map(move |row| row.iter().take(chroma_plane_display_width));
 
         let chroma_plane_coded_height =
-            self.frame.format.coded_height as usize / Self::CHROMA_SUBSAMPLE_RATIO;
+            self.frame.format.size.as_ref().unwrap().height as usize / Self::CHROMA_SUBSAMPLE_RATIO;
         let chroma_u = chroma_rows
             .clone()
             .skip(chroma_plane_coded_height)
@@ -113,14 +119,17 @@ impl<'a> Subsample420 for Nv12Frame<'a> {}
 impl<'a> Nv12Frame<'a> {
     /// Returns an iterator over the display data in Yv12 format.
     fn yv12_iter(&self) -> impl Iterator<Item = u8> + 'a {
-        let rows = self.frame.data.chunks(self.frame.format.bytes_per_row as usize);
-        let luminance_row_count = self.frame.format.display_height as usize;
+        let rows =
+            self.frame.data.chunks(*self.frame.format.bytes_per_row.as_ref().unwrap() as usize);
+        let luminance_row_count = self.frame.format.display_rect.as_ref().unwrap().height as usize;
         let chroma_row_count = luminance_row_count / Self::CHROMA_SUBSAMPLE_RATIO;
-        let row_length = self.frame.format.display_width as usize;
+        let row_length = self.frame.format.display_rect.as_ref().unwrap().width as usize;
 
         let luminance =
             rows.clone().take(luminance_row_count).flat_map(move |row| row.iter().take(row_length));
-        let chroma_rows = rows.skip(self.frame.format.coded_height as usize).take(chroma_row_count);
+        let chroma_rows = rows
+            .skip(self.frame.format.size.as_ref().unwrap().height as usize)
+            .take(chroma_row_count);
         let chroma_u =
             chroma_rows.clone().flat_map(move |row| row.iter().take(row_length).step_by(2));
         let chroma_v =
@@ -148,7 +157,7 @@ impl<'a> TryFrom<Frame<'a>> for Nv12Frame<'a> {
 fn packet_display_data<'a>(
     src: &'a OutputPacket,
 ) -> Result<Box<dyn Iterator<Item = u8> + 'a>, Error> {
-    let format = src
+    let sysmem_format = src
         .format
         .format_details
         .domain
@@ -160,15 +169,16 @@ fn packet_display_data<'a>(
             _ => None,
         })
         .ok_or(Error::FormatDetailsNotUncompressedVideo)?;
+    let format = images2_image_format_from_sysmem_image_format(&sysmem_format).unwrap();
 
-    Ok(match format.pixel_format.type_ {
-        sysmem::PixelFormatType::Yv12 => {
+    Ok(match format.pixel_format.as_ref().unwrap() {
+        images2::PixelFormat::Yv12 => {
             Box::new(Yv12Frame::try_from(Frame { data: src.data.as_slice(), format })?.yv12_iter())
         }
-        sysmem::PixelFormatType::Nv12 => {
+        images2::PixelFormat::Nv12 => {
             Box::new(Nv12Frame::try_from(Frame { data: src.data.as_slice(), format })?.yv12_iter())
         }
-        _ => Err(Error::UnsupportedPixelFormat(format.pixel_format.type_))?,
+        _ => Err(Error::UnsupportedPixelFormat(*format.pixel_format.as_ref().unwrap()))?,
     })
 }
 
@@ -244,7 +254,9 @@ impl OutputValidator for VideoFrameHasher {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_sysmem::{ColorSpace, *};
+    use fidl_fuchsia_images2::{self as fimages2, *};
+    use fidl_fuchsia_math::{RectU, SizeU};
+    use fuchsia_image_format::sysmem1_image_format_from_images2_image_format;
     use fuchsia_stream_processors::{ValidPacket, ValidPacketHeader};
     use rand::prelude::*;
     use std::rc::Rc;
@@ -252,7 +264,7 @@ mod test {
 
     #[derive(Debug, Copy, Clone)]
     struct TestSpec {
-        pixel_format: PixelFormatType,
+        pixel_format: PixelFormat,
         coded_width: usize, // coded_height() is in the impl
         display_width: usize,
         display_height: usize,
@@ -270,26 +282,25 @@ mod test {
         fn into(self) -> OutputPacket {
             let mut format_details = FormatDetails::default();
             format_details.domain = Some(DomainFormat::Video(VideoFormat::Uncompressed(
-                new_video_uncompressed_format(ImageFormat2 {
-                    pixel_format: PixelFormat {
-                        type_: self.pixel_format,
-                        has_format_modifier: false,
-                        format_modifier: FormatModifier { value: 0 },
-                    },
-                    coded_width: self.coded_width as u32,
-                    coded_height: self.coded_height() as u32,
-                    bytes_per_row: self.bytes_per_row as u32,
-                    display_width: self.display_width as u32,
-                    display_height: self.display_height as u32,
-                    layers: 0,
-                    color_space: ColorSpace { type_: ColorSpaceType::Rec709 },
-                    has_pixel_aspect_ratio: false,
-                    pixel_aspect_ratio_width: 0,
-                    pixel_aspect_ratio_height: 0,
+                new_video_uncompressed_format(ImageFormat {
+                    pixel_format: Some(self.pixel_format),
+                    size: Some(SizeU {
+                        width: self.coded_width.try_into().unwrap(),
+                        height: self.coded_height().try_into().unwrap(),
+                    }),
+                    bytes_per_row: Some(self.bytes_per_row.try_into().unwrap()),
+                    display_rect: Some(RectU {
+                        x: 0,
+                        y: 0,
+                        width: self.display_width.try_into().unwrap(),
+                        height: self.display_height.try_into().unwrap(),
+                    }),
+                    color_space: Some(fimages2::ColorSpace::Rec709),
+                    ..Default::default()
                 }),
             )));
             OutputPacket {
-                data: vec![0; self.bytes_per_row * self.coded_height() * 3 / 2],
+                data: vec![0; (self.bytes_per_row * self.coded_height() * 3 / 2) as usize],
                 format: Rc::new(ValidStreamOutputFormat {
                     stream_lifetime_ordinal: 0,
                     format_details,
@@ -308,11 +319,9 @@ mod test {
         }
     }
 
-    fn new_video_uncompressed_format(
-        image_format: fidl_fuchsia_sysmem::ImageFormat2,
-    ) -> VideoUncompressedFormat {
+    fn new_video_uncompressed_format(image_format: ImageFormat) -> VideoUncompressedFormat {
         VideoUncompressedFormat {
-            image_format,
+            image_format: sysmem1_image_format_from_images2_image_format(&image_format).unwrap(),
             fourcc: 0,
             primary_width_pixels: 0,
             primary_height_pixels: 0,
@@ -335,7 +344,7 @@ mod test {
         }
     }
 
-    fn specs(pixel_format: PixelFormatType) -> impl Iterator<Item = TestSpec> {
+    fn specs(pixel_format: PixelFormat) -> impl Iterator<Item = TestSpec> {
         vec![
             TestSpec {
                 pixel_format,
@@ -373,8 +382,7 @@ mod test {
     fn packets_of_different_formats_hash_same_with_matching_data() -> Result<(), Error> {
         let mut rng = StdRng::seed_from_u64(45);
 
-        for (nv12_spec, yv12_spec) in specs(PixelFormatType::Nv12).zip(specs(PixelFormatType::Yv12))
-        {
+        for (nv12_spec, yv12_spec) in specs(PixelFormat::Nv12).zip(specs(PixelFormat::Yv12)) {
             // Initialize two packets with random data. Then set every display byte to
             // `global_index % 256`, where `global_index` is a count of every display byte so far
             // in the frame.
@@ -399,7 +407,7 @@ mod test {
             for row in nv12_packet
                 .data
                 .chunks_mut(nv12_spec.bytes_per_row)
-                .skip(nv12_spec.coded_height())
+                .skip(nv12_spec.coded_height() as usize)
                 .take(nv12_spec.display_height / Nv12Frame::CHROMA_SUBSAMPLE_RATIO)
             {
                 row.iter_mut()
@@ -413,7 +421,7 @@ mod test {
             for row in nv12_packet
                 .data
                 .chunks_mut(nv12_spec.bytes_per_row)
-                .skip(nv12_spec.coded_height())
+                .skip(nv12_spec.coded_height() as usize)
                 .take(nv12_spec.display_height / Nv12Frame::CHROMA_SUBSAMPLE_RATIO)
             {
                 row.iter_mut().take(nv12_spec.display_width).step_by(2).for_each(&mut assign_index)
@@ -474,8 +482,7 @@ mod test {
     fn sanity_test_that_different_packets_hash_differently() -> Result<(), Error> {
         let mut rng = StdRng::seed_from_u64(45);
 
-        for (nv12_spec, yv12_spec) in specs(PixelFormatType::Nv12).zip(specs(PixelFormatType::Yv12))
-        {
+        for (nv12_spec, yv12_spec) in specs(PixelFormat::Nv12).zip(specs(PixelFormat::Yv12)) {
             let mut nv12_packet: OutputPacket = nv12_spec.into();
             rng.fill(nv12_packet.data.as_mut_slice());
 
@@ -500,7 +507,7 @@ mod test {
                 .clone();
                 rng.gen_range(y_range)
             };
-            let idx = y * (nv12_spec.bytes_per_row as usize) + x;
+            let idx = y * nv12_spec.bytes_per_row + x;
             nv12_packet.data[idx] = nv12_packet.data[idx].overflowing_add(1).0;
 
             let from_yv12 = packet_display_data(&yv12_packet)?;

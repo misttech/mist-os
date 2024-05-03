@@ -8,18 +8,8 @@ import("//build/toolchain/variant.gni")
 config("lto-clang") {
   cflags = [ "-flto" ]
 
-  if (!is_fuchsia) {
-    cflags += [
-      # Enable whole-program devirtualization and virtual constant propagation.
-      #
-      # TODO(https://fxbug.dev/42075686): Currently fuchsia does not support WPD
-      # because the patches supporting WPD and relative vtables have been
-      # reverted from upstream. Since relative vtables aren't subject to WPD,
-      # this flag is not needed for fuchsia. What limiting this to !is_fuchsia
-      # allows is for me to reland the relevant patches and make debugging
-      # easier once we roll those changes back in.
-      "-fwhole-program-vtables",
-    ]
+  if (!is_fuchsia || is_kernel) {
+    configs = [ ":lto-whole-program-devirtualization" ]
   }
 
   ldflags = cflags
@@ -45,6 +35,28 @@ config("lto-clang") {
       ]
     }
   }
+}
+
+# This enables whole program devirtualization when LTO is enabled. Individual
+# binaries can opt-in to using this for LTO builds. This can be turned on safely
+# for self-contained binaries that do not expose the C++ ABI (such as the
+# kernel or fdio). This should only be used for LTO builds.
+#
+# Users should be careful when using this because this can lead to virtual
+# function calls unexpectedly being devirtualized if the compiler determines
+# that a virtual call can resolve to a function from only one vtable.
+# https://fxbug.dev/42075686 contains an example of this. For these cases, if
+# the C++ ABI is expected to be exposed from a shared library, then adding
+# [[clang::lto_visibility_public]] to the public/exported class will tell the
+# compiler that other subclasses may exist outside this LTO unit. See
+# https://clang.llvm.org/docs/LTOVisibility.html for more information on the
+# annotation.
+config("lto-whole-program-devirtualization") {
+  cflags = [
+    # Opt-in for whole-program devirtualization and virtual constant propagation.
+    "-fwhole-program-vtables",
+  ]
+  ldflags = cflags
 }
 
 config("lto-rust") {

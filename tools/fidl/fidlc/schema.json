@@ -779,6 +779,17 @@
             ],
             "type": "object"
         },
+        "implementation-locations": {
+            "description": "List of locations that are allowed to implement an endpoint kind",
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "external",
+                    "platform"
+                ]
+            }
+        },
         "integer-type": {
             "description": "Definition of integer primitive sub-type",
             "enum": [
@@ -841,6 +852,22 @@
                         "closed"
                     ],
                     "type": "string"
+                },
+                "implementation_locations": {
+                    "description": "Where endpoints for this protocol may be implemented",
+                    "type": "object",
+                    "properties": {
+                        "client": {
+                            "$ref": "#/definitions/implementation-locations"
+                        },
+                        "server": {
+                            "$ref": "#/definitions/implementation-locations"
+                        }
+                    },
+                    "required": [
+                        "client",
+                        "server"
+                    ]
                 }
             },
             "required": [

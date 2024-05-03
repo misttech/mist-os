@@ -17,10 +17,10 @@ class MultiThreads : public F2fsFakeDevTestFixture {
 };
 
 TEST_F(MultiThreads, Truncate) {
-  fbl::RefPtr<fs::Vnode> test_file;
-  root_dir_->Create("test2", S_IFREG, &test_file);
+  zx::result test_file = root_dir_->Create("test2", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
   {
-    fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
+    fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file));
 
     constexpr int kNTry = 1000;
     uint8_t buf[kPageSize * 2] = {1};
@@ -45,12 +45,13 @@ TEST_F(MultiThreads, Truncate) {
 }
 
 TEST_F(MultiThreads, Write) {
-  fbl::RefPtr<fs::Vnode> test_file1, test_file2;
-  root_dir_->Create("test1", S_IFREG, &test_file1);
-  root_dir_->Create("test2", S_IFREG, &test_file2);
+  zx::result test_file1 = root_dir_->Create("test1", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file1.is_ok()) << test_file1.status_string();
+  zx::result test_file2 = root_dir_->Create("test2", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file2.is_ok()) << test_file2.status_string();
   {
-    fbl::RefPtr<f2fs::File> vn1 = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file1));
-    fbl::RefPtr<f2fs::File> vn2 = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file2));
+    fbl::RefPtr<f2fs::File> vn1 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file1));
+    fbl::RefPtr<f2fs::File> vn2 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file2));
 
     constexpr int kNTry = 51200;
     uint8_t buf[kPageSize * 2] = {1};
@@ -85,11 +86,10 @@ TEST_F(MultiThreads, Write) {
 }
 
 TEST_F(MultiThreads, Create) {
-  std::string dir_name("dir");
-  fbl::RefPtr<fs::Vnode> child;
-  ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &child), ZX_OK);
+  zx::result child = root_dir_->Create("dir", fs::CreationType::kDirectory);
+  ASSERT_TRUE(child.is_ok()) << child.status_string();
   {
-    fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(std::move(child));
+    fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(*std::move(child));
     constexpr int kNThreads = 10;
     constexpr int kNEntries = 100;
     std::thread threads[kNThreads];
@@ -97,7 +97,7 @@ TEST_F(MultiThreads, Create) {
       threads[nThread] = std::thread([nThread, child_dir]() {
         // Create dentries more than MaxInlineDentry() to trigger ConvertInlineDir().
         for (uint32_t child_count = 0; child_count < kNEntries; ++child_count) {
-          uint32_t mode = child_count % 2 == 0 ? S_IFDIR : S_IFREG;
+          umode_t mode = child_count % 2 == 0 ? S_IFDIR : S_IFREG;
           auto child_name = child_count + nThread * kNEntries;
           FileTester::CreateChild(child_dir.get(), mode, std::to_string(child_name));
         }
@@ -125,10 +125,10 @@ TEST_F(MultiThreads, Create) {
 
 TEST_F(MultiThreads, Unlink) {
   std::string dir_name("dir");
-  fbl::RefPtr<fs::Vnode> child;
-  ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &child), ZX_OK);
+  zx::result child = root_dir_->Create(dir_name, fs::CreationType::kDirectory);
+  ASSERT_TRUE(child.is_ok()) << child.status_string();
   {
-    fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(std::move(child));
+    fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(*std::move(child));
 
     constexpr int kNThreads = 10;
     constexpr int kNEntries = 100;
@@ -136,7 +136,7 @@ TEST_F(MultiThreads, Unlink) {
 
     // create child vnodes.
     for (uint32_t child = 0; child < kNThreads * kNEntries; ++child) {
-      uint32_t mode = child % 2 == 0 ? S_IFDIR : S_IFREG;
+      umode_t mode = child % 2 == 0 ? S_IFDIR : S_IFREG;
       FileTester::CreateChild(child_dir.get(), mode, std::to_string(child));
     }
 

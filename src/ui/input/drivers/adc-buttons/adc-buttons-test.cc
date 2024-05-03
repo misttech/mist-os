@@ -12,7 +12,7 @@
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace adc_buttons_device {
 
@@ -54,7 +54,7 @@ struct IncomingNamespace {
   FakeAdcServer fake_adc_server_;
 };
 
-class AdcButtonsDeviceTest : public zxtest::Test {
+class AdcButtonsDeviceTest : public testing::Test {
  public:
   void SetUp() override {
     fuchsia_driver_framework::DriverStartArgs start_args;
@@ -91,10 +91,10 @@ class AdcButtonsDeviceTest : public zxtest::Test {
       ASSERT_TRUE(metadata_bytes.is_ok());
       auto status = incoming->device_server_.AddMetadata(
           DEVICE_METADATA_BUTTONS, metadata_bytes->data(), metadata_bytes->size());
-      EXPECT_OK(status);
+      EXPECT_EQ(ZX_OK, status);
       status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                               &incoming->env_.incoming_directory());
-      EXPECT_OK(status);
+      EXPECT_EQ(ZX_OK, status);
 
       // Serve fake_adc_server_.
       auto result = incoming->env_.incoming_directory().AddService<fuchsia_hardware_adc::Service>(
@@ -111,14 +111,14 @@ class AdcButtonsDeviceTest : public zxtest::Test {
     zx::result connect_result = incoming_.SyncCall([](IncomingNamespace* incoming) {
       return incoming->node_.children().at("adc-buttons").ConnectToDevice();
     });
-    ASSERT_OK(connect_result.status_value());
+    EXPECT_EQ(ZX_OK, connect_result.status_value());
     client_.Bind(
         fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(connect_result.value())));
   }
 
   void DrainInitialReport(fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>& reader) {
     auto result = reader->ReadInputReports();
-    ASSERT_OK(result.status());
+    EXPECT_EQ(ZX_OK, result.status());
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
@@ -194,7 +194,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
 
   {
     auto result = reader->ReadInputReports();
-    ASSERT_OK(result.status());
+    EXPECT_EQ(ZX_OK, result.status());
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
@@ -218,7 +218,7 @@ TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
 
   {
     auto result = reader->ReadInputReports();
-    ASSERT_OK(result.status());
+    EXPECT_EQ(ZX_OK, result.status());
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 

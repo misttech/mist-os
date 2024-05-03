@@ -54,6 +54,7 @@ if (current_cpu == "x64") {
     bazel_recovery_image_target = "//products/zedboot:x64"
     bazel_elf_sizes_target = ":elf_sizes.x64"
     bazel_inputs_from_gn = [
+      "//build/images/flash:esp.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]
@@ -75,6 +76,7 @@ if (current_cpu == "x64") {
     bazel_recovery_image_target = "//products/zedboot:qemu-x64"
     bazel_elf_sizes_target = ":elf_sizes.qemu-x64"
     bazel_inputs_from_gn = [
+      "//build/images/flash:esp.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]
@@ -99,6 +101,7 @@ if (current_cpu == "arm64") {
     bazel_elf_sizes_target = ":elf_sizes.arm64"
     bazel_inputs_from_gn = [
       "//boards/arm64:arm64.bazel_input",
+      "//build/images/flash:esp.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]

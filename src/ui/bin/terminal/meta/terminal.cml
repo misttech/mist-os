@@ -27,11 +27,6 @@
             path: "/boot/bin",
         },
         {
-            directory: "pkgfs-packages",
-            rights: [ "r*" ],
-            path: "/pkgfs/packages",
-        },
-        {
             protocol: [
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.HostWatcher",

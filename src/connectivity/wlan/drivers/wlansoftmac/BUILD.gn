@@ -22,7 +22,6 @@ source_set("source_set") {
   sources = [
     "buffer_allocator.cc",
     "buffer_allocator.h",
-    "device_interface.h",
     "driver.cc",
     "softmac_binding.cc",
     "softmac_binding.h",

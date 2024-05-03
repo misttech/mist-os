@@ -48,6 +48,11 @@ def main():
         help="Whether the atom is a sdk_noop_atom. Sets the atom's meta to be empty. Defaults to False.",
     )
     parser.add_argument("--type", help="Type of the atom", required=True)
+    parser.add_argument(
+        "--stable",
+        help="Whether this library is stabilized",
+        action="store_true",
+    )
     parser.add_argument("--plasa", help="Path to the plasa metadata, optional")
     parser.add_argument("--area", help="API council area that owns the atom")
     parser.add_argument(
@@ -106,6 +111,7 @@ def main():
                     ],
                     "type": args.type,
                     "plasa": plasa_fragments,
+                    "stable": args.stable,
                 }
             )
         ]

@@ -17,6 +17,7 @@
                 "fuchsia.power.system.ActivityGovernor",
             ],
         },
+        { service: "fuchsia.power.broker.ElementInfoProviderService" },
     ],
     use: [
         {
@@ -34,6 +35,10 @@
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
             ],
+            from: "self",
+        },
+        {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "self",
         },
     ],

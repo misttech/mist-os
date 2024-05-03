@@ -21,7 +21,7 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
-      const fdf::Dispatcher& dispatcher, const frame_processor_t* frame_processor,
+      const frame_processor_t* frame_processor,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);
 
@@ -33,6 +33,7 @@ class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc
                       ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequest& request,
                           NotifyScanCompleteCompleter::Sync& completer) override;
+  void StopBridgedDriver(std::unique_ptr<fit::callback<void()>> stop_completer);
 
  private:
   explicit SoftmacIfcBridge(const frame_processor_t* frame_processor)

@@ -25,6 +25,7 @@ sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_testing_cpp"
   include_base = "//sdk"
+  stable = true
   public_configs = [ "//sdk/config" ]
 
   sources = [

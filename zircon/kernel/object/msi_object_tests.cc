@@ -223,7 +223,7 @@ bool interrupt_vmo_test() {
   zx_rights_t rights;
   {
     fbl::RefPtr<VmObjectPaged> vmo, vmo_noncontig;
-    size_t vmo_size = sizeof(MsiCapability);
+    size_t vmo_size = ROUNDUP_PAGE_SIZE(sizeof(MsiCapability));
     ASSERT_EQ(ZX_OK, VmObjectPaged::CreateContiguous(PMM_ALLOC_FLAG_ANY, vmo_size,
                                                      /*alignment_log2=*/0, &vmo));
     ASSERT_EQ(ZX_OK,

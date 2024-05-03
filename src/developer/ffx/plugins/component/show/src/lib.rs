@@ -33,7 +33,8 @@ impl FfxMain for ShowTool {
                 .map_err(|e| FfxError::Error(e, 1))?;
             writer.machine(&output)?;
         } else {
-            show_cmd_print(self.cmd.query, realm_query, writer)
+            let with_style = termion::is_tty(&std::io::stdout());
+            show_cmd_print(self.cmd.query, realm_query, writer, with_style)
                 .await
                 .map_err(|e| FfxError::Error(e, 1))?;
         }

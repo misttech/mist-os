@@ -35,7 +35,7 @@ namespace {
 void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
             fidl::ServerEnd<fio::Node> server_end, std::string_view path,
             VnodeConnectionOptions options, fio::Rights parent_rights) {
-  vfs->Open(parent, path, options, parent_rights, 0)
+  vfs->Open(parent, path, options, parent_rights)
       .visit([vfs, &server_end, options, path](auto&& result) {
         using ResultT = std::decay_t<decltype(result)>;
         using OpenResult = fs::Vfs::OpenResult;

@@ -27,6 +27,8 @@ pub(crate) use self::handle::ProxyableRW;
 pub(crate) use self::run::spawn::recv as spawn_recv;
 pub(crate) use self::run::spawn::send as spawn_send;
 
+pub use self::run::set_proxy_drop_event_handler;
+
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::ChannelProxyProtocol;
 

@@ -6,7 +6,6 @@ use display_utils::BufferCollectionId;
 use std::collections::BTreeSet;
 
 pub mod sysmem;
-pub mod sysmem2;
 
 #[cfg(test)]
 use std::ops::Range;

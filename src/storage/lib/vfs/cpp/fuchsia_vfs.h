@@ -131,10 +131,10 @@ class FuchsiaVfs : public Vfs {
                         VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Vfs protected overrides.
-  zx::result<bool> EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                fbl::RefPtr<Vnode>* out_vn, fs::VnodeConnectionOptions options,
-                                uint32_t mode, fuchsia_io::Rights parent_rights) override
-      __TA_REQUIRES(vfs_lock_);
+  zx::result<bool> EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
+                                CreationType type, bool allow_existing,
+                                fuchsia_io::Rights parent_rights,
+                                fbl::RefPtr<Vnode>* out_vn) override __TA_REQUIRES(vfs_lock_);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of
   // |connection|. On error registering a connection, callers must close the associated vnode.

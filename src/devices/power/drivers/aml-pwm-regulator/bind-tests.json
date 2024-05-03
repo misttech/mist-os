@@ -22,5 +22,17 @@
                 }
             }
         ]
+    },
+    {
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,pwm-regulator\""
+                }
+            }
+        ]
     }
 ]

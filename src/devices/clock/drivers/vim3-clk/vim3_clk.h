@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -65,6 +66,9 @@ class Vim3Clock final : public fdf::DriverBase,
   void InitGates();
   void InitHiu();
   void InitCpuClks();
+
+  zx::result<fdf::MmioBuffer> MapMmio(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t idx);
 
   // Required for maintaining the topological path.
   compat::SyncInitializedDeviceServer compat_server_;

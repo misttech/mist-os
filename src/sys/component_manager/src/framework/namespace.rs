@@ -218,8 +218,7 @@ mod tests {
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
-            dict.lock_entries()
-                .insert(fecho::EchoMarker::DEBUG_NAME.parse().unwrap(), Capability::Sender(sender))
+            dict.insert(fecho::EchoMarker::DEBUG_NAME.parse().unwrap(), Capability::Sender(sender))
                 .expect("dict entry already exists");
 
             let (dict_proxy, stream) =
@@ -283,8 +282,7 @@ mod tests {
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
-            dict.lock_entries()
-                .insert(fecho::EchoMarker::DEBUG_NAME.parse().unwrap(), Capability::Sender(sender))
+            dict.insert(fecho::EchoMarker::DEBUG_NAME.parse().unwrap(), Capability::Sender(sender))
                 .expect("dict entry already exists");
 
             let (dict_proxy, stream) =

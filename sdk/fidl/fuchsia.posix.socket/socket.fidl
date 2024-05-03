@@ -46,6 +46,14 @@ type TimestampOption = strict enum {
     MICROSECOND = 2;
 };
 
+/// Domains for a mark. This allows multiple marks to be set and retrieved
+/// independently.
+@available(added=HEAD)
+type MarkDomain = strict enum {
+    MARK_1 = 0;
+    MARK_2 = 1;
+};
+
 /// A socket.
 closed protocol BaseSocket {
     compose fuchsia.unknown.Cloneable;
@@ -185,6 +193,25 @@ closed protocol BaseSocket {
     /// Get `SOL_SOCKET` -> `SO_TIMESTAMP` or `SO_TIMESTAMPNS`.
     strict GetTimestamp() -> (struct {
         value TimestampOption;
+    }) error fuchsia.posix.Errno;
+
+    /// Like setting `SOL_SOCKET` -> `SO_MARK`. The major difference is that
+    /// unlike the standard SO_MARK, this API has multiple mark domains and each
+    /// mark can be set independently in each domain.
+    @available(added=HEAD)
+    strict SetMark(struct {
+        domain MarkDomain;
+        mark OptionalUint32;
+    }) -> () error fuchsia.posix.Errno;
+
+    /// Like getting `SOL_SOCKET` -> `SO_MARK`. The major difference is that
+    /// unlike the standard SO_MARK, this API has multiple mark domains and each
+    /// mark can be retrieved independently in each domain.
+    @available(added=HEAD)
+    strict GetMark(struct {
+        domain MarkDomain;
+    }) -> (struct {
+        mark OptionalUint32;
     }) error fuchsia.posix.Errno;
 };
 

@@ -4,15 +4,36 @@
 
 import argparse
 from dataclasses import dataclass
+import enum
 import pathlib
 import sys
 import typing
-import functools
 
 import termout
 import util.arg_option as arg_option
 
 LOG_TO_STDOUT_OPTION = "-"
+
+
+class PrevOption(enum.StrEnum):
+    LOG = "log"
+    HELP = "help"
+
+    def help(self) -> str:
+        """Get the help string for this option.
+
+        Raises:
+            RuntimeError: If an invalid option is passed.
+
+        Returns:
+            str: Human-readable information about how this options is used.
+        """
+        if self is PrevOption.LOG:
+            return "Print all test logs from the previous run. Logs are grouped by test suite."
+        elif self is PrevOption.HELP:
+            return "Print this help output."
+        else:
+            raise RuntimeError("BUG: Invalid prev option")
 
 
 @dataclass
@@ -24,6 +45,7 @@ class Flags:
 
     dry: bool
     list: bool
+    previous: PrevOption | None
     print_logs: bool
 
     build: bool
@@ -201,17 +223,19 @@ def parse_args(
         help="Do not actually run tests. Instead print out the list of test cases each test contains.",
     )
     utility.add_argument(
+        "-pr",
+        "--prev",
+        "--previous",
+        dest="previous",
+        type=PrevOption,
+        choices=list(PrevOption),
+        help=f"Do not actually run tests. Instead print information from the previous run. Input is read from the last log file, and it respects the value of --logpath.",
+    )
+    utility.add_argument(
         "--print-logs",
         action="store_true",
         default=False,
-        help="If set, pretty print the contents of the log file. If no --logpath is set, the default log output location is checked and the most recent log is used.",
-    )
-    utility.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        default=False,
-        help="Silence INFO and INSTRUCTION messages from the tool",
+        help="This argument is deprecated and will be removed. Please use --previous log",
     )
     build = parser.add_argument_group("Build Options")
     build.add_argument(
@@ -493,6 +517,13 @@ def parse_args(
         type=float,
         default=0,
         help="If non-zero, automatically show output for tests taking longer than this many seconds.",
+    )
+    output.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Silence INFO and INSTRUCTION messages from the tool",
     )
 
     if defaults is not None:

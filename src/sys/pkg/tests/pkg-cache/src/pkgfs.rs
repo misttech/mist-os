@@ -64,20 +64,3 @@ async fn expose_system_image_package_as_system_directory() {
 
     let () = env.stop().await;
 }
-
-#[fuchsia_async::run_singlethreaded(test)]
-async fn expose_pkgfs_packages_directory() {
-    let system_image_package = SystemImageBuilder::new().build().await;
-    let env =
-        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
-
-    assert_eq!(
-        fuchsia_fs::directory::readdir(&env.proxies.pkgfs_packages).await.unwrap(),
-        vec![fuchsia_fs::directory::DirEntry {
-            name: "system_image".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::Directory
-        },]
-    );
-
-    let () = env.stop().await;
-}

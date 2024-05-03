@@ -110,6 +110,10 @@
                         "sysroot",
                         "version_history"
                     ]
+                },
+                "stable": {
+                    "description": "If true, the atom is subject to API compatibility policy. If false, it its experimental and may change without warning.",
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -120,6 +124,7 @@
                 "id",
                 "meta",
                 "plasa",
+                "stable",
                 "type"
             ],
             "additionalProperties": false

@@ -8,6 +8,7 @@
 #include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
 
 namespace media_audio {
+namespace {
 
 // These cases unittest the Map... functions with inputs that cause WARNING logging.
 
@@ -33,4 +34,5 @@ TEST(SignalProcessingUtilsWarningTest, BadTopologyList) {
   EXPECT_TRUE(MapTopologies(kTopologiesWithEmptyEdgePairs).empty());
 }
 
+}  // namespace
 }  // namespace media_audio

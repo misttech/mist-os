@@ -4,7 +4,11 @@
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
@@ -13,10 +17,123 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
 
-static constexpr serial_port_info_t kSerialInfo = {
-    .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci),
+static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
+    .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
     .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
     .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
+};
+
+class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+ public:
+  FakeSystemActivityGovernor() = default;
+
+  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
+    fuchsia_power_system::PowerElements elements;
+    zx::event::create(0, &wake_handling_);
+    zx::event duplicate;
+    wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
+
+    fuchsia_power_system::WakeHandling wake_handling = {
+        {.active_dependency_token = std::move(duplicate)}};
+
+    elements = {{.wake_handling = std::move(wake_handling)}};
+
+    completer.Reply({{std::move(elements)}});
+  }
+
+  void RegisterListener(RegisterListenerRequest& request,
+                        RegisterListenerCompleter::Sync& completer) override {}
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  zx::event wake_handling_;
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+};
+
+class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
+ public:
+  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& request,
+                   WatchStatusCompleter::Sync& completer) override {
+    completer.Reply(lease_status_);
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
+};
+
+class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
+ public:
+  void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
+             LeaseCompleter::Sync& completer) override {
+    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
+    auto lease_control_impl = std::make_unique<FakeLeaseControl>();
+    lease_control_ = lease_control_impl.get();
+    lease_control_binding_ = fidl::BindServer<fuchsia_power_broker::LeaseControl>(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control->server),
+        std::move(lease_control_impl),
+        [](FakeLeaseControl* impl, fidl::UnbindInfo info,
+           fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end) mutable {});
+
+    completer.Reply(fit::success(std::move(lease_control->client)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  FakeLeaseControl* lease_control_;
+  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
+};
+
+class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
+ public:
+  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void AddElement(fuchsia_power_broker::ElementSchema& request,
+                  AddElementCompleter::Sync& completer) override {
+    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
+    element_control_server_ = std::move(element_control->server);
+    if (request.lessor_channel()) {
+      auto lessor_impl = std::make_unique<FakeLessor>();
+      wake_lessor_ = lessor_impl.get();
+      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
+          fidl::BindServer<fuchsia_power_broker::Lessor>(
+              fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              std::move(*request.lessor_channel()), std::move(lessor_impl),
+              [](FakeLessor* impl, fidl::UnbindInfo info,
+                 fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
+    }
+
+    fuchsia_power_broker::TopologyAddElementResponse result{
+        {.element_control_channel = std::move(element_control->client)},
+    };
+
+    completer.Reply(fit::success(std::move(result)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server() {
+    return element_control_server_;
+  }
+
+ private:
+  FakeLessor* wake_lessor_ = nullptr;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
+  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
 };
 
 class Environment : public fdf_testing::Environment {
@@ -30,6 +147,31 @@ class Environment : public fdf_testing::Environment {
     state_.set_irq_signaller(config.irqs[0].borrow());
     config.mmios[0] = state_.GetMmio();
 
+    // Add power configuration to config.
+    constexpr uint8_t kPowerLevelOff =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
+    constexpr uint8_t kPowerLevelHandling =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+    constexpr char kPowerElementName[] = "aml-uart-wake-on-interrupt";
+    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
+        .child_level = kPowerLevelHandling,
+        .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+    }};
+    fuchsia_hardware_power::PowerDependency wake_handling = {{
+        .child = kPowerElementName,
+        .parent = fuchsia_hardware_power::ParentElement::WithSag(
+            fuchsia_hardware_power::SagElement::kWakeHandling),
+        .level_deps = {{std::move(wake_handling_on)}},
+        .strength = fuchsia_hardware_power::RequirementType::kActive,
+    }};
+    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
+    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelHandling, .name = "on"}};
+    fuchsia_hardware_power::PowerElement element = {
+        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
+    fuchsia_hardware_power::PowerElementConfiguration wake_config = {
+        {.element = std::move(element), .dependencies = {{std::move(wake_handling)}}}};
+    config.power_elements.push_back(wake_config);
+
     pdev_server_.SetConfig(std::move(config));
 
     // Add pdev.
@@ -40,24 +182,51 @@ class Environment : public fdf_testing::Environment {
             pdev_server_.GetInstanceHandler(dispatcher), kInstanceName);
     ZX_ASSERT(add_service_result.is_ok());
 
+    // Add power protocols.
+    auto result_sag =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+            system_activity_governor_.CreateHandler());
+    EXPECT_EQ(ZX_OK, result_sag.status_value());
+    auto result_broker =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
+            power_broker_.CreateHandler());
+    EXPECT_EQ(ZX_OK, result_broker.status_value());
+
     // Configure and add compat.
     compat_server_.Init("default", "topo");
-    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, &kSerialInfo, sizeof(kSerialInfo));
+
+    fit::result encoded = fidl::Persist(kSerialInfo);
+    ZX_ASSERT(encoded.is_ok());
+
+    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, encoded->data(), encoded->size());
     return zx::make_result(compat_server_.Serve(dispatcher, &to_driver_vfs));
   }
 
   DeviceState& device_state() { return state_; }
+  FakePowerBroker& power_broker() { return power_broker_; }
 
  private:
   DeviceState state_;
   fake_pdev::FakePDevFidl pdev_server_;
+  FakeSystemActivityGovernor system_activity_governor_;
+  FakePowerBroker power_broker_;
   compat::DeviceServer compat_server_;
 };
 
 class AmlUartTestConfig {
  public:
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = false;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = serial::AmlUartV2;
+  using EnvironmentType = Environment;
+};
+
+class AmlUartAsyncTestConfig {
+ public:
   static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStartDriver = false;
   static constexpr bool kAutoStopDriver = true;
 
   using DriverType = serial::AmlUartV2;
@@ -66,13 +235,74 @@ class AmlUartTestConfig {
 
 class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig> {
  public:
+  void SetUp() override {
+    zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
+      aml_uart_dfv2_config::Config fake_config;
+      fake_config.enable_suspend() = false;
+      args.config(fake_config.ToVmo());
+    });
+
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf::WireSyncClient<fuchsia_hardware_serialimpl::Device> CreateClient() {
+    zx::result driver_connect_result =
+        Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
+    if (driver_connect_result.is_error()) {
+      return {};
+    }
+    return fdf::WireSyncClient(std::move(driver_connect_result.value()));
+  }
+};
+
+class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTestConfig> {
+ public:
+  void SetUp() override {
+    zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
+      aml_uart_dfv2_config::Config fake_config;
+      fake_config.enable_suspend() = false;
+      args.config(fake_config.ToVmo());
+    });
+
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateClient() {
+    zx::result driver_connect_result =
+        Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
+    if (driver_connect_result.is_error()) {
+      return {};
+    }
+    return fdf::WireClient(std::move(driver_connect_result.value()),
+                           fdf::Dispatcher::GetCurrent()->get());
+  }
+
   serial::AmlUart& Device() { return driver()->aml_uart_for_testing(); }
 };
 
+class AmlUartHarnessWithPower : public AmlUartHarness {
+ public:
+  void SetUp() override {
+    zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
+      aml_uart_dfv2_config::Config fake_config;
+      fake_config.enable_suspend() = true;
+      args.config(fake_config.ToVmo());
+    });
+
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
+
 TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
-  serial_port_info_t info;
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncGetInfo(&info));
-  ASSERT_EQ(info.serial_class, fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci));
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+  auto result = client.buffer(arena)->GetInfo();
+  ASSERT_TRUE(result.ok());
+  ASSERT_TRUE(result->is_ok());
+
+  const auto& info = result->value()->info;
+  ASSERT_EQ(info.serial_class, fuchsia_hardware_serial::Class::kBluetoothHci);
   ASSERT_EQ(info.serial_pid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458);
   ASSERT_EQ(info.serial_vid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM);
 }
@@ -102,56 +332,103 @@ TEST_F(AmlUartHarness, SerialImplAsyncGetInfoFromDriverService) {
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncConfig) {
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(false));
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  {
+    auto result = client.buffer(arena)->Enable(false);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
+
   RunInEnvironmentTypeContext([](Environment& env) {
     ASSERT_EQ(env.device_state().Control().tx_enable(), 0u);
     ASSERT_EQ(env.device_state().Control().rx_enable(), 0u);
     ASSERT_EQ(env.device_state().Control().inv_cts(), 0u);
   });
 
-  static constexpr uint32_t serial_test_config =
-      SERIAL_DATA_BITS_6 | SERIAL_STOP_BITS_2 | SERIAL_PARITY_EVEN | SERIAL_FLOW_CTRL_CTS_RTS;
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncConfig(20, serial_test_config));
+  static constexpr uint32_t serial_test_config = fuchsia_hardware_serialimpl::kSerialDataBits6 |
+                                                 fuchsia_hardware_serialimpl::kSerialStopBits2 |
+                                                 fuchsia_hardware_serialimpl::kSerialParityEven |
+                                                 fuchsia_hardware_serialimpl::kSerialFlowCtrlCtsRts;
+  {
+    auto result = client.buffer(arena)->Config(20, serial_test_config);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 
   RunInEnvironmentTypeContext([](Environment& env) {
-    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
-    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
-    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_EQ(env.device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+    ASSERT_EQ(env.device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+    ASSERT_EQ(env.device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
     ASSERT_TRUE(env.device_state().FlowControl());
   });
 
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
+  {
+    auto result =
+        client.buffer(arena)->Config(40, fuchsia_hardware_serialimpl::kSerialSetBaudRateOnly);
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  }
 
   RunInEnvironmentTypeContext([](Environment& env) {
-    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
-    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
-    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_EQ(env.device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+    ASSERT_EQ(env.device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+    ASSERT_EQ(env.device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
     ASSERT_TRUE(env.device_state().FlowControl());
   });
 
-  ASSERT_NE(ZX_OK, Device().SerialImplAsyncConfig(0, serial_test_config));
-  ASSERT_NE(ZX_OK, Device().SerialImplAsyncConfig(UINT32_MAX, serial_test_config));
-  ASSERT_NE(ZX_OK, Device().SerialImplAsyncConfig(1, serial_test_config));
+  {
+    auto result = client.buffer(arena)->Config(0, serial_test_config);
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  }
+
+  {
+    auto result = client.buffer(arena)->Config(UINT32_MAX, serial_test_config);
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  }
+
+  {
+    auto result = client.buffer(arena)->Config(1, serial_test_config);
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  }
 
   RunInEnvironmentTypeContext([](Environment& env) {
-    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
-    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
-    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_EQ(env.device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+    ASSERT_EQ(env.device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+    ASSERT_EQ(env.device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
     ASSERT_TRUE(env.device_state().FlowControl());
   });
 
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
+  {
+    auto result =
+        client.buffer(arena)->Config(40, fuchsia_hardware_serialimpl::kSerialSetBaudRateOnly);
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  }
 
   RunInEnvironmentTypeContext([](Environment& env) {
-    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
-    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
-    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_EQ(env.device_state().DataBits(), fuchsia_hardware_serialimpl::kSerialDataBits6);
+    ASSERT_EQ(env.device_state().StopBits(), fuchsia_hardware_serialimpl::kSerialStopBits2);
+    ASSERT_EQ(env.device_state().Parity(), fuchsia_hardware_serialimpl::kSerialParityEven);
     ASSERT_TRUE(env.device_state().FlowControl());
   });
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncEnable) {
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(false));
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  {
+    auto result = client.buffer(arena)->Enable(false);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 
   RunInEnvironmentTypeContext([](Environment& env) {
     ASSERT_EQ(env.device_state().Control().tx_enable(), 0u);
@@ -159,7 +436,11 @@ TEST_F(AmlUartHarness, SerialImplAsyncEnable) {
     ASSERT_EQ(env.device_state().Control().inv_cts(), 0u);
   });
 
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(true));
+  {
+    auto result = client.buffer(arena)->Enable(true);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 
   RunInEnvironmentTypeContext([](Environment& env) {
     ASSERT_EQ(env.device_state().Control().tx_enable(), 1u);
@@ -172,28 +453,6 @@ TEST_F(AmlUartHarness, SerialImplAsyncEnable) {
     ASSERT_TRUE(env.device_state().Control().tx_interrupt_enable());
     ASSERT_TRUE(env.device_state().Control().rx_interrupt_enable());
   });
-}
-
-TEST_F(AmlUartHarness, SerialImplReadAsync) {
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(true));
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
-  for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
-  }
-  auto cb = [](void* ctx, zx_status_t status, const uint8_t* buffer, size_t bufsz) {
-    auto context = static_cast<Context*>(ctx);
-    EXPECT_EQ(bufsz, kDataLen);
-    EXPECT_EQ(memcmp(buffer, context->data, bufsz), 0);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncReadAsync(cb, &context);
-
-  RunInEnvironmentTypeContext(
-      [&context](Environment& env) { env.device_state().Inject(context.data, kDataLen); });
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
 }
 
 TEST_F(AmlUartHarness, SerialImplReadDriverService) {
@@ -212,6 +471,7 @@ TEST_F(AmlUartHarness, SerialImplReadDriverService) {
   device_client.buffer(arena)->Enable(true).Then(
       [quit = runtime().QuitClosure()](auto& res) { quit(); });
   runtime().Run();
+  runtime().ResetQuit();
 
   device_client.buffer(arena)->Read().Then(
       [quit = runtime().QuitClosure(),
@@ -230,29 +490,6 @@ TEST_F(AmlUartHarness, SerialImplReadDriverService) {
   runtime().Run();
 }
 
-TEST_F(AmlUartHarness, SerialImplWriteAsync) {
-  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(true));
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
-  for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
-  }
-  auto cb = [](void* ctx, zx_status_t status) {
-    auto context = static_cast<Context*>(ctx);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncWriteAsync(context.data, kDataLen, cb, &context);
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
-
-  RunInEnvironmentTypeContext([&context](Environment& env) {
-    auto buf = env.device_state().TxBuf();
-    ASSERT_EQ(buf.size(), kDataLen);
-    ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
-  });
-}
-
 TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
   uint8_t data[kDataLen];
   for (size_t i = 0; i < kDataLen; i++) {
@@ -269,6 +506,7 @@ TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
   device_client.buffer(arena)->Enable(true).Then(
       [quit = runtime().QuitClosure()](auto& res) { quit(); });
   runtime().Run();
+  runtime().ResetQuit();
 
   device_client.buffer(arena)
       ->Write(fidl::VectorView<uint8_t>::FromExternal(data, kDataLen))
@@ -287,49 +525,75 @@ TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
   });
 }
 
-TEST_F(AmlUartHarness, SerialImplAsyncWriteDoubleCallback) {
+TEST_F(AmlUartAsyncHarness, SerialImplAsyncWriteDoubleCallback) {
   // NOTE: we don't start the IRQ thread.  The Handle*RaceForTest() enable.
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
-  for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
-  }
-  auto cb = [](void* ctx, zx_status_t status) {
-    auto context = static_cast<Context*>(ctx);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncWriteAsync(context.data, kDataLen, cb, &context);
-  Device().HandleTXRaceForTest();
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
+  auto client = CreateClient();
 
-  RunInEnvironmentTypeContext([&context](Environment& env) {
-    auto buf = env.device_state().TxBuf();
-    ASSERT_EQ(buf.size(), kDataLen);
-    ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+  fdf::Arena arena('TEST');
+
+  std::vector<uint8_t> expected_data;
+  for (size_t i = 0; i < kDataLen; i++) {
+    expected_data.push_back(static_cast<uint8_t>(i));
+  }
+
+  bool write_complete = false;
+  client.buffer(arena)
+      ->Write(fidl::VectorView<uint8_t>::FromExternal(expected_data.data(), kDataLen))
+      .ThenExactlyOnce([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        write_complete = true;
+      });
+  runtime().RunUntilIdle();
+  Device().HandleTXRaceForTest();
+  runtime().RunUntil([&]() { return write_complete; });
+
+  RunInEnvironmentTypeContext([expected_data = std::move(expected_data)](Environment& env) {
+    EXPECT_EQ(expected_data, env.device_state().TxBuf());
   });
 }
 
-TEST_F(AmlUartHarness, SerialImplAsyncReadDoubleCallback) {
+TEST_F(AmlUartAsyncHarness, SerialImplAsyncReadDoubleCallback) {
   // NOTE: we don't start the IRQ thread.  The Handle*RaceForTest() enable.
-  struct Context {
-    uint8_t data[kDataLen];
-    sync_completion_t completion;
-  } context;
+  auto client = CreateClient();
+
+  fdf::Arena arena('TEST');
+
+  std::vector<uint8_t> expected_data;
   for (size_t i = 0; i < kDataLen; i++) {
-    context.data[i] = static_cast<uint8_t>(i);
+    expected_data.push_back(static_cast<uint8_t>(i));
   }
-  auto cb = [](void* ctx, zx_status_t status, const uint8_t* buffer, size_t bufsz) {
-    auto context = static_cast<Context*>(ctx);
-    EXPECT_EQ(bufsz, kDataLen);
-    EXPECT_EQ(memcmp(buffer, context->data, bufsz), 0);
-    sync_completion_signal(&context->completion);
-  };
-  Device().SerialImplAsyncReadAsync(cb, &context);
+
+  client.buffer(arena)->Read().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    const std::vector actual_data(result->value()->data.cbegin(), result->value()->data.cend());
+    EXPECT_EQ(expected_data, actual_data);
+    runtime().Quit();
+  });
+  runtime().RunUntilIdle();
 
   RunInEnvironmentTypeContext(
-      [&context](Environment& env) { env.device_state().Inject(context.data, kDataLen); });
+      [&](Environment& env) { env.device_state().Inject(expected_data.data(), kDataLen); });
   Device().HandleRXRaceForTest();
-  sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
+  runtime().Run();
+}
+
+TEST_F(AmlUartHarnessWithPower, PowerElementControl) {
+  zx_info_handle_basic_t broker_element_control, driver_element_control;
+
+  RunInDriverContext([&](serial::AmlUartV2& driver) {
+    zx_status_t status = driver.element_control_for_testing().channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &driver_element_control, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  });
+
+  RunInEnvironmentTypeContext([&](Environment& env) {
+    zx_status_t status = env.power_broker().element_control_server().channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &broker_element_control, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    ASSERT_EQ(status, ZX_OK);
+  });
+  ASSERT_EQ(broker_element_control.koid, driver_element_control.related_koid);
 }

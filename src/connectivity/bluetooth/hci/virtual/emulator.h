@@ -6,19 +6,10 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_EMULATOR_H_
 
 #include <fidl/fuchsia.bluetooth.test/cpp/fidl.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
-#include <fuchsia/hardware/bt/hci/cpp/banjo.h>
-#include <fuchsia/hardware/test/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/fidl/cpp/binding.h>
-#include <zircon/compiler.h>
-#include <zircon/syscalls.h>
-#include <zircon/types.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <queue>
 #include <unordered_map>
@@ -31,49 +22,48 @@
 
 namespace bt_hci_virtual {
 
-enum class Channel : uint8_t { ACL, COMMAND, EMULATOR, ISO, SNOOP };
+enum class ChannelType : uint8_t { ACL, COMMAND, EMULATOR, ISO, SNOOP };
 
-class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
+using AddChildCallback = fit::function<void(fuchsia_driver_framework::wire::NodeAddArgs)>;
+using ShutdownCallback = fit::function<void()>;
+
+class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
+                       public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator>,
+                       public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor>,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator> {
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
-  explicit EmulatorDevice(zx_device_t* device);
+  explicit EmulatorDevice();
 
-  zx_status_t Bind(std::string_view name);
-  void Unbind();
-  void Release();
+  // This error handler is called when the EmulatorDevice is shut down by DFv2. We call |Shutdown()|
+  // to manually delete the heap-allocated EmulatorDevice.
+  void on_fidl_error(fidl::UnbindInfo error) override { Shutdown(); }
 
-  zx_status_t GetProtocol(uint32_t proto_id, void* out_proto);
-  zx_status_t OpenChan(Channel chan_type, zx_handle_t chan);
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::Node> metadata) override {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
-  // fuchsia_hardware_bluetooth::Hci overrides:
-  void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer) override;
-  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer) override;
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
-  void ResetSco(ResetScoCompleter::Sync& completer) override;
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override;
-  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
+  // Methods used by the VirtualController to control the EmulatorDevice's lifecycle
+  zx_status_t Initialize(std::string_view name, AddChildCallback callback,
+                         ShutdownCallback shutdown);
+  void Shutdown();
 
-  // fuchsia_hardware_bluetooth::Emulator overrides:
-  void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
+  zx_status_t OpenChannel(ChannelType chan_type, zx_handle_t chan);
 
-  void ClearHciDev() {
-    std::lock_guard<std::mutex> lock(hci_dev_lock_);
-    hci_dev_ = nullptr;
+  void set_emulator_ptr(std::unique_ptr<EmulatorDevice> ptr) { emulator_ptr_ = std::move(ptr); }
+
+  fidl::WireClient<fuchsia_driver_framework::Node>* emulator_child_node() {
+    return &emulator_child_node_;
+  }
+  void set_emulator_child_node(fidl::WireClient<fuchsia_driver_framework::Node> node) {
+    emulator_child_node_ = std::move(node);
   }
 
  private:
-  void StartEmulatorInterface(fidl::ServerEnd<fuchsia_bluetooth_test::HciEmulator> request);
+  // fuchsia_hardware_bluetooth::Emulator overrides:
+  void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 
   // fuchsia_bluetooth_test::HciEmulator overrides:
   void Publish(PublishRequest& request, PublishCompleter::Sync& completer) override;
@@ -94,19 +84,48 @@ class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // Helper function for Vendor EncodeCommand
+  // fuchsia_hardware_bluetooth::Hci overrides:
+  void OpenCommandChannel(OpenCommandChannelRequestView request,
+                          OpenCommandChannelCompleter::Sync& completer) override;
+  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
+                          OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                          OpenScoDataChannelCompleter::Sync& completer) override;
+  void ConfigureSco(ConfigureScoRequestView request,
+                    ConfigureScoCompleter::Sync& completer) override;
+  void ResetSco(ResetScoCompleter::Sync& completer) override;
+  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                          OpenIsoDataChannelCompleter::Sync& completer) override;
+  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
+                        OpenSnoopChannelCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  void ConnectEmulator(fidl::ServerEnd<fuchsia_hardware_bluetooth::Emulator> request);
+  void ConnectVendor(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
+
+  // Helper function for fuchsia.hardware.bluetooth.Emulator.Open that binds the HciEmulator
+  // |chan| and processes HciEmulator protocol messages
+  void StartEmulatorInterface(fidl::ServerEnd<fuchsia_bluetooth_test::HciEmulator> request);
+
+  // Helper function for fuchsia.bluetooth.test.HciEmulator.Publish that adds bt-hci-device as a
+  // child of EmulatorDevice device node
+  zx_status_t AddHciDeviceChildNode();
+
+  // Helper function for fuchsia.hardware.bluetooth.Vendor.EncodeCommand
   void EncodeSetAclPriorityCommand(
       fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer);
 
-  // Helper function used to initialize BR/EDR and LE peers.
+  // Helper function used to initialize BR/EDR and LE peers
   void AddPeer(std::unique_ptr<EmulatedPeer> peer);
 
+  // Event handlers
   void OnControllerParametersChanged();
   void MaybeUpdateControllerParametersChanged();
   void OnLegacyAdvertisingStateChanged();
   void MaybeUpdateLegacyAdvertisingStates();
 
-  // Remove the bt-hci device.
+  // Remove bt-hci-device node
   void UnpublishHci();
 
   void OnPeerConnectionStateChanged(const bt::DeviceAddress& address,
@@ -114,15 +133,15 @@ class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
                                     bool canceled);
 
   // Starts listening for command/event packets on the given channel.
-  // Returns false if already listening on a command channel
+  // Returns false if already listening on a command channel.
   bool StartCmdChannel(zx::channel chan);
 
-  // Starts listening for acl packets on the given channel.
-  // Returns false if already listening on a acl channel
+  // Starts listening for ACL packets on the given channel.
+  // Returns false if already listening on a ACL channel
   bool StartAclChannel(zx::channel chan);
 
   // Starts listening for ISO packets on the given channel.
-  // Return false if already listenong on an ISO channel.
+  // Return false if already listening on an ISO channel.
   bool StartIsoChannel(zx::channel chan);
 
   void CloseCommandChannel();
@@ -133,7 +152,7 @@ class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
   void SendAclPacket(pw::span<const std::byte> buffer);
   void SendIsoPacket(pw::span<const std::byte> buffer);
 
-  // Read and handle packets received over the channels.
+  // Read and handle packets received over the channels
   void HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                            zx_status_t wait_status, const zx_packet_signal_t* signal);
   void HandleAclPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
@@ -141,42 +160,20 @@ class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
   void HandleIsoPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                        zx_status_t wait_status, const zx_packet_signal_t* signal);
 
-  // Responsible for running the thread-hostile fake_device_, along with other members listed below.
-  // Device publishes a bt-hci child, which is bound to by a bt-host child, which talks to the
-  // fake_device_ over some channels. As such, |loop_| cannot be safely shut down until Device's
-  // children are released, i.e. loop_ and members responsible for servicing bt-host live past
-  // Unbind, and are shut down upon Release.
-  async::Loop loop_;
-
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
-
-  zx_device_t* const parent_;
-
-  std::mutex hci_dev_lock_;
-  // The device that implements the bt-hci protocol. |hci_dev_| will only be accessed on |loop_|,
-  // and only in the following conditions:
-  //   1. Initialized during Publish().
-  //   2. Unpublished when the HciEmulator FIDL channel (i.e. |binding_|) gets closed, which gets
-  //      processed on the |loop_| dispatcher.
-  //   3. Unpublished in the DDK Unbind() call. While the Unbind method itself runs on a devhost
-  //      thread, the Unpublish call is posted to |loop_| and joined upon during unbind, ensuring
-  //      that |hci_dev_| is never accessed across threads.
-  zx_device_t* hci_dev_ __TA_GUARDED(hci_dev_lock_);
-
-  // The device that implements the bt-emulator protocol.
-  zx_device_t* emulator_dev_;
-
   pw_random_zircon::ZirconRandomGenerator rng_;
 
-  // All objects below are only accessed on the |loop_| dispatcher.
+  // Responsible for running the thread-hostile |fake_device_|
+  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
+
   bt::testing::FakeController fake_device_;
 
-  // Binding for fuchsia.bluetooth.test.HciEmulator channel. |binding_| is only accessed on
-  // |loop_|'s dispatcher.
+  // Binding for fuchsia.bluetooth.test.HciEmulator channel
   fidl::ServerBindingGroup<fuchsia_bluetooth_test::HciEmulator> bindings_;
 
-  // List of active peers that have been registered with us.
+  // List of active peers that have been registered with us
   std::unordered_map<bt::DeviceAddress, std::unique_ptr<EmulatedPeer>> peers_;
+
+  ShutdownCallback shutdown_cb_;
 
   std::optional<fuchsia_bluetooth_test::ControllerParameters> controller_parameters_;
   std::optional<WatchControllerParametersCompleter::Async> controller_parameters_completer_;
@@ -191,6 +188,18 @@ class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleCommandPacket> cmd_channel_wait_{this};
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleAclPacket> acl_channel_wait_{this};
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleIsoPacket> iso_channel_wait_{this};
+
+  // EmulatorDevice
+  fidl::WireClient<fuchsia_driver_framework::Node> emulator_child_node_;
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::Emulator> emulator_devfs_connector_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Emulator> emulator_binding_group_;
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> vendor_devfs_connector_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
+  std::unique_ptr<EmulatorDevice> emulator_ptr_;
+
+  // bt-hci-device
+  fidl::WireClient<fuchsia_driver_framework::NodeController> hci_node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::Node> hci_child_node_;
 };
 
 }  // namespace bt_hci_virtual

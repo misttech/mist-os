@@ -26,7 +26,7 @@ TEST_P(SparseHostFilesystemTest, Sparse) {
   char filename[20];
   sprintf(filename, "::my_file_%u", ++count);
 
-  int fd = emu_open(filename, O_RDWR | O_CREAT, 0644);
+  int fd = emu_open(filename, O_RDWR | O_CREAT);
   ASSERT_GT(fd, 0);
 
   // Create a random write buffer of data
@@ -42,7 +42,7 @@ TEST_P(SparseHostFilesystemTest, Sparse) {
             static_cast<ssize_t>(GetParam().write_size));
   // Reopen file
   ASSERT_EQ(emu_close(fd), 0);
-  fd = emu_open(filename, O_RDWR, 0644);
+  fd = emu_open(filename, O_RDWR);
   ASSERT_GT(fd, 0);
 
   // Access read buffer from file

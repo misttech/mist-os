@@ -90,7 +90,7 @@ fuchsia_partition(
 
 fuchsia_bootloader_partition(
     name = "fuchsia_esp",
-    image = "@legacy_ninja_build_outputs//:fuchsia.esp.blk",
+    image = "@gn_targets//build/images/flash:fuchsia_esp",
     partition_name = "fuchsia-esp",
     # For x64 platform there is only one bootloader and thus there is no need
     # for multiple types and default empty string is used.

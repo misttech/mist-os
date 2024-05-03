@@ -226,6 +226,7 @@ impl FxVolume {
         self.pager.set_recorder(None);
         // Stop profiler ensuring that the write handle is closed.
         profile_state.state.stop_profiler();
+        info!("Stopping profile activity for volume object {}.", self.store.store_object_id());
         std::mem::take(&mut profile_state.recording_info)
     }
 
@@ -293,6 +294,7 @@ impl FxVolume {
             self.pager.set_recorder(Some(profile_state.state.record_new(handle)));
             profile_state.recording_info = Some((name.to_owned(), recording_id));
         }
+        info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
 
         // If there is a recording already, replay it.
         let profile_dir = self.get_profile_directory().await?;
@@ -301,6 +303,10 @@ impl FxVolume {
             let handle = ObjectStore::open_object(self, id, HandleOptions::default(), None).await?;
             let mut profile_state = self.profile_state.lock().unwrap();
             profile_state.state.replay_profile(handle, self.clone());
+            info!(
+                "Replaying existing profile '{name}' for volume object {}",
+                self.store.store_object_id()
+            );
         }
         Ok(())
     }

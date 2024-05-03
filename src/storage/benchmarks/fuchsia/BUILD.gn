@@ -11,7 +11,7 @@ import("//src/storage/testing/driver_test_realm.gni")
 rustc_library("framework") {
   testonly = true
   edition = "2021"
-  name = "fuchia_storage_benchmarks_lib"
+  name = "fuchsia_storage_benchmarks_lib"
   sources = [
     "src/block_devices.rs",
     "src/filesystems/blobfs.rs",

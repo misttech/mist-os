@@ -9,10 +9,7 @@ driver_bind_rules("serial_bind") {
   rules = "serial.bind"
   bind_output = "serial.bindbc"
   tests = "tests/tests.json"
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_bindlib",
-    "//src/devices/bind/fuchsia.serial",
-  ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_bindlib" ]
 }
 
 fuchsia_driver("serial-driver") {
@@ -45,7 +42,6 @@ source_set("common") {
   sources = [ "serial.cc" ]
   public_deps = [
     ":serial_bind",
-    "//sdk/banjo/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
     "//src/devices/lib/driver:driver_runtime",

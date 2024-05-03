@@ -96,9 +96,12 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
   }
 
   // Make sure size is page aligned.
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // Forbid creating children of resizable VMOs. This restriction may be lifted in the future.

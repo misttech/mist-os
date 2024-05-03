@@ -739,7 +739,6 @@ where
                     .capability(Capability::directory(SHELL_COMMANDS_BIN_PATH))
                     .capability(Capability::directory("pkgfs"))
                     .capability(Capability::directory("system"))
-                    .capability(Capability::directory("pkgfs-packages"))
                     .from(&pkg_cache)
                     .to(Ref::parent()),
             )
@@ -765,12 +764,6 @@ where
                 .root
                 .connect_to_protocol_at_exposed_dir::<fpkg::RetainedPackagesMarker>()
                 .expect("connect to retained packages"),
-            pkgfs_packages: fuchsia_fs::directory::open_directory_no_describe(
-                realm_instance.root.get_exposed_dir(),
-                "pkgfs-packages",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )
-            .expect("open pkgfs-packages"),
             pkgfs: fuchsia_fs::directory::open_directory_no_describe(
                 realm_instance.root.get_exposed_dir(),
                 "pkgfs",
@@ -802,7 +795,6 @@ struct Proxies {
     space_manager: fspace::ManagerProxy,
     package_cache: fpkg::PackageCacheProxy,
     retained_packages: fpkg::RetainedPackagesProxy,
-    pkgfs_packages: fio::DirectoryProxy,
     pkgfs: fio::DirectoryProxy,
 }
 

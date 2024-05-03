@@ -10,10 +10,9 @@ use {
         error::ComponentInstanceError,
     },
     cm_rust::{RegistrationDeclCommon, RegistrationSource, RunnerRegistration, SourceName},
-    cm_types::Name,
+    cm_types::{Name, Url},
     fidl_fuchsia_component_decl as fdecl,
     std::{collections::HashMap, sync::Arc},
-    url::Url,
 };
 
 #[cfg(feature = "serde")]
@@ -224,10 +223,6 @@ impl DebugRegistry {
     }
 }
 
-pub fn component_has_relative_url<C: ComponentInstanceInterface>(component: &Arc<C>) -> bool {
-    Url::parse(component.url()) == Err(url::ParseError::RelativeUrlWithoutBase)
-}
-
 pub fn find_first_absolute_ancestor_url<C: ComponentInstanceInterface>(
     component: &Arc<C>,
 ) -> Result<Url, ComponentInstanceError> {
@@ -235,14 +230,8 @@ pub fn find_first_absolute_ancestor_url<C: ComponentInstanceInterface>(
     loop {
         match parent {
             ExtendedInstanceInterface::Component(parent_component) => {
-                if !component_has_relative_url(&parent_component) {
-                    let parent_url = Url::parse(parent_component.url()).map_err(|_| {
-                        ComponentInstanceError::MalformedUrl {
-                            url: parent_component.url().to_string(),
-                            moniker: parent_component.moniker().clone(),
-                        }
-                    })?;
-                    return Ok(parent_url);
+                if !parent_component.url().is_relative() {
+                    return Ok(parent_component.url().clone());
                 }
                 parent = parent_component.try_get_parent()?;
             }

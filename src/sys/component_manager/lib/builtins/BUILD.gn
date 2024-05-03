@@ -60,7 +60,6 @@ rustc_library("builtins") {
     "src/power_resource.rs",
     "src/profile_resource.rs",
     "src/root_job.rs",
-    "src/root_resource.rs",
     "src/smc_resource.rs",
     "src/vmex_resource.rs",
   ]

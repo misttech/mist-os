@@ -56,6 +56,11 @@ def main():
     parser.add_argument(
         "--plasa", help="Path to the plasa fragments list", nargs="*"
     )
+    parser.add_argument(
+        "--stable",
+        help="Whether this library is stabilized",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     if len(args.deps) != len(args.dep_names):
@@ -72,6 +77,7 @@ def main():
         "headers": args.headers,
         "include_dir": args.include_dir,
         "banjo_deps": [],
+        "stable": args.stable,
     }
 
     deps = []

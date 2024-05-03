@@ -37,8 +37,8 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext2,
-        TimerHandler,
+        CoreTimerContext, CounterContext, EventContext, HandleableTimer, InstantBindingsTypes,
+        TimerBindingsTypes, TimerContext,
     },
     counters::Counter,
     device::{
@@ -1452,30 +1452,32 @@ struct TimerHeap<I: Ip, BT: TimerBindingsTypes + InstantBindingsTypes> {
     neighbor: LocalTimerHeap<SpecifiedAddr<I::Addr>, NudEvent, BT>,
 }
 
-impl<I: Ip, BC: TimerContext2> TimerHeap<I, BC> {
+impl<I: Ip, BC: TimerContext> TimerHeap<I, BC> {
     fn new<
         DeviceId: device::WeakId,
         L: LinkDevice,
-        F: Fn(NudTimerId<I, L, DeviceId>) -> BC::DispatchId,
+        CC: CoreTimerContext<NudTimerId<I, L, DeviceId>, BC>,
     >(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
-        convert: F,
     ) -> Self {
         Self {
-            neighbor: LocalTimerHeap::new(
+            neighbor: LocalTimerHeap::new_with_context::<_, CC>(
                 bindings_ctx,
-                convert(NudTimerId {
+                NudTimerId {
                     device_id: device_id.clone(),
                     timer_type: NudTimerType::Neighbor,
                     _marker: PhantomData,
-                }),
+                },
             ),
-            gc: bindings_ctx.new_timer(convert(NudTimerId {
-                device_id,
-                timer_type: NudTimerType::GarbageCollection,
-                _marker: PhantomData,
-            })),
+            gc: CC::new_timer(
+                bindings_ctx,
+                NudTimerId {
+                    device_id,
+                    timer_type: NudTimerType::GarbageCollection,
+                    _marker: PhantomData,
+                },
+            ),
         }
     }
 
@@ -1528,7 +1530,7 @@ impl<I: Ip, BC: TimerContext2> TimerHeap<I, BC> {
         last_gc: &Option<BC::Instant>,
     ) {
         let Self { gc, neighbor: _ } = self;
-        if num_entries > MAX_ENTRIES && bindings_ctx.scheduled_instant2(gc).is_none() {
+        if num_entries > MAX_ENTRIES && bindings_ctx.scheduled_instant(gc).is_none() {
             let instant = if let Some(last_gc) = last_gc {
                 last_gc.add(MIN_GARBAGE_COLLECTION_INTERVAL.get())
             } else {
@@ -1537,7 +1539,7 @@ impl<I: Ip, BC: TimerContext2> TimerHeap<I, BC> {
             // Scheduling a timer requires a mutable borrow and we're
             // currently holding it exclusively. We just checked that the timer
             // is not scheduled, so this assertion always holds.
-            assert_eq!(bindings_ctx.schedule_timer_instant2(instant, gc), None);
+            assert_eq!(bindings_ctx.schedule_timer_instant(instant, gc), None);
         }
     }
 }
@@ -1550,23 +1552,22 @@ pub struct NudState<I: Ip, D: LinkDevice, BT: NudBindingsTypes<D>> {
     timer_heap: TimerHeap<I, BT>,
 }
 
-impl<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D> + TimerContext2> NudState<I, D, BC> {
-    pub fn new<DeviceId: device::WeakId, F: Fn(NudTimerId<I, D, DeviceId>) -> BC::DispatchId>(
+impl<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D> + TimerContext> NudState<I, D, BC> {
+    pub fn new<DeviceId: device::WeakId, CC: CoreTimerContext<NudTimerId<I, D, DeviceId>, BC>>(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
-        convert: F,
     ) -> Self {
         Self {
             neighbors: Default::default(),
             last_gc: None,
-            timer_heap: TimerHeap::new(bindings_ctx, device_id, convert),
+            timer_heap: TimerHeap::new::<_, _, CC>(bindings_ctx, device_id),
         }
     }
 }
 
 /// The bindings context for NUD.
 pub trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
-    TimerContext2
+    TimerContext
     + LinkResolutionContext<D>
     + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
 {
@@ -1576,7 +1577,7 @@ impl<
         I: Ip,
         D: LinkDevice,
         DeviceId,
-        BC: TimerContext2
+        BC: TimerContext
             + LinkResolutionContext<D>
             + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>,
     > NudBindingsContext<I, D, DeviceId> for BC
@@ -1918,23 +1919,16 @@ impl<
         D: LinkDevice,
         BC: NudBindingsContext<I, D, CC::DeviceId>,
         CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
-    > TimerHandler<BC, NudTimerId<I, D, CC::WeakDeviceId>> for CC
+    > HandleableTimer<CC, BC> for NudTimerId<I, D, CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        NudTimerId { device_id, timer_type, _marker: PhantomData }: NudTimerId<
-            I,
-            D,
-            CC::WeakDeviceId,
-        >,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id, timer_type, _marker: PhantomData } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
         match timer_type {
-            NudTimerType::Neighbor => handle_neighbor_timer(self, bindings_ctx, device_id),
-            NudTimerType::GarbageCollection => collect_garbage(self, bindings_ctx, device_id),
+            NudTimerType::Neighbor => handle_neighbor_timer(core_ctx, bindings_ctx, device_id),
+            NudTimerType::GarbageCollection => collect_garbage(core_ctx, bindings_ctx, device_id),
         }
     }
 }
@@ -2585,12 +2579,12 @@ mod tests {
     use core::num::{NonZeroU16, NonZeroUsize};
 
     use ip_test_macro::ip_test;
-
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
         ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet},
         UnicastAddr, Witness as _,
     };
+    use netstack3_base::IntoCoreTimerCtx;
     use packet::{InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         ethernet::{EtherType, EthernetFrameLengthCheck},
@@ -2697,7 +2691,10 @@ mod tests {
                     },
                 },
                 FakeNudContext {
-                    nud: NudState::new(bindings_ctx, FakeWeakDeviceId(FakeLinkDeviceId), |t| t),
+                    nud: NudState::new::<_, IntoCoreTimerCtx>(
+                        bindings_ctx,
+                        FakeWeakDeviceId(FakeLinkDeviceId),
+                    ),
                     counters: Default::default(),
                 },
             )
@@ -4994,7 +4991,7 @@ mod tests {
             true,
         );
         assert_eq!(
-            bindings_ctx.timer_ctx().scheduled_instant2(&mut core_ctx.outer.nud.timer_heap.gc),
+            bindings_ctx.timer_ctx().scheduled_instant(&mut core_ctx.outer.nud.timer_heap.gc),
             None
         );
     }

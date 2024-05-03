@@ -171,6 +171,7 @@ variant("coverage-rust") {
   }
 }
 
+# Enable PGO instrumentation to collect profiles.
 variant("profile") {
   common_flags = [ "-fprofile-generate" ]
 
@@ -203,5 +204,17 @@ variant("profile") {
       "-mllvm",
       "-disable-vp",
     ]
+  }
+}
+
+# PGO-optimized build that uses collected profiles.
+config("profile-use") {
+  if (pgo_profile_path != "") {
+    cflags =
+        [ "-fprofile-use=" + rebase_path(pgo_profile_path, root_build_dir) ]
+
+    # TODO(https://fxbug.dev/336358027): Suppress the following warning in PGO
+    # optimized build: "Function control flow change detected (hash mismatch)"
+    cflags += [ "-Wno-backend-plugin" ]
   }
 }

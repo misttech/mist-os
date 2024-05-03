@@ -17,23 +17,24 @@
 
 #include <wlan/drivers/log.h>
 
-#include "device_interface.h"
+#include "buffer_allocator.h"
+#include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
-using InitCompleter = fit::callback<void(zx_status_t status, wlansoftmac_handle_t* rust_handle)>;
-using StopCompleter = fit::callback<void()>;
+using InitCompleter = fit::callback<void(zx_status_t status)>;
 
 class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
   static zx::result<std::unique_ptr<SoftmacBridge>> New(
       std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
-      fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
+      fit::callback<void(zx_status_t)> sta_shutdown_handler,
       fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
       std::shared_ptr<std::mutex> ethernet_proxy_lock,
-      ddk::EthernetIfcProtocolClient* ethernet_proxy);
-  zx_status_t Stop(std::unique_ptr<StopCompleter> completer);
+      ddk::EthernetIfcProtocolClient* ethernet_proxy,
+      std::optional<uint32_t>* cached_ethernet_status);
+  void StopBridgedDriver(std::unique_ptr<fit::callback<void()>> completer);
   ~SoftmacBridge() override;
 
   void Query(QueryCompleter::Sync& completer) final;
@@ -42,6 +43,9 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) final;
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) final;
+  void Start(StartRequest& request, StartCompleter::Sync& completer) final;
+  void SetEthernetStatus(SetEthernetStatusRequest& request,
+                         SetEthernetStatusCompleter::Sync& completer) final;
   void SetChannel(SetChannelRequest& request, SetChannelCompleter::Sync& completer) final;
   void JoinBss(JoinBssRequest& request, JoinBssCompleter::Sync& completer) final;
   void EnableBeaconing(EnableBeaconingRequest& request,
@@ -59,14 +63,15 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   void CancelScan(CancelScanRequest& request, CancelScanCompleter::Sync& completer) final;
   void UpdateWmmParameters(UpdateWmmParametersRequest& request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
+  zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
   static zx_status_t WlanTx(void* ctx, const uint8_t* payload, size_t payload_size);
   static zx_status_t EthernetRx(void* ctx, const uint8_t* payload, size_t payload_size);
 
  private:
-  explicit SoftmacBridge(DeviceInterface* device_interface,
-                         fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+  explicit SoftmacBridge(fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
                          std::shared_ptr<std::mutex> ethernet_proxy_lock,
-                         ddk::EthernetIfcProtocolClient* ethernet_proxy);
+                         ddk::EthernetIfcProtocolClient* ethernet_proxy,
+                         std::optional<uint32_t>* cached_ethernet_status);
 
   template <typename, typename = void>
   static constexpr bool has_value_type = false;
@@ -77,12 +82,16 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
       softmac_bridge_server_;
   fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> softmac_client_;
 
-  DeviceInterface* device_interface_;
-  wlansoftmac_handle_t* rust_handle_;
+  // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
+  // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
+  // again until its reset upon the framework calling the unbind hook.
+  mutable std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
+
   fdf::Dispatcher rust_dispatcher_;
 
   std::shared_ptr<std::mutex> ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient* ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
+  mutable std::optional<uint32_t>* cached_ethernet_status_ __TA_GUARDED(ethernet_proxy_lock_);
 
   static wlansoftmac_buffer_t IntoRustBuffer(std::unique_ptr<Buffer> buffer);
   wlansoftmac_buffer_provider_ops_t rust_buffer_provider{

@@ -5,11 +5,14 @@
 use {
     crate::{
         client::{
-            connection_selection::{bss_selection, ConnectionSelectionRequester},
+            connection_selection::{
+                ConnectionSelectionRequester, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
+            },
             roaming::{lib::*, roam_monitor},
             types,
         },
         telemetry::{TelemetryEvent, TelemetrySender},
+        util::pseudo_energy::SignalData,
     },
     anyhow::{format_err, Error},
     fuchsia_async as fasync,
@@ -26,7 +29,7 @@ const MIN_SNR_IMPROVEMENT_TO_ROAM: f64 = 3.0;
 pub trait LocalRoamManagerApi: Send + Sync {
     fn get_roam_monitor(
         &mut self,
-        quality_data: bss_selection::BssQualityData,
+        signal: types::Signal,
         currently_fulfilled_connection: types::ConnectSelection,
         roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
     ) -> Box<dyn roam_monitor::RoamMonitorApi>;
@@ -55,13 +58,18 @@ impl LocalRoamManagerApi for LocalRoamManager {
     // for a connection.
     fn get_roam_monitor(
         &mut self,
-        quality_data: bss_selection::BssQualityData,
+        signal: types::Signal,
         currently_fulfilled_connection: types::ConnectSelection,
         roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
     ) -> Box<dyn roam_monitor::RoamMonitorApi> {
         let connection_data = ConnectionData::new(
             currently_fulfilled_connection.clone(),
-            quality_data,
+            SignalData::new(
+                signal.rssi_dbm,
+                signal.snr_db,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
             fasync::Time::now(),
         );
         Box::new(roam_monitor::RoamMonitor::new(
@@ -161,8 +169,8 @@ fn is_roam_worthwhile(
         return false;
     }
     // Candidate RSSI or SNR must be significantly better in order to trigger a roam.
-    let current_rssi = request.connection_data.quality_data.signal_data.ewma_rssi.get();
-    let current_snr = request.connection_data.quality_data.signal_data.ewma_snr.get();
+    let current_rssi = request.connection_data.signal_data.ewma_rssi.get();
+    let current_snr = request.connection_data.signal_data.ewma_snr.get();
     info!(
         "Roam candidate BSS - RSSI: {:?}, SNR: {:?}. Current BSS - RSSI: {:?}, SNR: {:?}.",
         roam_candidate.bss.signal.rssi_dbm,
@@ -187,17 +195,10 @@ mod tests {
     use {
         super::*,
         crate::{
-            client::connection_selection::{
-                ConnectionSelectionRequest, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
-            },
-            config_management::network_config::PastConnectionList,
-            util::{
-                pseudo_energy::SignalData,
-                testing::{
-                    generate_connect_selection, generate_random_bss,
-                    generate_random_bss_quality_data, generate_random_channel,
-                    generate_random_scanned_candidate,
-                },
+            client::connection_selection::ConnectionSelectionRequest,
+            util::testing::{
+                generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
+                generate_random_signal_data,
             },
         },
         fuchsia_async::TestExecutor,
@@ -255,15 +256,12 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        let bss_quality_data = bss_selection::BssQualityData::new(
-            SignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR),
-            generate_random_channel(),
-            PastConnectionList::default(),
-        );
+        let signal_data =
+            SignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR);
 
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
-            bss_quality_data,
+            signal_data,
             fuchsia_async::Time::now(),
         );
 
@@ -321,14 +319,9 @@ mod tests {
             EWMA_SMOOTHING_FACTOR,
             EWMA_VELOCITY_SMOOTHING_FACTOR,
         );
-        let bss_quality_data = bss_selection::BssQualityData::new(
-            signal_data,
-            generate_random_channel(),
-            PastConnectionList::default(),
-        );
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
-            bss_quality_data,
+            signal_data,
             fuchsia_async::Time::now(),
         );
 
@@ -401,14 +394,9 @@ mod tests {
             EWMA_SMOOTHING_FACTOR,
             EWMA_VELOCITY_SMOOTHING_FACTOR,
         );
-        let bss_quality_data = bss_selection::BssQualityData::new(
-            signal_data,
-            generate_random_channel(),
-            PastConnectionList::default(),
-        );
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
-            bss_quality_data,
+            signal_data,
             fuchsia_async::Time::now(),
         );
 
@@ -450,7 +438,7 @@ mod tests {
         let roam_search_request = RoamSearchRequest::new(
             ConnectionData::new(
                 generate_connect_selection(),
-                generate_random_bss_quality_data(),
+                generate_random_signal_data(),
                 fasync::Time::now(),
             ),
             sender,

@@ -97,7 +97,7 @@ class PageQueues {
 
   void SetWired(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
-  void SetPagerBacked(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
+  void SetReclaim(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetPagerBackedDirty(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetHighPriority(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
@@ -107,8 +107,8 @@ class PageQueues {
 
   void MoveToWired(vm_page_t* page);
   void MoveToAnonymous(vm_page_t* page);
-  void MoveToPagerBacked(vm_page_t* page);
-  void MoveToPagerBackedDontNeed(vm_page_t* page);
+  void MoveToReclaim(vm_page_t* page);
+  void MoveToReclaimDontNeed(vm_page_t* page);
   void MoveToPagerBackedDirty(vm_page_t* page);
   void MoveToAnonymousZeroFork(vm_page_t* page);
   void MoveToHighPriority(vm_page_t* page);
@@ -294,8 +294,8 @@ class PageQueues {
 
   // This takes an optional output parameter that, if the function returns true, will contain the
   // index of the queue that the page was in.
-  bool DebugPageIsPagerBacked(const vm_page_t* page, size_t* queue = nullptr) const;
-  bool DebugPageIsPagerBackedDontNeed(const vm_page_t* page) const;
+  bool DebugPageIsReclaim(const vm_page_t* page, size_t* queue = nullptr) const;
+  bool DebugPageIsReclaimDontNeed(const vm_page_t* page) const;
   bool DebugPageIsPagerBackedDirty(const vm_page_t* page) const;
   bool DebugPageIsAnonymous(const vm_page_t* page) const;
   bool DebugPageIsAnonymousZeroFork(const vm_page_t* page) const;

@@ -106,13 +106,11 @@ impl RouterExt for Router {
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict {
-        let entries = dict.lock_entries();
-        let out = Dict::new();
-        let mut out_entries = out.lock_entries();
-        for (key, value) in entries.iter() {
+        let mut out = Dict::new();
+        for (key, value) in dict.enumerate() {
             let value = match value {
                 Capability::Dictionary(dict) => {
-                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, dict))
+                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, &dict))
                 }
                 Capability::Router(r) => {
                     let router = r.clone();
@@ -133,9 +131,8 @@ impl RouterExt for Router {
                 }
                 other => other.clone(),
             };
-            out_entries.insert(key.clone(), value.clone()).ok();
+            out.insert(key, value).ok();
         }
-        drop(out_entries);
         out
     }
 
@@ -191,18 +188,21 @@ impl RouterExt for Router {
                 let result = self.router.route(self.request.clone()).await;
                 let error = match result {
                     Ok(capability) => {
-                        // HACK: Dict needs special casing because [Dict::try_into_open]
-                        // is unaware of [Router].
                         let capability = match capability {
+                            // HACK: Dict needs special casing because [Dict::try_into_open]
+                            // is unaware of [Router].
                             Capability::Dictionary(d) => {
                                 Router::dict_routers_to_open(&self.request.target, &self.scope, &d)
                                     .into()
                             }
+                            Capability::Unit(_) => {
+                                return Err(zx::Status::NOT_FOUND);
+                            }
                             cap => cap,
                         };
-                        match super::capability_into_open(capability.clone()) {
+                        match capability.try_into_directory_entry() {
                             Ok(open) => return open.open_entry(open_request),
-                            Err(error) => error,
+                            Err(e) => errors::OpenError::DoesNotSupportOpen(e).into(),
                         }
                     }
                     Err(error) => error, // Routing failed (e.g. broken route).

@@ -168,6 +168,7 @@ test("syscalls_cpp_test_bin") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
+    "//zircon/system/public",
     "//zircon/system/ulib/fbl",
   ]
   include_dirs = [
@@ -183,6 +184,10 @@ test("syscalls_cpp_test_bin") {
   }
 
   configs += [ "//build/config:rtti" ]
+
+  if (!is_fuchsia) {
+    configs += [ "//build/config:thread_safety_annotations" ]
+  }
 
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]

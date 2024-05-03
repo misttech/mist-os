@@ -17,10 +17,11 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 // static
 std::shared_ptr<RingBufferServer> RingBufferServer::Create(
-    std::shared_ptr<const FidlThread> thread,
-    fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
+    std::shared_ptr<const FidlThread> thread, fidl::ServerEnd<fad::RingBuffer> server_end,
     std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device, ElementId element_id) {
   ADR_LOG_STATIC(kLogObjectLifetimes);
 
@@ -84,15 +85,13 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
 
   if (parent_->ControlledDeviceReceivedError()) {
     ADR_WARN_METHOD() << "device has an error";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kDeviceError));
+    completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kDeviceError));
     return;
   }
 
   if (active_channels_completer_) {
     ADR_WARN_METHOD() << "previous `SetActiveChannels` request has not yet completed";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kAlreadyPending));
+    completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kAlreadyPending));
     return;
   }
 
@@ -100,15 +99,13 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
   FX_CHECK(device_->supports_set_active_channels(element_id_).has_value());
   if (!*device_->supports_set_active_channels(element_id_)) {
     ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported));
+    completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
     return;
   }
 
   if (!request.channel_bitmask()) {
     ADR_WARN_METHOD() << "required field 'channel_bitmask' is missing";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kInvalidChannelBitmask));
+    completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kInvalidChannelBitmask));
     return;
   }
 
@@ -119,8 +116,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
                       << ") too large, for this " << std::dec
                       << *device_->ring_buffer_format(element_id_).channel_count()
                       << "-channel format";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kChannelOutOfRange));
+    completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kChannelOutOfRange));
     return;
   }
 
@@ -139,11 +135,10 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
         active_channels_completer_.reset();
         if (result.is_error()) {
           ADR_WARN_OBJECT() << "SetActiveChannels callback: device has an error";
-          completer->Reply(
-              fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kDeviceError));
+          completer->Reply(fit::error(fad::RingBufferSetActiveChannelsError::kDeviceError));
         }
 
-        completer->Reply(fit::success(fuchsia_audio_device::RingBufferSetActiveChannelsResponse{{
+        completer->Reply(fit::success(fad::RingBufferSetActiveChannelsResponse{{
             .set_time = result.value().get(),
         }}));
       });
@@ -154,8 +149,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
     auto completer = std::move(active_channels_completer_);
     active_channels_completer_.reset();
-    completer->Reply(
-        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported));
+    completer->Reply(fit::error(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
   }
 
   // Otherwise, `active_channels_completer_` is saved for the future async response.
@@ -166,19 +160,19 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
 
   if (parent_->ControlledDeviceReceivedError()) {
     ADR_WARN_METHOD() << "device has an error";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kDeviceError));
+    completer.Reply(fit::error(fad::RingBufferStartError::kDeviceError));
     return;
   }
 
   if (start_completer_) {
     ADR_WARN_METHOD() << "previous `Start` request has not yet completed";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kAlreadyPending));
+    completer.Reply(fit::error(fad::RingBufferStartError::kAlreadyPending));
     return;
   }
 
   if (started_) {
     ADR_WARN_METHOD() << "device is already started";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kAlreadyStarted));
+    completer.Reply(fit::error(fad::RingBufferStartError::kAlreadyStarted));
     return;
   }
 
@@ -195,11 +189,11 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
     start_completer_.reset();
     if (result.is_error()) {
       ADR_WARN_OBJECT() << "Start callback: device has an error";
-      completer->Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kDeviceError));
+      completer->Reply(fit::error(fad::RingBufferStartError::kDeviceError));
     }
 
     started_ = true;
-    completer->Reply(fit::success(fuchsia_audio_device::RingBufferStartResponse{{
+    completer->Reply(fit::success(fad::RingBufferStartResponse{{
         .start_time = result.value().get(),
     }}));
   });
@@ -210,19 +204,19 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
 
   if (parent_->ControlledDeviceReceivedError()) {
     ADR_WARN_METHOD() << "device has an error";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kDeviceError));
+    completer.Reply(fit::error(fad::RingBufferStopError::kDeviceError));
     return;
   }
 
   if (stop_completer_) {
     ADR_WARN_METHOD() << "previous `Stop` request has not yet completed";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kAlreadyPending));
+    completer.Reply(fit::error(fad::RingBufferStopError::kAlreadyPending));
     return;
   }
 
   if (!started_) {
     ADR_WARN_METHOD() << "device is not started";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kAlreadyStopped));
+    completer.Reply(fit::error(fad::RingBufferStopError::kAlreadyStopped));
     return;
   }
 
@@ -239,12 +233,12 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
     stop_completer_.reset();
     if (status != ZX_OK) {
       ADR_WARN_OBJECT() << "Stop callback: device has an error";
-      completer->Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kDeviceError));
+      completer->Reply(fit::error(fad::RingBufferStopError::kDeviceError));
       return;
     }
 
     started_ = false;
-    completer->Reply(fit::success(fuchsia_audio_device::RingBufferStopResponse{}));
+    completer->Reply(fit::success(fad::RingBufferStopResponse{}));
   });
 }
 
@@ -253,14 +247,13 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 
   if (parent_->ControlledDeviceReceivedError()) {
     ADR_WARN_METHOD() << "device has an error";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kDeviceError));
+    completer.Reply(fit::error(fad::RingBufferWatchDelayInfoError::kDeviceError));
     return;
   }
 
   if (delay_info_completer_) {
     ADR_WARN_METHOD() << "previous `WatchDelayInfo` request has not yet completed";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kAlreadyPending));
+    completer.Reply(fit::error(fad::RingBufferWatchDelayInfoError::kAlreadyPending));
     return;
   }
 
@@ -268,7 +261,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
   MaybeCompleteWatchDelayInfo();
 }
 
-void RingBufferServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
+void RingBufferServer::DelayInfoChanged(const fad::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
   new_delay_info_to_notify_ = delay_info;
@@ -283,7 +276,7 @@ void RingBufferServer::MaybeCompleteWatchDelayInfo() {
     auto completer = std::move(*delay_info_completer_);
     delay_info_completer_.reset();
 
-    completer.Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
+    completer.Reply(fit::success(fad::RingBufferWatchDelayInfoResponse{{
         .delay_info = delay_info,
     }}));
   }

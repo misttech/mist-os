@@ -806,12 +806,12 @@ static bool pq_add_remove() {
   status = make_uncommitted_pager_vmo(1, false, false, &vmo);
   ASSERT_OK(status);
 
-  pq.SetPagerBacked(&test_page, vmo->DebugGetCowPages().get(), 0);
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
+  pq.SetReclaim(&test_page, vmo->DebugGetCowPages().get(), 0);
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
   pq.Remove(&test_page);
-  EXPECT_FALSE(pq.DebugPageIsPagerBacked(&test_page));
+  EXPECT_FALSE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   pq.SetPagerBackedDirty(&test_page, vmo->DebugGetCowPages().get(), 0);
@@ -858,21 +858,21 @@ static bool pq_move_queues() {
   status = make_uncommitted_pager_vmo(1, false, false, &vmo);
   ASSERT_OK(status);
 
-  pq.SetPagerBacked(&test_page, vmo->DebugGetCowPages().get(), 0);
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
+  pq.SetReclaim(&test_page, vmo->DebugGetCowPages().get(), 0);
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
   pq.MoveToPagerBackedDirty(&test_page);
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDirty(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.pager_backed_dirty = 1}));
 
-  pq.MoveToPagerBacked(&test_page);
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
+  pq.MoveToReclaim(&test_page);
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
-  pq.MoveToPagerBackedDontNeed(&test_page);
-  EXPECT_FALSE(pq.DebugPageIsPagerBacked(&test_page));
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&test_page));
+  pq.MoveToReclaimDontNeed(&test_page);
+  EXPECT_FALSE(pq.DebugPageIsReclaim(&test_page));
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim_dont_need = 1}));
 
   // Verify that the DontNeed page is first in line for eviction.
@@ -880,8 +880,8 @@ static bool pq_move_queues() {
   EXPECT_TRUE(backlink != ktl::nullopt && backlink->page == &test_page);
 
   pq.MoveToWired(&test_page);
-  EXPECT_FALSE(pq.DebugPageIsPagerBackedDontNeed(&test_page));
-  EXPECT_FALSE(pq.DebugPageIsPagerBacked(&test_page));
+  EXPECT_FALSE(pq.DebugPageIsReclaimDontNeed(&test_page));
+  EXPECT_FALSE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
 
@@ -940,12 +940,12 @@ static bool pq_move_self_queue() {
   status = make_uncommitted_pager_vmo(1, false, false, &vmo);
   ASSERT_OK(status);
 
-  pq.SetPagerBacked(&test_page, vmo->DebugGetCowPages().get(), 0);
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
+  pq.SetReclaim(&test_page, vmo->DebugGetCowPages().get(), 0);
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
-  pq.MoveToPagerBacked(&test_page);
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
+  pq.MoveToReclaim(&test_page);
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
   pq.Remove(&test_page);
@@ -988,12 +988,12 @@ static bool pq_rotate_queue() {
 
   // Put the pages in and validate initial state.
   pq.SetWired(&wired_page, vmo->DebugGetCowPages().get(), 0);
-  pq.SetPagerBacked(&clean_pager_page, vmo->DebugGetCowPages().get(), 0);
+  pq.SetReclaim(&clean_pager_page, vmo->DebugGetCowPages().get(), 0);
   pq.SetPagerBackedDirty(&dirty_pager_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDirty(&dirty_pager_page));
   size_t queue;
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&clean_pager_page, &queue));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&clean_pager_page, &queue));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){
                   .reclaim = {1, 0, 0, 0, 0, 0, 0, 0}, .pager_backed_dirty = 1, .wired = 1}));
@@ -1004,7 +1004,7 @@ static bool pq_rotate_queue() {
   pq.RotateReclaimQueues();
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDirty(&dirty_pager_page));
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&clean_pager_page, &queue));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&clean_pager_page, &queue));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){
                   .reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .pager_backed_dirty = 1, .wired = 1}));
@@ -1047,16 +1047,16 @@ static bool pq_rotate_queue() {
   pq.RotateReclaimQueues();
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDirty(&dirty_pager_page));
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&clean_pager_page));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&clean_pager_page));
   counts = pq.QueueCounts();
   EXPECT_TRUE(counts == counts_last || counts == counts_second_last);
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 1}));
 
   // Moving the page should bring it back to the first queue.
-  pq.MoveToPagerBacked(&clean_pager_page);
+  pq.MoveToReclaim(&clean_pager_page);
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDirty(&dirty_pager_page));
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&clean_pager_page));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&clean_pager_page));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){
                   .reclaim = {1, 0, 0, 0, 0, 0, 0, 0}, .pager_backed_dirty = 1, .wired = 1}));
@@ -1101,31 +1101,31 @@ static bool pq_toggle_dont_need_queue() {
   ASSERT_OK(status);
 
   // Put the pages in and validate initial state.
-  pq.SetPagerBacked(&page1, vmo->DebugGetCowPages().get(), 0);
+  pq.SetReclaim(&page1, vmo->DebugGetCowPages().get(), 0);
   size_t queue;
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page1, &queue));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&page1, &queue));
   EXPECT_EQ(queue, 0u);
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 0}));
-  pq.SetPagerBacked(&page2, vmo->DebugGetCowPages().get(), 0);
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page2, &queue));
+  pq.SetReclaim(&page2, vmo->DebugGetCowPages().get(), 0);
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&page2, &queue));
   EXPECT_EQ(queue, 0u);
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {2, 0, 0, 0, 0, 0, 0, 0}}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 2, 0}));
 
   // Move the pages to the DontNeed queue.
-  pq.MoveToPagerBackedDontNeed(&page1);
-  pq.MoveToPagerBackedDontNeed(&page2);
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page1));
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
+  pq.MoveToReclaimDontNeed(&page1);
+  pq.MoveToReclaimDontNeed(&page2);
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page1));
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 2}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 
   // Rotate the queues. This should also process the DontNeed queue.
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page1));
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page1));
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 2}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
@@ -1134,9 +1134,9 @@ static bool pq_toggle_dont_need_queue() {
   // accessed page1 out of the DontNeed queue to MRU+1 (as we've rotated the queues after access).
   pq.MarkAccessed(&page1);
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page1, &queue));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&page1, &queue));
   EXPECT_EQ(queue, 1u);
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){.reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 1}));
   // Two active queues by default, so page1 is still considered active.
@@ -1144,9 +1144,9 @@ static bool pq_toggle_dont_need_queue() {
 
   // Rotate the queues again. The page accessed above should move to the next pager-backed queue.
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page1, &queue));
+  EXPECT_TRUE(pq.DebugPageIsReclaim(&page1, &queue));
   EXPECT_EQ(queue, 2u);
-  EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
               ((PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .reclaim_dont_need = 1}));
   // page1 has now moved on past the two active queues, so it now counts as inactive.

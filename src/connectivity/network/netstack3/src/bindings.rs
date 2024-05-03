@@ -20,14 +20,13 @@ mod interfaces_watcher;
 mod name_worker;
 mod neighbor_worker;
 mod netdevice_worker;
+mod resource_removal;
 mod root_fidl_worker;
 mod routes;
 mod socket;
 mod stack_fidl_worker;
+
 mod timers;
-// TODO(https://fxbug.dev/42083407): Rename this module when everything is using
-// the new timer context.
-mod timers2;
 mod util;
 mod verifier_worker;
 
@@ -35,6 +34,7 @@ use std::{
     collections::HashMap,
     convert::{Infallible as Never, TryFrom as _},
     ffi::CStr,
+    fmt::Debug,
     future::Future,
     num::NonZeroU16,
     ops::Deref,
@@ -64,7 +64,7 @@ use devices::{
     StaticCommonInfo, StaticNetdeviceInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
-use timers::TimerDispatcher;
+use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use net_types::{
     ethernet::Mac,
@@ -88,10 +88,11 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
-    sync::RwLock as CoreRwLock,
+    sync::{DynDebugReferences, RwLock as CoreRwLock},
     udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
-    EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
-    TimerBindingsTypes, TimerContext, TimerContext2, TimerId, TracingContext,
+    DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext, IpExt,
+    ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
+    TracingContext,
 };
 
 mod ctx {
@@ -135,8 +136,12 @@ mod ctx {
     }
 
     impl Ctx {
-        fn new(routes_change_sink: routes::ChangeSink) -> Self {
-            let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(routes_change_sink)));
+        fn new(
+            routes_change_sink: routes::ChangeSink,
+            resource_removal: ResourceRemovalSink,
+        ) -> Self {
+            let mut bindings_ctx =
+                BindingsCtx(Arc::new(BindingsCtxInner::new(routes_change_sink, resource_removal)));
             let core_ctx = Arc::new(StackState::new(&mut bindings_ctx));
             Self { bindings_ctx, core_ctx }
         }
@@ -189,6 +194,7 @@ mod ctx {
         pub(crate) routes_change_runner: routes::ChangeRunner,
         pub(crate) neighbor_worker: neighbor_worker::Worker,
         pub(crate) neighbor_watcher_sink: mpsc::Sender<neighbor_worker::NewWatcher>,
+        pub(crate) resource_removal_worker: ResourceRemovalWorker,
     }
 
     impl Default for NetstackSeed {
@@ -196,7 +202,8 @@ mod ctx {
             let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
                 interfaces_watcher::Worker::new();
             let (routes_change_sink, routes_change_runner) = routes::create_sink_and_runner();
-            let ctx = Ctx::new(routes_change_sink);
+            let (resource_removal_worker, resource_removal_sink) = ResourceRemovalWorker::new();
+            let ctx = Ctx::new(routes_change_sink, resource_removal_sink);
             let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
                 neighbor_worker::new_worker();
             Self {
@@ -206,6 +213,7 @@ mod ctx {
                 routes_change_runner,
                 neighbor_worker,
                 neighbor_watcher_sink,
+                resource_removal_worker,
             }
         }
     }
@@ -266,48 +274,25 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 pub(crate) struct BindingsCtxInner {
     timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
-    timers2: timers2::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
+    resource_removal: ResourceRemovalSink,
 }
 
 impl BindingsCtxInner {
-    fn new(routes_change_sink: routes::ChangeSink) -> Self {
+    fn new(routes_change_sink: routes::ChangeSink, resource_removal: ResourceRemovalSink) -> Self {
         Self {
             timers: Default::default(),
-            timers2: Default::default(),
             devices: Default::default(),
             routes: routes_change_sink,
+            resource_removal,
         }
-    }
-}
-
-impl AsRef<timers::TimerDispatcher<TimerId<BindingsCtx>>> for BindingsCtx {
-    fn as_ref(&self) -> &TimerDispatcher<TimerId<BindingsCtx>> {
-        &self.timers
     }
 }
 
 impl AsRef<Devices<DeviceId<BindingsCtx>>> for BindingsCtx {
     fn as_ref(&self) -> &Devices<DeviceId<BindingsCtx>> {
         &self.devices
-    }
-}
-
-impl timers::TimerHandler<TimerId<BindingsCtx>> for Ctx {
-    fn handle_expired_timer(&mut self, timer: TimerId<BindingsCtx>) {
-        self.api().handle_timer(timer)
-    }
-
-    fn get_timer_dispatcher(&mut self) -> &timers::TimerDispatcher<TimerId<BindingsCtx>> {
-        self.bindings_ctx().as_ref()
-    }
-}
-
-impl timers::TimerContext<TimerId<BindingsCtx>> for Netstack {
-    type Handler = Ctx;
-    fn handler(&self) -> Ctx {
-        self.ctx.clone()
     }
 }
 
@@ -455,16 +440,16 @@ impl RngContext for BindingsCtx {
 }
 
 impl TimerBindingsTypes for BindingsCtx {
-    type Timer = timers2::Timer<TimerId<BindingsCtx>>;
+    type Timer = timers::Timer<TimerId<BindingsCtx>>;
     type DispatchId = TimerId<BindingsCtx>;
 }
 
-impl TimerContext2 for BindingsCtx {
+impl TimerContext for BindingsCtx {
     fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-        self.timers2.new_timer(id)
+        self.timers.new_timer(id)
     }
 
-    fn schedule_timer_instant2(
+    fn schedule_timer_instant(
         &mut self,
         StackTime(time): Self::Instant,
         timer: &mut Self::Timer,
@@ -472,34 +457,12 @@ impl TimerContext2 for BindingsCtx {
         timer.schedule(time).map(Into::into)
     }
 
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+    fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         timer.cancel().map(Into::into)
     }
 
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+    fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         timer.scheduled_time().map(Into::into)
-    }
-}
-
-impl TimerContext<TimerId<BindingsCtx>> for BindingsCtx {
-    fn schedule_timer_instant(
-        &mut self,
-        time: StackTime,
-        id: TimerId<BindingsCtx>,
-    ) -> Option<StackTime> {
-        self.timers.schedule_timer(id, time)
-    }
-
-    fn cancel_timer(&mut self, id: TimerId<BindingsCtx>) -> Option<StackTime> {
-        self.timers.cancel_timer(&id)
-    }
-
-    fn cancel_timers_with<F: FnMut(&TimerId<BindingsCtx>) -> bool>(&mut self, f: F) {
-        self.timers.cancel_timers_with(f);
-    }
-
-    fn scheduled_instant(&self, id: TimerId<BindingsCtx>) -> Option<StackTime> {
-        self.timers.scheduled_time(&id)
     }
 }
 
@@ -732,16 +695,64 @@ impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
     }
 }
 
-impl netstack3_core::ReferenceNotifiers for BindingsCtx {
-    type ReferenceReceiver<T: 'static> = futures::channel::oneshot::Receiver<T>;
+pub(crate) struct ReferenceReceiver<T> {
+    pub(crate) receiver: futures::channel::oneshot::Receiver<T>,
+    pub(crate) debug_references: DynDebugReferences,
+}
+
+impl<T> ReferenceReceiver<T> {
+    pub(crate) fn into_future<'a>(
+        self,
+        resource_name: &'static str,
+        resource_id: &'a impl Debug,
+    ) -> impl Future<Output = T> + 'a
+    where
+        T: 'a,
+    {
+        let Self { receiver, debug_references: refs } = self;
+        tracing::debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
+        // If we get stuck trying to remove the resource, log the remaining refs
+        // at a low frequency to aid debugging.
+        let interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
+            .map(move |()| {
+                tracing::warn!(
+                    "{resource_name} {resource_id:?} removal is pending references: {refs:?}"
+                )
+            })
+            .collect::<()>();
+
+        futures::future::select(receiver, interval_logging).map(|r| match r {
+            futures::future::Either::Left((rcv, _)) => {
+                rcv.expect("sender dropped without notifying")
+            }
+            futures::future::Either::Right(((), _)) => {
+                unreachable!("interval channel never completes")
+            }
+        })
+    }
+}
+
+impl ReferenceNotifiers for BindingsCtx {
+    type ReferenceReceiver<T: 'static> = ReferenceReceiver<T>;
 
     type ReferenceNotifier<T: Send + 'static> = ReferenceNotifier<T>;
 
-    fn new_reference_notifier<T: Send + 'static, D: std::fmt::Debug>(
-        _debug_references: D,
+    fn new_reference_notifier<T: Send + 'static>(
+        debug_references: DynDebugReferences,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
         let (sender, receiver) = futures::channel::oneshot::channel();
-        (ReferenceNotifier(Some(sender)), receiver)
+        (ReferenceNotifier(Some(sender)), ReferenceReceiver { receiver, debug_references })
+    }
+}
+
+impl DeferredResourceRemovalContext for BindingsCtx {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+        let ReferenceReceiver { receiver, debug_references } = receiver;
+        self.resource_removal.defer_removal(
+            debug_references,
+            receiver.map(|r| r.expect("sender dropped without notifying receiver")),
+        );
     }
 }
 
@@ -1148,18 +1159,14 @@ impl NetstackSeed {
             mut routes_change_runner,
             neighbor_worker,
             neighbor_watcher_sink,
+            resource_removal_worker,
         } = self;
 
         // Start servicing timers.
-        let timers_task =
-            NamedTask::new("timers", netstack.ctx.bindings_ctx().timers.spawn(netstack.clone()));
-
         let mut timer_handler_ctx = netstack.ctx.clone();
-        // TODO(https://fxbug.dev/42083407): Don't forget to rename this
-        // variable and the string below when deleting old timers impl.
-        let timers2_task = NamedTask::new(
-            "timers2",
-            netstack.ctx.bindings_ctx().timers2.spawn(move |timer| {
+        let timers_task = NamedTask::new(
+            "timers",
+            netstack.ctx.bindings_ctx().timers.spawn(move |timer| {
                 timer_handler_ctx.api().handle_timer(timer);
             }),
         );
@@ -1175,6 +1182,12 @@ impl NetstackSeed {
 
         let routes_change_task_fut = routes_change_task.into_future().fuse();
         let mut routes_change_task_fut = pin!(routes_change_task_fut);
+
+        // Start executing delayed resource removal.
+        let resource_removal_task =
+            NamedTask::spawn("resource_removal", resource_removal_worker.run());
+        let resource_removal_task_fut = resource_removal_task.into_future().fuse();
+        let mut resource_removal_task_fut = pin!(resource_removal_task_fut);
 
         let (loopback_stopper, _, loopback_tasks): (
             futures::channel::oneshot::Sender<_>,
@@ -1205,7 +1218,6 @@ impl NetstackSeed {
         let no_finish_tasks = loopback_tasks.into_iter().chain([
             interfaces_worker_task,
             timers_task,
-            timers2_task,
             neighbor_worker_task,
         ]);
         let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
@@ -1219,6 +1231,7 @@ impl NetstackSeed {
             let name = select! {
                 name = no_finish_tasks_fut => name,
                 name = routes_change_task_fut => Some(name),
+                name = resource_removal_task_fut => Some(name),
             };
             match name {
                 Some(name) => panic!("task {name} ended unexpectedly"),
@@ -1503,7 +1516,6 @@ impl NetstackSeed {
             .expect("loopback task must still be running");
         // Stop the timer dispatcher.
         ctx.bindings_ctx().timers.stop();
-        ctx.bindings_ctx().timers2.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
         // Stop the neighbor watcher worker.
@@ -1518,6 +1530,10 @@ impl NetstackSeed {
         // Stop the routes change runner.
         ctx.bindings_ctx().routes.close_senders();
         let _task_name: &str = routes_change_task_fut.await;
+
+        // Stop the resource removal worker.
+        ctx.bindings_ctx().resource_removal.close();
+        let _task_name: &str = resource_removal_task_fut.await;
 
         // Drop all inspector data, it holds ctx clones.
         std::mem::drop(inspect_nodes);

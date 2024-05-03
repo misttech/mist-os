@@ -25,7 +25,7 @@
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
 
-#include "power-support.h"
+#include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace power_lib_test {
 class PowerLibTest : public gtest::TestLoopFixture {};

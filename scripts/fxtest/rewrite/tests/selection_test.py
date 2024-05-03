@@ -177,13 +177,6 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
                     package_url=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                 )
             ),
-            info=test_list_file.TestListEntry(
-                name=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
-                tags=[],
-                execution=test_list_file.TestListExecutionEntry(
-                    component_url=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
-                ),
-            ),
         )
 
     @staticmethod
@@ -205,10 +198,6 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
                     os="linux",
                     path=f"host_x64/{name}",
                 )
-            ),
-            info=test_list_file.TestListEntry(
-                name=f"host_x64/{name}",
-                tags=[],
             ),
         )
 

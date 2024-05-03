@@ -371,7 +371,7 @@ class InfoNote : public NoteBase<Class, Topic> {
  public:
   fit::result<Error> Collect(Object& object) {
     Object& handle =
-        std::is_same_v<typename Class::Handle, Resource> ? object.root_resource() : object;
+        std::is_same_v<typename Class::Handle, Resource> ? object.info_resource() : object;
 
     if constexpr (kIsSpan<T>) {
       // Cache the data for iteration.  This tells zxdump::Object to refresh
@@ -583,7 +583,7 @@ template <typename Class, typename... Notes>
 using KernelNotes = std::tuple<  // The whole tuple of all note types:
     Notes...,                    // First the process or job notes.
     // Now the kernel note types.
-    InfoNote<Class, ZX_INFO_HANDLE_BASIC>,  // Identifies root resource KOID.
+    InfoNote<Class, ZX_INFO_HANDLE_BASIC>,  // Identifies info resource KOID.
     InfoNote<Class, ZX_INFO_CPU_STATS>,     //
     InfoNote<Class, ZX_INFO_KMEM_STATS>,    //
     InfoNote<Class, ZX_INFO_GUEST_STATS>>;

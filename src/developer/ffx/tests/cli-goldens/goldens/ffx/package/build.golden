@@ -36,6 +36,14 @@
       "hidden": false
     },
     {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--deprecated-ignore-api-level-unsupported-errors",
+      "short": null,
+      "description": "if true, and --api-level specifies an API level that is no longer supported, ignore the error and print a warning instead.",
+      "hidden": false
+    },
+    {
       "kind": {
         "Option": {
           "arg_name": "published-name"

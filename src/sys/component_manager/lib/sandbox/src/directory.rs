@@ -9,7 +9,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::Arc;
 use vfs::{directory::entry::DirectoryEntry, remote::RemoteLike};
 
-use crate::{registry, CapabilityTrait};
+use crate::CapabilityTrait;
 
 /// A capability that is a `fuchsia.io` directory.
 ///
@@ -26,7 +26,7 @@ impl Directory {
     ///
     /// * `client_end` - A `fuchsia.io/Directory` client endpoint.
     pub fn new(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
-        Directory { client_end: client_end }
+        Directory { client_end }
     }
 
     /// Turn the [Directory] into a remote VFS node.
@@ -65,7 +65,7 @@ impl CapabilityTrait for Directory {}
 
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     fn from(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
-        Directory { client_end: client_end }
+        Directory { client_end }
     }
 }
 
@@ -74,14 +74,6 @@ impl From<Directory> for ClientEnd<fio::DirectoryMarker> {
     /// the registry.
     fn from(directory: Directory) -> Self {
         let Directory { client_end } = directory;
-        // Create a null directory for the registry.
-        let new_dict =
-            Directory::new(ClientEnd::<fio::DirectoryMarker>::new(zx::Handle::invalid().into()));
-
-        // Move this capability into the registry.
-        let koid = client_end.get_koid().unwrap();
-        registry::insert(new_dict.into(), koid);
-
         client_end
     }
 }

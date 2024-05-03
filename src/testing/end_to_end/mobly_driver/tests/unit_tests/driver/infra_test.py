@@ -158,12 +158,8 @@ class InfraMoblyDriverTest(unittest.TestCase):
         )
         driver.teardown()
 
-        self.assertIn(
-            call("---MOCK_HEADER---", flush=True), mock_print.call_args_list
-        )
-        self.assertIn(
-            call("test_result", flush=True), mock_print.call_args_list
-        )
+        self.assertIn(call("---MOCK_HEADER---"), mock_print.call_args_list)
+        self.assertIn(call("test_result"), mock_print.call_args_list)
         mock_rm.assert_called_once_with("path/to/remove")
 
     @patch("mobly_driver.api.api_mobly.get_result_path")

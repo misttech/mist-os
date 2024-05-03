@@ -254,6 +254,12 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
   fbl::RefPtr<VmObject> child_vmo;
   bool no_write = false;
 
+  uint64_t vmo_size = 0;
+  status = VmObject::RoundSize(size, &vmo_size);
+  if (status != ZX_OK) {
+    return status;
+  }
+
   // Resizing a VMO requires the WRITE permissions, but NO_WRITE forbids the WRITE permissions, as
   // such it does not make sense to create a VMO with both of these.
   if ((options & ZX_VMO_CHILD_NO_WRITE) && (options & ZX_VMO_CHILD_RESIZABLE)) {
@@ -281,7 +287,8 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
     return status;
 
   // clone the vmo into a new one
-  status = vmo->CreateChild(options, offset, size, in_rights & ZX_RIGHT_GET_PROPERTY, &child_vmo);
+  status =
+      vmo->CreateChild(options, offset, vmo_size, in_rights & ZX_RIGHT_GET_PROPERTY, &child_vmo);
   if (status != ZX_OK)
     return status;
 

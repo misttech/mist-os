@@ -2311,6 +2311,8 @@ async fn start_dhcpv6_client(
                     prefix_delegation_config: request_prefix_delegation
                         .then_some(fnet_dhcpv6::PrefixDelegationConfig::Empty(fnet_dhcpv6::Empty)),
                 },
+                duid: (request_non_temporary_address || request_prefix_delegation)
+                    .then(|| fnet_dhcpv6::Duid::Uuid(uuid::Uuid::new_v4().into_bytes())),
             }
             .into(),
         )

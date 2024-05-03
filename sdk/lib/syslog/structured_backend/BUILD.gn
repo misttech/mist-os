@@ -10,6 +10,7 @@ sdk_source_set("structured_backend") {
   sdk_name = "syslog_structured_backend"
 
   include_base = "//sdk"
+  stable = true
 
   deps = []
 

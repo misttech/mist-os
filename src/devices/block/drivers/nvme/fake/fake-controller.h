@@ -11,11 +11,9 @@
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 
+#include <mutex>
 #include <unordered_map>
 #include <vector>
-
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/fake/fake-namespace.h"
@@ -43,12 +41,12 @@ class FakeController {
 
   // Add a command handler for the given admin opcode.
   void AddAdminCommand(uint8_t opcode, CommandHandler handler) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     admin_commands_.emplace(opcode, std::move(handler));
   }
   // Add a command handler for the given I/O opcode.
   void AddIoCommand(uint8_t opcode, CommandHandler handler) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     io_commands_.emplace(opcode, std::move(handler));
   }
 
@@ -57,7 +55,7 @@ class FakeController {
 
   // Add a namespace to this controller.
   void AddNamespace(uint32_t nsid, FakeNamespace& ns) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     namespaces_.emplace(nsid, ns);
   }
 
@@ -68,7 +66,7 @@ class FakeController {
 
   void AddQueuePair(size_t queue_id, const nvme::Queue* completion_queue,
                     const nvme::Queue* submission_queue) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     if (completion_queue) {
       completion_queues_.emplace(
           queue_id,
@@ -90,7 +88,7 @@ class FakeController {
   FakeRegisters& registers() { return regs_; }
   nvme::Nvme* nvme() { return nvme_; }
   const std::map<uint32_t, FakeNamespace&>& namespaces() const {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     return namespaces_;
   }
 
@@ -155,7 +153,7 @@ class FakeController {
   // Used to maintain integrity of the map containers rather than their contents, which are used to
   // add more elements to the map in certain cases (e.g., processing a queue's command to set up
   // another queue).
-  mutable fbl::Mutex lock_;
+  mutable std::mutex lock_;
   std::unordered_map<size_t, QueueState> completion_queues_ TA_GUARDED(lock_);
   std::unordered_map<size_t, QueueState> submission_queues_ TA_GUARDED(lock_);
   std::unordered_map<size_t, IrqState> irqs_ TA_GUARDED(lock_);

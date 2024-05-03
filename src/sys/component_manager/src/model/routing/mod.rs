@@ -26,7 +26,6 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
     moniker::MonikerBase,
-    sandbox::{Capability, Open},
     std::{collections::BTreeMap, sync::Arc},
     tracing::{info, warn},
     vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
@@ -58,15 +57,6 @@ fn check_source_for_void(source: &CapabilitySource) -> Result<(), RoutingError> 
         return Err(RoutingError::SourceCapabilityIsVoid.into());
     };
     Ok(())
-}
-
-pub(super) fn capability_into_open(capability: Capability) -> Result<Open, BedrockError> {
-    match capability {
-        Capability::Unit(_) => Err(RoutingError::SourceCapabilityIsVoid.into()),
-        cap => Ok(Open::new(
-            cap.try_into_directory_entry().map_err(errors::OpenError::DoesNotSupportOpen)?,
-        )),
-    }
 }
 
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.

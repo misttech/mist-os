@@ -101,21 +101,31 @@ fpromise::promise<std::vector<InspectData>, std::string> ReadBatches(
   return consumer.promise_or(fpromise::error("Failed to obtain consumer promise"));
 }
 
+fidl::ClientEnd<fuchsia_diagnostics::ArchiveAccessor> ConnectToAccessor() {
+  auto archive = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
+  ZX_ASSERT(archive.is_ok());
+  return std::move(*archive);
+}
+
 }  // namespace
 
 // TODO(b/303304683): This must become the primary API. Currently it is delegating to the
 // deprecated FIDL system.
 ArchiveReader::ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors)
-    : archive_(Bind(dispatcher)), executor_(dispatcher), selectors_(std::move(selectors)) {
+    : ArchiveReader(dispatcher, selectors, ConnectToAccessor()) {}
+
+ArchiveReader::ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors,
+                             fidl::ClientEnd<fuchsia_diagnostics::ArchiveAccessor> archive)
+    : archive_(Bind(dispatcher, std::move(archive))),
+      executor_(dispatcher),
+      selectors_(std::move(selectors)) {
   ZX_ASSERT(dispatcher != nullptr);
 }
 
 fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> ArchiveReader::Bind(
-    async_dispatcher_t* dispatcher) {
-  auto archive = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
-  ZX_ASSERT(archive.is_ok());
+    async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_diagnostics::ArchiveAccessor> archive) {
   fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> old;
-  old.Bind(std::move(archive.value()), dispatcher);
+  old.Bind(std::move(archive), dispatcher);
   return old;
 }
 

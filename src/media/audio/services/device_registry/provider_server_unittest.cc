@@ -14,8 +14,7 @@
 namespace media_audio {
 namespace {
 
-using Provider = fuchsia_audio_device::Provider;
-using Registry = fuchsia_audio_device::Registry;
+namespace fad = fuchsia_audio_device;
 
 class ProviderServerTest : public AudioDeviceRegistryServerTestBase {};
 class ProviderServerCodecTest : public ProviderServerTest {};
@@ -58,10 +57,10 @@ TEST_F(ProviderServerCodecTest, AddedDeviceThatOutlivesProvider) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test codec",
-          .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kCodec,
+          .driver_client = fad::DriverClient::WithCodec(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -89,10 +88,10 @@ TEST_F(ProviderServerCodecTest, ProviderCanOutliveAddedDevice) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test codec",
-          .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kCodec,
+          .driver_client = fad::DriverClient::WithCodec(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -123,10 +122,10 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test codec",
-          .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kCodec,
+          .driver_client = fad::DriverClient::WithCodec(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -138,7 +137,7 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
   received_callback = false;
 
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -157,7 +156,7 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto received_callback1 = false, received_callback2 = false;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback1](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&received_callback1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback1 = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -173,10 +172,10 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test codec",
-          .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kCodec,
+          .driver_client = fad::DriverClient::WithCodec(fake_driver->Enable()),
       }})
-      .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback2](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -203,10 +202,10 @@ TEST_F(ProviderServerCompositeTest, AddedDeviceThatOutlivesProvider) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test composite",
-          .device_type = fuchsia_audio_device::DeviceType::kComposite,
-          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kComposite,
+          .driver_client = fad::DriverClient::WithComposite(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -216,7 +215,7 @@ TEST_F(ProviderServerCompositeTest, AddedDeviceThatOutlivesProvider) {
   ASSERT_EQ(adr_service()->devices().size(), 1u);
   ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
-  provider->client() = fidl::Client<Provider>();
+  provider->client() = fidl::Client<fad::Provider>();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
@@ -234,10 +233,10 @@ TEST_F(ProviderServerCompositeTest, ProviderCanOutliveAddedDevice) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test composite",
-          .device_type = fuchsia_audio_device::DeviceType::kComposite,
-          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kComposite,
+          .driver_client = fad::DriverClient::WithComposite(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -268,10 +267,10 @@ TEST_F(ProviderServerCompositeTest, AddThenWatch) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test composite",
-          .device_type = fuchsia_audio_device::DeviceType::kComposite,
-          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kComposite,
+          .driver_client = fad::DriverClient::WithComposite(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -283,7 +282,7 @@ TEST_F(ProviderServerCompositeTest, AddThenWatch) {
   received_callback = false;
 
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -302,7 +301,7 @@ TEST_F(ProviderServerCompositeTest, WatchThenAdd) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto received_callback1 = false, received_callback2 = false;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback1](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&received_callback1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback1 = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -318,10 +317,10 @@ TEST_F(ProviderServerCompositeTest, WatchThenAdd) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test composite",
-          .device_type = fuchsia_audio_device::DeviceType::kComposite,
-          .driver_client = fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kComposite,
+          .driver_client = fad::DriverClient::WithComposite(fake_driver->Enable()),
       }})
-      .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback2](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -348,11 +347,10 @@ TEST_F(ProviderServerStreamConfigTest, AddedDeviceThatOutlivesProvider) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test output",
-          .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client =
-              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kOutput,
+          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -380,11 +378,10 @@ TEST_F(ProviderServerStreamConfigTest, ProviderCanOutliveAddedDevice) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test input",
-          .device_type = fuchsia_audio_device::DeviceType::kInput,
-          .driver_client =
-              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kInput,
+          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -415,11 +412,10 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test output",
-          .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client =
-              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kOutput,
+          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
-      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -431,7 +427,7 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
   received_callback = false;
 
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -450,7 +446,7 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto received_callback1 = false, received_callback2 = false;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback1](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&received_callback1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback1 = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -466,11 +462,10 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test output",
-          .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client =
-              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
+          .device_type = fad::DeviceType::kOutput,
+          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
-      .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
+      .Then([&received_callback2](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });

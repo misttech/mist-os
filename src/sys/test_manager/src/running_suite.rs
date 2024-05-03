@@ -431,16 +431,16 @@ impl RunningSuite {
                 .unwrap_or_else(|_| zx::Signals::empty())
         });
         if let Some(mock_ready_task) = self.mock_ready_task {
-            info!(?diagnostics, "Wait mock_ready_task");
+            info!(?diagnostics, "Waiting on mock_ready_task...");
             mock_ready_task.await;
         }
-        info!(?diagnostics, "Wait tokens_closed_signals");
+        info!(?diagnostics, "Waiting on tokens_closed_signals...");
         futures::future::join_all(tokens_closed_signals).await;
 
-        info!(?diagnostics, "Wait exposed_dir_close_task");
+        info!(?diagnostics, "Waiting on exposed_dir_close_task...");
         exposed_dir_close_task.await;
 
-        info!(?diagnostics, "Start destroy test realm");
+        info!(?diagnostics, "Start destroying test realm...");
 
         // TODO(https://fxbug.dev/42174479) Remove timeout once component manager hangs are removed.
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).

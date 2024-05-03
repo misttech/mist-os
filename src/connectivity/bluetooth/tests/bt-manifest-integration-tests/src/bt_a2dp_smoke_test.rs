@@ -20,7 +20,7 @@ use {
     fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryRequestStream},
     fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequestStream},
     fidl_fuchsia_settings::{AudioMarker, AudioRequestStream},
-    fidl_fuchsia_sysmem::{AllocatorMarker, AllocatorRequestStream},
+    fidl_fuchsia_sysmem2::{AllocatorMarker, AllocatorRequestStream},
     fidl_fuchsia_tracing_provider::{RegistryMarker, RegistryRequestStream},
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{

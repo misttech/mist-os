@@ -18,7 +18,7 @@ constexpr int kMiB = 1 << 20;
 constexpr int kPrintSize = 100 * kMiB;
 
 TEST_F(HostFilesystemTest, MaxFile) {
-  int fd = emu_open("::bigfile", O_CREAT | O_RDWR, 0644);
+  int fd = emu_open("::bigfile", O_CREAT | O_RDWR);
   ASSERT_GT(fd, 0);
   constexpr int kBufSize = 131072;
   char data_a[kBufSize];
@@ -72,7 +72,7 @@ TEST_F(HostFilesystemTest, MaxFile) {
 
   // Try closing, re-opening, and verifying the file
   ASSERT_EQ(emu_close(fd), 0);
-  fd = emu_open("::bigfile", O_RDWR, 0644);
+  fd = emu_open("::bigfile", O_RDWR);
   char readbuf[kBufSize];
   ssize_t bytes_read = 0;
   data = data_a;

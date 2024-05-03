@@ -543,6 +543,12 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
       }
     });
 
+    {
+      aml_sdmmc_config::Config fake_config;
+      fake_config.enable_suspend() = supply_power_framework;
+      start_args.config(fake_config.ToVmo());
+    }
+
     // Start dut_.
     ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
 

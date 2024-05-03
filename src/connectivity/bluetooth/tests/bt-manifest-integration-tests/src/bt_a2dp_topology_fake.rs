@@ -8,15 +8,15 @@ use {
     fidl_fuchsia_bluetooth_a2dp::{AudioModeMarker, AudioModeRequestStream},
     fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp, fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
     fidl_fuchsia_bluetooth_bredr::ProfileMarker,
-    fidl_fuchsia_bluetooth_component::LifecycleMarker,
     fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerRequestStream},
+    fidl_fuchsia_component::BinderMarker,
     fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, SessionAudioConsumerFactoryMarker},
     fidl_fuchsia_media_sessions2::PublisherMarker,
     fidl_fuchsia_mediacodec::CodecFactoryMarker,
     fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     fidl_fuchsia_power_battery::BatteryManagerMarker,
     fidl_fuchsia_settings::AudioMarker,
-    fidl_fuchsia_sysmem::AllocatorMarker,
+    fidl_fuchsia_sysmem2::AllocatorMarker,
     fidl_fuchsia_tracing_provider::RegistryMarker,
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
@@ -73,8 +73,9 @@ async fn main() -> Result<(), Error> {
     let _allocator_svc = connect_to_protocol::<AllocatorMarker>()?;
     let _tracing_svc = connect_to_protocol::<RegistryMarker>()?;
     let _battery_manager_svc = connect_to_protocol::<BatteryManagerMarker>()?;
-    // A2DP also relies on the Lifecycle service which is provided by its child `bt-avrcp-target`.
-    let _lifecycle_svc = connect_to_protocol::<LifecycleMarker>()?;
+    // A2DP also relies on the `Binder` service which is provided by the component framework; this
+    // allows A2DP to start AVRCP-TG;
+    let _binder_svc = connect_to_protocol::<BinderMarker>()?;
 
     service_fs_task.await;
     Ok(())

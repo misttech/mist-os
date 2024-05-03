@@ -15,8 +15,8 @@ use crate::{
         new_memfd,
         pidfd::new_pidfd,
         pipe::{new_pipe, PipeFileObject},
-        splice, AioContext, DirentSink64, EpollFileObject, FallocMode, FdFlags, FdNumber,
-        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString,
+        splice, AioContext, CheckAccessReason, DirentSink64, EpollFileObject, FallocMode, FdFlags,
+        FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString,
         IoOperation, IoOperationType, LookupContext, NamespaceNode, PathWithReachability,
         RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
         TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
@@ -751,7 +751,7 @@ pub fn sys_faccessat2(
     let mode = Access::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
     let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
     let name = lookup_at(current_task, dir_fd, user_path, lookup_flags)?;
-    name.check_access(current_task, mode)
+    name.check_access(current_task, mode, CheckAccessReason::Access)
 }
 
 pub fn sys_getdents64(

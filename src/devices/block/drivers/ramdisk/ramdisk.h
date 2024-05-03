@@ -18,10 +18,10 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <ddktl/device.h>
-#include <fbl/mutex.h>
 
 namespace ramdisk {
 
@@ -92,7 +92,7 @@ class Ramdisk : public RamdiskDeviceType,
 
   // Guards fields of the ramdisk which may be accessed concurrently
   // from a background worker thread.
-  fbl::Mutex lock_;
+  std::mutex lock_;
 
   // Identifies if the device has been unbound.
   bool dead_ TA_GUARDED(lock_) = false;

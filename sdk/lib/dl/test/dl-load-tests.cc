@@ -44,7 +44,7 @@ using DlTests = Fixture;
 // expectations and behave the same way, with exceptions noted within the test.
 using TestTypes = ::testing::Types<
 #ifdef __Fuchsia__
-    dl::testing::DlImplTests<dl::testing::TestFuchsia>,
+    dl::testing::DlImplLoadZirconTests,
 #endif
 // TODO(https://fxbug.dev/324650368): Test fixtures currently retrieve files
 // from different prefixed locations depending on the platform. Find a way
@@ -53,7 +53,7 @@ using TestTypes = ::testing::Types<
 #ifndef __Fuchsia__
     // libdl's POSIX test fixture can also be tested on Fuchsia and is included
     // for any ELF supported host.
-    dl::testing::DlImplTests<dl::testing::TestPosix>,
+    dl::testing::DlImplLoadPosixTests,
 #endif
     dl::testing::DlSystemTests>;
 
@@ -120,10 +120,11 @@ TYPED_TEST(DlTests, Basic) {
 // function's return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Relative) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kRelativeRelocFile = "relative-reloc.module.so";
 
-  this->ExpectRootModule("relative-reloc.module.so");
+  this->ExpectRootModule(kRelativeRelocFile);
 
-  auto result = this->DlOpen("relative-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kRelativeRelocFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -138,10 +139,11 @@ TYPED_TEST(DlTests, Relative) {
 // functions' return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Symbolic) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kSymbolicRelocFile = "symbolic-reloc.module.so";
 
-  this->ExpectRootModule("symbolic-reloc.module.so");
+  this->ExpectRootModule(kSymbolicRelocFile);
 
-  auto result = this->DlOpen("symbolic-reloc.module.so", RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kSymbolicRelocFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 

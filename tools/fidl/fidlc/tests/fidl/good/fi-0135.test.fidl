@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library test.good.fi0135;
 
-@discoverable("test.good.fi0135.Parser")
+@discoverable(name="test.good.fi0135.Parser")
 protocol Parser {
     Tokenize() -> (struct {
         tokens vector<string>;

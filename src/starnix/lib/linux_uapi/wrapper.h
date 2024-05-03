@@ -26,6 +26,7 @@
 #include <linux/bpf_perf_event.h>
 #include <linux/capability.h>
 #include <linux/close_range.h>
+#include <linux/dm-ioctl.h>
 #include <linux/errno.h>
 #include <linux/eventpoll.h>
 #include <linux/fadvise.h>

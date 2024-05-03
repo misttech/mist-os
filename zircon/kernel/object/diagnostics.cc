@@ -14,6 +14,7 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
+#include <arch/defines.h>
 #include <fbl/auto_lock.h>
 #include <kernel/deadline.h>
 #include <ktl/span.h>
@@ -531,9 +532,9 @@ void DumpVmObject(const VmObject& vmo, pretty::SizeUnit format_unit, zx_handle_t
   const char* uncomp_str = "phys";
   const char* comp_str = "phys";
   if (vmo.is_paged()) {
-    VmObject::AttributionCounts page_counts = vmo.AttributedPages();
-    uncomp_size.SetSize(page_counts.uncompressed * PAGE_SIZE, format_unit);
-    comp_size.SetSize(page_counts.compressed * PAGE_SIZE, format_unit);
+    VmObject::AttributionCounts counts = vmo.GetAttributedMemory();
+    uncomp_size.SetSize(counts.uncompressed_bytes, format_unit);
+    comp_size.SetSize(counts.compressed_bytes, format_unit);
     uncomp_str = uncomp_size.c_str();
     comp_str = comp_size.c_str();
   }
@@ -650,9 +651,9 @@ void DumpProcessVmObjects(zx_koid_t id, pretty::SizeUnit format_unit) {
         total_size += vmo->size();
         // TODO: Doing this twice (here and in DumpVmObject) is a waste of
         // work, and can get out of sync.
-        VmObject::AttributionCounts page_counts = vmo->AttributedPages();
-        total_alloc += page_counts.uncompressed * PAGE_SIZE;
-        total_compressed += page_counts.compressed * PAGE_SIZE;
+        VmObject::AttributionCounts counts = vmo->GetAttributedMemory();
+        total_alloc += counts.uncompressed_bytes;
+        total_compressed += counts.compressed_bytes;
         return ZX_OK;
       });
   printf("  total: %d VMOs, size %s, alloc %s compressed %s\n", count,
@@ -685,18 +686,17 @@ class VmCounter final : public VmEnumerator {
  public:
   bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth)
       TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
-    usage.mapped_pages += map->size_locked() / PAGE_SIZE;
+    usage.mapped_bytes += map->size_locked();
 
     auto vmo = map->vmo_locked();
-    const VmObject::AttributionCounts page_counts =
-        vmo->AttributedPagesInRange(map->object_offset_locked(), map->size_locked());
-    const size_t committed_pages = page_counts.uncompressed;
-    uint32_t share_count = vmo->share_count();
+    const VmObject::AttributionCounts counts =
+        vmo->GetAttributedMemoryInRange(map->object_offset_locked(), map->size_locked());
+    const uint32_t share_count = vmo->share_count();
     if (share_count == 1) {
-      usage.private_pages += committed_pages;
+      usage.private_bytes += counts.uncompressed_bytes;
     } else {
-      usage.shared_pages += committed_pages;
-      usage.scaled_shared_bytes += committed_pages * PAGE_SIZE / share_count;
+      usage.shared_bytes += counts.uncompressed_bytes;
+      usage.scaled_shared_bytes += counts.uncompressed_bytes / share_count;
     }
     return true;
   }
@@ -953,10 +953,12 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
     entry->type = ZX_INFO_MAPS_TYPE_MAPPING;
     zx_info_maps_mapping_t* u = &entry->u.mapping;
     u->mmu_flags = arch_mmu_flags_to_vm_flags(region_mmu_flags), u->vmo_koid = vmo->user_id();
-    const VmObject::AttributionCounts page_counts =
-        vmo->AttributedPagesInRange(region_object_offset, region_size);
-    u->committed_pages = page_counts.uncompressed;
-    u->populated_pages = page_counts.uncompressed + page_counts.compressed;
+    const VmObject::AttributionCounts counts =
+        vmo->GetAttributedMemoryInRange(region_object_offset, region_size);
+    const size_t committed_pages = counts.uncompressed_bytes / PAGE_SIZE;
+    const size_t compressed_pages = counts.compressed_bytes / PAGE_SIZE;
+    u->committed_pages = committed_pages;
+    u->populated_pages = committed_pages + compressed_pages;
     u->vmo_offset = region_object_offset;
   }
 
@@ -1144,7 +1146,7 @@ void DumpHandleTable() {
   Handle::diagnostics::DumpTableInfo();
 }
 
-size_t mwd_limit = 32 * 256;
+size_t mwd_limit_bytes = 32 * MB;
 bool mwd_running;
 
 size_t hwd_limit = 1024;
@@ -1171,15 +1173,15 @@ int hwd_thread(void* arg) {
   }
 }
 
-void DumpProcessMemoryUsage(const char* prefix, size_t min_pages) {
+void DumpProcessMemoryUsage(const char* prefix, size_t min_bytes) {
   auto walker = MakeProcessWalker([&](ProcessDispatcher* process) {
-    VmObject::AttributionCounts page_counts = process->PageCount();
-    if (page_counts.uncompressed >= min_pages) {
+    VmObject::AttributionCounts counts = process->GetAttributedMemory();
+    if (counts.uncompressed_bytes >= min_bytes) {
       char pname[ZX_MAX_NAME_LEN];
       [[maybe_unused]] zx_status_t status = process->get_name(pname);
       DEBUG_ASSERT(status == ZX_OK);
       printf("%sproc %5" PRIu64 " %4zuM '%s'\n", prefix, process->get_koid(),
-             page_counts.uncompressed / 256, pname);
+             counts.uncompressed_bytes / MB, pname);
     }
   });
   GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
@@ -1188,7 +1190,7 @@ void DumpProcessMemoryUsage(const char* prefix, size_t min_pages) {
 int mwd_thread(void* arg) {
   for (;;) {
     Thread::Current::SleepRelative(ZX_SEC(1));
-    DumpProcessMemoryUsage("MemoryHog! ", mwd_limit);
+    DumpProcessMemoryUsage("MemoryHog! ", mwd_limit_bytes);
   }
 }
 
@@ -1221,7 +1223,7 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
 
   if (strcmp(argv[1].str, "mwd") == 0) {
     if (argc == 3) {
-      mwd_limit = argv[2].u * 256;
+      mwd_limit_bytes = argv[2].u * MB;
     }
     if (!mwd_running) {
       Thread* t = Thread::Create("mwd", mwd_thread, nullptr, DEFAULT_PRIORITY);

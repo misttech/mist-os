@@ -235,7 +235,7 @@ where
         }
         OfferResult::OfferFromFilteredAggregate(offers, aggregation_component) => {
             // Check that all of the service offers contain non-conflicting filter instances.
-            let mut seen_instances: HashSet<String> = HashSet::new();
+            let mut seen_instances: HashSet<Name> = HashSet::new();
             for o in offers.iter() {
                 if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
                     match offer_service_decl.source_instance_filter {

@@ -14,7 +14,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
@@ -63,19 +62,19 @@ func TestPaveNewWithOldZedboot(t *testing.T) {
 }
 
 func doTest(ctx context.Context) error {
-	outputDir, cleanup, err := c.archiveConfig.OutputDir()
+	outputDir, archiveCleanup, err := c.archiveConfig.OutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to get output directory: %w", err)
 	}
-	defer cleanup()
+	defer archiveCleanup()
 
-	ffxIsolateDirPath, err := os.MkdirTemp("", "ffx-isolate-dir")
+	ffx, ffxCleanup, err := c.ffxConfig.NewFfxTool(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create ffx isolate dir: %w", err)
+		return fmt.Errorf("failed to create ffx: %w", err)
 	}
-	ffxIsolateDir := ffx.NewIsolateDir(ffxIsolateDirPath)
+	defer ffxCleanup()
 
-	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
+	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
 	if err != nil {
 		return fmt.Errorf("failed to create ota test client: %w", err)
 	}

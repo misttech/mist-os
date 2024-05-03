@@ -18,8 +18,7 @@ fuchsia_board_configuration(
 
 fuchsia_legacy_bundle(
     name = "legacy_gn_aib",
-    directory = "@legacy_ninja_build_outputs//:obj/build/images/updates/tests/fx_publish_test.gn_assembly/fx_publish_test.gn_assembly.bazel_legacy_aib",
-    files = "@legacy_ninja_build_outputs//:fx_publish_test.gn_assembly.bazel_legacy_aib",
+    files = "@gn_targets//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
 )
 
 fuchsia_product_configuration(

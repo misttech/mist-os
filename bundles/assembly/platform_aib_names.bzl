@@ -38,6 +38,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "resources",
     "virtcon",
     "virtcon_disable",
+    "wlanphy_driver",
 ]
 
 # These are the userdebug platform AIBs that are used by bootstrap
@@ -166,6 +167,7 @@ USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLA
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",
+    "core_realm_development_access_userdebug",
     "omaha_client_empty_eager_config",
     "power_framework",
     "standard_userdebug",
@@ -180,6 +182,7 @@ USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLA
 ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES + [
     "audio_development_support",
     "bluetooth_pandora",
+    "core_realm_development_access_eng",
     "core_realm_eng",
     "example_assembly_bundle",
     "full_package_drivers",

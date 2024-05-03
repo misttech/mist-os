@@ -42,7 +42,7 @@ static_assert(DEVICE_METADATA_SERIAL_NUMBER == ZBI_TYPE_SERIAL_NUMBER, "");
 #define DEVICE_METADATA_USB_CONFIG 0x4D425356  // USBC
 
 // Serial port info
-// type: serial_port_info_t
+// type: fuchsia.hardware.serial.SerialPortInfo
 #define DEVICE_METADATA_SERIAL_PORT_INFO 0x4D524553  // SERM
 
 // Platform board name (for sysinfo driver)

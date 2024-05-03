@@ -185,7 +185,7 @@ mod tests {
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
-            "test:///root".to_string(),
+            "test:///root".parse().unwrap(),
         )
         .await;
         let environment = Environment::from_decl(
@@ -267,7 +267,7 @@ mod tests {
             let model = Model::new(
                 ModelParams {
                     runtime_config,
-                    root_component_url: "test:///root".to_string(),
+                    root_component_url: "test:///root".parse().unwrap(),
                     root_environment: Environment::new_root(
                         &top_instance,
                         RunnerRegistry::new(HashMap::new()),
@@ -349,7 +349,7 @@ mod tests {
         let model = Model::new(
             ModelParams {
                 runtime_config: Arc::new(RuntimeConfig::default()),
-                root_component_url: "test:///root".to_string(),
+                root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
@@ -457,7 +457,7 @@ mod tests {
         let model = Model::new(
             ModelParams {
                 runtime_config,
-                root_component_url: "test:///root".to_string(),
+                root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
@@ -591,7 +591,7 @@ mod tests {
         let model = Model::new(
             ModelParams {
                 runtime_config,
-                root_component_url: "test:///root".to_string(),
+                root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
@@ -703,7 +703,7 @@ mod tests {
         let model = Model::new(
             ModelParams {
                 runtime_config: Arc::new(RuntimeConfig::default()),
-                root_component_url: "test:///root".to_string(),
+                root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
@@ -784,7 +784,7 @@ mod tests {
         let model = Model::new(
             ModelParams {
                 runtime_config: Arc::new(RuntimeConfig::default()),
-                root_component_url: "test:///root".to_string(),
+                root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::default(),

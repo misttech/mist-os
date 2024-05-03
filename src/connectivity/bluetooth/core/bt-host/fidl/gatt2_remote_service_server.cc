@@ -6,9 +6,8 @@
 
 #include <utility>
 
-#include <measure_tape/hlcpp/hlcpp_measure_tape_for_read_by_type_result.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/measure_tape/hlcpp_measure_tape_for_read_by_type_result.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
 

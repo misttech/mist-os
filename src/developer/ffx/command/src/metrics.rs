@@ -5,7 +5,7 @@
 use crate::Error;
 use analytics::{get_notice, opt_out_for_this_invocation};
 use ffx_config::EnvironmentContext;
-use ffx_metrics::{add_ffx_launch_event, init_metrics_svc};
+use ffx_metrics::{add_ffx_launch_event, add_ffx_overnet_proxy_drop_event, init_metrics_svc};
 use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
 use std::{
@@ -43,6 +43,15 @@ impl std::fmt::Display for CommandStats {
 
 impl MetricsSession {
     pub async fn start(context: &EnvironmentContext) -> Result<Self> {
+        overnet_core::set_proxy_drop_event_handler(|status| {
+            let status = format!("{status:?}");
+            fuchsia_async::Task::local(async move {
+                if let Err(e) = add_ffx_overnet_proxy_drop_event(status).await {
+                    tracing::error!("overnet metrics submission failed: {e}");
+                }
+            })
+            .detach();
+        });
         let invoker = context.get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
         let build_info = context.build_info();
         let enabled = context.analytics_enabled().await;

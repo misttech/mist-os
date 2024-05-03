@@ -32,8 +32,9 @@
 namespace bthost {
 namespace {
 
+namespace fbt = fuchsia::bluetooth;
 namespace fidlbredr = fuchsia::bluetooth::bredr;
-namespace android_hci = pw::bluetooth::vendor::android_hci;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 using bt::l2cap::testing::FakeChannel;
 using pw::bluetooth::AclPriority;
@@ -51,10 +52,10 @@ fidlbredr::ScoConnectionParameters CreateScoConnectionParameters(
     fidlbredr::HfpParameterSet param_set = fidlbredr::HfpParameterSet::T2) {
   fidlbredr::ScoConnectionParameters params;
   params.set_parameter_set(param_set);
-  params.set_air_coding_format(fidlbredr::CodingFormat::MSBC);
+  params.set_air_coding_format(fbt::AssignedCodingFormat::MSBC);
   params.set_air_frame_size(8u);
   params.set_io_bandwidth(32000);
-  params.set_io_coding_format(fidlbredr::CodingFormat::LINEAR_PCM);
+  params.set_io_coding_format(fbt::AssignedCodingFormat::LINEAR_PCM);
   params.set_io_frame_size(16u);
   params.set_io_pcm_data_format(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED);
   params.set_io_pcm_sample_payload_msb_position(3u);
@@ -1579,9 +1580,7 @@ TEST_F(ProfileServerTestFakeAdapter, AudioOffloadExtRequestParametersClosedOnCha
 
   // Support Android Vendor Extensions to enable Audio Offload Extension
   adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
-  bt::StaticPacket<
-      pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-      params;
+  bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
   params.SetToZeros();
   params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
   params.view().version_supported().major_number().Write(0);
@@ -1649,9 +1648,7 @@ TEST_P(ProfileServerInvalidSamplingFrequencyTest, SbcInvalidSamplingFrequency) {
   adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
 
   // enable offloaded sbc encoding
-  bt::StaticPacket<
-      pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-      params;
+  bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
   params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
   params.view().version_supported().major_number().Write(0);
   params.view().version_supported().minor_number().Write(98);
@@ -1742,9 +1739,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
   if (android_vendor_ext_support) {
     adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
 
-    bt::StaticPacket<
-        pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-        params;
+    bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
     params.view().version_supported().major_number().Write(0);
@@ -1796,8 +1791,8 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
   EXPECT_EQ(audio_offload_features_size, audio_offload_features.size());
 
   uint32_t capabilities = 0;
-  const uint32_t sbc_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::SBC);
-  const uint32_t aac_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::AAC);
+  const uint32_t sbc_capability = static_cast<uint32_t>(android_emb::A2dpCodecType::SBC);
+  const uint32_t aac_capability = static_cast<uint32_t>(android_emb::A2dpCodecType::AAC);
   for (const fidlbredr::AudioOffloadFeatures& feature : audio_offload_features) {
     if (feature.is_sbc()) {
       capabilities |= sbc_capability;
@@ -1816,9 +1811,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadSuccess) {
   if (android_vendor_ext_support) {
     adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
 
-    bt::StaticPacket<
-        pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-        params;
+    bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
     params.view().version_supported().major_number().Write(0);
@@ -1912,9 +1905,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
   if (android_vendor_ext_support) {
     adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
 
-    bt::StaticPacket<
-        pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-        params;
+    bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
     params.view().version_supported().major_number().Write(0);
@@ -2011,9 +2002,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress)
   if (android_vendor_ext_support) {
     adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
 
-    bt::StaticPacket<
-        pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-        params;
+    bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
     params.view().version_supported().major_number().Write(0);
@@ -2110,9 +2099,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
   if (android_vendor_ext_support) {
     adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
 
-    bt::StaticPacket<
-        pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
-        params;
+    bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
     params.view().version_supported().major_number().Write(0);
@@ -2195,10 +2182,10 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
 }
 
 const std::vector<std::pair<bool, uint32_t>> kVendorCapabilitiesParams = {
-    {{true, static_cast<uint32_t>(android_hci::A2dpCodecType::SBC)},
-     {true, static_cast<uint32_t>(android_hci::A2dpCodecType::AAC)},
-     {true, static_cast<uint32_t>(android_hci::A2dpCodecType::SBC) |
-                static_cast<uint32_t>(android_hci::A2dpCodecType::AAC)},
+    {{true, static_cast<uint32_t>(android_emb::A2dpCodecType::SBC)},
+     {true, static_cast<uint32_t>(android_emb::A2dpCodecType::AAC)},
+     {true, static_cast<uint32_t>(android_emb::A2dpCodecType::SBC) |
+                static_cast<uint32_t>(android_emb::A2dpCodecType::AAC)},
      {true, 0},
      {false, 0}}};
 INSTANTIATE_TEST_SUITE_P(ProfileServerTestFakeAdapter, AndroidSupportedFeaturesTest,

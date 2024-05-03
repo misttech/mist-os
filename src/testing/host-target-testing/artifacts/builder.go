@@ -31,14 +31,13 @@ func (b *Builder) GetLatestBuildID(ctx context.Context) (string, error) {
 func (b *Builder) GetLatestBuild(
 	ctx context.Context,
 	dir string,
-	ffxPath string,
 ) (*ArtifactsBuild, error) {
 	id, err := b.GetLatestBuildID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return b.archive.GetBuildByID(ctx, id, dir, ffxPath)
+	return b.archive.GetBuildByID(ctx, id, dir)
 }
 
 func (b *Builder) String() string {

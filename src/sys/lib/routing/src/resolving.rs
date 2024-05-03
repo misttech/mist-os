@@ -260,8 +260,8 @@ impl ComponentAddress {
 
     /// Parse the given absolute `component_url` and create a `ComponentAddress`
     /// with kind `Absolute`.
-    pub fn from_absolute_url(component_url: &str) -> Result<Self, ResolverError> {
-        match Url::parse(component_url) {
+    pub fn from_absolute_url(component_url: &cm_types::Url) -> Result<Self, ResolverError> {
+        match Url::parse(component_url.as_str()) {
             Ok(url) => Ok(Self::new_absolute(url)),
             Err(url::ParseError::RelativeUrlWithoutBase) => {
                 Err(ResolverError::RelativeUrlNotExpected(component_url.to_string()))
@@ -272,7 +272,8 @@ impl ComponentAddress {
 
     /// Assumes the given string is a relative URL, and converts this string into
     /// a `url::Url` by attaching a known, internal absolute URL prefix.
-    fn parse_relative_url(component_url: &str) -> Result<Url, ResolverError> {
+    fn parse_relative_url(component_url: &cm_types::Url) -> Result<Url, ResolverError> {
+        let component_url = component_url.as_str();
         match Url::parse(component_url) {
             Ok(_) => Err(ResolverError::malformed_url(anyhow::format_err!(
                 "Error parsing a relative URL given absolute URL '{}'.",
@@ -333,7 +334,7 @@ impl ComponentAddress {
     /// relative, use the component instance to get the required resolution
     /// context from the component's parent.
     pub async fn from<C: ComponentInstanceInterface>(
-        component_url: &str,
+        component_url: &cm_types::Url,
         component: &Arc<C>,
     ) -> Result<Self, ResolverError> {
         let result = Self::from_absolute_url(component_url);
@@ -652,6 +653,14 @@ struct RemoteError(fresolution::ResolverError);
 mod tests {
     use {super::*, assert_matches::assert_matches, fidl::endpoints::create_endpoints};
 
+    fn from_absolute_url(url: &str) -> ComponentAddress {
+        ComponentAddress::from_absolute_url(&url.parse().unwrap()).unwrap()
+    }
+
+    fn parse_relative_url(url: &str) -> Url {
+        ComponentAddress::parse_relative_url(&url.parse().unwrap()).unwrap()
+    }
+
     #[test]
     fn test_resolved_package() {
         let url = "some_url".to_string();
@@ -667,9 +676,7 @@ mod tests {
 
     #[test]
     fn test_component_address() {
-        let address =
-            ComponentAddress::from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")
-                .unwrap();
+        let address = from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "some-scheme");
         assert_eq!(address.path(), "/package");
@@ -750,7 +757,7 @@ mod tests {
             )
         );
 
-        let address = ComponentAddress::from_absolute_url("base://b").unwrap();
+        let address = from_absolute_url("base://b");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "base");
         assert_eq!(address.path(), "");
@@ -759,7 +766,7 @@ mod tests {
         assert_eq!(address.url(), "base://b");
         assert_matches!(address.to_url_and_context(), ("base://b", None));
 
-        let address = ComponentAddress::from_absolute_url("fuchsia-boot:///#meta/root.cm").unwrap();
+        let address = from_absolute_url("fuchsia-boot:///#meta/root.cm");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "fuchsia-boot");
         assert_eq!(address.path(), "/");
@@ -768,9 +775,7 @@ mod tests {
         assert_eq!(address.url(), "fuchsia-boot:///#meta/root.cm");
         assert_matches!(address.to_url_and_context(), ("fuchsia-boot:///#meta/root.cm", None));
 
-        let address =
-            ComponentAddress::from_absolute_url("custom-resolver:my:special:path#meta/root.cm")
-                .unwrap();
+        let address = from_absolute_url("custom-resolver:my:special:path#meta/root.cm");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "custom-resolver");
         assert_eq!(address.path(), "my:special:path");
@@ -782,7 +787,7 @@ mod tests {
             ("custom-resolver:my:special:path#meta/root.cm", None)
         );
 
-        let address = ComponentAddress::from_absolute_url("cast:00000000").unwrap();
+        let address = from_absolute_url("cast:00000000");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "cast");
         assert_eq!(address.path(), "00000000");
@@ -791,7 +796,7 @@ mod tests {
         assert_eq!(address.url(), "cast:00000000");
         assert_matches!(address.to_url_and_context(), ("cast:00000000", None));
 
-        let address = ComponentAddress::from_absolute_url("cast:00000000#meta/root.cm").unwrap();
+        let address = from_absolute_url("cast:00000000#meta/root.cm");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "cast");
         assert_eq!(address.path(), "00000000");
@@ -800,10 +805,8 @@ mod tests {
         assert_eq!(address.url(), "cast:00000000#meta/root.cm");
         assert_matches!(address.to_url_and_context(), ("cast:00000000#meta/root.cm", None));
 
-        let address = ComponentAddress::from_absolute_url(
-            "fuchsia-pkg://fuchsia.com/package?hash=cafe0123#meta/comp.cm",
-        )
-        .unwrap();
+        let address =
+            from_absolute_url("fuchsia-pkg://fuchsia.com/package?hash=cafe0123#meta/comp.cm");
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "fuchsia-pkg");
         assert_eq!(address.path(), "/package");
@@ -857,67 +860,54 @@ mod tests {
         // Same result as with three slashes
         assert_eq!(joined.path(), "/some_path_no_initial_slash");
 
-        let relative_url =
-            ComponentAddress::parse_relative_url("subpackage#meta/subcomp.cm").unwrap();
+        let relative_url = parse_relative_url("subpackage#meta/subcomp.cm");
         assert_eq!(relative_url.path(), "/subpackage");
         assert_eq!(relative_url.query(), None);
         assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
-        let relative_url = ComponentAddress::parse_relative_url("subpackage").unwrap();
+        let relative_url = parse_relative_url("/subpackage#meta/subcomp.cm");
         assert_eq!(relative_url.path(), "/subpackage");
         assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
+        assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
-        let relative_url = ComponentAddress::parse_relative_url("/subpackage").unwrap();
-        assert_eq!(relative_url.path(), "/subpackage");
-        assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
-
-        let relative_url = ComponentAddress::parse_relative_url("//subpackage").unwrap();
+        let relative_url = parse_relative_url("//subpackage#meta/subcomp.cm");
         assert_eq!(relative_url.path(), "");
         assert_eq!(relative_url.host_str(), Some("subpackage"));
         assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
+        assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
-        let relative_url = ComponentAddress::parse_relative_url("///subpackage").unwrap();
+        let relative_url = parse_relative_url("///subpackage#meta/subcomp.cm");
         assert_eq!(relative_url.path(), "/subpackage");
         assert_eq!(relative_url.host_str(), None);
         assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
+        assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
-        let relative_url = ComponentAddress::parse_relative_url("fuchsia.com/subpackage").unwrap();
+        let relative_url = parse_relative_url("fuchsia.com/subpackage#meta/subcomp.cm");
         assert_eq!(relative_url.path(), "/fuchsia.com/subpackage");
         assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
+        assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
-        let relative_url =
-            ComponentAddress::parse_relative_url("//fuchsia.com/subpackage").unwrap();
+        let relative_url = parse_relative_url("//fuchsia.com/subpackage#meta/subcomp.cm");
         assert_eq!(relative_url.path(), "/subpackage");
         assert_eq!(relative_url.host_str(), Some("fuchsia.com"));
         assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
+        assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
         assert_matches!(
-            ComponentAddress::parse_relative_url("fuchsia-pkg://fuchsia.com/subpackage"),
+            ComponentAddress::parse_relative_url(
+                &"fuchsia-pkg://fuchsia.com/subpackage#meta/subcomp.cm".parse().unwrap()
+            ),
             Err(ResolverError::MalformedUrl(..))
         );
 
-        let relative_url =
-            ComponentAddress::parse_relative_url("//fuchsia.com/subpackage").unwrap();
-        assert_eq!(relative_url.path(), "/subpackage");
-        assert_eq!(relative_url.query(), None);
-        assert_eq!(relative_url.fragment(), None);
-
-        let relative_url = ComponentAddress::parse_relative_url("#meta/peercomp.cm").unwrap();
+        let relative_url = parse_relative_url("#meta/peercomp.cm");
         assert_eq!(relative_url.path(), "/");
         assert_eq!(relative_url.query(), None);
         assert_eq!(relative_url.fragment(), Some("meta/peercomp.cm"));
 
-        let address =
-            ComponentAddress::from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")
-                .unwrap()
-                .clone_with_new_resource(relative_url.fragment())
-                .unwrap();
+        let address = from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")
+            .clone_with_new_resource(relative_url.fragment())
+            .unwrap();
 
         assert!(address.is_absolute());
         assert_eq!(address.scheme(), "some-scheme");
@@ -926,8 +916,7 @@ mod tests {
         assert_eq!(address.resource(), Some("meta/peercomp.cm"));
         assert_eq!(address.url(), "some-scheme://fuchsia.com/package#meta/peercomp.cm");
 
-        let address = ComponentAddress::from_absolute_url("cast:00000000")
-            .unwrap()
+        let address = from_absolute_url("cast:00000000")
             .clone_with_new_resource(relative_url.fragment())
             .unwrap();
 

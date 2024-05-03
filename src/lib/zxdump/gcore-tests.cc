@@ -409,10 +409,10 @@ TEST(ZxdumpTests, GcoreProcessDumpKernelInfo) {
       prefix,
       pid_string,
   });
-  // The gcore process needs to get the RootResource protocol, which
+  // The gcore process needs to get the InfoResource protocol, which
   // StartChild() already fetched for us.
-  EXPECT_TRUE(process.root_resource());
-  child.set_resource(zx::unowned_resource{process.root_resource().get()});
+  EXPECT_TRUE(process.info_resource());
+  child.set_resource(zx::unowned_resource{process.info_resource().get()});
   ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
   ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
   ASSERT_NO_FATAL_FAILURE(child.CollectStderr());

@@ -6,6 +6,7 @@
 
 use core::{
     borrow::Borrow,
+    convert::Infallible as Never,
     marker::PhantomData,
     num::NonZeroU8,
     ops::{Deref as _, DerefMut as _},
@@ -31,8 +32,8 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CoreTimerContext, CounterContext, InstantContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext},
+    context::{CoreTimerContext, CounterContext},
+    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
     ip::{
@@ -54,27 +55,30 @@ use crate::{
             },
             state::{
                 DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceStateBindingsTypes, Ipv4DeviceConfiguration, Ipv6AddrConfig,
-                Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
+                IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, Ipv4AddressEntry,
+                Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+                Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
             },
-            AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
-            IpDeviceIpExt, IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr,
+            AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
+            IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceStateContext,
+            IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
         },
         gmp::{
             self,
-            igmp::{IgmpContext, IgmpGroupState, IgmpStateContext},
+            igmp::{IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext},
             mld::{MldContext, MldGroupState, MldStateContext},
-            GmpHandler, GmpQueryHandler, GmpState, MulticastGroupSet,
+            GmpHandler, GmpQueryHandler, GmpStateRef, MulticastGroupSet,
         },
         socket::ipv6_source_address_selection::SasCandidate,
         types::AddableMetric,
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
+    sync::{RemoveResourceResultWithContext, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
-use super::state::Ipv6NetworkLearnedParameters;
+use super::{dad::DadTimerId, state::Ipv6NetworkLearnedParameters};
 
 pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
@@ -94,7 +98,7 @@ pub struct SlaacAddrs<'a, BC: BindingsContext> {
 /// type.
 pub struct SlaacAddrsIter<'x, BC: BindingsContext> {
     core_ctx: CoreCtx<'x, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>,
-    addrs: ip::device::state::AddressIdIter<'x, BC::Instant, Ipv6>,
+    addrs: ip::device::state::AddressIdIter<'x, Ipv6, BC>,
     device_id: &'x DeviceId<BC>,
 }
 
@@ -118,12 +122,12 @@ where
                  }| {
                     let addr_sub = addr_id.addr_sub();
                     match config {
-                        Ipv6AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
+                        Some(Ipv6AddrConfig::Slaac(config)) => Some(SlaacAddressEntry {
                             addr_sub,
                             config: *config,
                             deprecated: *deprecated,
                         }),
-                        Ipv6AddrConfig::Manual(_manual_config) => None,
+                        None | Some(Ipv6AddrConfig::Manual(_)) => None,
                     }
                 },
             )
@@ -157,10 +161,10 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
                 } = &mut *state;
 
                 match config {
-                    Ipv6AddrConfig::Slaac(config) => {
+                    Some(Ipv6AddrConfig::Slaac(config)) => {
                         cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
                     }
-                    Ipv6AddrConfig::Manual(_manual_config) => {}
+                    None | Some(Ipv6AddrConfig::Manual(_)) => {}
                 }
             })
         })
@@ -208,7 +212,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
                     addr_sub,
                     config: assert_matches::assert_matches!(
                         config,
-                        Ipv6AddrConfig::Slaac(c) => c
+                        Some(Ipv6AddrConfig::Slaac(c)) => c
                     ),
                     deprecated,
                 },
@@ -232,8 +236,9 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             AddressRemovedReason::Manual,
             config,
         )
-        .map(|(addr_sub, config)| {
+        .map(|(addr_sub, config, result)| {
             assert_eq!(&addr_sub.addr(), addr);
+            bindings_ctx.defer_removal_result(result);
             match config {
                 Ipv6AddrConfig::Slaac(s) => (addr_sub, s),
                 Ipv6AddrConfig::Manual(_manual_config) => {
@@ -260,7 +265,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
     ) -> O {
         crate::device::integration::with_ip_device_state(self, device, |mut state| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-            cb(&state)
+            let IpDeviceMulticastGroups { groups, .. } = &*state;
+            cb(groups)
         })
     }
 }
@@ -278,7 +284,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
     ) -> O {
         crate::device::integration::with_ip_device_state(self, device, |mut state| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-            cb(&state)
+            let IpDeviceMulticastGroups { groups, .. } = &*state;
+            cb(&groups)
         })
     }
 }
@@ -532,7 +539,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 fn assignment_state_v4<
-    BC: InstantContext,
+    BC: IpDeviceStateBindingsTypes,
     CC: IpDeviceStateContext<Ipv4, BC> + GmpQueryHandler<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
@@ -824,20 +831,7 @@ impl<
         BC,
     >;
 
-    fn get_address_id(
-        &mut self,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-    ) -> Self::AddressId {
-        device::IpDeviceStateContext::<Ipv6, BC>::get_address_id(
-            self,
-            device_id,
-            addr.into_specified(),
-        )
-        .expect("DAD address must always exist")
-    }
-
-    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>>) -> O>(
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>, BC>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
@@ -864,10 +858,7 @@ impl<
             CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
 
         cb(DadStateRef {
-            state: Some(DadAddressStateRef {
-                dad_state: dad_state.deref_mut(),
-                core_ctx: &mut core_ctx,
-            }),
+            state: DadAddressStateRef { dad_state: dad_state.deref_mut(), core_ctx: &mut core_ctx },
             retrans_timer: &retrans_timer,
             max_dad_transmits: &config.dad_transmits,
         })
@@ -1114,6 +1105,7 @@ where
     CoreCtx<'a, BC, L>: device::IpDeviceAddressIdContext<I>,
 {
     type AddressId = <CoreCtx<'a, BC, L> as device::IpDeviceAddressIdContext<I>>::AddressId;
+    type WeakAddressId = <CoreCtx<'a, BC, L> as device::IpDeviceAddressIdContext<I>>::WeakAddressId;
 }
 
 impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext, L> device::IpDeviceAddressContext<I, BC>
@@ -1177,7 +1169,7 @@ where
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BC::Instant>) {
+    ) -> RemoveResourceResultWithContext<AddrSubnet<I::Addr>, BC> {
         let Self { config: _, core_ctx } = self;
         device::IpDeviceStateContext::<I, BC>::remove_ip_address(core_ctx, device_id, addr)
     }
@@ -1266,7 +1258,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
+        F: FnOnce(GmpStateRef<'_, Ipv4, Self, BC>, &mut IgmpState<BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1285,8 +1277,9 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
             // IP enabled are not possible.
             let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
+            let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
             let enabled = ip_enabled && *gmp_enabled;
-            cb(GmpState { enabled, groups: &mut state })
+            cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
         })
     }
 
@@ -1303,7 +1296,7 @@ impl<
         L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>,
     > MldContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<BC::Instant>>) -> O>(
+    fn with_mld_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BC>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -1319,8 +1312,9 @@ impl<
         crate::device::integration::with_ip_device_state(core_ctx, device, |mut state| {
             let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+            let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
             let enabled = ip_enabled && *gmp_enabled;
-            cb(GmpState { enabled, groups: &mut state })
+            cb(GmpStateRef { enabled, groups, gmp })
         })
     }
 
@@ -1481,10 +1475,35 @@ impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'
     }
 }
 
-impl<I: IpDeviceIpExt, BT: BindingsTypes, L> CoreTimerContext<IpDeviceTimerId<I, DeviceId<BT>>, BT>
+pub struct IpAddrCtxSpec<BT>(Never, PhantomData<BT>);
+
+impl<BT: BindingsTypes> IpAddressIdSpec for IpAddrCtxSpec<BT> {
+    type WeakV4 = WeakRc<Ipv4AddressEntry<BT>>;
+    type WeakV6 = WeakRc<Ipv6AddressEntry<BT>>;
+}
+
+impl<BC: BindingsContext, L> IpAddressIdSpecContext for CoreCtx<'_, BC, L> {
+    type AddressIdSpec = IpAddrCtxSpec<BC>;
+}
+
+impl<'a, Config, L, BC: BindingsContext>
+    CoreTimerContext<DadTimerId<WeakDeviceId<BC>, WeakRc<Ipv6AddressEntry<BC>>>, BC>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
+    fn convert_timer(
+        dispatch_id: DadTimerId<WeakDeviceId<BC>, WeakRc<Ipv6AddressEntry<BC>>>,
+    ) -> BC::DispatchId {
+        IpDeviceTimerId::<Ipv6, _, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
+    }
+}
+
+impl<I: IpDeviceIpExt, BT: BindingsTypes, L>
+    CoreTimerContext<IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>, BT>
     for CoreCtx<'_, BT, L>
 {
-    fn convert_timer(dispatch_id: IpDeviceTimerId<I, DeviceId<BT>>) -> BT::DispatchId {
+    fn convert_timer(
+        dispatch_id: IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>,
+    ) -> BT::DispatchId {
         dispatch_id.into()
     }
 }

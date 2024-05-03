@@ -149,7 +149,9 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
                                          std::optional<Resourceness> maybe_resourceness);
   void GenerateExternalDeclarationsMember(const Compilation::Declarations& declarations,
                                           Position position = Position::kSubsequent);
-
+  void GenerateProtocolImplementationLocations(const Protocol& value);
+  void GenerateEndpointImplementationLocations(const std::string_view& endpoint,
+                                               const Attribute* discoverable, Position position);
   const Compilation* compilation_;
   ExperimentalFlagSet experimental_flags_;
   std::ostringstream json_file_;

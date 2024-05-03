@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: 'driver',
+        binary: 'driver/i2c.so',
         bind: 'meta/bind/i2c.bindbc',
-        compat: 'driver/i2c.so',
         colocate: 'true',
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },

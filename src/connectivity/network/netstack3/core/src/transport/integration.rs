@@ -100,13 +100,6 @@ where
         cb(&mut *all_sockets)
     }
 
-    fn socket_destruction_deferred(
-        &mut self,
-        _socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
-    ) {
-        // Do nothing, we use this function to assert on deferred destruction.
-    }
-
     fn for_each_socket<
         F: FnMut(
             &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
@@ -191,13 +184,6 @@ where
     ) -> O {
         let mut all_sockets = self.write_lock::<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>();
         cb(&mut *all_sockets)
-    }
-
-    fn socket_destruction_deferred(
-        &mut self,
-        _socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
-    ) {
-        // Do nothing, we use this function to assert on deferred destruction.
     }
 
     fn for_each_socket<

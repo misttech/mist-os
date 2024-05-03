@@ -350,10 +350,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_sender_into_open_via_dict() {
-        let dict = Dict::new();
+        let mut dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.lock_entries()
-            .insert("echo".parse().unwrap(), Capability::Sender(sender))
+        dict.insert("echo".parse().unwrap(), Capability::Sender(sender))
             .expect("dict entry already exists");
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());
@@ -372,10 +371,9 @@ mod tests {
     fn test_sender_into_open_via_dict_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let dict = Dict::new();
+        let mut dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.lock_entries()
-            .insert("echo".parse().unwrap(), Capability::Sender(sender))
+        dict.insert("echo".parse().unwrap(), Capability::Sender(sender))
             .expect("dict entry already exists");
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());

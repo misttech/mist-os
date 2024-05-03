@@ -17,11 +17,16 @@ use ffx_emulator_common::{
 };
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
+use fho::user_error;
 use pbms::ProductBundle;
-
 use sdk_metadata::VirtualDeviceManifest;
 use std::{
-    collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, str::FromStr,
+    collections::{hash_map::DefaultHasher, HashMap},
+    env,
+    fs::File,
+    hash::Hasher,
+    path::PathBuf,
+    str::FromStr,
     time::Duration,
 };
 
@@ -101,11 +106,11 @@ async fn apply_command_line_options(
                     match std::fs::OpenOptions::new().write(true).open(&path) {
                         Err(e) => match e.kind() {
                             std::io::ErrorKind::PermissionDenied => {
-                                tracing::debug!(
+                                tracing::warn!(
                                     "No write permission on {}. Running without acceleration.",
                                     path
                                 );
-                                println!(
+                                eprintln!(
                                     "Running without acceleration; emulator will be extremely \
                                     slow and may not establish a connection with ffx in the \
                                     allotted time.\n\n\
@@ -129,7 +134,7 @@ async fn apply_command_line_options(
                                     allotted time.\n"
                                 );
                             }
-                            _ => println!("Unknown error setting up acceleration: {:?}", e),
+                            _ => bail!("Unknown error setting up acceleration: {:?}", e),
                         },
                         Ok(_) => emu_config.host.acceleration = AccelerationMode::Hyper,
                     }
@@ -151,7 +156,7 @@ async fn apply_command_line_options(
         let available = tap_available();
         if available.is_ok() {
             emu_config.host.networking = NetworkingMode::Tap;
-            println!(
+            eprintln!(
                 "Auto resolving networking to tap-mode. For more information see \
                 https://fuchsia.dev/fuchsia-src/development/build/emulator#networking"
             );
@@ -160,7 +165,7 @@ async fn apply_command_line_options(
                 "Falling back on user-mode networking: {}",
                 available.as_ref().unwrap_err()
             );
-            println!(
+            eprintln!(
                 "Auto resolving networking to user-mode. For more information see \
                 https://fuchsia.dev/fuchsia-src/development/build/emulator#networking"
             );
@@ -211,7 +216,38 @@ async fn apply_command_line_options(
         emu_config.runtime.upscript = Some(PathBuf::from(upscript));
     }
 
+    if let Some(dev_config) = &cmd.dev_config {
+        apply_dev_config(dev_config, &mut emu_config)?
+    }
+
     Ok(emu_config)
+}
+
+fn apply_dev_config(
+    dev_config: &PathBuf,
+    emu_config: &mut EmulatorConfiguration,
+) -> fho::Result<()> {
+    #[derive(serde::Deserialize, Debug)]
+    struct DeveloperConfig {
+        #[serde(default)]
+        args: Vec<String>,
+        #[serde(default)]
+        kernel_args: Vec<String>,
+        #[serde(default)]
+        env: HashMap<String, String>,
+    }
+
+    let f = File::open(dev_config).map_err(|e| user_error!("Error opening {dev_config:?}: {e}"))?;
+    let data: DeveloperConfig =
+        serde_json::from_reader(f).map_err(|e| user_error!("Error parsing {dev_config:?}: {e}"))?;
+
+    emu_config.runtime.addl_emu_args.extend_from_slice(&data.args);
+    emu_config.runtime.addl_kernel_args.extend_from_slice(&data.kernel_args);
+    for (k, v) in data.env {
+        emu_config.runtime.addl_env.insert(k, v);
+    }
+
+    Ok(())
 }
 
 /// Reconciles the host ports specified on the command line with the guest ports defined in the
@@ -256,7 +292,7 @@ fn parse_host_port_maps(
         }
     }
     if emu_config.runtime.log_level == LogLevel::Verbose {
-        println!("Port map parsed: {:?}\n", emu_config.host.port_map);
+        eprintln!("Port map parsed: {:?}\n", emu_config.host.port_map);
     }
     Ok(())
 }
@@ -293,10 +329,7 @@ mod tests {
     };
     use regex::Regex;
     use serde_json::json;
-    use std::{
-        collections::HashMap,
-        fs::{create_dir_all, File},
-    };
+    use std::{fs::create_dir_all, io::Write};
     use tempfile::tempdir;
 
     #[fuchsia::test]
@@ -811,5 +844,39 @@ mod tests {
         assert!(parse_host_port_maps(&flag_contents, &mut emu_config).is_err());
         flag_contents = vec!["1234".to_string()];
         assert!(parse_host_port_maps(&flag_contents, &mut emu_config).is_err());
+    }
+
+    #[test]
+    fn test_apply_dev_config_empty() {
+        let mut emu_config = EmulatorConfiguration::default();
+        let mut dev_config = tempfile::NamedTempFile::new().expect("temp file");
+        writeln!(dev_config, "{{}}").expect("empty dev-config");
+        apply_dev_config(&dev_config.path().to_path_buf(), &mut emu_config)
+            .expect("apply_dev_config ok");
+        assert!(emu_config.runtime.addl_emu_args.is_empty());
+        assert!(emu_config.runtime.addl_kernel_args.is_empty());
+        assert!(emu_config.runtime.addl_env.is_empty());
+    }
+
+    #[test]
+    fn test_apply_dev_config_something() {
+        let mut emu_config = EmulatorConfiguration::default();
+        let mut dev_config = tempfile::NamedTempFile::new().expect("temp file");
+        write!(
+            dev_config,
+            r#"{{
+                "args": [ "-some-arg"],
+                "kernel_args": ["-karg"],
+                "env" : {{
+                    "a-key": "a-value"
+                }}
+            }}"#
+        )
+        .expect("dev-config contents");
+        apply_dev_config(&dev_config.path().to_path_buf(), &mut emu_config)
+            .expect("apply_dev_config ok");
+        assert_eq!(emu_config.runtime.addl_emu_args, vec!["-some-arg"]);
+        assert_eq!(emu_config.runtime.addl_kernel_args, vec!["-karg"]);
+        assert_eq!(emu_config.runtime.addl_env.get("a-key").unwrap(), "a-value");
     }
 }

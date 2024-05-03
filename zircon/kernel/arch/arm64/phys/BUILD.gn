@@ -65,7 +65,7 @@ if (toolchain_environment == "kernel.phys" ||
   source_set("linuxboot") {
     sources = [ "linuxboot-header.S" ]
     deps = [ "//zircon/kernel/lib/arch" ]
-    libs = [ "./linuxboot.ld" ]
+    libs = [ "//zircon/kernel/phys/linuxboot-pic.ld" ]
   }
 
   source_set("arch-handoff-prep") {

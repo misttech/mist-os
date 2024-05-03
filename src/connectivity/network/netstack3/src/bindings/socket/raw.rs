@@ -366,6 +366,14 @@ impl<'a> RequestHandler<'a> {
             fpraw::SocketRequest::GetIpv6Checksum { responder } => {
                 respond_not_supported!("raw::GetIpv6Checksum", responder)
             }
+            fpraw::SocketRequest::SetMark { domain: _, mark: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                respond_not_supported!("raw::SetMark", responder)
+            }
+            fpraw::SocketRequest::GetMark { domain: _, responder } => {
+                // TODO(https://fxbug.dev/337134565): Implement socket marks.
+                respond_not_supported!("raw::GetMark", responder)
+            }
         }
         ControlFlow::Continue(None)
     }

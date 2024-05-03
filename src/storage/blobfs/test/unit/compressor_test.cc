@@ -233,14 +233,13 @@ class BlobfsTestFixture : public testing::Test {
         },
         "", data_size);
 
-    fbl::RefPtr<fs::Vnode> file;
-    zx_status_t status = root_->Create(blob_info->path, 0, &file);
-    EXPECT_EQ(status, ZX_OK) << "Could not create file";
-    if (status != ZX_OK) {
+    zx::result file = root_->Create(blob_info->path, fs::CreationType::kFile);
+    EXPECT_TRUE(file.is_ok()) << "Could not create blob: " << file.status_string();
+    if (!file.is_ok()) {
       return nullptr;
     }
 
-    status = file->Truncate(data_size);
+    zx_status_t status = file->Truncate(data_size);
     EXPECT_EQ(status, ZX_OK) << "Could not truncate file";
     if (status != ZX_OK) {
       return nullptr;
@@ -256,7 +255,8 @@ class BlobfsTestFixture : public testing::Test {
       return nullptr;
     }
 
-    return file;
+    return *std::move(file);
+    ;
   }
 
  private:

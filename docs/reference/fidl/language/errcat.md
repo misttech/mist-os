@@ -416,4 +416,6 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0209.md>>
 
+<<error-catalog/_fi-0210.md>>
+
 [docs-fidlc]: ../language/fidlc.md

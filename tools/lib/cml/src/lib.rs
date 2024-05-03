@@ -25,7 +25,6 @@ use {
     json5format::{FormatOptions, PathOption},
     lazy_static::lazy_static,
     maplit::{hashmap, hashset},
-    paste::paste,
     reference_doc::ReferenceDoc,
     serde::{de, ser, Deserialize, Serialize},
     serde_json::{Map, Value},
@@ -616,6 +615,8 @@ pub enum AnyRef<'a> {
     Debug,
     /// A reference to this component. Parsed as `self`.
     Self_,
+    /// A reference to this component's program. Parsed as `program`.
+    Program,
     /// An intentionally omitted reference.
     Void,
     /// A reference to a dictionary. Parsed as a dictionary path.
@@ -634,6 +635,7 @@ impl fmt::Display for AnyRef<'_> {
             Self::Framework => write!(f, "framework"),
             Self::Debug => write!(f, "debug"),
             Self::Self_ => write!(f, "self"),
+            Self::Program => write!(f, "program"),
             Self::Void => write!(f, "void"),
             Self::Dictionary(d) => write!(f, "{}", d),
             Self::OwnDictionary(name) => write!(f, "self/{}", name),
@@ -873,6 +875,8 @@ pub enum RootDictionaryRef {
     Parent,
     /// A reference to this component.
     Self_,
+    /// A reference to this component's program.
+    Program,
 }
 
 /// A reference in an environment registration.
@@ -1478,167 +1482,132 @@ where
     }
 }
 
-/// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
-/// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is a
-/// capability routing field of [`Document`]: `use`, `offer`, `expose`, or `capabilities`.
-///
+/// Merges `us` into `other` according to the rules documented for [`include`].
 /// [`include`]: #include
-/// [`Document`]: struct.Document.html
-macro_rules! merge_from_capability_field {
-    ($self:ident, $other:ident, $field_name:ident) => {
-        // Empty entries are an error, and merging removes empty entries so we first need to check
-        // for them.
-        for entry in $self.$field_name.iter().flatten().chain($other.$field_name.iter().flatten()) {
-            if entry.names().is_empty() {
-                return Err(Error::Validate {
-                    err: format!("{}: Missing type name: {:#?}", entry.decl_type(), entry),
-                    filename: None,
-                });
-            }
+fn merge_from_capability_field<T: CapabilityClause>(
+    us: &mut Option<Vec<T>>,
+    other: &mut Option<Vec<T>>,
+) -> Result<(), Error> {
+    // Empty entries are an error, and merging removes empty entries so we first need to check
+    // for them.
+    for entry in us.iter().flatten().chain(other.iter().flatten()) {
+        if entry.names().is_empty() {
+            return Err(Error::Validate {
+                err: format!("{}: Missing type name: {:#?}", entry.decl_type(), entry),
+                filename: None,
+            });
         }
+    }
 
-        if let Some(all_ours) = $self.$field_name.as_mut() {
-            if let Some(all_theirs) = $other.$field_name.take() {
-                for mut theirs in all_theirs {
-                    for ours in &mut *all_ours {
-                        compute_diff(ours, &mut theirs);
-                    }
-                    all_ours.push(theirs);
+    if let Some(all_ours) = us.as_mut() {
+        if let Some(all_theirs) = other.take() {
+            for mut theirs in all_theirs {
+                for ours in &mut *all_ours {
+                    compute_diff(ours, &mut theirs);
                 }
+                all_ours.push(theirs);
             }
-            // Post-filter step: remove empty entries.
-            all_ours.retain(|ours| !ours.names().is_empty())
-        } else if let Some(theirs) = $other.$field_name.take() {
-            $self.$field_name.replace(theirs);
         }
-    };
+        // Post-filter step: remove empty entries.
+        all_ours.retain(|ours| !ours.names().is_empty())
+    } else if let Some(theirs) = other.take() {
+        us.replace(theirs);
+    }
+    Ok(())
 }
 
-/// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
-/// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is _not_ a
-/// capability routing field of [`Document`] (`use`, `offer`, `expose`, or `capabilities`).
-///
+/// Merges `us` into `other` according to the rules documented for [`include`].
 /// [`include`]: #include
-/// [`Document`]: #document
-macro_rules! merge_from_other_field {
-    ($self:ident, $other:ident, $field_name:ident) => {
-        if let Some(ref mut ours) = $self.$field_name {
-            if let Some(theirs) = $other.$field_name.take() {
-                // Add their elements, ignoring dupes with ours
-                for t in theirs {
-                    if !ours.contains(&t) {
-                        ours.push(t);
-                    }
-                }
-            }
-        } else if let Some(theirs) = $other.$field_name.take() {
-            $self.$field_name.replace(theirs);
-        }
-    };
-}
-
-/// Subtracts the capabilities in `$ours` from `$theirs` if the type matches `$type_name` and the
-/// declarations match. Stores the result in `$theirs`.
-///
-/// Inexact matches on `availability` are allowed if there is a partial order between them. The
-/// stronger availability is chosen.
-///
-/// This is a macro to let us easily specialize on the $type_name.
-macro_rules! compute_capability_diff {
-    ($ours:ident, $theirs:ident, $type_name:ident) => {
-        let our_field: Option<OneOrMany<Name>> =
-            $ours.$type_name().map(|o| o.into_iter().cloned().collect());
-        let their_field: Option<OneOrMany<Name>> =
-            $theirs.$type_name().map(|o| o.into_iter().cloned().collect());
-        match (our_field, their_field) {
-            (_, None) | (None, _) => {} // One of the declarations is not for `type_name`.
-            (Some(our_field), Some(their_field)) => {
-                // Check if the non-capability fields match before proceeding.
-                let mut ours_partial = $ours.clone();
-                let mut theirs_partial = $theirs.clone();
-                for e in [&mut ours_partial, &mut theirs_partial] {
-                    paste! { e.[<set_ $type_name>](None) };
-                    // Availability is allowed to differ (see merge algorithm below)
-                    e.set_availability(None);
-                }
-                let avail_cmp = $ours
-                    .availability()
-                    .unwrap_or_default()
-                    .partial_cmp(&$theirs.availability().unwrap_or_default());
-                if ours_partial != theirs_partial || avail_cmp.is_none() {
-                    // One of the following is true:
-                    // - The fields other than `availability` do not match.
-                    // - The fields other than `availability` do match, but `availability`
-                    //   does not and is incompatible (no partial order).
-                    // Either way, `ours` and `theirs` are not diffable.
-                } else {
-                    let avail_cmp = avail_cmp.unwrap();
-                    let mut our_entries_to_remove = HashSet::new();
-                    let mut their_entries_to_remove = HashSet::new();
-                    for e in &their_field {
-                        if !our_field.contains(e) {
-                            // Not a duplicate, so keep.
-                        } else {
-                            match avail_cmp {
-                                cmp::Ordering::Less => {
-                                    // Their availability is stronger, meaning theirs should take
-                                    // priority. Keep `e` in theirs, and remove it from ours.
-                                    our_entries_to_remove.insert(e);
-                                }
-                                cmp::Ordering::Greater => {
-                                    // Our availability is stronger, meaning ours should take
-                                    // priority. Remove `e` from theirs.
-                                    their_entries_to_remove.insert(e);
-                                }
-                                cmp::Ordering::Equal => {
-                                    // The availabilities are equal, so `e` is a duplicate.
-                                    their_entries_to_remove.insert(e);
-                                }
-                            }
-                        }
-                    }
-                    fn update_entries(
-                        decl: &mut impl CapabilityClause,
-                        field: &OneOrMany<Name>,
-                        to_remove: &HashSet<&Name>,
-                    ) {
-                        if to_remove.is_empty() {
-                            return;
-                        }
-                        let mut new_entries: Vec<_> = field.iter().cloned().collect();
-                        new_entries.retain(|e| !to_remove.contains(&e));
-                        let new_entries = match new_entries.len() {
-                            1 => Some(OneOrMany::One(new_entries.remove(0))),
-                            0 => None,
-                            _ => Some(OneOrMany::Many(new_entries)),
-                        };
-                        paste! { decl.[<set_ $type_name>](new_entries); }
-                    }
-                    update_entries($ours, &our_field, &our_entries_to_remove);
-                    update_entries($theirs, &their_field, &their_entries_to_remove);
+fn merge_from_other_field<T: std::cmp::PartialEq>(
+    us: &mut Option<Vec<T>>,
+    other: &mut Option<Vec<T>>,
+) {
+    if let Some(ref mut ours) = us {
+        if let Some(theirs) = other.take() {
+            // Add their elements, ignoring dupes with ours
+            for t in theirs {
+                if !ours.contains(&t) {
+                    ours.push(t);
                 }
             }
         }
-    };
+    } else if let Some(theirs) = other.take() {
+        us.replace(theirs);
+    }
 }
 
 /// Subtracts the capabilities in `ours` from `theirs` if the declarations match in their type and
 /// other fields, resulting in the removal of duplicates between `ours` and `theirs`. Stores the
-/// result in `theirs`. Returns true if `theirs` is empty, which is a signal to the caller that it
-/// can be discarded.
-fn compute_diff<T>(ours: &mut T, theirs: &mut T)
-where
-    T: CapabilityClause,
-{
-    compute_capability_diff!(ours, theirs, service);
-    compute_capability_diff!(ours, theirs, protocol);
-    compute_capability_diff!(ours, theirs, directory);
-    compute_capability_diff!(ours, theirs, storage);
-    compute_capability_diff!(ours, theirs, resolver);
-    compute_capability_diff!(ours, theirs, runner);
-    compute_capability_diff!(ours, theirs, event_stream);
-    compute_capability_diff!(ours, theirs, dictionary);
-    compute_capability_diff!(ours, theirs, config);
+/// result in `theirs`.
+///
+/// Inexact matches on `availability` are allowed if there is a partial order between them. The
+/// stronger availability is chosen.
+fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
+    // Return early if one is empty.
+    if ours.names().is_empty() || theirs.names().is_empty() {
+        return;
+    }
+
+    // Return early if the types don't match.
+    if ours.capability_type() != theirs.capability_type() {
+        return;
+    }
+
+    // Check if the non-capability fields match before proceeding.
+    let mut ours_partial = ours.clone();
+    let mut theirs_partial = theirs.clone();
+    for e in [&mut ours_partial, &mut theirs_partial] {
+        e.set_names(Vec::new());
+        // Availability is allowed to differ (see merge algorithm below)
+        e.set_availability(None);
+    }
+    if ours_partial != theirs_partial {
+        // The fields other than `availability` do not match, nothing to remove.
+        return;
+    }
+
+    // Compare the availabilities.
+    let Some(avail_cmp) = ours
+        .availability()
+        .unwrap_or_default()
+        .partial_cmp(&theirs.availability().unwrap_or_default())
+    else {
+        // The availabilities are incompatible (no partial order).
+        return;
+    };
+
+    let mut our_names: Vec<_> = ours.names().into_iter().cloned().collect();
+    let mut their_names: Vec<_> = theirs.names().into_iter().cloned().collect();
+
+    let mut our_entries_to_remove = HashSet::new();
+    let mut their_entries_to_remove = HashSet::new();
+    for e in &their_names {
+        if !our_names.contains(e) {
+            // Not a duplicate, so keep.
+            continue;
+        }
+        match avail_cmp {
+            cmp::Ordering::Less => {
+                // Their availability is stronger, meaning theirs should take
+                // priority. Keep `e` in theirs, and remove it from ours.
+                our_entries_to_remove.insert(e.clone());
+            }
+            cmp::Ordering::Greater => {
+                // Our availability is stronger, meaning ours should take
+                // priority. Remove `e` from theirs.
+                their_entries_to_remove.insert(e.clone());
+            }
+            cmp::Ordering::Equal => {
+                // The availabilities are equal, so `e` is a duplicate.
+                their_entries_to_remove.insert(e.clone());
+            }
+        }
+    }
+    our_names.retain(|e| !our_entries_to_remove.contains(e));
+    their_names.retain(|e| !their_entries_to_remove.contains(e));
+
+    ours.set_names(our_names);
+    theirs.set_names(their_names);
 }
 
 impl Document {
@@ -1649,13 +1618,13 @@ impl Document {
     ) -> Result<(), Error> {
         // Flatten the mergable fields that may contain a
         // list of capabilities in one clause.
-        merge_from_capability_field!(self, other, r#use);
-        merge_from_capability_field!(self, other, expose);
-        merge_from_capability_field!(self, other, offer);
-        merge_from_capability_field!(self, other, capabilities);
-        merge_from_other_field!(self, other, include);
-        merge_from_other_field!(self, other, children);
-        merge_from_other_field!(self, other, collections);
+        merge_from_capability_field(&mut self.r#use, &mut other.r#use)?;
+        merge_from_capability_field(&mut self.expose, &mut other.expose)?;
+        merge_from_capability_field(&mut self.offer, &mut other.offer)?;
+        merge_from_capability_field(&mut self.capabilities, &mut other.capabilities)?;
+        merge_from_other_field(&mut self.include, &mut other.include);
+        merge_from_other_field(&mut self.children, &mut other.children);
+        merge_from_other_field(&mut self.collections, &mut other.collections);
         self.merge_environment(other, include_path)?;
         self.merge_program(other, include_path)?;
         self.merge_facets(other, include_path)?;
@@ -2563,6 +2532,9 @@ pub struct Capability {
     /// - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
     /// - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
     /// - `self/<relative_path>`: A path to a dictionary defined by this component.
+    /// - `program/<relative_path>`: A path to a dictionary served by this component's program.
+    ///   <relative_path> is a path in the program's outgoing directory to a
+    ///   fuchsia.component.sandbox/DictionaryGetter protocol.
     /// `<relative_path>` may be either a name, identifying a dictionary capability), or
     /// a path with multiple parts, identifying a nested dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3409,7 +3381,7 @@ pub trait FromClause {
     fn from_(&self) -> OneOrMany<AnyRef<'_>>;
 }
 
-pub trait CapabilityClause: Clone + PartialEq {
+pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
     fn service(&self) -> Option<OneOrMany<&Name>>;
     fn protocol(&self) -> Option<OneOrMany<&Name>>;
     fn directory(&self) -> Option<OneOrMany<&Name>>;
@@ -3465,31 +3437,31 @@ pub trait CapabilityClause: Clone + PartialEq {
     }
 
     fn set_names(&mut self, names: Vec<Name>) {
-        let names = if names.len() == 1 {
-            OneOrMany::One(names.first().unwrap().clone())
-        } else {
-            OneOrMany::Many(names)
+        let names = match names.len() {
+            0 => None,
+            1 => Some(OneOrMany::One(names.first().unwrap().clone())),
+            _ => Some(OneOrMany::Many(names)),
         };
 
         let cap_type = self.capability_type();
         if cap_type == "protocol" {
-            self.set_protocol(Some(names));
+            self.set_protocol(names);
         } else if cap_type == "service" {
-            self.set_service(Some(names));
+            self.set_service(names);
         } else if cap_type == "directory" {
-            self.set_directory(Some(names));
+            self.set_directory(names);
         } else if cap_type == "storage" {
-            self.set_storage(Some(names));
+            self.set_storage(names);
         } else if cap_type == "runner" {
-            self.set_runner(Some(names));
+            self.set_runner(names);
         } else if cap_type == "resolver" {
-            self.set_resolver(Some(names));
+            self.set_resolver(names);
         } else if cap_type == "event_stream" {
-            self.set_event_stream(Some(names));
+            self.set_event_stream(names);
         } else if cap_type == "dictionary" {
-            self.set_dictionary(Some(names));
+            self.set_dictionary(names);
         } else if cap_type == "config" {
-            self.set_config(Some(names));
+            self.set_config(names);
         } else {
             panic!("Unknown capability type {}", cap_type);
         }

@@ -11,18 +11,18 @@
 namespace minfs {
 namespace {
 
-static constexpr uint8_t kFill = 0xe8;
+constexpr uint8_t kFill = 0xe8;
 
 class TruncateTest : public JournalIntegrationFixture {
  private:
   // Create a file with 2 blocks, then truncate down to 1 block. If the transaction succeeds we
   // should see the new length, but if it fails, we should still see the old length with the old
   // contents.
-  void PerformOperation(Minfs& fs) {
+  void PerformOperation(Minfs& fs) final {
     auto root = fs.VnodeGet(kMinfsRootIno);
     ASSERT_TRUE(root.is_ok());
-    fbl::RefPtr<fs::Vnode> foo;
-    ASSERT_EQ(root->Create("foo", 0, &foo), ZX_OK);
+    zx::result foo = root->Create("foo", fs::CreationType::kFile);
+    ASSERT_TRUE(foo.is_ok()) << foo.status_string();
     auto close = fit::defer([foo]() { ASSERT_EQ(foo->Close(), ZX_OK); });
     std::vector<uint8_t> buf(kMinfsBlockSize + 10, kFill);
     size_t written;

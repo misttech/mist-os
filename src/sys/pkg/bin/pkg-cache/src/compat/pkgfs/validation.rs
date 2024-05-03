@@ -49,7 +49,7 @@ impl Validation {
 
         let mut missing = self
             .blobfs
-            .filter_to_missing_blobs(&self.base_blobs, None)
+            .filter_to_missing_blobs(&self.base_blobs)
             .await
             .into_iter()
             .collect::<Vec<_>>();
@@ -218,7 +218,7 @@ impl vfs::directory::entry_container::Directory for Validation {
         zx::Status,
     > {
         super::read_dirents(
-            &BTreeMap::from([("missing".to_string(), super::DirentType::File)]),
+            &BTreeMap::from([("missing".to_string(), fio::DirentType::File)]),
             pos,
             sink,
         )

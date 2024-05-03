@@ -26,7 +26,7 @@
 
 namespace media_audio {
 
-using DriverClient = fuchsia_audio_device::DriverClient;
+namespace fad = fuchsia_audio_device;
 
 AudioDeviceRegistry::AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thread)
     : thread_(std::move(server_thread)),
@@ -37,31 +37,30 @@ AudioDeviceRegistry::AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thre
 AudioDeviceRegistry::~AudioDeviceRegistry() { ADR_LOG_METHOD(kLogObjectLifetimes); }
 
 zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
-  DeviceDetectionHandler device_detection_handler =
-      [this](std::string_view name, fuchsia_audio_device::DeviceType device_type,
-             fuchsia_audio_device::DriverClient driver_client) {
-        ADR_LOG_OBJECT(kLogDeviceDetection)
-            << "detected Audio " << device_type << " '" << name << "'";
+  DeviceDetectionHandler device_detection_handler = [this](std::string_view name,
+                                                           fad::DeviceType device_type,
+                                                           fad::DriverClient driver_client) {
+    ADR_LOG_OBJECT(kLogDeviceDetection) << "detected Audio " << device_type << " '" << name << "'";
 
-        switch (driver_client.Which()) {
-          case fuchsia_audio_device::DriverClient::Tag::kCodec:
-            FX_CHECK(driver_client.codec()->is_valid());
-            break;
-          case fuchsia_audio_device::DriverClient::Tag::kComposite:
-            FX_CHECK(driver_client.composite()->is_valid());
-            break;
-          case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
-            FX_CHECK(driver_client.stream_config()->is_valid());
-            break;
-          case fuchsia_audio_device::DriverClient::Tag::kDai:
-            ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
-            return;
-          default:
-            FX_CHECK(!driver_client.IsUnknown());
-        }
-        AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
-                                 std::move(driver_client)));
-      };
+    switch (driver_client.Which()) {
+      case fad::DriverClient::Tag::kCodec:
+        FX_CHECK(driver_client.codec()->is_valid());
+        break;
+      case fad::DriverClient::Tag::kComposite:
+        FX_CHECK(driver_client.composite()->is_valid());
+        break;
+      case fad::DriverClient::Tag::kStreamConfig:
+        FX_CHECK(driver_client.stream_config()->is_valid());
+        break;
+      case fad::DriverClient::Tag::kDai:
+        ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
+        return;
+      default:
+        FX_CHECK(!driver_client.IsUnknown());
+    }
+    AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
+                             std::move(driver_client)));
+  };
 
   auto detector_result =
       media_audio::DeviceDetector::Create(device_detection_handler, thread_->dispatcher());
@@ -191,8 +190,8 @@ void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(TokenId removed_device
 zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods);
 
-  auto status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::Provider>(
-      [this](fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) mutable {
+  auto status = outgoing_.AddUnmanagedProtocol<fad::Provider>(
+      [this](fidl::ServerEnd<fad::Provider> server_end) mutable {
         ADR_LOG_OBJECT(kLogProviderServerMethods)
             << "Incoming connection for fuchsia.audio.device.Provider";
 
@@ -205,8 +204,8 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
     return status.status_value();
   }
 
-  status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::Registry>(
-      [this](fidl::ServerEnd<fuchsia_audio_device::Registry> server_end) mutable {
+  status = outgoing_.AddUnmanagedProtocol<fad::Registry>(
+      [this](fidl::ServerEnd<fad::Registry> server_end) mutable {
         ADR_LOG_OBJECT(kLogRegistryServerMethods)
             << "Incoming connection for fuchsia.audio.device.Registry";
 
@@ -218,8 +217,8 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
     return status.status_value();
   }
 
-  status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::ControlCreator>(
-      [this](fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end) mutable {
+  status = outgoing_.AddUnmanagedProtocol<fad::ControlCreator>(
+      [this](fidl::ServerEnd<fad::ControlCreator> server_end) mutable {
         ADR_LOG_OBJECT(kLogControlCreatorServerMethods)
             << "Incoming connection for fuchsia.audio.device.ControlCreator";
 
@@ -240,7 +239,7 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
 }
 
 std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
-    fidl::ServerEnd<fuchsia_audio_device::Registry> server_end) {
+    fidl::ServerEnd<fad::Registry> server_end) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogRegistryServerMethods);
 
   auto new_registry = RegistryServer::Create(thread_, std::move(server_end), shared_from_this());
@@ -253,8 +252,7 @@ std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
 }
 
 std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
-    fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
-    const std::shared_ptr<Device>& observed_device) {
+    fidl::ServerEnd<fad::Observer> server_end, const std::shared_ptr<Device>& observed_device) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogObserverServerMethods);
 
   auto observer = ObserverServer::Create(thread_, std::move(server_end), observed_device);
@@ -263,8 +261,7 @@ std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
 }
 
 std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
-    fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
-    const std::shared_ptr<Device>& device_to_control) {
+    fidl::ServerEnd<fad::Control> server_end, const std::shared_ptr<Device>& device_to_control) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlServerMethods);
 
   auto control =
@@ -280,21 +277,20 @@ std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
 // These subsequent methods simply call [Provider|ControlCreator|RingBuffer]Server::Create directly,
 // but they mirror similar methods (above) for FIDL Server classes that do more.
 std::shared_ptr<ProviderServer> AudioDeviceRegistry::CreateProviderServer(
-    fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) {
+    fidl::ServerEnd<fad::Provider> server_end) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
   return ProviderServer::Create(thread_, std::move(server_end), shared_from_this());
 }
 
 std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorServer(
-    fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end) {
+    fidl::ServerEnd<fad::ControlCreator> server_end) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlCreatorServerMethods);
   return ControlCreatorServer::Create(thread_, std::move(server_end), shared_from_this());
 }
 
 std::shared_ptr<RingBufferServer> AudioDeviceRegistry::CreateRingBufferServer(
-    fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
-    const std::shared_ptr<ControlServer>& parent, const std::shared_ptr<Device>& device_to_control,
-    ElementId element_id) {
+    fidl::ServerEnd<fad::RingBuffer> server_end, const std::shared_ptr<ControlServer>& parent,
+    const std::shared_ptr<Device>& device_to_control, ElementId element_id) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogRingBufferServerMethods);
   return RingBufferServer::Create(thread_, std::move(server_end), parent, device_to_control,
                                   element_id);

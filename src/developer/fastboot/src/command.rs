@@ -5,7 +5,7 @@
 use std::fmt;
 use thiserror::Error;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum ClientVariable {
     // All variables.
     All,
@@ -29,7 +29,7 @@ pub enum ClientVariable {
     Oem(String),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Command {
     // Read a config/version variable from the bootloader.  The variable contents will be returned
     // after the OKAY response. If the variable is unknown, the bootloader should return a FAIL

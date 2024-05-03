@@ -773,6 +773,8 @@ impl<'a> ValidationContext<'a> {
                         // Allowed in general but not for event streams, add an error.
                         self.errors.push(Error::invalid_field(decl, "source"));
                     }
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                    Some(fdecl::Ref::Program(_)) => {}
                     Some(fdecl::Ref::Collection(_)) | Some(fdecl::RefUnknown!()) | None => {
                         // Already handled by validate_use_fields.
                     }
@@ -965,40 +967,15 @@ impl<'a> ValidationContext<'a> {
         dependency_type: Option<&fdecl::DependencyType>,
         availability: Option<&'a fdecl::Availability>,
     ) {
-        match source {
-            Some(fdecl::Ref::Parent(_)) => {}
-            Some(fdecl::Ref::Framework(_)) => {}
-            Some(fdecl::Ref::Debug(_)) => {}
-            Some(fdecl::Ref::Self_(_)) => {}
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            Some(fdecl::Ref::Environment(_)) => {}
-            Some(fdecl::Ref::Child(child)) => {
-                if self.validate_child_ref(decl, "source", &child, OfferType::Static)
-                    && dependency_type == Some(&fdecl::DependencyType::Strong)
-                {
-                    self.add_strong_dep(
-                        self.source_dependency_from_ref(source_name, source_dictionary, source),
-                        Some(DependencyNode::Self_),
-                    );
-                }
-            }
-            Some(fdecl::Ref::Capability(c)) => {
-                if self.validate_source_capability(&c, decl, "source")
-                    && dependency_type == Some(&fdecl::DependencyType::Strong)
-                {
-                    self.add_strong_dep(
-                        self.source_dependency_from_ref(source_name, source_dictionary, source),
-                        Some(DependencyNode::Self_),
-                    );
-                }
-            }
-            Some(fdecl::Ref::Collection(_)) | Some(fdecl::RefUnknown!()) => {
-                self.errors.push(Error::invalid_field(decl, "source"));
-            }
-            None => {
-                self.errors.push(Error::missing_field(decl, "source"));
-            }
-        };
+        if let Some(dep) =
+            self.validate_use_source(decl, source, source_dictionary, dependency_type)
+        {
+            self.add_strong_dep(
+                self.source_dependency_from_ref(source_name, source_dictionary, source),
+                Some(dep),
+            );
+        }
+
         check_name(source_name, decl, "source_name", &mut self.errors);
         if source_dictionary.is_some() {
             check_relative_path(source_dictionary, decl, "source_dictionary", &mut self.errors);
@@ -1019,6 +996,44 @@ impl<'a> ValidationContext<'a> {
             }
             _ => {}
         }
+    }
+
+    fn validate_use_source(
+        &mut self,
+        decl: DeclType,
+        source: Option<&'a fdecl::Ref>,
+        source_dictionary: Option<&'a String>,
+        dependency_type: Option<&fdecl::DependencyType>,
+    ) -> Option<DependencyNode<'a>> {
+        match (source, source_dictionary) {
+            // These sources support source_dictionary.
+            (Some(fdecl::Ref::Parent(_)), _) => {}
+            (Some(fdecl::Ref::Self_(_)), _) => {}
+            (Some(fdecl::Ref::Child(child)), _) => {
+                if self.validate_child_ref(decl, "source", &child, OfferType::Static)
+                    && dependency_type == Some(&fdecl::DependencyType::Strong)
+                {
+                    return Some(DependencyNode::Self_);
+                }
+            }
+            // These sources don't.
+            (Some(fdecl::Ref::Framework(_)), None) => {}
+            (Some(fdecl::Ref::Debug(_)), None) => {}
+            (Some(fdecl::Ref::Capability(c)), None) => {
+                if self.validate_source_capability(&c, decl, "source")
+                    && dependency_type == Some(&fdecl::DependencyType::Strong)
+                {
+                    return Some(DependencyNode::Self_);
+                }
+            }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            (Some(fdecl::Ref::Environment(_)), None) => {}
+            // `source` is required.
+            (None, _) => self.errors.push(Error::missing_field(decl, "source")),
+            // Any combination that was not recognized above must be invalid.
+            (_, _) => self.errors.push(Error::invalid_field(decl, "source")),
+        }
+        None
     }
 
     fn validate_child_decl(&mut self, child: &'a fdecl::Child) {
@@ -1418,7 +1433,9 @@ impl<'a> ValidationContext<'a> {
             self.all_dictionaries.insert(name, dictionary.source.as_ref());
         }
         match dictionary.source.as_ref() {
-            Some(fdecl::Ref::Self_(_)) | Some(fdecl::Ref::Parent(_)) => {
+            Some(fdecl::Ref::Self_(_))
+            | Some(fdecl::Ref::Parent(_))
+            | Some(fdecl::Ref::Program(_)) => {
                 check_relative_path(
                     dictionary.source_dictionary.as_ref(),
                     decl,
@@ -1572,11 +1589,26 @@ impl<'a> ValidationContext<'a> {
                 // which means the offer shouldn't have been created at all.
                 self.errors.push(Error::invalid_field(decl_type, "source_instance_filter"));
             }
+            for name in source_instance_filter {
+                check_name(Some(name), decl_type, "source_instance_filter", &mut self.errors);
+            }
         }
         if let Some(renamed_instances) = renamed_instances {
             // Multiple sources shouldn't map to the same target name
             let mut seen_target_names = HashSet::<String>::new();
             for mapping in renamed_instances {
+                check_name(
+                    Some(&mapping.source_name),
+                    decl_type,
+                    "renamed_instances.source_name",
+                    &mut self.errors,
+                );
+                check_name(
+                    Some(&mapping.target_name),
+                    decl_type,
+                    "renamed_instances.target_name",
+                    &mut self.errors,
+                );
                 if !seen_target_names.insert(mapping.target_name.clone()) {
                     self.errors.push(Error::invalid_field(decl_type, "renamed_instances"));
                     break;
@@ -1876,26 +1908,7 @@ impl<'a> ValidationContext<'a> {
         availability: Option<&fdecl::Availability>,
         prev_child_target_ids: &mut HashMap<&'a str, AllowableIds>,
     ) {
-        match source {
-            Some(r) => match r {
-                fdecl::Ref::Self_(_) | fdecl::Ref::VoidType(_) | fdecl::Ref::Framework(_) => {}
-                fdecl::Ref::Child(child) => {
-                    let _ = self.validate_child_ref(decl, "source", &child, OfferType::Static);
-                }
-                fdecl::Ref::Capability(c) => {
-                    self.validate_source_capability(c, decl, "source");
-                }
-                fdecl::Ref::Collection(c) if collection_source == CollectionSource::Allow => {
-                    self.validate_source_collection(c, decl);
-                }
-                _ => {
-                    self.errors.push(Error::invalid_field(decl, "source"));
-                }
-            },
-            None => {
-                self.errors.push(Error::missing_field(decl, "source"));
-            }
-        }
+        self.validate_expose_source(decl, collection_source, source, source_dictionary);
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
         match target {
             Some(r) => match r {
@@ -1925,6 +1938,41 @@ impl<'a> ValidationContext<'a> {
                 if prev_state == AllowableIds::One || prev_state != allowable_ids {
                     self.errors.push(Error::duplicate_field(decl, "target_name", target_name));
                 }
+            }
+        }
+    }
+
+    fn validate_expose_source(
+        &mut self,
+        decl: DeclType,
+        collection_source: CollectionSource,
+        source: Option<&fdecl::Ref>,
+        source_dictionary: Option<&String>,
+    ) {
+        match (source, source_dictionary) {
+            // These sources support source_dictionary.
+            (Some(fdecl::Ref::Self_(_)), _) => {}
+            (Some(fdecl::Ref::Child(child)), _) => {
+                let _ = self.validate_child_ref(decl, "source", &child, OfferType::Static);
+            }
+            // These sources don't.
+            (Some(fdecl::Ref::VoidType(_)), None) => {}
+            (Some(fdecl::Ref::Framework(_)), None) => {}
+            (Some(fdecl::Ref::Capability(c)), None) => {
+                self.validate_source_capability(c, decl, "source");
+            }
+            (Some(fdecl::Ref::Collection(c)), None)
+                if collection_source == CollectionSource::Allow =>
+            {
+                self.validate_source_collection(c, decl);
+            }
+            // `source` is required.
+            (None, _) => {
+                self.errors.push(Error::missing_field(decl, "source"));
+            }
+            // Any combination that was not recognized above must be invalid.
+            (_, _) => {
+                self.errors.push(Error::invalid_field(decl, "source"));
             }
         }
     }
@@ -2307,23 +2355,7 @@ impl<'a> ValidationContext<'a> {
         availability: Option<&'a fdecl::Availability>,
         offer_type: OfferType,
     ) {
-        match source {
-            Some(fdecl::Ref::Parent(_))
-            | Some(fdecl::Ref::Self_(_))
-            | Some(fdecl::Ref::VoidType(_))
-            | Some(fdecl::Ref::Framework(_)) => {}
-            Some(fdecl::Ref::Child(child)) => {
-                self.validate_child_ref(decl, "source", &child, offer_type);
-            }
-            Some(fdecl::Ref::Capability(c)) => {
-                self.validate_source_capability(c, decl, "source");
-            }
-            Some(fdecl::Ref::Collection(c)) if collection_source == CollectionSource::Allow => {
-                self.validate_source_collection(c, decl);
-            }
-            Some(_) => self.errors.push(Error::invalid_field(decl, "source")),
-            None => self.errors.push(Error::missing_field(decl, "source")),
-        }
+        self.validate_offer_source(decl, collection_source, source, source_dictionary, offer_type);
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
         check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
         if source_dictionary.is_some() {
@@ -2331,6 +2363,39 @@ impl<'a> ValidationContext<'a> {
         }
         self.validate_offer_target(decl, allowable_names, target, target_name, offer_type);
         check_offer_name(target_name, decl, "target_name", offer_type, &mut self.errors);
+    }
+
+    fn validate_offer_source(
+        &mut self,
+        decl: DeclType,
+        collection_source: CollectionSource,
+        source: Option<&'a fdecl::Ref>,
+        source_dictionary: Option<&'a String>,
+        offer_type: OfferType,
+    ) {
+        match (source, source_dictionary) {
+            // These sources support source_dictionary.
+            (Some(fdecl::Ref::Parent(_)), _) => {}
+            (Some(fdecl::Ref::Self_(_)), _) => {}
+            (Some(fdecl::Ref::Child(child)), _) => {
+                self.validate_child_ref(decl, "source", &child, offer_type);
+            }
+            // These sources don't.
+            (Some(fdecl::Ref::VoidType(_)), None) => {}
+            (Some(fdecl::Ref::Framework(_)), None) => {}
+            (Some(fdecl::Ref::Capability(c)), None) => {
+                self.validate_source_capability(c, decl, "source");
+            }
+            (Some(fdecl::Ref::Collection(c)), None)
+                if collection_source == CollectionSource::Allow =>
+            {
+                self.validate_source_collection(c, decl);
+            }
+            // `source` is required.
+            (None, _) => self.errors.push(Error::missing_field(decl, "source")),
+            // Any combination that was not recognized above must be invalid.
+            (_, _) => self.errors.push(Error::invalid_field(decl, "source")),
+        }
     }
 
     fn validate_storage_offer_fields(
@@ -2655,6 +2720,8 @@ impl<'a> ValidationContext<'a> {
             fdecl::Ref::Capability(fdecl::CapabilityRef { name, .. }) => {
                 Some(DependencyNode::Capability(name.as_str()))
             }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fdecl::Ref::Program(_) => Some(DependencyNode::Self_),
             fdecl::Ref::Self_(_) => {
                 if let Some(source_dictionary) = source_dictionary {
                     let root_dict = source_dictionary.split('/').next().unwrap();
@@ -6507,8 +6574,39 @@ mod tests {
                                 collection: None,
                             }
                         )),
+                        target_name: Some("fuchsia.logger.Log2".to_string()),
+                        source_instance_filter: Some(vec!["^badname".to_string()]),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(
+                            fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            }
+                        )),
                         target_name: Some("fuchsia.logger.Log1".to_string()),
                         renamed_instances: Some(vec![fdecl::NameMapping{source_name: "a".to_string(), target_name: "b".to_string()}, fdecl::NameMapping{source_name: "c".to_string(), target_name: "b".to_string()}]),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
+                        source_name: Some("fuchsia.logger.Log".to_string()),
+                        target: Some(fdecl::Ref::Child(
+                            fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            }
+                        )),
+                        target_name: Some("fuchsia.logger.Log3".to_string()),
+                        renamed_instances: Some(vec![
+                            fdecl::NameMapping {
+                                source_name: "^badname".to_string(),
+                                target_name: "^badname".to_string(),
+                            }
+                        ]),
                         ..Default::default()
                     })
                 ]);
@@ -6526,7 +6624,10 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 Error::invalid_field(DeclType::OfferService, "source_instance_filter"),
+                Error::invalid_field(DeclType::OfferService, "source_instance_filter"),
                 Error::invalid_field(DeclType::OfferService, "renamed_instances"),
+                Error::invalid_field(DeclType::OfferService, "renamed_instances.source_name"),
+                Error::invalid_field(DeclType::OfferService, "renamed_instances.target_name"),
             ])),
         },
         test_validate_offers_invalid_identifiers => {

@@ -388,7 +388,7 @@ impl Associating {
         sta.send_connect_conf_success(aid, assoc_resp_body.deref());
         let controlled_port_open = !sta.sta.eapol_required();
         if controlled_port_open {
-            if let Err(e) = sta.ctx.device.set_ethernet_up() {
+            if let Err(e) = sta.ctx.device.set_ethernet_up().await {
                 // TODO(https://fxbug.dev/42175857) - Consider returning an Err here.
                 error!("Cannot set ethernet to UP. Status: {}", e);
             }
@@ -568,13 +568,13 @@ pub struct Associated(pub Association);
 impl Associated {
     /// Processes an inbound disassociation frame.
     /// This always results in an MLME-DISASSOCIATE.indication message to MLME's SME peer.
-    fn on_disassoc_frame<D: DeviceOps>(
+    async fn on_disassoc_frame<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         disassoc_hdr: &mac::DisassocHdr,
     ) {
         wtrace::duration!(c"Associated::on_disassoc_frame");
-        self.pre_leaving_associated_state(sta);
+        self.pre_leaving_associated_state(sta).await;
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(disassoc_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
         sta.send_disassoc_ind(reason_code, LocallyInitiated(false));
@@ -587,7 +587,7 @@ impl Associated {
         deauth_hdr: &mac::DeauthHdr,
     ) {
         wtrace::duration!(c"Associated::on_deauth_frame");
-        self.pre_leaving_associated_state(sta);
+        self.pre_leaving_associated_state(sta).await;
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
         sta.send_deauthenticate_ind(reason_code, LocallyInitiated(false));
@@ -859,7 +859,7 @@ impl Associated {
         }
     }
 
-    fn on_sme_set_controlled_port<D: DeviceOps>(
+    async fn on_sme_set_controlled_port<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::SetControlledPortRequest,
@@ -873,7 +873,7 @@ impl Associated {
             return;
         }
         self.0.controlled_port_open = should_open_controlled_port;
-        if let Err(e) = sta.ctx.device.set_ethernet_status(req.state.into()) {
+        if let Err(e) = sta.ctx.device.set_ethernet_status(req.state.into()).await {
             error!(
                 "Error setting Ethernet port to {}: {}",
                 if should_open_controlled_port { "OPEN" } else { "CLOSED" },
@@ -891,7 +891,7 @@ impl Associated {
             error!("Error sending deauthentication frame to BSS: {}", e);
         }
 
-        self.pre_leaving_associated_state(sta);
+        self.pre_leaving_associated_state(sta).await;
         let _ =
             sta.clear_association().await.map_err(|e| error!("Failed to clear association: {}", e));
 
@@ -902,10 +902,10 @@ impl Associated {
         }
     }
 
-    fn pre_leaving_associated_state<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
+    async fn pre_leaving_associated_state<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         self.0.status_check_timeout.next_id.take();
         self.0.controlled_port_open = false;
-        if let Err(e) = sta.ctx.device.set_ethernet_down() {
+        if let Err(e) = sta.ctx.device.set_ethernet_down().await {
             error!("Error disabling ethernet device offline: {}", e);
         }
     }
@@ -913,7 +913,7 @@ impl Associated {
     #[must_use]
     /// Reports average signal strength to SME and check if auto deauthentication is due.
     /// Returns true if there auto deauthentication is triggered by lack of beacon frames.
-    fn on_timeout<D: DeviceOps>(
+    async fn on_timeout<D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         event_id: EventId,
@@ -943,7 +943,7 @@ impl Associated {
             {
                 warn!("Failed sending deauth frame {:?}", e);
             }
-            self.pre_leaving_associated_state(sta);
+            self.pre_leaving_associated_state(sta).await;
         } else {
             // Always check should_deauthenticate() first since even if Client receives a beacon,
             // it would still add a full association status check interval to the lost BSS counter.
@@ -1164,7 +1164,7 @@ impl States {
                         state.transition_to(Joined).into()
                     }
                     mac::MgmtBody::Disassociation { disassoc_hdr, .. } => {
-                        state.on_disassoc_frame(sta, &disassoc_hdr);
+                        state.on_disassoc_frame(sta, &disassoc_hdr).await;
                         state.transition_to(Authenticated).into()
                     }
                     mac::MgmtBody::Action(action_frame) => {
@@ -1263,7 +1263,7 @@ impl States {
             },
             TimedEvent::AssociationStatusCheck => match self {
                 States::Associated(mut state) => {
-                    let should_auto_deauth = state.on_timeout(sta, event_id);
+                    let should_auto_deauth = state.on_timeout(sta, event_id).await;
                     match should_auto_deauth {
                         true => state.transition_to(Joined).into(),
                         false => state.into(),
@@ -1367,7 +1367,7 @@ impl States {
                     state.into()
                 }
                 MlmeReq::SetCtrlPort(req) => {
-                    state.on_sme_set_controlled_port(sta, req);
+                    state.on_sme_set_controlled_port(sta, req).await;
                     state.into()
                 }
                 MlmeReq::Deauthenticate(req) => {
@@ -2156,7 +2156,7 @@ mod tests {
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device_state.lock().assocs.len());
 
-        sta.ctx.device.set_ethernet_up().expect("should succeed");
+        sta.ctx.device.set_ethernet_up().await.expect("should succeed");
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::UP);
 
         let _joined = state
@@ -2203,13 +2203,15 @@ mod tests {
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device_state.lock().assocs.len());
 
-        sta.ctx.device.set_ethernet_up().expect("should succeed");
+        sta.ctx.device.set_ethernet_up().await.expect("should succeed");
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::UP);
 
-        let _authenticated = state.on_disassoc_frame(
-            &mut sta,
-            &mac::DisassocHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
-        );
+        let _authenticated = state
+            .on_disassoc_frame(
+                &mut sta,
+                &mac::DisassocHdr { reason_code: fidl_ieee80211::ReasonCode::ApInitiated.into() },
+            )
+            .await;
 
         // Verify MLME-ASSOCIATE.confirm message was sent.
         let msg = m
@@ -3486,7 +3488,7 @@ mod tests {
         assert_eq!(1, m.fake_device_state.lock().assocs.len());
 
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
-        sta.ctx.device.set_ethernet_up().expect("should succeed");
+        sta.ctx.device.set_ethernet_up().await.expect("should succeed");
         assert_eq!(crate::device::LinkStatus::UP, m.fake_device_state.lock().link_status);
 
         let state = state.handle_mlme_req(&mut sta, fake_deauth_req()).await;

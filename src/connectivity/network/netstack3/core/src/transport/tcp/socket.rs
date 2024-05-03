@@ -47,8 +47,9 @@ use tracing::{debug, error, trace};
 use crate::{
     algorithm::{self, PortAllocImpl},
     context::{
-        ContextPair, CoreTimerContext, CounterContext, CtxPair, InstantBindingsTypes, RngContext,
-        TimerBindingsTypes, TimerContext2, TimerHandler, TracingContext,
+        ContextPair, CoreTimerContext, CounterContext, CtxPair, DeferredResourceRemovalContext,
+        HandleableTimer, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
+        TracingContext,
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
@@ -74,7 +75,7 @@ use crate::{
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, UpdateSharingError,
     },
-    sync::RwLock,
+    sync::{MapRcNotifier, RwLock},
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
         segment::Segment,
@@ -148,8 +149,7 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
 
     fn destroy_socket_with_demux_id<
         CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
-        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
-            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -218,8 +218,7 @@ impl DualStackIpExt for Ipv4 {
 
     fn destroy_socket_with_demux_id<
         CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
-        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
-            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -347,8 +346,7 @@ impl DualStackIpExt for Ipv6 {
 
     fn destroy_socket_with_demux_id<
         CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
-        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
-            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -444,18 +442,23 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static 
 /// The bindings context for TCP.
 ///
 /// TCP timers are scoped by weak device IDs.
-// TODO(https://fxbug.dev/42083407): Remove type parameters from this trait,
-// they're no longer needed.
-pub trait TcpBindingsContext<I: DualStackIpExt, D: device::WeakId>:
-    Sized + TimerContext2 + TracingContext + RngContext + TcpBindingsTypes
+pub trait TcpBindingsContext:
+    Sized
+    + DeferredResourceRemovalContext
+    + TimerContext
+    + TracingContext
+    + RngContext
+    + TcpBindingsTypes
 {
 }
 
-impl<I, D, O> TcpBindingsContext<I, D> for O
-where
-    I: DualStackIpExt,
-    O: TimerContext2 + TracingContext + RngContext + TcpBindingsTypes + Sized,
-    D: device::WeakId,
+impl<BC> TcpBindingsContext for BC where
+    BC: Sized
+        + DeferredResourceRemovalContext
+        + TimerContext
+        + TracingContext
+        + RngContext
+        + TcpBindingsTypes
 {
 }
 
@@ -606,11 +609,6 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         &mut self,
         cb: F,
     ) -> O;
-
-    /// Called whenever a socket has had its destruction deferred.
-    ///
-    /// Used for tests context implementations to forbid deferred destruction.
-    fn socket_destruction_deferred(&mut self, socket: WeakTcpSocketId<I, Self::WeakDeviceId, BC>);
 
     /// Calls the callback once for each currently installed socket.
     fn for_each_socket<
@@ -2031,8 +2029,7 @@ where
     I: DualStackIpExt,
     C: ContextPair,
     C::CoreContext: TcpContext<I, C::BindingsContext> + CounterContext<TcpCounters<I>>,
-    C::BindingsContext:
-        TcpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    C::BindingsContext: TcpBindingsContext,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair, IpVersionMarker { .. }) = self;
@@ -2968,7 +2965,7 @@ where
                         where
                             SockI: DualStackIpExt,
                             WireI: DualStackIpExt,
-                            BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                            BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
@@ -2997,7 +2994,7 @@ where
                                             .remove(demux_id, addr)
                                             .expect("failed to remove from socketmap");
                                     });
-                                    let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+                                    let _: Option<_> = bindings_ctx.cancel_timer(timer);
                                 }
                                 now_closed
                             } else {
@@ -3013,7 +3010,7 @@ where
                                     addr,
                                 );
                                 debug_assert_eq!(
-                                    bindings_ctx.scheduled_instant2(timer),
+                                    bindings_ctx.scheduled_instant(timer),
                                     None,
                                     "lingering timer for {:?}",
                                     id,
@@ -3117,7 +3114,7 @@ where
                         where
                             SockI: DualStackIpExt,
                             WireI: DualStackIpExt,
-                            BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                            BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
@@ -3583,7 +3580,7 @@ where
                 where
                     SockI: DualStackIpExt,
                     WireI: DualStackIpExt,
-                    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                    BC: TcpBindingsContext,
                     CC: TransportIpContext<WireI, BC>
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                         + CounterContext<TcpCounters<SockI>>,
@@ -3627,7 +3624,7 @@ where
                                     panic!("failed to remove from socketmap: {e:?}");
                                 }
                             });
-                            let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+                            let _: Option<_> = bindings_ctx.cancel_timer(timer);
                         }
                         (true, PrevState::Closed) | (false, _) => (),
                     }
@@ -4003,7 +4000,7 @@ where
                         );
                     }
                 };
-                let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+                let _: Option<_> = bindings_ctx.cancel_timer(timer);
                 match accept_queue {
                     Some(accept_queue) => {
                         accept_queue.remove(&id);
@@ -4037,10 +4034,7 @@ where
     ) where
         C::CoreContext: TcpContext<I::OtherVersion, C::BindingsContext>
             + CounterContext<TcpCounters<I::OtherVersion>>,
-        C::BindingsContext: TcpBindingsContext<
-            I::OtherVersion,
-            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
-        >,
+        C::BindingsContext: TcpBindingsContext,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
 
@@ -4200,92 +4194,83 @@ where
     }
 }
 
+/// A type to expose to bindings in the case of deferred resource removal.
+#[derive(Default)]
+struct TcpSocketResource<I: Ip>(IpVersionMarker<I>);
+
 /// Destroys the socket with `id`.
-fn destroy_socket<
-    I: DualStackIpExt,
-    CC: TcpContext<I, BC>,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
->(
+fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsContext>(
     core_ctx: &mut CC,
-    _bindings_ctx: &mut BC,
+    bindings_ctx: &mut BC,
     id: TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) {
-    let deferred = core_ctx.with_all_sockets_mut(move |all_sockets| {
+    core_ctx.with_all_sockets_mut(move |all_sockets| {
+        let TcpSocketId(rc) = &id;
+        let debug_refs = StrongRc::debug_references(rc);
         let entry = all_sockets.entry(id);
-        let (id, primary) = match entry {
+        let primary = match entry {
             hash_map::Entry::Occupied(o) => match o.get() {
                 TcpSocketSetEntry::DeadOnArrival => {
                     let id = o.key();
-                    let TcpSocketId(rc) = id;
-                    debug!(
-                        "{id:?} destruction skipped, socket is DOA. References={:?}",
-                        StrongRc::debug_references(rc)
-                    );
-                    // Destruction is deferred.
-                    return Some(id.downgrade());
+                    debug!("{id:?} destruction skipped, socket is DOA. References={debug_refs:?}",);
+                    None
                 }
                 TcpSocketSetEntry::Primary(_) => {
-                    assert_matches!(o.remove_entry(), (k, TcpSocketSetEntry::Primary(p)) => (k, p))
+                    assert_matches!(o.remove_entry(), (_, TcpSocketSetEntry::Primary(p)) => Some(p))
                 }
             },
             hash_map::Entry::Vacant(v) => {
                 let id = v.key();
                 let TcpSocketId(rc) = id;
-                let refs = StrongRc::debug_references(rc);
-                let weak = id.downgrade();
                 if StrongRc::marked_for_destruction(rc) {
                     // Socket is already marked for destruction, we've raced
                     // this removal with the addition to the socket set. Mark
                     // the entry as DOA.
                     debug!(
-                        "{id:?} raced with insertion, marking socket as DOA. References={refs:?}",
+                        "{id:?} raced with insertion, marking socket as DOA. \
+                        References={debug_refs:?}",
                     );
                     let _: &mut _ = v.insert(TcpSocketSetEntry::DeadOnArrival);
                 } else {
-                    debug!("{id:?} destruction is already deferred. References={refs:?}");
+                    debug!("{id:?} destruction is already deferred. References={debug_refs:?}");
                 }
-                return Some(weak);
-            }
-        };
-        struct LoggingNotifier<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
-            WeakTcpSocketId<I, D, BT>,
-        );
-
-        impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
-            crate::sync::RcNotifier<ReferenceState<I, D, BT>> for LoggingNotifier<I, D, BT>
-        {
-            fn notify(&mut self, data: ReferenceState<I, D, BT>) {
-                let state = data.into_inner();
-                let Self(weak) = self;
-                debug!("delayed-dropping {weak:?}: {state:?}");
-            }
-        }
-
-        // Keep a weak ref around so we can have nice debug logs.
-        let weak = id.downgrade();
-        core::mem::drop(id);
-        match PrimaryRc::unwrap_or_notify_with(primary, || (LoggingNotifier(weak.clone()), ())) {
-            Ok(state) => {
-                debug!("destroyed {weak:?} {state:?}");
                 None
             }
-            Err(()) => {
-                let WeakTcpSocketId(rc) = &weak;
-                debug!(
-                    "{weak:?} has strong references left. References={:?}",
-                    rc.debug_references()
-                );
-                Some(weak)
+        };
+
+        // There are a number of races that can happen with attempted socket
+        // destruction, but these should not be possible in tests because
+        // they're singlethreaded.
+        #[cfg(test)]
+        let primary = primary.unwrap_or_else(|| {
+            panic!("deferred destruction not allowed in tests. References={debug_refs:?}")
+        });
+        #[cfg(not(test))]
+        let Some(primary) = primary
+        else {
+            return;
+        };
+
+        let weak = PrimaryRc::downgrade(&primary);
+        match PrimaryRc::unwrap_or_notify_with(primary, move || {
+            let (notifier, receiver) =
+                BC::new_reference_notifier::<TcpSocketResource<I>>(debug_refs.into_dyn());
+            let notifier = MapRcNotifier::new(notifier, |_: ReferenceState<_, _, _>| {
+                // Expose a neat and empty type to bindings since we're always
+                // going to delegate this resource removal to it and it has no
+                // use for the internal reference state.
+                TcpSocketResource::<I>::default()
+            });
+            (notifier, receiver)
+        }) {
+            Ok(state) => {
+                debug!("destroyed {weak:?} {state:?}");
+            }
+            Err(receiver) => {
+                bindings_ctx.defer_removal(receiver);
             }
         }
-    });
-
-    if let Some(deferred) = deferred {
-        // Any situation where this is called where the socket is not actually
-        // destroyed is notified back to the context so tests can assert on
-        // correct behavior.
-        core_ctx.socket_destruction_deferred(deferred);
-    }
+    })
 }
 
 /// Closes all sockets in `pending`.
@@ -4298,7 +4283,7 @@ fn close_pending_sockets<I, CC, BC>(
     pending: impl Iterator<Item = TcpSocketId<I, CC::WeakDeviceId, BC>>,
 ) where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 {
     for conn_id in pending {
@@ -4311,7 +4296,7 @@ fn close_pending_sockets<I, CC, BC>(
                 }) => (conn, timer),
                 "invalid socket ID"
             );
-            let _: Option<BC::Instant> = bindings_ctx.cancel_timer2(timer);
+            let _: Option<BC::Instant> = bindings_ctx.cancel_timer(timer);
             let this_or_other_stack = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                     let (conn, addr) = converter.convert(conn_and_addr);
@@ -4398,7 +4383,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, DC::WeakDeviceId, BC>
         + CounterContext<TcpCounters<SockI>>,
-    BC: TcpBindingsContext<SockI, DC::WeakDeviceId>,
+    BC: TcpBindingsContext,
 {
     if !matches!(state, State::Closed(_)) {
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -4407,7 +4392,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
                 .remove(demux_id, conn_addr)
                 .expect("failed to remove from socketmap");
         });
-        let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+        let _: Option<_> = bindings_ctx.cancel_timer(timer);
     }
 
     if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
@@ -4426,7 +4411,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
 ) where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
     while let Some(seg) = core_ctx.with_counters(|counters| {
@@ -4443,7 +4428,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
     }
 
     if let Some(instant) = conn.state.poll_send_at() {
-        let _: Option<_> = bindings_ctx.schedule_timer_instant2(instant, timer);
+        let _: Option<_> = bindings_ctx.schedule_timer_instant(instant, timer);
     }
 }
 
@@ -4515,7 +4500,7 @@ impl AccessBufferSize for ReceiveBufferSize {
 fn set_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -4554,7 +4539,7 @@ fn set_buffer_size<
 fn get_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -4712,7 +4697,7 @@ fn connect_inner<CC, BC, SockI, WireI>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
         + CounterContext<TcpCounters<SockI>>,
@@ -4819,7 +4804,7 @@ where
     );
 
     let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
-    assert_eq!(bindings_ctx.schedule_timer_instant2(poll_send_at, &mut timer), None);
+    assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, &mut timer), None);
 
     let conn = convert_back_op(
         Connection {
@@ -4932,17 +4917,17 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
     }
 }
 
-impl<CC, BC> TimerHandler<BC, TimerId<CC::WeakDeviceId, BC>> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for TimerId<CC::WeakDeviceId, BC>
 where
-    BC: TcpBindingsContext<Ipv4, CC::WeakDeviceId> + TcpBindingsContext<Ipv6, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<Ipv4, BC>
         + TcpContext<Ipv6, BC>
         + CounterContext<TcpCounters<Ipv4>>
         + CounterContext<TcpCounters<Ipv6>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, timer_id: TimerId<CC::WeakDeviceId, BC>) {
-        let ctx_pair = CtxPair { core_ctx: self, bindings_ctx };
-        match timer_id {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let ctx_pair = CtxPair { core_ctx, bindings_ctx };
+        match self {
             TimerId::V4(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
             TimerId::V6(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
         }
@@ -5044,7 +5029,7 @@ mod tests {
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
                 WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
-            ContextProvider, InstantContext as _,
+            ContextProvider, InstantContext as _, ReferenceNotifiers,
         },
         device::{
             link::LinkDevice,
@@ -5063,7 +5048,7 @@ mod tests {
             testutil::DualStackSendIpPacketMeta,
             HopLimits, IpTransportContext,
         },
-        sync::Mutex,
+        sync::{DynDebugReferences, Mutex},
         testutil::ContextPair,
         testutil::{
             new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
@@ -5233,6 +5218,7 @@ mod tests {
                         Ipv4::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
+                        None,
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5244,6 +5230,7 @@ mod tests {
                         Ipv6::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
+                        None,
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5311,25 +5298,25 @@ mod tests {
     }
 
     /// Delegate implementation to internal thing.
-    impl<D: FakeStrongDeviceId> TimerContext2 for TcpBindingsCtx<D> {
+    impl<D: FakeStrongDeviceId> TimerContext for TcpBindingsCtx<D> {
         fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
             self.timers.new_timer(id)
         }
 
-        fn schedule_timer_instant2(
+        fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             timer: &mut Self::Timer,
         ) -> Option<Self::Instant> {
-            self.timers.schedule_timer_instant2(time, timer)
+            self.timers.schedule_timer_instant(time, timer)
         }
 
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.cancel_timer2(timer)
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.cancel_timer(timer)
         }
 
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.scheduled_instant2(timer)
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.scheduled_instant(timer)
         }
     }
 
@@ -5364,6 +5351,29 @@ mod tests {
 
     impl<D: FakeStrongDeviceId> FilterBindingsTypes for TcpBindingsCtx<D> {
         type DeviceClass = ();
+    }
+
+    impl<D: FakeStrongDeviceId> ReferenceNotifiers for TcpBindingsCtx<D> {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            // We don't support deferred destruction, tests are single threaded.
+            panic!(
+                "can't create deferred reference notifiers for type {}: \
+                debug_references={debug_references:?}",
+                core::any::type_name::<T>()
+            );
+        }
+    }
+
+    impl<D: FakeStrongDeviceId> DeferredResourceRemovalContext for TcpBindingsCtx<D> {
+        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+            match receiver {}
+        }
     }
 
     impl<D: FakeStrongDeviceId> RngContext for TcpBindingsCtx<D> {
@@ -5575,17 +5585,6 @@ mod tests {
             cb(&mut self.outer.v6.all_sockets)
         }
 
-        fn socket_destruction_deferred(
-            &mut self,
-            socket: WeakTcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
-        ) {
-            let WeakTcpSocketId(rc) = &socket;
-            panic!(
-                "deferred socket {socket:?} destruction, references = {:?}",
-                rc.debug_references()
-            );
-        }
-
         fn for_each_socket<
             F: FnMut(
                 &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
@@ -5651,17 +5650,6 @@ mod tests {
             cb: F,
         ) -> O {
             cb(&mut self.outer.v4.all_sockets)
-        }
-
-        fn socket_destruction_deferred(
-            &mut self,
-            socket: WeakTcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
-        ) {
-            let WeakTcpSocketId(rc) = &socket;
-            panic!(
-                "deferred socket {socket:?} destruction, references = {:?}",
-                rc.debug_references()
-            );
         }
 
         fn for_each_socket<
@@ -5889,7 +5877,7 @@ mod tests {
     fn assert_this_stack_conn<
         'a,
         I: DualStackIpExt,
-        BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+        BC: TcpBindingsContext,
         CC: TcpContext<I, BC>,
     >(
         conn: &'a I::ConnectionAndAddr<CC::WeakDeviceId, BC>,
@@ -7672,8 +7660,7 @@ mod tests {
             + TcpContext<I::OtherVersion, BC, DeviceId = FakeDeviceId>
             + CounterContext<TcpCounters<I>>
             + CounterContext<TcpCounters<I::OtherVersion>>,
-        BC: TcpBindingsContext<I, CC::WeakDeviceId>
-            + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>,
+        BC: TcpBindingsContext + TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,

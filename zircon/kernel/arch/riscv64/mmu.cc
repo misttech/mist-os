@@ -328,8 +328,6 @@ class Riscv64ArchVmAspace::ConsistencyManager {
 
   // Queue a TLB entry for flushing. This may get turned into a complete ASID flush.
   void FlushEntry(vaddr_t va, bool terminal) {
-    AssertHeld(aspace_.lock_);
-
     LTRACEF("va %#lx, asid %#x, terminal %u\n", va, aspace_.asid_, terminal);
 
     DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
@@ -382,7 +380,8 @@ class Riscv64ArchVmAspace::ConsistencyManager {
 
   // Performs any pending synchronization of TLBs and page table walkers. Includes the MB to ensure
   // TLB flushes have completed prior to returning to user.
-  void Flush() TA_REQ(aspace_.lock_) {
+  void Flush() {
+    AssertHeld(aspace_.lock_);
     kcounter_add(cm_flush_call, 1);
     if (!full_flush_ && num_pending_tlb_runs_ == 0) {
       return;
@@ -745,7 +744,8 @@ zx::result<size_t> Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t va
   return zx::ok(unmap_size);
 }
 
-zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, uint level, volatile pte_t* page_table,
+zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint level,
+                                              volatile pte_t* page_table,
                                               ExistingEntryAction existing_action,
                                               MappingCursor& cursor, ConsistencyManager& cm) {
   const vaddr_t block_size = page_size_per_level(level);
@@ -809,20 +809,44 @@ zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, uint level, volatile 
       DEBUG_ASSERT(next_page_table);
 
       zx_status_t result =
-          MapPageTable(attrs, level - 1, next_page_table, existing_action, cursor, cm);
+          MapPageTable(attrs, ro, level - 1, next_page_table, existing_action, cursor, cm);
       if (result != ZX_OK) {
         return result;
       }
     } else {
-      if (riscv64_pte_is_valid(pte)) {
-        if (existing_action == ExistingEntryAction::Error) {
-          LTRACEF("page table entry already in use, index %u, %#" PRIx64 "\n", index, pte);
-          return ZX_ERR_ALREADY_EXISTS;
+      const pte_t new_pte = riscv64_pte_pa_to_pte(cursor.paddr()) | attrs;
+
+      const bool valid = riscv64_pte_is_valid(pte);
+      if (unlikely(valid && existing_action == ExistingEntryAction::Error)) {
+        LTRACEF("page table entry already in use, index %u, %#" PRIx64 "\n", index, pte);
+        return ZX_ERR_ALREADY_EXISTS;
+      } else if (valid && existing_action == ExistingEntryAction::Skip) {
+        // Empty case to simplify the other branches.
+      } else if (valid && existing_action == ExistingEntryAction::Upgrade &&
+                 riscv64_pte_pa(pte) == cursor.paddr()) {
+        // Doing an upgrade of an existing entry where the output address is not changing. This is
+        // just a protect, which we can skip if either nothing is actually changing, or if we would
+        // potentially be reducing permissions.
+        if (!ro && new_pte != pte) {
+          update_pte(&page_table[index], new_pte);
+          cm.FlushEntry(cursor.vaddr(), true);
         }
       } else {
-        pte = riscv64_pte_pa_to_pte(cursor.paddr()) | attrs;
-        LTRACEF("pte %p[%u] = %#" PRIx64 "\n", page_table, index, pte);
-        page_table[index] = pte;
+        // Either no current entry, or we need to upgrade the existing one, potentially performing
+        // a break-before-make.
+        if (valid && !ro) {
+          // If the output address were not changing we would have hit the protect case above, so if
+          // the new entry is not read only then we must perform break-before-make before installing
+          // it. Failing to do this could result in writes being temporarily lost due to the
+          // different output addresses.
+          update_pte(&page_table[index], 0);
+          cm.FlushEntry(cursor.vaddr(), true);
+          // Must force the flush to happen now before installing the new entry. This will also
+          // ensure the page table entries we wrote will be visible before we install it.
+          cm.Flush();
+        }
+        LTRACEF("pte %p[%u] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte, cursor.paddr());
+        update_pte(&page_table[index], new_pte);
 
         // Flush the TLB on map as well, unlike most architectures.
         if (IsKernel()) {
@@ -1075,7 +1099,8 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
   MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
                        /*vaddr=*/vaddr);
-  zx_status_t result = MapPageTable(attrs, RISCV64_MMU_PT_LEVELS - 1, tt_virt_,
+  const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
+  zx_status_t result = MapPageTable(attrs, ro, RISCV64_MMU_PT_LEVELS - 1, tt_virt_,
                                     ExistingEntryAction::Error, cursor, cm);
   mb();
   if (result != ZX_OK) {
@@ -1099,7 +1124,6 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
                                      ExistingEntryAction existing_action, size_t* mapped) {
   canary_.Assert();
 
-  DEBUG_ASSERT(ENABLE_PAGE_FAULT_UPGRADE || existing_action != ExistingEntryAction::Upgrade);
   DEBUG_ASSERT(tt_virt_);
 
   DEBUG_ASSERT(IsValidVaddr(vaddr));
@@ -1140,8 +1164,9 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
     MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
                          /*vaddr=*/vaddr);
+    const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
     zx_status_t result =
-        MapPageTable(attrs, RISCV64_MMU_PT_LEVELS - 1, tt_virt_, existing_action, cursor, cm);
+        MapPageTable(attrs, ro, RISCV64_MMU_PT_LEVELS - 1, tt_virt_, existing_action, cursor, cm);
     mb();
     if (result != ZX_OK) {
       if (cursor.vaddr() > vaddr) {

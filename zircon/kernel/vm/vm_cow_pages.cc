@@ -1323,26 +1323,26 @@ uint32_t VmCowPages::DebugLookupDepthLocked() const {
   return depth;
 }
 
-VmCowPages::AttributionCounts VmCowPages::AttributedPagesInRangeLocked(uint64_t offset,
-                                                                       uint64_t len) const {
+VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeLocked(
+    uint64_t offset_bytes, uint64_t len_bytes) const {
   canary_.Assert();
 
   if (is_hidden_locked()) {
     return AttributionCounts{};
   }
 
-  VmCowPages::AttributionCounts page_counts;
-  // TODO: Decide who pages should actually be attribtued to.
+  AttributionCounts counts;
+  // TODO(https://g-issues.fuchsia.dev/issues/338300808): Formalize attribution model.
   page_list_.ForEveryPageAndGapInRange(
-      [&page_counts](const auto* p, uint64_t off) {
+      [&counts](const auto* p, uint64_t off) {
         if (p->IsPage()) {
-          page_counts.uncompressed++;
+          counts.uncompressed_bytes += PAGE_SIZE;
         } else if (p->IsReference()) {
-          page_counts.compressed++;
+          counts.compressed_bytes += PAGE_SIZE;
         }
         return ZX_ERR_NEXT;
       },
-      [this, &page_counts](uint64_t gap_start, uint64_t gap_end) {
+      [this, &counts](uint64_t gap_start, uint64_t gap_end) {
         AssertHeld(lock_ref());
 
         // If there's no parent, there's no pages to care about. If there is a non-hidden
@@ -1363,21 +1363,21 @@ VmCowPages::AttributionCounts VmCowPages::AttributedPagesInRangeLocked(uint64_t 
         while (off < parent_limit_ && off < gap_end) {
           AttributionCounts local_count;
           uint64_t attributed =
-              CountAttributedAncestorPagesLocked(off, gap_end - off, &local_count);
+              CountAttributedAncestorBytesLocked(off, gap_end - off, &local_count);
           // |CountAttributedAncestorPagesLocked| guarantees that it will make progress.
           DEBUG_ASSERT(attributed > 0);
           off += attributed;
-          page_counts += local_count;
+          counts += local_count;
         }
 
         return ZX_ERR_NEXT;
       },
-      offset, offset + len);
+      offset_bytes, offset_bytes + len_bytes);
 
-  return page_counts;
+  return counts;
 }
 
-uint64_t VmCowPages::CountAttributedAncestorPagesLocked(uint64_t offset, uint64_t size,
+uint64_t VmCowPages::CountAttributedAncestorBytesLocked(uint64_t offset, uint64_t size,
                                                         AttributionCounts* count) const
     TA_REQ(lock()) {
   // We need to walk up the ancestor chain to see if there are any pages that should be attributed
@@ -1398,7 +1398,7 @@ uint64_t VmCowPages::CountAttributedAncestorPagesLocked(uint64_t offset, uint64_
   AssertHeld(cur->lock_ref());
   uint64_t cur_offset = offset;
   uint64_t cur_size = size;
-  // Count of how many pages we attributed as being owned by this vmo.
+  // Count of how many bytes we attributed as being owned by this vmo.
   AttributionCounts attributed_ours;
   // Count how much we've processed. This is needed to remember when we iterate up the parent list
   // at an offset.
@@ -1456,9 +1456,9 @@ uint64_t VmCowPages::CountAttributedAncestorPagesLocked(uint64_t offset, uint64_
               !(sib.parent_offset_ + sib.parent_start_limit_ <= off &&
                 off < sib.parent_offset_ + sib.parent_limit_)) {
             if (p->IsPage()) {
-              attributed_ours.uncompressed++;
+              attributed_ours.uncompressed_bytes += PAGE_SIZE;
             } else if (p->IsReference()) {
-              attributed_ours.compressed++;
+              attributed_ours.compressed_bytes += PAGE_SIZE;
             }
           }
           return ZX_ERR_NEXT;
@@ -2100,7 +2100,7 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
       // If we are expecting a pending Add[New]PageLocked, we can defer updating the page queue.
       if (!is_pending_add) {
         // Move to evictable pager backed queue to start tracking age information.
-        pmm_page_queues()->MoveToPagerBacked(page);
+        pmm_page_queues()->MoveToReclaim(page);
       }
       break;
     case DirtyState::Dirty:
@@ -3774,7 +3774,7 @@ void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
         // reclaimable, place in the high priority queue instead.
         pq->MoveToHighPriority(page);
       } else {
-        pq->MoveToPagerBacked(page);
+        pq->MoveToReclaim(page);
       }
     } else {
       DEBUG_ASSERT(!page->is_loaned());
@@ -3810,7 +3810,7 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
         // reclaimable, place in the high priority queue instead.
         pq->SetHighPriority(page, this, offset);
       } else {
-        pq->SetPagerBacked(page, this, offset);
+        pq->SetReclaim(page, this, offset);
       }
     } else {
       DEBUG_ASSERT(!page->is_loaned());
@@ -3872,7 +3872,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
       // Note that this does not unset the always_need bit if it has been previously set. The
       // always_need hint is sticky.
       if (page->object.get_object() == root && page->object.pin_count == 0 && is_page_clean(page)) {
-        pmm_page_queues()->MoveToPagerBackedDontNeed(page);
+        pmm_page_queues()->MoveToReclaimDontNeed(page);
         vm_vmo_dont_need.Add(1);
       }
     }

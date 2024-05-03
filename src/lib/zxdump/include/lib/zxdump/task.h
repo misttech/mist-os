@@ -192,14 +192,14 @@ class TaskHolder {
   // inserted, and later start reporting new orphan tasks inserted after that.
   Job& root_job() const;
 
-  // Yields the root resource.  If a live handle to the root resource was
+  // Yields the info resource.  If a live handle to the info resource was
   // passed to Insert, this can access its data.  If dumps inserted include the
-  // "privileged kernel" information, that is attached to this fake root
+  // "privileged kernel" information, that is attached to this fake info
   // resource though it doesn't have information like a KOID itself.  If
   // multiple dumps supply kernel information, conflicting data inserted later
   // will be ignored.  If both live and dump data are available, the dump data
   // will obscure the live data.
-  Resource& root_resource() const;
+  Resource& info_resource() const;
 
   // These can't fail, but return empty/zero if no corresponding data is in the
   // dump.  If multiple dumps supply system-wide information, only the first
@@ -363,8 +363,8 @@ class Object {
 
   bool is_live() const { return live_.is_valid(); }
 
-  // As a convenience, TaskHolder::root_resource() is proxied by every Object.
-  Resource& root_resource();
+  // As a convenience, TaskHolder::info_resource() is proxied by every Object.
+  Resource& info_resource();
 
   // A job or process can have dump remarks, stored as a vector of {name, data}
   // pairs.
@@ -685,8 +685,8 @@ class Resource : public Object {
 // Get the live root job of the running system, e.g. for TaskHolder::Insert.
 fit::result<Error, LiveHandle> GetRootJob();
 
-// Get the live root resource handle of the running system.
-fit::result<Error, LiveHandle> GetRootResource();
+// Get the live info resource handle of the running system.
+fit::result<Error, LiveHandle> GetInfoResource();
 
 }  // namespace zxdump
 

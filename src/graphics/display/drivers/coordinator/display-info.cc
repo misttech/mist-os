@@ -61,6 +61,9 @@ inline void audio_stream_format_fidl_from_banjo(
 
 }  // namespace
 
+DisplayInfo::DisplayInfo() = default;
+DisplayInfo::~DisplayInfo() = default;
+
 void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   ZX_DEBUG_ASSERT(init_done);
   node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id.value()).c_str());
@@ -176,6 +179,49 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     edid.Print([](const char* str) { zxlogf(DEBUG, "%s", str); });
   }
   return zx::ok(std::move(out));
+}
+
+uint32_t DisplayInfo::GetHorizontalSizeMm() const {
+  if (!edid.has_value()) {
+    return 0;
+  }
+  return edid->base.horizontal_size_mm();
+}
+
+uint32_t DisplayInfo::GetVerticalSizeMm() const {
+  if (!edid.has_value()) {
+    return 0;
+  }
+  return edid->base.vertical_size_mm();
+}
+
+std::string_view DisplayInfo::GetManufacturerName() const {
+  if (!edid.has_value()) {
+    return std::string_view();
+  }
+
+  std::string_view manufacturer_name(edid->base.manufacturer_name());
+  if (!manufacturer_name.empty()) {
+    return manufacturer_name;
+  }
+
+  return std::string_view(edid->base.manufacturer_id());
+}
+
+std::string_view DisplayInfo::GetMonitorName() const {
+  if (!edid.has_value()) {
+    return std::string_view();
+  }
+
+  return std::string_view(edid->base.monitor_name());
+}
+
+std::string_view DisplayInfo::GetMonitorSerial() const {
+  if (!edid.has_value()) {
+    return std::string_view();
+  }
+
+  return std::string_view(edid->base.monitor_serial());
 }
 
 void DisplayInfo::PopulateDisplayAudio() {

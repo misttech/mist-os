@@ -7,7 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <zircon/status.h>
 
-#include <fbl/auto_lock.h>
+#include <mutex>
 
 #include "src/devices/block/drivers/block-verity/constants.h"
 #include "src/devices/block/drivers/block-verity/device-info.h"
@@ -63,7 +63,7 @@ void Device::BlockImplQuery(block_info_t* out_info, size_t* out_op_size) {
 
 void Device::BlockImplQueue(block_op_t* block_op, block_impl_queue_callback completion_cb,
                             void* cookie) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   extra_op_t* extra = BlockToExtra(block_op, info_.op_size);
   // Save original values in extra, and adjust block_op's block/vmo offsets.
   uint64_t data_start_offset = info_.geometry.AbsoluteLocationForData(0);

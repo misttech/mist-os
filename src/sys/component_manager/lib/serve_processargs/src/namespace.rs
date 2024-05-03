@@ -63,7 +63,7 @@ impl NamespaceBuilder {
         let dirname = path.parent();
 
         // Get the entry, or if it doesn't exist, make an empty dictionary.
-        let any = match self.entries.get(&dirname) {
+        let any = match self.entries.get_mut(&dirname) {
             Some(dir) => dir,
             None => {
                 let dict = self.make_dict_with_not_found_logging(dirname.to_string());
@@ -79,8 +79,7 @@ impl NamespaceBuilder {
         };
 
         // Insert the capability into the Dict.
-        dict.lock_entries()
-            .insert(path.basename().clone(), cap)
+        dict.insert(path.basename().clone(), cap)
             .map_err(|_| NamespaceError::Duplicate(path.clone().into()).into())
     }
 

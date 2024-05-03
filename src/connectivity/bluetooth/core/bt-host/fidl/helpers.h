@@ -38,7 +38,7 @@ class DiscoveryFilter;
 
 namespace bthost::fidl_helpers {
 
-namespace android_hci = pw::bluetooth::vendor::android_hci;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 // TODO(https://fxbug.dev/42171179): Temporary logic for converting between the stack identifier
 // type (integer) and FIDL identifier type (string). Remove these once all FIDL
@@ -224,26 +224,26 @@ std::unique_ptr<bt::gatt::Descriptor> Gatt2DescriptorFromFidl(
 std::unique_ptr<bt::gatt::Characteristic> Gatt2CharacteristicFromFidl(
     const fuchsia::bluetooth::gatt2::Characteristic& fidl_chrc);
 
-std::optional<android_hci::A2dpCodecType> FidlToCodecType(
+std::optional<android_emb::A2dpCodecType> FidlToCodecType(
     const fuchsia::bluetooth::bredr::AudioOffloadFeatures& codec);
 
-bt::StaticPacket<android_hci::A2dpScmsTEnableWriter> FidlToScmsTEnable(bool scms_t_enable);
+bt::StaticPacket<android_emb::A2dpScmsTEnableWriter> FidlToScmsTEnable(bool scms_t_enable);
 
-android_hci::A2dpSamplingFrequency FidlToSamplingFrequency(
+android_emb::A2dpSamplingFrequency FidlToSamplingFrequency(
     fuchsia::bluetooth::bredr::AudioSamplingFrequency sampling_frequency);
 
-android_hci::A2dpBitsPerSample FidlToBitsPerSample(
+android_emb::A2dpBitsPerSample FidlToBitsPerSample(
     fuchsia::bluetooth::bredr::AudioBitsPerSample bits_per_sample);
 
-android_hci::A2dpChannelMode FidlToChannelMode(
+android_emb::A2dpChannelMode FidlToChannelMode(
     fuchsia::bluetooth::bredr::AudioChannelMode channel_mode);
 
-bt::StaticPacket<android_hci::SbcCodecInformationWriter> FidlToEncoderSettingsSbc(
+bt::StaticPacket<android_emb::SbcCodecInformationWriter> FidlToEncoderSettingsSbc(
     const fuchsia::bluetooth::bredr::AudioEncoderSettings& encoder_settings,
     fuchsia::bluetooth::bredr::AudioSamplingFrequency sampling_frequency,
     fuchsia::bluetooth::bredr::AudioChannelMode channel_mode);
 
-bt::StaticPacket<android_hci::AacCodecInformationWriter> FidlToEncoderSettingsAac(
+bt::StaticPacket<android_emb::AacCodecInformationWriter> FidlToEncoderSettingsAac(
     const fuchsia::bluetooth::bredr::AudioEncoderSettings& encoder_settings,
     fuchsia::bluetooth::bredr::AudioSamplingFrequency sampling_frequency,
     fuchsia::bluetooth::bredr::AudioChannelMode channel_mode);

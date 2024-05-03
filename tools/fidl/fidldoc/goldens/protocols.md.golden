@@ -166,7 +166,7 @@
 
 
 ## HandleRightsProtocol {#HandleRightsProtocol}
-*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=88)*
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=91)*
 
 
 ### AnEvent {#HandleRightsProtocol.AnEvent}
@@ -236,7 +236,7 @@
 </table>
 
 ## ManyParameters {#ManyParameters}
-*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=127)*
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=130)*
 
 
 ### Fifteen {#ManyParameters.Fifteen}
@@ -342,7 +342,7 @@
 
 
 ## MethodWithUnion {#MethodWithUnion}
-*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=151)*
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=154)*
 
 
 ### UnionMethod {#MethodWithUnion.UnionMethod}
@@ -374,6 +374,10 @@
             </td>
         </tr>
 </table>
+
+## PlatformServer {#PlatformServer}
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=89)*
+
 
 ## SyscallProtocol {#SyscallProtocol}
 *Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=73)*
@@ -644,7 +648,7 @@
 </table>
 
 ## WithProtocolEnds {#WithProtocolEnds}
-*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=109)*
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=112)*
 
 
 ### ClientEnds {#WithProtocolEnds.ClientEnds}
@@ -741,7 +745,7 @@
 ## **STRUCTS**
 
 ### ProtocolEnds [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#ProtocolEnds data-text="ProtocolEnds"}
-*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=102)*
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=105)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -862,7 +866,7 @@ Type: <code>uint32</code>
 ## **UNIONS**
 
 ### TheUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#TheUnion data-text="TheUnion"}
-*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=147)*
+*Defined in [test.protocols/protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocols.test.fidl;l=150)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="TheUnion.v">

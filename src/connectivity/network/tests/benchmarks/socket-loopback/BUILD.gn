@@ -12,13 +12,11 @@ import("//build/testing/perf/test.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
 
 test("loopback_socket_benchmarks") {
-  sources = [
-    "../../os.h",
-    "loopback_socket_benchmarks.cc",
-  ]
+  sources = [ "loopback_socket_benchmarks.cc" ]
 
   deps = [
     "//sdk/lib/syslog/cpp",
+    "//src/connectivity/network/tests:os",
     "//src/lib/fxl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/perftest",

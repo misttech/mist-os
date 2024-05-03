@@ -81,11 +81,8 @@ impl System {
                 images_json_path,
                 images_json_orig_path,
             })?;
-        let mut images_json_contents = vec![];
-        images_json_blob
-            .reader_seeker()?
-            .read_to_end(&mut images_json_contents)
-            .map_err(|_error| Error::ReadImagesJson)?;
+        let images_json_contents =
+            images_json_blob.read().map_err(|_error| Error::ReadImagesJson)?;
         let image_packages_manifest = parse_image_packages_json(&images_json_contents)
             .map_err(|_error| Error::ParseImagesJson)?;
 
@@ -187,8 +184,10 @@ mod tests {
 
     fn write_blob<Dir: AsRef<Path>>(directory: Dir, contents: &[u8]) -> Hash {
         let hash = fuchsia_merkle::from_slice(contents).root();
-        let filename = format!("{}", hash);
-        fs::write(directory.as_ref().join(filename), contents).expect("write blob to file");
+        let filepath = directory.as_ref().join(format!("{hash}"));
+        let file = fs::File::create(filepath).expect("create blob file");
+        delivery_blob::generate_to(delivery_blob::DeliveryBlobType::Type1, contents, file)
+            .expect("generate delivery blob");
         hash
     }
 
@@ -196,7 +195,10 @@ mod tests {
     fn system_from_product_bundle() {
         let pb_dir = TempDir::new().expect("create tempdir for product bundle");
         let pb_path = path(pb_dir.path().to_path_buf());
-        let blobs_path = pb_dir.path().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH);
+        // Subdir for type 1 delivery blobs.
+        // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0207_offline_blob_compression#offline_compression_2
+        let blobs_path =
+            pb_dir.path().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH).join("1");
         fs::create_dir_all(&blobs_path).expect("create blobs directory");
 
         let mut update_blob_hashes: Vec<Hash> = vec![];

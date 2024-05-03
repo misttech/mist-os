@@ -15,4 +15,9 @@ pub struct PlatformKernelConfig {
     pub lru_memory_compression: bool,
     #[serde(default)]
     pub continuous_eviction: bool,
+    /// For address spaces that use ASLR this controls the number of bits of
+    /// entropy in the randomization. Higher entropy results in a sparser
+    /// address space and uses more memory for page tables. Valid values range
+    /// from 0-36. Default value is 30.
+    pub aslr_entropy_bits: Option<u8>,
 }

@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 use crate::fastboot_interface::Fastboot;
+use crate::fastboot_interface::FastbootError;
 use crate::fastboot_interface::FastbootInterface;
+use crate::fastboot_interface::FlashError;
 use crate::fastboot_interface::RebootEvent;
+use crate::fastboot_interface::StageError;
 use crate::fastboot_interface::UploadProgress;
 use crate::fastboot_interface::Variable;
 use crate::interface_factory::InterfaceFactory;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use chrono::Duration;
 use fastboot::{
@@ -146,7 +149,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
 
 #[async_trait(?Send)]
 impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
-    async fn prepare(&mut self, _listener: Sender<RebootEvent>) -> Result<()> {
+    async fn prepare(&mut self, _listener: Sender<RebootEvent>) -> Result<(), FastbootError> {
         // TODO(colnnelson): This is a part of the original fastboot interface, and is
         // "wrong". The device needs to be in fastboot mode before now.
         // This function exists soely to reboot the target from
@@ -155,30 +158,37 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
     }
 
     #[tracing::instrument]
-    async fn get_var(&mut self, name: &str) -> Result<String> {
-        send(Command::GetVar(ClientVariable::Oem(name.to_string())), self.interface().await?)
-            .await
-            .and_then(|r| match r {
+    async fn get_var(&mut self, name: &str) -> core::result::Result<String, FastbootError> {
+        let command = Command::GetVar(ClientVariable::Oem(name.to_string()));
+        match send(command.clone(), self.interface().await?).await {
+            Ok(r) => match r {
                 Reply::Okay(v) => Ok(v),
-                Reply::Fail(s) => bail!("Failed to get {}: {}", name, s),
-                _ => bail!("Unexpected reply from fastboot deviced for get_var"),
-            })
+                Reply::Fail(message) => {
+                    Err(FastbootError::GetVariableError { variable: name.to_string(), message })
+                }
+                r @ _ => Err(FastbootError::UnexpectedReply {
+                    method: command.to_string(),
+                    reply: r.to_string(),
+                }),
+            },
+            Err(e) => Err(FastbootError::Error(e)),
+        }
     }
 
     #[tracing::instrument]
-    async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<()> {
+    async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<(), FastbootError> {
         let variable_listener = VariableListener::new(listener)?;
-        send_with_listener(
-            Command::GetVar(ClientVariable::All),
-            self.interface().await?,
-            &variable_listener,
-        )
-        .await
-        .and_then(|r| match r {
+        let command = Command::GetVar(ClientVariable::All);
+        match send_with_listener(command.clone(), self.interface().await?, &variable_listener)
+            .await?
+        {
             Reply::Okay(_) => Ok(()),
-            Reply::Fail(s) => bail!("Failed to get all variables {}", s),
-            _ => bail!("Unexpected reply from fastboot deviced for get_var"),
-        })
+            Reply::Fail(s) => Err(FastbootError::GetAllVarsFailed(s)),
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: command.to_string(),
+                reply: r.to_string(),
+            }),
+        }
     }
 
     #[tracing::instrument]
@@ -187,20 +197,27 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         partition_name: &str,
         path: &str,
         listener: Sender<UploadProgress>,
-    ) -> Result<()> {
-        let mut file_to_flash = File::open(path)?;
-        let size = file_to_flash.metadata()?.len();
-        let progress_listener = ProgressListener::new(listener)?;
+    ) -> Result<(), FastbootError> {
+        // TODO(colnnelson): This file size could be done better.
+        // The stage function could return back how many bytes were uploaded
+        //
+
+        // Upload file
+        let mut file_to_flash = File::open(path).map_err(FlashError::from)?;
+        let size = file_to_flash.metadata().map_err(FlashError::from)?.len();
+        let size = u32::try_from(size).map_err(|e| FlashError::InvalidFileSize(e))?;
         //timeout rate is in mb per seconds
-        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).await?;
-        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).await?;
+        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).await.map_err(FlashError::from)?;
+        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).await.map_err(FlashError::from)?;
         let megabytes = (size / 1000000) as i64;
         let mut timeout = megabytes / timeout_rate;
         timeout = std::cmp::max(timeout, min_timeout);
         let timeout = Duration::seconds(timeout);
         tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
+        let progress_listener = ProgressListener::new(listener)?;
+        let span = tracing::span!(tracing::Level::INFO, "device_flash_upload").entered();
         let upload_reply = upload_with_read_timeout(
-            size.try_into()?,
+            size,
             &mut file_to_flash,
             self.interface().await?,
             &progress_listener,
@@ -208,64 +225,94 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         )
         .await
         .context(format!("uploading {}", path))?;
+        drop(span);
         match upload_reply {
             Reply::Okay(s) => tracing::debug!("Received response from download command: {}", s),
-            Reply::Fail(s) => bail!("Failed to upload {}: {}", path, s),
-            _ => bail!("Unexpected reply from fastboot device for download: {:?}", upload_reply),
+            Reply::Fail(s) => {
+                return Err(FastbootError::StageError(StageError::UploadFailed {
+                    path: path.to_string(),
+                    message: s,
+                }))
+            }
+            r @ _ => {
+                return Err(FastbootError::UnexpectedReply {
+                    method: Command::Download(size).to_string(),
+                    reply: r.to_string(),
+                })
+            }
         };
+
+        // Flash the uploaded file
         let span = tracing::span!(tracing::Level::INFO, "device_flash").entered();
-        let send_reply = send_with_timeout(
-            Command::Flash(partition_name.to_string()),
-            self.interface().await?,
-            timeout,
-        )
-        .await
-        .context("sending flash");
+        let command = Command::Flash(partition_name.to_string());
+        let send_reply = send_with_timeout(command.clone(), self.interface().await?, timeout)
+            .await
+            .context("sending flash");
         drop(span);
         match send_reply {
-            Ok(Reply::Okay(_)) => Ok(()),
-            Ok(Reply::Fail(s)) => bail!("Failed to flash \"{}\": {}", partition_name, s),
-            Ok(_) => bail!("Unexpected reply from fastboot device for flash command"),
+            Ok(reply) => match reply {
+                Reply::Okay(_) => Ok(()),
+                Reply::Fail(s) => Err(FastbootError::FlashError(FlashError::FlashFailed {
+                    partition: partition_name.to_string(),
+                    message: s,
+                })),
+                r @ _ => Err(FastbootError::UnexpectedReply {
+                    method: command.to_string(),
+                    reply: r.to_string(),
+                }),
+            },
             Err(ref e) => {
                 if let Some(ffx_err) = e.downcast_ref::<SendError>() {
                     match ffx_err {
                         SendError::Timeout => {
-                            if timeout_rate == 1 {
-                                bail!("Could not read response from device.  Reply timed out.");
-                            }
-                            let lowered_rate = timeout_rate - 1;
-                            let timeout_err = format!(
-                                "Time out while waiting on a response from the device. \n\
-                                The current timeout rate is {} mb/s.  Try lowering the timeout rate: \n\
-                                ffx config set \"{}\" {}",
-                                timeout_rate, FLASH_TIMEOUT_RATE, lowered_rate
-                            );
-                            bail!("{}", timeout_err);
+                            let message = if timeout_rate == 1 {
+                                "Could not read response from device.  Reply timed out.".to_string()
+                            } else {
+                                let lowered_rate = timeout_rate - 1;
+                                format!(
+                                    "Time out while waiting on a response from the device. \n\
+                                    The current timeout rate is {} mb/s.  Try lowering the timeout rate: \n\
+                                    ffx config set \"{}\" {}",
+                                    timeout_rate, FLASH_TIMEOUT_RATE, lowered_rate
+                                )
+                            };
+                            Err(FastbootError::FlashError(FlashError::TimeoutError(message)))
                         }
                     }
+                } else {
+                    Err(FastbootError::FlashError(
+                        send_reply.map_err(FlashError::from).err().unwrap(),
+                    ))
                 }
-                bail!("Unexpected reply from fastboot device for flash command: {:?}", send_reply)
             }
         }
     }
 
     #[tracing::instrument]
-    async fn erase(&mut self, partition_name: &str) -> Result<()> {
-        let reply = send(Command::Erase(partition_name.to_string()), self.interface().await?)
-            .await
-            .context("sending erase")?;
+    async fn erase(&mut self, partition_name: &str) -> Result<(), FastbootError> {
+        let command = Command::Erase(partition_name.to_string());
+        let reply =
+            send(command.clone(), self.interface().await?).await.context("sending erase")?;
         match reply {
             Reply::Okay(_) => {
                 tracing::debug!("Successfully erased parition: {}", partition_name);
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to erase \"{}\": {}", partition_name, s),
-            _ => bail!("Unexpected reply from fastboot device for erase command: {:?}", reply),
+            Reply::Fail(s) => {
+                return Err(FastbootError::ErasePartitionFailed {
+                    partition: partition_name.to_string(),
+                    message: s.to_string(),
+                })
+            }
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: command.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn boot(&mut self) -> Result<()> {
+    async fn boot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to boot,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
@@ -277,13 +324,17 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                 tracing::debug!("Successfully sent boot");
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to boot: {}", s),
-            _ => bail!("Unexpected reply from fastboot device for boot command: {reply:?}"),
+
+            Reply::Fail(s) => return Err(FastbootError::BootFailed(s)),
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: Command::Reboot.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn reboot(&mut self) -> Result<()> {
+    async fn reboot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to reboot,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
@@ -295,13 +346,19 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                 tracing::debug!("Successfully sent reboot");
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to reboot: {}", s),
-            _ => bail!("Unexpected reply from fastboot device for reboot command: {reply:?}"),
+            Reply::Fail(s) => return Err(FastbootError::RebootFailed(s)),
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: Command::Reboot.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn reboot_bootloader(&mut self, listener: Sender<RebootEvent>) -> Result<()> {
+    async fn reboot_bootloader(
+        &mut self,
+        listener: Sender<RebootEvent>,
+    ) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to reboot-bootloader,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
@@ -324,17 +381,21 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                     );
                 }
             }
-            Reply::Fail(s) => bail!("Failed to reboot to bootloader: {}", s),
-            _ => {
-                bail!("Unexpected reply from fastboot device for reboot bootloader command: {reply:?}")
+            Reply::Fail(s) => return Err(FastbootError::RebootBootloaderFailed { message: s }),
+            r @ _ => {
+                return Err(FastbootError::UnexpectedReply {
+                    method: Command::RebootBootLoader.to_string(),
+                    reply: r.to_string(),
+                })
             }
         };
         // Once the target is rebooted, reconnect
-        self.reconnect().await.context("reconnecting after rebooting to bootloader")
+        self.reconnect().await.context("reconnecting after rebooting to bootloader")?;
+        Ok(())
     }
 
     #[tracing::instrument]
-    async fn continue_boot(&mut self) -> Result<()> {
+    async fn continue_boot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to continue,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
@@ -347,13 +408,16 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                 tracing::debug!("Successfully sent continue");
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to continue: {}", s),
-            _ => bail!("Unexpected reply from fastboot device for continue command: {reply:?}"),
+            Reply::Fail(s) => return Err(FastbootError::ContinueBootFailed(s)),
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: Command::Continue.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn get_staged(&mut self, path: &str) -> Result<()> {
+    async fn get_staged(&mut self, path: &str) -> Result<(), FastbootError> {
         match download(&path.to_string(), self.interface().await?)
             .await
             .context(format!("downloading to {}", path))?
@@ -362,62 +426,84 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                 tracing::debug!("Successfully downloaded to \"{}\"", path);
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to download: {}", s),
-            _ => bail!("Unexpected reply from fastboot device for download command"),
+            Reply::Fail(message) => {
+                return Err(FastbootError::DownloadFailed { path: path.to_string(), message })
+            }
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: Command::Upload.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn stage(&mut self, path: &str, listener: Sender<UploadProgress>) -> Result<()> {
+    async fn stage(
+        &mut self,
+        path: &str,
+        listener: Sender<UploadProgress>,
+    ) -> Result<(), FastbootError> {
         let progress_listener = ProgressListener::new(listener)?;
-        let mut file_to_stage = File::open(path)?;
-        let size = file_to_stage.metadata()?.len();
+        let mut file_to_stage = File::open(path).map_err(StageError::from)?;
+        let size = file_to_stage.metadata().map_err(StageError::from)?.len();
+        let size = u32::try_from(size).map_err(|e| StageError::InvalidFileSize(e))?;
         tracing::debug!("uploading file size: {}", size);
-        match upload(
-            size.try_into()?,
-            &mut file_to_stage,
-            self.interface().await?,
-            &progress_listener,
-        )
-        .await
-        .context(format!("uploading {}", path))?
+        match upload(size, &mut file_to_stage, self.interface().await?, &progress_listener)
+            .await
+            .context(format!("uploading {}", path))?
         {
             Reply::Okay(s) => {
                 tracing::debug!("Received response from download command: {}", s);
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to upload {}: {}", path, s),
-            _ => bail!("Unexpected reply from fastboot device for download"),
+            Reply::Fail(s) => {
+                return Err(FastbootError::StageError(StageError::UploadFailed {
+                    path: path.to_string(),
+                    message: s,
+                }))
+            }
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: Command::Download(size).to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn set_active(&mut self, slot: &str) -> Result<()> {
-        match send(Command::SetActive(slot.to_string()), self.interface().await?)
-            .await
-            .context("sending set_active")?
-        {
+    async fn set_active(&mut self, slot: &str) -> Result<(), FastbootError> {
+        let command = Command::SetActive(slot.to_string());
+        match send(command.clone(), self.interface().await?).await.context("sending set_active")? {
             Reply::Okay(_) => {
                 tracing::debug!("Successfully sent set_active");
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to set_active: {}", s),
-            _ => bail!("Unexpected reply from fastboot device for set_active command"),
+            Reply::Fail(message) => {
+                return Err(FastbootError::SetActiveFailed { slot: slot.to_string(), message })
+            }
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: command.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 
     #[tracing::instrument]
-    async fn oem(&mut self, command: &str) -> Result<()> {
-        match send(Command::Oem(command.to_string()), self.interface().await?)
-            .await
-            .context("sending oem")?
-        {
+    async fn oem(&mut self, command: &str) -> Result<(), FastbootError> {
+        let command = Command::Oem(command.to_string());
+        match send(command.clone(), self.interface().await?).await.context("sending oem")? {
             Reply::Okay(_) => {
                 tracing::debug!("Successfully sent oem command \"{}\"", command);
                 Ok(())
             }
-            Reply::Fail(s) => bail!("Failed to oem \"{}\": {}", command, s),
-            _ => bail!("Unexpected reply from fastboot device for oem command \"{}\"", command),
+            Reply::Fail(message) => {
+                return Err(FastbootError::OemCommandFailed {
+                    command: command.to_string(),
+                    message,
+                })
+            }
+            r @ _ => Err(FastbootError::UnexpectedReply {
+                method: command.to_string(),
+                reply: r.to_string(),
+            }),
         }
     }
 }

@@ -331,9 +331,9 @@ TEST(FsckTest, OrphanNodes) {
     FileTester::CreateRoot(fs.get(), &root);
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-    fbl::RefPtr<fs::Vnode> vn;
-    ASSERT_EQ(root_dir->Create("test", S_IFREG, &vn), ZX_OK);
-    auto file = fbl::RefPtr<File>::Downcast(std::move(vn));
+    zx::result vn = root_dir->Create("test", fs::CreationType::kFile);
+    ASSERT_TRUE(vn.is_ok()) << vn.status_string();
+    auto file = fbl::RefPtr<File>::Downcast(*std::move(vn));
 
     char buf[kPageSize] = {
         0,
@@ -467,9 +467,9 @@ TEST(FsckTest, InvalidSsaEntry) {
     FileTester::CreateRoot(fs.get(), &root);
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-    fbl::RefPtr<fs::Vnode> vn;
-    ASSERT_EQ(root_dir->Create("test", S_IFREG, &vn), ZX_OK);
-    auto file = fbl::RefPtr<File>::Downcast(std::move(vn));
+    zx::result vn = root_dir->Create("test", fs::CreationType::kFile);
+    ASSERT_TRUE(vn.is_ok()) << vn.status_string();
+    auto file = fbl::RefPtr<File>::Downcast(*std::move(vn));
     // To allocate new data segment, kBufferSize must be bigger than f2fs segment size.
     constexpr uint32_t kBufferSize = kBlockSize * (kDefaultBlocksPerSegment + 1);
     std::vector<char> buf(kBufferSize);
@@ -531,11 +531,9 @@ TEST(FsckTest, WrongInodeHardlinkCount) {
     FileTester::CreateRoot(fs.get(), &root);
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-    std::string file_name("file");
-    fbl::RefPtr<fs::Vnode> child;
-    ASSERT_EQ(root_dir->Create(file_name, S_IFREG, &child), ZX_OK);
-
-    fbl::RefPtr<VnodeF2fs> child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
+    zx::result child = root_dir->Create("file", fs::CreationType::kFile);
+    ASSERT_TRUE(child.is_ok()) << child.status_string();
+    fbl::RefPtr<VnodeF2fs> child_file = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(child));
 
     ASSERT_EQ(root_dir->Link(std::string("link"), child_file), ZX_OK);
     ASSERT_EQ(root_dir->Link(std::string("link2"), child_file), ZX_OK);
@@ -671,11 +669,9 @@ TEST(FsckTest, InconsistentInodeFooter) {
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
     // Create a directory.
-    std::string child_name("test");
-    fbl::RefPtr<fs::Vnode> child;
-    ASSERT_EQ(root_dir->Create(child_name, S_IFDIR, &child), ZX_OK);
-
-    fbl::RefPtr<VnodeF2fs> child_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
+    zx::result child = root_dir->Create("test", fs::CreationType::kDirectory);
+    ASSERT_TRUE(child.is_ok()) << child.status_string();
+    fbl::RefPtr<VnodeF2fs> child_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(child));
 
     // Save the inode number for fsck to retrieve it.
     ino = child_vnode->GetKey();
@@ -729,11 +725,9 @@ TEST(FsckTest, InodeLinkCountAndBlockCount) {
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
     // Create a directory.
-    std::string child_name("test");
-    fbl::RefPtr<fs::Vnode> child;
-    ASSERT_EQ(root_dir->Create(child_name, S_IFDIR, &child), ZX_OK);
-
-    fbl::RefPtr<VnodeF2fs> child_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
+    zx::result child = root_dir->Create("test", fs::CreationType::kFile);
+    ASSERT_TRUE(child.is_ok()) << child.status_string();
+    fbl::RefPtr<VnodeF2fs> child_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(child));
 
     // Save the inode number for fsck to retrieve it.
     ino = child_vnode->GetKey();
@@ -846,12 +840,11 @@ TEST(FsckTest, WrongDataExistFlag) {
     FileTester::CreateRoot(fs.get(), &root);
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-    std::string file_name("file");
-    fbl::RefPtr<fs::Vnode> child;
-    ASSERT_EQ(root_dir->Create(file_name, S_IFREG, &child), ZX_OK);
+    zx::result child = root_dir->Create("file", fs::CreationType::kFile);
+    ASSERT_TRUE(child.is_ok()) << child.status_string();
 
     // Write string in inode and verify
-    fbl::RefPtr<VnodeF2fs> child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
+    fbl::RefPtr<VnodeF2fs> child_file = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(child));
     File *child_file_ptr = static_cast<File *>(child_file.get());
     child_file_ptr->SetFlag(InodeInfoFlag::kInlineData);
 

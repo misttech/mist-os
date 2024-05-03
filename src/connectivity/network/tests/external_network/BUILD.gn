@@ -9,12 +9,10 @@ import(
 
 test("bin") {
   output_name = "external_network_client"
-  sources = [
-    "../os.h",
-    "main.cc",
-  ]
+  sources = [ "main.cc" ]
 
   deps = [
+    "//src/connectivity/network/tests:os",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]

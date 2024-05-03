@@ -63,6 +63,12 @@ size_t AllocateAndOverwriteFreeMemory() {
   return bytes_allocated;
 }
 
+void LogMemory() {
+  if constexpr (HAVE_ALLOCATION_POOL) {
+    Allocation::GetPool().PrintMemoryRanges(ProgramName());
+  }
+}
+
 }  // namespace
 
 int TestMain(void* zbi_ptr, arch::EarlyTicks ticks) {
@@ -73,6 +79,8 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   // Initialize memory for allocation/free.
   AddressSpace aspace;
   InitMemory(zbi_ptr, &aspace);
+
+  LogMemory();
 
   printf("Testing memory allocation...\n");
 
@@ -85,9 +93,11 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   size_t bytes_allocated = AllocateAndOverwriteFreeMemory();
   if (bytes_allocated == 0) {
     printf("FAIL: Could not allocate any memory.\n");
+    LogMemory();
     return 1;
   }
 
   printf("Successfully allocated %zu bytes of memory.\n", bytes_allocated);
+  LogMemory();
   return 0;
 }

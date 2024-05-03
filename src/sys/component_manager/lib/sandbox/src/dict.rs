@@ -9,10 +9,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::{
-    collections::{
-        btree_map::{IntoIter, Iter},
-        BTreeMap,
-    },
+    collections::BTreeMap,
     sync::{Arc, Mutex, MutexGuard},
 };
 use tracing::warn;
@@ -33,7 +30,7 @@ pub type Key = cm_types::Name;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Dict {
-    entries: Arc<Mutex<DictEntries>>,
+    entries: Arc<Mutex<BTreeMap<Key, Capability>>>,
 
     /// When an external request tries to access a non-existent entry,
     /// this closure will be invoked with the name of the entry.
@@ -48,7 +45,7 @@ pub struct Dict {
 impl Default for Dict {
     fn default() -> Self {
         Self {
-            entries: Arc::new(Mutex::new(DictEntries::new())),
+            entries: Arc::new(Mutex::new(BTreeMap::new())),
             not_found: Arc::new(|_key: &str| {}),
             iterator_tasks: fasync::TaskGroup::new(),
         }
@@ -75,14 +72,55 @@ impl Dict {
     /// the name of the entry will be sent using `not_found`.
     pub fn new_with_not_found(not_found: impl Fn(&str) -> () + 'static + Send + Sync) -> Self {
         Self {
-            entries: Arc::new(Mutex::new(DictEntries::new())),
+            entries: Arc::new(Mutex::new(BTreeMap::new())),
             not_found: Arc::new(not_found),
             iterator_tasks: fasync::TaskGroup::new(),
         }
     }
 
-    pub fn lock_entries(&self) -> MutexGuard<'_, DictEntries> {
+    fn lock_entries(&self) -> MutexGuard<'_, BTreeMap<Key, Capability>> {
         self.entries.lock().unwrap()
+    }
+
+    /// Inserts an entry, mapping `key` to `capability`. If an entry already
+    /// exists at `key`, a `fsandbox::DictionaryError::AlreadyExists` will be
+    /// returned.
+    pub fn insert(
+        &mut self,
+        key: Key,
+        capability: Capability,
+    ) -> Result<(), fsandbox::DictionaryError> {
+        let mut entries = self.lock_entries();
+        match entries.insert(key, capability) {
+            Some(_) => Err(fsandbox::DictionaryError::AlreadyExists),
+            None => Ok(()),
+        }
+    }
+
+    /// Returns a clone of the capability associated with `key`. If there is no
+    /// entry for `key`, `None` is returned.
+    pub fn get(&self, key: &Key) -> Option<Capability> {
+        self.lock_entries().get(key).cloned()
+    }
+
+    /// Removes `key` from the entries, returning the capability at `key` if the
+    /// key was already in the entries.
+    pub fn remove(&mut self, key: &Key) -> Option<Capability> {
+        self.lock_entries().remove(key)
+    }
+
+    /// Returns an iterator over a clone of the entries, sorted by key.
+    pub fn enumerate(&self) -> impl Iterator<Item = (Key, Capability)> {
+        self.lock_entries().clone().into_iter()
+    }
+
+    /// Removes all entries from the Dict and returns them as an iterator.
+    pub fn drain(&mut self) -> impl Iterator<Item = (Key, Capability)> {
+        let entries = {
+            let mut entries = self.lock_entries();
+            std::mem::replace(&mut *entries, BTreeMap::new())
+        };
+        entries.into_iter()
     }
 
     /// Creates a new Dict with entries cloned from this Dict.
@@ -107,7 +145,7 @@ impl Dict {
                         let key = key.parse().map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
                         let cap = Capability::try_from(value)
                             .map_err(|_| fsandbox::DictionaryError::BadCapability)?;
-                        self.lock_entries().insert(key, cap)
+                        self.insert(key, cap)
                     })();
                     responder.send(result)?;
                 }
@@ -115,7 +153,7 @@ impl Dict {
                     let result = (|| {
                         let key =
                             Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
-                        match self.lock_entries().get(&key) {
+                        match self.get(&key) {
                             Some(cap) => Ok(cap.clone().into_fidl()),
                             None => {
                                 (self.not_found)(key.as_str());
@@ -129,7 +167,7 @@ impl Dict {
                     let result = (|| {
                         let key =
                             Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
-                        match self.lock_entries().remove(&key) {
+                        match self.remove(&key) {
                             Some(cap) => Ok(cap.into_fidl()),
                             None => {
                                 (self.not_found)(key.as_str());
@@ -141,10 +179,9 @@ impl Dict {
                 }
                 fsandbox::DictionaryRequest::Read { responder } => {
                     let items = self
-                        .lock_entries()
-                        .iter()
+                        .enumerate()
                         .map(|(key, value)| {
-                            let value = value.clone().into_fidl();
+                            let value = value.into_fidl();
                             fsandbox::DictionaryItem { key: key.to_string(), value }
                         })
                         .collect();
@@ -169,11 +206,7 @@ impl Dict {
                     responder.send(client_end)?;
                 }
                 fsandbox::DictionaryRequest::Enumerate { contents: server_end, .. } => {
-                    let items = self
-                        .lock_entries()
-                        .iter()
-                        .map(|(key, cap)| (key.clone(), cap.clone()))
-                        .collect();
+                    let items = self.enumerate().collect();
                     let stream = server_end.into_stream().unwrap();
                     let task = fasync::Task::spawn(serve_dict_iterator(items, stream));
                     self.iterator_tasks.add(task);
@@ -181,12 +214,8 @@ impl Dict {
                 fsandbox::DictionaryRequest::Drain { contents: server_end, .. } => {
                     // Take out entries, replacing with an empty BTreeMap.
                     // They are dropped if the caller does not request an iterator.
-                    let entries = {
-                        let mut entries = self.lock_entries();
-                        std::mem::replace(&mut *entries, DictEntries::new())
-                    };
                     if let Some(server_end) = server_end {
-                        let items = entries.into_iter().collect();
+                        let items = self.drain().collect();
                         let stream = server_end.into_stream().unwrap();
                         let task = fasync::Task::spawn(serve_dict_iterator(items, stream));
                         self.iterator_tasks.add(task);
@@ -229,10 +258,10 @@ impl From<Dict> for fsandbox::Capability {
 impl CapabilityTrait for Dict {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
-        for (key, value) in self.lock_entries().iter() {
+        for (key, value) in self.enumerate() {
             let remote: Arc<dyn DirectoryEntry> = match value {
-                Capability::Directory(d) => d.clone().into_remote(),
-                value => value.clone().try_into_directory_entry().map_err(|err| {
+                Capability::Directory(d) => d.into_remote(),
+                value => value.try_into_directory_entry().map_err(|err| {
                     ConversionError::Nested { key: key.to_string(), err: Box::new(err) }
                 })?,
             };
@@ -249,64 +278,6 @@ impl CapabilityTrait for Dict {
             not_found(path);
         }));
         Ok(dir)
-    }
-}
-
-/// The entries contained by a dictionary capability.
-///
-/// `DictEntries` creates a facade around it's underlying data representation in
-/// order to restrict its operations to those provided by the
-/// `fuchsia.component.sandbox.Dictionary` API.
-#[derive(Clone, Debug)]
-pub struct DictEntries {
-    map: BTreeMap<Key, Capability>,
-}
-
-impl DictEntries {
-    /// Creates an empty `DictEntries`.
-    pub fn new() -> Self {
-        Self { map: BTreeMap::new() }
-    }
-
-    /// Inserts an entry, mapping `key` to `capability`. If an entry already
-    /// exists at `key`, a `fsandbox::DictionaryError::AlreadyExists` will be
-    /// returned.
-    pub fn insert(
-        &mut self,
-        key: Key,
-        capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError> {
-        match self.map.insert(key, capability) {
-            Some(_) => Err(fsandbox::DictionaryError::AlreadyExists),
-            None => Ok(()),
-        }
-    }
-
-    /// Returns a reference to the capability associated with `key`. If there is
-    /// no entry for `key`, `None` is returned.
-    pub fn get(&self, key: &Key) -> Option<&Capability> {
-        self.map.get(key)
-    }
-
-    /// Removes `key` from the entries, returning the capability at `key` if the
-    /// key was already in the entries.
-    pub fn remove(&mut self, key: &Key) -> Option<Capability> {
-        self.map.remove(key)
-    }
-
-    /// Returns an iterator over the entries, sorted by key.
-    pub fn iter(&self) -> Iter<'_, Key, Capability> {
-        self.map.iter()
-    }
-}
-
-impl IntoIterator for DictEntries {
-    type Item = (Key, Capability);
-
-    type IntoIter = IntoIter<Key, Capability>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.map.into_iter()
     }
 }
 
@@ -400,7 +371,7 @@ mod tests {
         let mut entries = dict.lock_entries();
 
         // Inserting adds the entry to `entries`.
-        assert_eq!(entries.map.len(), 1);
+        assert_eq!(entries.len(), 1);
 
         // The entry that was inserted should now be in `entries`.
         let cap = entries.remove(&*CAP_KEY).expect("not in entries after insert");
@@ -417,11 +388,8 @@ mod tests {
         let mut dict = Dict::new();
 
         // Insert a Unit into the Dict.
-        {
-            let mut entries = dict.lock_entries();
-            entries.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
-            assert_eq!(entries.map.len(), 1);
-        }
+        dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
+        assert_eq!(dict.lock_entries().len(), 1);
 
         let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
@@ -442,7 +410,7 @@ mod tests {
         try_join!(client, server).unwrap();
 
         // Removing the entry with Remove should remove it from `entries`.
-        assert!(dict.lock_entries().map.is_empty());
+        assert!(dict.lock_entries().is_empty());
 
         Ok(())
     }
@@ -453,11 +421,8 @@ mod tests {
         let mut dict = Dict::new();
 
         // Insert a Unit into the Dict.
-        {
-            let mut entries = dict.lock_entries();
-            entries.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
-            assert_eq!(entries.map.len(), 1);
-        }
+        dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
+        assert_eq!(dict.lock_entries().len(), 1);
 
         let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
@@ -478,7 +443,7 @@ mod tests {
         try_join!(client, server).unwrap();
 
         // The capability should remain in the Dict.
-        assert_eq!(dict.lock_entries().map.len(), 1);
+        assert_eq!(dict.lock_entries().len(), 1);
 
         Ok(())
     }
@@ -585,27 +550,23 @@ mod tests {
     #[fuchsia::test]
     async fn copy() -> Result<()> {
         // Create a Dict with a Unit inside, and copy the Dict.
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert("unit1".parse().unwrap(), Capability::Unit(Unit::default()))
-            .unwrap();
+        let mut dict = Dict::new();
+        dict.insert("unit1".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
 
-        let copy = dict.shallow_copy();
+        let mut copy = dict.shallow_copy();
 
         // Insert a Unit into the copy.
-        copy.lock_entries()
-            .insert("unit2".parse().unwrap(), Capability::Unit(Unit::default()))
-            .unwrap();
+        copy.insert("unit2".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
 
         // The copy should have two Units.
         let copy_entries = copy.lock_entries();
-        assert_eq!(copy_entries.map.len(), 2);
-        assert!(copy_entries.map.values().all(|value| matches!(value, Capability::Unit(_))));
+        assert_eq!(copy_entries.len(), 2);
+        assert!(copy_entries.values().all(|value| matches!(value, Capability::Unit(_))));
 
         // The original Dict should have only one Unit.
         let entries = dict.lock_entries();
-        assert_eq!(entries.map.len(), 1);
-        assert!(entries.map.values().all(|value| matches!(value, Capability::Unit(_))));
+        assert_eq!(entries.len(), 1);
+        assert!(entries.values().all(|value| matches!(value, Capability::Unit(_))));
 
         Ok(())
     }
@@ -614,18 +575,15 @@ mod tests {
     #[fuchsia::test]
     async fn clone_by_reference() -> Result<()> {
         let dict = Dict::new();
-        let dict_clone = dict.clone();
+        let mut dict_clone = dict.clone();
 
         // Add a Unit into the clone.
-        {
-            let mut clone_entries = dict_clone.lock_entries();
-            clone_entries.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
-            assert_eq!(clone_entries.map.len(), 1);
-        }
+        dict_clone.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
+        assert_eq!(dict_clone.lock_entries().len(), 1);
 
         // The original dict should now have an entry because it shares entries with the clone.
         let entries = dict.lock_entries();
-        assert_eq!(entries.map.len(), 1);
+        assert_eq!(entries.len(), 1);
 
         Ok(())
     }
@@ -633,8 +591,8 @@ mod tests {
     /// Tests that a Dict can be cloned via `fuchsia.unknown/Cloneable.Clone2`
     #[fuchsia::test]
     async fn fidl_clone() -> Result<()> {
-        let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
+        let mut dict = Dict::new();
+        dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
 
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
@@ -665,7 +623,7 @@ mod tests {
 
         // The original dict should now have zero entries because the Unit was removed.
         let entries = dict.lock_entries();
-        assert!(entries.map.is_empty());
+        assert!(entries.is_empty());
 
         Ok(())
     }
@@ -683,14 +641,10 @@ mod tests {
             &[fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, 1];
 
         // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
-        let dict = Dict::new();
-        {
-            let mut entries = dict.lock_entries();
-            for i in 0..NUM_ENTRIES {
-                entries
-                    .insert(format!("{}", i).parse().unwrap(), Capability::Unit(Unit::default()))
-                    .unwrap();
-            }
+        let mut dict = Dict::new();
+        for i in 0..NUM_ENTRIES {
+            dict.insert(format!("{}", i).parse().unwrap(), Capability::Unit(Unit::default()))
+                .unwrap();
         }
 
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
@@ -725,9 +679,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn try_into_open_error_not_supported() {
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(CAP_KEY.clone(), Capability::Unit(Unit::default()))
+        let mut dict = Dict::new();
+        dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()))
             .expect("dict entry already exists");
         assert_matches!(
             dict.try_into_directory_entry().err(),
@@ -761,10 +714,9 @@ mod tests {
     /// Convert a dict `{ CAP_KEY: open }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success() {
-        let dict = Dict::new();
+        let mut dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
-        dict.lock_entries()
-            .insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
+        dict.insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
             .expect("dict entry already exists");
         let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
@@ -783,14 +735,13 @@ mod tests {
     /// Convert a dict `{ CAP_KEY: { CAP_KEY: open } }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success_nested() {
-        let inner_dict = Dict::new();
+        let mut inner_dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         inner_dict
-            .lock_entries()
             .insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
             .expect("dict entry already exists");
-        let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict)).unwrap();
+        let mut dict = Dict::new();
+        dict.insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict)).unwrap();
 
         let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
@@ -836,9 +787,8 @@ mod tests {
             "c" => open.into_remote(),
         };
         let directory = Directory::from(serve_vfs_dir(fs));
-        let dict = Dict::new();
-        dict.lock_entries()
-            .insert(CAP_KEY.clone(), Capability::Directory(directory))
+        let mut dict = Dict::new();
+        dict.insert(CAP_KEY.clone(), Capability::Directory(directory))
             .expect("dict entry already exists");
 
         let remote = dict.try_into_directory_entry().unwrap();

@@ -74,7 +74,7 @@ zx_status_t SdioControllerDevice::Create(SdmmcRootDevice* parent,
 
 zx_status_t SdioControllerDevice::Probe(
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return ProbeLocked();
 }
 
@@ -194,7 +194,7 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
 }
 
 zx_status_t SdioControllerDevice::StartSdioIrqDispatcherIfNeeded() {
-  fbl::AutoLock lock(&irq_dispatcher_lock_);
+  std::lock_guard<std::mutex> lock(irq_dispatcher_lock_);
 
   if (shutdown_) {
     return ZX_ERR_CANCELED;
@@ -216,7 +216,7 @@ zx_status_t SdioControllerDevice::StartSdioIrqDispatcherIfNeeded() {
 }
 
 zx_status_t SdioControllerDevice::AddDevice() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   dispatcher_ = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
 
@@ -279,7 +279,7 @@ void SdioControllerDevice::StopSdioIrqDispatcher(
   shutdown_ = true;
 
   {
-    fbl::AutoLock lock(&irq_dispatcher_lock_);
+    std::lock_guard<std::mutex> lock(irq_dispatcher_lock_);
     if (irq_dispatcher_.get()) {
       irq_dispatcher_.ShutdownAsync();
       irq_shutdown_completion_.Wait();
@@ -303,7 +303,7 @@ zx_status_t SdioControllerDevice::SdioGetDevHwInfo(uint8_t fn_idx, sdio_hw_info_
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   memcpy(&out_hw_info->dev_hw_info, &hw_info_, sizeof(sdio_device_hw_info_t));
   memcpy(&out_hw_info->func_hw_info, &funcs_[fn_idx].hw_info, sizeof(sdio_func_hw_info_t));
@@ -313,7 +313,7 @@ zx_status_t SdioControllerDevice::SdioGetDevHwInfo(uint8_t fn_idx, sdio_hw_info_
 }
 
 zx_status_t SdioControllerDevice::SdioEnableFn(uint8_t fn_idx) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return SdioEnableFnLocked(fn_idx);
 }
 
@@ -366,7 +366,7 @@ zx_status_t SdioControllerDevice::SdioDisableFn(uint8_t fn_idx) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   SdioFunction* func = &funcs_[fn_idx];
   if (!func->enabled) {
@@ -398,7 +398,7 @@ zx_status_t SdioControllerDevice::SdioEnableFnIntr(uint8_t fn_idx) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   SdioFunction* func = &funcs_[fn_idx];
   if (func->intr_enabled) {
@@ -435,7 +435,7 @@ zx_status_t SdioControllerDevice::SdioDisableFnIntr(uint8_t fn_idx) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   SdioFunction* func = &funcs_[fn_idx];
   if (!func->intr_enabled) {
@@ -468,7 +468,7 @@ zx_status_t SdioControllerDevice::SdioDisableFnIntr(uint8_t fn_idx) {
 }
 
 zx_status_t SdioControllerDevice::SdioUpdateBlockSize(uint8_t fn_idx, uint16_t blk_sz, bool deflt) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return SdioUpdateBlockSizeLocked(fn_idx, blk_sz, deflt);
 }
 
@@ -505,7 +505,7 @@ zx_status_t SdioControllerDevice::SdioUpdateBlockSizeLocked(uint8_t fn_idx, uint
 }
 
 zx_status_t SdioControllerDevice::SdioGetBlockSize(uint8_t fn_idx, uint16_t* out_cur_blk_size) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (hw_info_.caps & SDIO_CARD_MULTI_BLOCK) {
     zx_status_t st = ReadData16(0, SDIO_CIA_FBR_BASE_ADDR(fn_idx) + SDIO_CIA_FBR_BLK_SIZE_ADDR,
@@ -522,7 +522,7 @@ zx_status_t SdioControllerDevice::SdioGetBlockSize(uint8_t fn_idx, uint16_t* out
 
 zx_status_t SdioControllerDevice::SdioDoRwByte(bool write, uint8_t fn_idx, uint32_t addr,
                                                uint8_t write_byte, uint8_t* out_read_byte) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return SdioDoRwByteLocked(write, fn_idx, addr, write_byte, out_read_byte);
 }
 
@@ -559,7 +559,7 @@ void SdioControllerDevice::SdioAckInBandIntr(uint8_t fn_idx) {
   // Don't ack for function 0 interrupts. This should not be possible given the child devices we've
   // added, but check for it just in case.
   if (SdioFnIdxValid(fn_idx) && fn_idx != 0) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     interrupt_enabled_mask_ |= 1 << fn_idx;
     sdmmc_->AckInBandInterrupt();
   }
@@ -578,7 +578,7 @@ void SdioControllerDevice::SdioIrqHandler() {
 
   uint8_t intr_byte;
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
 
     zx_status_t st = SdioDoRwByteLocked(false, 0, SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, 0, &intr_byte);
     if (st != ZX_OK) {
@@ -644,7 +644,7 @@ zx_status_t SdioControllerDevice::SdioRegisterVmo(uint8_t fn_idx, uint32_t vmo_i
     return ZX_ERR_CANCELED;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return sdmmc_->RegisterVmo(vmo_id, fn_idx, std::move(vmo), offset, size, vmo_rights);
 }
 
@@ -657,7 +657,7 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
     return ZX_ERR_CANCELED;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   return sdmmc_->UnregisterVmo(vmo_id, fn_idx, out_vmo);
 }
 
@@ -666,7 +666,7 @@ zx_status_t SdioControllerDevice::SdioRequestCardReset() {
     return ZX_ERR_CANCELED;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   tuned_ = false;
   funcs_ = {};
@@ -839,7 +839,7 @@ zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const SdioRwTxn<T>
     return ZX_ERR_CANCELED;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   SdioTxnPosition<T> current_position = {
       .buffers = txn.buffers,
       .first_buffer_offset = 0,

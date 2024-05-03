@@ -255,11 +255,14 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
     // Flush every dirty Pages.
     size_t target_vnodes = 0;
     do {
+      // If CpFlag::kCpErrorFlag is set, it cannot be synchronized to disk. So we will drop all
+      // dirty pages.
+      if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
+        return ZX_ERR_INTERNAL;
+      }
       // If necessary, do gc.
       if (segment_manager_->HasNotEnoughFreeSecs()) {
         if (auto ret = gc_manager_->Run(); ret.is_error()) {
-          // If CpFlag::kCpErrorFlag is set, it cannot be synchronized to disk. So we will drop all
-          // dirty pages.
           if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
             return ZX_ERR_INTERNAL;
           }

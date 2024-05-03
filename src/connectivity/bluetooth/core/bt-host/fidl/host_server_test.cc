@@ -8,6 +8,7 @@
 #include <fuchsia/bluetooth/sys/cpp/fidl.h>
 #include <fuchsia/bluetooth/sys/cpp/fidl_test_base.h>
 #include <lib/zx/channel.h>
+#include <zircon/errors.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -557,36 +558,102 @@ TEST_F(HostServerTest, WatchDiscoveryState) {
   std::optional<fsys::HostInfo> info;
 
   // Make initial watch call so that subsequent calls remain pending.
-  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+  host_client()->WatchState([&](fhost::Host_WatchState_Result result) {
     ASSERT_TRUE(result.is_response());
     info = std::move(result.response().info);
   });
+  RunLoopUntilIdle();
   ASSERT_TRUE(info.has_value());
+  ASSERT_TRUE(info->has_discovering());
+  EXPECT_FALSE(info->discovering());
   info.reset();
 
   // Watch for updates.
-  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+  host_client()->WatchState([&](fhost::Host_WatchState_Result result) {
     ASSERT_TRUE(result.is_response());
     info = std::move(result.response().info);
   });
+  RunLoopUntilIdle();
   EXPECT_FALSE(info.has_value());
 
-  host_server()->StartDiscovery([](auto) {});
+  fhost::DiscoverySessionHandle discovery;
+  fhost::HostStartDiscoveryRequest start_request;
+  start_request.set_token(discovery.NewRequest());
+  fidl::InterfacePtr discovery_client = discovery.Bind();
+  std::optional<zx_status_t> discovery_error;
+  discovery_client.set_error_handler([&](zx_status_t error) { discovery_error = error; });
+  host_client()->StartDiscovery(std::move(start_request));
   RunLoopUntilIdle();
+  EXPECT_FALSE(discovery_error);
   ASSERT_TRUE(info.has_value());
   ASSERT_TRUE(info->has_discovering());
   EXPECT_TRUE(info->discovering());
 
   info.reset();
-  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+  host_client()->WatchState([&](fhost::Host_WatchState_Result result) {
     ASSERT_TRUE(result.is_response());
     info = std::move(result.response().info);
   });
-  EXPECT_FALSE(info.has_value());
-  host_server()->StopDiscovery();
   RunLoopUntilIdle();
+  EXPECT_FALSE(info.has_value());
+  discovery_client->Stop();
+  RunLoopUntilIdle();
+  ASSERT_TRUE(discovery_error);
+  EXPECT_EQ(discovery_error.value(), ZX_ERR_CANCELED);
   ASSERT_TRUE(info.has_value());
   ASSERT_TRUE(info->has_discovering());
+  EXPECT_FALSE(info->discovering());
+}
+
+TEST_F(HostServerTest, StartDiscoveryWithMissingToken) {
+  fhost::HostStartDiscoveryRequest start_request;
+  host_client()->StartDiscovery(std::move(start_request));
+  RunLoopUntilIdle();
+}
+
+TEST_F(HostServerTest, StartDiscoveryTwiceAndCloseTwice) {
+  fhost::DiscoverySessionHandle discovery_0;
+  fhost::HostStartDiscoveryRequest start_request_0;
+  start_request_0.set_token(discovery_0.NewRequest());
+  fidl::InterfacePtr discovery_client_0 = discovery_0.Bind();
+  std::optional<zx_status_t> discovery_error_0;
+  discovery_client_0.set_error_handler([&](zx_status_t error) { discovery_error_0 = error; });
+  host_client()->StartDiscovery(std::move(start_request_0));
+  RunLoopUntilIdle();
+  EXPECT_FALSE(discovery_error_0);
+
+  fhost::DiscoverySessionHandle discovery_1;
+  fhost::HostStartDiscoveryRequest start_request_1;
+  start_request_1.set_token(discovery_1.NewRequest());
+  fidl::InterfacePtr discovery_client_1 = discovery_1.Bind();
+  std::optional<zx_status_t> discovery_error_1;
+  discovery_client_1.set_error_handler([&](zx_status_t error) { discovery_error_1 = error; });
+  host_client()->StartDiscovery(std::move(start_request_1));
+  RunLoopUntilIdle();
+  EXPECT_FALSE(discovery_error_0);
+  EXPECT_FALSE(discovery_error_1);
+
+  std::optional<fsys::HostInfo> info;
+  host_client()->WatchState(
+      [&](fhost::Host_WatchState_Result result) { info = std::move(result.response().info); });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(info.has_value());
+  EXPECT_TRUE(info->discovering());
+  info.reset();
+
+  host_client()->WatchState(
+      [&](fhost::Host_WatchState_Result result) { info = std::move(result.response().info); });
+  RunLoopUntilIdle();
+  EXPECT_FALSE(info.has_value());
+
+  discovery_client_0.Unbind();
+  RunLoopUntilIdle();
+  // Client 1 is still open, so discovery should still be enabled.
+  EXPECT_FALSE(info.has_value());
+
+  discovery_client_1.Unbind();
+  RunLoopUntilIdle();
+  ASSERT_TRUE(info.has_value());
   EXPECT_FALSE(info->discovering());
 }
 

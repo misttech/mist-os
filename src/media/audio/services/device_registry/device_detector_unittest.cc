@@ -23,14 +23,14 @@
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace media_audio {
-
 namespace {
 
-// Minimal `fuchsia_hardware_audio::Codec` used to emulate a fake devfs directory for tests.
-using fuchsia_hardware_audio::Codec;
-using fuchsia_hardware_audio::CodecConnector;
-class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
-                       public fidl::testing::TestBase<Codec> {
+namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
+
+// Minimal Codec used to emulate a fake devfs directory for tests.
+class FakeAudioCodec : public fidl::testing::TestBase<fha::CodecConnector>,
+                       public fidl::testing::TestBase<fha::Codec> {
  public:
   explicit FakeAudioCodec(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -43,7 +43,7 @@ class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<CodecConnector> c) {
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fha::CodecConnector> c) {
       connector_binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
       return ZX_OK;
     });
@@ -53,21 +53,19 @@ class FakeAudioCodec : public fidl::testing::TestBase<CodecConnector>,
   async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  private:
-  // FIDL method for fuchsia.hardware.audio.CodecConnector.
+  // FIDL method for fuchsia.hardware.audio.fha::CodecConnector.
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
     binding_ = fidl::BindServer(dispatcher(), std::move(request.codec_protocol()), this);
   }
 
   async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBindingRef<CodecConnector>> connector_binding_;
-  std::optional<fidl::ServerBindingRef<Codec>> binding_;
+  std::optional<fidl::ServerBindingRef<fha::CodecConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<fha::Codec>> binding_;
 };
 
-using fuchsia_hardware_audio::Composite;
 // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove Connector.
-using fuchsia_hardware_audio::CompositeConnector;
-class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
-                           public fidl::testing::TestBase<CompositeConnector> {
+class FakeAudioComposite : public fidl::testing::TestBase<fha::Composite>,
+                           public fidl::testing::TestBase<fha::CompositeConnector> {
  public:
   explicit FakeAudioComposite(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -79,7 +77,7 @@ class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Composite> c) {
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fha::Composite> c) {
       binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
       return ZX_OK;
     });
@@ -96,14 +94,12 @@ class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
   }
 
   async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBindingRef<CompositeConnector>> connector_binding_;
-  std::optional<fidl::ServerBindingRef<Composite>> binding_;
+  std::optional<fidl::ServerBindingRef<fha::CompositeConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<fha::Composite>> binding_;
 };
 
-using fuchsia_hardware_audio::StreamConfig;
-using fuchsia_hardware_audio::StreamConfigConnector;
-class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnector>,
-                              public fidl::testing::TestBase<StreamConfig> {
+class FakeAudioStreamConfig : public fidl::testing::TestBase<fha::StreamConfigConnector>,
+                              public fidl::testing::TestBase<fha::StreamConfig> {
  public:
   explicit FakeAudioStreamConfig(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -115,7 +111,7 @@ class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnect
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<StreamConfigConnector> c) {
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fha::StreamConfigConnector> c) {
       connector_binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
       return ZX_OK;
     });
@@ -130,19 +126,16 @@ class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnect
   }
 
   async_dispatcher_t* dispatcher_;
-  std::optional<fidl::ServerBindingRef<StreamConfigConnector>> connector_binding_;
-  std::optional<fidl::ServerBindingRef<StreamConfig>> binding_;
+  std::optional<fidl::ServerBindingRef<fha::StreamConfigConnector>> connector_binding_;
+  std::optional<fidl::ServerBindingRef<fha::StreamConfig>> binding_;
 };
-
-using fuchsia_audio_device::DeviceType;
-using fuchsia_audio_device::DriverClient;
 
 class DeviceTracker {
  public:
   struct DeviceConnection {
     std::string_view name;
-    DeviceType device_type;
-    DriverClient client;
+    fad::DeviceType device_type;
+    fad::DriverClient client;
   };
 
   DeviceTracker(async_dispatcher_t* dispatcher, bool detection_is_expected)
@@ -156,8 +149,8 @@ class DeviceTracker {
   async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  private:
-  DeviceDetectionHandler handler_ = [this](std::string_view name, DeviceType device_type,
-                                           DriverClient driver_client) {
+  DeviceDetectionHandler handler_ = [this](std::string_view name, fad::DeviceType device_type,
+                                           fad::DriverClient driver_client) {
     ASSERT_TRUE(detection_is_expected_) << "Unexpected device detection";
 
     devices_.emplace_back(DeviceConnection{name, device_type, std::move(driver_client)});
@@ -359,20 +352,20 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
     int num_inputs = 0, num_composites = 0, num_outputs = 0, num_codecs = 0;
     for (auto dev_num = 0u; dev_num < tracker->size(); ++dev_num) {
       auto& device = tracker->devices()[dev_num];
-      if (device.device_type == DeviceType::kInput) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
+      if (device.device_type == fad::DeviceType::kInput) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kStreamConfig);
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_inputs;
-      } else if (device.device_type == DeviceType::kComposite) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kComposite);
+      } else if (device.device_type == fad::DeviceType::kComposite) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kComposite);
         EXPECT_TRUE(device.client.composite()->is_valid());
         ++num_composites;
-      } else if (device.device_type == DeviceType::kOutput) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
+      } else if (device.device_type == fad::DeviceType::kOutput) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kStreamConfig);
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_outputs;
-      } else if (device.device_type == DeviceType::kCodec) {
-        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kCodec);
+      } else if (device.device_type == fad::DeviceType::kCodec) {
+        EXPECT_EQ(device.client.Which(), fad::DriverClient::Tag::kCodec);
         EXPECT_TRUE(device.client.codec()->is_valid());
         ++num_codecs;
       } else {
@@ -390,17 +383,17 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
   // After the detector is gone, preexisting devices we detected should still be bound.
   std::for_each(tracker->devices().begin(), tracker->devices().end(), [](const auto& device) {
     switch (device.device_type) {
-      case DeviceType::kCodec:
+      case fad::DeviceType::kCodec:
         EXPECT_TRUE(device.client.codec()->is_valid());
         break;
-      case DeviceType::kComposite:
+      case fad::DeviceType::kComposite:
         EXPECT_TRUE(device.client.composite()->is_valid());
         break;
-      case DeviceType::kInput:
-      case DeviceType::kOutput:
+      case fad::DeviceType::kInput:
+      case fad::DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case DeviceType::kDai:
+      case fad::DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
         break;
@@ -480,10 +473,10 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
     RunLoopUntilIdle();  // Allow erroneous extra device additions to reveal themselves.
     ASSERT_EQ(tracker->size(), 4u) << "Timed out waiting for codec device to be detected";
 
-    EXPECT_EQ(tracker->devices()[0].device_type, DeviceType::kOutput);
-    EXPECT_EQ(tracker->devices()[1].device_type, DeviceType::kInput);
-    EXPECT_EQ(tracker->devices()[2].device_type, DeviceType::kComposite);
-    EXPECT_EQ(tracker->devices()[3].device_type, DeviceType::kCodec);
+    EXPECT_EQ(tracker->devices()[0].device_type, fad::DeviceType::kOutput);
+    EXPECT_EQ(tracker->devices()[1].device_type, fad::DeviceType::kInput);
+    EXPECT_EQ(tracker->devices()[2].device_type, fad::DeviceType::kComposite);
+    EXPECT_EQ(tracker->devices()[3].device_type, fad::DeviceType::kCodec);
   }
 
   // After the device detector is gone, dynamically-detected devices should still be bound.
@@ -491,17 +484,17 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
 
   std::for_each(tracker->devices().begin(), tracker->devices().end(), [](const auto& device) {
     switch (device.device_type) {
-      case DeviceType::kCodec:
+      case fad::DeviceType::kCodec:
         EXPECT_TRUE(device.client.codec()->is_valid());
         break;
-      case DeviceType::kComposite:
+      case fad::DeviceType::kComposite:
         EXPECT_TRUE(device.client.composite()->is_valid());
         break;
-      case DeviceType::kInput:
-      case DeviceType::kOutput:
+      case fad::DeviceType::kInput:
+      case fad::DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case DeviceType::kDai:
+      case fad::DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
         break;
@@ -545,5 +538,4 @@ TEST_F(DeviceDetectorTest, NoDanglingDetectors) {
 }
 
 }  // namespace
-
 }  // namespace media_audio

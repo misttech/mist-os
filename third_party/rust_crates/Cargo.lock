@@ -347,18 +347,12 @@ dependencies = [
 
 [[package]]
 name = "bit-set"
-version = "0.5.0"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f1efcc46c18245a69c38fcc5cc650f16d3a59d034f3106e9ed63748f695730a"
+checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
 dependencies = [
- "bit-vec 0.5.0",
+ "bit-vec",
 ]
-
-[[package]]
-name = "bit-vec"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4440d5cb623bb7390ae27fec0bb6c61111969860f8e3ae198bfa0663645e67cf"
 
 [[package]]
 name = "bit-vec"
@@ -1284,7 +1278,7 @@ dependencies = [
  "base64 0.21.7",
  "bincode",
  "bit-set",
- "bit-vec 0.6.3",
+ "bit-vec",
  "bitfield",
  "bitflags 2.4.1",
  "blocking",
@@ -1418,7 +1412,7 @@ dependencies = [
  "rayon",
  "ref-cast",
  "regex",
- "regex-syntax",
+ "regex-syntax 0.8.3",
  "ring",
  "rust_icu_common",
  "rust_icu_sys",
@@ -2358,6 +2352,7 @@ dependencies = [
  "log",
  "netlink-packet-core",
  "netlink-packet-utils",
+ "thiserror",
 ]
 
 [[package]]
@@ -2486,13 +2481,13 @@ dependencies = [
 
 [[package]]
 name = "num-derive"
-version = "0.3.3"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
+checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2 1.0.79",
  "quote 1.0.35",
- "syn 1.0.98",
+ "syn 2.0.55",
 ]
 
 [[package]]
@@ -2530,9 +2525,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.14"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+checksum = "da0df0e5185db44f69b44f26786fe401b6c293d1907744beaa7fa62b2e5a517a"
 dependencies = [
  "autocfg 1.1.0",
 ]
@@ -3078,7 +3073,7 @@ dependencies = [
  "rand 0.8.4",
  "rand_chacha 0.3.1",
  "rand_xorshift 0.3.0",
- "regex-syntax",
+ "regex-syntax 0.6.29",
  "rusty-fork",
  "tempfile",
 ]
@@ -3454,7 +3449,7 @@ checksum = "8b1f693b24f6ac912f4893ef08244d70b6067480d2f1a46e950c9691e6749d1d"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -3462,7 +3457,7 @@ name = "regex-automata"
 version = "0.1.9"
 dependencies = [
  "byteorder",
- "regex-syntax",
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -3470,6 +3465,12 @@ name = "regex-syntax"
 version = "0.6.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adad44e29e4c806119491a7f06f03de4d1af22c3a680dd47f1e6e179439d1f56"
 
 [[package]]
 name = "remove_dir_all"

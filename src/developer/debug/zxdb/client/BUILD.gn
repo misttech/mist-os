@@ -264,6 +264,7 @@ if (is_host) {
 source_set("tests") {
   testonly = true
   sources = [
+    "analytics_event_unittest.cc",
     "breakpoint_impl_unittest.cc",
     "call_site_symbol_data_provider_unittest.cc",
     "client_eval_context_impl_unittest.cc",

@@ -18,6 +18,14 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: "#font-server",
+            config: [
+                "fuchsia.fonts.FontManifest",
+                "fuchsia.fonts.VerboseLogging",
+            ],
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#font-server",

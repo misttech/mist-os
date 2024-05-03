@@ -82,16 +82,6 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-void".to_string(),
-        vec![vec![
-            "Optional",
-            "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
-            `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-void`",
-            "source capability is void",
-        ]],
-    );
-    treasure.insert(
         "routing-tests/offers-to-children-unavailable/child-open-unrequested".to_string(),
         vec![vec![
             "No capability available",

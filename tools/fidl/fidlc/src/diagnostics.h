@@ -413,6 +413,8 @@ constexpr ErrorDef<208, Platform> ErrReservedPlatform(
     "@available(platform=\"...\", added=...)");
 constexpr ErrorDef<209> ErrReservedNotAllowed(
     "FIDL no longer supports reserved table or union fields; use @available instead");
+constexpr ErrorDef<210, std::string_view> ErrInvalidDiscoverableLocation(
+    "invalid @discoverable location '{0}'; must be comma separated 'platform' and/or 'external'");
 
 // To add a new error:
 //
@@ -635,6 +637,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0207 */ &ErrTypeShapeIntegerOverflow,
     /* fi-0208 */ &ErrReservedPlatform,
     /* fi-0209 */ &ErrReservedNotAllowed,
+    /* fi-0210 */ &ErrInvalidDiscoverableLocation,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

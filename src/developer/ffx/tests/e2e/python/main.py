@@ -79,7 +79,16 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         """Test `ffx target list` output returns as expected when discovery is off."""
         self.dut.ffx.run(["daemon", "stop"])
         output = self.dut.ffx.run(
-            ["--machine", "json", "-c", "ffx.isolated=true", "target", "list"]
+            [
+                "--machine",
+                "json",
+                "-c",
+                "ffx.isolated=true",
+                "-c",
+                "ffx.target-list.local-connect=true",
+                "target",
+                "list",
+            ]
         )
         output_json = json.loads(output)
         devices = [
@@ -104,6 +113,8 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
                 "json",
                 "-c",
                 "ffx.isolated=true",
+                "-c",
+                "ffx.target-list.local-connect=true",
                 "target",
                 "list",
                 self.dut.device_name,

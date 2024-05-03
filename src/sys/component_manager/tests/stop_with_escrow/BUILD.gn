@@ -24,6 +24,7 @@ rustc_test("stop_with_escrow_integration_test_bin") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/component_manager/tests/fidl:components_rust",
+    "//src/sys/lib/component-events",
   ]
 
   sources = [ "stop_with_escrow_integration_test.rs" ]
@@ -78,6 +79,34 @@ fuchsia_component("stop_with_delivery_on_readable_request") {
   restricted_features = [ "delivery_type" ]
 }
 
+rustc_binary("stop_with_escrowed_dictionary_bin") {
+  name = "stop_with_escrowed_dictionary"
+  edition = "2021"
+  source_root = "stop_with_escrowed_dictionary.rs"
+  deps = [
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
+    "//src/lib/detect-stall",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/component_manager/tests/fidl:components_rust",
+    "//third_party/rust_crates:futures",
+  ]
+
+  sources = [ "stop_with_escrowed_dictionary.rs" ]
+}
+
+fuchsia_component("stop_with_escrowed_dictionary") {
+  testonly = true
+  manifest = "meta/stop_with_escrowed_dictionary.cml"
+  deps = [ ":stop_with_escrowed_dictionary_bin" ]
+  restricted_features = [ "delivery_type" ]
+}
+
 fuchsia_component("test_root") {
   testonly = true
   manifest = "meta/test_root.cml"
@@ -88,8 +117,9 @@ fuchsia_unittest_package("stop_with_escrow_integration_test") {
   deps = [
     ":stop_with_delivery_on_readable_request",
     ":stop_with_escrow_integration_test_bin",
+    ":stop_with_escrowed_dictionary",
     ":stop_with_pending_request",
     ":test_root",
-    "//src/sys/component_manager:component-manager-realm-builder-cmp",
+    "//src/sys/component_manager:component-manager-realm-builder-debug-cmp",
   ]
 }

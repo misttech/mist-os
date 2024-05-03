@@ -16,6 +16,7 @@ use super::{
 
 use selinux_common::{self as sc, ClassPermission as _};
 use std::{collections::HashMap, num::NonZeroU32};
+use zerocopy::little_endian as le;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
 /// structures. Typically, data is indexed by an enum that describes a well-known value and the
@@ -108,7 +109,15 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             ))?
             .id();
 
-        Ok(Self { classes, permissions, parsed_policy, cached_object_r_role })
+        let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
+
+        // Verify that the initial Security Contexts are all defined, and valid.
+        // TODO(b/335397745): Look up initial Contexts by name, and cache that index here.
+        for id in sc::InitialSid::all_variants() {
+            let _ = index.initial_context(id).map_err(anyhow::Error::from)?;
+        }
+
+        Ok(index)
     }
 
     pub fn class<'a>(&'a self, object_class: &sc::ObjectClass) -> &'a Class<PS> {
@@ -247,13 +256,44 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             })
     }
 
+    /// Returns the Id of the "object_r" role within the `parsed_policy`, for use when validating
+    /// Security Context fields.
+    pub(crate) fn object_role(&self) -> RoleId {
+        self.cached_object_r_role
+    }
+
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
         &self.parsed_policy
     }
 
+    /// Returns the [`SecurityContext`] defined by this policy for the specified
+    /// well-known (or "initial") Id. Failure indicates that the parsed policy is not
+    /// internally consistent.
+    pub(super) fn initial_context(
+        &self,
+        id: sc::InitialSid,
+    ) -> Result<security_context::SecurityContext, security_context::SecurityContextError> {
+        let id = le::U32::from(id as u32);
+
+        // Policy validation is assumed to have ensured that all `InitialSid` values exist
+        // and have valid & consistent content.
+        let context = self.parsed_policy().initial_context(id).unwrap();
+        let low_level = self.security_level(context.low_level());
+        let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
+
+        security_context::SecurityContext::new(
+            &self,
+            context.user_id(),
+            context.role_id(),
+            context.type_id(),
+            low_level,
+            high_level,
+        )
+    }
+
     /// Helper used by `initial_context()` to create a [`sc::SecurityLevel`] instance from
     /// the policy fields.
-    pub(crate) fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
+    fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
         security_context::SecurityLevel::new(
             level.sensitivity(),
             level.categories().spans().map(|span| self.security_context_category(span)).collect(),

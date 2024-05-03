@@ -24,24 +24,8 @@ fit::error<Error> TakeError() {
 }  // namespace
 
 fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
-  void* result;
-
-  // TODO(caslyn): have the POSIX vs Zircon base class supply a dlopen wrapper
-  // (e.g. CallDlopen). The POSIX base class can modify the module path and the
-  // Zircon base class will internally call CallWithLdsvcInstalled.
-  CallWithLdsvcInstalled([&]() {
-    // dlopen on POSIX does not use a Loader, so set the file arg to the test
-    // location from which it will retrieve the file.
-    std::filesystem::path path;
-#ifndef __Fuchsia__
-    if (file) {
-      path = elfldltl::testing::GetTestDataPath(file);
-      file = path.c_str();
-    }
-#endif
-    result = dlopen(file, mode);
-  });
-
+  // Call dlopen in an OS-specific context.
+  void* result = CallDlOpen(file, mode);
   if (!result) {
     return TakeError();
   }
@@ -55,5 +39,25 @@ fit::result<Error, void*> DlSystemTests::DlSym(void* module, const char* ref) {
   }
   return fit::ok(result);
 }
+
+#ifdef __Fuchsia__
+// Call dlopen with the mock fuchsia_ldsvc::Loader installed.
+void* DlSystemTests::CallDlOpen(const char* file, int mode) {
+  void* result;
+  // TODO(caslyn): verify and clear mock expectations.
+  CallWithLdsvcInstalled([&]() { result = dlopen(file, mode); });
+  return result;
+}
+#else
+// Call dlopen with the test path modified for POSIX.
+void* DlSystemTests::CallDlOpen(const char* file, int mode) {
+  std::filesystem::path path;
+  if (file) {
+    path = elfldltl::testing::GetTestDataPath(file);
+    file = path.c_str();
+  }
+  return dlopen(file, mode);
+}
+#endif
 
 }  // namespace dl::testing

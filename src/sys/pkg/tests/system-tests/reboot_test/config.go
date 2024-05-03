@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/cli"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 )
 
 type config struct {
+	ffxConfig        *cli.FfxConfig
 	archiveConfig    *cli.ArchiveConfig
 	deviceConfig     *cli.DeviceConfig
 	installerConfig  *cli.InstallerConfig
@@ -23,9 +23,6 @@ type config struct {
 	paveTimeout      time.Duration
 	cycleCount       int
 	cycleTimeout     time.Duration
-	beforeInitScript string
-	afterInitScript  string
-	afterTestScript  string
 	useFlash         bool
 	sleepAfterReboot time.Duration
 	checkABR         bool
@@ -39,10 +36,12 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 		return nil, err
 	}
 
+	ffxConfig := cli.NewFfxConfig(fs)
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
 
 	c := &config{
+		ffxConfig:       ffxConfig,
 		archiveConfig:   archiveConfig,
 		deviceConfig:    deviceConfig,
 		installerConfig: installerConfig,
@@ -52,9 +51,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.IntVar(&c.cycleCount, "cycle-count", 1, "How many cycles to run the test before completing (default is 1)")
 	fs.DurationVar(&c.paveTimeout, "pave-timeout", 5*time.Minute, "Err if a pave takes longer than this time (default 5 minutes)")
 	fs.DurationVar(&c.cycleTimeout, "cycle-timeout", 5*time.Minute, "Err if a test cycle takes longer than this time (default is 5 minutes)")
-	fs.StringVar(&c.beforeInitScript, "before-init-script", "", "Run this script before initializing device for testing")
-	fs.StringVar(&c.afterInitScript, "after-init-script", "", "Run this script after initializing device for testing")
-	fs.StringVar(&c.afterTestScript, "after-test-script", "", "Run this script after a test step")
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
 	fs.DurationVar(&c.sleepAfterReboot, "sleep-after-reboot", 0, "How long to sleep after rebooting the device and then connecting to the device (default 0 seconds)")
 	fs.BoolVar(&c.checkABR, "check-abr", true, "Check that the device booted into the expected ABR slot (default is true)")
@@ -63,6 +59,10 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 }
 
 func (c *config) validate() error {
+	if err := c.ffxConfig.Validate(); err != nil {
+		return err
+	}
+
 	if err := c.buildConfig.Validate(); err != nil {
 		return err
 	}
@@ -72,14 +72,6 @@ func (c *config) validate() error {
 	}
 
 	if err := c.deviceConfig.Validate(); err != nil {
-		return err
-	}
-
-	if err := util.ValidatePath(c.afterInitScript); err != nil {
-		return err
-	}
-
-	if err := util.ValidatePath(c.afterTestScript); err != nil {
 		return err
 	}
 

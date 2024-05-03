@@ -8,6 +8,7 @@ sdk_source_set("cpp") {
   category = "partner"
 
   sdk_name = "inspect_component_cpp"
+  stable = true
 
   include_base = "//sdk"
   sources = [

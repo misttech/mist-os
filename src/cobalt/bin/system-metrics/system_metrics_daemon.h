@@ -85,8 +85,6 @@ class SystemMetricsDaemon {
 
   void InitializeLogger();
 
-  void InitializeRootResourceHandle();
-
   // If the peer has closed the FIDL connection, automatically reconnect.
   zx_status_t ReinitializeIfPeerClosed(zx_status_t zx_status);
 

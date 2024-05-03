@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::framebuffer_server::{
-    init_viewport_scene, send_view_to_graphical_presenter, start_flatland_presentation_loop,
-    FramebufferServer,
-};
+use super::framebuffer_server::{init_viewport_scene, start_presentation_loop, FramebufferServer};
 use crate::{
     device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
     fs::sysfs::DeviceDirectory,
@@ -127,15 +124,11 @@ impl Framebuffer {
         incoming_dir: Option<fio::DirectoryProxy>,
     ) -> Result<(), anyhow::Error> {
         if let Some(server) = &self.server {
-            // Start presentation loop to prepare for display updates.
-            start_flatland_presentation_loop(kernel, server.clone());
-
             let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
             let view_identity = self.view_identity.lock().take().unwrap();
-            // Attempt to find and connect to GraphicalPresenter.
             if let Some(incoming_dir) = incoming_dir {
                 log_info!("Presenting view using GraphicalPresenter");
-                send_view_to_graphical_presenter(
+                start_presentation_loop(
                     kernel,
                     server.clone(),
                     view_bound_protocols,

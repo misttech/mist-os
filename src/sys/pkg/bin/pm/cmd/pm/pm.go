@@ -15,11 +15,9 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/delta"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/expand"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/genkey"
 	initcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/init"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/newrepo"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
@@ -43,14 +41,12 @@ Package Commands:
     archive  - construct a single .far representation of the package
 
 Repository Commands:
-    newrepo  - create a new local repostory
     publish  - publish a package to a local repository
     serve    - serve a local repository
     expand   - (deprecated) expand an archive
 
 Tools:
     snapshot - capture metadata from multiple packages in a single file
-    delta    - compare two snapshot files
 
 For help with individual commands run "pm <command> --help"
 `
@@ -97,7 +93,8 @@ func doMain() int {
 		err = buildcmd.Run(cfg, flag.Args()[1:])
 
 	case "delta":
-		err = delta.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "delta is deprecated without replacement")
+		err = nil
 
 	case "expand":
 		err = expand.Run(cfg, flag.Args()[1:])
@@ -131,7 +128,8 @@ func doMain() int {
 		err = verify.Run(cfg, flag.Args()[1:])
 
 	case "newrepo":
-		err = newrepo.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx repository create' instead")
+		err = nil
 
 	default:
 		flag.Usage()

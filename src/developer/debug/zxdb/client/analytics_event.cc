@@ -4,7 +4,49 @@
 
 #include "src/developer/debug/zxdb/client/analytics_event.h"
 
+#include <cstdlib>
+
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/lib/fxl/strings/string_printf.h"
+
+namespace {
+// Searches for the current user name in the given string and replaces it with a literal "$USER".
+// If not present, returns the input string unmodified.
+std::string ObfuscateUser(const std::string& string) {
+  const char* username = std::getenv("USER");
+
+  if (!username) {
+    // If the username is not set in the environment, give up.
+    return string;
+  }
+
+  size_t pos = string.find(username);
+  const size_t username_len = strlen(username);
+
+  std::string ret = string;
+  while (pos < ret.size()) {
+    std::string to_end;
+    size_t replace_end = pos + username_len;
+
+    // We have to special case the username being followed immediately by an escaped double-quote,
+    // which will be treated as the end of the string by std::string::replace below. We don't want
+    // to lose the rest of the string, so it's saved in a temporary.
+    if (replace_end < ret.size() && ret[replace_end] == '\"') {
+      to_end = ret.substr(replace_end);
+    }
+
+    ret.replace(pos, replace_end, "$USER");
+
+    if (!to_end.empty()) {
+      ret.append(to_end);
+    }
+
+    pos = ret.find(username);
+  }
+
+  return ret;
+}
+}  // namespace
 
 namespace zxdb {
 
@@ -53,6 +95,10 @@ void SessionEnded::SetSessionTime(std::chrono::milliseconds session_time) {
 // CommandEvent ------------------------------------------------------------------------------------
 CommandEvent::CommandEvent(const std::string& session_id) : AnalyticsEvent("command", session_id) {}
 
+// The CommandReport only fills in verbs, nouns, and switches using the well known strings for the
+// defined set of the respective group. We will never receive user information in any of those
+// strings. Arguments and error messages however, can contain arbitrary text, which must not contain
+// user identifiable data.
 void CommandEvent::FromCommandReport(const CommandReport& report) {
   SetParameter("verb_id", report.verb_id);
   SetParameter("verb", report.verb);
@@ -67,7 +113,7 @@ void CommandEvent::FromCommandReport(const CommandReport& report) {
 
   SetParameter("argument_count", static_cast<int64_t>(report.arguments.size()));
   for (size_t i = 0; i < report.arguments.size(); i++) {
-    SetParameter(fxl::StringPrintf("argument%zu", i), report.arguments[i]);
+    SetParameter(fxl::StringPrintf("argument%zu", i), ObfuscateUser(report.arguments[i]));
   }
 
   SetParameter("switch_count", static_cast<int64_t>(report.switches.size()));
@@ -80,7 +126,7 @@ void CommandEvent::FromCommandReport(const CommandReport& report) {
   SetParameter("has_error", report.err.has_error());
   SetParameter("error_code", static_cast<int>(report.err.type()));
   SetParameter("error_string", ErrTypeToString(report.err.type()));
-  SetParameter("error_message", report.err.msg());
+  SetParameter("error_message", ObfuscateUser(report.err.msg()));
 }
 
 }  // namespace zxdb

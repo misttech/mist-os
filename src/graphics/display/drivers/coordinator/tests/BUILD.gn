@@ -23,11 +23,13 @@ test("display-coordinator-unittests") {
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp_testing",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
 }

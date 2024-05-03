@@ -17,7 +17,7 @@ constexpr auto NotFuchsia() {
 
 fit::result<Error, LiveHandle> GetRootJob() { return NotFuchsia(); }
 
-fit::result<Error, LiveHandle> GetRootResource() { return NotFuchsia(); }
+fit::result<Error, LiveHandle> GetInfoResource() { return NotFuchsia(); }
 
 fit::result<Error> TaskHolder::InsertSystem() { return NotFuchsia(); }
 

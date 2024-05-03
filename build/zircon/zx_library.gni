@@ -76,6 +76,13 @@ import("//build/toolchain/toolchain_environment.gni")
 #     [string] The API area responsible for maintaining this library.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   stable (optional)
+#     Note: this option only currently used if sdk == "source"'
+#     Whether this sdk_atom is stabilized. If false, there will not be
+#     .api file generated, and the atom will be marked as unstable in the final
+#     IDK.
+#     Defaults to false.
+#
 #   sdk_headers
 #     Optional: Required, except if the global `is_kernel` is true.
 #     This must list all the public header files in the library's `include/`
@@ -99,6 +106,7 @@ template("zx_library") {
     "sdk",
     "sdk_headers",
     "sdk_publishable",
+    "stable",
   ]
 
   # TODO(https://fxbug.dev/333125197): Move this such that it is only applied
@@ -206,6 +214,7 @@ template("zx_library") {
                                    [
                                      "sdk_headers_for_internal_use",
                                      "sdk_area",
+                                     "stable",
                                    ])
           }
         } else {
@@ -217,6 +226,7 @@ template("zx_library") {
                                    [
                                      "sdk_headers_for_internal_use",
                                      "sdk_area",
+                                     "stable",
                                    ])
           }
         }

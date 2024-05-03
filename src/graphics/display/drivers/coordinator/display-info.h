@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <optional>
 #include <queue>
+#include <string_view>
 #include <vector>
 
 #include <fbl/array.h>
@@ -38,34 +39,30 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
  public:
   static zx::result<fbl::RefPtr<DisplayInfo>> Create(const added_display_args_t& info);
 
+  DisplayInfo(const DisplayInfo&) = delete;
+  DisplayInfo(DisplayInfo&&) = delete;
+  DisplayInfo& operator=(const DisplayInfo&) = delete;
+  DisplayInfo& operator=(DisplayInfo&&) = delete;
+
+  ~DisplayInfo();
+
   // Should be called after init_done is set to true.
   void InitializeInspect(inspect::Node* parent_node);
 
-  void GetPhysicalDimensions(uint32_t* horizontal_size_mm, uint32_t* vertical_size_mm) {
-    if (edid.has_value()) {
-      *horizontal_size_mm = edid->base.horizontal_size_mm();
-      *vertical_size_mm = edid->base.vertical_size_mm();
-    } else {
-      *horizontal_size_mm = *vertical_size_mm = 0;
-    }
-  }
+  // Returns zero if the information is not available.
+  uint32_t GetHorizontalSizeMm() const;
 
-  // Get human readable identifiers for this display. Strings will only live as
-  // long as the containing DisplayInfo, callers should copy these if they want
-  // to retain them longer.
-  void GetIdentifiers(const char** manufacturer_name, const char** monitor_name,
-                      const char** monitor_serial) {
-    if (edid.has_value()) {
-      *manufacturer_name = edid->base.manufacturer_name();
-      if (!strcmp("", *manufacturer_name)) {
-        *manufacturer_name = edid->base.manufacturer_id();
-      }
-      *monitor_name = edid->base.monitor_name();
-      *monitor_serial = edid->base.monitor_serial();
-    } else {
-      *manufacturer_name = *monitor_name = *monitor_serial = "";
-    }
-  }
+  // Returns zero if the information is not available.
+  uint32_t GetVerticalSizeMm() const;
+
+  // Returns an empty view if the information is not available.
+  std::string_view GetManufacturerName() const;
+
+  // Returns an empty view if the information is not available.
+  std::string_view GetMonitorName() const;
+
+  // Returns an empty string if the information is not available.
+  std::string_view GetMonitorSerial() const;
 
   struct Edid {
     edid::Edid base;
@@ -126,7 +123,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   std::queue<ConfigImages> config_image_queue;
 
  private:
-  DisplayInfo() = default;
+  DisplayInfo();
   void PopulateDisplayAudio();
   inspect::Node node;
   inspect::ValueList properties;

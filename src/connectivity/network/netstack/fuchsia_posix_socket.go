@@ -1231,6 +1231,14 @@ func (ep *endpoint) GetIpPacketInfo(fidl.Context) (socket.BaseNetworkSocketGetIp
 	return socket.BaseNetworkSocketGetIpPacketInfoResultWithResponse(socket.BaseNetworkSocketGetIpPacketInfoResponse{Value: value}), nil
 }
 
+func (ep *endpoint) SetMark(_ fidl.Context, domain socket.MarkDomain, mark socket.OptionalUint32) (socket.BaseSocketSetMarkResult, error) {
+	return socket.BaseSocketSetMarkResultWithErr(posix.ErrnoEopnotsupp), nil
+}
+
+func (ep *endpoint) GetMark(_ fidl.Context, domain socket.MarkDomain) (socket.BaseSocketGetMarkResult, error) {
+	return socket.BaseSocketGetMarkResultWithErr(posix.ErrnoEopnotsupp), nil
+}
+
 // endpointWithSocket implements a network socket that uses a zircon socket for
 // its data plane. This structure creates a pair of goroutines which are
 // responsible for moving data and signals between the underlying

@@ -5,7 +5,7 @@
 #ifndef SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_ASYNC_H_
 #define SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_ASYNC_H_
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -88,7 +88,7 @@ class ImagePipeSurfaceAsync : public ImagePipeSurface {
   fuchsia::ui::composition::AllocatorPtr flatland_allocator_;
   fuchsia::ui::views::ViewCreationToken view_creation_token_;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
   struct PendingPresent {
     uint32_t image_id;

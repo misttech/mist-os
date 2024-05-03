@@ -33,8 +33,8 @@ class HealthCheckServiceTest : public testing::Test {
 
   void InstallBlob(const BlobInfo& info) {
     auto root = OpenRoot();
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info.path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info.path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info.size_data), ZX_OK);
     ASSERT_EQ(file->Write(info.data.get(), info.size_data, 0, &out_actual), ZX_OK);

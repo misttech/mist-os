@@ -232,11 +232,11 @@
 				<0x0 0xffd19000 0x0 0x1000>, //PWM_EF
 				<0x0 0xff807000 0x0 0x1000>, //PWM_A0_AB
 				<0x0 0xff802000 0x0 0x1000>; //PWM_A0_CD
-			#pwm-cells = <2>;
+			#pwm-cells = <3>;
 		};
 
 		pwm-init {
-			pwms = <&pwm 4 0>; //A311D_PWM_E
+			pwms = <&pwm 4 0 0>; //A311D_PWM_E
 			gpios = <&gpio A311D_GPIOX(16) 0 &gpio A311D_GPIOX(17) 0>;
 			gpio-names = "WIFI_LPO", "BT_REG_ON";
 		};

@@ -18,7 +18,7 @@ void CheckFileContains(const char* filename, const void* data, ssize_t len) {
 
   ASSERT_EQ(emu_stat(filename, &st), 0);
   ASSERT_EQ(st.st_size, len);
-  int fd = emu_open(filename, O_RDWR, 0644);
+  int fd = emu_open(filename, O_RDWR);
   ASSERT_GT(fd, 0);
   ASSERT_TRUE(CheckStreamAll(emu_read, fd, buf, len));
   ASSERT_EQ(memcmp(buf, data, len), 0);
@@ -37,13 +37,13 @@ TEST_F(HostFilesystemTest, TruncateSmall) {
   const char* filename = "::alpha";
 
   // Try writing a string to a file
-  int fd = emu_open(filename, O_RDWR | O_CREAT, 0644);
+  int fd = emu_open(filename, O_RDWR | O_CREAT);
   ASSERT_GT(fd, 0);
   ASSERT_TRUE(CheckStreamAll(emu_write, fd, str, strlen(str)));
   ASSERT_NO_FATAL_FAILURE(CheckFileContains(filename, str, strlen(str)));
 
   // Check that opening a file with O_TRUNC makes it empty
-  int fd2 = emu_open(filename, O_RDWR | O_TRUNC, 0644);
+  int fd2 = emu_open(filename, O_RDWR | O_TRUNC);
   ASSERT_GT(fd2, 0);
   ASSERT_NO_FATAL_FAILURE(CheckFileEmpty(filename));
 
@@ -78,7 +78,7 @@ void CheckedTruncate(const char* filename, uint8_t* u8, ssize_t new_len) {
   ssize_t old_len = st.st_size;
 
   // Truncate the file, verify the size gets updated
-  int fd = emu_open(filename, O_RDWR, 0644);
+  int fd = emu_open(filename, O_RDWR);
   ASSERT_GT(fd, 0);
   ASSERT_EQ(emu_ftruncate(fd, new_len), 0);
   ASSERT_EQ(emu_stat(filename, &st), 0);
@@ -86,7 +86,7 @@ void CheckedTruncate(const char* filename, uint8_t* u8, ssize_t new_len) {
 
   // close and reopen the file; verify the inode stays updated
   ASSERT_EQ(emu_close(fd), 0);
-  fd = emu_open(filename, O_RDWR, 0644);
+  fd = emu_open(filename, O_RDWR);
   ASSERT_GT(fd, 0);
   ASSERT_EQ(emu_stat(filename, &st), 0);
   ASSERT_EQ(st.st_size, new_len);
@@ -149,7 +149,7 @@ TEST_P(TruncateLargeHostFilesystemTest, Large) {
 
   // Start a file filled with the u8 buffer
   const char* filename = "::alpha";
-  int fd = emu_open(filename, O_RDWR | O_CREAT, 0644);
+  int fd = emu_open(filename, O_RDWR | O_CREAT);
   ASSERT_GT(fd, 0);
   ASSERT_TRUE(CheckStreamAll(emu_write, fd, buf.data(), GetParam().buf_size));
   ASSERT_EQ(emu_close(fd), 0);

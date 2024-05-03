@@ -46,11 +46,12 @@ zx::result<VmObjectDispatcher::CreateStats> VmObjectDispatcher::parse_create_sys
     flags &= ~ZX_VMO_DISCARDABLE;
   }
   if (flags & ZX_VMO_UNBOUNDED) {
-    if (size != 0) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
     flags &= ~ZX_VMO_UNBOUNDED;
     res.size = VmObjectPaged::max_size();
+  } else {
+    if (zx_status_t status = VmObject::RoundSize(size, &res.size); status != ZX_OK) {
+      return zx::error(status);
+    }
   }
 
   if (flags) {
@@ -220,13 +221,13 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
                 (vmo->is_user_pager_backed() ? ZX_INFO_VMO_PAGER_BACKED : 0) |
                 (vmo->is_contiguous() ? ZX_INFO_VMO_CONTIGUOUS : 0);
   // As an implementation detail, both ends of an IOBuffer keep a child reference to a shared parent
-  // which is dropped. Since references aren't normally attributed pages otherwise, we specifically
-  // request their page count.
-  VmObject::AttributionCounts page_counts = ownership == VmoOwnership::kIoBuffer
-                                                ? vmo->AttributedPagesInReferenceOwner()
-                                                : vmo->AttributedPages();
-  entry.committed_bytes = page_counts.uncompressed * PAGE_SIZE;
-  entry.populated_bytes = (page_counts.compressed + page_counts.uncompressed) * PAGE_SIZE;
+  // which is dropped. Since references aren't normally attributed memory otherwise, we specifically
+  // request their attribution counts.
+  VmObject::AttributionCounts counts = ownership == VmoOwnership::kIoBuffer
+                                           ? vmo->GetAttributedMemoryInReferenceOwner()
+                                           : vmo->GetAttributedMemory();
+  entry.committed_bytes = counts.uncompressed_bytes;
+  entry.populated_bytes = counts.compressed_bytes + counts.uncompressed_bytes;
   entry.cache_policy = vmo->GetMappingCachePolicy();
   switch (ownership) {
     case VmoOwnership::kHandle:

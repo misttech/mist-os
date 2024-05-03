@@ -14,9 +14,10 @@
 #include <string.h>
 #include <zircon/assert.h>
 
+#include <mutex>
+
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <safemath/safe_conversions.h>
 #include <usb/ums.h>
 #include <usb/usb.h>
@@ -74,7 +75,7 @@ void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iov
 
   // Queue transaction.
   {
-    fbl::AutoLock l(&txn_lock_);
+    std::lock_guard<std::mutex> l(txn_lock_);
     list_add_tail(&queued_txns_, &txn->node);
   }
   sync_completion_signal(&txn_completion_);
@@ -109,7 +110,7 @@ void UsbMassStorageDevice::Release() {
 void UsbMassStorageDevice::DdkUnbind(ddk::UnbindTxn txn) {
   // terminate our worker thread
   {
-    fbl::AutoLock l(&txn_lock_);
+    std::lock_guard<std::mutex> l(txn_lock_);
     dead_ = true;
   }
   sync_completion_signal(&txn_completion_);
@@ -136,7 +137,7 @@ void UsbMassStorageDevice::DdkChildPreRelease(void* child_ctx) {
 
 void UsbMassStorageDevice::RequestQueue(usb_request_t* request,
                                         const usb_request_complete_callback_t* completion) {
-  fbl::AutoLock l(&txn_lock_);
+  std::lock_guard<std::mutex> l(txn_lock_);
   pending_requests_++;
   UsbRequestContext context;
   context.completion = *completion;
@@ -632,7 +633,7 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
     }
     Transaction* txn = nullptr;
     {
-      fbl::AutoLock l(&txn_lock_);
+      std::lock_guard<std::mutex> l(txn_lock_);
       if (dead_) {
         break;
       }
@@ -698,7 +699,7 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
       }
     }
     {
-      fbl::AutoLock l(&txn_lock_);
+      std::lock_guard<std::mutex> l(txn_lock_);
       if (current_txn == txn) {
         zxlogf(DEBUG, "UMS DONE %d (%p)", status, &op);
         txn->data_vmo.reset();
@@ -711,7 +712,7 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
   // complete any pending txns
   list_node_t txns = LIST_INITIAL_VALUE(txns);
   {
-    fbl::AutoLock l(&txn_lock_);
+    std::lock_guard<std::mutex> l(txn_lock_);
     list_move(&queued_txns_, &txns);
   }
 

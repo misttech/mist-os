@@ -23,6 +23,7 @@ rustc_binary("blackout-blobfs-checkerboard-target-bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/blackout/target/lib:blackout-target",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
@@ -30,7 +31,6 @@ rustc_binary("blackout-blobfs-checkerboard-target-bin") {
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
-    "//tools/blackout/blackout-target",
   ]
   source_root = "src/target.rs"
 

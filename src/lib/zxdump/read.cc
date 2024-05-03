@@ -199,7 +199,7 @@ class TaskHolder::JobTree {
  public:
   Job& root_job() const { return root_job_; }
 
-  Resource& root_resource() { return root_resource_; }
+  Resource& info_resource() { return info_resource_; }
 
   size_t memory_cache_limit() const { return live_memory_cache_.cache_limit(); }
 
@@ -459,37 +459,37 @@ class TaskHolder::JobTree {
       return fit::error(Error{"invalid resource handle", status});
     }
 
-    if (resource.kind != ZX_RSRC_KIND_ROOT) {
+    if (resource.kind != ZX_RSRC_KIND_SYSTEM && resource.base != ZX_RSRC_SYSTEM_INFO_BASE) {
       return fit::error{Error{
-          "non-root resources not supported",
+          "only info resource supported",
           ZX_ERR_NOT_SUPPORTED,
       }};
     }
 
-    if (root_resource_.live()) {
-      // There's already a live root resource attached.
+    if (info_resource_.live()) {
+      // There's already a live info resource attached.
       return fit::error{Error{
-          "live root resource handle already inserted",
+          "live info resource handle already inserted",
           ZX_ERR_ALREADY_EXISTS,
       }};
     }
 
     // Clear out any old data from dumps and inject the basic data we have now.
-    root_resource_.info_.clear();
-    root_resource_.properties_.clear();
+    info_resource_.info_.clear();
+    info_resource_.properties_.clear();
 
     auto inject = [this](zx_object_info_topic_t topic, auto& info) {
       auto buffer = GetBuffer(sizeof(info));
       memcpy(buffer, &info, sizeof(info));
-      root_resource_.info_.emplace(topic, ByteView{buffer, sizeof(info)});
+      info_resource_.info_.emplace(topic, ByteView{buffer, sizeof(info)});
     };
 
     inject(ZX_INFO_HANDLE_BASIC, info);
     inject(ZX_INFO_RESOURCE, resource);
 
-    root_resource_.live_ = std::move(live);
+    info_resource_.live_ = std::move(live);
 
-    return fit::ok(std::ref(root_resource_));
+    return fit::ok(std::ref(info_resource_));
   }
 
   fit::result<Error, std::reference_wrapper<Task>> InsertLiveTask(
@@ -747,7 +747,7 @@ class TaskHolder::JobTree {
   }
 
   fit::result<Error> ReadKernelNote(zx_object_info_topic_t topic, ByteView data) {
-    root_resource_.info_.try_emplace(topic, data);
+    info_resource_.info_.try_emplace(topic, data);
     return fit::ok();
   }
 
@@ -775,8 +775,8 @@ class TaskHolder::JobTree {
   // The root job is either the superroot or its only child.
   std::reference_wrapper<Job> root_job_{superroot_};
 
-  // The only resource we hold is the root resource.
-  Resource root_resource_{*this};
+  // The only resource we hold is the info resource.
+  Resource info_resource_{*this};
 
   // Shared cache of pages read from process memory (see live-memory-cache.h).
   LiveMemoryCache live_memory_cache_;
@@ -791,9 +791,9 @@ TaskHolder::~TaskHolder() = default;
 
 Job& TaskHolder::root_job() const { return tree_->root_job(); }
 
-Resource& TaskHolder::root_resource() const { return tree_->root_resource(); }
+Resource& TaskHolder::info_resource() const { return tree_->info_resource(); }
 
-Resource& Object::root_resource() { return tree().root_resource(); }
+Resource& Object::info_resource() { return tree().info_resource(); }
 
 fit::result<Error> TaskHolder::Insert(fbl::unique_fd fd, bool read_memory) {
   return tree_->Insert(std::move(fd), read_memory);
@@ -834,7 +834,7 @@ void Object::TakeBuffer(std::unique_ptr<std::byte[]> buffer) {
 }
 
 fit::result<Error, ByteView> Object::GetSuperrootInfo(zx_object_info_topic_t topic) {
-  if (this == &(tree().root_resource())) {
+  if (this == &(tree().info_resource())) {
     return fit::error{
         Error{"no kernel information recorded", ZX_ERR_NOT_SUPPORTED},
     };

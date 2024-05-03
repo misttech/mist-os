@@ -5,8 +5,12 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/client_base.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/errors.h>
 
 #include <array>
@@ -17,21 +21,49 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
-TEST(DisplayTest, NoOpTest) { EXPECT_OK(ZX_OK); }
+namespace {
+
+struct DispatcherAndShutdownCompletion {
+  fdf::SynchronizedDispatcher dispatcher;
+  std::shared_ptr<libsync::Completion> dispatcher_shutdown_completion;
+};
+
+DispatcherAndShutdownCompletion CreateDispatcherAndShutdownCompletionForTesting() {
+  auto shutdown_completion = std::make_shared<libsync::Completion>();
+  zx::result<fdf::SynchronizedDispatcher> create_result = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-test-dispatcher",
+      [shutdown_completion](fdf_dispatcher_t*) { shutdown_completion->Signal(); });
+  ZX_ASSERT_MSG(create_result.is_ok(), "Failed to create dispatcher: %s",
+                create_result.status_string());
+  return {.dispatcher = std::move(create_result).value(),
+          .dispatcher_shutdown_completion = std::move(shutdown_completion)};
+}
+
+}  // namespace
 
 TEST(DisplayTest, ClientVSyncOk) {
+  fdf_testing::DriverRuntime driver_runtime;
+
   constexpr ConfigStamp kControllerStampValue(1);
   constexpr ConfigStamp kClientStampValue(2);
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(std::move(engine_driver_client));
+  auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
+  controller.SetDispatcherForTesting(std::move(dispatcher));
+
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
   clientproxy.EnableVsync(true);
@@ -69,12 +101,24 @@ TEST(DisplayTest, ClientVSyncOk) {
   EXPECT_TRUE(event_handler.vsync_handled_);
 
   clientproxy.CloseTest();
+
+  controller.ShutdownDispatcherForTesting();
+  shutdown_completion->Wait();
 }
 
 TEST(DisplayTest, ClientVSynPeerClosed) {
+  fdf_testing::DriverRuntime driver_runtime;
+
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(std::move(engine_driver_client));
+  auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
+  controller.SetDispatcherForTesting(std::move(dispatcher));
+
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
   clientproxy.EnableVsync(true);
@@ -82,28 +126,52 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   client_end.reset();
   EXPECT_OK(clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
+
+  controller.ShutdownDispatcherForTesting();
+  shutdown_completion->Wait();
 }
 
 TEST(DisplayTest, ClientVSyncNotSupported) {
+  fdf_testing::DriverRuntime driver_runtime;
+
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(std::move(engine_driver_client));
+  auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
+  controller.SetDispatcherForTesting(std::move(dispatcher));
+
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
                 clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
+
+  controller.ShutdownDispatcherForTesting();
+  shutdown_completion->Wait();
 }
 
 TEST(DisplayTest, ClientMustDrainPendingStamps) {
+  fdf_testing::DriverRuntime driver_runtime;
+
   constexpr size_t kNumPendingStamps = 5;
   constexpr std::array<uint64_t, kNumPendingStamps> kControllerStampValues = {1u, 2u, 3u, 4u, 5u};
   constexpr std::array<uint64_t, kNumPendingStamps> kClientStampValues = {2u, 3u, 4u, 5u, 6u};
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
-  Controller controller(nullptr);
+  auto [engine_client_end, engine_server_end] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
+
+  Controller controller(std::move(engine_driver_client));
+  auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
+  controller.SetDispatcherForTesting(std::move(dispatcher));
+
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
   clientproxy.EnableVsync(false);
@@ -126,6 +194,9 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
             ConfigStamp(kControllerStampValues.back()));
 
   clientproxy.CloseTest();
+
+  controller.ShutdownDispatcherForTesting();
+  shutdown_completion->Wait();
 }
 
 }  // namespace display

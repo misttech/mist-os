@@ -28,7 +28,7 @@ const UART_MAX_FRAME_BUFFER_SIZE: usize = 1029;
 
 // Default control device.
 fn default_control_device() -> String {
-    // TODO(303503457): Access virtual device via "/dev/class/bt-hci-virtual".
+    // TODO(https://fxbug.dev/303503457): Access virtual device via "/dev/class/bt-hci-virtual"
     "sys/platform/00:00:30/bt_hci_virtual".to_string()
 }
 

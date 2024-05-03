@@ -137,7 +137,7 @@ class TestToolProcess::SandboxLoop {
     svc_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
 
     AddSvcEntry<fuchsia_kernel::RootJob, &SandboxLoop::root_job_server_>(*job);
-    AddSvcEntry<fuchsia_boot::RootResource, &SandboxLoop::root_resource_server_>(*resource);
+    AddSvcEntry<fuchsia_kernel::InfoResource, &SandboxLoop::info_resource_server_>(*resource);
 
     auto [svc_client, svc_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     status = vfs_->ServeDirectory(svc_dir_, std::move(svc_server));
@@ -172,7 +172,7 @@ class TestToolProcess::SandboxLoop {
   std::optional<fs::SynchronousVfs> vfs_;
   fbl::RefPtr<fs::PseudoDir> svc_dir_;
   SandboxGetServer<fuchsia_kernel::RootJob, zx::job> root_job_server_;
-  SandboxGetServer<fuchsia_boot::RootResource, zx::resource> root_resource_server_;
+  SandboxGetServer<fuchsia_kernel::InfoResource, zx::resource> info_resource_server_;
 };
 
 // Set the spawn actions to populate the namespace for the tool with only its

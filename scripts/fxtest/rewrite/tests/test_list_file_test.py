@@ -44,15 +44,19 @@ class TestListFileJoiningTest(unittest.TestCase):
     def test_joining_files(self) -> None:
         """Test joining the contents of tests.json and test-list.json into Test objects."""
 
-        tests_file = [
-            TestEntry(
-                test=TestSection(
-                    name="my_test", label="//src/my_test", os="linux"
+        test_list = [
+            Test(
+                TestEntry(
+                    test=TestSection(
+                        name="my_test", label="//src/my_test", os="linux"
+                    )
                 )
             ),
-            TestEntry(
-                test=TestSection(
-                    name="my_test2", label="//src/my_test2", os="linux"
+            Test(
+                TestEntry(
+                    test=TestSection(
+                        name="my_test2", label="//src/my_test2", os="linux"
+                    )
                 )
             ),
         ]
@@ -62,32 +66,33 @@ class TestListFileJoiningTest(unittest.TestCase):
             "extra_test": TestListEntry("extra_test", tags=[]),
         }
 
-        joined: list[Test] = Test.join_test_descriptions(
-            tests_file, test_list_file
-        )
+        Test.augment_tests_with_info(test_list, test_list_file)
+
         self.assertSetEqual(
-            set([t.info.name for t in joined]), set(["my_test", "my_test2"])
+            set([t.name() for t in test_list]), set(["my_test", "my_test2"])
         )
 
         # Names are consistent between build and info contents.
-        for test in joined:
-            self.assertEqual(test.build.test.name, test.info.name)
+        for test in test_list:
+            self.assertEqual(test.build.test.name, test.name())
 
         # Test implements equals.
-        self.assertNotEqual(joined[0], joined[1])
-        self.assertEqual(joined[0], joined[0])
-        self.assertEqual(joined[1], joined[1])
+        self.assertNotEqual(test_list[0], test_list[1])
+        self.assertEqual(test_list[0], test_list[0])
+        self.assertEqual(test_list[1], test_list[1])
 
         # Test implements hash.
-        set(joined)
+        set(test_list)
 
     def test_missing_from_test_list(self) -> None:
         """It is an error for tests.json to contain a test test-list.json omits."""
 
-        tests_file = [
-            TestEntry(
-                test=TestSection(
-                    name="my_test", label="//src/my_test", os="linux"
+        test_list = [
+            Test(
+                TestEntry(
+                    test=TestSection(
+                        name="my_test", label="//src/my_test", os="linux"
+                    )
                 )
             ),
         ]
@@ -95,7 +100,7 @@ class TestListFileJoiningTest(unittest.TestCase):
 
         self.assertRaises(
             ValueError,
-            lambda: Test.join_test_descriptions(tests_file, test_list_file),
+            lambda: Test.augment_tests_with_info(test_list, test_list_file),
         )
 
 

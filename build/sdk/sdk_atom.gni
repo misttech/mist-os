@@ -117,6 +117,12 @@ import("config.gni")
 #     Additional schema files referenced by the main schema named by
 #     the schema variable.
 #
+#   stable (optional)
+#     Whether this sdk_atom is stabilized. If false, there will not be
+#     .api file generated, and the atom will be marked as unstable in the final
+#     IDK.
+#     Defaults to false.
+#
 #   type (optional)
 #     Type of the atom. Defaults to schema.
 #
@@ -351,6 +357,10 @@ template("sdk_atom") {
              type,
              "--deps",
            ] + rebase_path(dep_manifests, root_build_dir) + file_args
+
+    if (defined(meta.stable) && meta.stable) {
+      args += [ "--stable" ]
+    }
 
     if (defined(invoker.sdk_area)) {
       args += [

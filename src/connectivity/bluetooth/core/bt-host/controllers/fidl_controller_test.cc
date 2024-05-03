@@ -501,4 +501,21 @@ TEST_F(FidlControllerTest, VendorServerClosesProtocol) {
   ASSERT_THAT(controller_error(), ::testing::Optional(pw::Status::Unavailable()));
 }
 
+// Attempting to send a command once the command channel has been closed may trigger the driver to
+// terminate. Verify that a clean shutdown will still occur.
+TEST_F(FidlControllerTest, EventClosesDriver) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  const StaticByteBuffer kCommandPacket(0x00, 0x01, 0x02, 0x03);
+  const StaticByteBuffer kEventPacket(0x04, 0x05, 0x06, 0x07);
+  controller()->SetEventFunction([&](pw::span<const std::byte> /* buffer */) {
+    hci_server()->CloseCommandChannel();
+    controller()->SendCommand(kCommandPacket.subspan());
+  });
+  hci_server()->SendEvent(kEventPacket.view());
+  RunLoopUntilIdle();
+}
+
 }  // namespace bt::controllers

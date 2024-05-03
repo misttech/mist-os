@@ -8,10 +8,9 @@
 
 #include <utility>
 
-#include <measure_tape/hlcpp/hlcpp_measure_tape_for_peer.h>
-
 #include "gatt_client_server.h"
 #include "helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/measure_tape/hlcpp_measure_tape_for_peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"

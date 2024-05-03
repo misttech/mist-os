@@ -11,7 +11,7 @@ use packet::{Buf, BufferMut, Serializer};
 use tracing::warn;
 
 use crate::{
-    context::{CoreTimerContext, ResourceCounterContext, TimerContext2},
+    context::{CoreTimerContext, ResourceCounterContext, TimerContext},
     device::{
         self,
         queue::{
@@ -99,7 +99,7 @@ impl DeviceStateSpec for PureIpDevice {
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
-        BC: DeviceLayerTypes + TimerContext2,
+        BC: DeviceLayerTypes + TimerContext,
     >(
         _bindings_ctx: &mut BC,
         _self_id: CC::WeakDeviceId,

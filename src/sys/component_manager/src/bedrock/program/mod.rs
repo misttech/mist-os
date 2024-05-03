@@ -72,7 +72,8 @@ impl Program {
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
         let (runtime_dir, runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let start_info = start_info.into_fidl(escrowed_state.outgoing_dir, runtime_server)?;
+
+        let start_info = start_info.into_fidl(escrowed_state, runtime_server)?;
 
         runner.start(start_info, server_end);
         let controller = ComponentController::new(controller, Some(diagnostics_sender));
@@ -314,20 +315,22 @@ pub struct StartInfo {
 impl StartInfo {
     pub fn into_fidl(
         self,
-        outgoing_server_end: ServerEnd<fio::DirectoryMarker>,
+        escrowed_state: EscrowedState,
         runtime_server_end: ServerEnd<fio::DirectoryMarker>,
     ) -> Result<fcrunner::ComponentStartInfo, StartError> {
+        let EscrowedState { outgoing_dir, escrowed_dictionary } = escrowed_state;
         let ns = self.namespace.serve().map_err(StartError::ServeNamespace)?;
         Ok(fcrunner::ComponentStartInfo {
             resolved_url: Some(self.resolved_url),
             program: Some(self.program),
             ns: Some(ns.into()),
-            outgoing_dir: Some(outgoing_server_end),
+            outgoing_dir: Some(outgoing_dir),
             runtime_dir: Some(runtime_server_end),
             numbered_handles: Some(self.numbered_handles),
             encoded_config: self.encoded_config,
             break_on_start: self.break_on_start,
             component_instance: Some(self.component_instance.into()),
+            escrowed_dictionary,
             ..Default::default()
         })
     }

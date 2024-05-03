@@ -1,0 +1,112 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
+
+group("blackout_all") {
+  testonly = true
+  deps = [
+    ":blackout_emulator",
+    ":blackout_fail",
+    ":blackout_vim3",
+  ]
+}
+
+group("blackout_emulator") {
+  testonly = true
+  deps = [
+    ":blackout_integration_test_no_reboot($host_toolchain)",
+    "//src/storage/blackout/target/blackout-integration",
+  ]
+}
+
+group("blackout_vim3") {
+  testonly = true
+  deps = [
+    ":blackout_integration_test_reboot($host_toolchain)",
+    "//src/storage/blackout/target/blackout-integration",
+  ]
+}
+
+# This is a special integration test which is supposed to fail, to test that verification failures
+# get caught. It shouldn't be run in CI/CQ since it's not set up to "succeed" on failure, it's just
+# for local testing.
+group("blackout_fail") {
+  testonly = true
+  deps = [
+    ":blackout_integration_test_fail($host_toolchain)",
+    "//src/storage/blackout/target/blackout-integration",
+  ]
+}
+
+if (is_host) {
+  python_mobly_test("blackout_integration_test_no_reboot") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
+    ]
+    transport = "fuchsia-controller"
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
+      device_label = "test_label"
+      device_path = "test_path"
+      test_duration = 5
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "None"
+    }
+    environments = [ emu_env ]
+  }
+
+  python_mobly_test("blackout_integration_test_reboot") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
+    ]
+    transport = "fuchsia-controller"
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
+      device_label = "loop"
+      device_path = "loop"
+      test_duration = 5
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "Soft-Reboot"
+    }
+    environments = [ vim3_env ]
+  }
+
+  python_mobly_test("blackout_integration_test_fail") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
+    ]
+    transport = "fuchsia-controller"
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
+      device_label = "fail"
+      device_path = "fail"
+      test_duration = 0
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "None"
+    }
+  }
+}

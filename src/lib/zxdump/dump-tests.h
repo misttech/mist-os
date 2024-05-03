@@ -204,14 +204,14 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder);
 
-  const LiveHandle& root_resource() const { return root_resource_; }
+  const LiveHandle& info_resource() const { return info_resource_; }
 
  private:
   static constexpr const char* kChildName = "zxdump-kernel-test-child";
 
   void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
 
-  LiveHandle root_resource_;
+  LiveHandle info_resource_;
 };
 
 class TestProcessForRemarks : public TestProcessForPropertiesAndInfo {

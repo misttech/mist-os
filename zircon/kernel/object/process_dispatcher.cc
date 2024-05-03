@@ -661,9 +661,9 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
 
   // If there's only one process using this aspace, then the accounting is simple.
   if (count == 1) {
-    stats->mem_mapped_bytes = usage.mapped_pages * PAGE_SIZE;
-    stats->mem_private_bytes = usage.private_pages * PAGE_SIZE;
-    stats->mem_shared_bytes = usage.shared_pages * PAGE_SIZE;
+    stats->mem_mapped_bytes = usage.mapped_bytes;
+    stats->mem_private_bytes = usage.private_bytes;
+    stats->mem_shared_bytes = usage.shared_bytes;
     stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes;
   } else {
     // There are multiple processes using the shareable aspace so things are a little more complex
@@ -672,7 +672,7 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     //
     // Mapped pages are unchanged.  If they're mapped in the aspace, they're mapped in the process
     // that uses this aspace.
-    stats->mem_mapped_bytes = usage.mapped_pages * PAGE_SIZE;
+    stats->mem_mapped_bytes = usage.mapped_bytes;
     //
     // This aspace contributes no private-to-process pages because multiple processes are using it.
     stats->mem_private_bytes = 0;
@@ -680,7 +680,7 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     // However, the private-to-aspace pages are really shared among the processes sharing this
     // aspace so be sure to count them in the process-shared bucket along with the aspace-shared
     // pages.
-    stats->mem_shared_bytes = (usage.private_pages + usage.shared_pages) * PAGE_SIZE;
+    stats->mem_shared_bytes = usage.private_bytes + usage.shared_bytes;
     //
     // Finally, we need to computed the mem_scaled_shared_bytes.
     //
@@ -689,7 +689,7 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes / count;
     // Now, add to that the private-to-aspace pages, scaled down by the number of processes that
     // share the aspace.
-    stats->mem_scaled_shared_bytes += (usage.private_pages * PAGE_SIZE) / count;
+    stats->mem_scaled_shared_bytes += usage.private_bytes / count;
   }
 
   // Now that we've handled the shareable aspace, handle the restricted aspace (if present).
@@ -699,9 +699,9 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     if (status != ZX_OK) {
       return status;
     }
-    stats->mem_mapped_bytes += r_usage.mapped_pages * PAGE_SIZE;
-    stats->mem_private_bytes += r_usage.private_pages * PAGE_SIZE;
-    stats->mem_shared_bytes += r_usage.shared_pages * PAGE_SIZE;
+    stats->mem_mapped_bytes += r_usage.mapped_bytes;
+    stats->mem_private_bytes += r_usage.private_bytes;
+    stats->mem_shared_bytes += r_usage.shared_bytes;
     stats->mem_scaled_shared_bytes += r_usage.scaled_shared_bytes;
   }
 
@@ -856,27 +856,27 @@ uint32_t ProcessDispatcher::ThreadCount() const {
   return static_cast<uint32_t>(thread_list_.size_slow());
 }
 
-VmObject::AttributionCounts ProcessDispatcher::PageCount() const {
+VmObject::AttributionCounts ProcessDispatcher::GetAttributedMemory() const {
   canary_.Assert();
 
-  VmObject::AttributionCounts page_counts;
+  VmObject::AttributionCounts counts;
   Guard<CriticalMutex> guard{get_lock()};
   if (state_ != State::RUNNING) {
-    return page_counts;
+    return counts;
   }
 
   auto root_vmar = shareable_state_->aspace()->RootVmar();
   if (root_vmar) {
-    page_counts += root_vmar->AllocatedPages();
+    counts += root_vmar->GetAttributedMemory();
   }
 
   if (restricted_aspace_ != nullptr) {
     root_vmar = restricted_aspace_->RootVmar();
     if (root_vmar) {
-      page_counts += root_vmar->AllocatedPages();
+      counts += root_vmar->GetAttributedMemory();
     };
   }
-  return page_counts;
+  return counts;
 }
 
 class FindProcessByKoid final : public JobEnumerator {

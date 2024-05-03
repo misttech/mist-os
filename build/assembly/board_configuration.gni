@@ -359,5 +359,6 @@ template("board_configuration") {
     source_dir = files.board_configuration_dir
     dest_dir = rebase_path(files.board_configuration_dir, root_out_dir)
     deps = [ ":${labels.main_target}" ]
+    gn_targets_name = labels.main_target
   }
 }

@@ -22,4 +22,5 @@ def _empty_repo_impl(_ctx):
 empty_repo = repository_rule(
     implementation = _empty_repo_impl,
     doc = "Just an empty repository rule",
+    environ = ["FOO_ENV_VAR"],
 )

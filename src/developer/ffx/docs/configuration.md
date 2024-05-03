@@ -29,7 +29,7 @@ When updating, please add the value in alphabetical order.
 :                                         : `ffx target list`, how long in     :
                                           : milliseconds to wait before        :
                                           : collecting responses. Defaults to  :
-                                          : `500`                              :
+                                          : `2000`                             :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |
 :                                         : nonzero u16). Default to `33331`   :
 | `discovery.zedboot.enabled`             | Determines if zedboot discovery is |

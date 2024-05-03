@@ -24,7 +24,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/android_extended_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/connection.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/extended_low_energy_advertiser.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/extended_low_energy_scanner.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_advertiser.h"
@@ -39,8 +38,8 @@
 
 namespace bt::gap {
 
-namespace hci_android = hci_spec::vendor::android;
-namespace android_hci = pw::bluetooth::vendor::android_hci;
+namespace android_hci = hci_spec::vendor::android;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 static constexpr const char* kInspectLowEnergyDiscoveryManagerNodeName =
     "low_energy_discovery_manager";
@@ -405,7 +404,8 @@ class AdapterImpl final : public Adapter {
 
   std::unique_ptr<hci::LowEnergyAdvertiser> CreateAdvertiser(bool extended) {
     if (extended) {
-      return std::make_unique<hci::ExtendedLowEnergyAdvertiser>(hci_);
+      return std::make_unique<hci::ExtendedLowEnergyAdvertiser>(
+          hci_, state_.low_energy_state.max_advertising_data_length_);
     }
 
     constexpr pw::bluetooth::Controller::FeaturesBits feature =
@@ -796,7 +796,7 @@ void AdapterImpl::ParseLEGetVendorCapabilitiesCommandComplete(
   // the vendor sends, and fill the rest with zero to disable the feature. If we
   // receive a response larger than what we expect, we read up to what we
   // support and drop the rest of the data.
-  StaticPacket<android_hci::LEGetVendorCapabilitiesCommandCompleteEventView>
+  StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventView>
       packet;
   packet.SetToZeros();
   size_t copy_size = std::min(packet.data().size(), event.size());
@@ -813,22 +813,22 @@ void AdapterImpl::ParseLEGetVendorCapabilitiesCommandComplete(
     // The version_supported field was only introduced into the command in
     // Version 0.95. Controllers that use the base version, Version 0.55,
     // don't have the version_supported field.
-    expected_size = android_hci::LEGetVendorCapabilitiesCommandCompleteEvent::
+    expected_size = android_emb::LEGetVendorCapabilitiesCommandCompleteEvent::
         version_0_55_size();
   } else if (major == 0 && minor == 95) {
-    expected_size = android_hci::LEGetVendorCapabilitiesCommandCompleteEvent::
+    expected_size = android_emb::LEGetVendorCapabilitiesCommandCompleteEvent::
         version_0_95_size();
   } else if (major == 0 && minor == 96) {
-    expected_size = android_hci::LEGetVendorCapabilitiesCommandCompleteEvent::
+    expected_size = android_emb::LEGetVendorCapabilitiesCommandCompleteEvent::
         version_0_96_size();
   } else if (major == 0 && minor == 98) {
-    expected_size = android_hci::LEGetVendorCapabilitiesCommandCompleteEvent::
+    expected_size = android_emb::LEGetVendorCapabilitiesCommandCompleteEvent::
         version_0_98_size();
   } else if (major == 1 && minor == 03) {
-    expected_size = android_hci::LEGetVendorCapabilitiesCommandCompleteEvent::
+    expected_size = android_emb::LEGetVendorCapabilitiesCommandCompleteEvent::
         version_1_03_size();
   } else if (major == 1 && minor == 04) {
-    expected_size = android_hci::LEGetVendorCapabilitiesCommandCompleteEvent::
+    expected_size = android_emb::LEGetVendorCapabilitiesCommandCompleteEvent::
         version_1_04_size();
   }
 
@@ -920,8 +920,8 @@ void AdapterImpl::InitializeStep1() {
            "set");
     init_seq_runner_->QueueCommand(
         hci::EmbossCommandPacket::New<
-            android_hci::LEGetVendorCapabilitiesCommandView>(
-            hci_android::kLEGetVendorCapabilities),
+            android_emb::LEGetVendorCapabilitiesCommandView>(
+            android_hci::kLEGetVendorCapabilities),
         [this](const hci::EmbossEventPacket& event) {
           if (hci_is_error(
                   event,
@@ -1040,6 +1040,42 @@ void AdapterImpl::InitializeStep2() {
                 .return_params<hci_spec::LEReadSupportedStatesReturnParams>();
         state_.low_energy_state.supported_states_ = le64toh(params->le_states);
       });
+
+  if (state_.IsCommandSupported(
+          /*octet=*/36,
+          hci_spec::SupportedCommand::kLEReadMaximumAdvertisingDataLength)) {
+    // HCI_LE_Read_Maximum_Advertising_Data_Length
+    init_seq_runner_->QueueCommand(
+        hci::EmbossCommandPacket::New<
+            pw::bluetooth::emboss::LEReadMaxAdvertisingDataLengthCommandView>(
+            hci_spec::kLEReadMaximumAdvertisingDataLength),
+        [this](const hci::EmbossEventPacket& cmd_complete) {
+          if (hci_is_error(cmd_complete,
+                           WARN,
+                           "gap",
+                           "LE read maximum advertising data length failed")) {
+            return;
+          }
+
+          auto params = cmd_complete.view<
+              pw::bluetooth::emboss::
+                  LEReadMaximumAdvertisingDataLengthCommandCompleteEventView>();
+          state_.low_energy_state.max_advertising_data_length_ =
+              params.max_advertising_data_length().Read();
+          bt_log(INFO,
+                 "gap",
+                 "maximum advertising data length: %d",
+                 state_.low_energy_state.max_advertising_data_length_);
+        });
+  } else {
+    bt_log(INFO,
+           "gap",
+           "LE read maximum advertising data command not supported, "
+           "defaulting to legacy maximum: %zu",
+           hci_spec::kMaxLEAdvertisingDataLength);
+    state_.low_energy_state.max_advertising_data_length_ =
+        hci_spec::kMaxLEAdvertisingDataLength;
+  }
 
   if (state_.IsCommandSupported(
           /*octet=*/41, hci_spec::SupportedCommand::kLEReadBufferSizeV2)) {

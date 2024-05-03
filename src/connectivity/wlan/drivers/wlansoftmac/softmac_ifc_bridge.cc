@@ -24,7 +24,7 @@ namespace wlan::drivers::wlansoftmac {
 using ::wlan::drivers::fidl_bridge::ForwardResult;
 
 zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
-    const fdf::Dispatcher& dispatcher, const frame_processor_t* frame_processor,
+    const frame_processor_t* frame_processor,
     fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
     fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
         softmac_ifc_bridge_client_endpoint) {
@@ -32,33 +32,25 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
   auto softmac_ifc_bridge =
       std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge(frame_processor));
 
-  // Bind the WlanSoftmacIfc server and WlanSoftmacIfcBridge client on
-  // softmac_ifc_bridge_server_dispatcher.
-  libsync::Completion binding_task_complete;
-  async::PostTask(
-      dispatcher.async_dispatcher(),
-      [softmac_ifc_bridge = softmac_ifc_bridge.get(), server_endpoint = std::move(server_endpoint),
-       softmac_ifc_bridge_client_endpoint = std::move(softmac_ifc_bridge_client_endpoint),
-       &binding_task_complete]() mutable {
-        WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacIfc server binding");
-        softmac_ifc_bridge->softmac_ifc_server_binding_ =
-            std::make_unique<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>(
-                fdf::Dispatcher::GetCurrent()->get(), std::move(server_endpoint),
-                softmac_ifc_bridge, [](fidl::UnbindInfo info) {
-                  WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacIfc close_handler");
-                  if (info.is_user_initiated()) {
-                    linfo("WlanSoftmacIfc server closed.");
-                  } else {
-                    lerror("WlanSoftmacIfc unexpectedly closed: %s", info.lossy_description());
-                  }
-                });
-        softmac_ifc_bridge->softmac_ifc_bridge_client_ =
-            std::make_unique<fidl::Client<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>(
-                std::move(softmac_ifc_bridge_client_endpoint),
-                fdf::Dispatcher::GetCurrent()->async_dispatcher());
-        binding_task_complete.Signal();
-      });
-  binding_task_complete.Wait();
+  {
+    WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacIfc server binding");
+    softmac_ifc_bridge->softmac_ifc_server_binding_ =
+        std::make_unique<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>(
+            fdf::Dispatcher::GetCurrent()->get(), std::move(server_endpoint),
+            softmac_ifc_bridge.get(), [](fidl::UnbindInfo info) {
+              WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacIfc close_handler");
+              if (info.is_user_initiated()) {
+                linfo("WlanSoftmacIfc server closed.");
+              } else {
+                lerror("WlanSoftmacIfc unexpectedly closed: %s", info.lossy_description());
+              }
+            });
+  }
+
+  softmac_ifc_bridge->softmac_ifc_bridge_client_ =
+      std::make_unique<fidl::Client<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>(
+          std::move(softmac_ifc_bridge_client_endpoint),
+          fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   return fit::ok(std::move(softmac_ifc_bridge));
 }
@@ -121,6 +113,17 @@ void SoftmacIfcBridge::NotifyScanComplete(NotifyScanCompleteRequest& request,
       ->NotifyScanComplete(request)
       .Then(ForwardResult<fuchsia_wlan_softmac::WlanSoftmacIfcBridge::NotifyScanComplete>(
           completer.ToAsync()));
+}
+
+void SoftmacIfcBridge::StopBridgedDriver(std::unique_ptr<fit::callback<void()>> stop_completer) {
+  WLAN_TRACE_DURATION();
+  (*softmac_ifc_bridge_client_)
+      ->StopBridgedDriver()
+      .Then(
+          [stop_completer = std::move(stop_completer)](
+              fidl::Result<fuchsia_wlan_softmac::WlanSoftmacIfcBridge::StopBridgedDriver>& result) {
+            (*stop_completer)();
+          });
 }
 
 }  // namespace wlan::drivers::wlansoftmac

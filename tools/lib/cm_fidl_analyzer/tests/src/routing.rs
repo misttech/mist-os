@@ -19,6 +19,7 @@ use {
     },
     cm_rust::*,
     cm_rust_testing::*,
+    cm_types::Url,
     fidl::prelude::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
@@ -37,7 +38,6 @@ use {
         sync::Arc,
     },
     thiserror::Error,
-    url::Url,
 };
 
 const TEST_URL_PREFIX: &str = "test:///";
@@ -53,8 +53,8 @@ pub struct RoutingTestForAnalyzer {
 }
 
 pub struct RoutingTestBuilderForAnalyzer {
-    root_url: cm_types::Url,
-    decls_by_url: HashMap<url::Url, (ComponentDecl, Option<config_encoder::ConfigFields>)>,
+    root_url: Url,
+    decls_by_url: HashMap<Url, (ComponentDecl, Option<config_encoder::ConfigFields>)>,
     namespace_capabilities: Vec<CapabilityDecl>,
     builtin_capabilities: Vec<CapabilityDecl>,
     builtin_runner_registrations: Vec<RunnerRegistration>,
@@ -72,10 +72,10 @@ impl RoutingTestBuilderForAnalyzer {
     // Creates a new builder with the specified map of component URLs to `ComponentDecl`s, rather
     // than using the default test URL scheme.
     fn new_with_custom_urls(root_url: String, components: Vec<(String, ComponentDecl)>) -> Self {
-        let root_url = cm_types::Url::new(root_url).expect("failed to parse root component url");
+        let root_url = Url::new(root_url).expect("failed to parse root component url");
         let decls_by_url =
             HashMap::from_iter(components.into_iter().map(|(url_string, component_decl)| {
-                (Url::parse(&url_string).unwrap(), (component_decl, None))
+                (Url::new(&url_string).unwrap(), (component_decl, None))
             }));
         Self {
             root_url,
@@ -98,10 +98,10 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
     // Creates a new builder with the specified components. Components are specified by name;
     // the method assigns each component a test URL.
     fn new(root_component: &str, components: Vec<(&'static str, ComponentDecl)>) -> Self {
-        let root_url = cm_types::Url::new(make_test_url(root_component))
-            .expect("failed to parse root component url");
+        let root_url =
+            Url::new(make_test_url(root_component)).expect("failed to parse root component url");
         let decls_by_url = HashMap::from_iter(components.into_iter().map(|(name, decl)| {
-            (Url::parse(&format!("{}{}", TEST_URL_PREFIX, name)).unwrap(), (decl, None))
+            (Url::new(&format!("{}{}", TEST_URL_PREFIX, name)).unwrap(), (decl, None))
         }));
         Self {
             root_url,
@@ -177,8 +177,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
         };
         config.builtin_boot_resolver = self.builtin_boot_resolver;
 
-        let root_url = Url::parse(self.root_url.as_str()).unwrap();
-        let build_model_result = ModelBuilderForAnalyzer::new(root_url).build(
+        let build_model_result = ModelBuilderForAnalyzer::new(self.root_url).build(
             self.decls_by_url,
             Arc::new(config),
             Arc::new(component_id_index),

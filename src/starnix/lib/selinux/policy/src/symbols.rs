@@ -1207,6 +1207,14 @@ impl<PS: ParseStrategy> User<PS> {
     pub(crate) fn name_bytes(&self) -> &[u8] {
         PS::deref_slice(&self.user_data.data)
     }
+
+    pub(crate) fn roles(&self) -> &ExtensibleBitmap<PS> {
+        &self.roles
+    }
+
+    pub(crate) fn mls_range(&self) -> &MlsRange<PS> {
+        &self.expanded_range
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for User<PS>

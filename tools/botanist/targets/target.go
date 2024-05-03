@@ -594,6 +594,9 @@ type Options struct {
 	// SSHKey is a private SSH key file, corresponding to an authorized key to be paved or
 	// to one baked into a boot image.
 	SSHKey string
+
+	// AuthorizedKey is the authorized key file corresponding to the private SSH key.
+	AuthorizedKey string
 }
 
 // FromJSON parses a Base target from JSON config.

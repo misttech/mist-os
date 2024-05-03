@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.process/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
 #include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
@@ -266,6 +267,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     return {
         // Route global capabilities from parent to the Debian realm.
         {.capabilities = {Proto<fuchsia_kernel::VmexResource>(), Proto<fuchsia_sysmem::Allocator>(),
+                          Proto<fuchsia_sysmem2::Allocator>(),
                           Proto<fuchsia_tracing_provider::Registry>()},
          .source = ParentRef(),
          .targets = {ChildRef{kDebianRealm}}},

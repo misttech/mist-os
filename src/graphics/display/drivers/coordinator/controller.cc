@@ -12,6 +12,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
 #include <lib/trace/event.h>
@@ -63,6 +64,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/graphics/display/lib/edid/timings.h"
+#include "src/lib/async-watchdog/watchdog.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
@@ -137,9 +139,9 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     uint32_t display_cfg_result;
     client_composition_opcode_t layer_result = 0;
     size_t display_layer_results_count;
-    display_cfg_result = driver_.CheckConfiguration(test_configs, 1, &layer_result,
-                                                    /*client_composition_opcodes_count=*/1,
-                                                    &display_layer_results_count);
+    display_cfg_result = engine_driver_client_->CheckConfiguration(
+        test_configs, 1, &layer_result,
+        /*client_composition_opcodes_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(timing, &ac);
@@ -219,7 +221,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
       // The array is empty if memory allocation failed. We prefer using an
       // empty ELD to dropping the display altogether.
-      driver_.SetEld(display_id, eld);
+      engine_driver_client_->SetEld(display_id, eld);
     }
 
     fbl::AutoLock lock(mtx());
@@ -275,7 +277,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
     delete task;
   });
-  task.release()->Post(loop_.dispatcher());
+  task.release()->Post(dispatcher_.async_dispatcher());
 }
 
 void Controller::DisplayControllerInterfaceOnCaptureComplete() {
@@ -310,7 +312,7 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
     }
     delete task;
   });
-  task.release()->Post(loop_.dispatcher());
+  task.release()->Post(dispatcher_.async_dispatcher());
 }
 
 void Controller::DisplayControllerInterfaceOnDisplayVsync(
@@ -488,16 +490,6 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
 
   last_valid_apply_config_config_stamp_property_.Set(config_stamp.value());
 
-  // Release the bootloader framebuffer referenced by the kernel. This only
-  // needs to be done once on the first ApplyConfig().
-  if (!kernel_framebuffer_released_) {
-    zx_framebuffer_set_range(get_framebuffer_resource(parent()), /*vmo=*/ZX_HANDLE_INVALID,
-                             /*len=*/0,
-                             /*format=*/ZBI_PIXEL_FORMAT_NONE, /*width=*/0, /*height=*/0,
-                             /*stride=*/0);
-    kernel_framebuffer_released_ = true;
-  }
-
   // TODO(https://fxbug.dev/42080631): Replace VLA with fixed-size array once we have a
   // limit on the number of connected displays.
   const int32_t display_configs_size = std::max(1, count);
@@ -620,11 +612,11 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   }
 
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
-  driver_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
+  engine_driver_client_->ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
 void Controller::ReleaseImage(DriverImageId driver_image_id) {
-  driver_.ReleaseImage(driver_image_id);
+  engine_driver_client_->ReleaseImage(driver_image_id);
 }
 
 void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
@@ -635,7 +627,7 @@ void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_i
     return;
   }
 
-  const zx::result<> result = driver_.ReleaseCapture(driver_capture_image_id);
+  const zx::result<> result = engine_driver_client_->ReleaseCapture(driver_capture_image_id);
   if (result.is_error() && result.error_value() == ZX_ERR_SHOULD_WAIT) {
     ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
@@ -733,30 +725,6 @@ zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelForm
     }
   }
   return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-bool Controller::GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
-                                       const char** monitor_name, const char** monitor_serial) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  for (auto& display : displays_) {
-    if (display.id == display_id) {
-      display.GetIdentifiers(manufacturer_name, monitor_name, monitor_serial);
-      return true;
-    }
-  }
-  return false;
-}
-
-bool Controller::GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
-                                              uint32_t* vertical_size_mm) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  for (DisplayInfo& display : displays_) {
-    if (display.id == display_id) {
-      display.GetPhysicalDimensions(horizontal_size_mm, vertical_size_mm);
-      return true;
-    }
-  }
-  return false;
 }
 
 namespace {
@@ -866,7 +834,7 @@ zx_status_t Controller::CreateClient(
         delete task;
       });
 
-  return task.release()->Post(loop_.dispatcher());
+  return task.release()->Post(dispatcher_.async_dispatcher());
 }
 
 display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() {
@@ -889,57 +857,69 @@ ConfigStamp Controller::TEST_controller_stamp() const {
   return controller_stamp_;
 }
 
-zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
-  ZX_DEBUG_ASSERT_MSG(device_ptr && device_ptr->get() == this, "Wrong controller passed to Bind()");
+// static
+zx::result<std::unique_ptr<Controller>> Controller::Create(
+    std::unique_ptr<EngineDriverClient> engine_driver_client) {
+  fbl::AllocChecker alloc_checker;
 
-  zx_status_t status = driver_.Bind();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to bind driver %d", status);
-    return status;
+  auto controller =
+      fbl::make_unique_checked<Controller>(&alloc_checker, std::move(engine_driver_client));
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for Controller");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  status = loop_.StartThread("display-client-loop", &loop_thread_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start loop %d", status);
-    return status;
+  zx::result<> initialize_result = controller->Initialize();
+  if (initialize_result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize the Controller device: %s",
+           initialize_result.status_string());
+    return initialize_result.take_error();
   }
 
-  status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
-                      .set_flags(DEVICE_ADD_NON_BINDABLE)
-                      .set_inspect_vmo(inspector_.DuplicateVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add display core device %d", status);
-    return status;
+  return zx::ok(std::move(controller));
+}
+
+zx::result<> Controller::Initialize() {
+  const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",
+          [this](fdf_dispatcher*) { dispatcher_shutdown_completion_.Signal(); },
+          kSchedulerRoleName);
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create dispatcher: %s", create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
+  }
+  dispatcher_ = std::move(create_dispatcher_result).value();
+
+  fbl::AllocChecker alloc_checker;
+  watchdog_ = fbl::make_unique_checked<async_watchdog::Watchdog>(
+      &alloc_checker, "display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
+      dispatcher_.async_dispatcher());
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for Watchdog");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  // Set the display controller looper thread to use a scheduler role.
-  {
-    const char* role_name = "fuchsia.graphics.display.drivers.display.controller";
-    status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(loop_thread_), role_name,
-                                        strlen(role_name));
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
-    }
-  }
-
-  [[maybe_unused]] auto ptr = device_ptr->release();
-
-  driver_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
-
-  supports_capture_ = driver_.IsCaptureSupported();
-  zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
-         zx_status_get_string(status));
+  supports_capture_ = engine_driver_client_->IsCaptureSupported();
+  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
 
   zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
   if (vsync_monitor_init_result.is_error()) {
     // VsyncMonitor::Init() logged the error.
-    return vsync_monitor_init_result.status_value();
+    return vsync_monitor_init_result.take_error();
   }
-  return ZX_OK;
+
+  engine_driver_client_->SetDisplayControllerInterface({
+      .ops = &display_controller_interface_protocol_ops_,
+      .ctx = this,
+  });
+
+  return zx::ok();
 }
 
-void Controller::DdkUnbind(ddk::UnbindTxn txn) {
-  zxlogf(INFO, "Controller::DdkUnbind");
+void Controller::PrepareStop() {
+  zxlogf(INFO, "Controller::PrepareStop");
 
   fbl::AutoLock lock(mtx());
   unbinding_ = true;
@@ -948,14 +928,14 @@ void Controller::DdkUnbind(ddk::UnbindTxn txn) {
   for (auto& client : clients_) {
     client->CloseOnControllerLoop();
   }
-
-  txn.Reply();
 }
 
-void Controller::DdkRelease() {
+void Controller::Stop() {
   vsync_monitor_.Deinitialize();
-  // Clients may have active work holding mtx_ in loop_.dispatcher(), so shut it down without mtx_.
-  loop_.Shutdown();
+
+  // Clients may have active work holding mtx_ in dispatcher_, so shut it down without mtx_.
+  dispatcher_.ShutdownAsync();
+  dispatcher_shutdown_completion_.Wait();
 
   // Set an empty config so that the display driver releases resources.
   display_config_t empty_config;
@@ -963,23 +943,23 @@ void Controller::DdkRelease() {
     fbl::AutoLock lock(mtx());
     ++controller_stamp_;
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-    driver_.ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+    engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
   }
-  driver_.ResetDisplayControllerInterface();
-  delete this;
 }
 
-Controller::Controller(zx_device_t* parent) : Controller(parent, inspect::Inspector{}) {}
+Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client)
+    : Controller(std::move(engine_driver_client), inspect::Inspector{}) {
+  ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
+}
 
-Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
-    : DeviceType(parent),
-      inspector_(std::move(inspector)),
+Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
+                       inspect::Inspector inspector)
+    : inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
       vsync_monitor_(root_.CreateChild("vsync_monitor")),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-                loop_.dispatcher()),
-      driver_(Driver(this, parent)) {
+      engine_driver_client_(std::move(engine_driver_client)) {
+  ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
+
   mtx_init(&mtx_, mtx_plain);
 
   last_valid_apply_config_timestamp_ns_property_ =
@@ -990,7 +970,10 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
       root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStamp.value());
 }
 
-Controller::~Controller() { zxlogf(INFO, "Controller::~Controller"); }
+Controller::~Controller() {
+  zxlogf(INFO, "Controller::~Controller");
+  engine_driver_client_->ResetDisplayControllerInterface();
+}
 
 size_t Controller::TEST_imported_images_count() const {
   fbl::AutoLock lock(mtx());
@@ -1003,25 +986,4 @@ size_t Controller::TEST_imported_images_count() const {
   return virtcon_images + primary_images + display_images;
 }
 
-// ControllerInstance methods
-
 }  // namespace display
-
-static zx_status_t display_controller_bind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  std::unique_ptr<display::Controller> core(new (&ac) display::Controller(parent));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  return core->Bind(&core);
-}
-
-static constexpr zx_driver_ops_t display_controller_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = display_controller_bind;
-  return ops;
-}();
-
-ZIRCON_DRIVER(display_controller, display_controller_ops, "zircon", "0.1");

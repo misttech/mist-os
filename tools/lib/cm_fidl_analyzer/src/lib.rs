@@ -239,16 +239,16 @@ mod tests {
         cm_config::RuntimeConfig,
         cm_rust::ComponentDecl,
         cm_rust_testing::ComponentDeclBuilder,
+        cm_types::Url,
         fuchsia_url::AbsoluteComponentUrl,
         routing::environment::RunnerRegistry,
         std::{collections::HashMap, sync::Arc},
-        url::Url,
     };
 
     const TEST_URL_PREFIX: &str = "test:///";
 
     fn make_test_url(component_name: &str) -> Url {
-        Url::parse(&format!("{}{}", TEST_URL_PREFIX, component_name)).unwrap()
+        Url::new(&format!("{}{}", TEST_URL_PREFIX, component_name)).unwrap()
     }
 
     fn make_decl_map(

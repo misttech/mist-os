@@ -697,10 +697,10 @@ impl TryFrom<&ChannelParameters> for fidl_bredr::ChannelParameters {
 #[fidl_table_src(fidl_bredr::ScoConnectionParameters)]
 pub struct ValidScoConnectionParameters {
     pub parameter_set: fidl_bredr::HfpParameterSet,
-    pub air_coding_format: fidl_bredr::CodingFormat,
+    pub air_coding_format: fidl_bt::AssignedCodingFormat,
     pub air_frame_size: u16,
     pub io_bandwidth: u32,
-    pub io_coding_format: fidl_bredr::CodingFormat,
+    pub io_coding_format: fidl_bt::AssignedCodingFormat,
     pub io_frame_size: u16,
     #[fidl_field_type(optional)]
     pub io_pcm_data_format: Option<fidl_fuchsia_hardware_audio::SampleFormat>,
@@ -1324,10 +1324,10 @@ mod tests {
 
         let params = fidl_bredr::ScoConnectionParameters {
             parameter_set: Some(fidl_bredr::HfpParameterSet::D1),
-            air_coding_format: Some(fidl_bredr::CodingFormat::Cvsd),
+            air_coding_format: Some(fidl_bt::AssignedCodingFormat::Cvsd),
             air_frame_size: Some(60),
             io_bandwidth: Some(16000),
-            io_coding_format: Some(fidl_bredr::CodingFormat::LinearPcm),
+            io_coding_format: Some(fidl_bt::AssignedCodingFormat::LinearPcm),
             io_frame_size: Some(16),
             io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
             io_pcm_sample_payload_msb_position: Some(1),

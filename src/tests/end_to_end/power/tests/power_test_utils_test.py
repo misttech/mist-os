@@ -6,8 +6,6 @@
 # keep-sorted start
 
 import dataclasses
-import itertools
-import json
 import signal
 import tempfile
 import time
@@ -19,7 +17,7 @@ import unittest.mock as mock
 # keep-sorted start
 from pathlib import Path
 from power_test_utils import power_test_utils
-from trace_processing import trace_importing, trace_metrics, trace_model
+from trace_processing import trace_metrics
 
 # keep-sorted end
 
@@ -30,7 +28,7 @@ _MEASUREPOWER_PATH = "path/to/power"
 class PowerSamplerTest(unittest.TestCase):
     """Tests for PowerSampler"""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.output_dir = tempfile.TemporaryDirectory()
         self.output_dir_path = Path(self.output_dir.name)
         self.expected_csv_output_path = Path(
@@ -62,7 +60,9 @@ class PowerSamplerTest(unittest.TestCase):
         self.assertEqual(sampler.to_fuchsiaperf_results(), [])
 
     @mock.patch("subprocess.Popen")
-    def test_sampler_with_measurepower(self, mock_popen) -> None:
+    def test_sampler_with_measurepower(
+        self, mock_popen: mock.MagicMock
+    ) -> None:
         """Tests PowerSampler when given a path to a measurepower binary.
 
         The sampler should interact with the binary via subprocess.Popen
@@ -130,7 +130,10 @@ class PowerSamplerTest(unittest.TestCase):
     @mock.patch("time.time")
     @mock.patch("time.sleep")
     def test_sampler_with_measurepower_timeout(
-        self, mock_sleep, mock_time, mock_popen
+        self,
+        mock_sleep: mock.MagicMock,
+        mock_time: mock.MagicMock,
+        mock_popen: mock.MagicMock,
     ) -> None:
         """Tests the sampler with a measurepower binary path that times out"""
         sampler = power_test_utils.create_power_sampler(

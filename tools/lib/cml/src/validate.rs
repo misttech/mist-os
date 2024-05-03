@@ -766,7 +766,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 }
                 match &d.root {
                     RootDictionaryRef::Self_ | RootDictionaryRef::Named(_) => {}
-                    RootDictionaryRef::Parent => {
+                    RootDictionaryRef::Parent | RootDictionaryRef::Program => {
                         return Err(Error::validate(
                             "`expose` dictionary path must begin with `self` or `#<child-name>`",
                         ));
@@ -943,7 +943,19 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         }
 
         for ref_ in offer.from.iter() {
-            if let OfferFromRef::Dictionary(_) = ref_ {
+            if let OfferFromRef::Dictionary(d) = ref_ {
+                match &d.root {
+                    RootDictionaryRef::Self_
+                    | RootDictionaryRef::Named(_)
+                    | RootDictionaryRef::Parent => {}
+                    RootDictionaryRef::Program => {
+                        return Err(Error::validate(
+                            "`offer` dictionary path must begin with `self`, `parent`, or \
+                                `#<child-name>`",
+                        ));
+                    }
+                }
+
                 if offer.storage.is_some() {
                     return Err(Error::validate(
                         "Dictionaries do not support \"storage\" capabilities",
@@ -1247,6 +1259,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             AnyRef::Named(n) => {
                 sources.push(DependencyNode::Named(n));
             }
+            AnyRef::Program => {
+                sources.push(DependencyNode::Self_);
+            }
             AnyRef::Parent | AnyRef::Void | AnyRef::Framework | AnyRef::Debug => {}
             AnyRef::OwnDictionary(_) => unreachable!("can't be a source"),
         }
@@ -1322,7 +1337,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     // The source is valid and void
                     if availability != &Some(Availability::Optional) {
                         return Err(Error::validate(format!(
-                            "capabilities with a source of \"void\" must have an availability of \"optional\"",
+                            "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"{}\", from: \"{}\"",
+                            cap.names().iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", "),
+                            cap.from_(),
                         )));
                     }
                 }
@@ -1333,7 +1350,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     // The source is invalid, and will be rewritten to void
                     if availability != &Some(Availability::Optional) && availability != &None {
                         return Err(Error::validate(format!(
-                            "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\"",
+                            "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"{}\", from: \"{}\"",
+                            cap.names().iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", "),
+                            cap.from_(),
                         )));
                     }
                 }
@@ -1756,6 +1775,7 @@ impl<'a> DependencyNode<'a> {
             RootDictionaryRef::Named(name) => Some(DependencyNode::Named(name)),
             RootDictionaryRef::Self_ => Some(DependencyNode::Self_),
             RootDictionaryRef::Parent => None,
+            RootDictionaryRef::Program => Some(DependencyNode::Self_),
         }
     }
 
@@ -3525,6 +3545,17 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "`expose` dictionary path must begin with `self` or `#<child-name>`"
         ),
+        test_cml_expose_from_dictionary_program(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "pkg_protocol",
+                        "from": "program/a",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "`expose` dictionary path must begin with `self` or `#<child-name>`"
+        ),
         test_cml_expose_protocol_from_collection_invalid(
             json!({
                 "collections": [ {
@@ -3951,6 +3982,24 @@ mod tests {
                 ],
             }),
             Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", \"#<collection-name>\", or a dictionary path"
+        ),
+        test_cml_offer_from_dictionary_program(
+            json!({
+                "offer": [
+                    {
+                        "protocol": "pkg_protocol",
+                        "from": "program/a",
+                        "to": "#child",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "child",
+                        "url": "fuchsia-pkg://child",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "`offer` dictionary path must begin with `self`, `parent`, or `#<child-name>`"
         ),
         test_cml_offer_to_non_dictionary(
             json!({
@@ -6106,7 +6155,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_offer_source_void_availability_same_as_target(
             json!({
@@ -6125,7 +6174,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_offer_source_missing_availability_required(
             json!({
@@ -6145,7 +6194,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
         test_offer_source_missing_availability_same_as_target(
             json!({
@@ -6165,7 +6214,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
         test_expose_source_availability_unknown(
             json!({
@@ -6213,7 +6262,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_expose_source_void_availability_same_as_target(
             json!({
@@ -6225,7 +6274,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with a source of \"void\" must have an availability of \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"void\""
         ),
         test_expose_source_missing_availability_required(
             json!({
@@ -6238,7 +6287,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
         test_expose_source_missing_availability_same_as_target(
             json!({
@@ -6251,7 +6300,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\""
+            Err(Error::Validate { err, .. }) if &err == "capabilities with an intentionally missing source must have an availability that is either unset or \"optional\", capabilities: \"fuchsia.examples.Echo\", from: \"#bar\""
         ),
     }
 
@@ -7174,7 +7223,42 @@ mod tests {
                 "Strong dependency cycles were found. Break the cycle by removing a \
                 dependency or marking an offer as weak. Cycles: {{#a -> self -> #dict -> #a}}"
         ),
-
+        test_cml_use_dependency_cycle_with_dictionary_that_extends(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        // This should create a dependency self -> #dict
+                        "extends": "program/some/dir",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "#meta/a.cm",
+                    },
+                ],
+                "use": [
+                    {
+                        "protocol": "1",
+                        "from": "#a",
+                    },
+                ],
+                "offer": [
+                    {
+                        "dictionary": "dict",
+                        "from": "self",
+                        "to": "#a",
+                    },
+                ],
+            }),
+            Err(Error::Validate {
+                err,
+                ..
+            }) if &err ==
+                "Strong dependency cycles were found. Break the cycle by removing a \
+                dependency or marking an offer as weak. Cycles: {{#a -> self -> #dict -> #a}}"
+        ),
     }}
 
     // Tests that offering and exposing service capabilities to the same target and target name is

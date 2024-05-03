@@ -55,9 +55,9 @@ fit::result<Error, LiveHandle> GetRootJob() {
                         &fidl::WireResponse<fuchsia_kernel::RootJob::Get>::job>();
 }
 
-fit::result<Error, LiveHandle> GetRootResource() {
-  return GetFromService<fuchsia_boot::RootResource,
-                        &fidl::WireResponse<fuchsia_boot::RootResource::Get>::resource>();
+fit::result<Error, LiveHandle> GetInfoResource() {
+  return GetFromService<fuchsia_kernel::InfoResource,
+                        &fidl::WireResponse<fuchsia_kernel::InfoResource::Get>::resource>();
 }
 
 }  // namespace zxdump

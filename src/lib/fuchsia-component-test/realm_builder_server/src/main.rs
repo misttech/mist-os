@@ -185,7 +185,7 @@ impl RealmBuilderFactory {
                         return Err(e);
                     }
                     let realm_node = match RealmNode2::load_from_pkg(
-                        relative_url.clone(),
+                        &relative_url,
                         Clone::clone(&pkg_dir),
                     )
                     .await
@@ -603,7 +603,7 @@ impl Realm {
         let name = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
         if is_fragment_only_url(&url) {
             let child_realm_node =
-                RealmNode2::load_from_pkg(url, Clone::clone(&self.pkg_dir)).await?;
+                RealmNode2::load_from_pkg(&url, Clone::clone(&self.pkg_dir)).await?;
             self.realm_node.add_child(name, options, child_realm_node).await
         } else {
             self.realm_node.add_child_decl(name, url, options).await
@@ -884,7 +884,7 @@ impl RealmNodeState {
 
         self.decl.children.push(cm_rust::ChildDecl {
             name: child_name,
-            url: child_url,
+            url: child_url.parse().map_err(|_| RealmBuilderError::UrlInvalid)?,
             startup: match child_options.startup {
                 Some(fcdecl::StartupMode::Lazy) => fcdecl::StartupMode::Lazy,
                 Some(fcdecl::StartupMode::Eager) => fcdecl::StartupMode::Eager,
@@ -1067,9 +1067,9 @@ impl RealmNode2 {
     }
 
     fn load_from_pkg(
-        fragment_only_url: String,
+        fragment_only_url: &str,
         test_pkg_dir: fio::DirectoryProxy,
-    ) -> BoxFuture<'static, Result<RealmNode2, RealmBuilderError>> {
+    ) -> BoxFuture<'_, Result<RealmNode2, RealmBuilderError>> {
         async move {
             let path = fragment_only_url.trim_start_matches('#');
 
@@ -1082,11 +1082,11 @@ impl RealmNode2 {
             let file_proxy = match file_proxy_res {
                 Ok(file_proxy) => file_proxy,
                 Err(fuchsia_fs::node::OpenError::OpenError(zx_status::Status::NOT_FOUND)) => {
-                    return Err(RealmBuilderError::DeclNotFound(fragment_only_url.clone()))
+                    return Err(RealmBuilderError::DeclNotFound(fragment_only_url.into()))
                 }
                 Err(e) => {
                     return Err(RealmBuilderError::DeclReadError(
-                        fragment_only_url.clone(),
+                        fragment_only_url.into(),
                         e.into(),
                     ))
                 }
@@ -1094,10 +1094,10 @@ impl RealmNode2 {
 
             let fidl_decl = fuchsia_fs::file::read_fidl::<fcdecl::Component>(&file_proxy)
                 .await
-                .map_err(|e| RealmBuilderError::DeclReadError(fragment_only_url.clone(), e))?;
+                .map_err(|e| RealmBuilderError::DeclReadError(fragment_only_url.into(), e))?;
             cm_fidl_validator::validate(&fidl_decl).map_err(|e| {
                 RealmBuilderError::InvalidComponentDeclWithName(
-                    fragment_only_url,
+                    fragment_only_url.into(),
                     to_tabulated_string(e),
                 )
             })?;
@@ -1108,11 +1108,12 @@ impl RealmNode2 {
 
             let children = state_guard.decl.children.drain(..).collect::<Vec<_>>();
             for child in children {
-                if !is_fragment_only_url(&child.url) {
+                if !is_fragment_only_url(child.url.as_str()) {
                     state_guard.decl.children.push(child);
                 } else {
                     let child_node =
-                        RealmNode2::load_from_pkg(child.url, Clone::clone(&test_pkg_dir)).await?;
+                        RealmNode2::load_from_pkg(child.url.as_str(), Clone::clone(&test_pkg_dir))
+                            .await?;
 
                     // TODO(https://fxbug.dev/42053123): Validate overrides in cm_fidl_validator before
                     // converting them to cm_rust.
@@ -1950,6 +1951,9 @@ enum RealmBuilderError {
     #[error("Invalid child declaration. Field `environment` is not a valid name.")]
     EnvironmentNameInvalid,
 
+    #[error("Invalid child declaration. Field `url` is not a valid url.")]
+    UrlInvalid,
+
     /// The handle the client provided is not usable
     #[error("Handle for child realm \"{0}\" is not usable. {1:?}")]
     InvalidChildRealmHandle(String, fidl::Error),
@@ -1992,6 +1996,7 @@ impl From<RealmBuilderError> for ftest::RealmBuilderError {
             RealmBuilderError::NoSuchChild(_) => Self::NoSuchChild,
             RealmBuilderError::ChildNameInvalid => Self::InvalidChildDecl,
             RealmBuilderError::EnvironmentNameInvalid => Self::InvalidChildDecl,
+            RealmBuilderError::UrlInvalid => Self::InvalidChildDecl,
             RealmBuilderError::ChildDeclNotVisible(_) => Self::ChildDeclNotVisible,
             RealmBuilderError::NoSuchSource(_) => Self::NoSuchSource,
             RealmBuilderError::NoSuchTarget(_) => Self::NoSuchTarget,
@@ -2080,11 +2085,11 @@ mod tests {
 
     impl ComponentTree {
         fn new_from_resolver(
-            url: String,
+            url: &str,
             registry: Arc<resolver::Registry>,
-        ) -> BoxFuture<'static, Option<ComponentTree>> {
+        ) -> BoxFuture<'_, Option<ComponentTree>> {
             async move {
-                let decl_from_resolver = match registry.get_decl_for_url(&url).await {
+                let decl_from_resolver = match registry.get_decl_for_url(url).await {
                     Some(decl) => decl,
                     None => return None,
                 };
@@ -2092,7 +2097,7 @@ mod tests {
                 let mut self_ = ComponentTree { decl: decl_from_resolver, children: vec![] };
                 let children = self_.decl.children.drain(..).collect::<Vec<_>>();
                 for child in children {
-                    match Self::new_from_resolver(child.url.clone(), registry.clone()).await {
+                    match Self::new_from_resolver(child.url.as_str(), registry.clone()).await {
                         None => {
                             self_.decl.children.push(child);
                         }
@@ -2338,7 +2343,7 @@ mod tests {
         // be `assert_eq`'d against what the tree is expected to be.
         async fn call_build_and_get_tree(&mut self) -> ComponentTree {
             let url = self.call_build().await.expect("builder unexpectedly returned an error");
-            ComponentTree::new_from_resolver(url, self.registry.clone())
+            ComponentTree::new_from_resolver(&url, self.registry.clone())
                 .await
                 .expect("tree missing from resolver")
         }
@@ -2397,7 +2402,7 @@ mod tests {
     async fn build_empty_realm() {
         let mut tree = ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2516,7 +2521,7 @@ mod tests {
         };
 
         let (root_url, registry) = build_tree(&mut input_tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), expected_output_tree);
     }
 
@@ -2530,7 +2535,7 @@ mod tests {
             children: vec![],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2545,7 +2550,7 @@ mod tests {
             )],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2563,7 +2568,7 @@ mod tests {
             )],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2585,7 +2590,7 @@ mod tests {
             )],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2603,7 +2608,7 @@ mod tests {
             )],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2633,7 +2638,7 @@ mod tests {
             )],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 
@@ -2651,7 +2656,7 @@ mod tests {
             )],
         };
         let (root_url, registry) = build_tree(&mut tree).await.expect("failed to build tree");
-        let tree_from_resolver = ComponentTree::new_from_resolver(root_url, registry).await;
+        let tree_from_resolver = ComponentTree::new_from_resolver(&root_url, registry).await;
         assert_decls_eq!(tree_from_resolver.unwrap(), tree);
     }
 

@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/326626515): Use this in production.
-#![allow(dead_code)]
-
 use std::{fmt::Debug, sync::Arc};
 
 use fasync::{Task, TaskGroup};

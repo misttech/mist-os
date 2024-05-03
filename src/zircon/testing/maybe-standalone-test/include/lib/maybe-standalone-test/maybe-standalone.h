@@ -17,7 +17,6 @@ struct BootOptions;
 namespace maybe_standalone {
 
 // This returns the invalid handle if not built standalone.
-zx::unowned_resource GetRootResource();
 zx::unowned_resource GetMmioResource();
 zx::unowned_resource GetSystemResource();
 

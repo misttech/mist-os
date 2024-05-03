@@ -5,7 +5,7 @@
 use fidl_fuchsia_bluetooth_bredr::*;
 use fidl_fuchsia_mediacodec::CodecFactoryMarker;
 use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;
-use fidl_fuchsia_sysmem::AllocatorMarker;
+use fidl_fuchsia_sysmem2::AllocatorMarker;
 use fidl_fuchsia_tracing_provider::RegistryMarker;
 use fixture::fixture;
 use fuchsia_bluetooth::types::Uuid;

@@ -13,7 +13,7 @@ use {
     async_trait::async_trait,
     cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
-    cm_types::Name,
+    cm_types::{Name, Url},
     derivative::Derivative,
     moniker::{ChildName, ExtendedMoniker, Moniker, MonikerBase},
     std::{
@@ -43,7 +43,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     fn moniker(&self) -> &Moniker;
 
     /// Returns this `ComponentInstanceInterface`'s component URL.
-    fn url(&self) -> &str;
+    fn url(&self) -> &Url;
 
     /// Returns a representation of this `ComponentInstanceInterface`'s environment.
     fn environment(&self) -> &environment::Environment<Self>;
@@ -326,7 +326,7 @@ pub mod tests {
             todo!()
         }
 
-        fn url(&self) -> &str {
+        fn url(&self) -> &Url {
             todo!()
         }
 

@@ -117,6 +117,9 @@ async fn create_realm() -> Result<(RealmInstance, ClientEnd<tsc::DeviceMarker>),
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
                 .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
+                .capability(Capability::service_by_name(
+                    "fuchsia.power.broker.ElementInfoProviderService",
+                ))
                 .from(&component_ref)
                 .to(Ref::parent()),
         )

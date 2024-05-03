@@ -4,6 +4,16 @@
 [cargo-vet]
 version = "0.8"
 
+[imports.google3]
+url = "https://raw.githubusercontent.com/google/rust-crate-audits/main/manual-sources/google3-audits.toml"
+
+[imports.google3.criteria-map]
+ub-risk-0 = "ub-risk-0"
+ub-risk-1 = "ub-risk-1"
+ub-risk-2 = "ub-risk-2"
+ub-risk-3 = "ub-risk-3"
+ub-risk-4 = "ub-risk-4"
+
 [policy.aho-corasick]
 audit-as-crates-io = true
 
@@ -13,6 +23,9 @@ notes = """
 These bindings are difficult to use correctly, but there's no way around it.
 We'd have to write effectively the same bindings anyway.
 """
+
+[policy.async-io]
+audit-as-crates-io = false
 
 [policy.byteorder]
 audit-as-crates-io = true
@@ -59,7 +72,7 @@ safe-to-deploy we'll take another look at it and do so very closely.
 audit-as-crates-io = false
 
 [policy.memchr]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.miow]
 audit-as-crates-io = false
@@ -108,9 +121,6 @@ audit-as-crates-io = true
 audit-as-crates-io = false
 
 [policy.tracing-core]
-audit-as-crates-io = false
-
-[policy.valico]
 audit-as-crates-io = false
 
 [policy.walkdir]

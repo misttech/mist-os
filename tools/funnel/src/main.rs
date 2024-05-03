@@ -38,8 +38,8 @@ fn default_log_level() -> LevelFilter {
     LevelFilter::ERROR
 }
 
-fn default_repository_port() -> u32 {
-    8083
+fn default_repository_ports() -> Vec<u32> {
+    vec![8083]
 }
 
 #[derive(FromArgs)]
@@ -91,9 +91,9 @@ struct SubCommandHost {
     #[argh(option, short = 't')]
     target_name: Option<String>,
 
-    /// the repository port to forward to the remote host
-    #[argh(option, short = 'r', default = "default_repository_port()")]
-    repository_port: u32,
+    /// the repository ports to forward to the remote host (defaults to 8083 if none are specified).
+    #[argh(option, short = 'r')]
+    repository_ports: Vec<u32>,
 
     /// additional ports to forward from the remote host to the target.
     #[argh(option, short = 'p')]
@@ -260,8 +260,12 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     tracing::debug!("Target to forward: {:?}", target);
     tracing::info!("Additional port forwards: {:?}", args.additional_port_forwards);
     let host = args.host.clone();
-    let do_ssh_fut =
-        do_ssh(host.clone(), target, args.repository_port, args.additional_port_forwards);
+    let repository_ports = if args.repository_ports.len() > 0 {
+        args.repository_ports
+    } else {
+        default_repository_ports()
+    };
+    let do_ssh_fut = do_ssh(host.clone(), target, repository_ports, args.additional_port_forwards);
     // Need to both do ssh and listen for signals
     let mut signals = Signals::new(&[SIGINT]).unwrap();
     let handle = signals.handle();

@@ -39,10 +39,6 @@ _platform_configuration_base = {
     font_collection = "small-open-fonts-collection"
   }
 
-  intl = {
-    config_type = "small"
-  }
-
   media = {
     audio = {
       full_stack = {

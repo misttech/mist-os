@@ -11,6 +11,7 @@ use std::{
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
+use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_name as fnet_name;
 use fuchsia_zircon as zx;
 
@@ -27,6 +28,11 @@ use futures::{
 
 use crate::errors;
 use crate::{dns, DnsServerWatchers};
+
+// TODO(https://fxbug.dev/329099228): Switch to using DUID-LLT and persisting it to disk.
+pub(super) fn duid(mac: fnet_ext::MacAddress) -> fnet_dhcpv6::Duid {
+    fnet_dhcpv6::Duid::LinkLayerAddress(fnet_dhcpv6::LinkLayerAddress::Ethernet(mac.into()))
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(super) struct PrefixOnInterface {
@@ -122,11 +128,13 @@ pub(super) fn start_client(
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
     interface_id: NonZeroU64,
     sockaddr: fnet::Ipv6SocketAddress,
+    duid: fnet_dhcpv6::Duid,
     prefix_delegation_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
 ) -> Result<
     (impl Stream<Item = Result<Vec<fnet_name::DnsServer_>, fidl::Error>>, PrefixesStream),
     errors::Error,
 > {
+    let stateful = prefix_delegation_config.is_some();
     let params = fnet_dhcpv6_ext::NewClientParams {
         interface_id: interface_id.get(),
         address: sockaddr,
@@ -135,6 +143,7 @@ pub(super) fn start_client(
             non_temporary_address_config: Default::default(),
             prefix_delegation_config,
         },
+        duid: stateful.then_some(duid),
     };
     let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
         .context("error creating DHCPv6 client fidl endpoints")

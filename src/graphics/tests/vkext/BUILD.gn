@@ -24,8 +24,8 @@ source_set("vulkan_extension_test") {
 }
 
 fuchsia_component_manifest("child-manifest") {
-  component_name = "vkext-test"
-  manifest = "meta/vkext_child.cml"
+  component_name = "vkext-test-child"
+  manifest = "meta/vkext-test-child.cml"
 }
 
 fuchsia_structured_config_cpp_elf_lib("config") {
@@ -79,7 +79,7 @@ group("vkext_linux_x64") {
 }
 
 fuchsia_component("vkext_cmp") {
-  component_name = "vkext-test"
+  component_name = "vkext-test-child"
   deps = [
     ":vkext_bin",
     "//src/lib/vulkan/validation_layers",

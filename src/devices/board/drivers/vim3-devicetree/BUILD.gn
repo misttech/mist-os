@@ -17,7 +17,8 @@ group("tests") {
 }
 
 devicetree_fragment("amlogic-a311d") {
-  sources = [ "dts/amlogic-a311d.dtsi" ]
+  sources = [ "dts/amlogic-a311d.dtsi.S" ]
+  deps = [ "//src/devices/lib/amlogic" ]
 }
 
 devicetree_fragment("meson-g12-common") {

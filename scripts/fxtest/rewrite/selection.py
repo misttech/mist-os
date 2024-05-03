@@ -81,21 +81,21 @@ async def select_tests(
     filtered_entry_scores: dict[str, int] = {}
     if mode == SelectionMode.HOST:
         filtered_entry_scores = {
-            test.info.name: NO_MATCH_DISTANCE
+            test.name(): NO_MATCH_DISTANCE
             for test in entries
             if not test.is_host_test()
         }
         entries = list(filter(Test.is_host_test, entries))
     elif mode == SelectionMode.DEVICE:
         filtered_entry_scores = {
-            test.info.name: NO_MATCH_DISTANCE
+            test.name(): NO_MATCH_DISTANCE
             for test in entries
             if not test.is_device_test()
         }
         entries = list(filter(Test.is_device_test, entries))
     elif mode == SelectionMode.E2E:
         filtered_entry_scores = {
-            test.info.name: NO_MATCH_DISTANCE
+            test.name(): NO_MATCH_DISTANCE
             for test in entries
             if not test.is_e2e_test()
         }
@@ -115,7 +115,7 @@ async def select_tests(
         return selection_types.TestSelections(
             entries.copy(),
             [],
-            make_final_scores({test.info.name: 0 for test in entries}),
+            make_final_scores({test.name(): 0 for test in entries}),
             [],
             fuzzy_distance_threshold,
         )
@@ -132,7 +132,7 @@ async def select_tests(
         return entry.build.test.label
 
     def extract_name(entry: Test) -> str:
-        return entry.info.name
+        return entry.name()
 
     def extract_component(entry: Test) -> str | None:
         if entry.build.test.package_url is None:
@@ -247,13 +247,13 @@ async def select_tests(
                     final_score = NO_MATCH_DISTANCE
 
                 # Perform bookkeeping for debug output.
-                best_matches[entry.info.name] = min(
-                    best_matches[entry.info.name], final_score
+                best_matches[entry.name()] = min(
+                    best_matches[entry.name()], final_score
                 )
 
                 # Record this test if it is now selected.
                 if final_score <= fuzzy_distance_threshold:
-                    matched.append(entry.info.name)
+                    matched.append(entry.name())
                     tests_to_run.add(entry)
             group_matches.append((group, matched))
 

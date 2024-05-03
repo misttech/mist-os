@@ -45,18 +45,11 @@ zx_status_t PrevalidateOptions(VnodeConnectionOptions options) {
 Vfs::Vfs() = default;
 
 Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                          VnodeConnectionOptions options, fuchsia_io::Rights parent_rights,
-                          uint32_t mode) {
-  std::lock_guard lock(vfs_lock_);
-  return OpenLocked(std::move(vndir), path, options, parent_rights, mode);
-}
-
-Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                VnodeConnectionOptions options, fuchsia_io::Rights parent_rights,
-                                uint32_t mode) {
-  FS_PRETTY_TRACE_DEBUG("Vfs::OpenLocked: path='", path, "' options=", options,
+                          VnodeConnectionOptions options, fuchsia_io::Rights parent_rights) {
+  FS_PRETTY_TRACE_DEBUG("Vfs::Open: path='", path, "' options=", options,
                         ", parent_rights=", parent_rights);
 
+  std::lock_guard lock(vfs_lock_);
   if (zx_status_t status = PrevalidateOptions(options); status != ZX_OK) {
     return status;
   }
@@ -81,15 +74,22 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
       options.flags |= fuchsia_io::OpenFlags::kDirectory;
     }
   }
-
   fbl::RefPtr<Vnode> vn;
   bool just_created;
   if (options.flags & fuchsia_io::OpenFlags::kCreate) {
-    zx::result result = EnsureExists(std::move(vndir), path, &vn, options, mode, parent_rights);
-    if (result.is_error()) {
-      return result.status_value();
+    bool allow_existing = !(options.flags & fio::OpenFlags::kCreateIfAbsent);
+
+    if (options.flags & fio::OpenFlags::kDirectory &&
+        options.flags & fio::OpenFlags::kNotDirectory) {
+      return ZX_ERR_INVALID_ARGS;
     }
-    just_created = result.value();
+    CreationType type =
+        options.flags & fio::OpenFlags::kDirectory ? CreationType::kDirectory : CreationType::kFile;
+    zx::result created = EnsureExists(vndir, path, type, allow_existing, parent_rights, &vn);
+    if (created.is_error()) {
+      return created.status_value();
+    }
+    just_created = created.value();
   } else {
     if (zx_status_t status = LookupNode(std::move(vndir), path, &vn); status != ZX_OK) {
       return status;
@@ -163,41 +163,36 @@ zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool mu
   return ZX_OK;
 }
 
-zx::result<bool> Vfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                   fbl::RefPtr<Vnode>* out_vn, fs::VnodeConnectionOptions options,
-                                   uint32_t mode, fuchsia_io::Rights parent_rights) {
-  if (options.flags & fuchsia_io::OpenFlags::kDirectory) {
-    if (mode == 0) {
-      mode |= S_IFDIR;
-    } else if (!S_ISDIR(mode)) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-  }
-  if ((options.flags & fuchsia_io::OpenFlags::kNotDirectory) && S_ISDIR(mode)) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
+zx::result<bool> Vfs::EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
+                                   CreationType type, bool allow_existing,
+                                   fuchsia_io::Rights parent_rights, fbl::RefPtr<Vnode>* out_vn) {
   if (ReadonlyLocked()) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   if (!(parent_rights & fuchsia_io::Rights::kModifyDirectory)) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
-  zx_status_t status = path == "." ? ZX_ERR_ALREADY_EXISTS : vndir->Create(path, mode, out_vn);
-  switch (status) {
-    case ZX_OK:
-      return zx::ok(true);
-    case ZX_ERR_ALREADY_EXISTS:
-      if (options.flags & fuchsia_io::OpenFlags::kCreateIfAbsent) {
-        return zx::error(status);
-      }
-      __FALLTHROUGH;
-    case ZX_ERR_NOT_SUPPORTED:
-      // Filesystem may not support create (like devfs) in which case we should still try to open()
-      // the file,
-      return zx::make_result(LookupNode(std::move(vndir), path, out_vn), false);
-    default:
-      return zx::error(status);
+
+  if (path == ".") {
+    if (allow_existing) {
+      *out_vn = std::move(vndir);
+      return zx::ok(false);
+    }
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
+
+  zx::result new_vn = vndir->Create(path, type);
+  if (new_vn.is_ok()) {
+    *out_vn = *new_vn;
+    return zx::ok(true);
+  }
+
+  if ((new_vn.error_value() == ZX_ERR_ALREADY_EXISTS && allow_existing) ||
+      new_vn.error_value() == ZX_ERR_NOT_SUPPORTED) {
+    return zx::make_result(LookupNode(std::move(vndir), path, out_vn), false);
+  }
+
+  return new_vn.take_error();
 }
 
 zx::result<bool> Vfs::TrimName(std::string_view& name) {

@@ -99,12 +99,8 @@ impl api::Bootfs for Bootfs {
             None => Err(BootfsPackageIndexError::IndexNotFound { path }),
         }?;
 
-        let mut reader =
-            pkg_index_blob.reader_seeker().map_err(|err| BootfsPackageIndexError::BlobRead(err))?;
-        let mut pkg_index_blob_contents = Vec::<u8>::new();
-        reader
-            .read_to_end(&mut pkg_index_blob_contents)
-            .map_err(|err| BootfsPackageIndexError::Io(err))?;
+        let pkg_index_blob_contents =
+            pkg_index_blob.read().map_err(|err| BootfsPackageIndexError::BlobRead(err))?;
 
         let pkg_index_str = std::str::from_utf8(&pkg_index_blob_contents)
             .map_err(|err| BootfsPackageIndexError::ParseUtf8(err))?;
@@ -195,8 +191,6 @@ pub enum AdditionalBootConfigurationError {
     FileNotFound { path: Box<dyn api::Path> },
     #[error("failed to read blob: {0}")]
     BlobRead(#[from] api::BlobError),
-    #[error("failed to perform io for blob: {0}")]
-    Io(#[from] IoError),
     #[error("failed to parse blob as utf-8: {0}")]
     ParseUtf8(#[from] Utf8Error),
     #[error("failed to parse additional boot configuration at line {line_num}: {message}")]
@@ -209,8 +203,6 @@ pub enum ComponentManagerConfigurationError {
     FileNotFound { path: Box<dyn api::Path> },
     #[error("failed to read blob: {0}")]
     BlobRead(#[from] api::BlobError),
-    #[error("failed to perform io for blob: {0}")]
-    Io(#[from] IoError),
     #[error("failed to deserialize component manager configuration from persistent fidl: {0}")]
     ParseFidl(#[from] FidlError),
     #[error("failed to parse component manager configuration from deserialized fidl: {0}")]
@@ -227,11 +219,7 @@ impl AdditionalBootConfiguration {
     fn new(blob: &VerifiedMemoryBlob) -> Result<Self, AdditionalBootConfigurationError> {
         let mut data = HashMap::<String, String>::new();
 
-        let mut reader = blob.reader_seeker()?;
-        let mut blob_contents = Vec::<u8>::new();
-        reader
-            .read_to_end(&mut blob_contents)
-            .map_err(|err| AdditionalBootConfigurationError::Io(err))?;
+        let blob_contents = blob.read()?;
 
         let cfg_raw = std::str::from_utf8(&blob_contents)
             .map_err(|err| AdditionalBootConfigurationError::ParseUtf8(err))?;
@@ -291,11 +279,7 @@ struct ComponentManagerConfiguration(Rc<RuntimeConfig>);
 
 impl ComponentManagerConfiguration {
     fn new(blob: &VerifiedMemoryBlob) -> Result<Self, ComponentManagerConfigurationError> {
-        let mut reader = blob.reader_seeker()?;
-        let mut blob_contents = Vec::<u8>::new();
-        reader
-            .read_to_end(&mut blob_contents)
-            .map_err(|err| ComponentManagerConfigurationError::Io(err))?;
+        let blob_contents = blob.read()?;
         let config =
             RuntimeConfig::try_from(unpersist::<component_internal::Config>(&blob_contents)?)?;
         Ok(Self(Rc::new(config)))
@@ -326,7 +310,6 @@ mod tests {
     use fidl::persist;
     use fidl_fuchsia_component_internal as component_internal;
     use std::collections::HashMap;
-    use std::io::Read as _;
 
     #[fuchsia::test]
     fn bootfs_iter_by_paths() {
@@ -358,17 +341,8 @@ mod tests {
         for (path, blob) in actual {
             let expected_blob = expected.get(&path).expect("actual blob in expectation set");
             assert_eq!(expected_blob.hash().as_ref(), blob.hash().as_ref());
-            let mut expected_bytes = vec![];
-            expected_blob
-                .reader_seeker()
-                .expect("expected blob reader/seeker")
-                .read_to_end(&mut expected_bytes)
-                .expect("read expected blob");
-            let mut actual_bytes = vec![];
-            blob.reader_seeker()
-                .expect("actual blob reader/seeker")
-                .read_to_end(&mut actual_bytes)
-                .expect("read actual blob");
+            let expected_bytes = expected_blob.read().expect("expected blob read");
+            let actual_bytes = blob.read().expect("actual blob read");
             assert_eq!(expected_bytes, actual_bytes);
             expected.remove(&path);
         }
@@ -405,17 +379,8 @@ mod tests {
         for blob in actual {
             let hash = blob.hash();
             let expected_blob = expected.get(&hash).expect("actual blob in expectation set");
-            let mut expected_bytes = vec![];
-            expected_blob
-                .reader_seeker()
-                .expect("expected blob reader/seeker")
-                .read_to_end(&mut expected_bytes)
-                .expect("read expected blob");
-            let mut actual_bytes = vec![];
-            blob.reader_seeker()
-                .expect("actual blob reader/seeker")
-                .read_to_end(&mut actual_bytes)
-                .expect("read actual blob");
+            let expected_bytes = expected_blob.read().expect("expected blob read");
+            let actual_bytes = blob.read().expect("actual blob read");
             assert_eq!(expected_bytes, actual_bytes);
             expected.remove(&hash);
         }
@@ -462,17 +427,8 @@ mod tests {
             let expected_blob =
                 expected_by_path.get(&path).expect("actual blob in expectation set");
             assert_eq!(expected_blob.hash().as_ref(), blob.hash().as_ref());
-            let mut expected_bytes = vec![];
-            expected_blob
-                .reader_seeker()
-                .expect("expected blob reader/seeker")
-                .read_to_end(&mut expected_bytes)
-                .expect("read expected blob");
-            let mut actual_bytes = vec![];
-            blob.reader_seeker()
-                .expect("actual blob reader/seeker")
-                .read_to_end(&mut actual_bytes)
-                .expect("read actual blob");
+            let expected_bytes = expected_blob.read().expect("expected blob read");
+            let actual_bytes = blob.read().expect("actual blob read");
             assert_eq!(expected_bytes, actual_bytes);
             expected_by_path.remove(&path);
         }
@@ -495,17 +451,8 @@ mod tests {
             let hash = blob.hash();
             let expected_blob =
                 expected_by_hash.get(&hash).expect("actual blob in expectation set");
-            let mut expected_bytes = vec![];
-            expected_blob
-                .reader_seeker()
-                .expect("expected blob reader/seeker")
-                .read_to_end(&mut expected_bytes)
-                .expect("read expected blob");
-            let mut actual_bytes = vec![];
-            blob.reader_seeker()
-                .expect("actual blob reader/seeker")
-                .read_to_end(&mut actual_bytes)
-                .expect("read actual blob");
+            let expected_bytes = expected_blob.read().expect("expected blob read");
+            let actual_bytes = blob.read().expect("actual blob read");
             assert_eq!(expected_bytes, actual_bytes);
             expected_by_hash.remove(&hash);
         }

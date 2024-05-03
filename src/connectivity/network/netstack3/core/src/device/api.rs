@@ -14,7 +14,7 @@ use tracing::debug;
 use crate::{
     context::{
         ContextPair, CoreTimerContext, RecvFrameContext, ReferenceNotifiers,
-        ResourceCounterContext, TimerContext2,
+        ResourceCounterContext, TimerContext,
     },
     device::{
         config::{
@@ -34,15 +34,12 @@ use crate::{
     for_any_device_id,
     ip::{
         device::{
-            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
-            Ipv6DeviceConfigurationContext,
+            IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
+            IpDeviceTimerId, Ipv6DeviceConfigurationContext,
         },
         types::RawMetric,
     },
-    sync::{
-        types::{RemoveResourceResult, RemoveResourceResultWithContext},
-        PrimaryRc,
-    },
+    sync::{PrimaryRc, RemoveResourceResult, RemoveResourceResultWithContext},
     Inspector,
 };
 
@@ -107,7 +104,7 @@ where
                     weak_ref.clone(),
                     properties,
                 );
-                IpLinkDeviceStateInner::new::<_, C::CoreContext>(
+                IpLinkDeviceStateInner::new::<_, _, C::CoreContext>(
                     bindings_ctx,
                     weak_ref.into(),
                     link,
@@ -185,7 +182,6 @@ where
         match PrimaryRc::unwrap_or_notify_with(primary.into_inner(), || {
             let (notifier, receiver) = C::BindingsContext::new_reference_notifier::<
                 D::External<C::BindingsContext>,
-                _,
             >(debug_references);
             let notifier =
                 crate::sync::MapRcNotifier::new(notifier, |state: BaseDeviceState<_, _>| {
@@ -420,16 +416,30 @@ where
 
 /// A marker trait for all the bindings context traits required to fulfill the
 /// [`DeviceApi`].
-pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers + TimerContext2 {}
+pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers + TimerContext {}
 
-impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers + TimerContext2
-{}
+impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers + TimerContext {}
 
 /// A marker trait with traits required to tie the device layer with the IP
 /// layer to fulfill [`DeviceApi`].
 pub trait DeviceApiIpLayerCoreContext<D: Device, BC: DeviceLayerTypes>:
     DeviceIdAnyCompatContext<D>
-    + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>
+    + IpAddressIdSpecContext
+    + CoreTimerContext<
+        IpDeviceTimerId<
+            Ipv6,
+            <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            Self::AddressIdSpec,
+        >,
+        BC,
+    > + CoreTimerContext<
+        IpDeviceTimerId<
+            Ipv4,
+            <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            Self::AddressIdSpec,
+        >,
+        BC,
+    >
 {
 }
 
@@ -438,6 +448,21 @@ where
     D: Device,
     BC: DeviceLayerTypes,
     O: DeviceIdAnyCompatContext<D>
-        + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>,
+        + IpAddressIdSpecContext
+        + CoreTimerContext<
+            IpDeviceTimerId<
+                Ipv6,
+                <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                Self::AddressIdSpec,
+            >,
+            BC,
+        > + CoreTimerContext<
+            IpDeviceTimerId<
+                Ipv4,
+                <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                Self::AddressIdSpec,
+            >,
+            BC,
+        >,
 {
 }

@@ -4,7 +4,7 @@
 
 use crate::{
     task::CurrentTask,
-    vfs::{FileSystemHandle, Namespace, NamespaceNode},
+    vfs::{CheckAccessReason, FileSystemHandle, Namespace, NamespaceNode},
 };
 use starnix_logging::log_trace;
 use starnix_sync::RwLock;
@@ -106,7 +106,7 @@ impl FsContext {
 
     /// Change the current working directory.
     pub fn chdir(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
-        name.check_access(current_task, Access::EXEC)?;
+        name.check_access(current_task, Access::EXEC, CheckAccessReason::Chdir)?;
         let mut state = self.state.write();
         state.cwd = name;
         Ok(())
@@ -114,7 +114,8 @@ impl FsContext {
 
     /// Change the root.
     pub fn chroot(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
-        name.check_access(current_task, Access::EXEC).map_err(|_| errno!(EACCES))?;
+        name.check_access(current_task, Access::EXEC, CheckAccessReason::Chroot)
+            .map_err(|_| errno!(EACCES))?;
         if !current_task.creds().has_capability(CAP_SYS_CHROOT) {
             return error!(EPERM);
         }

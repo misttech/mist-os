@@ -152,12 +152,6 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.boot.RootResource",
-
-            // This is not available on user builds.
-            availability: "optional",
-        },
-        {
             protocol: "fuchsia.hardware.pty.Device",
 
             // The source of this protocol, ptysvc,

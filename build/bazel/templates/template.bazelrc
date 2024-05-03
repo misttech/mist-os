@@ -52,7 +52,6 @@ common --experimental_workspace_rules_log_file={workspace_log_file}
 common:exec_log --experimental_execution_log_compact_file={execution_log_file}
 # Need the following to ensure the execution.log is actually uploaded to the RBE CAS.
 common:exec_log --remote_build_event_upload=all
-common --config=exec_log
 
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config={config_file}

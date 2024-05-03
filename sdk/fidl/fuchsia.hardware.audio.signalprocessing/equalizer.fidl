@@ -38,34 +38,33 @@ type EqualizerBand = table {
 
 /// Equalizer supported controls specified in `Equalizer`.
 type EqualizerSupportedControls = flexible bits : uint64 {
-    /// If included, the `frequency` of the equalizer bands can be changed with
-    /// `SetElement`.
+    /// If included, the `frequency` of the equalizer bands can be changed with `SetElementState`.
     CAN_CONTROL_FREQUENCY = 0x1;
 
-    /// If included, the `q` of the equalizer bands can be changed with `SetElement`.
+    /// If included, the `q` of the equalizer bands can be changed with `SetElementState`.
     CAN_CONTROL_Q = 0x2;
 
-    /// If included, the `type` of the equalizer bands can be changed with `SetElement`
+    /// If included, the `type` of the equalizer bands can be changed with `SetElementState`
     /// to `EqualizerBandType` `PEAK`.
     SUPPORTS_TYPE_PEAK = 0x4;
 
-    /// If included, the `type` of the equalizer bands can be changed with `SetElement`
+    /// If included, the `type` of the equalizer bands can be changed with `SetElementState`
     /// to `EqualizerBandType` `NOTCH`.
     SUPPORTS_TYPE_NOTCH = 0x8;
 
-    /// If included, the `type` of the equalizer bands can be changed with `SetElement`
+    /// If included, the `type` of the equalizer bands can be changed with `SetElementState`
     /// to `EqualizerBandType` `LOW_CUT`.
     SUPPORTS_TYPE_LOW_CUT = 0x10;
 
-    /// If included, the `type` of the equalizer bands can be changed with `SetElement`
+    /// If included, the `type` of the equalizer bands can be changed with `SetElementState`
     /// to `EqualizerBandType` `HIGH_CUT`.
     SUPPORTS_TYPE_HIGH_CUT = 0x20;
 
-    /// If included, the `type` of the equalizer bands can be changed with `SetElement`
+    /// If included, the `type` of the equalizer bands can be changed with `SetElementState`
     /// to `EqualizerBandType` `LOW_SHELF`.
     SUPPORTS_TYPE_LOW_SHELF = 0x40;
 
-    /// If included, the `type` of the equalizer bands can be changed with `SetElement`
+    /// If included, the `type` of the equalizer bands can be changed with `SetElementState`
     /// to `EqualizerBandType` `HIGH_SHELF`.
     SUPPORTS_TYPE_HIGH_SHELF = 0x80;
 };
@@ -73,8 +72,7 @@ type EqualizerSupportedControls = flexible bits : uint64 {
 /// Parameters for a `Element` with `type` equal to `EQUALIZER`.
 type Equalizer = table {
     /// Equalizers in this protocol are built by a number of bands, each specifying a number of
-    /// parameters here and `EqualizerElementState` that can be changed with
-    /// `SetElement`.
+    /// parameters here and `EqualizerElementState` that can be changed with `SetElementState`.
     /// The number of elements of the `bands` vector determines the number of bands
     /// supported by this processing element.
     ///
@@ -86,7 +84,7 @@ type Equalizer = table {
     /// Optional.
     2: supported_controls EqualizerSupportedControls;
 
-    /// If included and true, individual bands can be disabled via `ElementState`.
+    /// If included and true, individual bands can be disabled via `SetElementState`.
     /// If not included or false, the bands are always enabled.
     /// For a band to be functional its enclosing equalizer processing element has to be enabled.
     ///
@@ -112,21 +110,22 @@ type Equalizer = table {
 
     /// Minimum gain in dB.
     ///
-    /// Optional but required if any `EqualizerBand.EqualizerBandType` is set to `PEAK`,
-    /// `LOW_SHELF`, `HIGH_SHELF`.
+    /// Optional, but required if `supported_controls` is present and includes `SUPPORTS_TYPE_PEAK`,
+    /// `SUPPORTS_TYPE_LOW_SHELF` or `SUPPORTS_TYPE_HIGH_SHELF`.
     7: min_gain_db float32;
 
     /// Maximum gain in dB.
     ///
-    /// Optional but required if any `EqualizerBand.EqualizerBandType` is set to `PEAK`,
-    /// `LOW_SHELF`, `HIGH_SHELF`.
+    /// Optional, but required if `supported_controls` is present and includes `SUPPORTS_TYPE_PEAK`,
+    /// `SUPPORTS_TYPE_LOW_SHELF` or `SUPPORTS_TYPE_HIGH_SHELF`.
     8: max_gain_db float32;
 };
 
 /// State for a single band within a `Element` with `type` equal to `EQUALIZER`.
 type EqualizerBandState = table {
-    /// Unique ID for the band. Must match one of the `id`s specified in
-    /// `Equalizer` `bands`. Required.
+    /// Unique ID for the band. Must match one of the `id`s specified in `Equalizer` `bands`.
+    ///
+    /// Required.
     1: id uint64;
 
     /// Type of band.
@@ -148,7 +147,7 @@ type EqualizerBandState = table {
 
     /// Gain in dB.
     ///
-    /// Optional but required for `EqualizerBandType` `PEAK`, `LOW_SHELF` and `HIGH_SHELF`.
+    /// Optional, but required for `EqualizerBandType` `PEAK`, `LOW_SHELF` and `HIGH_SHELF`.
     /// May not be included for `EqualizerBandType` `NOTCH`, `LOW_CUT` or `HIGH_CUT`.
     5: gain_db float32;
 

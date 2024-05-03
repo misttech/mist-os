@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::client::{connection_selection::bss_selection, types},
+    crate::{
+        client::{connection_selection::bss_selection, types},
+        util::pseudo_energy::SignalData,
+    },
     fuchsia_async as fasync,
     futures::channel::mpsc,
 };
@@ -14,8 +17,8 @@ use {
 pub struct ConnectionData {
     // Information about the current connection, from the time of initial connection.
     pub currently_fulfilled_connection: types::ConnectSelection,
-    // Rolling data about the current quality of the connection
-    pub quality_data: bss_selection::BssQualityData,
+    // Rolling signal data
+    pub signal_data: SignalData,
     // Roaming related metadata
     pub roam_decision_data: RoamDecisionData,
 }
@@ -23,16 +26,16 @@ pub struct ConnectionData {
 impl ConnectionData {
     pub fn new(
         currently_fulfilled_connection: types::ConnectSelection,
-        quality_data: bss_selection::BssQualityData,
+        signal_data: SignalData,
         connection_start_time: fasync::Time,
     ) -> Self {
         Self {
             currently_fulfilled_connection,
             roam_decision_data: RoamDecisionData::new(
-                quality_data.signal_data.ewma_rssi.get(),
+                signal_data.ewma_rssi.get(),
                 connection_start_time,
             ),
-            quality_data,
+            signal_data,
         }
     }
 }

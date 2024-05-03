@@ -13,6 +13,7 @@ use {
         token::InstanceRegistry,
     },
     cm_config::RuntimeConfig,
+    cm_types::Url,
     errors::ModelError,
     std::sync::Arc,
     tracing::warn,
@@ -23,7 +24,7 @@ use {
 pub struct ModelParams {
     // TODO(viktard): Merge into RuntimeConfig
     /// The URL of the root component.
-    pub root_component_url: String,
+    pub root_component_url: Url,
     /// The environment provided to the root.
     pub root_environment: Environment,
     /// Global runtime configuration for the component_manager.

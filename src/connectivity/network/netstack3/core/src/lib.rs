@@ -215,20 +215,19 @@ pub mod socket {
 
 /// Useful synchronization primitives.
 pub mod sync {
-    pub(crate) mod types;
-    // TODO(https://fxbug.dev/42062225): Support single-threaded variants of types
-    // exported from this module.
+    // We take all of our dependencies directly from base for symmetry with the
+    // other crates. However, we want to explicitly have all the dependencies in
+    // GN so we can assert the dependencies on the crate variants. This defeats
+    // rustc's unused dependency check.
+    use netstack3_sync as _;
 
-    // Exclusively re-exports from the sync crate.
-    pub use netstack3_sync::{
-        rc::{
-            DebugReferences, MapNotifier as MapRcNotifier, Notifier as RcNotifier,
-            Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+    pub use netstack3_base::{
+        sync::{
+            DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
+            RcNotifier, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
         },
-        LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+        RemoveResourceResult, RemoveResourceResultWithContext,
     };
-
-    pub use types::{RemoveResourceResult, RemoveResourceResultWithContext};
 }
 
 /// Methods for dealing with TCP sockets.
@@ -263,8 +262,9 @@ pub mod udp {
 
 pub use api::CoreApi;
 pub use context::{
-    CoreCtx, EventContext, InstantBindingsTypes, InstantContext, ReferenceNotifiers, RngContext,
-    TimerBindingsTypes, TimerContext, TimerContext2, TracingContext, UnlockedCoreCtx,
+    CoreCtx, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
+    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
+    UnlockedCoreCtx,
 };
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};

@@ -80,7 +80,7 @@ class BlockDevice : public Device,
   // Lock to be used around Ring::AllocDescChain and FreeDesc.
   // TODO: Move this into Ring class once it's certain that other users of the class are okay with
   // it.
-  fbl::Mutex ring_lock_;
+  std::mutex ring_lock_;
 
   static const uint16_t ring_size = 128;  // 128 matches legacy pci.
 
@@ -113,7 +113,7 @@ class BlockDevice : public Device,
   void free_blk_req(size_t i) { blk_req_bitmap_ &= ~(1 << i); }
 
   // Pending txns and completion signal.
-  fbl::Mutex txn_lock_;
+  std::mutex txn_lock_;
   list_node pending_txn_list_ = LIST_INITIAL_VALUE(pending_txn_list_);
   sync_completion_t txn_signal_;
 

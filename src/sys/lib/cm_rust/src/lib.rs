@@ -7,7 +7,7 @@ use {
         ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl, OfferDeclCommon,
         OfferDeclCommonNoAvailability, UseDeclCommon,
     },
-    cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath},
+    cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath, Url},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
     from_enum::FromEnum,
@@ -112,6 +112,19 @@ impl NativeIntoFidl<Option<String>> for RelativePath {
     }
 }
 
+impl FidlIntoNative<Url> for String {
+    fn fidl_into_native(self) -> Url {
+        // cm_fidl_validator should have already validated this
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for Url {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
+    }
+}
+
 /// Generates `FidlIntoNative` and `NativeIntoFidl` implementations that leaves the input unchanged.
 macro_rules! fidl_translations_identical {
     ($into_type:ty) => {
@@ -168,6 +181,7 @@ macro_rules! fidl_translations_symmetrical_enums {
         }
     };
 }
+
 #[derive(FidlDecl, Debug, Clone, PartialEq, Default)]
 #[fidl_decl(fidl_table = "fdecl::Component")]
 pub struct ComponentDecl {
@@ -513,19 +527,25 @@ pub struct OfferEventStreamDecl {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameMapping {
-    pub source_name: String,
-    pub target_name: String,
+    pub source_name: Name,
+    pub target_name: Name,
 }
 
 impl NativeIntoFidl<fdecl::NameMapping> for NameMapping {
     fn native_into_fidl(self) -> fdecl::NameMapping {
-        fdecl::NameMapping { source_name: self.source_name, target_name: self.target_name }
+        fdecl::NameMapping {
+            source_name: self.source_name.native_into_fidl(),
+            target_name: self.target_name.native_into_fidl(),
+        }
     }
 }
 
 impl FidlIntoNative<NameMapping> for fdecl::NameMapping {
     fn fidl_into_native(self) -> NameMapping {
-        NameMapping { source_name: self.source_name, target_name: self.target_name }
+        NameMapping {
+            source_name: self.source_name.fidl_into_native(),
+            target_name: self.target_name.fidl_into_native(),
+        }
     }
 }
 
@@ -540,7 +560,7 @@ pub struct OfferServiceDecl {
     pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
-    pub source_instance_filter: Option<Vec<String>>,
+    pub source_instance_filter: Option<Vec<Name>>,
     pub renamed_instances: Option<Vec<NameMapping>>,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -1185,7 +1205,7 @@ impl CapabilityDecl {
 #[fidl_decl(fidl_table = "fdecl::Child")]
 pub struct ChildDecl {
     pub name: LongName,
-    pub url: String,
+    pub url: Url,
     pub startup: fdecl::StartupMode,
     pub on_terminate: Option<fdecl::OnTerminate>,
     pub environment: Option<Name>,
@@ -2548,6 +2568,7 @@ pub enum DictionarySource {
     Parent,
     Self_,
     Child(ChildRef),
+    Program,
 }
 
 impl FidlIntoNative<DictionarySource> for fdecl::Ref {
@@ -2556,7 +2577,9 @@ impl FidlIntoNative<DictionarySource> for fdecl::Ref {
             Self::Parent(_) => DictionarySource::Parent,
             Self::Self_(_) => DictionarySource::Self_,
             Self::Child(c) => DictionarySource::Child(c.fidl_into_native()),
-            _ => panic!("invalid OfferDictionarySource variant"),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            Self::Program(_) => DictionarySource::Program,
+            _ => panic!("invalid DictionarySource variant"),
         }
     }
 }
@@ -2567,6 +2590,8 @@ impl NativeIntoFidl<fdecl::Ref> for DictionarySource {
             Self::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
             Self::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
             Self::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            Self::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         }
     }
 }
@@ -2860,7 +2885,7 @@ mod tests {
                     }),
                     fdecl::Use::Directory(fdecl::UseDirectory {
                         dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                         source_name: Some("dir".to_string()),
                         source_dictionary: Some("in/dict".to_string()),
                         target_path: Some("/data".to_string()),
@@ -2901,7 +2926,7 @@ mod tests {
                     fdecl::Use::Runner(fdecl::UseRunner {
                         source: Some(fdecl::Ref::Environment(fdecl::EnvironmentRef {})),
                         source_name: Some("elf".to_string()),
-                        source_dictionary: Some("in/dict".to_string()),
+                        source_dictionary: None,
                         ..Default::default()
                     }),
                     fdecl::Use::Config(fdecl::UseConfiguration {
@@ -2967,8 +2992,9 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
-                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
-                            name: "modular".to_string(),
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "netstack".to_string(),
+                            collection: None,
                         })),
                         source_name: Some("netstack1".to_string()),
                         source_dictionary: Some("in/dict".to_string()),
@@ -3171,6 +3197,12 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict2".to_string()),
+                        source: Some(fdecl::Ref::Program(fdecl::ProgramRef {})),
+                        source_dictionary: Some("in/other".to_string()),
+                        ..Default::default()
+                    }),
+                    fdecl::Capability::Dictionary(fdecl::Dictionary {
+                        name: Some("dict3".to_string()),
                         source: None,
                         source_dictionary: None,
                         ..Default::default()
@@ -3341,7 +3373,7 @@ mod tests {
                         }),
                         UseDecl::Directory(UseDirectoryDecl {
                             dependency_type: DependencyType::Strong,
-                            source: UseSource::Framework,
+                            source: UseSource::Self_,
                             source_name: "dir".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_path: "/data".parse().unwrap(),
@@ -3370,7 +3402,7 @@ mod tests {
                         UseDecl::Runner(UseRunnerDecl {
                             source: UseSource::Environment,
                             source_name: "elf".parse().unwrap(),
-                            source_dictionary: "in/dict".parse().unwrap(),
+                            source_dictionary: ".".parse().unwrap(),
                         }),
                         UseDecl::Config(UseConfigurationDecl {
                             source: UseSource::Parent,
@@ -3414,7 +3446,7 @@ mod tests {
                             target_name: "pkg".parse().unwrap(),
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Collection("modular".parse().unwrap()),
+                            source: ExposeSource::Child("netstack".parse().unwrap()),
                             source_name: "netstack1".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
                             target_name: "mynetstack".parse().unwrap(),
@@ -3504,8 +3536,8 @@ mod tests {
                             source: OfferSource::Parent,
                             source_name: "netstack3".parse().unwrap(),
                             source_dictionary: ".".parse().unwrap(),
-                            source_instance_filter: Some(vec!["allowedinstance".to_string()]),
-                            renamed_instances: Some(vec![NameMapping{source_name: "default".to_string(), target_name: "allowedinstance".to_string()}]),
+                            source_instance_filter: Some(vec!["allowedinstance".parse().unwrap()]),
+                            renamed_instances: Some(vec![NameMapping{source_name: "default".parse().unwrap(), target_name: "allowedinstance".parse().unwrap()}]),
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,
@@ -3557,6 +3589,11 @@ mod tests {
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict2".parse().unwrap(),
+                            source: Some(DictionarySource::Program),
+                            source_dictionary: Some("in/other".parse().unwrap()),
+                        }),
+                        CapabilityDecl::Dictionary(DictionaryDecl {
+                            name: "dict3".parse().unwrap(),
                             source: None,
                             source_dictionary: None,
                         }),
@@ -3564,7 +3601,7 @@ mod tests {
                     children: vec![
                         ChildDecl {
                             name: "netstack".parse().unwrap(),
-                            url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm".to_string(),
+                            url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm".parse().unwrap(),
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: None,
                             environment: None,
@@ -3572,7 +3609,7 @@ mod tests {
                         },
                         ChildDecl {
                             name: "gtest".parse().unwrap(),
-                            url: "fuchsia-pkg://fuchsia.com/gtest#meta/gtest.cm".to_string(),
+                            url: "fuchsia-pkg://fuchsia.com/gtest#meta/gtest.cm".parse().unwrap(),
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: Some(fdecl::OnTerminate::None),
                             environment: None,
@@ -3580,7 +3617,7 @@ mod tests {
                         },
                         ChildDecl {
                             name: "echo".parse().unwrap(),
-                            url: "fuchsia-pkg://fuchsia.com/echo#meta/echo.cm".to_string(),
+                            url: "fuchsia-pkg://fuchsia.com/echo#meta/echo.cm".parse().unwrap(),
                             startup: fdecl::StartupMode::Eager,
                             on_terminate: Some(fdecl::OnTerminate::Reboot),
                             environment: Some("test_env".parse().unwrap()),

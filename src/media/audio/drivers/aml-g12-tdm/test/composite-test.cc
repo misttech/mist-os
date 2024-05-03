@@ -22,7 +22,7 @@
 
 #include <algorithm>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace audio::aml_g12 {
 
@@ -54,7 +54,7 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   }
 
   void InitResources() {
-    EXPECT_OK(zx::vmo::create(kMmioSize, 0, &mmio_));
+    EXPECT_EQ(ZX_OK, zx::vmo::create(kMmioSize, 0, &mmio_));
     fake_bti_create(bti_.reset_and_get_address());
   }
 
@@ -134,7 +134,7 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  void MapMmio() { ASSERT_OK(mapped_mmio_.Map(mmio_)); }
+  void MapMmio() { EXPECT_EQ(ZX_OK, mapped_mmio_.Map(mmio_)); }
 
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {}
 
@@ -239,7 +239,7 @@ struct IncomingNamespace {
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
 };
 
-class AmlG12CompositeTest : public zxtest::Test {
+class AmlG12CompositeTest : public testing::Test {
  public:
   AmlG12CompositeTest()
       : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
@@ -428,7 +428,7 @@ class AmlG12CompositeTest : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  // Use dut_ instead of driver_ because driver_ is used by zxtest.
+  // Use dut_ instead of driver_ because driver_ is used by gtest.
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<Driver>> dut_{
       driver_dispatcher(), std::in_place};
 };

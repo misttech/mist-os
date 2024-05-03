@@ -20,10 +20,10 @@ class DirectoryTest : public F2fsFakeDevTestFixture {
 };
 
 TEST_F(DirectoryTest, DentryReuse) {
-  fbl::RefPtr<fs::Vnode> test_dir;
-  ASSERT_EQ(root_dir_->Create("test", S_IFDIR, &test_dir), ZX_OK);
+  zx::result test_dir = root_dir_->Create("test", fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_dir.is_ok()) << test_dir.status_string();
 
-  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_dir));
+  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_dir));
 
   Dir *test_dir_ptr = static_cast<Dir *>(test_dir_vn.get());
 
@@ -94,10 +94,10 @@ TEST_F(DirectoryTest, DentryReuse) {
 }
 
 TEST_F(DirectoryTest, DentryBucket) {
-  fbl::RefPtr<fs::Vnode> test_dir;
-  ASSERT_EQ(root_dir_->Create("test", S_IFDIR, &test_dir), ZX_OK);
+  zx::result test_dir = root_dir_->Create("test", fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_dir.is_ok()) << test_dir.status_string();
 
-  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_dir));
+  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_dir));
 
   Dir *test_dir_ptr = static_cast<Dir *>(test_dir_vn.get());
 
@@ -164,10 +164,10 @@ TEST_F(DirectoryTest, MultiSlotDentry) {
   srand(seed);
   std::cout << "Random seed for DirTest.MultiSlotDentry: " << seed << std::endl;
 
-  fbl::RefPtr<fs::Vnode> test_dir;
-  ASSERT_EQ(root_dir_->Create("test", S_IFDIR, &test_dir), ZX_OK);
+  zx::result test_dir = root_dir_->Create("test", fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_dir.is_ok()) << test_dir.status_string();
 
-  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_dir));
+  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_dir));
 
   Dir *test_dir_ptr = static_cast<Dir *>(test_dir_vn.get());
 
@@ -239,10 +239,10 @@ TEST_F(DirectoryTest, MultiSlotDentry) {
 }
 
 TEST_F(DirectoryTest, SetDentryLevel1DoWriteAndRead) {
-  fbl::RefPtr<fs::Vnode> test_dir;
-  ASSERT_EQ(root_dir_->Create("test", S_IFDIR, &test_dir), ZX_OK);
+  zx::result test_dir = root_dir_->Create("test", fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_dir.is_ok()) << test_dir.status_string();
 
-  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_dir));
+  fbl::RefPtr<VnodeF2fs> test_dir_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_dir));
 
   Dir *test_dir_ptr = static_cast<Dir *>(test_dir_vn.get());
   test_dir_ptr->SetDirLevel(1);

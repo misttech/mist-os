@@ -2,10 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from typing import List
+from typing import List, Any
+from collections import deque
 
+import asyncio
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_device as device
+import fidl.fuchsia_hwinfo as hwinfo
 import fidl.fuchsia_feedback as feedback
 import fidl.fuchsia_io as io
 from fuchsia_controller_py import Channel
@@ -31,7 +34,8 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
 
         Targeted criteria:
         -- call that results in simple output.
-        -- calls a non-SDK protocol (daemon protocols are not explicitly in the SDK).
+        -- calls a non-SDK protocol
+           (daemon protocols are not explicitly in the SDK).
         """
         assert self.device.ctx is not None
         target_proxy = ffx.Target.Client(self.device.ctx.connect_target_proxy())
@@ -41,7 +45,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
 
     @asynctest
     async def test_get_device_info(self) -> None:
-        """Gets target device info and compares to internal fuchsia_device config.
+        """Gets target device info, compares to internal fuchsia_device config.
 
         Targeted criteria:
         -- calls a FIDL API on the Fuchsia target from the host.
@@ -59,13 +63,62 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         asserts.assert_equal(name, self.device.config["name"])
 
     @asynctest
+    async def test_get_device_info_and_hwinfo(self) -> None:
+        """Gets two different component infos in parallel.
+
+        Targeted criteria:
+        -- calls a FIDL API on the Fuchsia target from the host.
+        -- calls multiple different components in a single test.
+        """
+        assert self.device.ctx is not None
+        device_proxy = device.NameProvider.Client(
+            self.device.ctx.connect_device_proxy(
+                "/bootstrap/device_name_provider", device.NameProvider.MARKER
+            )
+        )
+        product_proxy = hwinfo.Product.Client(
+            self.device.ctx.connect_device_proxy(
+                "/core/hwinfo", hwinfo.Product.MARKER
+            )
+        )
+        loop = asyncio.get_running_loop()
+        tasks = [
+            loop.create_task(device_proxy.get_device_name()),
+            loop.create_task(product_proxy.get_info()),
+        ]
+        results: deque[Any] = deque([])
+        # The tasks will still happen in parallel as the await
+        # continues, but they will return in strict order.
+        for task in tasks:
+            results.append(await task)
+        device_name_res = results.popleft()
+        product_res = results.popleft().info
+        asserts.assert_not_equal(product_res, None, extras=str(product_res))
+        asserts.assert_not_equal(
+            device_name_res.response, None, extras=str(device_name_res)
+        )
+        name = device_name_res.response.name
+        asserts.assert_equal(name, self.device.config["name"])
+
+        expected_values = self.user_params["expected_values"]
+        asserts.assert_equal(
+            product_res.model, expected_values["model"], extras=str(product_res)
+        )
+        asserts.assert_equal(
+            product_res.manufacturer,
+            expected_values["manufacturer"],
+            extras=str(product_res),
+        )
+
+    @asynctest
     async def test_get_fuchsia_snapshot(self) -> None:
         """Gets Fuchsia Snapshot info.
 
         Targeted criteria:
-        -- call that results in streamed output (though via fuchsia.io/File protocol and not a
-        socket).
-        -- call that takes another FIDL protocol's channel as a parameter (fuchsia.io/File server).
+        -- call that results in streamed output (though via fuchsia.io/File
+           protocol and not a socket).
+        -- call that takes another FIDL protocol's channel as a parameter
+           (fuchsia.io/File server).
         """
         # [START snapshot_example]
         client, server = Channel.create()

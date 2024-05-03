@@ -237,6 +237,11 @@ async fn handle_command(
                                         },
                                     ),
                                 },
+                                duid: (request_non_temporary_address
+                                    || prefix_delegation_config.is_some())
+                                .then(|| {
+                                    fnet_dhcpv6::Duid::Uuid(uuid::Uuid::new_v4().into_bytes())
+                                }),
                             }
                             .into(),
                         )
@@ -537,6 +542,8 @@ mod test {
                                 fnet_dhcpv6::PrefixDelegationConfig::Prefix(PD_HINT)
                             ),
                         },
+                        // Don't check the DUID as it's a randomly generated UUID.
+                        duid: params.duid.clone(),
                     },
                 );
                 responder.send(Ok(())).expect("failed to send StartDhcpv6Client response");

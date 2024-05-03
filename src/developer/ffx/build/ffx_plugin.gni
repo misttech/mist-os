@@ -315,6 +315,12 @@ template("ffx_plugin") {
           configs += invoker.configs
         }
 
+        # This template is used to generate plugins.rs via the
+        # plugins GN template. If the template changes, then
+        # all plugin dependencies need to be regenerated, so
+        # this is here to invalidate the rust library that contains
+        # the plugins.rs.
+        inputs = [ "//src/developer/ffx/build/templates/plugins.rs.jinja" ]
         disable_rustdoc = true
         forward_variables_from(invoker,
                                "*",

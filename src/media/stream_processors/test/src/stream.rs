@@ -9,14 +9,14 @@ use crate::{
     Result,
 };
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem::BufferCollectionConstraints;
+use fidl_fuchsia_sysmem2::BufferCollectionConstraints;
 use fuchsia_stream_processors::*;
 use std::rc::Rc;
 use tracing::debug;
 
 pub type OrdinalSequence = <OrdinalPattern as IntoIterator>::IntoIter;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct StreamOptions {
     /// When true, the stream runner will queue format details for each stream. Otherwise it will
     /// inherit format details from the codec factory.
@@ -90,7 +90,7 @@ impl<'a: 'b, 'b> Stream<'a> {
                     ValidStreamBufferConstraints::try_from(input_constraints)?,
                     self.stream_processor,
                     BufferSetType::Input,
-                    self.options.input_buffer_collection_constraints,
+                    self.options.input_buffer_collection_constraints.clone(),
                 )
                 .await?;
 
@@ -120,7 +120,7 @@ impl<'a: 'b, 'b> Stream<'a> {
                             constraints.buffer_constraints,
                             self.stream_processor,
                             BufferSetType::Output,
-                            self.options.output_buffer_collection_constraints,
+                            self.options.output_buffer_collection_constraints.clone(),
                         )
                         .await?,
                     );

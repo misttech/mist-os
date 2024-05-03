@@ -38,6 +38,9 @@ class AmlHrtimer : public fdf::DriverBase {
   bool HasWaitCompleter(size_t timer_index) {
     return server_ && server_->HasWaitCompleter(timer_index);
   }
+  bool StartTicksLeftFitInHardware(size_t timer_index) {
+    return server_ && server_->StartTicksLeftFitInHardware(timer_index);
+  }
 
  private:
   static constexpr size_t kNumberOfIrqs = 8;  // These are provided by the platform, 8 total.

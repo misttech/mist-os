@@ -6,8 +6,8 @@ use crate::{
     task::{CurrentTask, Kernel},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeInfo,
-        FsNodeOps,
+        fileops_impl_seekable, fs_node_impl_not_dir, CheckAccessReason, FileObject, FileOps,
+        FsNode, FsNodeInfo, FsNodeOps,
     },
 };
 
@@ -62,6 +62,7 @@ where
         current_task: &CurrentTask,
         access: Access,
         info: &RwLock<FsNodeInfo>,
+        _reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         if self.capabilities != Capabilities::empty()
             && current_task.creds().has_capability(self.capabilities)

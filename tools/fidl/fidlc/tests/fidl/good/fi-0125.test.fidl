@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 library test.good.fi0125;
 
-@discoverable("example.Bar")
+@discoverable(name="example.Bar")
 protocol Foo {};

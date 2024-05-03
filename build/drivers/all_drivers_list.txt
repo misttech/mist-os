@@ -129,7 +129,7 @@
 //src/devices/bus/drivers/platform:platform-bus-driver
 //src/devices/clock/drivers/amlogic-clk:amlogic-clk-driver
 //src/devices/clock/drivers/clock:clock-driver
-//src/devices/clock/drivers/vim3-clk:vim3-clk-driver
+//src/devices/clock/drivers/vim3-clk:bazel_package.bazel_build
 //src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver
 //src/devices/cpu/drivers/aml-cpu:aml-cpu-driver
 //src/devices/gpio/drivers/aml-gpio:bazel_package.bazel_build
@@ -179,7 +179,6 @@
 //src/devices/serial/drivers/aml-uart:aml-uart-driver
 //src/devices/serial/drivers/ftdi:ftdi-driver
 //src/devices/serial/drivers/ftdi:ftdi-fake-usb-driver
-//src/devices/serial/drivers/serial-async:serial-async-driver
 //src/devices/serial/drivers/serial:serial-driver
 //src/devices/serial/drivers/uart16550:uart16550-driver
 //src/devices/serial/drivers/usb-cdc-acm:fake-usb-cdc-acm-driver
@@ -350,7 +349,7 @@
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver
 //src/ui/backlight/drivers/vim3-pwm-backlight:vim3-pwm-backlight-driver
-//src/ui/input/drivers/adc-buttons:adc-buttons-driver
+//src/ui/input/drivers/adc-buttons:bazel_package.bazel_build
 //src/ui/input/drivers/buttons:buttons-driver
 //src/ui/input/drivers/ctaphid:ctaphid-driver
 //src/ui/input/drivers/focaltech:focaltech-driver

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/node_removal_tracker.h"
+#include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 
 #include <gtest/gtest.h>
 

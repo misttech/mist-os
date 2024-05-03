@@ -27,27 +27,19 @@
 #include <wlan/common/macaddr.h>
 #include <wlan/drivers/log.h>
 
-#include "device_interface.h"
 #include "softmac_bridge.h"
-#include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
-class SoftmacBinding : public DeviceInterface {
+class SoftmacBinding {
  public:
   static zx::result<std::unique_ptr<SoftmacBinding>> New(zx_device_t* parent_device);
-  ~SoftmacBinding() override = default;
+  ~SoftmacBinding() = default;
 
   static constexpr inline SoftmacBinding* from(void* ctx) {
     return static_cast<SoftmacBinding*>(ctx);
   }
-
-  // DeviceInterface methods
-  zx_status_t Start(zx_handle_t softmac_ifc_bridge_client_handle,
-                    const frame_processor_t* frame_processor,
-                    zx::channel* out_sme_channel) const final;
-  zx_status_t SetEthernetStatus(uint32_t status) const final __TA_EXCLUDES(ethernet_proxy_lock_);
 
  private:
   // Private constructor to require use of New().
@@ -127,21 +119,24 @@ class SoftmacBinding : public DeviceInterface {
   // to acquire it.
   mutable std::shared_ptr<std::mutex> ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
-  // Before the child device calls `EthernetImpl.Start`, if MLME call
-  // `DeviceInterface::SetEthernetStatus`, that status will be kept in `cached_ethernet_status`.
-  // Upon receiving `EthernetImpl.Start`, the cached status, if any, will be forwarded to
-  // `EthernetImplIfc.Start`.
+
+  // If MLME calls `WlanSoftmacBridge.SetEthernetStatus` before the ethernet device calls
+  // `EthernetImpl.Start`, the status from MLME is stored in `cached_ethernet_status_`.
+  // When the ethernet device calls `EthernetImpl.Start`, the cached status, if any, will be
+  // forwarded to `EthernetImplIfc.Start`.
+  //
+  // When MLME calls `WlanSoftmacBridge.SetEthernetStatus` multiple times before the
+  // ethernet device calls `EthernetImpl.Start`, the `cached_ethernet_status_` is always
+  // overwritten with the most recent status from MLME.
+  //
+  // This field is shared with the `SoftmacBridge` instance (in `softmac_bridge_`) which
+  // writes to `cached_ethernet_status_` when `SoftmacBridge::SetEthernetStatus` is called.
   mutable std::optional<uint32_t> cached_ethernet_status_ __TA_GUARDED(ethernet_proxy_lock_);
 
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
 
   // The FIDL client to communicate with iwlwifi
   fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
-
-  // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
-  // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
-  // again until its reset upon the framework calling the unbind hook.
-  mutable std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   // Record when the framework calls the unbind hook to prevent sta_shutdown_handler() from calling
   // device_async_remove() when an unbind is already in progress.

@@ -3,14 +3,9 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{ensure, Context};
+use anyhow::ensure;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::fonts_config::FontsConfig;
-
-const FONT_SERVER_COMPONENT_LOCAL_URL: &str = "meta/font-server.cm";
-const FONT_SERVER_PACKAGE_NAME: &str = "font-server";
-
-const LEGACY_FONT_OMPONENT_LOCAL_URL: &str = "meta/fonts.cm";
-const LEGACY_FONT_PACKAGE_NAME: &str = "fonts";
 
 pub(crate) struct FontsSubsystem;
 impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
@@ -32,44 +27,38 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
                     "fonts.font_collection must not be empty",
                 );
                 builder.platform_bundle("fonts_hermetic");
-                let mut component = builder
-                    .package(FONT_SERVER_PACKAGE_NAME)
-                    .component(FONT_SERVER_COMPONENT_LOCAL_URL)
-                    .with_context(|| {
-                        format!("while setting component {}", FONT_SERVER_COMPONENT_LOCAL_URL)
-                    })?;
-                component
-                    .field(
-                        "verbose_logging",
-                        matches!(context.build_type, BuildType::Eng | BuildType::UserDebug),
-                    )
-                    .context("while setting verbose_logging")?;
+
+                builder.set_config_capability(
+                    "fuchsia.fonts.VerboseLogging",
+                    Config::new(
+                        ConfigValueType::Bool,
+                        matches!(context.build_type, BuildType::Eng | BuildType::UserDebug).into(),
+                    ),
+                )?;
+
                 let font_manifest = format!(
                     "/fonts/data/assets/{}_all.hermetic_assets.font_manifest.json",
                     font_collection_name
                 );
-                component
-                    .field("font_manifest", font_manifest)
-                    .context("while setting font_manifest")?;
+                builder.set_config_capability(
+                    "fuchsia.fonts.FontManifest",
+                    Config::new(ConfigValueType::String { max_size: 1024 }, font_manifest.into()),
+                )?;
             } else if fonts_config.enabled {
                 builder.platform_bundle("fonts");
-                let mut component = builder
-                    .package(LEGACY_FONT_PACKAGE_NAME)
-                    .component(LEGACY_FONT_OMPONENT_LOCAL_URL)
-                    .with_context(|| {
-                        format!("while setting component {}", LEGACY_FONT_OMPONENT_LOCAL_URL)
-                    })?;
-                component
-                    .field(
-                        "verbose_logging",
-                        matches!(context.build_type, BuildType::Eng | BuildType::UserDebug),
-                    )
-                    .context("while setting verbose_logging")?;
+                builder.set_config_capability(
+                    "fuchsia.fonts.VerboseLogging",
+                    Config::new(
+                        ConfigValueType::Bool,
+                        matches!(context.build_type, BuildType::Eng | BuildType::UserDebug).into(),
+                    ),
+                )?;
                 // Fallback to using fonts from `config-data` since a font collection was not
                 // specified. Signified by an empty value in `font_manifest`.
-                component
-                    .field("font_manifest", String::from(""))
-                    .context("while setting legacy value for font_manifest")?;
+                builder.set_config_capability(
+                    "fuchsia.fonts.FontManifest",
+                    Config::new(ConfigValueType::String { max_size: 1024 }, "".into()),
+                )?;
             }
         }
         Ok(())

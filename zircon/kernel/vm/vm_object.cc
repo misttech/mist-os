@@ -308,21 +308,6 @@ void VmObject::CacheOpPhys(paddr_t pa, uint64_t len, CacheOpType type,
   }
 }
 
-// round up the size to the next page size boundary and make sure we dont wrap
-zx_status_t VmObject::RoundSize(uint64_t size, uint64_t* out_size) {
-  *out_size = ROUNDUP_PAGE_SIZE(size);
-  if (*out_size < size) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  // there's a max size to keep indexes within range
-  if (*out_size > MAX_SIZE) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node* alloc_list,
                                       vm_page_t** page, paddr_t* pa) {
   zx_status_t status = ZX_OK;

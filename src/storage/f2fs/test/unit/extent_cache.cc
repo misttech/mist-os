@@ -24,10 +24,9 @@ class ExtentCacheTest : public F2fsFakeDevTestFixture {
   void SetUp() override {
     F2fsFakeDevTestFixture::SetUp();
 
-    fbl::RefPtr<fs::Vnode> test_file;
-    ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
-
-    file_ = fbl::RefPtr<File>::Downcast(std::move(test_file));
+    zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+    ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+    file_ = fbl::RefPtr<File>::Downcast(*std::move(test_file));
   }
 
   void TearDown() override {
@@ -59,10 +58,9 @@ TEST(ExtentCacheMountFlagTest, MountFlag) {
 
   fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir->Create("test", S_IFREG, &test_file), ZX_OK);
-
-  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
 
   ASSERT_EQ(file->ExtentCacheAvailable(), false);
 

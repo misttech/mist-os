@@ -82,11 +82,11 @@ zx::result<pgoff_t> CheckNodePage(F2fs *fs, NodePage &node_page) {
 zx::result<fbl::RefPtr<VnodeF2fs>> CreateFileAndWritePages(Dir *dir_vnode,
                                                            std::string_view file_name,
                                                            pgoff_t page_count, uint32_t signiture) {
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  if (zx_status_t ret = dir_vnode->Create(file_name, S_IFREG, &file_fs_vnode); ret != ZX_OK) {
-    return zx::error(ret);
+  zx::result file_fs_vnode = dir_vnode->Create(file_name, fs::CreationType::kFile);
+  if (file_fs_vnode.is_error()) {
+    return file_fs_vnode.take_error();
   }
-  fbl::RefPtr<VnodeF2fs> fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  fbl::RefPtr<VnodeF2fs> fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
   File *fsync_file_ptr = static_cast<File *>(fsync_vnode.get());
 
   // Write a page
@@ -351,9 +351,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
   // 1. Fsync directory
-  fbl::RefPtr<fs::Vnode> file_fs_vnode;
-  ASSERT_EQ(root_dir->Create("fsync_dir", S_IFDIR, &file_fs_vnode), ZX_OK);
-  fbl::RefPtr<VnodeF2fs> fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  zx::result file_fs_vnode = root_dir->Create("fsync_dir", fs::CreationType::kDirectory);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fbl::RefPtr<VnodeF2fs> fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
@@ -366,8 +366,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fsync_vnode = nullptr;
 
   // 2. Fsync Nlink = 0
-  ASSERT_EQ(root_dir->Create("fsync_file_nlink", S_IFREG, &file_fs_vnode), ZX_OK);
-  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  file_fs_vnode = root_dir->Create("fsync_file_nlink", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
   uint32_t temp_nlink = fsync_vnode->GetNlink();
   fsync_vnode->ClearNlink();
 
@@ -384,8 +385,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fsync_vnode = nullptr;
 
   // 3. Fsync vnode with kNeedCp flag
-  ASSERT_EQ(root_dir->Create("fsync_file_need_cp", S_IFREG, &file_fs_vnode), ZX_OK);
-  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  file_fs_vnode = root_dir->Create("fsync_file_need_cp", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
   fsync_vnode->SetFlag(InodeInfoFlag::kNeedCp);
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
@@ -399,8 +401,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fsync_vnode = nullptr;
 
   // 4. Not enough SpaceForRollForward
-  ASSERT_EQ(root_dir->Create("fsync_file_space_for_roll_forward", S_IFREG, &file_fs_vnode), ZX_OK);
-  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  file_fs_vnode = root_dir->Create("fsync_file_space_for_roll_forward", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
   block_t temp_user_block_count = fs->GetSuperblockInfo().GetTotalBlockCount();
   fs->GetSuperblockInfo().SetTotalBlockCount(0);
 
@@ -419,8 +422,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   FileTester::CreateChild(root_dir.get(), S_IFDIR, "parent_dir");
   fbl::RefPtr<fs::Vnode> child_dir_vn;
   FileTester::Lookup(root_dir.get(), "parent_dir", &child_dir_vn);
-  ASSERT_EQ(child_dir_vn->Create("fsync_file", S_IFREG, &file_fs_vnode), ZX_OK);
-  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  file_fs_vnode = child_dir_vn->Create("fsync_file", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
@@ -444,8 +448,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
 
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
-  ASSERT_EQ(root_dir->Create("fsync_file_disable_roll_forward", S_IFREG, &file_fs_vnode), ZX_OK);
-  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
+  file_fs_vnode = root_dir->Create("fsync_file_disable_roll_forward", fs::CreationType::kFile);
+  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
+  fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
@@ -668,10 +673,10 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   // 1. recover inline_data
   // Inline file creation
   std::string inline_file_name("inline");
-  fbl::RefPtr<fs::Vnode> inline_raw_vnode;
-  ASSERT_EQ(root_dir->Create(inline_file_name, S_IFREG, &inline_raw_vnode), ZX_OK);
+  zx::result inline_raw_vnode = root_dir->Create(inline_file_name, fs::CreationType::kFile);
+  ASSERT_TRUE(inline_raw_vnode.is_ok()) << inline_raw_vnode.status_string();
   fbl::RefPtr<VnodeF2fs> inline_vnode =
-      fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_raw_vnode));
+      fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(inline_raw_vnode));
   File *inline_file_ptr = static_cast<File *>(inline_vnode.get());
   inline_vnode->SetFlag(InodeInfoFlag::kInlineData);
   FileTester::CheckInlineFile(inline_vnode.get());
@@ -705,8 +710,9 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  FileTester::Lookup(root_dir.get(), inline_file_name, &inline_raw_vnode);
-  inline_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_raw_vnode));
+  fbl::RefPtr<fs::Vnode> lookup_vn;
+  FileTester::Lookup(root_dir.get(), inline_file_name, &lookup_vn);
+  inline_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(lookup_vn));
   inline_file_ptr = static_cast<File *>(inline_vnode.get());
   FileTester::CheckInlineFile(inline_vnode.get());
 
@@ -745,8 +751,8 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   FileTester::CreateRoot(fs.get(), &root);
   root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  FileTester::Lookup(root_dir.get(), inline_file_name, &inline_raw_vnode);
-  inline_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_raw_vnode));
+  FileTester::Lookup(root_dir.get(), inline_file_name, &lookup_vn);
+  inline_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(lookup_vn));
   inline_file_ptr = static_cast<File *>(inline_vnode.get());
   FileTester::CheckNonInlineFile(inline_vnode.get());
 

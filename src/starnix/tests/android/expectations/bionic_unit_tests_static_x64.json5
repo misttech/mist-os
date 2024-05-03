@@ -19,6 +19,8 @@
                 "sys_cachectl.__riscv_flush_icache",
                 "sys_hwprobe.__riscv_hwprobe",
                 "sys_hwprobe.__riscv_hwprobe_fail",
+                "sys_hwprobe.__riscv_hwprobe_misaligned_scalar",
+                "sys_hwprobe.__riscv_hwprobe_misaligned_vector",
                 "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
 
                 // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.

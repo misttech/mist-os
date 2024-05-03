@@ -21,12 +21,12 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/condition_variable.h>
-#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <usb/ums.h>
@@ -169,7 +169,7 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
 
   sync_completion_t txn_completion_;  // signals WorkerThread when new txns are available
                                       // and when device is dead
-  fbl::Mutex txn_lock_;               // protects queued_txns, txn_completion and dead
+  std::mutex txn_lock_;               // protects queued_txns, txn_completion and dead
 
   fbl::Array<fbl::RefPtr<scsi::Disk>> block_devs_;
 

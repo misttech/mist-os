@@ -63,8 +63,9 @@ use crate::{
             FakeInstant, FakeTimerCtx, FakeTimerCtxExt, PureIpDeviceAndIpVersion,
             WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerBindingsTypes,
-        TimerContext, TimerContext2, TimerHandler, TracingContext, UnlockedCoreCtx,
+        DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
+        ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
+        TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -87,7 +88,7 @@ use crate::{
         IpLayerEvent,
     },
     state::{StackState, StackStateBuilder},
-    sync::Mutex,
+    sync::{DynDebugReferences, Mutex},
     time::TimerId,
     transport::{
         tcp::{
@@ -839,57 +840,31 @@ impl InstantContext for FakeBindingsCtx {
     }
 }
 
-// TODO(https://fxbug.dev/42083407): Improve the fake timer implementation
-// to not rely on hashing the dispatch IDs. This implementation gives us a
-// way to soft transition to the new world, but the new API is not asking
-// for DispatchId uniqueness between timers, even though that's how current
-// usage works.
 impl TimerBindingsTypes for FakeBindingsCtx {
-    type Timer = TimerId<Self>;
+    type Timer =
+        <crate::context::testutil::FakeTimerCtx<TimerId<Self>> as TimerBindingsTypes>::Timer;
     type DispatchId = TimerId<Self>;
 }
 
-impl TimerContext2 for FakeBindingsCtx {
+impl TimerContext for FakeBindingsCtx {
     fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
         self.with_inner_mut(|ctx| ctx.new_timer(id))
     }
 
-    fn schedule_timer_instant2(
+    fn schedule_timer_instant(
         &mut self,
         time: Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
-        self.with_inner_mut(|ctx| ctx.schedule_timer_instant2(time, timer))
+        self.with_inner_mut(|ctx| ctx.schedule_timer_instant(time, timer))
     }
 
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.with_inner_mut(|ctx| ctx.cancel_timer2(timer))
+    fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+        self.with_inner_mut(|ctx| ctx.cancel_timer(timer))
     }
 
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.with_inner_mut(|ctx| ctx.scheduled_instant2(timer))
-    }
-}
-
-impl TimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
-    fn schedule_timer_instant(
-        &mut self,
-        time: FakeInstant,
-        id: TimerId<FakeBindingsCtx>,
-    ) -> Option<FakeInstant> {
-        self.with_inner_mut(|ctx| ctx.schedule_timer_instant(time, id))
-    }
-
-    fn cancel_timer(&mut self, id: TimerId<FakeBindingsCtx>) -> Option<FakeInstant> {
-        self.with_inner_mut(|ctx| ctx.cancel_timer(id))
-    }
-
-    fn cancel_timers_with<F: FnMut(&TimerId<FakeBindingsCtx>) -> bool>(&mut self, f: F) {
-        self.with_inner_mut(|ctx| ctx.cancel_timers_with(f))
-    }
-
-    fn scheduled_instant(&self, id: TimerId<FakeBindingsCtx>) -> Option<FakeInstant> {
-        self.with_inner_mut(|ctx| ctx.scheduled_instant(id))
+    fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+        self.with_inner_mut(|ctx| ctx.scheduled_instant(timer))
     }
 }
 
@@ -940,13 +915,13 @@ impl TcpBindingsTypes for FakeBindingsCtx {
     }
 }
 
-impl crate::ReferenceNotifiers for FakeBindingsCtx {
+impl ReferenceNotifiers for FakeBindingsCtx {
     type ReferenceReceiver<T: 'static> = Never;
 
     type ReferenceNotifier<T: Send + 'static> = Never;
 
-    fn new_reference_notifier<T: Send + 'static, D: Debug>(
-        debug_references: D,
+    fn new_reference_notifier<T: Send + 'static>(
+        debug_references: DynDebugReferences,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
         // NB: We don't want deferred destruction in core tests. These are
         // always single-threaded and single-task, and we want to encourage
@@ -956,6 +931,12 @@ impl crate::ReferenceNotifiers for FakeBindingsCtx {
             debug_references={debug_references:?}",
             core::any::type_name::<T>()
         );
+    }
+}
+
+impl DeferredResourceRemovalContext for FakeBindingsCtx {
+    fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+        match receiver {}
     }
 }
 
@@ -2037,16 +2018,26 @@ mod tests {
         set_logger_for_test();
         let mut net = new_fake_network_with_latency(None);
 
+        let (mut t1, mut t4, mut t5) =
+            net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
+                (timer_ctx.new_timer(1), timer_ctx.new_timer(4), timer_ctx.new_timer(5))
+            });
+
         net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), 1), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(4), 4), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), 5), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), &mut t1), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(4), &mut t4), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), &mut t5), None);
         });
 
+        let (mut t2, mut t3, mut t6) =
+            net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
+                (timer_ctx.new_timer(2), timer_ctx.new_timer(3), timer_ctx.new_timer(6))
+            });
+
         net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), 2), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), 3), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), 6), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), &mut t2), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), &mut t3), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), &mut t6), None);
         });
 
         // No timers fired before.
@@ -2085,12 +2076,18 @@ mod tests {
         set_logger_for_test();
         let mut net = new_fake_network_with_latency(None);
 
+        let mut t1 =
+            net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.new_timer(1));
         net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), 1), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), &mut t1), None);
+        });
+
+        let (mut t2, mut t3) = net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            (timer_ctx.new_timer(2), timer_ctx.new_timer(3))
         });
         net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), 2), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), 3), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), &mut t2), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), &mut t3), None);
         });
 
         while !net.step().is_idle() && net.context(1).fired_timers.len() < 1
@@ -2108,14 +2105,19 @@ mod tests {
         let mut net = new_fake_network_with_latency(Some(Duration::from_millis(5)));
 
         // 1 sends 2 a request and schedules a timer.
+        let mut t11 =
+            net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.new_timer(1));
         net.with_context(1, |FakeNetworkTestCtx { frame_ctx, timer_ctx, .. }| {
             frame_ctx.push((), FakeNetworkTestCtx::request());
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(3), 1), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(3), &mut t11), None);
         });
         // 2 schedules some timers.
+        let (mut t21, mut t22) = net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            (timer_ctx.new_timer(1), timer_ctx.new_timer(2))
+        });
         net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(7), 2), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(10), 1), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(7), &mut t22), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(10), &mut t21), None);
         });
 
         // Order of expected events is as follows:

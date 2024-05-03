@@ -20,6 +20,7 @@ import args
 import environment
 import event
 import main
+import test_list_file
 import util.command
 
 
@@ -96,6 +97,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             os.path.isfile(os.path.join(self.test_data_path, "test-list.json")),
             f"path was {self.test_data_path} for {__file__}",
         )
+        self.test_list_input = os.path.join(
+            self.test_data_path, "test-list.json"
+        )
         self.assertTrue(
             os.path.isfile(
                 os.path.join(self.test_data_path, "package-repositories.json")
@@ -128,6 +132,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             )
         )
 
+        # Make sure that generated test list is identical to input.
+        self._mock_generate_test_list()
+
         return super().setUp()
 
     def _mock_run_commands_in_parallel(self, stdout: str) -> mock.MagicMock:
@@ -146,6 +153,16 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             )
         )
         patch = mock.patch("main.execution.run_command", m)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return m
+
+    def _mock_generate_test_list(self) -> mock.MagicMock:
+        test_list_entries = test_list_file.TestListFile.entries_from_file(
+            self.test_list_input
+        )
+        m = mock.AsyncMock(return_value=test_list_entries)
+        patch = mock.patch("main.generate_test_list", m)
         patch.start()
         self.addCleanup(patch.stop)
         return m
@@ -620,7 +637,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertIsSubset({("fx", "ota", "--no-build")}, call_prefixes)
 
     async def test_print_logs_success(self) -> None:
-        """Test that --print-logs searches for logs, can be given a log,
+        """Test that print_logs searches for logs, can be given a log,
         and handles invalid data
         """
         env = environment.ExecutionEnvironment.initialize_from_args(
@@ -713,24 +730,6 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 f"Did not find substring, content was:\n{output.getvalue()}",
             )
 
-        # Corrupt the data a bit, the output should still work.
-        with open(new_file_path, "r+b") as f:
-            # Overwrite last 20 bytes of the file with 0
-            f.seek(-20, 2)
-            f.write(b"\0" * 80)
-        output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            return_code = main.do_print_logs(
-                args.parse_args(["--logpath", new_file_path])
-            )
-            self.assertEqual(
-                return_code, 0, f"Content was:\n{output.getvalue()}"
-            )
-            self.assertIsNotNone(
-                re.search(r"3 tests were run", output.getvalue(), re.MULTILINE),
-                f"Did not find substring, content was:\n{output.getvalue()}",
-            )
-
     async def test_print_logs_failure(self) -> None:
         """Test that --print-logs prints an error and exits if the log cannot be found"""
 
@@ -780,8 +779,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_log_to_stdout(self, _termout_mock: mock.Mock) -> None:
         """Test that we can log everything to stdout, and it parses as JSON lines"""
 
-        _command_mock = self._mock_run_command(0)
-        _subprocess_mock = self._mock_subprocess_call(0)
+        self._mock_run_command(0)
+        self._mock_subprocess_call(0)
         self._mock_has_device_connected(True)
         self._mock_has_tests_in_base([])
 

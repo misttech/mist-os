@@ -24,6 +24,7 @@ sdk_source_set("fidl_driver_transport") {
 sdk_source_set("fidl_driver") {
   category = "partner"
   sdk_name = "fidl_driver"
+  stable = true
   public = [ "include/lib/fidl_driver/cpp/wire_types.h" ]
   public_configs = [ ":include" ]
   public_deps = [
@@ -51,6 +52,7 @@ sdk_source_set("fidl_driver") {
 sdk_source_set("fidl_driver_natural") {
   category = "partner"
   sdk_name = "fidl_driver_natural"
+  stable = true
   public = [
     "include/lib/fidl_driver/cpp/natural_ostream.h",
     "include/lib/fidl_driver/cpp/natural_types.h",

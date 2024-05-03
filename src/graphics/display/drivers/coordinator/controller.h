@@ -10,9 +10,10 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/ddk/device.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
@@ -22,17 +23,12 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
-#include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #include <list>
 #include <memory>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
-#include <fbl/intrusive_double_list.h>
-#include <fbl/intrusive_hash_table.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
@@ -40,7 +36,7 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
-#include "src/graphics/display/drivers/coordinator/driver.h"
+#include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -60,21 +56,27 @@ class ControllerTest;
 class DisplayConfig;
 class IntegrationTest;
 
-using DeviceType = ddk::Device<Controller, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_display::Provider>::Mixin>;
-
 // Multiplexes between display controller clients and display engine drivers.
-class Controller : public DeviceType,
-                   public ddk::DisplayControllerInterfaceProtocol<Controller>,
-                   public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
+class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
+                   public fidl::WireServer<fuchsia_hardware_display::Provider> {
  public:
-  // Creates a new coordinator Controller device. It creates a new Inspector
-  // which will be solely owned by the Controller device.
-  explicit Controller(zx_device_t* parent);
+  // Factory method for production use.
+  // Creates and initializes a Controller instance.
+  static zx::result<std::unique_ptr<Controller>> Create(
+      std::unique_ptr<EngineDriverClient> engine_driver_client);
 
-  // Creates a new coordinator Controller device with an injected `inspector`.
+  // Creates a new coordinator Controller instance. It creates a new Inspector
+  // which will be solely owned by the Controller instance.
+  //
+  // `engine_driver_client` must not be null.
+  explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client);
+
+  // Creates a new coordinator Controller instance with an injected `inspector`.
   // The `inspector` and inspect data may be duplicated and shared.
-  Controller(zx_device_t* parent, inspect::Inspector inspector);
+  //
+  // `engine_driver_client` must not be null.
+  Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
+             inspect::Inspector inspector);
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -83,9 +85,9 @@ class Controller : public DeviceType,
 
   static void PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode);
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-  zx_status_t Bind(std::unique_ptr<display::Controller>* device_ptr);
+  // These method names reference the DFv2 (fdf::DriverBase) driver lifecycle.
+  void PrepareStop();
+  void Stop();
 
   void DisplayControllerInterfaceOnDisplaysChanged(
       const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
@@ -112,25 +114,34 @@ class Controller : public DeviceType,
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
       __TA_REQUIRES(mtx());
 
-  bool GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
-                             const char** monitor_name, const char** monitor_serial)
-      __TA_REQUIRES(mtx());
-  bool GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
-                                    uint32_t* vertical_size_mm) __TA_REQUIRES(mtx());
-  Driver* driver() { return &driver_; }
+  // Calls `callback` with a const DisplayInfo& matching the given `display_id`.
+  //
+  // Returns true iff a DisplayInfo with `display_id` was found and `callback`
+  // was called.
+  //
+  // The controller mutex is guaranteed to be held while `callback` is called.
+  template <typename Callback>
+  bool FindDisplayInfo(DisplayId display_id, Callback callback) __TA_REQUIRES(mtx());
+
+  EngineDriverClient* engine_driver_client() { return engine_driver_client_.get(); }
 
   bool supports_capture() { return supports_capture_; }
 
-  async::Loop& loop() { return loop_; }
-  bool current_thread_is_loop() { return thrd_current() == loop_thread_; }
+  async_dispatcher_t* async_dispatcher() { return dispatcher_.async_dispatcher(); }
+  bool IsRunningOnDispatcher() { return fdf::Dispatcher::GetCurrent()->get() == dispatcher_.get(); }
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
   // places where we believe a mutex aliases mtx()
   void AssertMtxAliasHeld(mtx_t* m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(m == mtx()); }
   mtx_t* mtx() const { return &mtx_; }
+  const inspect::Inspector& inspector() const { return inspector_; }
 
   // Test helpers
   size_t TEST_imported_images_count() const;
   ConfigStamp TEST_controller_stamp() const;
+  void SetDispatcherForTesting(fdf::SynchronizedDispatcher dispatcher) {
+    dispatcher_ = std::move(dispatcher);
+  }
+  void ShutdownDispatcherForTesting() { dispatcher_.ShutdownAsync(); }
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -140,17 +151,20 @@ class Controller : public DeviceType,
 
   display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 
+  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
+                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
+                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+
  private:
   friend ControllerTest;
   friend IntegrationTest;
 
+  // Initializes logic that is not suitable for the constructor.
+  zx::result<> Initialize();
+
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
-
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& _completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& _completer) override;
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
@@ -161,8 +175,6 @@ class Controller : public DeviceType,
   // mtx_ is a global lock on state shared among clients.
   mutable mtx_t mtx_;
   bool unbinding_ __TA_GUARDED(mtx()) = false;
-
-  bool kernel_framebuffer_released_ = false;
 
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
   uint32_t applied_layer_stamp_ = UINT32_MAX;
@@ -189,10 +201,11 @@ class Controller : public DeviceType,
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
 
-  async::Loop loop_;
-  thrd_t loop_thread_;
-  async_watchdog::Watchdog watchdog_;
-  Driver driver_;
+  fdf::SynchronizedDispatcher dispatcher_;
+  libsync::Completion dispatcher_shutdown_completion_;
+
+  std::unique_ptr<async_watchdog::Watchdog> watchdog_;
+  std::unique_ptr<EngineDriverClient> engine_driver_client_;
 
   zx_time_t last_valid_apply_config_timestamp_{};
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;
@@ -201,6 +214,19 @@ class Controller : public DeviceType,
 
   ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStamp;
 };
+
+template <typename Callback>
+bool Controller::FindDisplayInfo(DisplayId display_id, Callback callback) {
+  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
+
+  for (const DisplayInfo& display : displays_) {
+    if (display.id == display_id) {
+      callback(display);
+      return true;
+    }
+  }
+  return false;
+}
 
 }  // namespace display
 

@@ -18,7 +18,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/check"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/flash"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/pave"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/script"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
@@ -69,19 +68,19 @@ func TestRecovery(t *testing.T) {
 }
 
 func doTest(ctx context.Context) error {
-	outputDir, cleanup, err := c.archiveConfig.OutputDir()
+	outputDir, archiveCleanup, err := c.archiveConfig.OutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to get output directory: %w", err)
 	}
-	defer cleanup()
+	defer archiveCleanup()
 
-	ffxIsolateDirPath, err := os.MkdirTemp("", "ffx-isolate-dir")
+	ffx, ffxCleanup, err := c.ffxConfig.NewFfxTool(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create ffx isolate dir: %w", err)
+		return fmt.Errorf("failed to create ffx: %w", err)
 	}
-	ffxIsolateDir := ffx.NewIsolateDir(ffxIsolateDirPath)
+	defer ffxCleanup()
 
-	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
+	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
 	if err != nil {
 		return fmt.Errorf("failed to create ota test client: %w", err)
 	}
@@ -106,18 +105,19 @@ func doTest(ctx context.Context) error {
 	}
 
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
-		err := initializeDevice(ctx, deviceClient, build)
+		err := initializeDevice(ctx, deviceClient, ffx, build)
 		return err
 	}); err != nil {
 		return fmt.Errorf("initialization failed: %w", err)
 	}
 
-	return testRecovery(ctx, deviceClient, build)
+	return testRecovery(ctx, deviceClient, ffx.IsolateDir(), build)
 }
 
 func testRecovery(
 	ctx context.Context,
 	device *device.Client,
+	ffxIsolateDir ffx.IsolateDir,
 	build artifacts.Build,
 ) error {
 	for i := 1; i <= c.cycleCount; i++ {
@@ -127,7 +127,7 @@ func testRecovery(
 		// setting a timeout on the context, and running the actual test in a
 		// closure.
 		if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-			return doTestRecovery(ctx, device, build)
+			return doTestRecovery(ctx, device, ffxIsolateDir, build)
 		}); err != nil {
 			return fmt.Errorf("Recovery Cycle %d failed: %w", i, err)
 		}
@@ -139,10 +139,11 @@ func testRecovery(
 func doTestRecovery(
 	ctx context.Context,
 	device *device.Client,
+	ffxIsolateDir ffx.IsolateDir,
 	build artifacts.Build,
 ) error {
 	// We don't install an OTA, so we don't need to prefetch the blobs.
-	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
+	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, ffxIsolateDir)
 	if err != nil {
 		return fmt.Errorf("unable to get repository: %w", err)
 	}
@@ -195,28 +196,20 @@ func doTestRecovery(
 		return fmt.Errorf("system_recovery does seem to be running")
 	}
 
-	// exit script
-	if err := script.RunScript(ctx, device, repo, c.afterTestScript); err != nil {
-		return fmt.Errorf("failed to run after-test-script: %w", err)
-	}
-
 	return nil
 }
 
 func initializeDevice(
 	ctx context.Context,
 	device *device.Client,
+	ffx *ffx.FFXTool,
 	build artifacts.Build,
 ) error {
 	logger.Infof(ctx, "Initializing device")
 
-	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
+	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, ffx.IsolateDir())
 	if err != nil {
 		return err
-	}
-
-	if err := script.RunScript(ctx, device, repo, c.beforeInitScript); err != nil {
-		return fmt.Errorf("failed to run before-init-script: %w", err)
 	}
 
 	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
@@ -244,11 +237,11 @@ func initializeDevice(
 		}
 
 		if c.useFlash {
-			if err := flash.FlashDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
+			if err := flash.FlashDevice(ctx, device, ffx, build, sshPrivateKey.PublicKey()); err != nil {
 				return fmt.Errorf("failed to flash device during initialization: %w", err)
 			}
 		} else {
-			if err := pave.PaveDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
+			if err := pave.PaveDevice(ctx, device, ffx, build, sshPrivateKey.PublicKey()); err != nil {
 				return fmt.Errorf("failed to pave device during initialization: %w", err)
 			}
 		}
@@ -273,10 +266,6 @@ func initializeDevice(
 		c.checkABR,
 	); err != nil {
 		return err
-	}
-
-	if err := script.RunScript(ctx, device, repo, c.afterInitScript); err != nil {
-		return fmt.Errorf("failed to run after-init-script: %w", err)
 	}
 
 	return nil

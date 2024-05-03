@@ -10,6 +10,7 @@ sdk_source_set("cpp") {
   sdk_name = "sys_cpp"
 
   include_base = "//sdk"
+  stable = true
   sources = [
     "component_context.cc",
     "component_context.h",

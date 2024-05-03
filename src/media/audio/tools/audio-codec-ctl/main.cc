@@ -242,6 +242,11 @@ fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing> GetS
 }
 
 int main(int argc, char** argv) {
+  printf(
+      "WARNING: audio-codec-ctl is deprecated. Please use `ffx audio device`\n"
+      "to get and set device properties. For more information,\n"
+      "run `ffx audio device --help`,\n");
+
   std::string path = {};
 
   std::deque<std::string> args(argv + 1, argv + argc);

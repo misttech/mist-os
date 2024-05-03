@@ -58,6 +58,8 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/pt/dt-root",
       "sys/platform/pt/khadas-mcu-18",
       "sys/platform/pt/suspend",
+      "sys/platform/pwm_a-regulator",
+      "sys/platform/pwm_a0_d-regulator",
       "sys/platform/pwm-ffd1b000",
       "sys/platform/register-controller-1000",
       "sys/platform/temperature-sensor-ff634800",

@@ -10,7 +10,7 @@
 #include <threads.h>
 #include <zircon/types.h>
 
-#include <fbl/mutex.h>
+#include <mutex>
 
 #include "bus.h"
 #include "sata.h"
@@ -101,7 +101,7 @@ class Port {
   // Largest command tag (= maximum number of simultaneous commands minus 1).
   uint32_t max_command_tag_ = 0;
 
-  fbl::Mutex lock_;
+  std::mutex lock_;
   // Whether this port is implemented by the controller.
   bool port_implemented_ = false;
   // Whether a device is present on this port.

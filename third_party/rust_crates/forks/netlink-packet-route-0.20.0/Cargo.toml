@@ -30,6 +30,9 @@ name = "dump_packet_links"
 [dependencies.anyhow]
 version = "1.0.31"
 
+[dependencies.thiserror]
+version = "1.0.31"
+
 [dependencies.bitflags]
 version = "2"
 

@@ -61,7 +61,10 @@ use crate::{
         },
         types::IpTypesIpExt,
     },
-    sync::{PrimaryRc, StrongRc},
+    sync::{
+        MapRcNotifier, PrimaryRc, RemoveResourceResult, RemoveResourceResultWithContext, StrongRc,
+        WeakRc,
+    },
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -301,7 +304,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv4> for CoreCtx<'_, BC, L> {
-    type AddressId = StrongRc<Ipv4AddressEntry<BC::Instant>>;
+    type AddressId = StrongRc<Ipv4AddressEntry<BC>>;
+    type WeakAddressId = WeakRc<Ipv4AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
@@ -366,7 +370,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<Ipv4Addr>, <Ipv4 as IpDeviceIpExt>::AddressConfig<BC::Instant>) {
+    ) -> RemoveResourceResultWithContext<AddrSubnet<Ipv4Addr>, BC> {
         let primary = with_ip_device_state(self, device_id, |mut state| {
             state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>().remove(&addr.addr())
         })
@@ -374,9 +378,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let Ipv4AddressEntry { addr_sub, state } = PrimaryRc::unwrap(primary);
-        let Ipv4AddressState { config } = state.into_inner();
-        (addr_sub, config)
+        let extract_addr_sub = |Ipv4AddressEntry { addr_sub, state: _ }| addr_sub;
+        let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
+        match PrimaryRc::unwrap_or_notify_with(primary, || {
+            let (notifier, receiver) =
+                BC::new_reference_notifier::<AddrSubnet<Ipv4Addr>>(debug_references);
+            let notifier = MapRcNotifier::new(notifier, extract_addr_sub);
+            (notifier, receiver)
+        }) {
+            Ok(entry) => RemoveResourceResult::Removed(extract_addr_sub(entry)),
+            Err(receiver) => RemoveResourceResult::Deferred(receiver),
+        }
     }
 
     fn get_address_id(
@@ -394,7 +406,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         })
     }
 
-    type AddressIdsIter<'a> = AddressIdIter<'a, BC::Instant, Ipv4>;
+    type AddressIdsIter<'a> = AddressIdIter<'a, Ipv4, BC>;
     fn with_address_ids<
         O,
         F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
@@ -590,7 +602,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv6> for CoreCtx<'_, BC, L> {
-    type AddressId = StrongRc<Ipv6AddressEntry<BC::Instant>>;
+    type AddressId = StrongRc<Ipv6AddressEntry<BC>>;
+    type WeakAddressId = WeakRc<Ipv6AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
@@ -653,8 +666,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>)
-    {
+    ) -> RemoveResourceResultWithContext<AddrSubnet<Ipv6Addr>, BC> {
         let primary = with_ip_device_state(self, device_id, |mut state| {
             state
                 .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
@@ -664,9 +676,19 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let Ipv6AddressEntry { addr_sub, dad_state: _, state } = PrimaryRc::unwrap(primary);
-        let Ipv6AddressState { flags: _, config } = state.into_inner();
-        (addr_sub, config)
+        let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
+        let extract_addr_sub = |Ipv6AddressEntry { addr_sub, dad_state: _, state: _ }| {
+            addr_sub.to_witness::<SpecifiedAddr<_>>()
+        };
+        match PrimaryRc::unwrap_or_notify_with(primary, || {
+            let (notifier, receiver) =
+                BC::new_reference_notifier::<AddrSubnet<Ipv6Addr>>(debug_references);
+            let notifier = MapRcNotifier::new(notifier, extract_addr_sub);
+            (notifier, receiver)
+        }) {
+            Ok(entry) => RemoveResourceResult::Removed(extract_addr_sub(entry)),
+            Err(receiver) => RemoveResourceResult::Deferred(receiver),
+        }
     }
 
     fn get_address_id(
@@ -683,7 +705,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         })
     }
 
-    type AddressIdsIter<'a> = AddressIdIter<'a, BC::Instant, Ipv6>;
+    type AddressIdsIter<'a> = AddressIdIter<'a, Ipv6, BC>;
     fn with_address_ids<
         O,
         F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,

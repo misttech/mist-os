@@ -276,6 +276,57 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::Ano
   }
 };
 template <>
+struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::PlatformServer>> {
+  using HLCPPType = fidl::InterfaceHandle<::test::protocols::PlatformServer>;
+  static inline fidl::InterfaceHandle<::test::protocols::PlatformServer> Convert(fidl::ClientEnd<::test_protocols::PlatformServer>&& c) {
+    return fidl::InterfaceHandle<::test::protocols::PlatformServer>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ServerEnd<::test_protocols::PlatformServer>> {
+  using HLCPPType = fidl::InterfaceRequest<::test::protocols::PlatformServer>;
+  static inline fidl::InterfaceRequest<::test::protocols::PlatformServer> Convert(fidl::ServerEnd<::test_protocols::PlatformServer>&& c) {
+    return fidl::InterfaceRequest<::test::protocols::PlatformServer>(c.TakeChannel());
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceHandle<::test::protocols::PlatformServer>> {
+  using NaturalType = fidl::ClientEnd<::test_protocols::PlatformServer>;
+  static inline fidl::ClientEnd<::test_protocols::PlatformServer> Convert(fidl::InterfaceHandle<::test::protocols::PlatformServer>&& c) {
+    return fidl::ClientEnd<::test_protocols::PlatformServer>(c.TakeChannel());
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::PlatformServer>> {
+  using NaturalType = fidl::ServerEnd<::test_protocols::PlatformServer>;
+  static inline fidl::ServerEnd<::test_protocols::PlatformServer> Convert(fidl::InterfaceRequest<::test::protocols::PlatformServer>&& c) {
+    return fidl::ServerEnd<::test_protocols::PlatformServer>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::PlatformServer>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::PlatformServer>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::PlatformServer> Convert(fidl::ProtocolHandler<::test_protocols::PlatformServer>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::PlatformServer> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::PlatformServer>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::PlatformServer>;
+  static inline fidl::ProtocolHandler<::test_protocols::PlatformServer> Convert(fidl::InterfaceRequestHandler<::test::protocols::PlatformServer>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::PlatformServer> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
+template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::HandleRightsProtocol>> {
   using HLCPPType = fidl::InterfaceHandle<::test::protocols::HandleRightsProtocol>;
   static inline fidl::InterfaceHandle<::test::protocols::HandleRightsProtocol> Convert(fidl::ClientEnd<::test_protocols::HandleRightsProtocol>&& c) {

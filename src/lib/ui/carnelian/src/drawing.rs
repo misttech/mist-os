@@ -746,7 +746,7 @@ mod tests {
         let mut buffer_allocator = BufferCollectionAllocator::new(
             size.width,
             size.height,
-            fidl_fuchsia_sysmem::PixelFormatType::Bgra32,
+            fidl_fuchsia_images2::PixelFormat::B8G8R8A8,
             FrameUsage::Cpu,
             3,
         )

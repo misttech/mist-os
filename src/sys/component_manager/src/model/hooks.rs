@@ -7,7 +7,7 @@ use {
     anyhow::format_err,
     async_trait::async_trait,
     cm_rust::ComponentDecl,
-    cm_types::Name,
+    cm_types::{Name, Url},
     errors::ModelError,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -22,146 +22,139 @@ use {
     tracing::warn,
 };
 
-/// Defines the `EventType` enum as well as its implementation.
-/// |description| is the description of the event that will be a doc comment on that event type.
-/// |name| is the name of the event on CamelCase format, capitalized.
-/// |string_name| is the name of the event on snake_case format, not capitalized.
-macro_rules! events {
-    ([$($(#[$description:meta])* ($name:ident, $string_name:ident),)*]) => {
-        pub trait HasEventType {
-            fn event_type(&self) -> EventType;
-        }
-
-        #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-        pub enum EventType {
-            $(
-                $(#[$description])*
-                $name,
-            )*
-        }
-
-        impl From<EventType> for Name {
-            fn from(event_type: EventType) -> Name {
-                match event_type {
-                    $(
-                        EventType::$name => stringify!($string_name).parse().unwrap(),
-                    )*
-                }
-            }
-        }
-
-        /// Transfers any move-only state out of self into a new event that is otherwise
-        /// a clone.
-        #[async_trait]
-        pub trait TransferEvent {
-            async fn transfer(&self) -> Self;
-        }
-
-        impl fmt::Display for EventType {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", match self {
-                    $(
-                        EventType::$name => stringify!($string_name),
-                    )*
-                }
-                .to_string())
-            }
-        }
-
-        impl TryFrom<String> for EventType {
-            type Error = anyhow::Error;
-
-            fn try_from(string: String) -> Result<EventType, Self::Error> {
-                match string.as_str() {
-                    $(
-                        stringify!($string_name) => Ok(EventType::$name),
-                    )*
-                    other => Err(format_err!("invalid string for event type: {:?}", other))
-                }
-            }
-        }
-
-        impl EventType {
-            /// Returns all available event types.
-            pub fn values() -> Vec<EventType> {
-                vec![
-                    $(EventType::$name,)*
-                ]
-            }
-        }
-
-        impl HasEventType for EventPayload {
-            fn event_type(&self) -> EventType {
-                match self {
-                    $(
-                        EventPayload::$name { .. } => EventType::$name,
-                    )*
-                }
-            }
-        }
-    };
+pub trait HasEventType {
+    fn event_type(&self) -> EventType;
 }
 
-macro_rules! external_events {
-    ($($name:ident),*) => {
+/// Transfers any move-only state out of self into a new event that is otherwise
+/// a clone.
+#[async_trait]
+pub trait TransferEvent {
+    async fn transfer(&self) -> Self;
+}
 
-        impl From<fcomponent::EventType> for EventType {
-            fn from(fidl_event_type: fcomponent::EventType) -> Self {
-                match fidl_event_type {
-                    $(
-                        fcomponent::EventType::$name => EventType::$name,
-                    )*
-                }
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum EventType {
+    /// After a CapabilityProvider has been selected, the CapabilityRequested event is dispatched
+    /// with the ServerEnd of the channel for the capability.
+    CapabilityRequested,
+    /// A component instance was discovered.
+    Discovered,
+    /// Destruction of an instance has begun. The instance may/may not be stopped by this point.
+    /// The instance still exists in the parent's realm but will soon be removed.
+    Destroyed,
+    /// An instance's declaration was resolved successfully for the first time.
+    Resolved,
+    /// An instance is about to be started.
+    Started,
+    /// An instance was stopped successfully.
+    /// This event must occur before Destroyed.
+    Stopped,
+    /// Similar to the Started event, except the payload will carry an eventpair
+    /// that the subscriber could use to defer the launch of the component.
+    DebugStarted,
+    /// A component instance was unresolved.
+    Unresolved,
+}
+
+impl EventType {
+    fn as_str(&self) -> &str {
+        match self {
+            EventType::CapabilityRequested => "capability_requested",
+            EventType::Discovered => "discovered",
+            EventType::Destroyed => "destroyed",
+            EventType::Resolved => "resolved",
+            EventType::Started => "started",
+            EventType::Stopped => "stopped",
+            EventType::DebugStarted => "debug_started",
+            EventType::Unresolved => "unresolved",
+        }
+    }
+
+    /// Returns all available event types.
+    pub fn values() -> Vec<EventType> {
+        vec![
+            EventType::CapabilityRequested,
+            EventType::Discovered,
+            EventType::Destroyed,
+            EventType::Resolved,
+            EventType::Started,
+            EventType::Stopped,
+            EventType::DebugStarted,
+            EventType::Unresolved,
+        ]
+    }
+}
+
+impl From<EventType> for Name {
+    fn from(event_type: EventType) -> Name {
+        event_type.as_str().parse().unwrap()
+    }
+}
+
+impl fmt::Display for EventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl TryFrom<String> for EventType {
+    type Error = anyhow::Error;
+    fn try_from(string: String) -> Result<EventType, Self::Error> {
+        for value in EventType::values() {
+            if value.as_str() == string {
+                return Ok(value);
             }
         }
+        Err(format_err!("invalid string for event type: {:?}", string))
+    }
+}
 
-        impl TryInto<fcomponent::EventType> for EventType {
-            type Error = anyhow::Error;
-            fn try_into(self) -> Result<fcomponent::EventType, anyhow::Error> {
-                match self {
-                    $(
-                        EventType::$name => Ok(fcomponent::EventType::$name),
-                    )*
-                }
-            }
+impl HasEventType for EventPayload {
+    fn event_type(&self) -> EventType {
+        match self {
+            EventPayload::CapabilityRequested { .. } => EventType::CapabilityRequested,
+            EventPayload::Discovered => EventType::Discovered,
+            EventPayload::Destroyed => EventType::Destroyed,
+            EventPayload::Resolved { .. } => EventType::Resolved,
+            EventPayload::Started { .. } => EventType::Started,
+            EventPayload::Stopped { .. } => EventType::Stopped,
+            EventPayload::DebugStarted { .. } => EventType::DebugStarted,
+            EventPayload::Unresolved => EventType::Unresolved,
         }
     }
 }
 
-// Keep the event types listed below in alphabetical order!
-events!([
-    /// After a CapabilityProvider has been selected, the CapabilityRequested event is dispatched
-    /// with the ServerEnd of the channel for the capability.
-    (CapabilityRequested, capability_requested),
-    /// A component instance was discovered.
-    (Discovered, discovered),
-    /// Destruction of an instance has begun. The instance may/may not be stopped by this point.
-    /// The instance still exists in the parent's realm but will soon be removed.
-    (Destroyed, destroyed),
-    /// An instance's declaration was resolved successfully for the first time.
-    (Resolved, resolved),
-    /// An instance is about to be started.
-    (Started, started),
-    /// An instance was stopped successfully.
-    /// This event must occur before Destroyed.
-    (Stopped, stopped),
-    /// Similar to the Started event, except the payload will carry an eventpair
-    /// that the subscriber could use to defer the launch of the component.
-    (DebugStarted, debug_started),
-    /// A component instance was unresolved.
-    (Unresolved, unresolved),
-]);
+impl From<fcomponent::EventType> for EventType {
+    fn from(fidl_event_type: fcomponent::EventType) -> Self {
+        match fidl_event_type {
+            fcomponent::EventType::CapabilityRequested => EventType::CapabilityRequested,
+            fcomponent::EventType::Discovered => EventType::Discovered,
+            fcomponent::EventType::Destroyed => EventType::Destroyed,
+            fcomponent::EventType::Resolved => EventType::Resolved,
+            fcomponent::EventType::Started => EventType::Started,
+            fcomponent::EventType::Stopped => EventType::Stopped,
+            fcomponent::EventType::DebugStarted => EventType::DebugStarted,
+            fcomponent::EventType::Unresolved => EventType::Unresolved,
+        }
+    }
+}
 
-external_events!(
-    CapabilityRequested,
-    Discovered,
-    Destroyed,
-    Resolved,
-    Started,
-    Stopped,
-    DebugStarted,
-    Unresolved
-);
+impl TryInto<fcomponent::EventType> for EventType {
+    type Error = anyhow::Error;
+    fn try_into(self) -> Result<fcomponent::EventType, anyhow::Error> {
+        match self {
+            EventType::CapabilityRequested => Ok(fcomponent::EventType::CapabilityRequested),
+            EventType::Discovered => Ok(fcomponent::EventType::Discovered),
+            EventType::Destroyed => Ok(fcomponent::EventType::Destroyed),
+            EventType::Resolved => Ok(fcomponent::EventType::Resolved),
+            EventType::Started => Ok(fcomponent::EventType::Started),
+            EventType::Stopped => Ok(fcomponent::EventType::Stopped),
+            EventType::DebugStarted => Ok(fcomponent::EventType::DebugStarted),
+            EventType::Unresolved => Ok(fcomponent::EventType::Unresolved),
+        }
+    }
+}
 
 /// The component manager calls out to objects that implement the `Hook` trait on registered
 /// component manager events. Hooks block the flow of a task, and can mutate, decorate and replace
@@ -310,7 +303,7 @@ pub struct Event {
     pub target_moniker: ExtendedMoniker,
 
     /// Component url of the component that this event applies to
-    pub component_url: String,
+    pub component_url: Url,
 
     /// Payload of the event
     pub payload: EventPayload,
@@ -334,7 +327,7 @@ impl Event {
         let timestamp = zx::Time::get_monotonic();
         Self::new_internal(
             ExtendedMoniker::ComponentManager,
-            "bin/component_manager".to_string(),
+            "file:///bin/component_manager".parse().unwrap(),
             timestamp,
             payload,
         )
@@ -356,13 +349,13 @@ impl Event {
     #[cfg(test)]
     pub fn new_for_test(
         target_moniker: Moniker,
-        component_url: impl Into<String>,
+        component_url: &str,
         payload: EventPayload,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Self::new_internal(
             ExtendedMoniker::ComponentInstance(target_moniker),
-            component_url.into(),
+            component_url.parse().unwrap(),
             timestamp,
             payload,
         )
@@ -370,7 +363,7 @@ impl Event {
 
     fn new_internal(
         target_moniker: ExtendedMoniker,
-        component_url: String,
+        component_url: Url,
         timestamp: zx::Time,
         payload: EventPayload,
     ) -> Self {

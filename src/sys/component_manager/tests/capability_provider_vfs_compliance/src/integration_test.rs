@@ -23,7 +23,6 @@ async fn component_manager_namespace() {
         "/svc/fuchsia.boot.FactoryItems",
         "/svc/fuchsia.boot.Items",
         "/svc/fuchsia.boot.ReadOnlyLog",
-        "/svc/fuchsia.boot.RootResource",
         "/svc/fuchsia.boot.WriteOnlyLog",
         "/svc/fuchsia.inspect.InspectSink",
         "/svc/fuchsia.kernel.CpuResource",

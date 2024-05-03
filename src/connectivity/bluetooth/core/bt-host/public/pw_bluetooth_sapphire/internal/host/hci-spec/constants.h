@@ -635,11 +635,11 @@ enum class LESupportedFeature : uint64_t {
   kConnectedIsochronousStreamCentral     = (1 << 28),
   kConnectedIsochronousStreamPeripheral  = (1 << 29),
   kIsochronousBoradcaster                = (1 << 30),
-  kSynchronizedReceiver                  = (1ul << 31),
-  kConnectedIsochronousStreamHostSupport = (1ul << 32),
-  kLEPowerControlRequest                 = (1ul << 33),
-  kLEPowerChangeIndication               = (1ul << 34),
-  kLEPathLossMonitoring                  = (1ul << 35),
+  kSynchronizedReceiver                  = (1ull << 31),
+  kConnectedIsochronousStreamHostSupport = (1ull << 32),
+  kLEPowerControlRequest                 = (1ull << 33),
+  kLEPowerChangeIndication               = (1ull << 34),
+  kLEPathLossMonitoring                  = (1ull << 35),
 
   // The rest is reserved for future use.
 };
@@ -813,7 +813,7 @@ enum class EncryptionStatus : uint8_t {
 // TODO(https://fxbug.dev/42070690, https://fxbug.dev/42070801) This was
 // increased to handle flaking integration tests. We may want to reduce this
 // to something lower again once we have a bette resolution to this issue.
-constexpr pw::chrono::SystemClock::duration kCommandTimeout = std::chrono::seconds(10);
+constexpr pw::chrono::SystemClock::duration kCommandTimeout = std::chrono::duration_cast<pw::chrono::SystemClock::duration>(std::chrono::seconds(10));
 
 // The minimum and maximum range values for the LE advertising interval
 // parameters.
@@ -890,14 +890,6 @@ constexpr uint16_t kLERPATimeoutDefault = 0x0384;  // 900 seconds or 15 minutes.
 // HCI_LE_Read_Maximum_Advertising_Data_Length command to obtain this
 // information.
 constexpr size_t kMaxLEAdvertisingDataLength = 0x1F;  // (31)
-
-// The number of bytes of advertising data that can be sent in a single extended
-// advertisement. The Bluetooth spec allows for a larger amount of bytes (based
-// on the value returned for the LE Read Maximum Advertising Data Length
-// parameter) but they must be fragmented across multiple extended advertising
-// PDUs. We don't currently support data framgentation when advertising, nor do
-// we support the use of extended advertising PDUs when advertising.
-constexpr size_t kMaxPduLEExtendedAdvertisingDataLength = 248;
 
 // Core Spec Version 5.4, Volume 6, Part B, Section 2.3.4.9: the total
 // amount of Host Advertising Data before fragmentation shall not exceed 1650
@@ -1349,7 +1341,7 @@ constexpr pw::chrono::SystemClock::duration kMaxAutomaticFlushTimeoutDuration = 
 
 // Page Timeout = N * 0.625 ms (Core Spec v5.2, Vol 4, Part E, Sec 7.3.16).
 // The default is 5.12 sec.
-constexpr pw::chrono::SystemClock::duration kDurationPerPageTimeoutUnit = std::chrono::microseconds(625);
+constexpr pw::chrono::SystemClock::duration kDurationPerPageTimeoutUnit = std::chrono::duration_cast<pw::chrono::SystemClock::duration>(std::chrono::microseconds(625));
 constexpr pw::chrono::SystemClock::duration kMinPageTimeoutDuration = kDurationPerPageTimeoutUnit * static_cast<uint16_t>(pw::bluetooth::emboss::PageTimeout::MIN);
 constexpr pw::chrono::SystemClock::duration kDefaultPageTimeoutDuration = kDurationPerPageTimeoutUnit * static_cast<uint16_t>(pw::bluetooth::emboss::PageTimeout::DEFAULT);
 constexpr pw::chrono::SystemClock::duration kMaxPageTimeoutDuration = kDurationPerPageTimeoutUnit * static_cast<uint16_t>(pw::bluetooth::emboss::PageTimeout::MAX);

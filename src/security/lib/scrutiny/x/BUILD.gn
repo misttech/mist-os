@@ -32,6 +32,7 @@ if (is_host) {
       "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-url",
+      "//src/storage/lib/delivery_blob",
       "//src/sys/lib/cm_config",
       "//src/sys/lib/cm_rust",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",

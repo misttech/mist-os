@@ -4,7 +4,7 @@
 
 /dts-v1/;
 
-/include/ "src/devices/board/drivers/vim3-devicetree/dts/amlogic-a311d.dtsi";
+/include/ "amlogic-a311d.dtsi"
 
 #include <lib/ddk/platform-defs.h>
 

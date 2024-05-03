@@ -6,10 +6,9 @@
 //! state machine.
 
 use alloc::collections::hash_map;
-use assert_matches::assert_matches;
 use core::{fmt::Debug, num::NonZeroU16};
-use tracing::{debug, error};
 
+use assert_matches::assert_matches;
 use net_types::{ip::IpAddress, SpecifiedAddr};
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
@@ -21,6 +20,7 @@ use packet_formats::{
     },
 };
 use thiserror::Error;
+use tracing::{debug, error, warn};
 
 use crate::{
     context::{CounterContext, CtxPair},
@@ -29,8 +29,8 @@ use crate::{
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
-        socket::MmsError, EitherDeviceId, IpSockCreationError, IpTransportContext,
-        TransportIpContext, TransportReceiveError,
+        base::TransparentLocalDelivery, socket::MmsError, EitherDeviceId, IpSockCreationError,
+        IpTransportContext, TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
@@ -73,8 +73,7 @@ impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for
 impl<I, BC, CC> IpTransportContext<I, BC, CC> for TcpIpTransportContext
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>
-        + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -123,7 +122,15 @@ where
         remote_ip: I::RecvSrcAddr,
         local_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            warn!(
+                "TODO(https://fxbug.dev/337009139): transparent proxy not supported for TCP \
+                sockets; will not override dispatch to perform local delivery to {delivery:?}"
+            );
+        }
+
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
                 core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
@@ -203,8 +210,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
     incoming: Segment<&[u8]>,
 ) where
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<WireI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -408,7 +414,7 @@ fn lookup_socket<I, CC, BC>(
 ) -> Option<SocketLookupResult<I, CC::WeakDeviceId, BC>>
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
 {
     addrs_to_search.find_map(|addr| {
@@ -464,7 +470,7 @@ fn try_handle_incoming_for_connection_dual_stack<SockI, CC, BC>(
 ) -> ConnectionIncomingSegmentDisposition
 where
     SockI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -566,7 +572,7 @@ fn try_handle_incoming_for_connection<SockI, WireI, CC, BC, DC>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -665,7 +671,7 @@ where
                     assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
                 },
             );
-            let _: Option<_> = bindings_ctx.cancel_timer2(timer);
+            let _: Option<_> = bindings_ctx.cancel_timer(timer);
             if let Some(accept_queue) = accept_queue {
                 accept_queue.remove(&conn_id);
                 *defunct = true;
@@ -727,9 +733,7 @@ where
         + TcpContext<WireI, BC>
         + TcpContext<WireI::OtherVersion, BC>
         + CounterContext<TcpCounters<SockI>>,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>,
+    BC: TcpBindingsContext,
 {
     match disposition {
         ListenerIncomingSegmentDisposition::FoundSocket => true,
@@ -832,9 +836,7 @@ fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI, CC::WeakDeviceId>
-        + TcpBindingsContext<WireI::OtherVersion, CC::WeakDeviceId>
+    BC: TcpBindingsContext
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -1012,7 +1014,7 @@ where
                     // later. This only runs when inserting into the demux
                     // succeeds so it's okay.
                     assert_eq!(
-                        bindings_ctx_moved.schedule_timer_instant2(poll_send_at, &mut timer),
+                        bindings_ctx_moved.schedule_timer_instant(poll_send_at, &mut timer),
                         None
                     );
                     TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })

@@ -19,8 +19,8 @@
 #include <pw_bluetooth/hci_vendor.emb.h>
 
 namespace bt::l2cap {
-namespace hci_android = bt::hci_spec::vendor::android;
-namespace android_hci = pw::bluetooth::vendor::android_hci;
+namespace android_hci = bt::hci_spec::vendor::android;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 void A2dpOffloadManager::StartA2dpOffload(
     const Configuration& config,
@@ -68,14 +68,14 @@ void A2dpOffloadManager::StartA2dpOffload(
   a2dp_offload_status_ = A2dpOffloadStatus::kStarting;
 
   constexpr size_t kPacketSize =
-      android_hci::StartA2dpOffloadCommand::MaxSizeInBytes();
+      android_emb::StartA2dpOffloadCommand::MaxSizeInBytes();
   auto packet =
-      hci::EmbossCommandPacket::New<android_hci::StartA2dpOffloadCommandWriter>(
-          hci_android::kA2dpOffloadCommand, kPacketSize);
+      hci::EmbossCommandPacket::New<android_emb::StartA2dpOffloadCommandWriter>(
+          android_hci::kA2dpOffloadCommand, kPacketSize);
   auto view = packet.view_t();
 
   view.vendor_command().sub_opcode().Write(
-      hci_android::kStartA2dpOffloadCommandSubopcode);
+      android_hci::kStartA2dpOffloadCommandSubopcode);
   view.codec_type().Write(config.codec);
   view.max_latency().Write(config.max_latency);
   view.scms_t_enable().CopyFrom(
@@ -90,15 +90,15 @@ void A2dpOffloadManager::StartA2dpOffload(
 
   // kAptx and kAptxhd codecs not yet handled
   switch (config.codec) {
-    case android_hci::A2dpCodecType::SBC:
+    case android_emb::A2dpCodecType::SBC:
       view.sbc_codec_information().CopyFrom(
           const_cast<Configuration&>(config).sbc_configuration.view());
       break;
-    case android_hci::A2dpCodecType::AAC:
+    case android_emb::A2dpCodecType::AAC:
       view.aac_codec_information().CopyFrom(
           const_cast<Configuration&>(config).aac_configuration.view());
       break;
-    case android_hci::A2dpCodecType::LDAC:
+    case android_emb::A2dpCodecType::LDAC:
       view.ldac_codec_information().CopyFrom(
           const_cast<Configuration&>(config).ldac_configuration.view());
       break;
@@ -194,12 +194,12 @@ void A2dpOffloadManager::RequestStopA2dpOffload(
   a2dp_offload_status_ = A2dpOffloadStatus::kStopping;
 
   auto packet =
-      hci::EmbossCommandPacket::New<android_hci::StopA2dpOffloadCommandWriter>(
-          hci_android::kA2dpOffloadCommand);
+      hci::EmbossCommandPacket::New<android_emb::StopA2dpOffloadCommandWriter>(
+          android_hci::kA2dpOffloadCommand);
   auto packet_view = packet.view_t();
 
   packet_view.vendor_command().sub_opcode().Write(
-      hci_android::kStopA2dpOffloadCommandSubopcode);
+      android_hci::kStopA2dpOffloadCommandSubopcode);
 
   cmd_channel_->SendCommand(
       std::move(packet),

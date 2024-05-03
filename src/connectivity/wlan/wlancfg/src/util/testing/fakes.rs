@@ -6,9 +6,7 @@
 use {
     crate::{
         client::{
-            connection_selection::{
-                bss_selection, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
-            },
+            connection_selection::{EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR},
             roaming::{local_roam_manager::LocalRoamManagerApi, roam_monitor::RoamMonitorApi},
             scan, types as client_types,
         },
@@ -293,13 +291,19 @@ pub struct FakeLocalRoamManager {
 impl LocalRoamManagerApi for FakeLocalRoamManager {
     fn get_roam_monitor(
         &mut self,
-        quality_data: bss_selection::BssQualityData,
+        signal: client_types::Signal,
         _currently_fulfilled_connection: client_types::ConnectSelection,
         _roam_sender: mpsc::UnboundedSender<client_types::ScannedCandidate>,
     ) -> Box<dyn RoamMonitorApi> {
+        let signal_data = SignalData::new(
+            signal.rssi_dbm,
+            signal.snr_db,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
+        );
         Box::new(FakeRoamMonitor {
             stats_sender: self.stats_sender.clone(),
-            signal_data: Some(quality_data.signal_data),
+            signal_data: Some(signal_data),
         })
     }
 }

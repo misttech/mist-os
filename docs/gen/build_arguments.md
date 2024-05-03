@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2099
+From //build/config/BUILDCONFIG.gn:2102
 
 ### allowed_test_device_types
 
@@ -315,12 +315,10 @@ From //build/testing/environments.gni:9
 If true, emit additional execution logs, which contains information
 about remote executions and their action digests, cache status,
 remote inputs, and more.
-Caution: these logs can grow to be very large, due to the amount
-of information logged per action.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/bazel/logging.gni:11
+From //build/bazel/logging.gni:9
 
 ### bazel_fuchsia_sdk_all_cpus
 
@@ -2723,7 +2721,7 @@ From //BUILD.gn:75
 List of GN paths to source files to NOT instrument by `profile` variants.
 These take precedence over `profile_source_files`.
 
-**Current value (from the default):** `[]`
+**Current value (from the default):** `["//prebuilt/*"]`
 
 From //build/config/profile/config.gni:15
 
@@ -3247,7 +3245,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1834
+From //build/config/BUILDCONFIG.gn:1837
 
 ### extra_vbmeta_descriptors
 
@@ -4378,7 +4376,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1635
+From //build/config/BUILDCONFIG.gn:1638
 
 ### legacy_base_package_labels
 
@@ -5449,6 +5447,14 @@ cacheline size of the target architecture.
 
 From //zircon/kernel/params.gni:125
 
+### pgo_profile_path
+
+Profile data path that is used by PGO.
+
+**Current value (from the default):** `""`
+
+From //build/config/profile/config.gni:29
+
 ### platform_enable_user_pci
 
 **Current value (from the default):** `false`
@@ -5567,7 +5573,7 @@ and functions to be instrumented by `profile` variants.
 
 **Current value (from the default):** `[]`
 
-From //build/config/profile/config.gni:24
+From //build/config/profile/config.gni:26
 
 ### proprietary_codecs
 
@@ -7536,7 +7542,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2089
+From //build/config/BUILDCONFIG.gn:2092
 
 ### select_variant_canonical
 
@@ -7546,7 +7552,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2094
+From //build/config/BUILDCONFIG.gn:2097
 
 ### select_variant_shortcuts
 
@@ -7604,7 +7610,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1880
+From //build/config/BUILDCONFIG.gn:1883
 
 ### size_checker_input
 
@@ -8079,7 +8085,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1864
+From //build/config/BUILDCONFIG.gn:1867
 
 ### universe_package_labels
 

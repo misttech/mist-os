@@ -22,10 +22,11 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+
 // static
 std::shared_ptr<RegistryServer> RegistryServer::Create(
-    std::shared_ptr<const FidlThread> thread,
-    fidl::ServerEnd<fuchsia_audio_device::Registry> server_end,
+    std::shared_ptr<const FidlThread> thread, fidl::ServerEnd<fad::Registry> server_end,
     std::shared_ptr<AudioDeviceRegistry> parent) {
   ADR_LOG_STATIC(kLogRegistryServerMethods);
 
@@ -49,8 +50,8 @@ void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& complet
   ADR_LOG_METHOD(kLogRegistryServerMethods);
   if (watch_devices_added_completer_) {
     ADR_WARN_METHOD() << "previous `WatchDevicesAdded` request has not yet completed";
-    completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDevicesAddedError>(
-        fuchsia_audio_device::RegistryWatchDevicesAddedError::kAlreadyPending));
+    completer.Reply(fit::error<fad::RegistryWatchDevicesAddedError>(
+        fad::RegistryWatchDevicesAddedError::kAlreadyPending));
     return;
   }
 
@@ -62,7 +63,7 @@ void RegistryServer::DeviceWasAdded(const std::shared_ptr<const Device>& new_dev
   ADR_LOG_METHOD(kLogRegistryServerMethods);
 
   auto id = *new_device->info()->token_id();
-  auto token_match = [id](fuchsia_audio_device::Info& info) { return info.token_id() == id; };
+  auto token_match = [id](fad::Info& info) { return info.token_id() == id; };
   if (std::find_if(devices_added_since_notify_.begin(), devices_added_since_notify_.end(),
                    token_match) != devices_added_since_notify_.end()) {
     FX_LOGS(ERROR) << "Device already added and not yet acknowledged, for this RegistryServer";
@@ -94,7 +95,7 @@ void RegistryServer::ReplyWithAddedDevices() {
   for (auto& info : devices_added_since_notify_) {
     ADR_LOG_METHOD(kLogRegistryServerResponses) << "    token_id " << *info.token_id();
   }
-  completer.Reply(fit::success(fuchsia_audio_device::RegistryWatchDevicesAddedResponse{{
+  completer.Reply(fit::success(fad::RegistryWatchDevicesAddedResponse{{
       .devices = std::move(devices_added_since_notify_),
   }}));
 }
@@ -104,8 +105,8 @@ void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& compl
   ADR_LOG_METHOD(kLogRegistryServerMethods);
   if (watch_device_removed_completer_) {
     ADR_WARN_METHOD() << "previous `WatchDeviceRemoved` request has not yet completed";
-    completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDeviceRemovedError>(
-        fuchsia_audio_device::RegistryWatchDeviceRemovedError::kAlreadyPending));
+    completer.Reply(fit::error<fad::RegistryWatchDeviceRemovedError>(
+        fad::RegistryWatchDeviceRemovedError::kAlreadyPending));
     return;
   }
 
@@ -128,9 +129,9 @@ void RegistryServer::DeviceWasRemoved(TokenId removed_id) {
     FX_LOGS(ERROR) << "Device (" << removed_id << ") already removed and not yet acknowledged";
     return;
   }
-  auto match = std::find_if(
-      devices_added_since_notify_.begin(), devices_added_since_notify_.end(),
-      [removed_id](fuchsia_audio_device::Info& info) { return info.token_id() == removed_id; });
+  auto match =
+      std::find_if(devices_added_since_notify_.begin(), devices_added_since_notify_.end(),
+                   [removed_id](fad::Info& info) { return info.token_id() == removed_id; });
   if (match != devices_added_since_notify_.end()) {
     ADR_LOG_METHOD(kLogRegistryServerResponses)
         << "Device (" << removed_id << ") added then removed before notified!";
@@ -157,8 +158,8 @@ void RegistryServer::ReplyWithNextRemovedDevice() {
   ADR_LOG_METHOD(kLogRegistryServerResponses) << "responding with token_id " << next_removed_id;
   auto completer = *std::move(watch_device_removed_completer_);
   watch_device_removed_completer_.reset();
-  completer.Reply(fit::success(
-      fuchsia_audio_device::RegistryWatchDeviceRemovedResponse{{.token_id = next_removed_id}}));
+  completer.Reply(
+      fit::success(fad::RegistryWatchDeviceRemovedResponse{{.token_id = next_removed_id}}));
 }
 
 void RegistryServer::CreateObserver(CreateObserverRequest& request,
@@ -167,13 +168,12 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
 
   if (!request.token_id()) {
     ADR_WARN_METHOD() << "required field 'id' is missing";
-    completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId));
+    completer.Reply(fit::error(fad::RegistryCreateObserverError::kInvalidTokenId));
     return;
   }
   if (!request.observer_server()) {
     ADR_WARN_METHOD() << "required field 'observer_server' is missing";
-    completer.Reply(
-        fit::error(fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver));
+    completer.Reply(fit::error(fad::RegistryCreateObserverError::kInvalidObserver));
     return;
   }
   auto token_id = *request.token_id();
@@ -182,13 +182,12 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
     // We could break these out into separate error codes if needed.
     case AudioDeviceRegistry::DevicePresence::Unknown:
       ADR_WARN_METHOD() << "no device found with 'id' " << token_id;
-      completer.Reply(
-          fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound));
+      completer.Reply(fit::error(fad::RegistryCreateObserverError::kDeviceNotFound));
       return;
 
     case AudioDeviceRegistry::DevicePresence::Error:
       ADR_WARN_METHOD() << "device with 'id' " << token_id << " has an error";
-      completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceError));
+      completer.Reply(fit::error(fad::RegistryCreateObserverError::kDeviceError));
       return;
 
     case AudioDeviceRegistry::DevicePresence::Active:
@@ -200,7 +199,7 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
   auto observer =
       parent_->CreateObserverServer(std::move(*request.observer_server()), matching_device);
 
-  completer.Reply(fit::success(fuchsia_audio_device::RegistryCreateObserverResponse{}));
+  completer.Reply(fit::success(fad::RegistryCreateObserverResponse{}));
 }
 
 }  // namespace media_audio

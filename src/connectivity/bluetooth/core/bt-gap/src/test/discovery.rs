@@ -28,6 +28,7 @@ const MAX_NUM_MOCK_CLIENTS: u64 = 4;
 enum Event {
     ToggleDiscovery(u64),
     Execute,
+    RemoveHost,
 }
 
 fn stream_events(client_no: u64) -> Vec<Event> {
@@ -45,6 +46,7 @@ fn execution_sequences(max_num_clients: u64) -> impl Strategy<Value = Vec<Event>
         let mut events =
             (0..num_clients).flat_map(|client_no| stream_events(client_no)).collect::<Vec<_>>();
         events.extend(iter::repeat(Event::Execute).take((num_clients * 2) as usize));
+        events.push(Event::RemoveHost);
         events
     }
 
@@ -89,24 +91,34 @@ proptest! {
     #[test]
     fn test_discovery_invariants(execution in execution_sequences(MAX_NUM_MOCK_CLIENTS)) {
         let mut executor = fasync::TestExecutor::new();
-        let hd = host_dispatcher::test::make_simple_test_dispatcher();
-
-        // Add mock host to dispatcher and make active
-        let add_mock_host_fut = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(1), &hd);
-        let mut add_mock_host_fut = pin!(add_mock_host_fut);
-        let (host_stream, host_device, _gatt_server) = executor.run_singlethreaded(&mut add_mock_host_fut).unwrap();
-        let host_info = Arc::new(RwLock::new(host_device.info()));
-        hd.set_active_host(host_device.id())?;
-
         // Maps {client no. -> discovery session token}
         let mut discovery_sessions = HashMap::new();
         // Maps {client no. -> access proxy}
         let mut access_proxies = HashMap::new();
         // For the collection of access::run futures
         let mut access_sessions = FuturesUnordered::new();
-        // Host server future
-        let mut host_task =
-            Box::pin(host_device::test::run_discovery_host_server(host_stream, host_info));
+        let hd = host_dispatcher::test::make_simple_test_dispatcher();
+
+        // Add mock host 1 to dispatcher and make active
+        let add_mock_host_fut_1 = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(1), &hd);
+        let mut add_mock_host_fut_1 = pin!(add_mock_host_fut_1);
+        let (host_stream_1, host_device_1, _gatt_server_1) = executor.run_singlethreaded(&mut add_mock_host_fut_1).unwrap();
+        let host_info_1 = Arc::new(RwLock::new(host_device_1.info()));
+        hd.set_active_host(host_device_1.id())?;
+        let mut active_host = 1;
+
+        let mut host_server_task_1 =
+            Box::pin(host_device::test::run_discovery_host_server(host_stream_1, host_info_1));
+
+        // Add mock host 2 to dispatcher but do NOT make active.
+        let add_mock_host_fut_2 = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(2), &hd);
+        let mut add_mock_host_fut_2 = pin!(add_mock_host_fut_2);
+        let (host_stream_2, host_device_2, _gatt_server_2) = executor.run_singlethreaded(&mut add_mock_host_fut_2).unwrap();
+        let host_info_2 = Arc::new(RwLock::new(host_device_2.info()));
+
+        let mut host_server_task_2 =
+            Box::pin(host_device::test::run_discovery_host_server(host_stream_2, host_info_2));
+
 
         for event in execution {
             match event {
@@ -136,14 +148,25 @@ proptest! {
                         }
                     }
                 }
-
+                Event::RemoveHost => {
+                            let mut rm_device = pin!(hd.rm_device("/dev/host1"));
+                            let _ = executor.run_until_stalled(&mut rm_device);
+                            active_host = 2;
+                }
                 Event::Execute => {
-                    let is_discovering = run_access_and_host(
-                        &mut executor,
-                        &mut access_sessions,
-                        &mut host_task,
-                        host_device.clone(),
+                     let is_discovering_1 = run_access_and_host(
+                            &mut executor,
+                            &mut access_sessions,
+                            &mut host_server_task_1,
+                            host_device_1.clone(),
                     );
+                    let is_discovering_2 = run_access_and_host(
+                            &mut executor,
+                            &mut access_sessions,
+                            &mut host_server_task_2,
+                            host_device_2.clone(),
+                    );
+
                     // INVARIANT:
                     // If discovery_sessions is nonempty, at least one client holds a discovery
                     // session token, so host should be discovering. Otherwise, host should not
@@ -151,8 +174,14 @@ proptest! {
 
                     // We test our invariant during Execute events, after driving the Access
                     // and host futures, to ensure there are no pending requests, the
-                    // processessing of which may affect the system's state.
-                    prop_assert_eq!(is_discovering, !discovery_sessions.is_empty());
+                    // processing of which may affect the system's state.
+                    if active_host == 1 {
+                        prop_assert_eq!(is_discovering_1, !discovery_sessions.is_empty());
+                        prop_assert_eq!(is_discovering_2, false);
+                    } else {
+                        prop_assert_eq!(is_discovering_1, false);
+                        prop_assert_eq!(is_discovering_2, !discovery_sessions.is_empty());
+                    }
                 }
             }
         }
@@ -162,8 +191,15 @@ proptest! {
         let is_discovering = run_access_and_host(
             &mut executor,
             &mut access_sessions,
-            &mut host_task,
-            host_device.clone(),
+            &mut host_server_task_1,
+            host_device_1.clone(),
+        );
+        prop_assert!(!is_discovering);
+        let is_discovering = run_access_and_host(
+            &mut executor,
+            &mut access_sessions,
+            &mut host_server_task_2,
+            host_device_2.clone(),
         );
         prop_assert!(!is_discovering);
     }

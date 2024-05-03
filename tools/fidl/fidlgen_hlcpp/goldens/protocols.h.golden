@@ -144,6 +144,15 @@ using AnotherDiscoverableProtocolHandle = ::fidl::InterfaceHandle<AnotherDiscove
 
 
 
+#ifdef __Fuchsia__
+
+class PlatformServer;
+using PlatformServerHandle = ::fidl::InterfaceHandle<PlatformServer>;
+
+#endif  // __Fuchsia__
+
+
+
 class HandleRightsProtocolNoResponseMethodRequest;
 
 
@@ -1484,6 +1493,25 @@ class AnotherDiscoverableProtocol_RequestEncoder {
 
 
 class AnotherDiscoverableProtocol_ResponseEncoder {
+ public:
+};
+
+#endif  // __Fuchsia__
+
+
+
+#ifdef __Fuchsia__
+
+
+
+
+class PlatformServer_RequestEncoder {
+ public:
+};
+
+
+
+class PlatformServer_ResponseEncoder {
  public:
 };
 
@@ -3749,6 +3777,22 @@ class AnotherDiscoverableProtocol_SyncProxy;
 
 #ifdef __Fuchsia__
 
+using PlatformServerPtr = ::fidl::InterfacePtr<PlatformServer>;
+class PlatformServer_Proxy;
+class PlatformServer_Stub;
+class PlatformServer_EventSender;
+class PlatformServer_Sync;
+using PlatformServerSyncPtr = ::fidl::SynchronousInterfacePtr<PlatformServer>;
+class PlatformServer_SyncProxy;
+
+
+
+#endif  // __Fuchsia__
+
+
+
+#ifdef __Fuchsia__
+
 using HandleRightsProtocolPtr = ::fidl::InterfacePtr<HandleRightsProtocol>;
 class HandleRightsProtocol_Proxy;
 class HandleRightsProtocol_Stub;
@@ -4410,6 +4454,87 @@ class AnotherDiscoverableProtocol_SyncProxy : public ::test::protocols::AnotherD
   private:
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<AnotherDiscoverableProtocol>;
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+class PlatformServer {
+ public:
+  using Proxy_ = ::test::protocols::PlatformServer_Proxy;
+  using Stub_ = ::test::protocols::PlatformServer_Stub;
+  using EventSender_ = ::test::protocols::PlatformServer_EventSender;
+  using Sync_ = ::test::protocols::PlatformServer_Sync;
+  static const char Name_[];
+  virtual ~PlatformServer();
+
+  
+};
+
+class PlatformServer_RequestDecoder {
+ public:
+  PlatformServer_RequestDecoder() = default;
+  virtual ~PlatformServer_RequestDecoder() = default;
+  static const fidl_type_t* GetType(uint64_t ordinal, bool* out_needs_response, bool* is_known);
+};
+
+class PlatformServer_ResponseDecoder {
+ public:
+  PlatformServer_ResponseDecoder() = default;
+  virtual ~PlatformServer_ResponseDecoder() = default;
+  static const fidl_type_t* GetType(uint64_t ordinal);
+};
+
+class PlatformServer_EventSender {
+ public:
+  virtual ~PlatformServer_EventSender();
+};
+
+class PlatformServer_Sync {
+ public:
+  using Proxy_ = ::test::protocols::PlatformServer_SyncProxy;
+  virtual ~PlatformServer_Sync();
+};
+
+class PlatformServer_Proxy final : public ::fidl::internal::Proxy, public PlatformServer {
+ public:
+  explicit PlatformServer_Proxy(::fidl::internal::ProxyController* controller);
+  ~PlatformServer_Proxy() override;
+
+  zx_status_t Dispatch_(::fidl::HLCPPIncomingMessage message) override;
+
+  
+
+
+ private:
+  PlatformServer_Proxy(const ::test::protocols::PlatformServer_Proxy&) = delete;
+  PlatformServer_Proxy& operator=(const ::test::protocols::PlatformServer_Proxy&) = delete;
+
+  ::fidl::internal::ProxyController* controller_;
+};
+
+class PlatformServer_Stub final : public ::fidl::internal::Stub, public ::test::protocols::PlatformServer_EventSender {
+ public:
+  typedef class ::test::protocols::PlatformServer PlatformServer_clazz;
+  explicit PlatformServer_Stub(::test::protocols::PlatformServer_Stub::PlatformServer_clazz* impl);
+  ~PlatformServer_Stub() override;
+
+  zx_status_t Dispatch_(::fidl::HLCPPIncomingMessage message,
+                        ::fidl::internal::PendingResponse response) override;
+
+ private:
+  ::test::protocols::PlatformServer_Stub::PlatformServer_clazz* impl_;
+};
+
+class PlatformServer_SyncProxy : public ::test::protocols::PlatformServer_Sync {
+ public:
+  explicit PlatformServer_SyncProxy(::zx::channel channel);
+  ~PlatformServer_SyncProxy() override;
+
+  private:
+  ::fidl::internal::SynchronousProxy proxy_;
+  friend class ::fidl::SynchronousInterfacePtr<PlatformServer>;
 };
 
 #endif  // __Fuchsia__

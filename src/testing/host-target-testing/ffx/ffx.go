@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
@@ -38,6 +39,16 @@ func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
 		ffxToolPath: ffxToolPath,
 		isolateDir:  isolateDir,
 	}, nil
+}
+
+func (f *FFXTool) IsolateDir() IsolateDir {
+	return f.isolateDir
+}
+
+func (f *FFXTool) StopDaemon(ctx context.Context) error {
+	args := []string{"daemon", "stop", "--wait"}
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
 }
 
 type targetEntry struct {
@@ -86,6 +97,22 @@ func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]tar
 	}
 
 	return matchingTargets, nil
+}
+
+func (f *FFXTool) TargetGetSshAddress(ctx context.Context, target string) (string, error) {
+	args := []string{
+		"--target",
+		target,
+		"target",
+		"get-ssh-address",
+	}
+
+	stdout, err := f.runFFXCmd(ctx, args...)
+	if err != nil {
+		return "", fmt.Errorf("ffx target get-ssh-address failed: %w", err)
+	}
+
+	return strings.TrimSpace(string(stdout)), nil
 }
 
 func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {

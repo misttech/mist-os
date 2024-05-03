@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/image.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/zx/vmo.h>

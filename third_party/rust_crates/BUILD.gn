@@ -114,7 +114,7 @@ group("bincode") {
 }
 
 group("bit-set") {
-  public_deps = [ ":bit-set-v0_5_0" ]
+  public_deps = [ ":bit-set-v0_5_3" ]
 }
 
 group("bit-vec") {
@@ -565,11 +565,11 @@ group("num") {
 }
 
 group("num-derive") {
-  public_deps = [ ":num-derive-v0_3_3($host_toolchain)" ]
+  public_deps = [ ":num-derive-v0_4_2($host_toolchain)" ]
 }
 
 group("num-traits") {
-  public_deps = [ ":num-traits-v0_2_14" ]
+  public_deps = [ ":num-traits-v0_2_18" ]
 }
 
 group("omaha_client") {
@@ -715,7 +715,7 @@ group("regex") {
 }
 
 group("regex-syntax") {
-  public_deps = [ ":regex-syntax-v0_6_29" ]
+  public_deps = [ ":regex-syntax-v0_8_3" ]
 }
 
 group("ring") {
@@ -2329,68 +2329,37 @@ rust_library("bincode-v1_3_3") {
   applicable_licenses = [ ":bincode-v1_3_3.license" ]
 }
 
-license("bit-set-v0_5_0.license") {
+license("bit-set-v0_5_3.license") {
   public_package_name = "bit_set"
   license_files = [
-    "//third_party/rust_crates/vendor/bit-set-0.5.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/bit-set-0.5.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/bit-set-0.5.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bit-set-0.5.3/LICENSE-MIT",
   ]
 }
 
-rust_library("bit-set-v0_5_0") {
+rust_library("bit-set-v0_5_3") {
   crate_name = "bit_set"
-  crate_root = "//third_party/rust_crates/vendor/bit-set-0.5.0/src/lib.rs"
-  output_name = "bit_set-ff87f32c24820532"
+  crate_root = "//third_party/rust_crates/vendor/bit-set-0.5.3/src/lib.rs"
+  output_name = "bit_set-1bfda5d01e22a6bd"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bit-vec-v0_5_0" ]
+  deps += [ ":bit-vec-v0_6_3" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=ff87f32c24820532",
-    "-Cextra-filename=-ff87f32c24820532",
+    "-Cmetadata=1bfda5d01e22a6bd",
+    "-Cextra-filename=-1bfda5d01e22a6bd",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":bit-set-v0_5_0.license" ]
-}
-
-license("bit-vec-v0_5_0.license") {
-  public_package_name = "bit_vec"
-  license_files = [
-    "//third_party/rust_crates/vendor/bit-vec-0.5.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/bit-vec-0.5.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("bit-vec-v0_5_0") {
-  crate_name = "bit_vec"
-  crate_root = "//third_party/rust_crates/vendor/bit-vec-0.5.0/src/lib.rs"
-  output_name = "bit_vec-56024dde80975899"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=56024dde80975899",
-    "-Cextra-filename=-56024dde80975899",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":bit-vec-v0_5_0.license" ]
+  applicable_licenses = [ ":bit-set-v0_5_3.license" ]
 }
 
 license("bit-vec-v0_6_3.license") {
@@ -2994,7 +2963,7 @@ rust_library("chrono-v0_4_19") {
   deps = []
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":time-v0_1_45" ]
   if (false) {
@@ -3448,7 +3417,7 @@ rust_library("criterion-v0_2_11") {
   deps += [ ":itertools-v0_8_0" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":libc-v0_2_149" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":rand_core-v0_3_1" ]
   deps += [ ":rand_os-v0_1_2" ]
   deps += [ ":rand_xoshiro-v0_1_0" ]
@@ -5031,7 +5000,7 @@ rust_library("euclid-v0_22_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":serde-v1_0_147" ]
 
   rustenv = []
@@ -5129,7 +5098,7 @@ rust_library("fancy-regex-v0_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bit-set-v0_5_0" ]
+  deps += [ ":bit-set-v0_5_3" ]
   deps += [ ":regex-v1_7_3" ]
 
   rustenv = []
@@ -5376,7 +5345,7 @@ rust_library("float-cmp-v0_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
 
   rustenv = []
 
@@ -8913,7 +8882,7 @@ rust_library("num-v0_4_0") {
   deps += [ ":num-integer-v0_1_44" ]
   deps += [ ":num-iter-v0_1_42" ]
   deps += [ ":num-rational-v0_4_0" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
 
   rustenv = []
 
@@ -8949,7 +8918,7 @@ rust_library("num-bigint-v0_4_3") {
 
   deps = []
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":rand-v0_8_4" ]
 
   rustenv = [ "OUT_DIR=../../../../compat/num-bigint" ]
@@ -8988,7 +8957,7 @@ rust_library("num-complex-v0_4_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":rand-v0_8_4" ]
 
   rustenv = []
@@ -9043,37 +9012,37 @@ rust_library("num_cpus-v1_13_0") {
   applicable_licenses = [ ":num_cpus-v1_13_0.license" ]
 }
 
-license("num-derive-v0_3_3.license") {
+license("num-derive-v0_4_2.license") {
   public_package_name = "num_derive"
   license_files = [
-    "//third_party/rust_crates/vendor/num-derive-0.3.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-derive-0.3.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-derive-0.4.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-derive-0.4.2/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("num-derive-v0_3_3") {
+rust_proc_macro("num-derive-v0_4_2") {
   crate_name = "num_derive"
-  crate_root = "//third_party/rust_crates/vendor/num-derive-0.3.3/src/lib.rs"
-  output_name = "num_derive-aba044aab91859c"
+  crate_root = "//third_party/rust_crates/vendor/num-derive-0.4.2/src/lib.rs"
+  output_name = "num_derive-59c052b6ac9cc106"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_79" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_55" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=aba044aab91859c",
-    "-Cextra-filename=-aba044aab91859c",
+    "--edition=2021",
+    "-Cmetadata=59c052b6ac9cc106",
+    "-Cextra-filename=-59c052b6ac9cc106",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-derive-v0_3_3.license" ]
+  applicable_licenses = [ ":num-derive-v0_4_2.license" ]
 }
 
 license("num-integer-v0_1_44.license") {
@@ -9091,7 +9060,7 @@ rust_library("num-integer-v0_1_44") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
 
   rustenv = []
 
@@ -9126,7 +9095,7 @@ rust_library("num-iter-v0_1_42") {
 
   deps = []
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
 
   rustenv = []
 
@@ -9163,7 +9132,7 @@ rust_library("num-rational-v0_4_0") {
   deps = []
   deps += [ ":num-bigint-v0_4_3" ]
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
 
   rustenv = []
 
@@ -9183,18 +9152,18 @@ rust_library("num-rational-v0_4_0") {
   applicable_licenses = [ ":num-rational-v0_4_0.license" ]
 }
 
-license("num-traits-v0_2_14.license") {
+license("num-traits-v0_2_18.license") {
   public_package_name = "num_traits"
   license_files = [
-    "//third_party/rust_crates/vendor/num-traits-0.2.14/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-traits-0.2.14/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-traits-0.2.18/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-traits-0.2.18/LICENSE-MIT",
   ]
 }
 
-rust_library("num-traits-v0_2_14") {
+rust_library("num-traits-v0_2_18") {
   crate_name = "num_traits"
-  crate_root = "//third_party/rust_crates/vendor/num-traits-0.2.14/src/lib.rs"
-  output_name = "num_traits-eace97eec9f18ef0"
+  crate_root = "//third_party/rust_crates/vendor/num-traits-0.2.18/src/lib.rs"
+  output_name = "num_traits-7866ac47502981a8"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9203,18 +9172,26 @@ rust_library("num-traits-v0_2_14") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=eace97eec9f18ef0",
-    "-Cextra-filename=-eace97eec9f18ef0",
+    "--edition=2018",
+    "-Cmetadata=7866ac47502981a8",
+    "-Cextra-filename=-7866ac47502981a8",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"i128\"",
     "--cfg=feature=\"std\"",
-    "--cfg=has_i128",
+    "--cfg=has_copysign",
+    "--cfg=has_div_euclid",
+    "--cfg=has_float_to_from_bytes",
+    "--cfg=has_int_to_from_bytes",
+    "--cfg=has_is_subnormal",
+    "--cfg=has_leading_trailing_ones",
+    "--cfg=has_reverse_bits",
+    "--cfg=has_to_int_unchecked",
+    "--cfg=has_total_cmp",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-traits-v0_2_14.license" ]
+  applicable_licenses = [ ":num-traits-v0_2_18.license" ]
 }
 
 license("numtoa-v0_1_0.license") {
@@ -10960,10 +10937,10 @@ rust_library("proptest-v1_0_0") {
 
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":bit-set-v0_5_0" ]
+  deps += [ ":bit-set-v0_5_3" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":num-traits-v0_2_14" ]
+  deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":quick-error-v2_0_1" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":rand_chacha-v0_3_1" ]
@@ -12285,6 +12262,47 @@ rust_library("regex-syntax-v0_6_29") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":regex-syntax-v0_6_29.license" ]
+}
+
+license("regex-syntax-v0_8_3.license") {
+  public_package_name = "regex_syntax"
+  license_files = [
+    "//third_party/rust_crates/vendor/regex-syntax-0.8.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/regex-syntax-0.8.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/regex-syntax-0.8.3/src/unicode_tables/LICENSE-UNICODE",
+  ]
+}
+
+rust_library("regex-syntax-v0_8_3") {
+  crate_name = "regex_syntax"
+  crate_root = "//third_party/rust_crates/vendor/regex-syntax-0.8.3/src/lib.rs"
+  output_name = "regex_syntax-b15c1f1d5c6432f4"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=b15c1f1d5c6432f4",
+    "-Cextra-filename=-b15c1f1d5c6432f4",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+    "--cfg=feature=\"unicode\"",
+    "--cfg=feature=\"unicode-age\"",
+    "--cfg=feature=\"unicode-bool\"",
+    "--cfg=feature=\"unicode-case\"",
+    "--cfg=feature=\"unicode-gencat\"",
+    "--cfg=feature=\"unicode-perl\"",
+    "--cfg=feature=\"unicode-script\"",
+    "--cfg=feature=\"unicode-segment\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":regex-syntax-v0_8_3.license" ]
 }
 
 license("remove_dir_all-v0_5_1.license") {

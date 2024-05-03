@@ -32,7 +32,6 @@ import (
 	testrunnerconstants "go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 
 	"github.com/creack/pty"
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -324,27 +323,8 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		return err
 	}
 
-	if zbi != nil && t.config.ZBITool != "" && t.SSHKey() != "" {
-		signers, err := parseOutSigners([]string{t.SSHKey()})
-		if err != nil {
-			return fmt.Errorf("could not parse out signers from private keys: %w", err)
-		}
-		var authorizedKeys []byte
-		for _, s := range signers {
-			authorizedKey := ssh.MarshalAuthorizedKey(s.PublicKey())
-			authorizedKeys = append(authorizedKeys, authorizedKey...)
-		}
-		if len(authorizedKeys) == 0 {
-			return fmt.Errorf("missing authorized keys")
-		}
-		tmpFile := filepath.Join(workdir, "authorized_keys")
-		if err := os.WriteFile(tmpFile, authorizedKeys, os.ModePerm); err != nil {
-			return fmt.Errorf("could not write authorized keys to file: %w", err)
-		}
-		if t.UseFFXExperimental(ffxEmuExperimentLevel) {
-			t.ffx.ConfigSet(ctx, "ssh.pub", tmpFile)
-		}
-		if err := embedZBIWithKey(ctx, zbi, t.config.ZBITool, tmpFile); err != nil {
+	if zbi != nil && t.config.ZBITool != "" {
+		if err := embedZBIWithKey(ctx, zbi, t.config.ZBITool, t.opts.AuthorizedKey); err != nil {
 			return fmt.Errorf("failed to embed zbi with key: %w", err)
 		}
 	}

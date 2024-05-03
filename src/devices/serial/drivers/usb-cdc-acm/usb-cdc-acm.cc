@@ -5,7 +5,6 @@
 #include "usb-cdc-acm.h"
 
 #include <assert.h>
-#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
@@ -24,7 +23,9 @@ constexpr int32_t kReadRequestCount = 8;
 constexpr int32_t kWriteRequestCount = 8;
 
 constexpr uint32_t kDefaultBaudRate = 115200;
-constexpr uint32_t kDefaultConfig = SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
+constexpr uint32_t kDefaultConfig = fuchsia_hardware_serialimpl::wire::kSerialDataBits8 |
+                                    fuchsia_hardware_serialimpl::wire::kSerialStopBits1 |
+                                    fuchsia_hardware_serialimpl::wire::kSerialParityNone;
 
 constexpr uint32_t kUsbBufferSize = 2048;
 
@@ -40,27 +41,9 @@ struct usb_cdc_acm_line_coding_t {
   uint8_t bDataBits;
 } __PACKED;
 
-void UsbCdcAcmDevice::NotifyCallback() {
-  if (need_to_notify_cb_ == true) {
-    need_to_notify_cb_ = false;
-    if (notify_cb_.callback) {
-      notify_cb_.callback(notify_cb_.ctx, state_);
-    }
-  }
-}
-
-void UsbCdcAcmDevice::CheckStateLocked() {
-  uint32_t state = 0;
-  state |= free_write_queue_.is_empty() ? 0 : SERIAL_STATE_WRITABLE;
-  state |= completed_reads_queue_.is_empty() ? 0 : SERIAL_STATE_READABLE;
-
-  if (state != state_) {
-    state_ = state;
-    need_to_notify_cb_ = true;
-  }
-}
-
 void UsbCdcAcmDevice::DdkUnbind(ddk::UnbindTxn txn) {
+  CancelAll();
+
   cancel_thread_ = std::thread([this, unbind_txn = std::move(txn)]() mutable {
     usb_client_.CancelAll(bulk_in_addr_);
     usb_client_.CancelAll(bulk_out_addr_);
@@ -73,50 +56,59 @@ void UsbCdcAcmDevice::DdkRelease() {
   delete this;
 }
 
-zx_status_t UsbCdcAcmDevice::SerialImplGetInfo(serial_port_info_t* info) {
-  memcpy(info, &serial_port_info_, sizeof(*info));
-  return ZX_OK;
+void UsbCdcAcmDevice::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  completer.buffer(arena).ReplySuccess(serial_port_info_);
 }
 
-zx_status_t UsbCdcAcmDevice::SerialImplConfig(uint32_t baud_rate, uint32_t flags) {
-  if (baud_rate_ != baud_rate || flags != config_flags_) {
-    return ConfigureDevice(baud_rate, flags);
+void UsbCdcAcmDevice::Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request,
+                             fdf::Arena& arena, ConfigCompleter::Sync& completer) {
+  zx_status_t status = ZX_OK;
+  if (baud_rate_ != request->baud_rate || request->flags != config_flags_) {
+    status = ConfigureDevice(request->baud_rate, request->flags);
   }
-  return ZX_OK;
+  completer.buffer(arena).Reply(zx::make_result(status));
 }
 
-zx_status_t UsbCdcAcmDevice::SerialImplEnable(bool enable) {
-  enabled_ = enable;
-  return ZX_OK;
+void UsbCdcAcmDevice::Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request,
+                             fdf::Arena& arena, EnableCompleter::Sync& completer) {
+  completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t UsbCdcAcmDevice::SerialImplRead(uint8_t* data, size_t len, size_t* actual) {
+size_t UsbCdcAcmDevice::CopyFromRequest(usb::Request<>& request, size_t request_offset,
+                                        cpp20::span<uint8_t> buffer) {
+  ZX_ASSERT(request.request()->response.actual >= request_offset);
+  const size_t to_copy =
+      std::min(request.request()->response.actual - request_offset, buffer.size());
+
+  const size_t result = request.CopyFrom(buffer.data(), to_copy, request_offset);
+  ZX_ASSERT(result == to_copy);
+  return to_copy;
+}
+
+void UsbCdcAcmDevice::Read(fdf::Arena& arena, ReadCompleter::Sync& completer) {
+  // This was the maximum size for reads from the serial core driver at the time of our conversion
+  // from Banjo to FIDL.
+  uint8_t buffer[fuchsia_io::wire::kMaxBuf];
   size_t bytes_copied = 0;
   size_t offset = read_offset_;
-  auto* buffer = static_cast<uint8_t*>(data);
+  zx_status_t status = ZX_OK;
 
   fbl::AutoLock lock(&lock_);
 
-  while (bytes_copied < len) {
-    std::optional<usb::Request<>> req = completed_reads_queue_.pop();
-    if (!req) {
-      break;
-    }
-
-    // Skip invalid or empty responses.
-    if (req->request()->response.status == ZX_OK && req->request()->response.actual > 0) {
-      // |offset| will always be zero if a response is being read for the first time. It can only be
-      // non-zero if |req| was re-queued below, which should guarantee that |offset| is within the
-      // response length.
-      assert(offset < req->request()->response.actual);
-
-      // Copy as many bytes as available or as needed from the first request.
-      size_t to_copy = req->request()->response.actual - offset;
-      if ((to_copy + bytes_copied) > len) {
-        to_copy = len - bytes_copied;
+  // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUND should be returned if the client makes a
+  // read request when one was already in progress.
+  if (read_completer_) {
+    status = ZX_ERR_ALREADY_BOUND;
+  } else {
+    while (bytes_copied < std::size(buffer)) {
+      std::optional<usb::Request<>> req = completed_reads_queue_.pop();
+      if (!req) {
+        break;
       }
-      size_t result = req->CopyFrom(&buffer[bytes_copied], to_copy, offset);
-      ZX_ASSERT(result == to_copy);
+
+      size_t to_copy =
+          CopyFromRequest(*req, offset, {&buffer[bytes_copied], std::size(buffer) - bytes_copied});
       bytes_copied += to_copy;
 
       // If we aren't reading the whole request, put it back on the front of the completed queue and
@@ -126,58 +118,115 @@ zx_status_t UsbCdcAcmDevice::SerialImplRead(uint8_t* data, size_t len, size_t* a
         completed_reads_queue_.push_next(*std::move(req));
         break;
       }
+
+      usb_client_.RequestQueue(req->take(), &read_request_complete_);
+      offset = 0;
     }
 
-    usb_client_.RequestQueue(req->take(), &read_request_complete_);
-    offset = 0;
+    // Store the offset into the current request for the next read.
+    read_offset_ = offset;
+
+    if (bytes_copied == 0) {
+      read_completer_.emplace(completer.ToAsync());
+      return;
+    }
   }
 
-  CheckStateLocked();
-
-  // Store the offset into the current request for the next read.
-  read_offset_ = offset;
-  *actual = bytes_copied;
-
   lock.release();
-  NotifyCallback();
 
-  return ZX_OK;
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess(
+        fidl::VectorView<uint8_t>::FromExternal(buffer, bytes_copied));
+  } else {
+    completer.buffer(arena).ReplyError(status);
+  }
 }
 
-zx_status_t UsbCdcAcmDevice::SerialImplWrite(const uint8_t* buf, size_t length, size_t* actual) {
-  fbl::AutoLock lock(&lock_);
+void UsbCdcAcmDevice::Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request,
+                            fdf::Arena& arena, WriteCompleter::Sync& completer) {
+  zx_status_t status = ZX_OK;
 
-  std::optional<usb::Request<>> req = free_write_queue_.pop();
-  if (!req) {
-    *actual = 0;
-    return ZX_ERR_SHOULD_WAIT;
+  {
+    fbl::AutoLock lock(&lock_);
+
+    if (write_context_) {
+      // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUND should be returned if the client makes a
+      // write request when one was already in progress.
+      status = ZX_ERR_ALREADY_BOUND;
+    } else if (request->data.count() > 0) {
+      cpp20::span<const uint8_t> data = request->data.get();
+      size_t pending_write_requests = 0;
+      while (!data.empty()) {
+        if (std::optional<usb::Request<>> req = free_write_queue_.pop(); req) {
+          data = QueueWriteRequest(data, *std::move(req));
+          pending_write_requests++;
+        } else {
+          break;
+        }
+      }
+
+      // Copy the remaining write data to the vector, resizing if necessary.
+      write_buffer_.clear();
+      write_buffer_.insert(write_buffer_.begin(), data.begin(), data.end());
+      write_context_.emplace(completer.ToAsync(), write_buffer_, pending_write_requests);
+      return;
+    }
   }
 
-  *actual = req->CopyTo(buf, length, 0);
-  req->request()->header.length = length;
-
-  usb_client_.RequestQueue(req->take(), &write_request_complete_);
-  CheckStateLocked();
-
-  lock.release();
-  NotifyCallback();
-
-  return ZX_OK;
+  completer.buffer(arena).Reply(zx::make_result(status));
 }
 
-zx_status_t UsbCdcAcmDevice::SerialImplSetNotifyCallback(const serial_notify_t* cb) {
-  if (enabled_) {
-    return ZX_ERR_BAD_STATE;
+void UsbCdcAcmDevice::CancelAll(std::optional<CancelAllCompleter::Async> completer) {
+  std::optional<ReadCompleter::Async> read_completer;
+  std::optional<WriteContext> write_context;
+
+  {
+    fbl::AutoLock lock(&lock_);
+
+    // Clients should not call CancelAll() when a previous request is still pending.
+    if (completer && write_context_ && write_context_->cancel_all_completer) {
+      completer->Close(ZX_ERR_BAD_STATE);
+      return;
+    }
+
+    read_completer_.swap(read_completer);
+
+    if (!completer) {
+      // If completer is not set, we are unbinding and need to abort the write immediately.
+      write_context_.swap(write_context);
+    } else if (write_context_) {
+      // Otherwise complete the CancelAll request after all outstanding writes have completed.
+      write_context_->cancel_all_completer.swap(completer);
+    }
   }
 
-  notify_cb_ = *cb;
+  fdf::Arena arena('FTDI');
 
-  fbl::AutoLock lock(&lock_);
-  CheckStateLocked();
-  lock.release();
-  NotifyCallback();
+  if (read_completer) {
+    read_completer->buffer(arena).ReplyError(ZX_ERR_CANCELED);
+  }
 
-  return ZX_OK;
+  if (write_context) {
+    write_context->status = ZX_ERR_CANCELED;
+    write_context->Complete(arena);
+  }
+
+  if (completer) {
+    completer->buffer(arena).Reply();
+  }
+}
+
+void UsbCdcAcmDevice::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
+  usb_client_.CancelAll(bulk_in_addr_);
+  usb_client_.CancelAll(bulk_out_addr_);
+  CancelAll();
+  completer.buffer(arena).Reply();
+}
+
+void UsbCdcAcmDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method ordinal %lu", metadata.method_ordinal);
 }
 
 void UsbCdcAcmDevice::ReadComplete(usb_request_t* request) {
@@ -187,16 +236,41 @@ void UsbCdcAcmDevice::ReadComplete(usb_request_t* request) {
     return;
   }
 
-  fbl::AutoLock lock(&lock_);
+  uint8_t buffer[kUsbBufferSize];
+  fuchsia_hardware_serialimpl::wire::DeviceReadResponse response;
+  std::optional<ReadCompleter::Async> read_completer;
 
-  if (req.request()->response.status == ZX_OK) {
-    completed_reads_queue_.push(std::move(req));
-    CheckStateLocked();
-  } else {
-    usb_client_.RequestQueue(req.take(), &read_request_complete_);
+  zx_status_t status = req.request()->response.status;
+
+  {
+    fbl::AutoLock lock(&lock_);
+
+    if (read_completer_ && status == ZX_OK) {
+      // The USB request succeeded and there is a pending read. Copy the serial data out and use it
+      // to populate the response.
+      ZX_ASSERT(request->response.actual <= std::size(buffer));
+      size_t actual = CopyFromRequest(req, 0, {buffer, std::size(buffer)});
+      response.data = fidl::VectorView<uint8_t>::FromExternal(buffer, actual);
+    }
+
+    if (!read_completer_ && status == ZX_OK) {
+      // The USB request succeeded and there is no pending read. Add the request to the queue to be
+      // read by the client.
+      completed_reads_queue_.push(std::move(req));
+    } else {
+      // The USB request did not succeed, or there is a pending read that will consume the entire
+      // buffer. Re-queue the request to receive the next batch of serial data.
+      usb_client_.RequestQueue(req.take(), &read_request_complete_);
+    }
+
+    // Swap out the completer so that we can reply after releasing the lock.
+    read_completer_.swap(read_completer);
   }
-  lock.release();
-  NotifyCallback();
+
+  if (read_completer) {
+    fdf::Arena arena('FTDI');
+    read_completer->buffer(arena).Reply(zx::make_result(status, &response));
+  }
 }
 
 void UsbCdcAcmDevice::WriteComplete(usb_request_t* request) {
@@ -206,13 +280,54 @@ void UsbCdcAcmDevice::WriteComplete(usb_request_t* request) {
     return;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::optional<WriteContext> write_context;
 
-  free_write_queue_.push(std::move(req));
-  CheckStateLocked();
+  {
+    fbl::AutoLock lock(&lock_);
 
-  lock.release();
-  NotifyCallback();
+    if (!write_context_) {
+      // This should only happen while we're unbinding.
+      free_write_queue_.push(std::move(req));
+      return;
+    }
+
+    ZX_ASSERT(write_context_->pending_requests > 0);
+
+    if (req.request()->response.status != ZX_OK && write_context_->status == ZX_OK) {
+      write_context_->data = {};
+      write_context_->status = req.request()->response.status;
+      usb_client_.CancelAll(bulk_out_addr_);
+    }
+
+    if (!write_context_->data.empty()) {
+      // There is more data to write, refill the request and queue it up to be sent.
+      write_context_->data = QueueWriteRequest(write_context->data, std::move(req));
+      return;
+    }
+
+    free_write_queue_.push(std::move(req));
+    write_context_->pending_requests--;
+    if (write_context_->pending_requests == 0) {
+      // All requests have been completed, possibly with errors. Swap out the completer so that we
+      // can reply after releasing the lock.
+      write_context_.swap(write_context);
+    }
+  }
+
+  if (write_context) {
+    fdf::Arena arena('FTDI');
+    write_context->Complete(arena);
+  }
+}
+
+cpp20::span<const uint8_t> UsbCdcAcmDevice::QueueWriteRequest(cpp20::span<const uint8_t> data,
+                                                              usb::Request<> req) {
+  const ssize_t actual = req.CopyTo(data.data(), data.size(), 0);
+  req.request()->header.length = data.size();
+
+  usb_client_.RequestQueue(req.take(), &write_request_complete_);
+
+  return data.subspan(actual);
 }
 
 zx_status_t UsbCdcAcmDevice::ConfigureDevice(uint32_t baud_rate, uint32_t flags) {
@@ -223,7 +338,7 @@ zx_status_t UsbCdcAcmDevice::ConfigureDevice(uint32_t baud_rate, uint32_t flags)
   zx_status_t status = ZX_OK;
 
   usb_cdc_acm_line_coding_t coding;
-  const bool baud_rate_only = flags & SERIAL_SET_BAUD_RATE_ONLY;
+  const bool baud_rate_only = flags & fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly;
   if (baud_rate_only) {
     size_t coding_length;
     status = usb_client_.ControlIn(
@@ -236,40 +351,40 @@ zx_status_t UsbCdcAcmDevice::ConfigureDevice(uint32_t baud_rate, uint32_t flags)
       return status;
     }
   } else {
-    switch (flags & SERIAL_STOP_BITS_MASK) {
-      case SERIAL_STOP_BITS_1:
+    switch (flags & fuchsia_hardware_serialimpl::wire::kSerialStopBitsMask) {
+      case fuchsia_hardware_serialimpl::wire::kSerialStopBits1:
         coding.bCharFormat = 0;
         break;
-      case SERIAL_STOP_BITS_2:
+      case fuchsia_hardware_serialimpl::wire::kSerialStopBits2:
         coding.bCharFormat = 2;
         break;
       default:
         return ZX_ERR_INVALID_ARGS;
     }
-    switch (flags & SERIAL_PARITY_MASK) {
-      case SERIAL_PARITY_NONE:
+    switch (flags & fuchsia_hardware_serialimpl::wire::kSerialParityMask) {
+      case fuchsia_hardware_serialimpl::wire::kSerialParityNone:
         coding.bParityType = 0;
         break;
-      case SERIAL_PARITY_EVEN:
+      case fuchsia_hardware_serialimpl::wire::kSerialParityEven:
         coding.bParityType = 2;
         break;
-      case SERIAL_PARITY_ODD:
+      case fuchsia_hardware_serialimpl::wire::kSerialParityOdd:
         coding.bParityType = 1;
         break;
       default:
         return ZX_ERR_INVALID_ARGS;
     }
-    switch (flags & SERIAL_DATA_BITS_MASK) {
-      case SERIAL_DATA_BITS_5:
+    switch (flags & fuchsia_hardware_serialimpl::wire::kSerialDataBitsMask) {
+      case fuchsia_hardware_serialimpl::wire::kSerialDataBits5:
         coding.bDataBits = 5;
         break;
-      case SERIAL_DATA_BITS_6:
+      case fuchsia_hardware_serialimpl::wire::kSerialDataBits6:
         coding.bDataBits = 6;
         break;
-      case SERIAL_DATA_BITS_7:
+      case fuchsia_hardware_serialimpl::wire::kSerialDataBits7:
         coding.bDataBits = 7;
         break;
-      case SERIAL_DATA_BITS_8:
+      case fuchsia_hardware_serialimpl::wire::kSerialDataBits8:
         coding.bDataBits = 8;
         break;
       default:
@@ -339,9 +454,34 @@ zx_status_t UsbCdcAcmDevice::Bind() {
     return status;
   }
 
-  serial_port_info_.serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kGeneric);
+  serial_port_info_.serial_class = fuchsia_hardware_serial::Class::kGeneric;
 
-  status = DdkAdd("usb-cdc-acm");
+  {
+    fuchsia_hardware_serialimpl::Service::InstanceHandler handler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+    auto result = outgoing_.AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
+    if (result.is_error()) {
+      zxlogf(ERROR, "AddService failed: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  {
+    auto result = outgoing_.Serve(std::move(directory_server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_serialimpl::Service::Name};
+  status = DdkAdd(ddk::DeviceAddArgs("usb-cdc-acm")
+                      .set_outgoing_dir(directory_client.TakeChannel())
+                      .set_runtime_service_offers(fidl_service_offers));
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb-cdc-acm: failed to create device: %d", status);
     return status;

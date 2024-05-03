@@ -5,7 +5,7 @@
 #include "src/media/audio/services/device_registry/logging.h"
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -23,6 +23,10 @@
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
 namespace media_audio {
+
+namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   if (!unique_instance_id) {
@@ -46,7 +50,7 @@ std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   return str;
 }
 
-void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_props) {
+void LogStreamProperties(const fha::StreamProperties& stream_props) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -100,9 +104,9 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
   std::string clock_domain_str{"   clock _domain     "};
   if (stream_props.clock_domain()) {
     clock_domain_str += std::to_string(*stream_props.clock_domain());
-    if (*stream_props.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
+    if (*stream_props.clock_domain() == fha::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
-    } else if (*stream_props.clock_domain() == fuchsia_hardware_audio::kClockDomainExternal) {
+    } else if (*stream_props.clock_domain() == fha::kClockDomainExternal) {
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
@@ -112,8 +116,7 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
 }
 
 void LogElementRingBufferFormatSets(
-    const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
-        element_ring_buffer_format_sets) {
+    const std::vector<fad::ElementRingBufferFormatSet>& element_ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -124,7 +127,7 @@ void LogElementRingBufferFormatSets(
 }
 
 void LogElementRingBufferFormatSet(
-    const fuchsia_audio_device::ElementRingBufferFormatSet& element_ring_buffer_format_set) {
+    const fad::ElementRingBufferFormatSet& element_ring_buffer_format_set) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -144,12 +147,12 @@ void LogElementRingBufferFormatSet(
 }
 
 void LogTranslatedRingBufferFormatSets(
-    const std::vector<fuchsia_audio_device::PcmFormatSet>& translated_ring_buffer_format_sets) {
+    const std::vector<fad::PcmFormatSet>& translated_ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
 
-  FX_LOGS(INFO) << "fuchsia_audio_device::translated_ring_buffer_format_sets";
+  FX_LOGS(INFO) << "fuchsia_audio_device/translated_ring_buffer_format_sets";
   FX_LOGS(INFO) << "    PcmFormatSet[" << translated_ring_buffer_format_sets.size() << "]";
   for (auto idx = 0u; idx < translated_ring_buffer_format_sets.size(); ++idx) {
     FX_LOGS(INFO) << "      [" << idx << "]";
@@ -157,8 +160,7 @@ void LogTranslatedRingBufferFormatSets(
   }
 }
 
-void LogTranslatedRingBufferFormatSet(
-    const fuchsia_audio_device::PcmFormatSet& translated_ring_buffer_format_set) {
+void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_buffer_format_set) {
   if constexpr (!kLogStreamConfigFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -210,8 +212,7 @@ void LogTranslatedRingBufferFormatSet(
   }
 }
 
-void LogRingBufferFormatSets(
-    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -293,7 +294,7 @@ void LogRingBufferFormatSets(
   }
 }
 
-void LogGainState(const fuchsia_hardware_audio::GainState& gain_state) {
+void LogGainState(const fha::GainState& gain_state) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -312,7 +313,7 @@ void LogGainState(const fuchsia_hardware_audio::GainState& gain_state) {
   }
 }
 
-void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
+void LogPlugState(const fha::PlugState& plug_state) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
@@ -326,7 +327,7 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
                                                  : "<none> (non-compliant)");
 }
 
-void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props) {
+void LogCodecProperties(const fha::CodecProperties& codec_props) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -356,8 +357,7 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_pro
   }
 }
 
-void LogElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets) {
+void LogElementDaiFormatSets(const std::vector<fad::ElementDaiFormatSet>& element_dai_format_sets) {
   if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -367,8 +367,7 @@ void LogElementDaiFormatSets(
   }
 }
 
-void LogElementDaiFormatSet(
-    const fuchsia_audio_device::ElementDaiFormatSet& element_dai_format_set) {
+void LogElementDaiFormatSet(const fad::ElementDaiFormatSet& element_dai_format_set) {
   if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
@@ -386,8 +385,7 @@ void LogElementDaiFormatSet(
   }
 }
 
-void LogDaiFormatSets(
-    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+void LogDaiFormatSets(const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -437,7 +435,7 @@ void LogDaiFormatSets(
   }
 }
 
-void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format) {
+void LogDaiFormat(std::optional<fha::DaiFormat> dai_format) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -459,7 +457,7 @@ void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format) {
                 << static_cast<uint16_t>(dai_format->bits_per_sample());
 }
 
-void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info) {
+void LogCodecFormatInfo(std::optional<fha::CodecFormatInfo> format_info) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -470,17 +468,20 @@ void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> f
     return;
   }
   FX_LOGS(INFO) << "    external_delay (ns)   "
-                << (format_info->external_delay() ? std::to_string(*format_info->external_delay())
-                                                  : "<none>");
+                << (format_info->external_delay().has_value()
+                        ? std::to_string(*format_info->external_delay())
+                        : "<none>");
   FX_LOGS(INFO) << "    turn_on_delay  (ns)   "
-                << (format_info->turn_on_delay() ? std::to_string(*format_info->turn_on_delay())
-                                                 : "<none>");
+                << (format_info->turn_on_delay().has_value()
+                        ? std::to_string(*format_info->turn_on_delay())
+                        : "<none>");
   FX_LOGS(INFO) << "    turn_off_delay (ns)   "
-                << (format_info->turn_off_delay() ? std::to_string(*format_info->turn_off_delay())
-                                                  : "<none>");
+                << (format_info->turn_off_delay().has_value()
+                        ? std::to_string(*format_info->turn_off_delay())
+                        : "<none>");
 }
 
-void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& composite_props) {
+void LogCompositeProperties(const fha::CompositeProperties& composite_props) {
   if constexpr (!kLogCompositeFidlResponseValues) {
     return;
   }
@@ -488,7 +489,7 @@ void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& c
   FX_LOGS(INFO) << "fuchsia_hardware_audio/CompositeProperties";
 
   FX_LOGS(INFO) << "    manufacturer      "
-                << (composite_props.manufacturer()
+                << (composite_props.manufacturer().has_value()
                         ? ("'" +
                            std::string(composite_props.manufacturer()->data(),
                                        composite_props.manufacturer()->size()) +
@@ -496,11 +497,12 @@ void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& c
                         : "<none>");
 
   FX_LOGS(INFO) << "    product           "
-                << (composite_props.product() ? ("'" +
-                                                 std::string(composite_props.product()->data(),
-                                                             composite_props.product()->size()) +
-                                                 "'")
-                                              : "<none>");
+                << (composite_props.product().has_value()
+                        ? ("'" +
+                           std::string(composite_props.product()->data(),
+                                       composite_props.product()->size()) +
+                           "'")
+                        : "<none>");
 
   FX_LOGS(INFO) << "    unique_id         " << UidToString(composite_props.unique_id());
 
@@ -511,62 +513,188 @@ void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& c
   }
 }
 
-void LogElementStateInternal(
-    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state,
-    const std::string& indent) {
+void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_state,
+                             const std::string& indent) {
+  std::string new_indent = indent + "                 ";
   if (!element_state.has_value()) {
-    FX_LOGS(INFO) << indent << "                      <none>  (during device initialization)";
+    FX_LOGS(INFO) << new_indent << "     <none>  (during device initialization)";
     return;
   }
 
   if (element_state->type_specific().has_value()) {
     switch (element_state->type_specific()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kVendorSpecific:
-        FX_LOGS(INFO) << indent << "type_specific         VendorSpecific";
+      case fhasp::TypeSpecificElementState::Tag::kDynamics:
+        if (!element_state->type_specific()->dynamics().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Dynamics)              <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "type_specific (Dynamics)";
+        if (!element_state->type_specific()->dynamics()->band_states().has_value()) {
+          FX_LOGS(INFO) << indent << "                band_states           <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "                band_states ["
+                      << element_state->type_specific()->dynamics()->band_states()->size() << "]"
+                      << (element_state->type_specific()->dynamics()->band_states()->empty()
+                              ? " (non-compliant)"
+                              : "");
+        for (auto i = 0u; i < element_state->type_specific()->dynamics()->band_states()->size();
+             ++i) {
+          const auto& bs = element_state->type_specific()->dynamics()->band_states()->at(i);
+          FX_LOGS(INFO) << new_indent << "[" << i << "]  id                "
+                        << (bs.id().has_value() ? std::to_string(*bs.id())
+                                                : "<none> (non-compliant)");
+          FX_LOGS(INFO) << new_indent << "     min_frequency     "
+                        << (bs.min_frequency().has_value() ? std::to_string(*bs.min_frequency())
+                                                           : "<none> (non-compliant)");
+          FX_LOGS(INFO) << new_indent << "     max_frequency     "
+                        << (bs.max_frequency().has_value() ? std::to_string(*bs.max_frequency())
+                                                           : "<none> (non-compliant)");
+          FX_LOGS(INFO) << new_indent << "     threshold_db      "
+                        << (bs.threshold_db().has_value() ? std::to_string(*bs.threshold_db())
+                                                          : "<none> (non-compliant)");
+          FX_LOGS(INFO) << new_indent << "     threshold_type    " << bs.threshold_type();
+          FX_LOGS(INFO) << new_indent << "     ratio             "
+                        << (bs.ratio().has_value() ? std::to_string(*bs.ratio())
+                                                   : "<none> (non-compliant)");
+          FX_LOGS(INFO) << new_indent << "     knee_width_db     "
+                        << (bs.knee_width_db().has_value() ? std::to_string(*bs.knee_width_db())
+                                                           : "<none>");
+          FX_LOGS(INFO) << new_indent << "     attack            "
+                        << (bs.attack().has_value() ? std::to_string(*bs.attack()) + " nsec"
+                                                    : "<none>");
+          FX_LOGS(INFO) << new_indent << "     release           "
+                        << (bs.release().has_value() ? std::to_string(*bs.release()) + " nsec"
+                                                     : "<none>");
+          FX_LOGS(INFO) << new_indent << "     output_gain_db    "
+                        << (bs.output_gain_db().has_value()
+                                ? std::to_string(*bs.output_gain_db()) + " dB"
+                                : "<none>");
+          FX_LOGS(INFO) << new_indent << "     input_gain_db     "
+                        << (bs.input_gain_db().has_value()
+                                ? std::to_string(*bs.input_gain_db()) + " dB"
+                                : "<none>");
+          FX_LOGS(INFO) << new_indent << "     level_type        " << bs.level_type();
+          FX_LOGS(INFO) << new_indent << "     lookahead         "
+                        << (bs.lookahead().has_value() ? std::to_string(*bs.lookahead()) + " nsec"
+                                                       : "<none>");
+          FX_LOGS(INFO) << new_indent << "     linked_channels   "
+                        << (bs.linked_channels().has_value()
+                                ? (*bs.linked_channels() ? "TRUE" : "FALSE")
+                                : "<none>");
+        }
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain:
-        FX_LOGS(INFO) << indent << "type_specific         Gain";
+      case fhasp::TypeSpecificElementState::Tag::kEndpoint:
+        if (!element_state->type_specific()->endpoint().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Endpoint)    <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "type_specific (Endpoint)";
+        if (!element_state->type_specific()->endpoint()->plug_state().has_value()) {
+          FX_LOGS(INFO) << new_indent << "     PlugState  <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO)
+            << new_indent << "     PlugState  plugged          "
+            << (element_state->type_specific()->endpoint()->plug_state()->plugged().has_value()
+                    ? (element_state->type_specific()->endpoint()->plug_state()->plugged()
+                           ? "Plugged"
+                           : "Unplugged")
+                    : "<none> (non-compliant)");
+        FX_LOGS(INFO) << new_indent << "                plug_state_time  "
+                      << (element_state->type_specific()
+                                  ->endpoint()
+                                  ->plug_state()
+                                  ->plug_state_time()
+                                  .has_value()
+                              ? std::to_string(*element_state->type_specific()
+                                                    ->endpoint()
+                                                    ->plug_state()
+                                                    ->plug_state_time()) +
+                                    " nsec"
+                              : "<none> (non-compliant)");
+
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer:
-        FX_LOGS(INFO) << indent << "type_specific         Equalizer";
+      case fhasp::TypeSpecificElementState::Tag::kEqualizer:
+        if (!element_state->type_specific()->equalizer().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Equalizer)             <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "type_specific (Equalizer)";
+        if (!element_state->type_specific()->equalizer()->band_states().has_value()) {
+          FX_LOGS(INFO) << indent << "                band_states           <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "                band_states ["
+                      << element_state->type_specific()->equalizer()->band_states()->size() << "]"
+                      << (element_state->type_specific()->equalizer()->band_states()->empty()
+                              ? " (non-compliant)"
+                              : "");
+        for (auto i = 0u; i < element_state->type_specific()->equalizer()->band_states()->size();
+             ++i) {
+          const auto& bs = element_state->type_specific()->equalizer()->band_states()->at(i);
+          FX_LOGS(INFO) << new_indent << "[" << i << "]  id                "
+                        << (bs.id().has_value() ? std::to_string(*bs.id())
+                                                : "<none> (non-compliant)");
+          FX_LOGS(INFO) << new_indent << "     type              " << bs.type();
+          FX_LOGS(INFO) << new_indent << "     frequency         "
+                        << (bs.frequency().has_value() ? std::to_string(*bs.frequency())
+                                                       : "<none>");
+          FX_LOGS(INFO) << new_indent << "     gain_db           "
+                        << (bs.gain_db().has_value() ? std::to_string(*bs.gain_db()) : "<none>");
+          FX_LOGS(INFO) << new_indent << "     enabled           "
+                        << (bs.enabled().has_value() ? (*bs.enabled() ? "TRUE" : "FALSE")
+                                                     : "<none>");
+        }
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics:
-        FX_LOGS(INFO) << indent << "type_specific         Dynamics";
+      case fhasp::TypeSpecificElementState::Tag::kGain:
+        if (!element_state->type_specific()->gain().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Gain)        <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "type_specific (Gain)";
+        if (!element_state->type_specific()->gain()->gain().has_value()) {
+          FX_LOGS(INFO) << new_indent << "     gain    <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << new_indent << "     gain    "
+                      << *element_state->type_specific()->gain()->gain() << " dB";
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint:
-        FX_LOGS(INFO) << indent << "type_specific         Endpoint";
+      case fhasp::TypeSpecificElementState::Tag::kVendorSpecific:
+        FX_LOGS(INFO) << indent << "type_specific (VendorSpecific)";
         break;
       default:
-        FX_LOGS(INFO) << indent << "type_specific         <unknown union>  (non-compliant)";
+        FX_LOGS(INFO) << indent << "type_specific <unknown union>  (non-compliant)";
         break;
     }
   } else {
-    FX_LOGS(INFO) << indent << "type_specific         <none>";
+    FX_LOGS(INFO) << indent << "type_specific <none> (non-compliant)";
   }
 
-  FX_LOGS(INFO) << indent << "enabled               "
-                << (element_state->enabled().has_value()
-                        ? (*element_state->enabled() ? "TRUE" : "FALSE")
-                        : "<none>");
+  if (element_state->enabled().has_value()) {
+    FX_LOGS(INFO) << indent << "enabled               "
+                  << (*element_state->enabled() ? "TRUE" : "FALSE")
+                  << " (non-compliant -- deprecated)";
+  }
 
   if (element_state->latency().has_value()) {
     switch (element_state->latency()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime:
+      case fhasp::Latency::Tag::kLatencyTime:
         FX_LOGS(INFO) << indent << "latency (time)";
         if (element_state->latency()->latency_time().has_value()) {
-          FX_LOGS(INFO) << indent << "                      "
-                        << element_state->latency()->latency_time().value() << " ns";
+          FX_LOGS(INFO) << new_indent << "     " << element_state->latency()->latency_time().value()
+                        << " ns";
         } else {
-          FX_LOGS(INFO) << indent << "                      <none> ns (non-compliant)";
+          FX_LOGS(INFO) << new_indent << "     <none> ns (non-compliant)";
         }
         break;
-      case fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames:
+      case fhasp::Latency::Tag::kLatencyFrames:
         FX_LOGS(INFO) << indent << "latency (frames)";
         if (element_state->latency()->latency_frames().has_value()) {
-          FX_LOGS(INFO) << indent << "                      "
+          FX_LOGS(INFO) << new_indent << "     "
                         << element_state->latency()->latency_frames().value() << " frames";
         } else {
-          FX_LOGS(INFO) << indent << "                      <none> frames (non-compliant)";
+          FX_LOGS(INFO) << new_indent << "     <none> frames (non-compliant)";
         }
         break;
       default:
@@ -584,10 +712,29 @@ void LogElementStateInternal(
   } else {
     FX_LOGS(INFO) << indent << "vendor_specific_data  <none>";
   }
+
+  FX_LOGS(INFO) << indent << "started               "
+                << (element_state->started().has_value()
+                        ? (*element_state->started() ? "TRUE" : "FALSE")
+                        : "<none> (non-compliant)");
+
+  FX_LOGS(INFO) << indent << "bypassed              "
+                << (element_state->bypassed().has_value()
+                        ? (*element_state->bypassed() ? "TRUE" : "FALSE")
+                        : "<none>");
+
+  FX_LOGS(INFO) << indent << "turn_on_delay  (ns)   "
+                << (element_state->turn_on_delay().has_value()
+                        ? std::to_string(*element_state->turn_on_delay())
+                        : "<none>");
+
+  FX_LOGS(INFO) << indent << "turn_off_delay (ns)   "
+                << (element_state->turn_off_delay().has_value()
+                        ? std::to_string(*element_state->turn_off_delay())
+                        : "<none>");
 }
 
-void LogElementState(
-    const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state) {
+void LogElementState(const std::optional<fhasp::ElementState>& element_state) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -596,8 +743,8 @@ void LogElementState(
   LogElementStateInternal(element_state, "    ");
 }
 
-void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& element,
-                        std::string indent, std::optional<size_t> index = std::nullopt,
+void LogElementInternal(const fhasp::Element& element, std::string indent,
+                        std::optional<size_t> index = std::nullopt,
                         std::string_view addl_indent = "") {
   std::string first_indent{indent};
   if (index.has_value()) {
@@ -610,46 +757,215 @@ void LogElementInternal(const fuchsia_hardware_audio_signalprocessing::Element& 
   }
   indent.append(addl_indent);
 
-  FX_LOGS(INFO) << first_indent << "id               "
-                << (element.id() ? std::to_string(*element.id()) : "<none> (non-compliant)");
-  FX_LOGS(INFO) << indent << "type             " << element.type();
+  FX_LOGS(INFO) << first_indent << "id                    "
+                << (element.id().has_value() ? std::to_string(*element.id())
+                                             : "<none> (non-compliant)");
 
-  std::ostringstream type_specific;
-  type_specific << "type_specific    ";
-  if (element.type_specific()) {
+  FX_LOGS(INFO) << indent << "type                  " << element.type();
+
+  std::string ts_indent = indent + "                      ";
+  if (element.type_specific().has_value()) {
     switch (element.type_specific()->Which()) {
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kVendorSpecific:
-        type_specific << "vendor_specific";
+      case fhasp::TypeSpecificElement::Tag::kDynamics:
+        FX_LOGS(INFO) << indent << "type_specific         DYNAMICS";
+        if (element.type_specific()->dynamics().has_value()) {
+          if (element.type_specific()->dynamics()->bands().has_value()) {
+            FX_LOGS(INFO) << ts_indent << "bands ["
+                          << element.type_specific()->dynamics()->bands()->size() << "]";
+            for (auto i = 0u; i < element.type_specific()->dynamics()->bands()->size(); ++i) {
+              FX_LOGS(INFO) << ts_indent << " [" << i << "]          id    "
+                            << (element.type_specific()->dynamics()->bands()->at(i).id().has_value()
+                                    ? std::to_string(
+                                          *element.type_specific()->dynamics()->bands()->at(i).id())
+                                    : "<none> (non-compliant)");
+            }
+          } else {
+            FX_LOGS(INFO) << ts_indent << "bands               <none> (non-compliant)";
+            break;
+          }
+        } else {
+          FX_LOGS(INFO) << ts_indent << "<none> (non-compliant)";
+        }
+        FX_LOGS(INFO) << ts_indent << "supported_controls  ";
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kKneeWidth) {
+          FX_LOGS(INFO) << ts_indent << "                    KNEE_WIDTH";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kAttack) {
+          FX_LOGS(INFO) << ts_indent << "                    ATTACK";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kRelease) {
+          FX_LOGS(INFO) << ts_indent << "                    RELEASE";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kOutputGain) {
+          FX_LOGS(INFO) << ts_indent << "                    OUTPUT_GAIN";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kInputGain) {
+          FX_LOGS(INFO) << ts_indent << "                    INPUT_GAIN";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kLookahead) {
+          FX_LOGS(INFO) << ts_indent << "                    LOOKAHEAD";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kLevelType) {
+          FX_LOGS(INFO) << ts_indent << "                    LEVEL_TYPE";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kLinkedChannels) {
+          FX_LOGS(INFO) << ts_indent << "                    LINKED_CHANNELS";
+        }
+        if (*element.type_specific()->dynamics()->supported_controls() &
+            fhasp::DynamicsSupportedControls::kThresholdType) {
+          FX_LOGS(INFO) << ts_indent << "                    THRESHOLD_TYPE";
+        }
+        //
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kGain:
-        type_specific << "gain";
+      case fhasp::TypeSpecificElement::Tag::kEndpoint:
+        FX_LOGS(INFO) << indent << "type_specific         "
+                      << element.type_specific()->endpoint().value();
+        //
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEqualizer:
-        type_specific << "equalizer";
+      case fhasp::TypeSpecificElement::Tag::kEqualizer:
+        FX_LOGS(INFO) << indent << "type_specific         EQUALIZER";
+        if (element.type_specific()->equalizer().has_value()) {
+          if (element.type_specific()->equalizer()->bands().has_value()) {
+            FX_LOGS(INFO) << ts_indent << "bands ["
+                          << element.type_specific()->equalizer()->bands()->size() << "]";
+            for (auto i = 0u; i < element.type_specific()->equalizer()->bands()->size(); ++i) {
+              FX_LOGS(INFO)
+                  << ts_indent << " [" << i << "]          id    "
+                  << (element.type_specific()->equalizer()->bands()->at(i).id().has_value()
+                          ? std::to_string(
+                                *element.type_specific()->equalizer()->bands()->at(i).id())
+                          : "<none> (non-compliant)");
+            }
+          } else {
+            FX_LOGS(INFO) << indent
+                          << "                      bands               <none> (non-compliant)";
+            break;
+          }
+        } else {
+          FX_LOGS(INFO) << ts_indent << "<none> (non-compliant)";
+        }
+        FX_LOGS(INFO) << ts_indent << "supported_controls  ";
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kCanControlFrequency) {
+          FX_LOGS(INFO) << ts_indent << "                    CAN_CONTROL_FREQUENCY";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kCanControlQ) {
+          FX_LOGS(INFO) << ts_indent << "                    CAN_CONTROL_Q";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kSupportsTypePeak) {
+          FX_LOGS(INFO) << ts_indent << "                    SUPPORTS_TYPE_PEAK";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kSupportsTypeNotch) {
+          FX_LOGS(INFO) << ts_indent << "                    SUPPORTS_TYPE_NOTCH";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kSupportsTypeLowCut) {
+          FX_LOGS(INFO) << ts_indent << "                    SUPPORTS_TYPE_LOW_CUT";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kSupportsTypeHighCut) {
+          FX_LOGS(INFO) << ts_indent << "                    SUPPORTS_TYPE_HIGH_CUT";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kSupportsTypeLowShelf) {
+          FX_LOGS(INFO) << ts_indent << "                    SUPPORTS_TYPE_LOW_SHELF";
+        }
+        if (*element.type_specific()->equalizer()->supported_controls() &
+            fhasp::EqualizerSupportedControls::kSupportsTypeHighShelf) {
+          FX_LOGS(INFO) << ts_indent << "                    SUPPORTS_TYPE_HIGH_SHELF";
+        }
+
+        FX_LOGS(INFO) << ts_indent << "can_disable_bands   "
+                      << (element.type_specific()->equalizer()->can_disable_bands().has_value()
+                              ? (*element.type_specific()->equalizer()->can_disable_bands()
+                                     ? "TRUE"
+                                     : "FALSE")
+                              : "<none>");
+        FX_LOGS(INFO) << ts_indent << "min_frequency       "
+                      << (element.type_specific()->equalizer()->min_frequency().has_value()
+                              ? std::to_string(
+                                    *element.type_specific()->equalizer()->min_frequency())
+                              : "<none> (non-compliant)");
+        FX_LOGS(INFO) << ts_indent << "max_frequency       "
+                      << (element.type_specific()->equalizer()->max_frequency().has_value()
+                              ? std::to_string(
+                                    *element.type_specific()->equalizer()->max_frequency())
+                              : "<none> (non-compliant)");
+        FX_LOGS(INFO) << ts_indent << "max_q               "
+                      << (element.type_specific()->equalizer()->max_q().has_value()
+                              ? std::to_string(*element.type_specific()->equalizer()->max_q())
+                              : "<none>");
+        FX_LOGS(INFO) << ts_indent << "min_gain_db         "
+                      << (element.type_specific()->equalizer()->min_gain_db().has_value()
+                              ? std::to_string(*element.type_specific()->equalizer()->min_gain_db())
+                              : "<none>");
+        FX_LOGS(INFO) << ts_indent << "max_gain_db         "
+                      << (element.type_specific()->equalizer()->max_gain_db().has_value()
+                              ? std::to_string(*element.type_specific()->equalizer()->max_gain_db())
+                              : "<none>");
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kDynamics:
-        type_specific << "dynamics";
+      case fhasp::TypeSpecificElement::Tag::kGain:
+        FX_LOGS(INFO) << indent << "type_specific         GAIN";
+        FX_LOGS(INFO) << ts_indent << "type                "
+                      << element.type_specific()->gain()->type();
+        FX_LOGS(INFO) << ts_indent << "domain              "
+                      << element.type_specific()->gain()->domain();
+        FX_LOGS(INFO) << ts_indent << "min_gain            "
+                      << (element.type_specific()->gain()->min_gain().has_value()
+                              ? std::to_string(*element.type_specific()->gain()->min_gain()) + " dB"
+                              : "<none>");
+        FX_LOGS(INFO) << ts_indent << "max_gain            "
+                      << (element.type_specific()->gain()->max_gain().has_value()
+                              ? std::to_string(*element.type_specific()->gain()->max_gain()) + " dB"
+                              : "<none>");
+        FX_LOGS(INFO) << ts_indent << "min_gain_step       "
+                      << (element.type_specific()->gain()->min_gain_step().has_value()
+                              ? std::to_string(*element.type_specific()->gain()->min_gain_step()) +
+                                    " dB"
+                              : "<none>");
         break;
-      case fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::Tag::kEndpoint:
-        type_specific << element.type_specific()->endpoint().value();
+      case fhasp::TypeSpecificElement::Tag::kVendorSpecific:
+        FX_LOGS(INFO) << indent << "type_specific         VENDOR_SPECIFIC";
         break;
       default:
-        type_specific << "OTHER (unknown enum)";
+        FX_LOGS(INFO) << indent << "type_specific         OTHER - unknown enum";
         break;
     }
   } else {
-    type_specific << "<none>";
+    FX_LOGS(INFO) << indent << "type_specific         <none>";
   }
-  FX_LOGS(INFO) << indent << type_specific.str();
 
-  FX_LOGS(INFO) << indent << "can_disable      "
-                << (element.can_disable() ? (*element.can_disable() ? "TRUE" : "FALSE")
-                                          : "<none> (FALSE)");
-  FX_LOGS(INFO) << indent << "description      "
-                << (element.description() ? std::string("'") + *element.description() + "'"
-                                          : "<none>");
+  if (element.can_disable().has_value()) {
+    FX_LOGS(INFO) << indent << "can_disable <deprecated> "
+                  << (*element.can_disable() ? "TRUE" : "FALSE") << " (non-compliant)";
+  }
+
+  FX_LOGS(INFO) << indent << "description           "
+                << (element.description().has_value()
+                        ? std::string("'") + *element.description() + "'"
+                        : "<none>");
+
+  FX_LOGS(INFO) << indent << "can_stop              "
+                << (element.can_stop().has_value() ? (*element.can_stop() ? "TRUE" : "FALSE")
+                                                   : "<none> (FALSE)");
+
+  FX_LOGS(INFO) << indent << "can_bypass            "
+                << (element.can_bypass().has_value() ? (*element.can_bypass() ? "TRUE" : "FALSE")
+                                                     : "<none> (FALSE)");
 }
-void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element) {
+
+void LogElement(const fhasp::Element& element) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -657,7 +973,8 @@ void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element)
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Element";
   LogElementInternal(element, "    ");
 }
-void LogElements(const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements) {
+
+void LogElements(const std::vector<fhasp::Element>& elements) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -680,16 +997,16 @@ void LogElementMap(const std::unordered_map<ElementId, ElementRecord>& element_m
     FX_LOGS(INFO) << "ElementId     " << element_id;
     FX_LOGS(INFO) << "ElementRecord";
 
-    FX_LOGS(INFO) << "    element";
+    FX_LOGS(INFO) << "   element";
     LogElementInternal(element_record.element, "        ");
 
-    FX_LOGS(INFO) << "    state";
+    FX_LOGS(INFO) << "   state";
     LogElementStateInternal(element_record.state, "        ");
   }
 }
 
-void LogTopologyInternal(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
-                         std::string indent, std::optional<size_t> index = std::nullopt,
+void LogTopologyInternal(const fhasp::Topology& topology, std::string indent,
+                         std::optional<size_t> index = std::nullopt,
                          std::string_view addl_indent = "") {
   std::string first_indent{indent};
   if (index.has_value()) {
@@ -718,7 +1035,8 @@ void LogTopologyInternal(const fuchsia_hardware_audio_signalprocessing::Topology
     FX_LOGS(INFO) << indent << "processing_elements_edge_pairs <none> (non-compliant)";
   }
 }
-void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology) {
+
+void LogTopology(const fhasp::Topology& topology) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -726,8 +1044,8 @@ void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topolo
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Topology";
   LogTopologyInternal(topology, "        ");
 }
-void LogTopologies(
-    const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies) {
+
+void LogTopologies(const std::vector<fhasp::Topology>& topologies) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;
   }
@@ -741,7 +1059,7 @@ void LogTopologies(
 }
 
 // Signal the successful detection, querying, initialization and addition of a device.
-void LogDeviceAddition(const fuchsia_audio_device::Info& device_info) {
+void LogDeviceAddition(const fad::Info& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     FX_DCHECK(device_info.device_type().has_value());
     FX_LOGS(INFO) << device_info.device_type() << " device "
@@ -757,7 +1075,7 @@ void LogDeviceAddition(const fuchsia_audio_device::Info& device_info) {
 
 // Mirror (bookend) the analogous `LogDeviceAddition` for device removal. Removals may be "normal"
 // (USB unplug) or caused by fatal error. The latter can happen before `device_info` is created.
-void LogDeviceRemoval(const std::optional<fuchsia_audio_device::Info>& device_info) {
+void LogDeviceRemoval(const std::optional<fad::Info>& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     if (device_info.has_value()) {
       FX_DCHECK(device_info->device_type().has_value());
@@ -777,7 +1095,7 @@ void LogDeviceRemoval(const std::optional<fuchsia_audio_device::Info>& device_in
 
 // Mirror (bookend) the analogous `LogDeviceAddition`, for a device error.
 // This can also occur before a device has been successfully added: device_info may not be set.
-void LogDeviceError(const std::optional<fuchsia_audio_device::Info>& device_info) {
+void LogDeviceError(const std::optional<fad::Info>& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     if (device_info.has_value()) {
       FX_DCHECK(device_info->device_type().has_value());
@@ -795,211 +1113,210 @@ void LogDeviceError(const std::optional<fuchsia_audio_device::Info>& device_info
   }
 }
 
-void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
+void LogDeviceInfo(const fad::Info& device_info) {
   if constexpr (!kLogDeviceInfo) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_audio_device/Info";
 
-  FX_LOGS(INFO) << "   token_id                     "
+  FX_LOGS(INFO) << "  token_id                     "
                 << (device_info.token_id() ? std::to_string(*device_info.token_id())
                                            : "<none> (non-compliant)");
 
-  FX_LOGS(INFO) << "   device_type                  " << device_info.device_type();
+  FX_LOGS(INFO) << "  device_type                  " << device_info.device_type();
 
-  FX_LOGS(INFO) << "   device_name                  "
+  FX_LOGS(INFO) << "  device_name                  "
                 << (device_info.device_name() ? std::string("'") + *device_info.device_name() + "'"
                                               : "<none>");
 
-  FX_LOGS(INFO) << "   manufacturer                 "
+  FX_LOGS(INFO) << "  manufacturer                 "
                 << (device_info.manufacturer() ? "'" + *device_info.manufacturer() + "'"
                                                : "<none>");
 
-  FX_LOGS(INFO) << "   product                      "
+  FX_LOGS(INFO) << "  product                      "
                 << (device_info.product() ? "'" + *device_info.product() + "'" : "<none>");
 
-  FX_LOGS(INFO) << "   unique_instance_id           "
+  FX_LOGS(INFO) << "  unique_instance_id           "
                 << UidToString(device_info.unique_instance_id());
 
-  FX_LOGS(INFO) << "   is_input                     "
+  FX_LOGS(INFO) << "  is_input                     "
                 << (device_info.is_input() ? (*device_info.is_input() ? "TRUE" : "FALSE")
                                            : "<none>");
 
   if (device_info.ring_buffer_format_sets()) {
-    FX_LOGS(INFO) << "   ring_buffer_format_sets [" << device_info.ring_buffer_format_sets()->size()
+    FX_LOGS(INFO) << "  ring_buffer_format_sets [" << device_info.ring_buffer_format_sets()->size()
                   << "]";
     for (auto i = 0u; i < device_info.ring_buffer_format_sets()->size(); ++i) {
       const auto& element_ring_buffer_format_set = device_info.ring_buffer_format_sets()->at(i);
-      FX_LOGS(INFO) << "    [" << i << "] element_id              "
+      FX_LOGS(INFO) << "   [" << i << "] element_id              "
                     << (element_ring_buffer_format_set.element_id().has_value()
                             ? std::to_string(*element_ring_buffer_format_set.element_id())
                             : "<none> (non-compliant)");
       if (element_ring_buffer_format_set.format_sets().has_value()) {
-        FX_LOGS(INFO) << "        format_set ["
+        FX_LOGS(INFO) << "       format_set ["
                       << element_ring_buffer_format_set.format_sets()->size() << "]";
         for (auto j = 0u; j < element_ring_buffer_format_set.format_sets()->size(); ++j) {
           const auto& pcm_format_set = element_ring_buffer_format_set.format_sets()->at(j);
           if (pcm_format_set.channel_sets()) {
-            FX_LOGS(INFO) << "         [" << j << "] channel_sets ["
+            FX_LOGS(INFO) << "        [" << j << "] channel_sets ["
                           << pcm_format_set.channel_sets()->size() << "]";
             for (auto k = 0u; k < pcm_format_set.channel_sets()->size(); ++k) {
               const auto& channel_set = pcm_format_set.channel_sets()->at(k);
               if (channel_set.attributes()) {
-                FX_LOGS(INFO) << "              [" << k << "] attributes ["
+                FX_LOGS(INFO) << "             [" << k << "] attributes ["
                               << channel_set.attributes()->size() << "]";
                 for (auto idx = 0u; idx < channel_set.attributes()->size(); ++idx) {
                   const auto& attributes = channel_set.attributes()->at(idx);
                   if (attributes.min_frequency()) {
-                    FX_LOGS(INFO) << "                   [" << idx << "] min_freq "
+                    FX_LOGS(INFO) << "                  [" << idx << "] min_freq "
                                   << *attributes.min_frequency();
                   } else {
-                    FX_LOGS(INFO) << "                   [" << idx << "] min_freq <none>";
+                    FX_LOGS(INFO) << "                  [" << idx << "] min_freq <none>";
                   }
                   if (attributes.max_frequency()) {
-                    FX_LOGS(INFO) << "                       max_freq "
+                    FX_LOGS(INFO) << "                      max_freq "
                                   << *attributes.max_frequency();
                   } else {
-                    FX_LOGS(INFO) << "                       max_freq <none>";
+                    FX_LOGS(INFO) << "                      max_freq <none>";
                   }
                 }
               } else {
-                FX_LOGS(INFO) << "               [" << k
+                FX_LOGS(INFO) << "              [" << k
                               << "] attributes     <none>  (non-compliant)";
               }
             }
           } else {
-            FX_LOGS(INFO) << "         [" << j << "] channel_sets       <none> (non-compliant)";
+            FX_LOGS(INFO) << "        [" << j << "] channel_sets       <none> (non-compliant)";
           }
 
           if (pcm_format_set.sample_types()) {
-            FX_LOGS(INFO) << "             sample_types [" << pcm_format_set.sample_types()->size()
+            FX_LOGS(INFO) << "            sample_types [" << pcm_format_set.sample_types()->size()
                           << "]";
             for (auto idx = 0u; idx < pcm_format_set.sample_types()->size(); ++idx) {
-              FX_LOGS(INFO) << "              [" << idx << "]               "
+              FX_LOGS(INFO) << "             [" << idx << "]               "
                             << pcm_format_set.sample_types()->at(idx);
             }
           } else {
-            FX_LOGS(INFO) << "             sample_types       <none> (non-compliant)";
+            FX_LOGS(INFO) << "            sample_types       <none> (non-compliant)";
           }
           if (pcm_format_set.frame_rates()) {
-            FX_LOGS(INFO) << "             frame_rates [" << pcm_format_set.frame_rates()->size()
+            FX_LOGS(INFO) << "            frame_rates [" << pcm_format_set.frame_rates()->size()
                           << "]";
             for (auto idx = 0u; idx < pcm_format_set.frame_rates()->size(); ++idx) {
-              FX_LOGS(INFO) << "              [" << idx << "]               "
+              FX_LOGS(INFO) << "             [" << idx << "]               "
                             << pcm_format_set.frame_rates()->at(idx);
             }
           } else {
-            FX_LOGS(INFO) << "             frame_rates        <none> (non-compliant)";
+            FX_LOGS(INFO) << "            frame_rates        <none> (non-compliant)";
           }
         }
       } else {
-        FX_LOGS(INFO) << "        format_set              <none> (non-compliant)";
+        FX_LOGS(INFO) << "       format_set              <none> (non-compliant)";
       }
     }
   } else {
-    FX_LOGS(INFO) << "   ring_buffer_format_sets      <none>"
-                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
-                       device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput)
+    FX_LOGS(INFO) << "  ring_buffer_format_sets      <none>"
+                  << ((device_info.device_type() == fad::DeviceType::kInput ||
+                       device_info.device_type() == fad::DeviceType::kOutput)
                           ? " (non-compliant)"
                           : "");
   }
 
   // dai_format_sets
   if (device_info.dai_format_sets()) {
-    FX_LOGS(INFO) << "   dai_format_sets [" << device_info.dai_format_sets()->size() << "]";
+    FX_LOGS(INFO) << "  dai_format_sets [" << device_info.dai_format_sets()->size() << "]";
     for (auto i = 0u; i < device_info.dai_format_sets()->size(); ++i) {
       auto element_dai_format_set = device_info.dai_format_sets()->at(i);
-      FX_LOGS(INFO) << "    [" << i << "]  element_id             "
+      FX_LOGS(INFO) << "   [" << i << "]  element_id             "
                     << (element_dai_format_set.format_sets().has_value()
                             ? std::to_string(*element_dai_format_set.element_id())
                             : "<none> (non-compliant)");
       if (element_dai_format_set.format_sets().has_value()) {
-        FX_LOGS(INFO) << "         format_set [" << element_dai_format_set.format_sets()->size()
+        FX_LOGS(INFO) << "        format_set [" << element_dai_format_set.format_sets()->size()
                       << "]";
         for (auto j = 0u; j < element_dai_format_set.format_sets()->size(); ++j) {
           const auto& dai_format_set = element_dai_format_set.format_sets()->at(j);
           const auto& channel_counts = dai_format_set.number_of_channels();
-          FX_LOGS(INFO) << "          [" << j << "] number_of_channels [" << channel_counts.size()
+          FX_LOGS(INFO) << "         [" << j << "] number_of_channels [" << channel_counts.size()
                         << "]";
           for (auto idx = 0u; idx < channel_counts.size(); ++idx) {
-            FX_LOGS(INFO) << "               [" << idx << "]              " << channel_counts[idx];
+            FX_LOGS(INFO) << "              [" << idx << "]              " << channel_counts[idx];
           }
 
           const auto& sample_formats = dai_format_set.sample_formats();
-          FX_LOGS(INFO) << "              sample_formats [" << sample_formats.size() << "]";
+          FX_LOGS(INFO) << "             sample_formats [" << sample_formats.size() << "]";
           for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
-            FX_LOGS(INFO) << "               [" << idx << "]              " << sample_formats[idx];
+            FX_LOGS(INFO) << "              [" << idx << "]              " << sample_formats[idx];
           }
 
           const auto& frame_formats = dai_format_set.frame_formats();
-          FX_LOGS(INFO) << "              frame_formats [" << frame_formats.size() << "]";
+          FX_LOGS(INFO) << "             frame_formats [" << frame_formats.size() << "]";
           for (auto idx = 0u; idx < frame_formats.size(); ++idx) {
-            FX_LOGS(INFO) << "               [" << idx << "]              " << frame_formats[idx];
+            FX_LOGS(INFO) << "              [" << idx << "]              " << frame_formats[idx];
           }
 
           const auto& frame_rates = dai_format_set.frame_rates();
-          FX_LOGS(INFO) << "              frame_rates [" << frame_rates.size() << "]";
+          FX_LOGS(INFO) << "             frame_rates [" << frame_rates.size() << "]";
           for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
-            FX_LOGS(INFO) << "               [" << idx << "]              " << frame_rates[idx];
+            FX_LOGS(INFO) << "              [" << idx << "]              " << frame_rates[idx];
           }
 
           const auto& bits_per_slot = dai_format_set.bits_per_slot();
-          FX_LOGS(INFO) << "              bits_per_slot [" << bits_per_slot.size() << "]";
+          FX_LOGS(INFO) << "             bits_per_slot [" << bits_per_slot.size() << "]";
           for (auto idx = 0u; idx < bits_per_slot.size(); ++idx) {
-            FX_LOGS(INFO) << "               [" << idx << "]              "
+            FX_LOGS(INFO) << "              [" << idx << "]              "
                           << static_cast<int16_t>(bits_per_slot[idx]);
           }
 
           const auto& bits_per_sample = dai_format_set.bits_per_sample();
           FX_LOGS(INFO) << "              bits_per_sample [" << bits_per_sample.size() << "]";
           for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
-            FX_LOGS(INFO) << "               [" << idx << "]              "
+            FX_LOGS(INFO) << "              [" << idx << "]              "
                           << static_cast<int16_t>(bits_per_sample[idx]);
           }
         }
       } else {
-        FX_LOGS(INFO) << "         format_set <none> (non-compliant)";
+        FX_LOGS(INFO) << "        format_set <none> (non-compliant)";
       }
     }
   } else {
-    FX_LOGS(INFO) << "   dai_format_sets              <none>"
-                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kCodec)
-                          ? " (non-compliant)"
-                          : "");
+    FX_LOGS(INFO) << "  dai_format_sets              <none>"
+                  << ((device_info.device_type() == fad::DeviceType::kCodec) ? " (non-compliant)"
+                                                                             : "");
   }
 
   if (device_info.gain_caps()) {
     if (device_info.gain_caps()->min_gain_db()) {
-      FX_LOGS(INFO) << "   gain_caps  min_gain_db       " << *device_info.gain_caps()->min_gain_db()
+      FX_LOGS(INFO) << "  gain_caps  min_gain_db       " << *device_info.gain_caps()->min_gain_db()
                     << " dB";
     } else {
-      FX_LOGS(INFO) << "   gain_caps  min_gain_db       <none> (non-compliant)";
+      FX_LOGS(INFO) << "  gain_caps  min_gain_db       <none> (non-compliant)";
     }
     if (device_info.gain_caps()->max_gain_db()) {
-      FX_LOGS(INFO) << "              max_gain_db       " << *device_info.gain_caps()->max_gain_db()
+      FX_LOGS(INFO) << "             max_gain_db       " << *device_info.gain_caps()->max_gain_db()
                     << " dB";
     } else {
-      FX_LOGS(INFO) << "              max_gain_db       <none> (non-compliant)";
+      FX_LOGS(INFO) << "             max_gain_db       <none> (non-compliant)";
     }
     if (device_info.gain_caps()->gain_step_db()) {
-      FX_LOGS(INFO) << "              gain_step_db      "
-                    << *device_info.gain_caps()->gain_step_db() << " dB";
+      FX_LOGS(INFO) << "             gain_step_db      " << *device_info.gain_caps()->gain_step_db()
+                    << " dB";
     } else {
-      FX_LOGS(INFO) << "              gain_step_db      <none> (non-compliant)";
+      FX_LOGS(INFO) << "             gain_step_db      <none> (non-compliant)";
     }
-    FX_LOGS(INFO) << "              can_mute          "
+    FX_LOGS(INFO) << "             can_mute          "
                   << (device_info.gain_caps()->can_mute()
                           ? (*device_info.gain_caps()->can_mute() ? "true" : "false")
                           : "<none> (false)");
-    FX_LOGS(INFO) << "              can_agc           "
+    FX_LOGS(INFO) << "             can_agc           "
                   << (device_info.gain_caps()->can_agc()
                           ? (*device_info.gain_caps()->can_agc() ? "true" : "false")
                           : "<none> (false)");
   } else {
-    FX_LOGS(INFO) << "   gain_caps                    <none>"
-                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
-                       device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput)
+    FX_LOGS(INFO) << "  gain_caps                    <none>"
+                  << ((device_info.device_type() == fad::DeviceType::kInput ||
+                       device_info.device_type() == fad::DeviceType::kOutput)
                           ? " (non-compliant)"
                           : "");
   }
@@ -1009,16 +1326,16 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   std::string clock_domain_str{"  clock_domain                 "};
   if (device_info.clock_domain()) {
     clock_domain_str += std::to_string(*device_info.clock_domain());
-    if (*device_info.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
+    if (*device_info.clock_domain() == fha::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
-    } else if (*device_info.clock_domain() == fuchsia_hardware_audio::kClockDomainExternal) {
+    } else if (*device_info.clock_domain() == fha::kClockDomainExternal) {
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
     clock_domain_str += "<none>";
-    if (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite ||
-        device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
-        device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+    if (device_info.device_type() == fad::DeviceType::kComposite ||
+        device_info.device_type() == fad::DeviceType::kInput ||
+        device_info.device_type() == fad::DeviceType::kOutput) {
       clock_domain_str += " (non-compliant)";
     }
   }
@@ -1034,9 +1351,8 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     FX_LOGS(INFO) << "  signal_processing_elements   <none>"
-                  << (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite
-                          ? " (non-compliant)"
-                          : "");
+                  << (device_info.device_type() == fad::DeviceType::kComposite ? " (non-compliant)"
+                                                                               : "");
   }
 
   if (device_info.signal_processing_topologies()) {
@@ -1050,13 +1366,12 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
     }
   } else {
     FX_LOGS(INFO) << "  signal_processing_topologies <none>"
-                  << (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite
-                          ? " (non-compliant)"
-                          : "");
+                  << (device_info.device_type() == fad::DeviceType::kComposite ? " (non-compliant)"
+                                                                               : "");
   }
 }
 
-void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props) {
+void LogRingBufferProperties(const fha::RingBufferProperties& rb_props) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -1081,7 +1396,7 @@ void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties&
   }
 }
 
-void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format) {
+void LogRingBufferFormat(const fha::Format& ring_buffer_format) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -1105,8 +1420,7 @@ void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_forma
                 << ring_buffer_format.pcm_format()->frame_rate();
 }
 
-void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                      fuchsia_hardware_audio::Format rb_format) {
+void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, fha::Format rb_format) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -1147,7 +1461,7 @@ void LogActiveChannels(uint64_t channel_bitmask, zx::time set_time) {
   FX_LOGS(INFO) << "    set_time             " << set_time.get();
 }
 
-void LogDelayInfo(const fuchsia_hardware_audio::DelayInfo& info) {
+void LogDelayInfo(const fha::DelayInfo& info) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }

@@ -6,7 +6,7 @@ use {
     anyhow::{Context, Error},
     assert_matches::assert_matches,
     cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative},
-    cm_types::{LongName, Name, Path, RelativePath},
+    cm_types::{LongName, Name, Path, RelativePath, Url},
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     std::collections::BTreeMap,
@@ -161,7 +161,7 @@ impl ComponentDeclBuilder {
 #[derivative(Default)]
 pub struct ChildBuilder {
     name: Option<LongName>,
-    url: Option<String>,
+    url: Option<Url>,
     #[derivative(Default(value = "fdecl::StartupMode::Lazy"))]
     startup: fdecl::StartupMode,
     on_terminate: Option<fdecl::OnTerminate>,
@@ -177,13 +177,13 @@ impl ChildBuilder {
     pub fn name(mut self, name: &str) -> Self {
         self.name = Some(name.parse().unwrap());
         if self.url.is_none() {
-            self.url = Some(format!("test:///{name}"));
+            self.url = Some(format!("test:///{name}").parse().unwrap());
         }
         self
     }
 
     pub fn url(mut self, url: &str) -> Self {
-        self.url = Some(url.into());
+        self.url = Some(url.parse().unwrap());
         self
     }
 
@@ -1064,7 +1064,7 @@ pub struct OfferBuilder {
     source: Option<cm_rust::OfferSource>,
     target: Option<cm_rust::OfferTarget>,
     target_name: Option<Name>,
-    source_instance_filter: Option<Vec<String>>,
+    source_instance_filter: Option<Vec<Name>>,
     renamed_instances: Option<Vec<cm_rust::NameMapping>>,
     rights: Option<fio::Operations>,
     subdir: RelativePath,
@@ -1200,15 +1200,27 @@ impl OfferBuilder {
         self
     }
 
-    pub fn source_instance_filter(mut self, filter: Vec<String>) -> Self {
+    pub fn source_instance_filter<'a>(mut self, filter: impl IntoIterator<Item = &'a str>) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Service);
-        self.source_instance_filter = Some(filter);
+        self.source_instance_filter =
+            Some(filter.into_iter().map(|s| s.parse().unwrap()).collect());
         self
     }
 
-    pub fn renamed_instances(mut self, mapping: Vec<cm_rust::NameMapping>) -> Self {
+    pub fn renamed_instances<'a, 'b>(
+        mut self,
+        mapping: impl IntoIterator<Item = (&'a str, &'b str)>,
+    ) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Service);
-        self.renamed_instances = Some(mapping);
+        self.renamed_instances = Some(
+            mapping
+                .into_iter()
+                .map(|(s, t)| cm_rust::NameMapping {
+                    source_name: s.parse().unwrap(),
+                    target_name: t.parse().unwrap(),
+                })
+                .collect(),
+        );
         self
     }
 

@@ -30,11 +30,6 @@
             path: "/pkgfs",
         },
         {
-            directory: "pkgfs-packages",
-            rights: [ "rx*" ],
-            path: "/pkgfs/packages",
-        },
-        {
             directory: "build-info",
             rights: [ "r*" ],
             path: "/specific-base-packages/build-info/meta/fuchsia.domain_config/data",
@@ -111,7 +106,6 @@
                 "build-info",
                 "config-data",
                 "pkgfs",
-                "pkgfs-packages",
                 "root-ssl-certificates",
                 "shell-commands-bin",
                 "system",

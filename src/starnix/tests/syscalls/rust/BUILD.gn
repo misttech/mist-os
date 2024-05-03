@@ -32,15 +32,39 @@ if (is_host && has_board) {
 rustc_test("syscalls_rust_test_bin") {
   edition = "2021"
   source_root = "src/lib.rs"
-  sources = [ source_root ]
+  sources = [
+    "src/device_mapper_test.rs",
+    source_root,
+  ]
+
+  deps = [
+    "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:serial_test",
+    "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:zerocopy",
+  ]
 
   # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
   exclude_toolchain_tags = [ "asan" ]
 }
 
+resource("simple_ext4_image") {
+  sources = [
+    "data/corrupted_hashtree.txt",
+    "data/corrupted_image_with_hashtree.txt",
+    "data/hashtree_truncated.txt",
+    "data/root_hash.txt",
+    "data/simple_ext4.img",
+    "data/valid_image_with_hashtree.txt",
+  ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
 starnix_linux_test_component("syscalls_rust_test") {
   test_label = ":syscalls_rust_test_bin"
   test_binary = "syscalls_rust_test_bin"
+  deps = [ ":simple_ext4_image" ]
   test_type = "starnix"
 }
 

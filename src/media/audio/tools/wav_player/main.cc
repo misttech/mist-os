@@ -108,6 +108,11 @@ void usage(const char* prog_name) {
 }
 
 int main(int argc, const char** argv) {
+  printf(
+      "WARNING: wav_player is deprecated. Please use `ffx audio play` or\n"
+      "or `ffx audio device play` to play WAV files. For more information, run \n"
+      "`ffx audio play --help` and `ffx audio device play --help`\n\n");
+
   const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   const auto& pos_args = command_line.positional_args();
   if (command_line.HasOption(kHelpSwitch) || command_line.HasOption(kHelp2Switch)) {

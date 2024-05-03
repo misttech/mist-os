@@ -7,11 +7,15 @@ pub async fn ffx_plugin_impl(
 {% if includes_execution %}
   match _cmd.subcommand {
 {% else %}
+  // If there are subcommands, match on each sub command
+  // enum variant, and call the matching ffx_suite.
+  // This passes the command line down the subcommand structure.
   match Some(_cmd.subcommand) {
 {% endif %}
 {% for plugin in plugins %}
     Some({{suite_subcommand_lib}}::SubCommand::{{plugin.enum}}(c)) => return {{plugin.lib}}_suite::ffx_plugin_impl(_injector, c).await.map_err(fho::Error::from),
 {% endfor %}
+    // This handles everything that does not match. This falls through to not implemented.
     None => (),
   };
 {% endif %}
@@ -19,7 +23,7 @@ pub async fn ffx_plugin_impl(
 {% if includes_execution %}
   {{execution_lib}}::ffx_plugin_impl(_injector, _cmd).await.map_err(fho::Error::from)
 {% else %}
-  println!("SubCommand not implemented yet.");
+  eprintln!("This subCommand is not implemented yet.");
   Ok(())
 {% endif %}
 }
@@ -44,6 +48,10 @@ pub fn ffx_plugin_redact_args(
   vec![]
 }
 
+// Since the subcommands can be implemented in separate libraries, these
+// need to be collected and inspect the writers
+// for each sub command to see if any of the subcommands support
+// machine output.
 pub fn ffx_plugin_is_machine_supported(
   _cmd: &{{suite_args_lib}}::FfxPluginCommand,
 ) -> bool {
@@ -64,11 +72,52 @@ pub fn ffx_plugin_is_machine_supported(
 {% if includes_execution %}
   {{execution_lib}}::ffx_plugin_is_machine_supported()
 {% else %}
+  // If no subcommand is matched, return false.
+  false
+{% endif %}
+}
+
+// Since the subcommands can be implemented in separate libraries, these
+// need to be collected and inspect the writers
+// for each sub command to see if any of the subcommands support
+// a schema for the machine output.
+pub fn ffx_plugin_has_schema(
+  _cmd: &{{suite_args_lib}}::FfxPluginCommand,
+) -> bool {
+{% if includes_subcommands %}
+{% if includes_execution %}
+  match &_cmd.subcommand {
+{% else %}
+  match Some(&_cmd.subcommand) {
+{% endif %}
+
+{% for plugin in plugins %}
+    Some({{suite_subcommand_lib}}::SubCommand::{{plugin.enum}}(c)) => return {{plugin.lib}}_suite::ffx_plugin_has_schema(c),
+{% endfor %}
+    None => (),
+  };
+{% endif %}
+
+{% if includes_execution %}
+  {{execution_lib}}::ffx_plugin_has_schema()
+{% else %}
+  // If no subcommand is matched, return false.
   false
 {% endif %}
 }
 
 {% if includes_subcommands %}
+/// SuiteAdapter is used to stitch multiple subcommands together
+/// and delegate the processing of the command line down the
+/// sub command tree.
+/// This makes working loosely coupled subcommands insanely hard,
+/// (if you are reading this I think you agree).
+///
+/// Changes to this template most likely need changes to
+/// //src/developer/ffx/lib/fho/src/adapters.rs as well.
+///
+/// The old plugin macro might also have to change:
+/// //src/developer/ffx/core/macro/src/impl.rs
 struct SuiteAdapter {
     cmd: {{suite_args_lib}}::FfxPluginCommand,
     injector: std::sync::Arc<dyn ffx_core::Injector>,
@@ -86,6 +135,10 @@ impl fho::FfxTool for SuiteAdapter {
       ffx_plugin_is_machine_supported(&self.cmd)
     }
 
+    fn has_schema(&self) -> bool {
+      ffx_plugin_has_schema(&self.cmd)
+    }
+
     async fn from_env(env: fho::FhoEnvironment, cmd: Self::Command) -> fho::Result<Self> {
         let injector = env.injector.clone();
         Ok(SuiteAdapter { cmd, injector })
@@ -94,9 +147,17 @@ impl fho::FfxTool for SuiteAdapter {
 
 #[fho::macro_deps::async_trait(?Send)]
 impl fho::FfxMain for SuiteAdapter {
+    // The Writer type here should not matter, and as such, do not
+    // rely on it be accurate. The correct writer is created
+    // as part of ffx_plugin_impl().
     type Writer = fho::SimpleWriter;
+
     async fn main(self, _writer:  Self::Writer) -> fho::Result<()> {
         ffx_plugin_impl(&self.injector, self.cmd).await
+    }
+
+    async fn try_print_schema(self, _writer: Self::Writer)  -> fho::Result<()> {
+      ffx_plugin_impl(&self.injector, self.cmd).await
     }
 }
 

@@ -39,9 +39,9 @@ class GcManagerTest : public F2fsFakeDevTestFixture {
                            !fs_->GetSegmentManager().HasNotEnoughFreeSecs();
            ++i, ++count) {
         std::string file_name = std::to_string(count);
-        fbl::RefPtr<fs::Vnode> test_file;
-        EXPECT_EQ(root_dir_->Create(file_name, S_IFREG, &test_file), ZX_OK);
-        auto file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
+        zx::result test_file = root_dir_->Create(file_name, fs::CreationType::kFile);
+        EXPECT_TRUE(test_file.is_ok()) << test_file.status_string();
+        auto file_vn = fbl::RefPtr<File>::Downcast(*std::move(test_file));
         std::array<char, kPageSize> buf;
         f2fs_hash_t hash = DentryHash(file_name);
         std::memcpy(buf.data(), &hash, sizeof(hash));
@@ -176,9 +176,9 @@ TEST_F(GcManagerTest, CheckpointDiskReadFailOnGcPreFree) TA_NO_THREAD_SAFETY_ANA
 
 TEST_F(GcManagerTest, PageColdData) {
   fs_->GetGcManager().DisableFgGc();
-  fbl::RefPtr<fs::Vnode> test_file;
-  ASSERT_EQ(root_dir_->Create("file", S_IFREG, &test_file), ZX_OK);
-  auto file = fbl::RefPtr<File>::Downcast(std::move(test_file));
+  zx::result test_file = root_dir_->Create("file", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
 
   char buf[kPageSize] = {
       0,
@@ -235,9 +235,9 @@ TEST_F(GcManagerTest, OrphanFileGc) {
   DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
   FreeSegmapInfo *free_info = &fs_->GetSegmentManager().GetFreeSegmentInfo();
 
-  fbl::RefPtr<fs::Vnode> vn;
-  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &vn), ZX_OK);
-  auto file = fbl::RefPtr<File>::Downcast(std::move(vn));
+  zx::result vn = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(vn.is_ok()) << vn.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(vn));
 
   uint8_t buffer[kPageSize] = {
       0xAA,
@@ -374,8 +374,8 @@ TEST_P(GcManagerTestWithLargeSec, SecureSpace) {
   // It should be able to create new files on free blocks that gc acquires.
   for (uint32_t i = 0; i < blocks_to_secure; ++i) {
     std::string file_name = "_" + std::to_string(i);
-    fbl::RefPtr<fs::Vnode> test_file;
-    ASSERT_EQ(root_dir_->Create(file_name, S_IFDIR, &test_file), ZX_OK);
+    zx::result test_file = root_dir_->Create(file_name, fs::CreationType::kFile);
+    ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
     test_file->Close();
   }
 }

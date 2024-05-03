@@ -11,7 +11,7 @@
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/images2/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -29,6 +29,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/vulkan/swapchain/vulkan_utils.h"
 #include "vulkan/vulkan_fuchsia.h"
+#include "zircon/rights.h"
 
 namespace image_pipe_swapchain {
 
@@ -73,7 +74,7 @@ static fuchsia::hardware::display::CoordinatorPtr ConnectToCoordinatorFromServic
 }
 
 bool ImagePipeSurfaceDisplay::Init() {
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
+  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                             sysmem_allocator_.NewRequest().TakeChannel().release());
 
   if (status != ZX_OK) {
@@ -81,7 +82,10 @@ bool ImagePipeSurfaceDisplay::Init() {
     return false;
   }
 
-  sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+  fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest debug_client_request;
+  debug_client_request.set_name(fsl::GetCurrentProcessName());
+  debug_client_request.set_id(fsl::GetCurrentProcessKoid());
+  sysmem_allocator_->SetDebugClientInfo(std::move(debug_client_request));
 
   display_coordinator_ = ConnectToCoordinatorFromService(loop_.dispatcher());
   if (!display_coordinator_) {
@@ -237,38 +241,52 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   }
 
   VkResult result;
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-  zx_status_t status;
-  status = sysmem_allocator_->AllocateSharedCollection(local_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest local_allocate_request;
+  local_allocate_request.set_token_request(local_token.NewRequest());
+  zx_status_t status =
+      sysmem_allocator_->AllocateSharedCollection(std::move(local_allocate_request));
   if (status != ZX_OK) {
     fprintf(stderr, "%s: AllocateSharedCollection failed: %d\n", kTag, status);
     return false;
   }
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr vulkan_token;
 
-  status = local_token->Duplicate(std::numeric_limits<uint32_t>::max(), vulkan_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr vulkan_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest vulkan_duplicate_request;
+  vulkan_duplicate_request.set_token_request(vulkan_token.NewRequest());
+  vulkan_duplicate_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  status = local_token->Duplicate(std::move(vulkan_duplicate_request));
   if (status != ZX_OK) {
     fprintf(stderr, "%s: Duplicate failed: %d\n", kTag, status);
     return false;
   }
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
 
-  status =
-      vulkan_token->Duplicate(std::numeric_limits<uint32_t>::max(), display_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest display_duplicate_request;
+  vulkan_duplicate_request.set_token_request(display_token.NewRequest());
+  vulkan_duplicate_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  status = local_token->Duplicate(std::move(display_duplicate_request));
   if (status != ZX_OK) {
     fprintf(stderr, "%s: Duplicate failed: %d\n", kTag, status);
     return false;
   }
-  status = vulkan_token->Sync();
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = local_token->Sync(&sync_result);
   if (status != ZX_OK) {
     fprintf(stderr, "%s: Sync failed: %d\n", kTag, status);
+    return false;
+  }
+  if (sync_result.is_framework_err()) {
+    fprintf(stderr, "%s: Sync failed with framework_err\n", kTag);
     return false;
   }
 
   constexpr fuchsia::hardware::display::BufferCollectionId kBufferCollectionId = {.value = 1};
 
   display_coordinator_->ImportBufferCollection(
-      kBufferCollectionId, std::move(display_token),
+      kBufferCollectionId,
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          display_token.Unbind().TakeChannel()),
       [this,
        &status](fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result) {
         status = result.is_err() ? result.err() : ZX_OK;
@@ -348,11 +366,11 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   const VkSysmemColorSpaceFUCHSIA kSrgbColorSpace = {
       .sType = VK_STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
       .pNext = nullptr,
-      .colorSpace = static_cast<uint32_t>(fuchsia::sysmem::ColorSpaceType::SRGB)};
+      .colorSpace = static_cast<uint32_t>(fuchsia::images2::ColorSpace::SRGB)};
   const VkSysmemColorSpaceFUCHSIA kYuvColorSpace = {
       .sType = VK_STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
       .pNext = nullptr,
-      .colorSpace = static_cast<uint32_t>(fuchsia::sysmem::ColorSpaceType::REC709)};
+      .colorSpace = static_cast<uint32_t>(fuchsia::images2::ColorSpace::REC709)};
 
   VkImageFormatConstraintsInfoFUCHSIA format_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_CONSTRAINTS_INFO_FUCHSIA,
@@ -401,9 +419,11 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     return false;
   }
 
-  fuchsia::sysmem::BufferCollectionSyncPtr sysmem_collection;
-  status = sysmem_allocator_->BindSharedCollection(std::move(local_token),
-                                                   sysmem_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr sysmem_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(local_token));
+  bind_shared_request.set_buffer_collection_request(sysmem_collection.NewRequest());
+  status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
   if (status != ZX_OK) {
     fprintf(stderr, "%s: BindSharedCollection failed: %d\n", kTag, status);
     return false;
@@ -411,29 +431,42 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   // 1000 should override the generic Magma name.
   constexpr uint32_t kNamePriority = 1000u;
   const char* kImageName = "ImagePipeSurfaceDisplay";
-  sysmem_collection->SetName(kNamePriority, kImageName);
-  fuchsia::sysmem::BufferCollectionConstraints constraints{};
-  constraints.min_buffer_count = image_count;
+  fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+  set_name_request.set_name(kImageName);
+  set_name_request.set_priority(kNamePriority);
+  sysmem_collection->SetName(std::move(set_name_request));
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest constraints_request;
+  constraints_request.mutable_constraints()->set_min_buffer_count(image_count);
   // Used because every constraints need to have a usage.
-  constraints.usage.display = fuchsia::sysmem::displayUsageLayer;
-  status = sysmem_collection->SetConstraints(true, constraints);
+  constraints_request.mutable_constraints()->mutable_usage()->set_display(
+      fuchsia::sysmem2::DISPLAY_USAGE_LAYER);
+  status = sysmem_collection->SetConstraints(std::move(constraints_request));
   if (status != ZX_OK) {
     fprintf(stderr, "%s: SetConstraints failed: %d\n", kTag, status);
     return false;
   }
 
-  zx_status_t allocation_status = ZX_OK;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-  status = sysmem_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
-  if (status != ZX_OK || allocation_status != ZX_OK) {
-    fprintf(stderr, "%s: WaitForBuffersAllocated failed: %d %d\n", kTag, status, allocation_status);
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_for_buffers_result;
+  status = sysmem_collection->WaitForAllBuffersAllocated(&wait_for_buffers_result);
+  if (status != ZX_OK) {
+    fprintf(stderr, "%s: WaitForBuffersAllocated failed: %d\n", kTag, status);
     return false;
   }
-  sysmem_collection->Close();
+  if (wait_for_buffers_result.is_framework_err()) {
+    fprintf(stderr, "%s: WaitForBuffersAllocated failed with framework_err\n", kTag);
+    return false;
+  }
+  if (wait_for_buffers_result.is_err()) {
+    fprintf(stderr, "%s: WaitForBuffersAllocated failed: %u\n", kTag,
+            static_cast<uint32_t>(wait_for_buffers_result.err()));
+    return false;
+  }
+  sysmem_collection->Release();
 
-  if (buffer_collection_info.buffer_count != image_count) {
-    fprintf(stderr, "%s: incorrect image count %d allocated vs. %d requested\n", kTag,
-            buffer_collection_info.buffer_count, image_count);
+  auto& buffer_collection_info = wait_for_buffers_result.response().buffer_collection_info();
+  if (buffer_collection_info.buffers().size() != image_count) {
+    fprintf(stderr, "%s: incorrect image count %lu allocated vs. %d requested\n", kTag,
+            buffer_collection_info.buffers().size(), image_count);
     return false;
   }
 

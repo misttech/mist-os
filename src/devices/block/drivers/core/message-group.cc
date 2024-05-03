@@ -11,7 +11,7 @@
 
 zx_status_t MessageGroup::ExpectResponses(int response_count, int request_count,
                                           std::optional<reqid_t> request_id) {
-  fbl::AutoLock guard(&lock_);
+  std::lock_guard<std::mutex> guard(lock_);
   zx_status_t status = ZX_OK;
   if (pending_ && request_count != 0) {
     response_.status = ZX_ERR_IO;
@@ -37,7 +37,7 @@ zx_status_t MessageGroup::ExpectResponses(int response_count, int request_count,
 }
 
 void MessageGroup::Complete(const zx_status_t status) {
-  fbl::AutoLock guard(&lock_);
+  std::lock_guard<std::mutex> guard(lock_);
 
   if (status != ZX_OK && response_.status == ZX_OK) {
     zxlogf(WARNING, "Transaction completed with error status: %s", zx_status_get_string(status));

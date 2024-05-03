@@ -17,6 +17,7 @@
 #include "src/media/audio/services/device_registry/testing/stub_registry_server.h"
 
 namespace media_audio {
+namespace {
 
 zx_status_t RegisterAndServeOutgoing(component::OutgoingDirectory& outgoing,
                                      const std::shared_ptr<FidlThread>& thread) {
@@ -69,6 +70,7 @@ zx_status_t RegisterAndServeOutgoing(component::OutgoingDirectory& outgoing,
   return outgoing.ServeFromStartupInfo().status_value();
 }
 
+}  // namespace
 }  // namespace media_audio
 
 int main(int argc, const char** argv) {

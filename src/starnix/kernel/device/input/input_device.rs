@@ -38,10 +38,13 @@ use std::sync::{
     Arc, Weak,
 };
 
+// Touch and keyboard input IDs should be distinct.
 // Per https://www.linuxjournal.com/article/6429, the bus type should be populated with a
 // sensible value, but other fields may not be.
-const INPUT_ID: input_id =
+const TOUCH_INPUT_ID: input_id =
     input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
+const KEYBOARD_INPUT_ID: input_id =
+    input_id { bustype: BUS_VIRTUAL as u16, product: 1, vendor: 1, version: 1 };
 
 #[derive(Clone)]
 enum InputDeviceType {
@@ -263,14 +266,14 @@ impl InputDevice {
         let input_file = match self.device_type {
             InputDeviceType::Touch(display_width, display_height) => {
                 let file = Arc::new(InputFile::new_touch(
-                    INPUT_ID,
+                    TOUCH_INPUT_ID,
                     display_width,
                     display_height,
                     Some(self.input_files_node.create_child("touch_file")),
                 ));
                 file
             }
-            InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(INPUT_ID, None)),
+            InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, None)),
         };
         self.open_files.lock().push(Arc::downgrade(&input_file));
         let file_object = starnix_core::vfs::FileObject::new(
@@ -297,7 +300,7 @@ impl DeviceOps for InputDevice {
         let input_file = match self.device_type {
             InputDeviceType::Touch(display_width, display_height) => {
                 let file = Arc::new(InputFile::new_touch(
-                    INPUT_ID,
+                    TOUCH_INPUT_ID,
                     display_width,
                     display_height,
                     Some(self.input_files_node.create_child("touch_file")),
@@ -305,7 +308,7 @@ impl DeviceOps for InputDevice {
                 file
             }
             InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(
-                INPUT_ID,
+                KEYBOARD_INPUT_ID,
                 Some(self.input_files_node.create_child("keyboard_file")),
             )),
         };
@@ -1117,7 +1120,7 @@ mod test {
     fn touch_input_file_initialized_with_inspect_node() {
         let inspector = fuchsia_inspect::Inspector::default();
         let _touch_file = InputFile::new_touch(
-            INPUT_ID,
+            TOUCH_INPUT_ID,
             720,  /* screen height */
             1200, /* screen width */
             Some(inspector.root().create_child("touch_input_file")),

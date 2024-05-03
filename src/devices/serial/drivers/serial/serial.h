@@ -7,11 +7,8 @@
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
-#include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <lib/ddk/driver.h>
 #include <zircon/types.h>
-
-#include <variant>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
@@ -25,11 +22,8 @@ using DeviceType =
 
 class SerialDevice : public DeviceType, public fidl::WireServer<fuchsia_hardware_serial::Device> {
  public:
-  using SerialType = std::variant<fdf::WireClient<fuchsia_hardware_serialimpl::Device>,
-                                  ddk::SerialImplProtocolClient>;
-
-  SerialDevice(zx_device_t* parent, SerialType serial)
-      : DeviceType(parent), serial_(std::move(serial)) {}
+  SerialDevice(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_serialimpl::Device> serial)
+      : DeviceType(parent), serial_(std::move(serial), fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* dev);
   zx_status_t Bind();
@@ -52,8 +46,7 @@ class SerialDevice : public DeviceType, public fidl::WireServer<fuchsia_hardware
   zx_status_t Enable(bool enable);
 
   // The serial protocol of the device we are binding against.
-  // TODO(b/333094948): Drop support for Banjo.
-  SerialType serial_;
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> serial_;
 
   uint32_t serial_class_;
   using Binding = struct {

@@ -1,14 +1,11 @@
 # Recording a kernel trace
 
 The kernel traces various actions by writing records to an internal buffer,
-which can later be retrieved and printed.
+which can later be retrieved, printed, and viewed.
 
 ## Kernel trace format
 
-The kernel trace format is described in the
-[ktrace.h](/zircon/system/ulib/zircon-internal/include/lib/zircon-internal/ktrace.h) and
-[ktrace-def.h](/zircon/system/ulib/zircon-internal/include/lib/zircon-internal/ktrace-def.h) files under
-[system/ulib/zircon-internal/include/lib/zircon-internal](/zircon/system/ulib/zircon-internal/include/lib/zircon-internal).
+The kernel trace format uses [FXT](/docs/reference/tracing/trace-format.md)
 
 ## Controlling what to trace
 
@@ -47,9 +44,10 @@ Options:
   --help  - Duh.
 ```
 
-## Pretty-printing a kernel trace
+## Viewing kernel trace
 
-The host tool `ktrace-dump` can be used to pretty-print a kernel trace.
+Traces can be uploaded to ui.perfetto.dev to be viewed. Alternatively, the host tool `trace2json`
+can be used to export a trace to a more readable json output.
 
 Example:
 
@@ -62,15 +60,15 @@ $ ktrace stop
 $ ktrace save /tmp/save.ktrace
 ```
 
-Then copy the file to the development host, and dump it:
+Then copy the file to the development host, and export it:
 
 ```
-host$ out/default/host-tools/netcp :/tmp/save.ktrace save.ktrace
-host$ out/default/host-tools/ktrace-dump save.ktrace > save.dump
+host$ out/default/host-tools/netcp :/tmp/save.ktrace save.fxt
+host$ fx trace2json < save.fxt > save.json
 ```
 
-The pretty-printed output can be quite voluminous, thus it's recommended
-to send it to a file and then view it in your editor or whatever.
+The output can be quite voluminous, thus it's recommended to send it to a
+file and then view it in your editor or whatever.
 
 ## Use with Fuchsia Tracing
 

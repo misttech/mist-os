@@ -14,19 +14,51 @@ extern crate fakealloc as alloc;
 
 mod context;
 mod counters;
+mod data_structures;
 mod inspect;
+mod resource_references;
 mod time;
 
 pub use context::ContextPair;
 pub use counters::Counter;
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
-pub use time::{
-    local_timer_heap::LocalTimerHeap, CoreTimerContext, Instant, InstantBindingsTypes,
-    InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext2,
+pub use resource_references::{
+    DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
+    RemoveResourceResultWithContext,
 };
+pub use time::{
+    local_timer_heap::LocalTimerHeap, CoreTimerContext, HandleableTimer, Instant,
+    InstantBindingsTypes, InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx,
+    TimerBindingsTypes, TimerContext, TimerHandler,
+};
+
+/// Reference counted hash map data structure.
+pub mod ref_counted_hash_map {
+    pub use crate::data_structures::ref_counted_hash_map::{
+        InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
+    };
+}
+
+/// Sync utilities common to netstack3.
+pub mod sync {
+    // TODO(https://fxbug.dev/42062225): Support single-threaded variants of
+    // types exported from this module.
+
+    // Exclusively re-exports from the sync crate.
+    pub use netstack3_sync::{
+        rc::{
+            DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier,
+            Notifier as RcNotifier, Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+        },
+        LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    };
+}
 
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
-    pub use crate::time::testutil::{FakeInstant, FakeInstantCtx};
+    pub use crate::time::testutil::{
+        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
+        WithFakeTimerContext,
+    };
 }

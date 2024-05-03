@@ -1908,7 +1908,7 @@ TEST(AttributesTests, GoodDiscoverableExplicitName) {
     std::string library_str = R"FIDL(
 library example;
 
-@discoverable("%1")
+@discoverable(name="%1")
 protocol Foo {};
 )FIDL";
     library_str.replace(library_str.find("%1"), 2, name);
@@ -1922,7 +1922,7 @@ TEST(AttributesTests, BadDiscoverableInvalidName) {
     std::string library_str = R"FIDL(
 library example;
 
-@discoverable("%1")
+@discoverable(name="%1")
 protocol Foo {};
 )FIDL";
     library_str.replace(library_str.find("%1"), 2, name);
@@ -1936,6 +1936,32 @@ TEST(AttributesTests, BadDiscoverableInvalidNameErrcat) {
   TestLibrary library;
   library.AddFile("bad/fi-0135.test.fidl");
   library.ExpectFail(ErrInvalidDiscoverableName, "test.bad.fi0135/Parser");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(AttributeTests, GoodDiscoverableLocation) {
+  TestLibrary library(R"FIDL(
+library example;
+
+@discoverable(client="")
+protocol P{};
+
+@discoverable(client="platform", server="external")
+protocol Q{};
+
+@discoverable(client="platform,external", server="external,platform")
+protocol R{};
+
+@discoverable(client="platform, external", server="external, platform")
+protocol S{};
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(AttributesTests, BadDiscoverableLocationErrcat) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0210.test.fidl");
+  library.ExpectFail(ErrInvalidDiscoverableLocation, "platform,canada");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

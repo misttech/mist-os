@@ -10,6 +10,7 @@ if (is_host) {
     deps = [
       "//src/testing/host-target-testing/artifacts",
       "//src/testing/host-target-testing/device",
+      "//src/testing/host-target-testing/ffx",
       "//third_party/golibs:golang.org/x/crypto",
       "//tools/lib/logger",
     ]

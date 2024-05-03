@@ -41,9 +41,15 @@ async fn show_impl<W: std::io::Write>(
     let query_proxy = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
         .await
         .context("opening realm query")?;
-    show_cmd_print("core/session-manager/session:session".to_string(), query_proxy, writer)
-        .await
-        .context(DETAILS_FAILURE)?;
+    let with_style = termion::is_tty(&std::io::stdout());
+    show_cmd_print(
+        "core/session-manager/session:session".to_string(),
+        query_proxy,
+        writer,
+        with_style,
+    )
+    .await
+    .context(DETAILS_FAILURE)?;
 
     Ok(())
 }

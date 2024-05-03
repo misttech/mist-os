@@ -12,9 +12,10 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
 #include <fbl/macros.h>
-#include <fbl/mutex.h>
 
 #include "lib/inspect/cpp/inspector.h"
 #include "src/security/lib/zxcrypt/volume.h"
@@ -110,7 +111,7 @@ class DeviceManager final : public DeviceManagerType {
 
   // Used to ensure calls to |Unseal|, |Seal|, and |Unbind| are exclusive to each
   // other, and protects access to |state_|.
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // Used for debug state.
   inspect::Inspector inspect_;

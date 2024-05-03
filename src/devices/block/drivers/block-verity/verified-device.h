@@ -11,10 +11,10 @@
 #include <zircon/listnode.h>
 
 #include <memory>
+#include <mutex>
 #include <optional>
 
 #include <ddktl/device.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/block-verity/block-loader-interface.h"
 #include "src/devices/block/drivers/block-verity/block-verifier.h"
@@ -113,7 +113,7 @@ class VerifiedDevice final : public VerifiedDeviceType,
   // Current device state.
   DeviceState state_ __TA_GUARDED(mtx_);
 
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
 
   // A single block op request buffer, allocated to be the size of the parent
   // block op size request.

@@ -49,7 +49,6 @@
             // when this list is updated.
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
                 "fuchsia.exception.Handler",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebuglogResource",

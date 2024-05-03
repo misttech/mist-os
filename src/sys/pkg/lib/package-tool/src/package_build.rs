@@ -19,7 +19,8 @@ use {
     },
     tempfile::NamedTempFile,
     tempfile_ext::NamedTempFileExt as _,
-    version_history::HISTORY,
+    tracing::warn,
+    version_history::ApiLevelError,
 };
 
 const META_FAR_NAME: &str = "meta.far";
@@ -27,6 +28,13 @@ const META_FAR_DEPFILE_NAME: &str = "meta.far.d";
 const BLOBS_MANIFEST_NAME: &str = "blobs.manifest";
 
 pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
+    cmd_package_build_with_history(cmd, version_history::HISTORY).await
+}
+
+pub async fn cmd_package_build_with_history(
+    cmd: PackageBuildCommand,
+    history: version_history::VersionHistory,
+) -> Result<()> {
     let package_build_manifest = File::open(&cmd.package_build_manifest_path)
         .with_context(|| format!("opening {}", cmd.package_build_manifest_path))?;
 
@@ -34,13 +42,28 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         PackageBuildManifest::from_pm_fini(BufReader::new(package_build_manifest))
             .with_context(|| format!("reading {}", cmd.package_build_manifest_path))?;
 
-    let mut builder = PackageBuilder::from_package_build_manifest(
-        &package_build_manifest,
-        HISTORY.check_api_level_for_build(cmd.api_level)?,
-    )
-    .with_context(|| {
-        format!("creating package manifest from {}", cmd.package_build_manifest_path)
-    })?;
+    let abi_revision = match history.check_api_level_for_build(cmd.api_level) {
+        Ok(abi_revision) => abi_revision,
+        // TODO(https://fxbug.dev/337904808): Remove this case and return an
+        // error whenever check_api_level_for_build fails.
+        Err(ApiLevelError::Unsupported { version, supported })
+            if cmd.deprecated_ignore_api_level_unsupported_errors =>
+        {
+            warn!(
+                "Downgrading error to warning due to
+--deprecated-ignore-api-level-unsupported-errors: {}",
+                ApiLevelError::Unsupported { version: version.clone(), supported }
+            );
+            version.abi_revision
+        }
+        Err(err) => return Err(err.into()),
+    };
+
+    let mut builder =
+        PackageBuilder::from_package_build_manifest(&package_build_manifest, abi_revision)
+            .with_context(|| {
+                format!("creating package manifest from {}", cmd.package_build_manifest_path)
+            })?;
 
     if let Some(published_name) = &cmd.published_name {
         builder.published_name(published_name);
@@ -169,8 +192,44 @@ mod test {
             convert::TryInto as _,
             fs::{read_dir, read_to_string},
         },
-        version_history::{AbiRevision, ApiLevel},
+        version_history::{AbiRevision, ApiLevel, Status, Version, VersionHistory},
     };
+
+    pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory::new(&[
+        Version {
+            api_level: ApiLevel::from_u64(6),
+            abi_revision: AbiRevision::from_u64(0x6f3b9f0c4b2a33ff),
+            status: Status::Unsupported,
+        },
+        Version {
+            api_level: ApiLevel::from_u64(7),
+            abi_revision: AbiRevision::from_u64(0x481ed4bbfa125507),
+            status: Status::Supported,
+        },
+        Version {
+            api_level: ApiLevel::from_u64(8),
+            // Unlike the other levels, this is the real ABI revision for
+            // API level 8, to remain compatible with a previous version of
+            // these tests.
+            abi_revision: AbiRevision::from_u64(0xa56735a6690e09d8),
+            status: Status::Supported,
+        },
+        Version {
+            api_level: ApiLevel::from_u64(9),
+            abi_revision: AbiRevision::from_u64(0x2db0661e7832b33d),
+            status: Status::Supported,
+        },
+        Version {
+            api_level: ApiLevel::HEAD,
+            abi_revision: AbiRevision::from_u64(0x2db0661e7832b33d),
+            status: Status::InDevelopment,
+        },
+        Version {
+            api_level: ApiLevel::LEGACY,
+            abi_revision: AbiRevision::from_u64(0x2db0661e7832b33d),
+            status: Status::InDevelopment,
+        },
+    ]);
 
     fn file_merkle(path: &Utf8Path) -> fuchsia_merkle::Hash {
         let mut f = File::open(path).unwrap();
@@ -205,6 +264,7 @@ mod test {
             package_build_manifest_path: root.join("invalid path"),
             out: Utf8PathBuf::from("out"),
             api_level: 8.into(),
+            deprecated_ignore_api_level_unsupported_errors: false,
             repository: None,
             published_name: None,
             depfile: false,
@@ -213,7 +273,7 @@ mod test {
             subpackages_build_manifest_path: None,
         };
 
-        assert!(cmd_package_build(cmd).await.is_err());
+        assert!(cmd_package_build_with_history(cmd, FAKE_VERSION_HISTORY).await.is_err());
     }
 
     #[fuchsia::test]
@@ -229,6 +289,7 @@ mod test {
             package_build_manifest_path,
             out,
             api_level: 8.into(),
+            deprecated_ignore_api_level_unsupported_errors: false,
             repository: None,
             published_name: None,
             depfile: false,
@@ -237,7 +298,7 @@ mod test {
             subpackages_build_manifest_path: None,
         };
 
-        assert!(cmd_package_build(cmd).await.is_err());
+        assert!(cmd_package_build_with_history(cmd, FAKE_VERSION_HISTORY).await.is_err());
     }
 
     #[fuchsia::test]
@@ -258,17 +319,21 @@ mod test {
             .write_all(format!("meta/package={meta_package_path}").as_bytes())
             .unwrap();
 
-        cmd_package_build(PackageBuildCommand {
-            package_build_manifest_path,
-            out: out.clone(),
-            api_level: 8.into(),
-            repository: None,
-            published_name: None,
-            depfile: false,
-            blobs_json: false,
-            blobs_manifest: false,
-            subpackages_build_manifest_path: None,
-        })
+        cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: 8.into(),
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: None,
+                published_name: None,
+                depfile: false,
+                blobs_json: false,
+                blobs_manifest: false,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
         .await
         .unwrap();
 
@@ -335,17 +400,21 @@ mod test {
             .write_all(format!("meta/package={meta_package_path}").as_bytes())
             .unwrap();
 
-        cmd_package_build(PackageBuildCommand {
-            package_build_manifest_path,
-            out: out.clone(),
-            api_level: ApiLevel::HEAD,
-            repository: None,
-            published_name: None,
-            depfile: false,
-            blobs_json: false,
-            blobs_manifest: false,
-            subpackages_build_manifest_path: None,
-        })
+        cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: ApiLevel::HEAD,
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: None,
+                published_name: None,
+                depfile: false,
+                blobs_json: false,
+                blobs_manifest: false,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
         .await
         .unwrap();
 
@@ -386,15 +455,12 @@ mod test {
             }),
         );
 
-        let head_abi_revision =
-            version_history::HISTORY.check_api_level_for_build(ApiLevel::HEAD).unwrap();
-
         assert_eq!(
             read_meta_far_contents(&out.join(META_FAR_NAME)),
             BTreeMap::from([
                 ("meta/contents".into(), "".into()),
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
-                ("meta/fuchsia.abi/abi-revision".into(), head_abi_revision.to_string(),),
+                ("meta/fuchsia.abi/abi-revision".into(), "2db0661e7832b33d".to_string()),
             ]),
         );
     }
@@ -424,17 +490,21 @@ mod test {
             )
             .unwrap();
 
-        cmd_package_build(PackageBuildCommand {
-            package_build_manifest_path,
-            out: out.clone(),
-            api_level: 8.into(),
-            repository: Some("my-repository".into()),
-            published_name: None,
-            depfile: false,
-            blobs_json: false,
-            blobs_manifest: false,
-            subpackages_build_manifest_path: None,
-        })
+        cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: 8.into(),
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: Some("my-repository".into()),
+                published_name: None,
+                depfile: false,
+                blobs_json: false,
+                blobs_manifest: false,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
         .await
         .unwrap();
 
@@ -507,8 +577,6 @@ mod test {
         let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
-        let supported_version = HISTORY.get_example_supported_version_for_tests();
-
         // Write the subpackages build manifest file, matching the schema from
         // //src/sys/pkg/lib/fuchsia-pkg/src/subpackages_build_manifest.rs
         let subpackages_build_manifest_path = root.join("subpackages");
@@ -576,17 +644,21 @@ mod test {
             .unwrap();
 
         // Build the package.
-        cmd_package_build(PackageBuildCommand {
-            package_build_manifest_path,
-            out: out.clone(),
-            api_level: supported_version.api_level,
-            repository: None,
-            published_name: Some("published-name".into()),
-            depfile: true,
-            blobs_json: true,
-            blobs_manifest: true,
-            subpackages_build_manifest_path: Some(subpackages_build_manifest_path.clone()),
-        })
+        cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: 9.into(),
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: None,
+                published_name: Some("published-name".into()),
+                depfile: true,
+                blobs_json: true,
+                blobs_manifest: true,
+                subpackages_build_manifest_path: Some(subpackages_build_manifest_path.clone()),
+            },
+            FAKE_VERSION_HISTORY,
+        )
         .await
         .unwrap();
 
@@ -601,10 +673,7 @@ mod test {
             BTreeMap::from([
                 ("meta/contents".into(), format!("empty-file={empty_file_hash}\n")),
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
-                (
-                    "meta/fuchsia.abi/abi-revision".into(),
-                    supported_version.abi_revision.to_string(),
-                ),
+                ("meta/fuchsia.abi/abi-revision".into(), "2db0661e7832b33d".to_string(),),
                 ("meta/fuchsia.pkg/subpackages".into(), meta_subpackages_str),
             ]),
         );
@@ -695,15 +764,13 @@ mod test {
         let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
-        let supported_version = HISTORY.get_example_supported_version_for_tests();
-
         // Write the creation manifest file.
         let package_build_manifest_path = root.join("package-build.manifest");
         let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
 
         // Create a properly-formatted ABI revision file.
         let abi_stamp_path = root.join("abi_stamp");
-        std::fs::write(&abi_stamp_path, supported_version.abi_revision.as_bytes()).unwrap();
+        std::fs::write(&abi_stamp_path, "2db0661e7832b33d").unwrap();
 
         package_build_manifest
             .write_all(
@@ -718,21 +785,159 @@ mod test {
         // Building the package will fail, because the ABI revision must be
         // specified on the command line (via the --api-level flag), rather than
         // via the manifest.
-        let err = cmd_package_build(PackageBuildCommand {
-            package_build_manifest_path,
-            out: out.clone(),
-            api_level: supported_version.api_level,
-            repository: None,
-            published_name: Some("published-name".into()),
-            depfile: true,
-            blobs_json: true,
-            blobs_manifest: true,
-            subpackages_build_manifest_path: None,
-        })
+        let err = cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: ApiLevel::HEAD,
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: None,
+                published_name: Some("published-name".into()),
+                depfile: true,
+                blobs_json: true,
+                blobs_manifest: true,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
         .await
         .unwrap_err();
 
         let err_string = format!("{:?}", err);
         assert!(err_string.contains("--api-level"), "Wrong error message: {err_string}");
+    }
+
+    #[fuchsia::test]
+    async fn test_build_package_unknown_api_level() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tempdir.path()).unwrap();
+        let out = root.join("out");
+
+        let meta_package_path = root.join("package");
+        let meta_package_file = File::create(&meta_package_path).unwrap();
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
+        meta_package.serialize(meta_package_file).unwrap();
+
+        let package_build_manifest_path = root.join("package-build.manifest");
+        let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
+
+        package_build_manifest
+            .write_all(format!("meta/package={meta_package_path}").as_bytes())
+            .unwrap();
+
+        let err = cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: 3221225472.into(), // Arbitrary big number.
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: None,
+                published_name: None,
+                depfile: false,
+                blobs_json: false,
+                blobs_manifest: false,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
+        .await
+        .unwrap_err();
+
+        // Ensure the error mentions the API level.
+        let err_string = format!("{:?}", err);
+        assert!(err_string.contains("3221225472"), "Wrong error message: {err_string}");
+    }
+
+    #[fuchsia::test]
+    async fn test_build_package_unsupported_api_level() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tempdir.path()).unwrap();
+        let out = root.join("out");
+
+        let meta_package_path = root.join("package");
+        let meta_package_file = File::create(&meta_package_path).unwrap();
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
+        meta_package.serialize(meta_package_file).unwrap();
+
+        let package_build_manifest_path = root.join("package-build.manifest");
+        let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
+
+        package_build_manifest
+            .write_all(format!("meta/package={meta_package_path}").as_bytes())
+            .unwrap();
+
+        let err = cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: 6.into(),
+                deprecated_ignore_api_level_unsupported_errors: false,
+                repository: None,
+                published_name: None,
+                depfile: false,
+                blobs_json: false,
+                blobs_manifest: false,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
+        .await
+        .unwrap_err();
+
+        let err_string = format!("{:?}", err);
+        assert!(
+            err_string.contains("no longer supports API level 6"),
+            "Wrong error message: {err_string}"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_build_package_unsupported_api_level_override() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tempdir.path()).unwrap();
+        let out = root.join("out");
+
+        let meta_package_path = root.join("package");
+        let meta_package_file = File::create(&meta_package_path).unwrap();
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
+        meta_package.serialize(meta_package_file).unwrap();
+
+        let package_build_manifest_path = root.join("package-build.manifest");
+        let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
+
+        package_build_manifest
+            .write_all(format!("meta/package={meta_package_path}").as_bytes())
+            .unwrap();
+
+        cmd_package_build_with_history(
+            PackageBuildCommand {
+                package_build_manifest_path,
+                out: out.clone(),
+                api_level: 6.into(),
+                deprecated_ignore_api_level_unsupported_errors: true,
+                repository: None,
+                published_name: None,
+                depfile: false,
+                blobs_json: false,
+                blobs_manifest: false,
+                subpackages_build_manifest_path: None,
+            },
+            FAKE_VERSION_HISTORY,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            read_meta_far_contents(&out.join(META_FAR_NAME)),
+            BTreeMap::from([
+                ("meta/contents".into(), "".into()),
+                ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
+                (
+                    "meta/fuchsia.abi/abi-revision".into(),
+                    // ABI revision for unsupported API level 6.
+                    "6f3b9f0c4b2a33ff".into()
+                ),
+            ]),
+        );
     }
 }

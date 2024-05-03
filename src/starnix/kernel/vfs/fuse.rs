@@ -9,12 +9,12 @@ use crate::{
     vfs::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-        fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, DirEntry, DirectoryEntryType,
-        DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdNumber,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback,
-        SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget, ValueOrSize,
-        VecDirectory, VecDirectoryEntry, XattrOp,
+        fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, CheckAccessReason, DirEntry,
+        DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode,
+        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
+        SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
     },
 };
 use bstr::B;
@@ -130,7 +130,7 @@ pub fn new_fuse_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let mut mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
+    let mut mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
     let fd = fs_args::parse::<FdNumber>(
         mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?.as_ref(),
     )?;
@@ -469,6 +469,17 @@ impl FuseNode {
 
     fn from_node(node: &FsNode) -> Result<&Arc<FuseNode>, Errno> {
         node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
+    }
+
+    fn default_check_access_with_valid_node_attributes(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        access: Access,
+        info: &RwLock<FsNodeInfo>,
+    ) -> Result<(), Errno> {
+        let info = self.refresh_expired_node_attributes(current_task, info)?;
+        node.default_check_access_impl(current_task, access, info)
     }
 
     fn refresh_expired_node_attributes<'a>(
@@ -909,24 +920,59 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         access: Access,
         info: &RwLock<FsNodeInfo>,
+        reason: CheckAccessReason,
     ) -> Result<(), Errno> {
+        // Perform access checks regardless of the reason when userspace configured
+        // the kernel to perform its default access checks on behalf of the FUSE fs.
         if FuseFs::from_fs(&node.fs())?
             .default_permissions
             .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
         {
-            let info = self.refresh_expired_node_attributes(current_task, info)?;
-            return node.default_check_access_impl(current_task, access, info);
+            return self.default_check_access_with_valid_node_attributes(
+                node,
+                current_task,
+                access,
+                info,
+            );
         }
 
-        let response = self.connection.lock().execute_operation(
-            current_task,
-            self,
-            FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
-        )?;
-        if let FuseResponse::Access(result) = response {
-            result
-        } else {
-            error!(EINVAL)
+        match reason {
+            CheckAccessReason::Access | CheckAccessReason::Chdir | CheckAccessReason::Chroot => {
+                // Per `libfuse`'s low-level handler for `FUSE_ACCESS` requests, the kernel
+                // is only expected to send `FUSE_ACCESS` requests for the `access` and `chdir`
+                // family of syscalls when the `default_permissions` flag isn't set on the FUSE
+                // fs. Seems like `chroot` also triggers a `FUSE_ACCESS` request on Linux.
+                let response = self.connection.lock().execute_operation(
+                    current_task,
+                    self,
+                    FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
+                )?;
+
+                if let FuseResponse::Access(result) = response {
+                    result
+                } else {
+                    error!(EINVAL)
+                }
+            }
+            CheckAccessReason::Open => {
+                // Don't perform any access checks when this access check is being
+                // performed for an open. `FUSE_OPEN` handlers are expected to validate
+                // that the open request is valid for the given node being opened,
+                // including the flags which hold the requested access permissions
+                // like read/write (e.g. `O_RDONLY`/`O_RDWR`).
+                //
+                // For more details, see fuse(4) and `libfuse`'s low-level `FUSE_OPEN`
+                // handler.
+                Ok(())
+            }
+            CheckAccessReason::InternalPermissionChecks => {
+                return self.default_check_access_with_valid_node_attributes(
+                    node,
+                    current_task,
+                    access,
+                    info,
+                );
+            }
         }
     }
 

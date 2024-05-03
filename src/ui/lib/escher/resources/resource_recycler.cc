@@ -4,6 +4,8 @@
 
 #include "src/ui/lib/escher/resources/resource_recycler.h"
 
+#include <vector>
+
 #include "src/ui/lib/escher/escher.h"
 
 namespace escher {
@@ -16,7 +18,10 @@ ResourceRecycler::ResourceRecycler(EscherWeakPtr escher)
 }
 
 ResourceRecycler::~ResourceRecycler() {
-  FX_DCHECK(unused_resources_.empty());
+  {
+    std::scoped_lock lock(lock_);
+    FX_DCHECK(unused_resources_.empty());
+  }
   // Unregister ourselves. Unregister() is defined in our superclass
   // CommandBufferSequenceListener.
   escher()->command_buffer_sequencer()->RemoveListener(this);
@@ -28,6 +33,7 @@ void ResourceRecycler::OnReceiveOwnable(std::unique_ptr<Resource> resource) {
     RecycleResource(std::move(resource));
   } else {
     // Defer recycling.
+    std::scoped_lock lock(lock_);
     unused_resources_[resource.get()] = std::move(resource);
   }
 }
@@ -38,14 +44,22 @@ void ResourceRecycler::OnCommandBufferFinished(uint64_t sequence_number) {
 
   // The sequence number allows us to find all unused resources that are no
   // longer referenced by a pending command-buffer; destroy these.
-  auto it = unused_resources_.begin();
-  while (it != unused_resources_.end()) {
-    if (it->second->sequence_number() <= last_finished_sequence_number_) {
-      RecycleResource(std::move(it->second));
-      it = unused_resources_.erase(it);
-    } else {
-      ++it;
+  std::vector<std::unique_ptr<Resource>> resources_to_recycle;
+  {
+    std::scoped_lock lock(lock_);
+    auto it = unused_resources_.begin();
+    while (it != unused_resources_.end()) {
+      if (it->second->sequence_number() <= last_finished_sequence_number_) {
+        resources_to_recycle.push_back(std::move(it->second));
+        it = unused_resources_.erase(it);
+      } else {
+        ++it;
+      }
     }
+  }
+
+  for (auto& resource : resources_to_recycle) {
+    RecycleResource(std::move(resource));
   }
 }
 

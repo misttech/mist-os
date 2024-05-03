@@ -60,7 +60,7 @@ class Vfs {
   // The return value will suggest the next action to take. Refer to the variants in |OpenResult|
   // for more information.
   OpenResult Open(fbl::RefPtr<Vnode> vn, std::string_view path, VnodeConnectionOptions options,
-                  fuchsia_io::Rights parent_rights, uint32_t mode) __TA_EXCLUDES(vfs_lock_);
+                  fuchsia_io::Rights parent_rights) __TA_EXCLUDES(vfs_lock_);
 
   // Implements Unlink for a pre-validated and trimmed name.
   virtual zx_status_t Unlink(fbl::RefPtr<Vnode> vn, std::string_view name, bool must_be_dir)
@@ -78,10 +78,6 @@ class Vfs {
   // Whether this file system is read-only.
   bool ReadonlyLocked() const __TA_REQUIRES(vfs_lock_) { return readonly_; }
 
-  OpenResult OpenLocked(fbl::RefPtr<Vnode> vn, std::string_view path,
-                        VnodeConnectionOptions options, fuchsia_io::Rights parent_rights,
-                        uint32_t mode) __TA_REQUIRES(vfs_lock_);
-
   // Trim trailing slashes from name before sending it to internal filesystem functions. This also
   // validates whether the name has internal slashes and rejects them. Returns failure if the
   // resulting name is too long, empty, or contains slashes after trimming.
@@ -97,10 +93,10 @@ class Vfs {
   //   fatal), attempt to lookup the vnode.
   //
   // In the success case, returns a boolean indicating whether an entry was created.
-  virtual zx::result<bool> EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                        fbl::RefPtr<Vnode>* out_vn,
-                                        fs::VnodeConnectionOptions options, uint32_t mode,
-                                        fuchsia_io::Rights parent_rights) __TA_REQUIRES(vfs_lock_);
+  virtual zx::result<bool> EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
+                                        CreationType type, bool allow_existing,
+                                        fuchsia_io::Rights parent_rights,
+                                        fbl::RefPtr<Vnode>* out_vn) __TA_REQUIRES(vfs_lock_);
 
   // A lock which should be used to protect lookup and walk operations
   mutable std::mutex vfs_lock_;

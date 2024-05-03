@@ -12,7 +12,7 @@ use crate::{
     context::FilterBindingsContext, packets::TransportPacket, FilterBindingsTypes, IpPacket,
     MaybeTransportPacket,
 };
-use netstack3_sync::Mutex;
+use netstack3_base::sync::Mutex;
 
 /// Implements a connection tracking subsystem.
 ///

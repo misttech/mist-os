@@ -26,6 +26,7 @@ use {
         compression::{ChunkedArchive, ChunkedDecompressor},
         format::SerializedType1Blob,
     },
+    serde::{Deserialize, Serialize},
     static_assertions::assert_eq_size,
     thiserror::Error,
     zerocopy::{AsBytes, Ref},
@@ -73,6 +74,32 @@ pub fn decompressed_size(delivery_blob: &[u8]) -> Result<u64, DecompressError> {
     }
 }
 
+/// Returns the decompressed size of the delivery blob from `reader`.
+pub fn decompressed_size_from_reader(
+    mut reader: impl std::io::Read,
+) -> Result<u64, DecompressError> {
+    let mut buf = vec![];
+    loop {
+        let already_read = buf.len();
+        let new_size = already_read + 4096;
+        buf.resize(new_size, 0);
+        let new_size = already_read + reader.read(&mut buf[already_read..new_size])?;
+        if new_size == already_read {
+            return Err(DecompressError::NeedMoreData);
+        }
+        buf.truncate(new_size);
+        match decompressed_size(&buf) {
+            Ok(size) => {
+                return Ok(size);
+            }
+            Err(DecompressError::NeedMoreData) => {}
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+}
+
 /// Decompress a delivery blob in `delivery_blob`, delivery blob type is auto detected.
 pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
     let header = DeliveryBlobHeader::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
@@ -80,6 +107,20 @@ pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
         DeliveryBlobType::Type1 => Type1Blob::decompress(delivery_blob),
         _ => Err(DecompressError::DeliveryBlob(DeliveryBlobError::InvalidType)),
     }
+}
+
+/// Calculate the merkle root digest of the decompressed `delivery_blob`, delivery blob type is auto
+/// detected.
+pub fn calculate_digest(delivery_blob: &[u8]) -> Result<fuchsia_merkle::Hash, DecompressError> {
+    let mut writer = fuchsia_merkle::MerkleTreeWriter::new(std::io::sink());
+    let header = DeliveryBlobHeader::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
+    match header.delivery_type {
+        DeliveryBlobType::Type1 => {
+            let () = Type1Blob::decompress_to(delivery_blob, &mut writer)?;
+        }
+        _ => return Err(DecompressError::DeliveryBlob(DeliveryBlobError::InvalidType)),
+    }
+    Ok(writer.finish().root())
 }
 
 /// Obtain the file path to use when writing `blob_name` as a delivery blob.
@@ -109,6 +150,9 @@ pub enum DecompressError {
 
     #[error("Need more data")]
     NeedMoreData,
+
+    #[error("io error")]
+    IoError(#[from] std::io::Error),
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -150,7 +194,7 @@ impl DeliveryBlobHeader {
 ///
 /// **WARNING**: These constants are used when generating delivery blobs and should not be changed.
 /// Non backwards-compatible changes to delivery blob formats should be made by creating a new type.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum DeliveryBlobType {
     /// Reserved for internal use.
@@ -288,18 +332,33 @@ impl Type1Blob {
 
     /// Decompress a Type 1 delivery blob in `delivery_blob`.
     pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
+        let mut decompressed = vec![];
+        decompressed.reserve(Self::decompressed_size(delivery_blob)? as usize);
+        Self::decompress_to(delivery_blob, &mut decompressed)?;
+        Ok(decompressed)
+    }
+
+    /// Decompress a Type 1 delivery blob in `delivery_blob` to `writer`.
+    pub fn decompress_to(
+        delivery_blob: &[u8],
+        mut writer: impl std::io::Write,
+    ) -> Result<(), DecompressError> {
         let (header, payload) = Self::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
         if !header.is_compressed {
-            return Ok(payload.into());
+            return Ok(writer.write_all(payload)?);
         }
 
         let (seek_table, chunk_data) = compression::decode_archive(payload, header.payload_length)?
             .ok_or(DecompressError::NeedMoreData)?;
         let mut decompressor = ChunkedDecompressor::new(seek_table)?;
-        let mut decompressed = vec![];
-        let mut chunk_callback = |chunk: &[u8]| decompressed.extend_from_slice(chunk);
+        let mut result = Ok(());
+        let mut chunk_callback = |chunk: &[u8]| {
+            if let Err(e) = writer.write_all(chunk) {
+                result = Err(e.into());
+            }
+        };
         decompressor.update(chunk_data, &mut chunk_callback)?;
-        Ok(decompressed)
+        result
     }
 }
 
@@ -358,5 +417,29 @@ mod tests {
         assert!(header.is_compressed);
         assert!(header.payload_length < data.len());
         assert_eq!(Type1Blob::decompress(&delivery_blob).unwrap(), data);
+    }
+
+    #[test]
+    fn get_decompressed_size() {
+        let data: Vec<u8> = {
+            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
+            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+        };
+        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
+        assert_eq!(decompressed_size(&delivery_blob).unwrap(), DATA_LEN as u64);
+        assert_eq!(decompressed_size_from_reader(&delivery_blob[..]).unwrap(), DATA_LEN as u64);
+    }
+
+    #[test]
+    fn test_calculate_digest() {
+        let data: Vec<u8> = {
+            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
+            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
+        };
+        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
+        assert_eq!(
+            calculate_digest(&delivery_blob).unwrap(),
+            fuchsia_merkle::from_slice(&data).root()
+        );
     }
 }

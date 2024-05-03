@@ -19,7 +19,10 @@ use net_types::{
 use packet::Buf;
 
 use crate::{
-    context::{CounterContext, InstantContext, TimerBindingsTypes, TimerHandler},
+    context::{
+        CounterContext, HandleableTimer, InstantContext, ReferenceNotifiers, TimerBindingsTypes,
+        TimerHandler,
+    },
     counters::Counter,
     device::{
         arp::ArpCounters,
@@ -209,18 +212,15 @@ impl<BT: DeviceLayerTypes> From<EthernetTimerId<EthernetWeakDeviceId<BT>>>
     }
 }
 
-impl<CC, BT> TimerHandler<BT, DeviceLayerTimerId<BT>> for CC
+impl<CC, BT> HandleableTimer<CC, BT> for DeviceLayerTimerId<BT>
 where
     BT: DeviceLayerTypes,
     CC: TimerHandler<BT, EthernetTimerId<EthernetWeakDeviceId<BT>>>,
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BT,
-        DeviceLayerTimerId(id): DeviceLayerTimerId<BT>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
+        let Self(id) = self;
         match id {
-            DeviceLayerTimerIdInner::Ethernet(id) => self.handle_timer(bindings_ctx, id),
+            DeviceLayerTimerIdInner::Ethernet(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }
@@ -532,6 +532,7 @@ pub trait DeviceLayerTypes:
     + socket::DeviceSocketTypes
     + LinkResolutionContext<EthernetLinkDevice>
     + TimerBindingsTypes
+    + ReferenceNotifiers
     + 'static
 {
 }
@@ -540,6 +541,7 @@ impl<
             + socket::DeviceSocketTypes
             + LinkResolutionContext<EthernetLinkDevice>
             + TimerBindingsTypes
+            + ReferenceNotifiers
             + 'static,
     > DeviceLayerTypes for BC
 {
@@ -898,6 +900,7 @@ mod tests {
         time::Duration,
     };
 
+    use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
     use net_types::{
@@ -1231,13 +1234,15 @@ mod tests {
 
         let ip = SpecifiedAddr::new(ip).unwrap();
         // Del IP (ok).
-        let () = ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip).unwrap();
+        let removed =
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip).unwrap().into_removed();
+        assert_eq!(removed, addr_subnet);
         assert_eq!(check_contains_addr(&mut ctx), false);
 
         // Del IP again (not found).
-        assert_eq!(
+        assert_matches!(
             ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip),
-            Err(error::NotFoundError),
+            Err(error::NotFoundError)
         );
 
         assert_eq!(check_contains_addr(&mut ctx), false);

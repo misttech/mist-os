@@ -16,14 +16,14 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/le_connection_parameters.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_advertiser.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test_double_base.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
 
 namespace bt::testing {
 
-namespace android_hci = pw::bluetooth::vendor::android_hci;
+namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 class FakePeer;
 
@@ -85,21 +85,21 @@ class FakeController final : public ControllerTestDoubleBase,
     uint8_t total_num_iso_data_packets = 0;
 
     // Vendor extensions
-    StaticPacket<android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
+    StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter>
         android_extension_settings;
   };
 
   // Configuration of an L2CAP channel for A2DP offloading.
   struct OffloadedA2dpChannel final {
-    android_hci::A2dpCodecType codec_type = android_hci::A2dpCodecType::SBC;
+    android_emb::A2dpCodecType codec_type = android_emb::A2dpCodecType::SBC;
     uint16_t max_latency = 0;
-    StaticPacket<android_hci::A2dpScmsTEnableWriter> scms_t_enable;
-    android_hci::A2dpSamplingFrequency sampling_frequency =
-        android_hci::A2dpSamplingFrequency::HZ_44100;
-    android_hci::A2dpBitsPerSample bits_per_sample =
-        android_hci::A2dpBitsPerSample::BITS_PER_SAMPLE_16;
-    android_hci::A2dpChannelMode channel_mode =
-        android_hci::A2dpChannelMode::MONO;
+    StaticPacket<android_emb::A2dpScmsTEnableWriter> scms_t_enable;
+    android_emb::A2dpSamplingFrequency sampling_frequency =
+        android_emb::A2dpSamplingFrequency::HZ_44100;
+    android_emb::A2dpBitsPerSample bits_per_sample =
+        android_emb::A2dpBitsPerSample::BITS_PER_SAMPLE_16;
+    android_emb::A2dpChannelMode channel_mode =
+        android_emb::A2dpChannelMode::MONO;
     uint32_t encoded_audio_bitrate = 0;
     hci_spec::ConnectionHandle connection_handle = 0;
     l2cap::ChannelId l2cap_channel_id = 0;
@@ -130,12 +130,9 @@ class FakeController final : public ControllerTestDoubleBase,
     }
 
     bool IsDirectedAdvertising() const;
-    bool IsScannableAdvertising() const;
-    bool IsConnectableAdvertising() const;
 
     bool enabled = false;
-    pw::bluetooth::emboss::LEAdvertisingType adv_type = pw::bluetooth::emboss::
-        LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED;
+    hci::LowEnergyAdvertiser::AdvertisingEventProperties properties;
 
     std::optional<DeviceAddress> random_address;
     pw::bluetooth::emboss::LEOwnAddressType own_address_type =
@@ -144,10 +141,10 @@ class FakeController final : public ControllerTestDoubleBase,
     uint32_t interval_min = 0;
     uint32_t interval_max = 0;
 
-    uint8_t data_length = 0;
-    uint8_t data[hci_spec::kMaxLEAdvertisingDataLength] = {0};
-    uint8_t scan_rsp_length = 0;
-    uint8_t scan_rsp_data[hci_spec::kMaxLEAdvertisingDataLength] = {0};
+    uint16_t data_length = 0;
+    uint8_t data[hci_spec::kMaxLEExtendedAdvertisingDataLength] = {0};
+    uint16_t scan_rsp_length = 0;
+    uint8_t scan_rsp_data[hci_spec::kMaxLEExtendedAdvertisingDataLength] = {0};
   };
 
   // The parameters of the most recent low energy connection initiation request
@@ -432,6 +429,10 @@ class FakeController final : public ControllerTestDoubleBase,
 
   void clear_pause_listener_for_opcode(hci_spec::OpCode code) {
     paused_opcode_listeners_.erase(code);
+  }
+
+  void set_maximum_advertising_data_length(uint16_t value) {
+    max_advertising_data_length_ = value;
   }
 
   // Called when a HCI_LE_Read_Advertising_Channel_Tx_Power command is
@@ -914,7 +915,7 @@ class FakeController final : public ControllerTestDoubleBase,
       const PacketView<hci_spec::CommandHeader>& command_packet);
 
   void OnAndroidStartA2dpOffload(
-      const android_hci::StartA2dpOffloadCommandView& params);
+      const android_emb::StartA2dpOffloadCommandView& params);
 
   void OnAndroidStopA2dpOffload();
 
@@ -922,19 +923,19 @@ class FakeController final : public ControllerTestDoubleBase,
       const PacketView<hci_spec::CommandHeader>& command_packet);
 
   void OnAndroidLEMultiAdvtSetAdvtParam(
-      const android_hci::LEMultiAdvtSetAdvtParamCommandView& params);
+      const android_emb::LEMultiAdvtSetAdvtParamCommandView& params);
 
   void OnAndroidLEMultiAdvtSetAdvtData(
-      const android_hci::LEMultiAdvtSetAdvtDataCommandView& params);
+      const android_emb::LEMultiAdvtSetAdvtDataCommandView& params);
 
   void OnAndroidLEMultiAdvtSetScanResp(
-      const android_hci::LEMultiAdvtSetScanRespDataCommandView& params);
+      const android_emb::LEMultiAdvtSetScanRespDataCommandView& params);
 
   void OnAndroidLEMultiAdvtSetRandomAddr(
-      const android_hci::LEMultiAdvtSetRandomAddrCommandView& params);
+      const android_emb::LEMultiAdvtSetRandomAddrCommandView& params);
 
   void OnAndroidLEMultiAdvtEnable(
-      const android_hci::LEMultiAdvtEnableCommandView& params);
+      const android_emb::LEMultiAdvtEnableCommandView& params);
 
   // Called when a command with an OGF of hci_spec::kVendorOGF is received.
   void OnVendorCommand(
@@ -1073,6 +1074,7 @@ class FakeController final : public ControllerTestDoubleBase,
   bool auto_disconnection_complete_event_enabled_ = true;
 
   AdvertisingProcedure advertising_procedure_ = AdvertisingProcedure::kUnknown;
+  uint16_t max_advertising_data_length_ = hci_spec::kMaxLEAdvertisingDataLength;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(FakeController);
 };

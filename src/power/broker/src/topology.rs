@@ -11,9 +11,6 @@ use uuid::Uuid;
 /// If true, use non-random IDs for ease of debugging.
 const ID_DEBUG_MODE: bool = false;
 
-/// The minimum possible PowerLevel.
-const ABSOLUTE_MINIMUM_POWER_LEVEL: PowerLevel = 0;
-
 // This may be a token later, but using a String for now for simplicity.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct ElementID {
@@ -165,11 +162,11 @@ impl Topology {
 
     pub fn minimum_level(&self, element_id: &ElementID) -> PowerLevel {
         let Some(elem) = self.elements.get(element_id) else {
-            return ABSOLUTE_MINIMUM_POWER_LEVEL;
+            return PowerLevel::MIN;
         };
         match elem.valid_levels.first().copied() {
             Some(level) => level,
-            None => ABSOLUTE_MINIMUM_POWER_LEVEL,
+            None => PowerLevel::MIN,
         }
     }
 

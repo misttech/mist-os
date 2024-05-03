@@ -15,7 +15,7 @@ use {
     },
     fidl::endpoints::Proxy,
     fidl_fuchsia_bluetooth::{self as fbt, DeviceClass, MAJOR_DEVICE_CLASS_TOY},
-    fidl_fuchsia_bluetooth_host as _,
+    fidl_fuchsia_bluetooth_host::{self as _, HostStartDiscoveryRequest},
     fidl_fuchsia_bluetooth_sys::{self as fsys, TechnologyType},
     fidl_fuchsia_bluetooth_test::{HciError, PeerProxy},
     fuchsia_async::TimeoutExt,
@@ -41,8 +41,9 @@ async fn wait_for_test_peer(
 
     // Start discovery and let bt-host process the fake LE peer.
     let host = harness.aux().host.clone();
-    let result = host.start_discovery().await.unwrap();
-    assert_eq!(Ok(()), result);
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    host.start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
+        .unwrap();
 
     let le_dev = peer::address(address.clone());
     let _ = host_expectation::peer(&harness, le_dev).await.unwrap();
@@ -177,8 +178,10 @@ async fn test_discovery(harness: HostHarness) {
     let proxy = harness.aux().host.clone();
 
     // Start discovery. "discovering" should get set to true.
-    let result = proxy.start_discovery().await.unwrap();
-    assert_eq!(Ok(()), result);
+    let (discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    proxy
+        .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
+        .unwrap();
     let _ = host_expectation::host_state(&harness, expectation::host_driver::discovering(true))
         .await
         .unwrap();
@@ -193,7 +196,8 @@ async fn test_discovery(harness: HostHarness) {
         .unwrap();
 
     // Stop discovery. "discovering" should get set to false.
-    proxy.stop_discovery().unwrap();
+    discovery_proxy.stop().unwrap();
+    let _ = discovery_proxy.on_closed().await.unwrap();
     let _ = host_expectation::host_state(&harness, expectation::host_driver::discovering(false))
         .await
         .unwrap();
@@ -204,8 +208,10 @@ async fn test_discovery(harness: HostHarness) {
 async fn test_close(harness: HostHarness) {
     // Enable all procedures.
     let proxy = harness.aux().host.clone();
-    let result = proxy.start_discovery().await.unwrap();
-    assert_eq!(Ok(()), result);
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    proxy
+        .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
+        .unwrap();
     let result = proxy.set_discoverable(true).await.unwrap();
     assert_eq!(Ok(()), result);
 
@@ -248,8 +254,10 @@ async fn test_watch_peers(harness: HostHarness) {
 
     // Wait for all fake devices to be discovered.
     let proxy = harness.aux().host.clone();
-    let result = proxy.start_discovery().await.unwrap();
-    assert_eq!(Ok(()), result);
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    proxy
+        .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
+        .unwrap();
     let expected_le =
         peer::address(le_peer_address).and(peer::technology(TechnologyType::LowEnergy));
     let expected_bredr =
@@ -276,8 +284,10 @@ async fn test_connect(harness: HostHarness) {
     let proxy = harness.aux().host.clone();
 
     // Start discovery and let bt-host process the fake devices.
-    let result = proxy.start_discovery().await.unwrap();
-    assert_eq!(Ok(()), result);
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    proxy
+        .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
+        .unwrap();
 
     let _ = host_expectation::peer(&harness, peer::address(address1)).await.unwrap();
     let _ = host_expectation::peer(&harness, peer::address(address2)).await.unwrap();

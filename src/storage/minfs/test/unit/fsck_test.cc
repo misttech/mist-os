@@ -102,10 +102,10 @@ class ConsistencyCheckerFixtureVerbose : public testing::Test {
 
   fs::VnodeAttributes CreateAndWrite(const char* name, size_t truncate_size, size_t offset,
                                      size_t data_size) {
-    auto root_or = fs().VnodeGet(kMinfsRootIno);
-    EXPECT_TRUE(root_or.is_ok());
-    fbl::RefPtr<fs::Vnode> child;
-    EXPECT_EQ(root_or->Create(name, 0, &child), ZX_OK);
+    auto root = fs().VnodeGet(kMinfsRootIno);
+    EXPECT_TRUE(root.is_ok());
+    zx::result child = root->Create(name, fs::CreationType::kFile);
+    EXPECT_TRUE(child.is_ok()) << child.status_string();
     if (data_size != 0) {
       char data[data_size];
       memset(data, 0, data_size);
@@ -244,9 +244,9 @@ void ConsistencyCheckerFixtureVerbose::MarkDirectoryEntryMissing(size_t offset,
                                                                  std::unique_ptr<Bcache>* bcache) {
   blk_t root_dir_block;
   {
-    auto root_or = fs().VnodeGet(kMinfsRootIno);
-    EXPECT_TRUE(root_or.is_ok());
-    root_dir_block = root_or->GetInode()->dnum[0] + fs().Info().dat_block;
+    auto root = fs().VnodeGet(kMinfsRootIno);
+    EXPECT_TRUE(root.is_ok());
+    root_dir_block = root->GetInode()->dnum[0] + fs().Info().dat_block;
   }
 
   DestroyMinfs(bcache);
@@ -279,11 +279,11 @@ void CreateUnlinkedDirectoryWithEntry(std::unique_ptr<Runner> fs,
   blk_t inode_block;
 
   {
-    auto root_or = fs->minfs().VnodeGet(kMinfsRootIno);
-    ASSERT_TRUE(root_or.is_ok());
-    fbl::RefPtr<fs::Vnode> child_;
-    ASSERT_EQ(root_or->Create("foo", 0, &child_), ZX_OK);
-    auto child = fbl::RefPtr<VnodeMinfs>::Downcast(std::move(child_));
+    auto root = fs->minfs().VnodeGet(kMinfsRootIno);
+    ASSERT_TRUE(root.is_ok());
+    zx::result child_ = root->Create("foo", fs::CreationType::kFile);
+    EXPECT_TRUE(child_.is_ok()) << child_.status_string();
+    auto child = fbl::RefPtr<VnodeMinfs>::Downcast(*std::move(child_));
     auto close_child = fit::defer([child]() { child->Close(); });
     ino = child->GetIno();
     ASSERT_GT(kMinfsInodesPerBlock, ino);
@@ -302,7 +302,7 @@ void CreateUnlinkedDirectoryWithEntry(std::unique_ptr<Runner> fs,
     ASSERT_EQ(child->Write(data, dirent_buffer.dirent.reclen, 0, &written), ZX_OK);
     ASSERT_EQ(written, dirent_buffer.dirent.reclen);
 
-    ASSERT_EQ(root_or->Unlink("foo", false), ZX_OK);
+    ASSERT_EQ(root->Unlink("foo", false), ZX_OK);
 
     sync_completion_t completion;
     fs->minfs().Sync([&completion](zx_status_t status) { sync_completion_signal(&completion); });

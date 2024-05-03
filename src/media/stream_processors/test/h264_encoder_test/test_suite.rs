@@ -6,8 +6,9 @@
 
 use anyhow::format_err;
 use async_trait::async_trait;
+use fidl_fuchsia_images2 as images2;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem as sysmem;
+use fidl_fuchsia_sysmem2 as sysmem2;
 use fuchsia_zircon as zx;
 use h264_stream::*;
 use std::io::Write;
@@ -142,7 +143,7 @@ impl H264DecoderValidator {
 
 pub struct H264EncoderTestCase {
     pub num_frames: usize,
-    pub input_format: sysmem::ImageFormat2,
+    pub input_format: images2::ImageFormat,
     // This is a function because FIDL unions are not Copy or Clone.
     pub settings: Rc<dyn Fn() -> EncoderSettings>,
     pub expected_nals: Option<Vec<H264NalKind>>,
@@ -181,20 +182,17 @@ impl H264EncoderTestCase {
             expected_terminal_output: Output::Eos { stream_lifetime_ordinal: 1 },
         }));
 
-        let format_constraints = sysmem::ImageFormatConstraints {
-            pixel_format: self.input_format.pixel_format,
-            color_spaces_count: 1,
-            color_space: [sysmem::ColorSpace { type_: sysmem::ColorSpaceType::Rec709 }; 32],
-            required_max_coded_width: self.input_format.coded_width,
-            required_max_coded_height: self.input_format.coded_height,
-            ..IMAGE_FORMAT_CONSTRAINTS_DEFAULT
+        let format_constraints = sysmem2::ImageFormatConstraints {
+            pixel_format: Some(*self.input_format.pixel_format.as_ref().unwrap()),
+            color_spaces: Some(vec![images2::ColorSpace::Rec709]),
+            required_max_size: self.input_format.size.clone(),
+            ..image_format_constraints_default()
         };
 
         let stream_options = Some(StreamOptions {
-            input_buffer_collection_constraints: Some(sysmem::BufferCollectionConstraints {
-                image_format_constraints_count: 1,
-                image_format_constraints: [format_constraints; 32],
-                ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
+            input_buffer_collection_constraints: Some(sysmem2::BufferCollectionConstraints {
+                image_format_constraints: Some(vec![format_constraints]),
+                ..buffer_collection_constraints_default()
             }),
             ..StreamOptions::default()
         });
@@ -227,7 +225,7 @@ impl H264EncoderTestCase {
 
     fn create_test_stream(&self) -> Result<Rc<VideoFrameStream>> {
         Ok(Rc::new(VideoFrameStream::create(
-            self.input_format,
+            self.input_format.clone(),
             self.num_frames,
             self.settings.clone(),
             self.get_frame_rate(),

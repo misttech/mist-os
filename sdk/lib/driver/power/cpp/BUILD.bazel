@@ -9,9 +9,11 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "cpp",
     srcs = [
+        "element-description-builder.cc",
         "power-support.cc",
     ],
     hdrs = [
+        "element-description-builder.h",
         "power-support.h",
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],

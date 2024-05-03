@@ -13,12 +13,13 @@
 use crate::task::Kernel;
 use anyhow::anyhow;
 use fidl::{
-    endpoints::{create_proxy, create_request_stream},
+    endpoints::{create_proxy, create_request_stream, ClientEnd},
     HandleBased,
 };
 use fidl_fuchsia_element as felement;
+use fidl_fuchsia_images2 as fimages2;
 use fidl_fuchsia_math as fmath;
-use fidl_fuchsia_sysmem as fsysmem;
+use fidl_fuchsia_sysmem2 as fsysmem2;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_views as fuiviews;
 use flatland_frame_scheduling_lib::{
@@ -74,7 +75,7 @@ pub struct FramebufferServer {
     flatland: fuicomposition::FlatlandProxy,
 
     /// The buffer collection that is registered with Flatland.
-    collection: fsysmem::BufferCollectionInfo2,
+    collection: fsysmem2::BufferCollectionInfo,
 
     /// The width of the display and framebuffer image.
     image_width: u32,
@@ -123,7 +124,7 @@ impl FramebufferServer {
 
     /// Returns a clone of the VMO that is shared with Flatland.
     pub fn get_vmo(&self) -> Result<zx::Vmo, Errno> {
-        self.collection.buffers[0]
+        self.collection.buffers.as_ref().unwrap()[0]
             .vmo
             .as_ref()
             .ok_or_else(|| errno!(EINVAL))?
@@ -148,7 +149,7 @@ fn init_fb_scene(
     allocator: &fuicomposition::AllocatorSynchronousProxy,
     width: u32,
     height: u32,
-) -> Result<fsysmem::BufferCollectionInfo2, anyhow::Error> {
+) -> Result<fsysmem2::BufferCollectionInfo, anyhow::Error> {
     flatland
         .create_transform(&ROOT_TRANSFORM_ID)
         .map_err(|_| anyhow!("error creating transform"))?;
@@ -172,7 +173,7 @@ fn init_fb_scene(
             let mut buffer_allocator = BufferCollectionAllocator::new(
                 width,
                 height,
-                fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
+                fimages2::PixelFormat::R8G8B8A8,
                 FrameUsage::Cpu,
                 1,
             )?;
@@ -202,7 +203,13 @@ fn init_fb_scene(
     let buffer_tokens = BufferCollectionTokenPair::new();
     let args = fuicomposition::RegisterBufferCollectionArgs {
         export_token: Some(buffer_tokens.export_token),
-        buffer_collection_token: Some(sysmem_buffer_collection_token),
+        // The token channel is serving both sysmem(1) and sysmem2, so we can convert here until
+        // flatland has a field for a sysmem2 token.
+        buffer_collection_token: Some(
+            ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                sysmem_buffer_collection_token.into_channel(),
+            ),
+        ),
         ..Default::default()
     };
 
@@ -282,19 +289,26 @@ pub fn init_viewport_scene(
     server.present();
 }
 
-pub fn send_view_to_graphical_presenter(
+pub fn start_presentation_loop(
     kernel: &Arc<Kernel>,
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     view_identity: fuiviews::ViewIdentityOnCreation,
     incoming_dir: fidl_fuchsia_io::DirectoryProxy,
 ) {
+    let flatland = server.flatland.clone();
+    let mut flatland_event_stream = flatland.take_event_stream();
+    let server_clone = server.clone();
+    let mut presentation_receiver = server_clone.presentation_receiver.lock();
+    let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
     kernel.kthreads.spawner().spawn(|_, _| {
         let mut executor = fasync::LocalExecutor::new();
+        let scheduler = ThroughputScheduler::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         let mut view_identity = Some(view_identity);
         let mut maybe_view_controller_proxy = None;
         executor.run_singlethreaded(async move {
+            let mut scene_state = None;
             let link_token_pair =
                 ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
             // We don't actually care about the parent viewport at the moment, because we don't resize.
@@ -315,8 +329,29 @@ pub fn send_view_to_graphical_presenter(
                 )
                 .expect("FIDL error");
 
-            // Now that the view has been created, start presenting.
+            // Now that the view has been created, start presenting to Flatland.
+            // We must do this first because GraphicalPresenter can only
+            // service `present_view` once a child view is attached to the view
+            // tree. In order to attach, the child must have presented at least
+            // once.
             server.present();
+            let message = presentation_receiver.next().await;
+            if message.is_some() {
+                scene_state = message;
+                scheduler.request_present();
+                let present_parameters = scheduler.wait_to_update().await;
+                flatland
+                .present(fuicomposition::PresentArgs {
+                    requested_presentation_time: Some(
+                        present_parameters.requested_presentation_time.into_nanos(),
+                    ),
+                    acquire_fences: None,
+                    release_fences: None,
+                    unsquashable: Some(present_parameters.unsquashable),
+                    ..Default::default()
+                })
+                .unwrap_or(());
+            };
 
             let graphical_presenter = connect_to_protocol_at_dir_root::<
                 felement::GraphicalPresenterMarker,
@@ -339,30 +374,16 @@ pub fn send_view_to_graphical_presenter(
             let (annotation_controller_client_end, _annotation_controller_stream) =
                 create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
 
+            // Wait for present_view before processing Flatland events.
             graphical_presenter
-                .present_view(
-                    view_spec,
-                    Some(annotation_controller_client_end),
-                    Some(view_controller_server_end),
-                )
-                .await
-                .expect("failed to present view")
-                .unwrap_or_else(|e| println!("{:?}", e));
-        });
-    });
-}
+            .present_view(
+                view_spec,
+                Some(annotation_controller_client_end),
+                Some(view_controller_server_end),
+            ).await.expect("failed to present view")
+            .unwrap_or_else(|e| println!("{:?}", e));
 
-/// Starts a flatland presentation loop, using the flatland proxy in `server`.
-pub fn start_flatland_presentation_loop(kernel: &Arc<Kernel>, server: Arc<FramebufferServer>) {
-    let flatland = server.flatland.clone();
-    let mut flatland_event_stream = flatland.take_event_stream();
-    let mut presentation_receiver = server.presentation_receiver.lock();
-    let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
-    kernel.kthreads.spawner().spawn(|_, _| {
-        let mut executor = fasync::LocalExecutor::new();
-        let scheduler = ThroughputScheduler::new();
-        executor.run_singlethreaded(async move {
-            let mut scene_state = None;
+            // Start presentation loop to prepare for display updates.
             loop {
                 futures::select! {
                     message = presentation_receiver.next() => {
@@ -432,6 +453,6 @@ pub fn start_flatland_presentation_loop(kernel: &Arc<Kernel>, server: Arc<Frameb
                     }
                 }
             }
-        })
+        });
     });
 }

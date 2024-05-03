@@ -60,7 +60,7 @@ impl StreamRunner {
                 current_output_format: None,
                 stream_processor: &mut self.stream_processor,
                 stream: stream.as_ref(),
-                options,
+                options: options.clone(),
                 output: vec![],
             };
 

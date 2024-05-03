@@ -9,7 +9,7 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.bluetooth.component.Lifecycle" ],
+            protocol: [ "fuchsia.component.Binder" ],
         },
     ],
     use: [
@@ -24,8 +24,8 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.bluetooth.component.Lifecycle" ],
-            from: "self",
+            protocol: [ "fuchsia.component.Binder" ],
+            from: "framework",
         },
     ],
 }

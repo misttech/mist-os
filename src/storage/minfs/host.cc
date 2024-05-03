@@ -247,7 +247,7 @@ fs::VnodeConnectionOptions fdio_flags_to_connection_options(uint32_t flags) {
   return options;
 }
 
-int emu_open(const char* path, int flags, mode_t mode) {
+int emu_open(const char* path, int flags) {
   // TODO: fdtab lock
   ZX_DEBUG_ASSERT_MSG(!host_path(path), "'emu_' functions can only operate on target paths");
   if (flags & O_APPEND) {
@@ -259,7 +259,7 @@ int emu_open(const char* path, int flags, mode_t mode) {
       std::string_view str(path + PREFIX_SIZE);
       fs::VnodeConnectionOptions options = fdio_flags_to_connection_options(flags);
       auto result =
-          fake_fs.fake_vfs->Open(fake_fs.fake_root, str, options, fs::Rights::ReadWrite(), mode);
+          fake_fs.fake_vfs->Open(fake_fs.fake_root, str, options, fs::Rights::ReadWrite());
       if (result.is_error()) {
         STATUS(result.error());
       }
@@ -461,10 +461,9 @@ struct MinDir {
   dirent de = {};
 };
 
-int emu_mkdir(const char* path, mode_t mode) {
+int emu_mkdir(const char* path) {
   ZX_DEBUG_ASSERT_MSG(!host_path(path), "'emu_' functions can only operate on target paths");
-  mode = S_IFDIR;
-  int fd = emu_open(path, O_CREAT | O_EXCL, S_IFDIR | (mode & 0777));
+  int fd = emu_open(path, O_CREAT | O_EXCL | O_DIRECTORY);
   if (fd >= 0) {
     emu_close(fd);
     return 0;
@@ -478,8 +477,7 @@ DIR* emu_opendir(const char* name) {
   std::string_view path(name + PREFIX_SIZE);
   fs::VnodeConnectionOptions options{.flags = fuchsia_io::OpenFlags::kPosixWritable,
                                      .rights = fuchsia_io::kRStarDir};
-  auto result =
-      fake_fs.fake_vfs->Open(fake_fs.fake_root, path, options, fs::Rights::ReadWrite(), 0);
+  auto result = fake_fs.fake_vfs->Open(fake_fs.fake_root, path, options, fs::Rights::ReadWrite());
   if (result.is_error()) {
     return nullptr;
   }

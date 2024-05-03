@@ -11,6 +11,12 @@
     program: {
         binary: "bin/font_provider_integration_tests",
     },
+    children: [
+        {
+            name: "config",
+            url: "#meta/test_config_values.cm",
+        },
+    ],
     collections: [
         {
             name: "coll",
@@ -31,6 +37,14 @@
             ],
             from: "parent",
             to: "#coll",
+        },
+        {
+            from: "#config",
+            to: "#coll",
+            config: [
+                "fuchsia.fonts.FontManifest",
+                "fuchsia.fonts.VerboseLogging",
+            ],
         },
     ],
 }

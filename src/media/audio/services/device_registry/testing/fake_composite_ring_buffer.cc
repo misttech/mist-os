@@ -20,8 +20,10 @@
 
 namespace media_audio {
 
+namespace fha = fuchsia_hardware_audio;
+
 FakeCompositeRingBuffer::FakeCompositeRingBuffer(FakeComposite* parent, ElementId element_id,
-                                                 fuchsia_hardware_audio::PcmFormat format,
+                                                 fha::PcmFormat format,
                                                  size_t ring_buffer_allocated_size)
     : TestBase(),
       parent_(parent),
@@ -59,7 +61,7 @@ void FakeCompositeRingBuffer::NotImplemented_(const std::string& name,
 
 void FakeCompositeRingBuffer::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
-  fuchsia_hardware_audio::RingBufferProperties props;
+  fha::RingBufferProperties props;
   if (needs_cache_flush_or_invalidate_) {
     props.needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
   }
@@ -79,7 +81,7 @@ void FakeCompositeRingBuffer::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sy
   if (total_requested_size > allocated_size_) {
     ADR_WARN_METHOD() << "Requested size " << total_requested_size << " exceeds allocated size "
                       << allocated_size_;
-    completer.Reply(fit::error(fuchsia_hardware_audio::GetVmoError::kInvalidArgs));
+    completer.Reply(fit::error(fha::GetVmoError::kInvalidArgs));
     return;
   }
   clock_recovery_notifications_per_ring_ = request.clock_recovery_notifications_per_ring();
@@ -89,7 +91,7 @@ void FakeCompositeRingBuffer::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sy
   zx::vmo out_vmo;
   FX_CHECK(vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_vmo) == ZX_OK);
 
-  completer.Reply(zx::ok(fuchsia_hardware_audio::RingBufferGetVmoResponse{{
+  completer.Reply(zx::ok(fha::RingBufferGetVmoResponse{{
       .num_frames = requested_frames_,
       .ring_buffer = std::move(out_vmo),
   }}));
@@ -167,7 +169,7 @@ void FakeCompositeRingBuffer::MaybeCompleteWatchDelayInfo() {
     auto completer = std::move(*watch_delay_info_completer_);
     watch_delay_info_completer_.reset();
 
-    fuchsia_hardware_audio::DelayInfo info;
+    fha::DelayInfo info;
     if (internal_delay_) {
       info.internal_delay(internal_delay_->get());
     }

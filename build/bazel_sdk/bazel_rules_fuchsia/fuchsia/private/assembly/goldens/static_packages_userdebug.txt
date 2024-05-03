@@ -108,5 +108,6 @@ system-update-committer
 ?wlandevicemonitor
 ?wlanif
 ?wlanix
+?wlanphy
 ?wlansoftmac
 ?zoneinfo-provider

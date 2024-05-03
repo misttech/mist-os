@@ -30,7 +30,6 @@ cc_library(
         "low_energy_scanner.cc",
         "sco_connection.cc",
         "sequential_command_runner.cc",
-        "util.cc",
     ],
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
@@ -74,7 +73,6 @@ fuchsia_cc_test(
         "low_energy_multiple_advertising_test.cc",
         "low_energy_scanner_test.cc",
         "sequential_command_runner_test.cc",
-        "util_test.cc",
     ],
     death_unittest = True,
     visibility = ["//visibility:public"],

@@ -11,7 +11,7 @@ use fuchsia_sync::Mutex;
 use futures::future::{pending, BoxFuture};
 use futures::{select, FutureExt, Stream, StreamExt};
 use std::{collections::HashMap, mem, sync::Arc};
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::{host_dispatcher::*, watch_peers::PeerWatcher};
 
@@ -102,15 +102,24 @@ async fn handler(
         AccessRequest::StartDiscovery { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.StartDiscovery()");
             let stream = token.into_stream().unwrap(); // into_stream never fails
-            let result = hd
-                .start_discovery()
-                .await
-                .map(|token| {
-                    session.discovery_session =
-                        Some(watch_stream_for_session(stream, token).boxed());
-                })
-                .map_err(Into::into);
-            responder.send(result).map_err(Error::from)
+            let result = hd.start_discovery().await.map(|discovery_session| {
+                debug!("StartDiscovery: discovery started");
+                let mut wait_for_discovery_end = discovery_session.on_discovery_end();
+                let discovery_fut = async move {
+                    // Wait for either the client to drop its ProcedureToken or the Host server to
+                    // terminate discovery.
+                    select! {
+                      _ = watch_stream_for_session(stream, discovery_session).fuse() => {
+                          debug!("StartDiscovery: watch_stream_for_session completed");
+                      }
+                      _ = wait_for_discovery_end => {
+                          debug!("StartDiscovery: wait_for_discovery_end completed");
+                      }
+                    }
+                };
+                session.discovery_session = Some(discovery_fut.boxed());
+            });
+            responder.send(result.map_err(Into::into)).map_err(Error::from)
         }
         AccessRequest::WatchPeers { responder } => {
             trace!("Received FIDL call: fuchsia.bluetooth.sys.Access.WatchPeers()");

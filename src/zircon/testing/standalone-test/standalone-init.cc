@@ -21,10 +21,7 @@
 namespace standalone {
 namespace {
 
-zx::resource root_resource, ioport_resource, irq_resource, mmio_resource, system_resource;
-
-constexpr std::string_view kMissingRootResource =
-    "*** standalone-test must run directly from userboot ***\n";
+zx::resource ioport_resource, irq_resource, mmio_resource, system_resource;
 
 constexpr std::string_view kStartupMessage =
     "*** Running standalone test directly from userboot ***\n";
@@ -49,11 +46,6 @@ zx::unowned_channel GetNsDir(std::string_view name) {
   }
 
   return it->second.borrow();
-}
-
-zx::unowned_resource GetRootResource() {
-  ZX_ASSERT_MSG(root_resource, "standalone test didn't receive root resource");
-  return root_resource.borrow();
 }
 
 zx::unowned_resource GetIoportResource() {
@@ -104,12 +96,6 @@ extern "C" [[gnu::retain]] __EXPORT void __libc_extensions_init(uint32_t count,
 
   for (unsigned n = 0; n < count; n++) {
     switch (PA_HND_TYPE(info[n])) {
-      case PA_RESOURCE:
-        if (PA_HND_ARG(info[n]) == 0) {
-          root_resource.reset(take_handle(n));
-        }
-        break;
-
       case PA_IOPORT_RESOURCE:
         ioport_resource.reset(take_handle(n));
         break;
@@ -151,11 +137,6 @@ extern "C" [[gnu::retain]] __EXPORT void __libc_extensions_init(uint32_t count,
         break;
       }
     }
-  }
-
-  if (!root_resource.is_valid()) {
-    zx_debug_write(kMissingRootResource.data(), kMissingRootResource.size());
-    __builtin_trap();
   }
 
   // Eagerly write a message. This ensures that every standalone test links

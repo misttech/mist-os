@@ -30,10 +30,6 @@
                 target_monikers: [
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -44,10 +40,6 @@
                 target_monikers: [
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -277,9 +269,6 @@
                 source_name: "fuchsia.kernel.VmexResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/42073035): Remove once merkle verification happens
-                    // out-of-process.
-                    "/bootstrap/fshost/fxfs",
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
@@ -604,10 +593,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/cr50_agent",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
 
@@ -622,10 +607,6 @@
                     "/bootstrap/cr50_agent",
                     "/bootstrap/console-launcher",
                     "/bootstrap/paver",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {

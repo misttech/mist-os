@@ -53,6 +53,7 @@ config("cpp_base.headers") {
 if (is_fuchsia) {
   sdk_source_set("cpp") {
     category = "partner"
+    stable = true
 
     # TODO(https://fxbug.dev/42055960): Rename SDK element to "fidl_cpp".
     api = "fidl_cpp_v2.api"
@@ -90,6 +91,7 @@ if (is_fuchsia) {
 # The support header for HLCPP / Natural conversion
 sdk_source_set("hlcpp_conversion") {
   category = "partner"
+  stable = true
   api = "fidl_cpp_hlcpp_conversion.api"
   sdk_name = "fidl_cpp_hlcpp_conversion"
   public = [ "include/lib/fidl/cpp/hlcpp_conversion.h" ]
@@ -103,6 +105,7 @@ sdk_source_set("hlcpp_conversion") {
 # The support header for Natural type printing
 sdk_source_set("natural_ostream") {
   category = "partner"
+  stable = true
   api = "fidl_cpp_natural_ostream.api"
   sdk_name = "fidl_cpp_natural_ostream"
   public = [ "include/lib/fidl/cpp/natural_ostream.h" ]

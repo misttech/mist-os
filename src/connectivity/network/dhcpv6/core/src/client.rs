@@ -22,7 +22,7 @@ use std::{
 use tracing::{debug, info, warn};
 use zerocopy::ByteSlice;
 
-use crate::{Instant, InstantExt as _};
+use crate::{ClientDuid, Instant, InstantExt as _};
 
 /// Initial Information-request timeout `INF_TIMEOUT` from [RFC 8415, Section 7.6].
 ///
@@ -70,11 +70,6 @@ const ADVERTISE_MAX_PREFERENCE: u8 = std::u8::MAX;
 ///
 /// [RFC 8415, Section 21.9]: https://tools.ietf.org/html/rfc8415#section-21.9
 const ELAPSED_TIME_DENOMINATOR: u128 = 10;
-
-/// The length of the [Client Identifier].
-///
-/// [Client Identifier]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.2
-const CLIENT_ID_LEN: usize = 18;
 
 /// The minimum value for the randomization factor `RAND` used in calculating
 /// retransmission timeout, as specified in [RFC 8415, Section 15].
@@ -964,7 +959,7 @@ enum OptionsError {
     #[error("missing Client Id option")]
     MissingClientId,
     #[error("got Client ID option {got:?} but want {want:?}")]
-    MismatchedClientId { got: Vec<u8>, want: [u8; CLIENT_ID_LEN] },
+    MismatchedClientId { got: Vec<u8>, want: Vec<u8> },
     #[error("unexpected Client ID in Reply to anonymous Information-Request: {0:?}")]
     UnexpectedClientId(Vec<u8>),
     // TODO(https://fxbug.dev/42055437): Use an owned option type rather
@@ -1044,7 +1039,7 @@ impl<V> IaChecker for HashMap<v6::IAID, V> {
 fn process_options<B: ByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>(
     msg: &v6::Message<'_, B>,
     exchange_type: ExchangeType,
-    want_client_id: Option<[u8; CLIENT_ID_LEN]>,
+    want_client_id: Option<&[u8]>,
     iana_checker: &IaNaChecker,
     iapd_checker: &IaPdChecker,
 ) -> Result<ProcessedOptions, OptionsError> {
@@ -1442,10 +1437,13 @@ fn process_options<B: ByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>
     match (client_id_option, want_client_id) {
         (None, None) => {}
         (Some(got), None) => return Err(OptionsError::UnexpectedClientId(got)),
-        (None, Some::<[u8; CLIENT_ID_LEN]>(_)) => return Err(OptionsError::MissingClientId),
+        (None, Some::<&[u8]>(_)) => return Err(OptionsError::MissingClientId),
         (Some(got), Some(want)) => {
             if got != want {
-                return Err(OptionsError::MismatchedClientId { want, got });
+                return Err(OptionsError::MismatchedClientId {
+                    want: want.to_vec(),
+                    got: got.to_vec(),
+                });
             }
         }
     }
@@ -1657,7 +1655,7 @@ struct ServerDiscovery<I> {
     /// communication with servers.
     ///
     /// [Client Identifier]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.2
-    client_id: [u8; CLIENT_ID_LEN],
+    client_id: ClientDuid,
     /// The non-temporary addresses the client is configured to negotiate.
     configured_non_temporary_addresses: HashMap<v6::IAID, HashSet<Ipv6Addr>>,
     /// The delegated prefixes the client is configured to negotiate.
@@ -1688,7 +1686,7 @@ impl<I: Instant> ServerDiscovery<I> {
     /// [RFC 8415, Section 18.2.1]: https://datatracker.ietf.org/doc/html/rfc8415#section-18.2.1
     fn start<R: Rng>(
         transaction_id: [u8; 3],
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: ClientDuid,
         configured_non_temporary_addresses: HashMap<v6::IAID, HashSet<Ipv6Addr>>,
         configured_delegated_prefixes: HashMap<v6::IAID, HashSet<Subnet<Ipv6Addr>>>,
         options_to_request: &[v6::OptionCode],
@@ -1940,7 +1938,7 @@ impl<I: Instant> ServerDiscovery<I> {
         let ProcessedOptions { server_id, solicit_max_rt_opt, result } = match process_options(
             &msg,
             ExchangeType::AdvertiseToSolicit,
-            Some(client_id),
+            Some(&client_id),
             &configured_non_temporary_addresses,
             &configured_delegated_prefixes,
         ) {
@@ -2278,7 +2276,7 @@ struct Requesting<I> {
     ///
     /// [Client Identifier]:
     /// https://datatracker.ietf.org/doc/html/rfc8415#section-21.2
-    client_id: [u8; CLIENT_ID_LEN],
+    client_id: ClientDuid,
     /// The non-temporary addresses negotiated by the client.
     non_temporary_addresses: HashMap<v6::IAID, AddressEntry<I>>,
     /// The delegated prefixes negotiated by the client.
@@ -2929,7 +2927,7 @@ pub struct IaUpdate<V> {
 //
 // If an error is returned, the message should be ignored.
 fn process_reply_with_leases<B: ByteSlice, I: Instant>(
-    client_id: [u8; CLIENT_ID_LEN],
+    client_id: &[u8],
     server_id: &[u8],
     current_non_temporary_addresses: &HashMap<v6::IAID, AddressEntry<I>>,
     current_delegated_prefixes: &HashMap<v6::IAID, PrefixEntry<I>>,
@@ -3238,7 +3236,7 @@ impl<I: Instant> Requesting<I> {
     ///
     /// [RFC 8415, Section 18.2.2]: https://tools.ietf.org/html/rfc8415#section-18.2.2
     fn start<R: Rng>(
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: ClientDuid,
         server_id: Vec<u8>,
         non_temporary_addresses: HashMap<v6::IAID, AddressEntry<I>>,
         delegated_prefixes: HashMap<v6::IAID, PrefixEntry<I>>,
@@ -3493,7 +3491,7 @@ impl<I: Instant> Requesting<I> {
             actions,
             next_state,
         } = match process_reply_with_leases(
-            client_id,
+            &client_id,
             &server_id,
             &current_non_temporary_addresses,
             &current_delegated_prefixes,
@@ -3898,7 +3896,7 @@ struct Assigned<I> {
     /// communication with servers.
     ///
     /// [Client Identifier]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.2
-    client_id: [u8; CLIENT_ID_LEN],
+    client_id: ClientDuid,
     /// The non-temporary addresses negotiated by the client.
     non_temporary_addresses: HashMap<v6::IAID, AddressEntry<I>>,
     /// The delegated prefixes negotiated by the client.
@@ -3917,7 +3915,7 @@ struct Assigned<I> {
 }
 
 fn restart_server_discovery<R: Rng, I: Instant>(
-    client_id: [u8; CLIENT_ID_LEN],
+    client_id: ClientDuid,
     non_temporary_addresses: HashMap<v6::IAID, AddressEntry<I>>,
     delegated_prefixes: HashMap<v6::IAID, PrefixEntry<I>>,
     dns_servers: Vec<Ipv6Addr>,
@@ -4151,7 +4149,7 @@ impl<I: Instant> Renewing<I> {
 struct RenewingOrRebindingInner<I> {
     /// [Client Identifier](https://datatracker.ietf.org/doc/html/rfc8415#section-21.2)
     /// used for uniquely identifying the client in communication with servers.
-    client_id: [u8; CLIENT_ID_LEN],
+    client_id: ClientDuid,
     /// The non-temporary addresses negotiated by the client.
     non_temporary_addresses: HashMap<v6::IAID, AddressEntry<I>>,
     /// The delegated prefixes negotiated by the client.
@@ -4193,7 +4191,7 @@ impl<I: Instant, const IS_REBINDING: bool> RenewingOrRebinding<I, IS_REBINDING> 
     /// [RFC 8415, Section 18.2.4]: https://tools.ietf.org/html/rfc8415#section-18.2.4
     /// [RFC 8415, Section 18.2.5]: https://tools.ietf.org/html/rfc8415#section-18.2.5
     fn start<R: Rng>(
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: ClientDuid,
         non_temporary_addresses: HashMap<v6::IAID, AddressEntry<I>>,
         delegated_prefixes: HashMap<v6::IAID, PrefixEntry<I>>,
         server_id: Vec<u8>,
@@ -4387,7 +4385,7 @@ impl<I: Instant, const IS_REBINDING: bool> RenewingOrRebinding<I, IS_REBINDING> 
             actions,
             next_state,
         } = match process_reply_with_leases(
-            client_id,
+            &client_id,
             &server_id,
             &current_non_temporary_addresses,
             &current_delegated_prefixes,
@@ -4918,7 +4916,7 @@ impl<I: Instant, R: Rng> ClientStateMachine<I, R> {
     /// [RFC 8415, Section 6.3]: https://tools.ietf.org/html/rfc8415#section-6.3
     pub fn start_stateful(
         transaction_id: [u8; 3],
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: ClientDuid,
         configured_non_temporary_addresses: HashMap<v6::IAID, HashSet<Ipv6Addr>>,
         configured_delegated_prefixes: HashMap<v6::IAID, HashSet<Subnet<Ipv6Addr>>>,
         options_to_request: Vec<v6::OptionCode>,
@@ -5164,7 +5162,7 @@ pub(crate) mod testutil {
 
     pub(super) fn assert_server_discovery(
         state: &Option<ClientState<Instant>>,
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &[u8],
         configured_non_temporary_addresses: HashMap<v6::IAID, HashSet<Ipv6Addr>>,
         configured_delegated_prefixes: HashMap<v6::IAID, HashSet<Subnet<Ipv6Addr>>>,
         first_solicit_time: Instant,
@@ -5183,7 +5181,7 @@ pub(crate) mod testutil {
                 collected_advertise,
                 collected_sol_max_rt,
             })) => {
-                assert_eq!(got_client_id, &client_id);
+                assert_eq!(got_client_id, client_id);
                 assert_eq!(
                     got_configured_non_temporary_addresses,
                     &configured_non_temporary_addresses,
@@ -5205,7 +5203,7 @@ pub(crate) mod testutil {
         assert_outgoing_stateful_message(
             buf,
             v6::MessageType::Solicit,
-            &client_id,
+            client_id,
             None,
             &options_to_request,
             &configured_non_temporary_addresses,
@@ -5222,7 +5220,7 @@ pub(crate) mod testutil {
     /// Returns the client in ServerDiscovery state.
     pub(crate) fn start_and_assert_server_discovery<R: Rng + std::fmt::Debug>(
         transaction_id: [u8; 3],
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &ClientDuid,
         configured_non_temporary_addresses: HashMap<v6::IAID, HashSet<Ipv6Addr>>,
         configured_delegated_prefixes: HashMap<v6::IAID, HashSet<Subnet<Ipv6Addr>>>,
         options_to_request: Vec<v6::OptionCode>,
@@ -5543,7 +5541,7 @@ pub(crate) mod testutil {
     /// parsed or does not contain the expected options, or the Requesting state
     /// is incorrect.
     pub(super) fn request_and_assert<R: Rng + std::fmt::Debug>(
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &ClientDuid,
         server_id: [u8; TEST_SERVER_ID_LEN],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
         delegated_prefixes_to_assign: Vec<TestIaPd>,
@@ -5573,7 +5571,7 @@ pub(crate) mod testutil {
         };
         let mut client = testutil::start_and_assert_server_discovery(
             transaction_id.clone(),
-            client_id.clone(),
+            client_id,
             configured_non_temporary_addresses.clone(),
             configured_delegated_prefixes.clone(),
             options_to_request.clone(),
@@ -5631,7 +5629,7 @@ pub(crate) mod testutil {
                 delegated_prefixes: _,
                 first_request_time: _,
             } = assert_matches!(&state, Some(ClientState::Requesting(requesting)) => requesting);
-            assert_eq!(*got_client_id, client_id);
+            assert_eq!(got_client_id, client_id);
             assert_eq!(*got_server_id, server_id);
             assert!(
                 collected_advertise.is_empty(),
@@ -5654,7 +5652,7 @@ pub(crate) mod testutil {
     ///
     /// `assign_and_assert` panics if assignment fails.
     pub(super) fn assign_and_assert<R: Rng + std::fmt::Debug>(
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &ClientDuid,
         server_id: [u8; TEST_SERVER_ID_LEN],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
         delegated_prefixes_to_assign: Vec<TestIaPd>,
@@ -5663,7 +5661,7 @@ pub(crate) mod testutil {
         now: Instant,
     ) -> (ClientStateMachine<Instant, R>, Actions<Instant>) {
         let (mut client, transaction_id) = testutil::request_and_assert(
-            client_id.clone(),
+            client_id,
             server_id.clone(),
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
@@ -5739,7 +5737,7 @@ pub(crate) mod testutil {
             &state,
             Some(ClientState::Assigned(assigned)) => assigned
         );
-        assert_eq!(*got_client_id, client_id);
+        assert_eq!(got_client_id, client_id);
         assert_eq!(non_temporary_addresses, &expected_non_temporary_addresses);
         assert_eq!(delegated_prefixes, &expected_delegated_prefixes);
         assert_eq!(*got_server_id, server_id);
@@ -5770,7 +5768,7 @@ pub(crate) mod testutil {
     pub(crate) fn assert_outgoing_stateful_message(
         mut buf: &[u8],
         expected_msg_type: v6::MessageType,
-        expected_client_id: &[u8; CLIENT_ID_LEN],
+        expected_client_id: &[u8],
         expected_server_id: Option<&[u8; TEST_SERVER_ID_LEN]>,
         expected_oro: &[v6::OptionCode],
         expected_non_temporary_addresses: &HashMap<v6::IAID, HashSet<Ipv6Addr>>,
@@ -5881,7 +5879,7 @@ pub(crate) mod testutil {
     /// `send_renew_and_assert` panics if assignment fails, or if sending a
     /// renew fails.
     pub(super) fn send_renew_and_assert<R: Rng + std::fmt::Debug>(
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &ClientDuid,
         server_id: [u8; TEST_SERVER_ID_LEN],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
         delegated_prefixes_to_assign: Vec<TestIaPd>,
@@ -5894,7 +5892,7 @@ pub(crate) mod testutil {
     ) -> ClientStateMachine<Instant, R> {
         let expected_dns_servers_as_slice = expected_dns_servers.unwrap_or(&[]);
         let (client, actions) = testutil::assign_and_assert(
-            client_id.clone(),
+            client_id,
             server_id.clone(),
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
@@ -5982,7 +5980,7 @@ pub(crate) mod testutil {
 
         handle_renew_or_rebind_timer(
             client,
-            client_id,
+            &client_id,
             server_id,
             non_temporary_addresses_to_assign,
             delegated_prefixes_to_assign,
@@ -6029,7 +6027,7 @@ pub(crate) mod testutil {
 
     pub(super) fn handle_renew_or_rebind_timer<R: Rng>(
         mut client: ClientStateMachine<Instant, R>,
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &[u8],
         server_id: [u8; TEST_SERVER_ID_LEN],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
         delegated_prefixes_to_assign: Vec<TestIaPd>,
@@ -6067,7 +6065,7 @@ pub(crate) mod testutil {
             start_time: _,
             retrans_timeout: _,
         } = with_state(state);
-        assert_eq!(*got_client_id, client_id);
+        assert_eq!(got_client_id, client_id);
         assert_eq!(*got_server_id, server_id);
         assert_eq!(dns_servers, expected_dns_servers_as_slice);
         assert_eq!(*solicit_max_rt, MAX_SOLICIT_TIMEOUT);
@@ -6090,7 +6088,7 @@ pub(crate) mod testutil {
         testutil::assert_outgoing_stateful_message(
             &buf,
             message_type,
-            &client_id,
+            client_id,
             expect_server_id.then(|| &server_id),
             expected_oro,
             &expected_addresses_to_renew,
@@ -6109,7 +6107,7 @@ pub(crate) mod testutil {
     /// `send_rebind_and_assert` panics if assignmentment fails, or if sending a
     /// rebind fails.
     pub(super) fn send_rebind_and_assert<R: Rng + std::fmt::Debug>(
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &ClientDuid,
         server_id: [u8; TEST_SERVER_ID_LEN],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
         delegated_prefixes_to_assign: Vec<TestIaPd>,
@@ -6141,7 +6139,7 @@ pub(crate) mod testutil {
 
         handle_renew_or_rebind_timer(
             client,
-            client_id,
+            &client_id,
             server_id,
             non_temporary_addresses_to_assign,
             delegated_prefixes_to_assign,
@@ -6370,7 +6368,7 @@ mod tests {
         // The client is checked inside `start_and_assert_server_discovery`.
         let _client = testutil::start_and_assert_server_discovery(
             [0, 1, 2],
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 address_count,
                 preferred_non_temporary_addresses.into_iter().map(|a| HashSet::from([a])),
@@ -6534,7 +6532,6 @@ mod tests {
     #[test_case(v6::DhcpOption::SolMaxRt(*VALID_MAX_SOLICIT_TIMEOUT_RANGE.end()); "sol_max_rt")]
     #[test_case(v6::DhcpOption::DnsServers(&DNS_SERVERS); "dns_servers")]
     fn process_options_duplicates<'a>(opt: v6::DhcpOption<'a>) {
-        let client_id = v6::duid_uuid();
         let iana_options = [v6::DhcpOption::IaAddr(v6::IaAddrSerializer::new(
             CONFIGURED_NON_TEMPORARY_ADDRESSES[0],
             60,
@@ -6562,7 +6559,7 @@ mod tests {
             process_options(
                 &msg,
                 ExchangeType::AdvertiseToSolicit,
-                Some(client_id),
+                Some(&CLIENT_ID),
                 &requested_ia_nas,
                 &NoIaRequested
             ),
@@ -6679,7 +6676,7 @@ mod tests {
         let (first_lifetimes, second_lifetimes) = check(process_options(
             &msg,
             ExchangeType::AdvertiseToSolicit,
-            Some(CLIENT_ID),
+            Some(&CLIENT_ID),
             &requested_ia_nas,
             &NoIaRequested,
         ));
@@ -6758,7 +6755,7 @@ mod tests {
         let requested_ia_nas = HashMap::from([(iaid1, None::<Ipv6Addr>), (iaid2, None)]);
         let requested_ia_pds = HashMap::from([(iaid1, None::<Subnet<Ipv6Addr>>), (iaid2, None)]);
         assert_matches!(
-            process_options(&msg, ExchangeType::AdvertiseToSolicit, Some(CLIENT_ID), &requested_ia_nas, &requested_ia_pds),
+            process_options(&msg, ExchangeType::AdvertiseToSolicit, Some(&CLIENT_ID), &requested_ia_nas, &requested_ia_pds),
             Ok(ProcessedOptions {
                 server_id: _,
                 solicit_max_rt_opt: _,
@@ -6815,7 +6812,7 @@ mod tests {
         let msg = v6::Message::parse(&mut buf, ()).expect("failed to parse test buffer");
         let requested_ia_nas = HashMap::from([(iaid, None::<Ipv6Addr>)]);
         assert_matches!(
-            process_options(&msg, ExchangeType::AdvertiseToSolicit, Some(CLIENT_ID), &requested_ia_nas, &NoIaRequested),
+            process_options(&msg, ExchangeType::AdvertiseToSolicit, Some(&CLIENT_ID), &requested_ia_nas, &NoIaRequested),
             Err(OptionsError::DuplicateIaNaId(got_iaid, _, _)) if got_iaid == iaid
         );
     }
@@ -6832,7 +6829,7 @@ mod tests {
             process_options(
                 &msg,
                 ExchangeType::AdvertiseToSolicit,
-                Some(CLIENT_ID),
+                Some(&CLIENT_ID),
                 &NoIaRequested,
                 &NoIaRequested
             ),
@@ -6852,7 +6849,7 @@ mod tests {
             process_options(
                 &msg,
                 ExchangeType::AdvertiseToSolicit,
-                Some(CLIENT_ID),
+                Some(&CLIENT_ID),
                 &NoIaRequested,
                 &NoIaRequested
             ),
@@ -6872,7 +6869,7 @@ mod tests {
         let mut buf = &buf[..]; // Implements BufferView.
         let msg = v6::Message::parse(&mut buf, ()).expect("failed to parse test buffer");
         assert_matches!(
-            process_options(&msg, ExchangeType::AdvertiseToSolicit, Some(CLIENT_ID), &NoIaRequested, &NoIaRequested),
+            process_options(&msg, ExchangeType::AdvertiseToSolicit, Some(&CLIENT_ID), &NoIaRequested, &NoIaRequested),
             Err(OptionsError::MismatchedClientId { got, want })
                 if got[..] == MISMATCHED_CLIENT_ID && want == CLIENT_ID
         );
@@ -6931,7 +6928,7 @@ mod tests {
         let mut buf = &buf[..]; // Implements BufferView.
         let msg = v6::Message::parse(&mut buf, ()).expect("failed to parse test buffer");
         assert_matches!(
-            process_options(&msg, exchange_type, Some(CLIENT_ID), &NoIaRequested, &NoIaRequested),
+            process_options(&msg, exchange_type, Some(&CLIENT_ID), &NoIaRequested, &NoIaRequested),
             Err(OptionsError::InvalidOption(_))
         );
     }
@@ -7032,7 +7029,7 @@ mod tests {
             let mut solicit_max_rt = MAX_SOLICIT_TIMEOUT;
             let time = Instant::now();
             check_res(process_reply_with_leases(
-                CLIENT_ID,
+                &CLIENT_ID,
                 &SERVER_ID[0],
                 &assigned_addresses(time),
                 &assigned_prefixes(time),
@@ -7049,7 +7046,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             [0, 1, 2],
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 1,
                 std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
@@ -7128,7 +7125,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             [0, 1, 2],
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 2,
                 std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
@@ -7256,7 +7253,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             transaction_id,
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 1,
                 std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
@@ -7333,7 +7330,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             [0, 1, 2],
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 1,
                 std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
@@ -7434,7 +7431,7 @@ mod tests {
     #[test]
     fn send_request() {
         let (mut _client, _transaction_id) = testutil::request_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             CONFIGURED_NON_TEMPORARY_ADDRESSES.into_iter().map(TestIaNa::new_default).collect(),
             CONFIGURED_DELEGATED_PREFIXES.into_iter().map(TestIaPd::new_default).collect(),
@@ -7475,7 +7472,7 @@ mod tests {
 
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
-            CLIENT_ID,
+            CLIENT_ID.into(),
             SERVER_ID[0].to_vec(),
             advertise_to_ia_entries(
                 testutil::to_default_ias_map(&advertised_non_temporary_addresses),
@@ -7678,7 +7675,7 @@ mod tests {
 
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
-            CLIENT_ID,
+            CLIENT_ID.into(),
             SERVER_ID[0].to_vec(),
             advertise_to_ia_entries(
                 testutil::to_default_ias_map(&CONFIGURED_NON_TEMPORARY_ADDRESSES[0..2]),
@@ -7809,7 +7806,7 @@ mod tests {
 
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
-            CLIENT_ID,
+            CLIENT_ID.into(),
             SERVER_ID[0].to_vec(),
             advertise_to_ia_entries(
                 testutil::to_default_ias_map(&CONFIGURED_NON_TEMPORARY_ADDRESSES[0..1]),
@@ -7942,7 +7939,7 @@ mod tests {
         ] {
             let time = Instant::now();
             let Transition { state, actions: _, transaction_id } = Requesting::start(
-                CLIENT_ID,
+                CLIENT_ID.into(),
                 SERVER_ID[0].to_vec(),
                 advertise_to_ia_entries(
                     testutil::to_default_ias_map(&CONFIGURED_NON_TEMPORARY_ADDRESSES[0..2]),
@@ -8075,7 +8072,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             transaction_id,
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 CONFIGURED_NON_TEMPORARY_ADDRESSES.len(),
                 CONFIGURED_NON_TEMPORARY_ADDRESSES.map(|a| HashSet::from([a])),
@@ -8242,7 +8239,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             transaction_id,
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 1,
                 std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
@@ -8452,7 +8449,7 @@ mod tests {
     fn assignment() {
         let now = Instant::now();
         let (client, actions) = testutil::assign_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             CONFIGURED_NON_TEMPORARY_ADDRESSES[0..2]
                 .iter()
@@ -8527,7 +8524,7 @@ mod tests {
     fn assigned_get_dns_servers() {
         let now = Instant::now();
         let (client, actions) = testutil::assign_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(), /* delegated_prefixes_to_assign */
@@ -8576,7 +8573,7 @@ mod tests {
         let mut rng = StepRng::new(u64::MAX / 2, 0);
         let time = Instant::now();
         let Transition { state, actions: _, transaction_id } = Requesting::start(
-            CLIENT_ID,
+            CLIENT_ID.into(),
             SERVER_ID[0].to_vec(),
             advertise_to_ia_entries(
                 testutil::to_default_ias_map(&CONFIGURED_NON_TEMPORARY_ADDRESSES[0..1]),
@@ -8723,7 +8720,7 @@ mod tests {
 
     struct RenewRebindTest {
         send_and_assert: fn(
-            [u8; CLIENT_ID_LEN],
+            &ClientDuid,
             [u8; TEST_SERVER_ID_LEN],
             Vec<TestIaNa>,
             Vec<TestIaPd>,
@@ -8826,7 +8823,7 @@ mod tests {
         RenewRebindSendTestCase { ia_nas, ia_pds }: RenewRebindSendTestCase,
     ) {
         let _client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             ia_nas,
             ia_pds,
@@ -8851,7 +8848,7 @@ mod tests {
         }: RenewRebindTest,
     ) {
         let client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             CONFIGURED_NON_TEMPORARY_ADDRESSES[0..2]
                 .into_iter()
@@ -9016,7 +9013,7 @@ mod tests {
         let iapd = vec![iapd];
         let now = Instant::now();
         let (client, actions) = testutil::assign_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             iana.clone(),
             iapd.clone(),
@@ -9056,7 +9053,7 @@ mod tests {
         let _client = if let Some(next_timer) = next_timer {
             handle_renew_or_rebind_timer(
                 client,
-                CLIENT_ID,
+                &CLIENT_ID,
                 SERVER_ID[0],
                 iana,
                 iapd,
@@ -9091,7 +9088,7 @@ mod tests {
             .collect::<Vec<_>>();
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
@@ -9141,7 +9138,7 @@ mod tests {
                 start_time: _,
                 retrans_timeout: _,
             } = with_state(state);
-            assert_eq!(client_id, &CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
             assert_eq!(server_id[..], SERVER_ID[0]);
             assert_eq!(dns_servers, &[] as &[Ipv6Addr]);
             assert_eq!(*solicit_max_rt, MAX_SOLICIT_TIMEOUT);
@@ -9235,7 +9232,7 @@ mod tests {
     ) {
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             original_server_id.clone(),
             ia_nas.clone(),
             ia_pds.clone(),
@@ -9364,7 +9361,7 @@ mod tests {
                 solicit_max_rt,
                 _marker,
             })) => {
-                assert_eq!(client_id, &CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
                 assert_eq!(non_temporary_addresses, &expected_non_temporary_addresses);
                 assert_eq!(delegated_prefixes, &expected_delegated_prefixes);
                 assert_eq!(server_id.as_slice(), reply_server_id);
@@ -9435,7 +9432,7 @@ mod tests {
         let addr = CONFIGURED_NON_TEMPORARY_ADDRESSES[0];
         let prefix = CONFIGURED_DELEGATED_PREFIXES[0];
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             vec![TestIaNa::new_default(addr)],
             vec![TestIaPd::new_default(prefix)],
@@ -9487,7 +9484,7 @@ mod tests {
             retrans_timeout: _,
             solicit_max_rt: got_sol_max_rt,
         } = with_state(state);
-        assert_eq!(*client_id, CLIENT_ID);
+        assert_eq!(client_id.as_slice(), &CLIENT_ID);
         fn expected_values<V: IaValue>(
             value: V,
             time: Instant,
@@ -9570,7 +9567,7 @@ mod tests {
         let delegated_prefixes = &CONFIGURED_DELEGATED_PREFIXES[0..2];
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             non_temporary_addresses.iter().copied().map(TestIaNa::new_default).collect(),
             delegated_prefixes.iter().copied().map(TestIaPd::new_default).collect(),
@@ -9625,7 +9622,7 @@ mod tests {
                 retrans_timeout: _,
                 solicit_max_rt,
             } = with_state(state);
-            assert_eq!(*client_id, CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
             fn expected_values<V: IaValue>(
                 values: &[V],
                 present_iaids: Vec<v6::IAID>,
@@ -9688,7 +9685,7 @@ mod tests {
 
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             CONFIGURED_NON_TEMPORARY_ADDRESSES.iter().copied().map(TestIaNa::new_default).collect(),
             CONFIGURED_DELEGATED_PREFIXES.iter().copied().map(TestIaPd::new_default).collect(),
@@ -9777,7 +9774,7 @@ mod tests {
                 solicit_max_rt,
                 _marker,
             })) => {
-                assert_eq!(client_id, &CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
                 fn expected_values<V: IaValueTestExt>(
                     without_value: v6::IAID,
                     time: Instant,
@@ -9883,7 +9880,7 @@ mod tests {
 
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             CONFIGURED_NON_TEMPORARY_ADDRESSES.iter().copied().map(TestIaNa::new_default).collect(),
             CONFIGURED_DELEGATED_PREFIXES.iter().copied().map(TestIaPd::new_default).collect(),
@@ -9964,7 +9961,7 @@ mod tests {
                 solicit_max_rt,
                 _marker,
             })) => {
-                assert_eq!(client_id, &CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
                 fn expected_values<V: IaValueTestExt>(
                     zero_lifetime_iaid: v6::IAID,
                     time: Instant,
@@ -10069,7 +10066,7 @@ mod tests {
     ) {
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             vec![TestIaPd::new_default(CONFIGURED_DELEGATED_PREFIXES[0])],
@@ -10124,7 +10121,7 @@ mod tests {
                 solicit_max_rt,
                 _marker,
             })) => {
-                assert_eq!(client_id, &CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
                 fn calc_expected<V: IaValue>(
                     iaid: v6::IAID,
                     time: Instant,
@@ -10306,7 +10303,7 @@ mod tests {
         let non_temporary_addresses_to_assign = to_assign::<Ipv6Addr>();
         let delegated_prefixes_to_assign = to_assign::<Subnet<Ipv6Addr>>();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
@@ -10400,7 +10397,7 @@ mod tests {
                 &state,
                 Some(ClientState::Requesting(requesting)) => requesting
             );
-            assert_eq!(*client_id, CLIENT_ID);
+            assert_eq!(client_id.as_slice(), &CLIENT_ID);
             fn expected_values<V: IaValueTestExt>(
                 no_binding: bool,
                 time: Instant,
@@ -10469,7 +10466,7 @@ mod tests {
         // all addresses may be invalidated.
         handle_all_leases_invalidated(
             client,
-            CLIENT_ID,
+            &CLIENT_ID,
             non_temporary_addresses_to_assign,
             delegated_prefixes_to_assign,
             ia_na_no_binding.then_some(NO_BINDING_IA_IDX),
@@ -10608,7 +10605,7 @@ mod tests {
     ) {
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             CONFIGURED_NON_TEMPORARY_ADDRESSES.into_iter().map(TestIaNa::new_default).collect(),
             CONFIGURED_DELEGATED_PREFIXES.into_iter().map(TestIaPd::new_default).collect(),
@@ -10881,7 +10878,7 @@ mod tests {
         let time = Instant::now();
         let mut client = testutil::start_and_assert_server_discovery(
             [0, 1, 2],
-            v6::duid_uuid(),
+            &(CLIENT_ID.into()),
             testutil::to_configured_addresses(
                 1,
                 std::iter::once(HashSet::from([CONFIGURED_NON_TEMPORARY_ADDRESSES[0]])),
@@ -10901,7 +10898,7 @@ mod tests {
     fn requesting_refresh_timeout_is_unreachable() {
         let time = Instant::now();
         let (mut client, _transaction_id) = testutil::request_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(),
@@ -10920,7 +10917,7 @@ mod tests {
     fn address_assiged_unexpected_timeout_is_unreachable(timeout: ClientTimerType) {
         let time = Instant::now();
         let (mut client, _actions) = testutil::assign_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(), /* delegated_prefixes_to_assign */
@@ -10948,7 +10945,7 @@ mod tests {
     ) {
         let time = Instant::now();
         let mut client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             vec![TestIaNa::new_default(CONFIGURED_NON_TEMPORARY_ADDRESSES[0])],
             Default::default(), /* delegated_prefixes_to_assign */
@@ -10966,7 +10963,7 @@ mod tests {
 
     fn handle_all_leases_invalidated<R: Rng>(
         mut client: ClientStateMachine<Instant, R>,
-        client_id: [u8; CLIENT_ID_LEN],
+        client_id: &[u8],
         non_temporary_addresses_to_assign: Vec<TestIaNa>,
         delegated_prefixes_to_assign: Vec<TestIaPd>,
         skip_removed_event_for_test_iana_idx: Option<usize>,
@@ -11061,7 +11058,7 @@ mod tests {
             .map(TestIaPd::new_default)
             .collect::<Vec<_>>();
         let (client, _actions) = testutil::assign_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
@@ -11072,7 +11069,7 @@ mod tests {
 
         handle_all_leases_invalidated(
             client,
-            CLIENT_ID,
+            &CLIENT_ID,
             non_temporary_addresses_to_assign,
             delegated_prefixes_to_assign,
             None,
@@ -11101,7 +11098,7 @@ mod tests {
             .map(|&addr| TestIaPd::new_default(addr))
             .collect::<Vec<_>>();
         let client = send_and_assert(
-            CLIENT_ID,
+            &(CLIENT_ID.into()),
             SERVER_ID[0],
             non_temporary_addresses_to_assign.clone(),
             delegated_prefixes_to_assign.clone(),
@@ -11115,7 +11112,7 @@ mod tests {
 
         handle_all_leases_invalidated(
             client,
-            CLIENT_ID,
+            &CLIENT_ID,
             non_temporary_addresses_to_assign,
             delegated_prefixes_to_assign,
             None,

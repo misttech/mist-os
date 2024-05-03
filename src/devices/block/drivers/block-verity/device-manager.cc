@@ -15,11 +15,11 @@
 #include <zircon/status.h>
 
 #include <memory>
+#include <mutex>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <fbl/macros.h>
 
 #include "src/devices/block/drivers/block-verity/config.h"
@@ -67,7 +67,7 @@ zx_status_t DeviceManager::Create(void* ctx, zx_device_t* parent) {
 
 zx_status_t DeviceManager::Bind() {
   zx_status_t rc;
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   if ((rc = DdkAdd(ddk::DeviceAddArgs("verity").set_flags(DEVICE_ADD_NON_BINDABLE))) != ZX_OK) {
     zxlogf(ERROR, "failed to add verity device: %s", zx_status_get_string(rc));
@@ -80,7 +80,7 @@ zx_status_t DeviceManager::Bind() {
 }
 
 void DeviceManager::DdkUnbind(ddk::UnbindTxn txn) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   // Mark the device as getting-removed, so we refuse all other FIDL calls.
   state_ = kRemoved;
 
@@ -91,7 +91,7 @@ void DeviceManager::DdkUnbind(ddk::UnbindTxn txn) {
 void DeviceManager::DdkRelease() { delete this; }
 
 void DeviceManager::DdkChildPreRelease(void* child_ctx) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
 
   switch (state_) {
     case kAuthoring:
@@ -156,7 +156,7 @@ void DeviceManager::DdkChildPreRelease(void* child_ctx) {
 
 void DeviceManager::OpenForWrite(OpenForWriteRequestView request,
                                  OpenForWriteCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   auto async_completer = completer.ToAsync();
   if (state_ != kClosed) {
     async_completer.ReplyError(ZX_ERR_BAD_STATE);
@@ -210,7 +210,7 @@ void DeviceManager::OpenForWrite(OpenForWriteRequestView request,
 }
 
 void DeviceManager::CloseAndGenerateSeal(CloseAndGenerateSealCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   auto async_completer = completer.ToAsync();
   fuchsia_hardware_block_verified::wire::Seal seal;
   if (state_ != kAuthoring) {
@@ -229,7 +229,7 @@ void DeviceManager::CloseAndGenerateSeal(CloseAndGenerateSealCompleter::Sync& co
 }
 
 void DeviceManager::OnSealCompleted(zx_status_t status, const uint8_t* seal_buf, size_t seal_len) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   ZX_ASSERT(state_ == kSealing);
   ZX_ASSERT(seal_completer_.has_value());
   ZX_ASSERT(seal_len == 32);
@@ -255,7 +255,7 @@ void DeviceManager::OnSealCompleted(zx_status_t status, const uint8_t* seal_buf,
 
 void DeviceManager::OnSuperblockVerificationCompleted(zx_status_t status,
                                                       const Superblock* superblock) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   ZX_ASSERT(state_ == kVerifiedReadCheck);
   ZX_ASSERT(open_for_verified_read_completer_.has_value());
 
@@ -323,7 +323,7 @@ void DeviceManager::CompleteOpenForVerifiedRead(zx_status_t status) {
 
 void DeviceManager::OpenForVerifiedRead(OpenForVerifiedReadRequestView request,
                                         OpenForVerifiedReadCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   auto async_completer = completer.ToAsync();
   if (state_ != kClosed) {
     async_completer.ReplyError(ZX_ERR_BAD_STATE);
@@ -357,7 +357,7 @@ void DeviceManager::OpenForVerifiedRead(OpenForVerifiedReadRequestView request,
 }
 
 void DeviceManager::Close(CloseCompleter::Sync& completer) {
-  fbl::AutoLock lock(&mtx_);
+  std::lock_guard<std::mutex> lock(mtx_);
   auto async_completer = completer.ToAsync();
   if (state_ != kAuthoring && state_ != kVerifiedRead) {
     async_completer.ReplyError(ZX_ERR_BAD_STATE);

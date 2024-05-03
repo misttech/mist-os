@@ -232,7 +232,7 @@ impl RemoteFs {
         // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
         // selinux support is further along, we might want to remove this mount option.
         let context: Option<FsString> = if kernel.has_fake_selinux() {
-            fs_args::generic_parse_mount_options(options.params.as_ref())
+            fs_args::generic_parse_mount_options(options.params.as_ref())?
                 .get(B("defcontext"))
                 .map(|v| v.to_owned())
         } else {

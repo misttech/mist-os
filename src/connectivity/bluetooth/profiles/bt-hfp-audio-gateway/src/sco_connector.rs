@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::Proxy;
+use fidl_fuchsia_bluetooth as fidl_bt;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::{profile::ValidScoConnectionParameters, types::PeerId};
 use fuchsia_inspect_derive::Unit;
@@ -59,7 +60,7 @@ fn common_sco_params() -> bredr::ScoConnectionParameters {
     bredr::ScoConnectionParameters {
         air_frame_size: Some(60), // Chosen to match legacy usage.
         // IO parameters are to fit 16-bit PSM Signed audio input expected from the audio chip.
-        io_coding_format: Some(bredr::CodingFormat::LinearPcm),
+        io_coding_format: Some(fidl_bt::AssignedCodingFormat::LinearPcm),
         io_frame_size: Some(16),
         io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
         path: Some(bredr::DataPath::Offload),
@@ -72,7 +73,7 @@ fn common_sco_params() -> bredr::ScoConnectionParameters {
 fn sco_params_fallback() -> bredr::ScoConnectionParameters {
     bredr::ScoConnectionParameters {
         parameter_set: Some(bredr::HfpParameterSet::D1),
-        air_coding_format: Some(bredr::CodingFormat::Cvsd),
+        air_coding_format: Some(fidl_bt::AssignedCodingFormat::Cvsd),
         // IO bandwidth to match an 8khz audio rate.
         io_bandwidth: Some(16000),
         ..common_sco_params()
@@ -103,13 +104,17 @@ pub(crate) fn parameter_sets_for_codec(
         CodecId::MSBC => {
             let (air_coding_format, io_bandwidth, io_coding_format) = if in_band_sco {
                 (
-                    Some(bredr::CodingFormat::Transparent),
+                    Some(fidl_bt::AssignedCodingFormat::Transparent),
                     Some(16000),
-                    Some(bredr::CodingFormat::Transparent),
+                    Some(fidl_bt::AssignedCodingFormat::Transparent),
                 )
             } else {
                 // IO bandwidth to match an 16khz audio rate. (x2 for input + output)
-                (Some(bredr::CodingFormat::Msbc), Some(32000), Some(bredr::CodingFormat::LinearPcm))
+                (
+                    Some(fidl_bt::AssignedCodingFormat::Msbc),
+                    Some(32000),
+                    Some(fidl_bt::AssignedCodingFormat::LinearPcm),
+                )
             };
             let params_fn = |set| bredr::ScoConnectionParameters {
                 parameter_set: Some(set),
@@ -125,9 +130,9 @@ pub(crate) fn parameter_sets_for_codec(
         // CVSD parameter sets
         _ => {
             let (io_bandwidth, io_frame_size, io_coding_format) = if in_band_sco {
-                (Some(16000), Some(8), Some(bredr::CodingFormat::Cvsd))
+                (Some(16000), Some(8), Some(fidl_bt::AssignedCodingFormat::Cvsd))
             } else {
-                (Some(16000), Some(16), Some(bredr::CodingFormat::LinearPcm))
+                (Some(16000), Some(16), Some(fidl_bt::AssignedCodingFormat::LinearPcm))
             };
 
             let params_fn = |set| bredr::ScoConnectionParameters {
@@ -271,7 +276,7 @@ pub(crate) mod tests {
             vec![
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::T2),
-                    air_coding_format: Some(bredr::CodingFormat::Msbc),
+                    air_coding_format: Some(fidl_bt::AssignedCodingFormat::Msbc),
                     io_bandwidth: Some(32000),
                     path: Some(bredr::DataPath::Offload),
                     ..common_sco_params()
@@ -302,28 +307,28 @@ pub(crate) mod tests {
             vec![
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::T2),
-                    air_coding_format: Some(bredr::CodingFormat::Transparent),
+                    air_coding_format: Some(fidl_bt::AssignedCodingFormat::Transparent),
                     io_bandwidth: Some(16000),
-                    io_coding_format: Some(bredr::CodingFormat::Transparent),
+                    io_coding_format: Some(fidl_bt::AssignedCodingFormat::Transparent),
                     path: Some(bredr::DataPath::Host),
                     ..common_sco_params()
                 },
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::S4),
-                    io_coding_format: Some(bredr::CodingFormat::Cvsd),
+                    io_coding_format: Some(fidl_bt::AssignedCodingFormat::Cvsd),
                     io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
                 },
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::S1),
-                    io_coding_format: Some(bredr::CodingFormat::Cvsd),
+                    io_coding_format: Some(fidl_bt::AssignedCodingFormat::Cvsd),
                     io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
                 },
                 bredr::ScoConnectionParameters {
-                    io_coding_format: Some(bredr::CodingFormat::Cvsd),
+                    io_coding_format: Some(fidl_bt::AssignedCodingFormat::Cvsd),
                     io_frame_size: Some(8),
                     path: Some(bredr::DataPath::Host),
                     ..sco_params_fallback()
@@ -341,9 +346,9 @@ pub(crate) mod tests {
             vec![
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::T2),
-                    air_coding_format: Some(bredr::CodingFormat::Transparent),
+                    air_coding_format: Some(fidl_bt::AssignedCodingFormat::Transparent),
                     io_bandwidth: Some(16000),
-                    io_coding_format: Some(bredr::CodingFormat::Transparent),
+                    io_coding_format: Some(fidl_bt::AssignedCodingFormat::Transparent),
                     path: Some(bredr::DataPath::Host),
                     ..common_sco_params()
                 },

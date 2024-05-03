@@ -18,6 +18,7 @@ test("concurrent-test") {
   output_name = "libconcurrent-test"
   include_dirs = [ "include" ]
   sources = [
+    "chainlock.cc",
     "copy.cc",
     "seqlock.cc",
   ]

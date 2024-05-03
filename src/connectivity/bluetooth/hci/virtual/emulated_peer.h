@@ -81,8 +81,10 @@ class EmulatedPeer : public fidl::Server<fuchsia_bluetooth_test::Peer> {
   fidl::ServerBinding<fuchsia_bluetooth_test::Peer> binding_;
   fit::callback<void()> closed_callback_;
 
+  std::mutex connection_states_lock_;
   std::vector<fuchsia_bluetooth_test::ConnectionState> connection_states_;
-  std::queue<WatchConnectionStatesCompleter::Async> connection_states_completers_;
+  std::queue<WatchConnectionStatesCompleter::Async> connection_states_completers_
+      __TA_GUARDED(connection_states_lock_);
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(EmulatedPeer);
 };

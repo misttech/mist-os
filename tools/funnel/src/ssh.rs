@@ -75,7 +75,7 @@ fn get_control_path() -> Result<Utf8PathBuf, TunnelError> {
 pub(crate) async fn do_ssh(
     host: String,
     target: TargetInfo,
-    repo_port: u32,
+    repo_port: Vec<u32>,
     additional_port_forwards: Vec<u32>,
 ) -> Result<(), TunnelError> {
     // Set up the control master
@@ -112,7 +112,7 @@ pub(crate) async fn do_ssh(
 fn build_ssh_args(
     target: TargetInfo,
     control_master_path: impl AsRef<Utf8Path>,
-    repo_port: u32,
+    repo_port: Vec<u32>,
     additional_port_forwards: Vec<u32>,
 ) -> Result<Vec<String>, TunnelError> {
     let mut addrs: Vec<TargetAddr> = target.addresses.into_iter().collect::<Vec<TargetAddr>>();
@@ -144,9 +144,6 @@ fn build_ssh_args(
         "-o RequestTTY no".into(),
         "-o ExitOnForwardFailure yes".into(),
         "-o StreamLocalBindUnlink yes".into(),
-        // Request to a package server on the local host are forwarded to the remote
-        // host.
-        format!("-o LocalForward *:{repo_port} localhost:{repo_port}"),
         // Requests from the remote to ssh to localhost:8022 will be forwarded to the
         // target.
         format!("-o RemoteForward 8022 [{target_ip}]:22"),
@@ -169,6 +166,9 @@ fn build_ssh_args(
         .into_iter()
         .map(|p| format!("-o RemoteForward {p} [{target_ip}]:{p}"));
     res.extend(additional_forwards);
+    let repo_forwards =
+        repo_port.into_iter().map(|p| format!("-o LocalForward *:{p} localhost:{p}"));
+    res.extend(repo_forwards);
 
     Ok(res)
 }
@@ -243,7 +243,7 @@ mod test {
             addresses: vec![src_ipv4.into(), src.into()],
         };
 
-        let got = build_ssh_args(target, "/foo", 8081, vec![5555])?;
+        let got = build_ssh_args(target, "/foo", vec![8081], vec![5555])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily inet6",
@@ -252,7 +252,6 @@ mod test {
             "-o RequestTTY no",
             "-o ExitOnForwardFailure yes",
             "-o StreamLocalBindUnlink yes",
-            "-o LocalForward *:8081 localhost:8081",
             "-o RemoteForward 8022 [ff00::]:22",
             "-o RemoteForward 2345 [ff00::]:2345",
             "-o RemoteForward 8007 [ff00::]:8007",
@@ -262,6 +261,7 @@ mod test {
             "-o RemoteForward 8888 [ff00::]:8888",
             "-o RemoteForward 5554 [ff00::]:5554",
             "-o RemoteForward 5555 [ff00::]:5555",
+            "-o LocalForward *:8081 localhost:8081",
         ];
 
         assert_eq!(got, want);
@@ -283,7 +283,7 @@ mod test {
             ..Default::default()
         };
 
-        let got = build_ssh_args(target, "/foo", 8081, vec![])?;
+        let got = build_ssh_args(target, "/foo", vec![8081], vec![])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily inet6",
@@ -292,7 +292,6 @@ mod test {
             "-o RequestTTY no",
             "-o ExitOnForwardFailure yes",
             "-o StreamLocalBindUnlink yes",
-            "-o LocalForward *:8081 localhost:8081",
             "-o RemoteForward 8022 [ff00::]:22",
             "-o RemoteForward 2345 [ff00::]:2345",
             "-o RemoteForward 8007 [ff00::]:8007",
@@ -301,6 +300,47 @@ mod test {
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
             "-o RemoteForward 5554 [ff00::]:5554",
+            "-o LocalForward *:8081 localhost:8081",
+        ];
+
+        assert_eq!(got, want);
+        Ok(())
+    }
+
+    #[test]
+    fn test_make_args_multiple_repos() -> Result<()> {
+        let src = TargetAddrInfo::Ip(TargetIp {
+            ip: IpAddress::Ipv6(Ipv6Address {
+                addr: Ipv6Addr::new(0xff00, 0, 0, 0, 0, 0, 0, 0).octets(),
+            }),
+            scope_id: 2,
+        });
+
+        let target = TargetInfo {
+            nodename: "ianthe".to_string(),
+            addresses: vec![src.into()],
+            ..Default::default()
+        };
+
+        let got = build_ssh_args(target, "/foo", vec![8081, 8085], vec![])?;
+
+        let want: Vec<&str> = vec![
+            "-o AddressFamily any",
+            "-o ControlPath /foo",
+            "-o ControlMaster auto",
+            "-o RequestTTY no",
+            "-o ExitOnForwardFailure yes",
+            "-o StreamLocalBindUnlink yes",
+            "-o RemoteForward 8022 [ff00::]:22",
+            "-o RemoteForward 2345 [ff00::]:2345",
+            "-o RemoteForward 8007 [ff00::]:8007",
+            "-o RemoteForward 8008 [ff00::]:8008",
+            "-o RemoteForward 8443 [ff00::]:8443",
+            "-o RemoteForward 9080 [ff00::]:80",
+            "-o RemoteForward 8888 [ff00::]:8888",
+            "-o RemoteForward 5554 [ff00::]:5554",
+            "-o LocalForward *:8081 localhost:8081",
+            "-o LocalForward *:8085 localhost:8085",
         ];
 
         assert_eq!(got, want);
@@ -312,18 +352,18 @@ mod test {
         let nodename = "cytherea".to_string();
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, "/foo", 9091, vec![]);
+            let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
             assert!(res.is_err());
         }
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, "/foo", 9091, vec![]);
+            let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
             assert!(res.is_err());
         }
         {
             let target =
                 TargetInfo { nodename: nodename.clone(), addresses: vec![], ..Default::default() };
-            let res = build_ssh_args(target, "/foo", 9091, vec![]);
+            let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
             assert!(res.is_err());
         }
     }
@@ -335,7 +375,7 @@ mod test {
             addresses: vec![],
             ..Default::default()
         };
-        let res = build_ssh_args(target, "/foo", 9091, vec![]);
+        let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
         assert!(res.is_err());
     }
 }

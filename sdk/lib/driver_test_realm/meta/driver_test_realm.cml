@@ -64,11 +64,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.boot.RootResource" ],
-            from: "parent",
-            to: "#realm_builder",
-        },
-        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",

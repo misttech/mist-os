@@ -26,8 +26,8 @@ pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
     algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
     context::{
-        CoreTimerContext, CounterContext, InstantBindingsTypes, InstantContext, RngContext,
-        TimerBindingsTypes, TimerContext2, TimerHandler,
+        CoreTimerContext, CounterContext, HandleableTimer, InstantBindingsTypes, InstantContext,
+        RngContext, TimerBindingsTypes, TimerContext,
     },
     counters::Counter,
     device::{self, AnyDevice, DeviceIdContext, Id, WeakId as _},
@@ -67,7 +67,7 @@ pub struct SlaacState<BT: SlaacBindingsTypes> {
     timers: LocalTimerHeap<InnerSlaacTimerId, (), BT>,
 }
 
-impl<BC: SlaacBindingsTypes + TimerContext2> SlaacState<BC> {
+impl<BC: SlaacBindingsTypes + TimerContext> SlaacState<BC> {
     pub fn new<D: device::WeakId, CC: CoreTimerContext<SlaacTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -249,8 +249,8 @@ pub trait SlaacBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
 impl<BT> SlaacBindingsTypes for BT where BT: InstantBindingsTypes + TimerBindingsTypes {}
 
 /// The bindings execution context for SLAAC.
-pub trait SlaacBindingsContext: RngContext + TimerContext2 + SlaacBindingsTypes {}
-impl<BC> SlaacBindingsContext for BC where BC: RngContext + TimerContext2 + SlaacBindingsTypes {}
+pub trait SlaacBindingsContext: RngContext + TimerContext + SlaacBindingsTypes {}
+impl<BC> SlaacBindingsContext for BC where BC: RngContext + TimerContext + SlaacBindingsTypes {}
 
 /// An implementation of SLAAC.
 pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
@@ -442,8 +442,16 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
             slaac_addrs
                 .with_addrs(|addrs| addrs.map(|a| a.addr_sub.addr()).collect::<Vec<_>>())
                 .into_iter()
-                .map(|addr| {
-                    slaac_addrs.remove_addr(bindings_ctx, &addr).expect("remove existing address")
+                .filter_map(|addr| {
+                    slaac_addrs.remove_addr(bindings_ctx, &addr).map(Some).unwrap_or_else(
+                        |NotFoundError| {
+                            // We're not holding locks on the assigned addresses
+                            // here, so we can't assume a race is impossible with
+                            // something else removing the address. Just assume that
+                            // it is gone.
+                            None
+                        },
+                    )
                 })
                 .collect::<Vec<_>>()
         })
@@ -872,18 +880,15 @@ fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext>(
     ControlFlow::Continue(slaac_type)
 }
 
-impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>>
-    TimerHandler<BC, SlaacTimerId<CC::WeakDeviceId>> for CC
+impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
+    for SlaacTimerId<CC::WeakDeviceId>
 {
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        SlaacTimerId { device_id }: SlaacTimerId<CC::WeakDeviceId>,
-    ) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        let Self { device_id } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
         };
-        self.with_slaac_addrs_mut_and_configs(&device_id, |slaac_addrs_config, slaac_state| {
+        core_ctx.with_slaac_addrs_mut_and_configs(&device_id, |slaac_addrs_config, slaac_state| {
             let Some((timer_id, ())) = slaac_state.timers.pop(bindings_ctx) else {
                 return;
             };

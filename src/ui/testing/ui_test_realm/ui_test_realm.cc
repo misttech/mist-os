@@ -14,6 +14,8 @@
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/settings/cpp/fidl.h>
+#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
@@ -85,8 +87,11 @@ constexpr auto kIntl = "intl";
 // Set of low-level system services that components in the realm can consume
 // from parent (test_manager).
 std::vector<std::string> DefaultSystemServices() {
-  return {fuchsia::logger::LogSink::Name_, fuchsia::scheduler::RoleManager::Name_,
-          fuchsia::sysmem::Allocator::Name_, fuchsia::tracing::provider::Registry::Name_,
+  return {fuchsia::logger::LogSink::Name_,
+          fuchsia::scheduler::RoleManager::Name_,
+          fuchsia::sysmem::Allocator::Name_,
+          fuchsia::sysmem2::Allocator::Name_,
+          fuchsia::tracing::provider::Registry::Name_,
           fuchsia::vulkan::loader::Loader::Name_};
 }
 

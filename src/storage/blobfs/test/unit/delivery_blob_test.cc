@@ -112,8 +112,9 @@ TEST_P(DeliveryBlobTest, WriteAll) {
   const fbl::Array<uint8_t> delivery_blob =
       GenerateDeliveryBlobType1({info->data.get(), info->size_data}, GetParam().compress).value();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(ZX_OK, root()->Create(GetDeliveryBlobPath(info->GetMerkleRoot()), 0, &file));
+  zx::result file =
+      root()->Create(GetDeliveryBlobPath(info->GetMerkleRoot()), fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   ASSERT_EQ(ZX_OK, file->Truncate(delivery_blob.size()));
   size_t out_actual;
   ASSERT_EQ(ZX_OK, file->Write(delivery_blob.data(), delivery_blob.size(), 0, &out_actual));
@@ -123,7 +124,7 @@ TEST_P(DeliveryBlobTest, WriteAll) {
   // Try to open the newly created blob.
   fbl::RefPtr<fs::Vnode> file_ptr;
   ASSERT_EQ(ZX_OK, root()->Lookup(info->GetMerkleRoot(), &file_ptr));
-  ASSERT_EQ(ZX_OK, file_ptr->Open(&file));
+  ASSERT_EQ(ZX_OK, file_ptr->Open(&*file));
 
   // Validate file contents.
   if (GetParam().blob_size > 0) {
@@ -143,8 +144,9 @@ TEST_P(DeliveryBlobTest, WriteChunked) {
   const fbl::Array<uint8_t> delivery_blob =
       GenerateDeliveryBlobType1({info->data.get(), info->size_data}, GetParam().compress).value();
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root()->Create(GetDeliveryBlobPath(info->GetMerkleRoot()), 0, &file), ZX_OK);
+  zx::result file =
+      root()->Create(GetDeliveryBlobPath(info->GetMerkleRoot()), fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
   ASSERT_EQ(file->Truncate(delivery_blob.size()), ZX_OK);
 
   // Write the delivery blob in chunks. We use a very small chunk size to cover more edge cases.
@@ -166,7 +168,7 @@ TEST_P(DeliveryBlobTest, WriteChunked) {
   // Try to open the newly created blob.
   fbl::RefPtr<fs::Vnode> file_ptr;
   ASSERT_EQ(ZX_OK, root()->Lookup(info->GetMerkleRoot(), &file_ptr));
-  ASSERT_EQ(ZX_OK, file_ptr->Open(&file));
+  ASSERT_EQ(ZX_OK, file_ptr->Open(&*file));
 
   // Validate file contents.
   if (GetParam().blob_size > 0) {

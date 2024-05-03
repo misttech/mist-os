@@ -5,7 +5,10 @@
 use {
     anyhow::{format_err, Error},
     fidl::endpoints::RequestStream,
-    fidl_fuchsia_bluetooth_host::{HostControlHandle, HostMarker, HostRequest, HostRequestStream},
+    fidl_fuchsia_bluetooth_host::{
+        DiscoverySessionRequestStream, HostControlHandle, HostMarker, HostRequest,
+        HostRequestStream,
+    },
     fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
     fuchsia_bluetooth::types::{
         bonding_data::example, Address, BondingData, HostId, HostInfo, Peer, PeerId,
@@ -72,49 +75,42 @@ async fn host_device_set_local_name() -> Result<(), Error> {
 }
 
 // Test that we can establish a host discovery session, then stop discovery on the host when
-// the session token is dropped
+// the discovery proxy is dropped.
 #[fuchsia::test]
 async fn test_discovery_session() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
 
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
-    let info = Arc::new(RwLock::new(host.info()));
+    let info_server = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
 
     // Simulate request to establish discovery session
-    let establish_discovery_session = host.establish_discovery_session();
-    let expect_fidl = expect_call(server.clone(), |_, e| match e {
-        HostRequest::StartDiscovery { responder } => {
-            info.write().discovering = true;
-            responder.send(Ok(()))?;
+    let discovery_proxy = host.start_discovery()?;
+    let mut discovery_request_stream: Option<DiscoverySessionRequestStream> = None;
+    let expect_fidl = expect_call(server.clone(), |_, request| match request {
+        HostRequest::StartDiscovery { payload, .. } => {
+            info_server.write().discovering = true;
+            discovery_request_stream = Some(payload.token.unwrap().into_stream().unwrap());
             Ok(())
         }
         _ => Err(format_err!("Unexpected!")),
     });
 
-    let (discovery_result, expect_result) = join!(establish_discovery_session, expect_fidl);
-    let session = discovery_result.expect("did not receive discovery session token");
-    let _ = expect_result.expect("FIDL result unsatisfied");
+    let _ = expect_fidl.await.expect("FIDL result unsatisfied");
+    let discovery_request_stream = discovery_request_stream.unwrap();
 
     // Assert that host is now marked as discovering
-    refresh_host(host.clone(), server.clone(), info.read().clone()).await;
+    refresh_host(host.clone(), server.clone(), info_server.read().clone()).await;
     let is_discovering = host.info().discovering.clone();
     assert!(is_discovering);
 
-    // Simulate drop of discovery session
-    let expect_fidl = expect_call(server.clone(), |_, e| match e {
-        HostRequest::StopDiscovery { control_handle: _ } => {
-            info.write().discovering = false;
-            Ok(())
-        }
-        _ => Err(format_err!("Unexpected!")),
-    });
-    std::mem::drop(session);
-    expect_fidl.await.expect("FIDL result unsatisfied");
+    std::mem::drop(discovery_proxy);
+    discovery_request_stream.map(|_| ()).collect::<()>().await;
+    info_server.write().discovering = false;
 
     // Assert that host is no longer marked as discovering
-    refresh_host(host.clone(), server.clone(), info.read().clone()).await;
+    refresh_host(host.clone(), server.clone(), info_server.read().clone()).await;
     let is_discovering = host.info().discovering.clone();
     assert!(!is_discovering);
 

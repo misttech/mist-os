@@ -16,6 +16,7 @@ use bt_a2dp::{
 use bt_avdtp::{self as avdtp, ServiceCapability, ServiceCategory, StreamEndpoint};
 use fidl_fuchsia_bluetooth_a2dp::{AudioModeRequest, AudioModeRequestStream, Role};
 use fidl_fuchsia_bluetooth_bredr as bredr;
+use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_media::{
     AudioChannelId, AudioPcmMode, PcmFormat, SessionAudioConsumerFactoryMarker,
 };
@@ -37,7 +38,6 @@ use std::{collections::HashSet, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
 mod avrcp_relay;
-mod avrcp_target;
 mod config;
 mod encoding;
 mod latm;
@@ -562,13 +562,14 @@ async fn main() -> Result<(), Error> {
     });
 
     // The AVRCP Target component is needed if it is requested and A2DP Source is requested.
+    let mut _avrcp_target = None;
     if config.source.is_some() && config.enable_avrcp_target {
-        fasync::Task::spawn(async {
-            if let Err(e) = avrcp_target::start_avrcp_target().await {
-                warn!("Couldn't launch AVRCP target: {e}");
-            };
-        })
-        .detach();
+        match fuchsia_component::client::connect_to_protocol::<BinderMarker>() {
+            Err(e) => warn!("Couldn't start AVRCP target: {e}"),
+            Ok(tg) => {
+                _avrcp_target = Some(tg);
+            }
+        }
     }
 
     let peers = Arc::new(Mutex::new(peers));

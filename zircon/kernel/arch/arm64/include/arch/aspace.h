@@ -108,7 +108,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   void FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm,
                      Reclaim reclaim = Reclaim::No) TA_REQ(lock_);
 
-  zx_status_t MapPageTable(pte_t attrs, uint index_shift, volatile pte_t* page_table,
+  zx_status_t MapPageTable(pte_t attrs, bool ro, uint index_shift, volatile pte_t* page_table,
                            ExistingEntryAction existing_action, MappingCursor& cursor,
                            ConsistencyManager& cm) TA_REQ(lock_);
 

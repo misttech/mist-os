@@ -18,9 +18,9 @@
 #include <lib/zx/vmo.h>
 
 #include <memory>
+#include <mutex>
 
 #include <fbl/algorithm.h>
-#include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
 #include "fake-sdmmc-device.h"

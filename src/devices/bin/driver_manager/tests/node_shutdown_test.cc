@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include "src/devices/bin/driver_manager/driver_host.h"
-#include "src/devices/bin/driver_manager/node_removal_tracker.h"
+#include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
 
 using namespace driver_manager;

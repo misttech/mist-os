@@ -16,7 +16,7 @@ use crate::peer::{FramedStreamReader, FramedStreamWriter};
 use anyhow::{bail, format_err, Context as _, Error};
 use fuchsia_zircon_status as zx_status;
 use futures::{future::Either, prelude::*};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::ChannelProxyProtocol;
@@ -100,6 +100,16 @@ fn new_task_joiner<Hdl: Proxyable>() -> (FinishProxyLoopSender<Hdl>, FinishProxy
     (FinishProxyLoopSender { chan: tx }, rx)
 }
 
+/// Store behind [`set_proxy_drop_event_handler`]
+static PROXY_DROP_EVENT: Mutex<Option<Box<dyn Fn(&Result<(), Error>) + 'static + Send>>> =
+    Mutex::new(None);
+
+/// Sets a global callback to call every time a proxy is dropped. It's given a
+/// reference to the error and can be used to send metrics events.
+pub fn set_proxy_drop_event_handler(handler: impl Fn(&Result<(), Error>) + 'static + Send) {
+    *PROXY_DROP_EVENT.lock().unwrap() = Some(Box::new(handler));
+}
+
 // Spawn a proxy (two tasks, one for each direction of proxying).
 pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     proxy: Arc<Proxy<Hdl>>,
@@ -155,6 +165,9 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     .map_ok(drop)
     .await;
 
+    if let Some(cb) = &*PROXY_DROP_EVENT.lock().unwrap() {
+        cb(&res)
+    }
     if let Err(e) = res {
         if let Some(proxy) = my_proxy {
             Arc::try_unwrap(proxy).unwrap().close_with_reason(format!("{e:?}"));

@@ -26,7 +26,7 @@ mod probe_sequence;
 
 use {
     anyhow::{bail, format_err, Error},
-    device::{completers::StopCompleter, DeviceOps},
+    device::DeviceOps,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_sync::Mutex,
     fuchsia_trace as trace, fuchsia_zircon as zx,
@@ -216,7 +216,7 @@ impl DriverEventSink {
 
 pub enum DriverEvent {
     // Indicates that the device is being removed and our main loop should exit.
-    Stop(StopCompleter),
+    Stop { responder: fidl_softmac::WlanSoftmacIfcBridgeStopBridgedDriverResponder },
     // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
     // Indicates receipt of a MAC frame from a peer.
     MacFrameRx { bytes: Vec<u8>, rx_info: fidl_softmac::WlanRxInfo, async_id: trace::Id },
@@ -234,7 +234,27 @@ impl fmt::Display for DriverEvent {
             f,
             "{}",
             match self {
-                DriverEvent::Stop(_) => "Stop",
+                DriverEvent::Stop { .. } => "Stop",
+                DriverEvent::MacFrameRx { .. } => "MacFrameRx",
+                DriverEvent::EthFrameTx { .. } => "EthFrameTx",
+                DriverEvent::ScanComplete { .. } => "ScanComplete",
+                DriverEvent::TxResultReport { .. } => "TxResultReport",
+            }
+        )
+    }
+}
+
+// This Debug implementation intentionally only logs the event name to
+// avoid inadvertenaly logging sensitive content contained in the events
+// themselves, i.e., logging data contained in the MacFrameRx and EthFrameTx
+// events.
+impl fmt::Debug for DriverEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                DriverEvent::Stop { .. } => "Stop",
                 DriverEvent::MacFrameRx { .. } => "MacFrameRx",
                 DriverEvent::EthFrameTx { .. } => "EthFrameTx",
                 DriverEvent::ScanComplete { .. } => "ScanComplete",
@@ -336,8 +356,8 @@ async fn main_loop_impl<T: MlmeImpl>(
             driver_event = driver_event_stream.next() => match driver_event {
                 Some(event) => match event {
                     // DriverEvent::Stop indicates a safe shutdown.
-                    DriverEvent::Stop(stop_completer) => {
-                        stop_completer.complete();
+                    DriverEvent::Stop {responder} => {
+                        responder.send().format_send_err_with_context("Stop")?;
                         return Ok(())
                     },
                     DriverEvent::MacFrameRx { bytes, rx_info, async_id } => {
@@ -601,7 +621,6 @@ mod tests {
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
         let (init_sender, mut init_receiver) = oneshot::channel::<Result<(), zx::Status>>();
-        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
             init_sender,
             (),
@@ -616,17 +635,32 @@ mod tests {
             Poll::Ready(Ok(Ok(())))
         );
 
+        // Create a `WlanSoftmacIfcBridge` proxy and stream in order to send a `StopBridgedDriver`
+        // message and extract its responder.
+        let (softmac_ifc_bridge_proxy, mut softmac_ifc_bridge_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+                .unwrap();
+
+        let mut stop_response_fut = softmac_ifc_bridge_proxy.stop_bridged_driver();
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
+            Poll::Pending
+        );
+        let Some(Ok(fidl_softmac::WlanSoftmacIfcBridgeRequest::StopBridgedDriver { responder })) =
+            softmac_ifc_bridge_request_stream.next().await
+        else {
+            panic!("Did not receive StopBridgedDriver message");
+        };
+
         device_sink
-            .unbounded_send(DriverEvent::Stop(StopCompleter::new(Box::new(move || {
-                shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
-            }))))
+            .unbounded_send(DriverEvent::Stop { responder })
             .expect("Failed to send stop event");
         assert_variant!(
             TestExecutor::poll_until_stalled(&mut main_loop).await,
             Poll::Ready(Ok(()))
         );
-        assert_eq!(
-            TestExecutor::poll_until_stalled(&mut shutdown_receiver).await,
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut stop_response_fut).await,
             Poll::Ready(Ok(()))
         );
         assert!(device_sink.is_closed());

@@ -53,9 +53,10 @@ pub async fn show_cmd_print<W: std::io::Write>(
     query: String,
     realm_query: fsys::RealmQueryProxy,
     mut writer: W,
+    with_style: bool,
 ) -> Result<()> {
     let instance = get_instance_by_query(query, realm_query).await?;
-    let table = create_table(instance);
+    let table = create_table(instance, with_style);
     table.print(&mut writer)?;
     writeln!(&mut writer, "")?;
 
@@ -126,7 +127,7 @@ async fn get_instance_by_query(
     })
 }
 
-fn create_table(instance: ShowCmdInstance) -> Table {
+fn create_table(instance: ShowCmdInstance, with_style: bool) -> Table {
     let mut table = Table::new();
     table.set_format(FormatBuilder::new().padding(2, 0).build());
 
@@ -142,14 +143,27 @@ fn create_table(instance: ShowCmdInstance) -> Table {
         table.add_row(row!(r->"Instance ID:", "None"));
     }
 
-    add_resolved_info_to_table(&mut table, instance.resolved);
+    add_resolved_info_to_table(&mut table, instance.resolved, with_style);
 
     table
 }
 
-fn add_resolved_info_to_table(table: &mut Table, resolved: Option<ShowCmdResolvedInfo>) {
+fn colorized(string: &str, color: Colour, with_style: bool) -> String {
+    if with_style {
+        color.paint(string).to_string()
+    } else {
+        string.to_string()
+    }
+}
+
+fn add_resolved_info_to_table(
+    table: &mut Table,
+    resolved: Option<ShowCmdResolvedInfo>,
+    with_style: bool,
+) {
     if let Some(resolved) = resolved {
-        table.add_row(row!(r->"Component State:", Colour::Green.paint("Resolved")));
+        table
+            .add_row(row!(r->"Component State:", colorized("Resolved", Colour::Green, with_style)));
         table.add_row(row!(r->"Resolved URL:", resolved.resolved_url));
 
         let namespace_capabilities = resolved.incoming_capabilities.join("\n");
@@ -182,15 +196,20 @@ fn add_resolved_info_to_table(table: &mut Table, resolved: Option<ShowCmdResolve
             table.add_row(row!(r->"Collections:", resolved.collections.join("\n")));
         }
 
-        add_execution_info_to_table(table, resolved.started)
+        add_execution_info_to_table(table, resolved.started, with_style)
     } else {
-        table.add_row(row!(r->"Component State:", Colour::Red.paint("Unresolved")));
+        table
+            .add_row(row!(r->"Component State:", colorized("Unresolved", Colour::Red, with_style)));
     }
 }
 
-fn add_execution_info_to_table(table: &mut Table, exec: Option<ShowCmdExecutionInfo>) {
+fn add_execution_info_to_table(
+    table: &mut Table,
+    exec: Option<ShowCmdExecutionInfo>,
+    with_style: bool,
+) {
     if let Some(exec) = exec {
-        table.add_row(row!(r->"Execution State:", Colour::Green.paint("Running")));
+        table.add_row(row!(r->"Execution State:", colorized("Running", Colour::Green, with_style)));
         table.add_row(row!(r->"Start reason:", exec.start_reason));
 
         let outgoing_capabilities = exec.outgoing_capabilities.join("\n");
@@ -221,7 +240,7 @@ fn add_execution_info_to_table(table: &mut Table, exec: Option<ShowCmdExecutionI
             }
         }
     } else {
-        table.add_row(row!(r->"Execution State:", Colour::Red.paint("Stopped")));
+        table.add_row(row!(r->"Execution State:", colorized("Stopped", Colour::Red, with_style)));
     }
 }
 

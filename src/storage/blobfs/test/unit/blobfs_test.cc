@@ -200,8 +200,8 @@ TEST_F(BlobfsTest, TrimsData) {
 
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 1024);
 
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
 
   size_t actual;
   EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
@@ -247,9 +247,9 @@ TEST_F(BlobfsTestWithLargeDevice, WritingBlobLargerThanWritebackCapacitySucceeds
 
   std::unique_ptr<BlobInfo> info =
       GenerateRealisticBlob("", (blobfs()->WriteBufferBlockCount() + 1) * kBlobfsBlockSize);
-  fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
-  auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(file.is_ok()) << file.status_string();
+  auto blob = fbl::RefPtr<Blob>::Downcast(*file);
   EXPECT_EQ(blob->Truncate(info->size_data), ZX_OK);
   size_t actual;
   // If this starts to fail with an ERR_NO_SPACE error it could be because WriteBufferBlockCount()
@@ -265,8 +265,9 @@ TEST_F(BlobfsTestWithLargeDevice, WritingBlobLargerThanWritebackCapacitySucceeds
   EXPECT_EQ(blob->Close(), ZX_OK);
   blob.reset();
 
-  ASSERT_EQ(root_node->Lookup(info->path, &file), ZX_OK);
-  TestScopedVnodeOpen open(file);  // File must be open to read from it.
+  fbl::RefPtr<fs::Vnode> lookup_vn;
+  ASSERT_EQ(root_node->Lookup(info->path, &lookup_vn), ZX_OK);
+  TestScopedVnodeOpen open(lookup_vn);  // File must be open to read from it.
 
   auto buffer = std::make_unique<uint8_t[]>(info->size_data);
   EXPECT_EQ(file->Read(buffer.get(), info->size_data, 0, &actual), ZX_OK);
@@ -291,8 +292,8 @@ TEST_F(FsckAtEndOfEveryTransactionTest, FsckAtEndOfEveryTransaction) {
 
   std::unique_ptr<BlobInfo> info = GenerateRealisticBlob("", 500123);
   {
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
+    zx::result file = root->Create(info->path, fs::CreationType::kFile);
+    ASSERT_TRUE(file.is_ok()) << file.status_string();
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     size_t actual;
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &actual), ZX_OK);
@@ -326,9 +327,8 @@ void VnodeSync(fs::Vnode* vnode) {
 std::unique_ptr<BlobInfo> CreateBlob(const fbl::RefPtr<fs::Vnode>& root, size_t size) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", size);
 
-  fbl::RefPtr<fs::Vnode> file;
-  EXPECT_EQ(root->Create(info->path, 0, &file), ZX_OK);
-
+  zx::result file = root->Create(info->path, fs::CreationType::kFile);
+  ZX_ASSERT_MSG(file.is_ok(), "Failed to create blob: %s", file.status_string());
   size_t out_actual = 0;
   EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
 

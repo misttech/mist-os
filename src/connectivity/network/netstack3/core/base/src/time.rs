@@ -86,10 +86,7 @@ pub trait TimerBindingsTypes {
 }
 
 /// A context providing time scheduling to core.
-// TODO(https://fxbug.dev/42083407): Remove '2' qualifiers when we delete the
-// old trait. Note that all the methods that conflict with the old trait names
-// have a disambiguating qualifier to make transitioning smoother.
-pub trait TimerContext2: InstantContext + TimerBindingsTypes {
+pub trait TimerContext: InstantContext + TimerBindingsTypes {
     /// Creates a new timer that dispatches `id` back to core when fired.
     ///
     /// Creating a new timer is an expensive operation and should be used
@@ -101,20 +98,20 @@ pub trait TimerContext2: InstantContext + TimerBindingsTypes {
 
     /// Schedule a timer to fire at some point in the future.
     /// Returns the previously scheduled instant, if this timer was scheduled.
-    fn schedule_timer_instant2(
+    fn schedule_timer_instant(
         &mut self,
         time: Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant>;
 
-    /// Like [`schedule_timer_instant2`] but schedules a time for `duration` in
+    /// Like [`schedule_timer_instant`] but schedules a time for `duration` in
     /// the future.
-    fn schedule_timer2(
+    fn schedule_timer(
         &mut self,
         duration: Duration,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
-        self.schedule_timer_instant2(self.now().checked_add(duration).unwrap(), timer)
+        self.schedule_timer_instant(self.now().checked_add(duration).unwrap(), timer)
     }
 
     /// Cancel a timer.
@@ -128,11 +125,43 @@ pub trait TimerContext2: InstantContext + TimerBindingsTypes {
     /// was created with is still making its way to the module that originally
     /// scheduled this timer. If `Some` is observed, however, then the
     /// `TimerContext` guarantees this `timer` will *not* fire until
-    ///[`schedule_timer_instant2`] is called to reschedule it.
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant>;
+    ///[`schedule_timer_instant`] is called to reschedule it.
+    fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant>;
 
     /// Get the instant a timer will fire, if one is scheduled.
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
+    fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
+}
+
+/// A handler for timer firing events.
+///
+/// A `TimerHandler` is a type capable of handling the event of a timer firing.
+///
+/// `TimerHandler` is offered as a blanket implementation for all timers that
+/// implement [`HandleableTimer`]. `TimerHandler` is meant to be used as bounds
+/// on core context types. whereas `HandleableTimer` allows split-crate
+/// implementations sidestepping coherence issues.
+pub trait TimerHandler<BC, Id> {
+    /// Handle a timer firing.
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
+}
+
+impl<Id, CC, BC> TimerHandler<BC, Id> for CC
+where
+    Id: HandleableTimer<CC, BC>,
+{
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id) {
+        id.handle(self, bindings_ctx)
+    }
+}
+
+/// A timer that can be handled by a pair of core context `CC` and bindings
+/// context `BC`.
+///
+/// This trait exists to sidestep coherence issues when dealing with timer
+/// layers, see [`TimerHandler`] for more.
+pub trait HandleableTimer<CC, BC> {
+    /// Handles this timer firing.
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC);
 }
 
 /// A core context providing timer type conversion.
@@ -146,7 +175,7 @@ pub trait CoreTimerContext<T, BT: TimerBindingsTypes> {
     /// A helper function to create a new timer with the provided dispatch id.
     fn new_timer(bindings_ctx: &mut BT, dispatch_id: T) -> BT::Timer
     where
-        BT: TimerContext2,
+        BT: TimerContext,
     {
         bindings_ctx.new_timer(Self::convert_timer(dispatch_id))
     }

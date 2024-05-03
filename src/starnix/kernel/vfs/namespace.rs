@@ -19,9 +19,10 @@ use crate::{
         fs_node_impl_not_dir,
         fuse::{new_fuse_fs, new_fusectl_fs},
         socket::{SocketAddress, SocketHandle, UnixSocket},
-        DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle,
-        FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps,
-        FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
+        CheckAccessReason, DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf,
+        DynamicFileSource, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
+        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode,
+        SymlinkTarget, UnlinkKind,
     },
 };
 use fidl_fuchsia_io as fio;
@@ -1551,8 +1552,13 @@ impl NamespaceNode {
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
-    pub fn check_access(&self, current_task: &CurrentTask, access: Access) -> Result<(), Errno> {
-        self.entry.node.check_access(current_task, &self.mount, access)
+    pub fn check_access(
+        &self,
+        current_task: &CurrentTask,
+        access: Access,
+        reason: CheckAccessReason,
+    ) -> Result<(), Errno> {
+        self.entry.node.check_access(current_task, &self.mount, access, reason)
     }
 
     /// Checks if O_NOATIME is allowed,

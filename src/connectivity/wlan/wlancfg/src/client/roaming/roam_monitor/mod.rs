@@ -56,20 +56,19 @@ impl RoamMonitorApi for RoamMonitor {
         &mut self,
         stats: fidl_internal::SignalReportIndication,
     ) -> Result<u8, anyhow::Error> {
-        self.connection_data
-            .quality_data
-            .signal_data
-            .update_with_new_measurement(stats.rssi_dbm, stats.snr_db);
+        self.connection_data.signal_data.update_with_new_measurement(stats.rssi_dbm, stats.snr_db);
 
         // Send RSSI and RSSI velocity metrics
         self.telemetry_sender.send(TelemetryEvent::OnSignalReport {
             ind: stats,
-            rssi_velocity: self.connection_data.quality_data.signal_data.ewma_rssi_velocity.get(),
+            rssi_velocity: self.connection_data.signal_data.ewma_rssi_velocity.get(),
         });
 
         // Evaluate current BSS, and determine if roaming future should be triggered.
-        let (roam_reasons, bss_score) =
-            bss_selection::evaluate_current_bss(&self.connection_data.quality_data);
+        let (roam_reasons, bss_score) = bss_selection::evaluate_current_bss(
+            self.connection_data.signal_data,
+            self.connection_data.currently_fulfilled_connection.target.bss.channel,
+        );
         if !roam_reasons.is_empty() {
             let now = fasync::Time::now();
             if now
@@ -86,7 +85,7 @@ impl RoamMonitorApi for RoamMonitor {
             let has_new_reason = roam_reasons.iter().any(|r| {
                 !self.connection_data.roam_decision_data.roam_reasons_prev_scan.contains(r)
             });
-            let rssi = self.connection_data.quality_data.signal_data.ewma_rssi.get();
+            let rssi = self.connection_data.signal_data.ewma_rssi.get();
             let is_rssi_different =
                 (self.connection_data.roam_decision_data.rssi_prev_roam_scan - rssi).abs()
                     > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
@@ -108,7 +107,7 @@ impl RoamMonitorApi for RoamMonitor {
 
     // Return the signal data for the tracked connection.
     fn get_signal_data(&self) -> SignalData {
-        self.connection_data.quality_data.signal_data
+        self.connection_data.signal_data
     }
 }
 
@@ -118,8 +117,7 @@ mod test {
         super::*,
         crate::{
             client::connection_selection::{EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR},
-            config_management::network_config::PastConnectionList,
-            util::testing::{generate_connect_selection, generate_random_channel},
+            util::testing::generate_connect_selection,
         },
         fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async::TestExecutor,
@@ -164,20 +162,15 @@ mod test {
         let init_rssi = -75;
         let init_snr = 15;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let past_connections = PastConnectionList::default();
-        let mut bss_quality_data = bss_selection::BssQualityData::new(
-            SignalData::new(
-                init_rssi,
-                init_snr,
-                EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
-            ),
-            generate_random_channel(),
-            past_connections,
+        let mut signal_data = SignalData::new(
+            init_rssi,
+            init_snr,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
         );
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
-            quality_data: bss_quality_data.clone(),
+            signal_data,
             roam_decision_data: roam_data,
         };
 
@@ -198,13 +191,13 @@ mod test {
         let _score = roam_monitor
             .handle_connection_stats(signal_report)
             .expect("Failed to get connection stats");
-        bss_quality_data.signal_data.update_with_new_measurement(rssi_dbm, snr_db);
+        signal_data.update_with_new_measurement(rssi_dbm, snr_db);
 
         // Check that a scan request is sent to the Roam Manager Service.
         let received_roam_req = test_values.roam_search_receiver.try_next();
         assert_variant!(received_roam_req, Ok(Some(req)) => {
             assert_eq!(req.connection_data.currently_fulfilled_connection, test_values.currently_fulfilled_connection);
-            assert_eq!(req.connection_data.quality_data, bss_quality_data);
+            assert_eq!(req.connection_data.signal_data, signal_data);
         });
 
         // Verify that a telemerty event is sent for the RSSI and RSSI velocity
@@ -225,21 +218,16 @@ mod test {
         let init_rssi = -70;
         let init_snr = 20;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let past_connections = PastConnectionList::default();
-        let bss_quality_data = bss_selection::BssQualityData::new(
-            SignalData::new(
-                init_rssi,
-                init_snr,
-                EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
-            ),
-            generate_random_channel(),
-            past_connections,
+        let signal_data = SignalData::new(
+            init_rssi,
+            init_snr,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
         );
 
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
-            quality_data: bss_quality_data.clone(),
+            signal_data,
             roam_decision_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(
@@ -293,20 +281,15 @@ mod test {
         let init_rssi = -80;
         let init_snr = 10;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let past_connections = PastConnectionList::default();
-        let bss_quality_data = bss_selection::BssQualityData::new(
-            SignalData::new(
-                init_rssi,
-                init_snr,
-                EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
-            ),
-            generate_random_channel(),
-            past_connections,
+        let signal_data = SignalData::new(
+            init_rssi,
+            init_snr,
+            EWMA_SMOOTHING_FACTOR,
+            EWMA_VELOCITY_SMOOTHING_FACTOR,
         );
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
-            quality_data: bss_quality_data.clone(),
+            signal_data,
             roam_decision_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(
@@ -328,7 +311,7 @@ mod test {
         let received_roam_req = test_values.roam_search_receiver.try_next();
         assert_variant!(received_roam_req, Ok(Some(req)) => {
             assert_eq!(req.connection_data.currently_fulfilled_connection, test_values.currently_fulfilled_connection);
-            assert_eq!(req.connection_data.quality_data, bss_quality_data.clone());
+            assert_eq!(req.connection_data.signal_data, signal_data.clone());
         });
 
         // Send stats with a worse RSSI and check that a roam scan is not initiated

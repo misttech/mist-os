@@ -12,6 +12,33 @@ group("docsgen") {
   deps = [ ":generated_docs" ]
 }
 
+# Runs one time python assemblydoc generation script.
+compiled_action("invoke_assemblydoc") {
+  tool = "//tools/assemblydoc:assemblydoc_bin"
+  tool_output_name = "assemblydoc"
+  deps = [ "//tools/assemblydoc($host_toolchain)" ]
+  args = [
+    "--archive-output",
+    rebase_path("$target_out_dir/assemblydoc.tar.gz", root_build_dir),
+  ]
+
+  metadata = {
+    # Record metadata for the //tools/docsgen build API.
+    generated_docset = [
+      {
+        name = "assemblydoc"
+        archive = {
+          origin_file =
+              rebase_path("$target_out_dir/assemblydoc.tar.gz", root_build_dir)
+          base_folder = "assemblydoc"
+        }
+        dest_folder = "sdk/assembly"
+      },
+    ]
+  }
+  outputs = [ "$target_out_dir/assemblydoc.tar.gz" ]
+}
+
 _fidldoc_transforms_script_target = "fidldoc_transforms"
 python_binary(_fidldoc_transforms_script_target) {
   main_source = "//build/fidl/gen_fidldocs.py"
@@ -284,6 +311,7 @@ build_api_module("generated_docs") {
   data_keys = [ "generated_docset" ]
   deps = [
     ":create_syscall_docs",
+    ":invoke_assemblydoc",
     ":invoke_clidoc",
     ":invoke_cmldoc",
     ":invoke_fidldoc",
@@ -296,6 +324,10 @@ build_api_module("generated_docs") {
 # Set up targets and files for sdk_documentation
 
 sdk_docs = [
+  {
+    target = ":invoke_assemblydoc"
+    file = "assemblydoc.tar.gz"
+  },
   {
     target = ":invoke_clidoc"
     file = "clidoc_out.tar.gz"

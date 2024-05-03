@@ -11,6 +11,11 @@
 
 namespace pwm_visitor_dt {
 
+enum class PwmFlags : uint32_t {
+  PWM_POLARITY_INVERTED = 0x1,
+  PWM_SKIP_INIT = 0x2,
+};
+
 class PwmVisitor : public fdf_devicetree::Visitor {
  public:
   static constexpr char kPwmReference[] = "pwms";

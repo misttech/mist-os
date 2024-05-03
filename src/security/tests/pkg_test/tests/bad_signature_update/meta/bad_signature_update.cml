@@ -102,14 +102,6 @@
             from: "#data",
         },
 
-        // Attempt to access packages via the `pkgfs` APIs.
-        {
-            directory: "pkgfs",
-            from: "#fshost",
-            rights: [ "rx*" ],
-            path: "/pkgfs",
-        },
-
         // Attempt to access packages via the `pkg-cache` APIs.
         {
             protocol: "fuchsia.pkg.PackageCache",
@@ -164,10 +156,7 @@
             to: "#pkg-cache",
         },
         {
-            directory: [
-                "blob",
-                "pkgfs",
-            ],
+            directory: [ "blob" ],
             from: "#fshost",
             to: "#pkg-cache",
         },
@@ -194,23 +183,6 @@
             protocol: [ "fuchsia.scheduler.deprecated.ProfileProvider" ],
             from: "parent",
             to: [ "#netstack" ],
-        },
-        {
-            directory: "pkgfs",
-            from: "#fshost",
-            as: "pkgfs-system",
-            to: [
-                "#pkg-resolver",
-                "#system-updater",
-            ],
-            subdir: "system",
-        },
-        {
-            directory: "pkgfs",
-            from: "#fshost",
-            as: "config-data",
-            to: "#pkg-resolver",
-            subdir: "packages/config-data/0/meta/data/pkg-resolver",
         },
         {
             directory: "pkgfs",

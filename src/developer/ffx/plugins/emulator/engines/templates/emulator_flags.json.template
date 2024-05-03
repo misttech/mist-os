@@ -204,6 +204,9 @@
         "-device",
         "edu"
         {{/if}}
+         {{#each runtime.addl_emu_args}}
+          ,"{{this}}"
+         {{/each}}
     ],
     "features": [
         {{! TODO(https://fxbug.dev/322029860): The following feature flags are
@@ -288,5 +291,8 @@
             "DISPLAY": "{{env "DISPLAY"}}",
         {{/unless}}
         "QEMU_AUDIO_DRV": "none"
+        {{#each runtime.addl_env}}
+          ,"{{@key}}" : "{{this}}"
+        {{/each}}
     }
 }

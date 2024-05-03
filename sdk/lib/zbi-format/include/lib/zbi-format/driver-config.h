@@ -51,6 +51,9 @@ typedef uint32_t zbi_kernel_driver_t;
 // 'WD32'
 #define ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG ((zbi_kernel_driver_t)(0x32334457u))
 
+// 'GENI'
+#define ZBI_KERNEL_DRIVER_GENI_UART ((zbi_kernel_driver_t)(0x494E4547u))
+
 // '8250'
 #define ZBI_KERNEL_DRIVER_I8250_PIO_UART ((zbi_kernel_driver_t)(0x30353238u))
 
@@ -80,7 +83,7 @@ typedef uint32_t zbi_kernel_driver_t;
 
 // Kernel driver struct that can be used for simple drivers.
 // Used by ZBI_KERNEL_DRIVER_PL011_UART, ZBI_KERNEL_DRIVER_AMLOGIC_UART, and
-// ZBI_KERNEL_DRIVER_I8250_MMIO_UART.
+// ZBI_KERNEL_DRIVER_GENI_UART, ZBI_KERNEL_DRIVER_I8250_MMIO_UART.
 typedef struct {
   uint64_t mmio_phys;
   uint32_t irq;

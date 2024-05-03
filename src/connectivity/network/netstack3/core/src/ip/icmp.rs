@@ -54,6 +54,7 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext, FrameDestination, StrongId as _, WeakId as _},
     filter::{MaybeTransportPacket, TransportPacketSerializer},
     ip::{
+        base::TransparentLocalDelivery,
         device::{
             nud::{ConfirmationFlags, NudIpHandler},
             route_discovery::Ipv6DiscoveredRoute,
@@ -878,12 +879,8 @@ impl<BC: IcmpBindingsContext<Ipv6, Self::DeviceId>, CC: InnerIcmpContext<Ipv6, B
 /// [RFC 4443 Section 2.4]: https://tools.ietf.org/html/rfc4443#section-2.4
 macro_rules! try_send_error {
     ($core_ctx:expr, $bindings_ctx:expr, $e:expr) => {{
-        // TODO(joshlf): Figure out a way to avoid querying for the current time
-        // unconditionally. See the documentation on the `CachedInstantCtx` type
-        // for more information.
-        let instant_ctx = crate::context::new_cached_instant_context($bindings_ctx);
         let send = $core_ctx.with_error_send_bucket_mut(|error_send_bucket| {
-            error_send_bucket.try_take(&instant_ctx)
+            error_send_bucket.try_take($bindings_ctx)
         });
 
         if send {
@@ -1009,7 +1006,15 @@ impl<
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            unreachable!(
+                "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
+                transparent proxy rules can only be configured for TCP and UDP packets"
+            );
+        }
+
         trace!(
             "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet({}, {})",
             src_ip,
@@ -1789,7 +1794,15 @@ impl<
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            unreachable!(
+                "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
+                transparent proxy rules can only be configured for TCP and UDP packets"
+            );
+        }
+
         trace!(
             "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet({:?}, {})",
             src_ip,
@@ -4229,6 +4242,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
+                None,
             )
             .unwrap();
 
@@ -4514,6 +4528,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
+                None,
             )
             .unwrap();
 

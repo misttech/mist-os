@@ -645,6 +645,11 @@ pub fn ffx_plugin(input: ItemFn, proxies: ProxyMap) -> Result<TokenStream, Error
         pub fn ffx_plugin_is_machine_supported() -> bool {
             #is_supported
         }
+        // Sorry for the bad implementation, to use the machine schema, you need to use FfxTool.
+        // which has support for Writers with schema.
+        pub fn ffx_plugin_has_schema() -> bool {
+            false
+        }
     };
     Ok(res)
 }

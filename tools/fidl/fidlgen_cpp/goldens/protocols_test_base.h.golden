@@ -108,6 +108,13 @@ class TestBase<::test_protocols::AnotherDiscoverableProtocol> : public ::fidl::S
 };
 
 template <>
+class TestBase<::test_protocols::PlatformServer> : public ::fidl::Server<::test_protocols::PlatformServer> {
+ public:
+  virtual ~TestBase<::test_protocols::PlatformServer>() = default;
+  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) = 0;
+};
+
+template <>
 class TestBase<::test_protocols::HandleRightsProtocol> : public ::fidl::Server<::test_protocols::HandleRightsProtocol> {
  public:
   virtual ~TestBase<::test_protocols::HandleRightsProtocol>() = default;

@@ -314,3 +314,9 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         event_handler = fc_othertest.CrossLibraryNoop.EventHandler(t_client)
         task = asyncio.get_running_loop().create_task(event_handler.serve())
         await task
+
+    async def test_echo_server_unimplemented(self):
+        _client, server = Channel.create()
+        s = fc_test.Noop.Server(server)
+        with self.assertRaises(NotImplementedError):
+            s.do_noop()

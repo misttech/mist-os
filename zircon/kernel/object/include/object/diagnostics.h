@@ -81,8 +81,8 @@ zx_status_t GetProcessVmos(ProcessDispatcher* process, VmoInfoWriter& vmos, size
                            size_t* actual, size_t* available);
 
 // Prints (with the supplied prefix) the number of mapped, committed bytes for
-// each process in the system whose page count > |min_pages|. Does not take
+// each process in the system whose committed memory > |min_bytes|. Does not take
 // sharing into account, and does not count unmapped VMOs.
-void DumpProcessMemoryUsage(const char* prefix, size_t min_pages);
+void DumpProcessMemoryUsage(const char* prefix, size_t min_bytes);
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_DIAGNOSTICS_H_

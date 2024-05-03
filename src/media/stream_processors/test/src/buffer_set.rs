@@ -8,7 +8,7 @@ use crate::{buffer_collection_constraints::*, Result};
 use anyhow::Context as _;
 use fidl::endpoints::{create_endpoints, ClientEnd, Proxy};
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem::*;
+use fidl_fuchsia_sysmem2::*;
 use fuchsia_component::client;
 use fuchsia_stream_processors::*;
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -62,10 +62,14 @@ pub enum BufferSetType {
 
 pub struct BufferSetFactory;
 
-fn set_allocator_name(sysmem_client: &fidl_fuchsia_sysmem::AllocatorProxy) -> Result<()> {
+fn set_allocator_name(sysmem_client: &fidl_fuchsia_sysmem2::AllocatorProxy) -> Result<()> {
     let name = fuchsia_runtime::process_self().get_name()?;
     let koid = fuchsia_runtime::process_self().get_koid()?;
-    Ok(sysmem_client.set_debug_client_info(name.to_str()?, koid.raw_koid())?)
+    Ok(sysmem_client.set_debug_client_info(&AllocatorSetDebugClientInfoRequest {
+        name: Some(name.to_str()?.to_string()),
+        id: Some(koid.raw_koid()),
+        ..Default::default()
+    })?)
 }
 
 // This client only intends to be filling one input buffer or hashing one output buffer at any given
@@ -95,26 +99,37 @@ impl BufferSetFactory {
                 .context("Sending output partial settings to codec")?,
         };
 
-        let (status, collection_info) =
-            collection_client.wait_for_buffers_allocated().await.context("Waiting for buffers")?;
-        debug!("Sysmem responded: {:?}", status);
-        let collection_info = zx::Status::ok(status).map(|_| collection_info)?;
+        let wait_result = collection_client
+            .wait_for_all_buffers_allocated()
+            .await
+            .context("Waiting for buffers")?;
+        debug!("Sysmem responded (None is success): {:?}", wait_result.as_ref().err());
+        let collection_info = wait_result
+            .map_err(|err| anyhow::format_err!("sysmem allocation error: {:?}", err))?
+            .buffer_collection_info
+            .unwrap();
 
         if let BufferSetType::Output = buffer_set_type {
             debug!("Completing settings for output.");
             codec.complete_output_buffer_partial_settings(buffer_lifetime_ordinal)?;
         }
 
-        //collection_client.close()?;
-
         debug!(
             "Got {} buffers of size {:?}",
-            collection_info.buffer_count, collection_info.settings.buffer_settings.size_bytes
+            collection_info.buffers.as_ref().unwrap().len(),
+            collection_info
+                .settings
+                .as_ref()
+                .unwrap()
+                .buffer_settings
+                .as_ref()
+                .unwrap()
+                .size_bytes
+                .as_ref()
+                .unwrap()
         );
-        debug!("Buffer collection is: {:#?}", collection_info.settings);
-        for (i, buffer) in collection_info.buffers.iter().enumerate() {
-            // We enumerate beyond collection_info.buffer_count just for debugging
-            // purposes at this log level.
+        debug!("Buffer collection is: {:#?}", collection_info.settings.as_ref().unwrap());
+        for (i, buffer) in collection_info.buffers.as_ref().unwrap().iter().enumerate() {
             debug!("Buffer {} is : {:#?}", i, buffer);
         }
 
@@ -141,38 +156,43 @@ impl BufferSetFactory {
         set_allocator_name(&sysmem_client).context("Setting sysmem allocator name")?;
 
         sysmem_client
-            .allocate_shared_collection(client_token_request)
+            .allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
+                token_request: Some(client_token_request),
+                ..Default::default()
+            })
             .context("Allocating shared collection")?;
-        client_token.duplicate(std::u32::MAX, codec_token_request)?;
+        client_token.duplicate(BufferCollectionTokenDuplicateRequest {
+            rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+            token_request: Some(codec_token_request),
+            ..Default::default()
+        })?;
 
         let (collection_client, collection_request) = create_endpoints::<BufferCollectionMarker>();
-        sysmem_client.bind_shared_collection(
-            ClientEnd::new(
-                client_token
-                    .into_channel()
-                    .map_err(|_| Error::ReclaimClientTokenChannel)?
-                    .into_zx_channel(),
+        sysmem_client.bind_shared_collection(AllocatorBindSharedCollectionRequest {
+            token: Some(
+                client_token.into_client_end().map_err(|_| Error::ReclaimClientTokenChannel)?,
             ),
-            collection_request,
-        )?;
+            buffer_collection_request: Some(collection_request),
+            ..Default::default()
+        })?;
         let collection_client = collection_client.into_proxy()?;
         collection_client.sync().await.context("Syncing codec_token_request with sysmem")?;
 
-        let mut collection_constraints =
-            buffer_collection_constraints.unwrap_or(BUFFER_COLLECTION_CONSTRAINTS_DEFAULT);
-        assert_eq!(
-            collection_constraints.min_buffer_count_for_camping, 0,
-            "min_buffer_count_for_camping should default to 0 before we've set it"
+        let mut collection_constraints = buffer_collection_constraints
+            .unwrap_or_else(|| buffer_collection_constraints_default());
+        assert!(
+            collection_constraints.min_buffer_count_for_camping.is_none(),
+            "min_buffer_count_for_camping should be un-set before we've set it"
         );
-        collection_constraints.min_buffer_count_for_camping = MIN_BUFFER_COUNT_FOR_CAMPING;
+        collection_constraints.min_buffer_count_for_camping = Some(MIN_BUFFER_COUNT_FOR_CAMPING);
 
         debug!("Our buffer collection constraints are: {:#?}", collection_constraints);
 
-        // By design we must say true even if all our fields are left at
-        // default, or sysmem will not give us buffer handles.
-        let has_constraints = true;
         collection_client
-            .set_constraints(has_constraints, &collection_constraints)
+            .set_constraints(BufferCollectionSetConstraintsRequest {
+                constraints: Some(collection_constraints),
+                ..Default::default()
+            })
             .context("Sending buffer constraints to sysmem")?;
 
         Ok((
@@ -182,7 +202,13 @@ impl BufferSetFactory {
                 buffer_constraints_version_ordinal: Some(
                     constraints.buffer_constraints_version_ordinal,
                 ),
-                sysmem_token: Some(codec_token),
+                // A sysmem token channel serves both sysmem(1) and sysmem2 token protocols, so we
+                // can convert here until StreamBufferPartialSettings has a sysmem2 token field.
+                sysmem_token: Some(
+                    ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
+                        codec_token.into_channel(),
+                    ),
+                ),
                 ..Default::default()
             },
         ))
@@ -192,7 +218,7 @@ impl BufferSetFactory {
 struct BufferSetSpec {
     proxy: BufferCollectionProxy,
     buffer_lifetime_ordinal: u64,
-    collection_info: BufferCollectionInfo2,
+    collection_info: BufferCollectionInfo,
 }
 
 #[derive(Debug, PartialEq)]
@@ -213,19 +239,32 @@ pub struct BufferSet {
 impl TryFrom<BufferSetSpec> for BufferSet {
     type Error = anyhow::Error;
     fn try_from(mut src: BufferSetSpec) -> std::result::Result<Self, Self::Error> {
+        let buffer_size = *src
+            .collection_info
+            .settings
+            .as_ref()
+            .unwrap()
+            .buffer_settings
+            .as_ref()
+            .unwrap()
+            .size_bytes
+            .as_ref()
+            .unwrap();
+        let buffer_count = src.collection_info.buffers.as_ref().unwrap().len();
+
         let mut buffers = vec![];
-        for (i, buffer) in src.collection_info.buffers
-            [0..(src.collection_info.buffer_count as usize)]
-            .iter_mut()
-            .enumerate()
-        {
+        for (i, buffer) in src.collection_info.buffers.as_mut().unwrap().iter_mut().enumerate() {
             buffers.push(Buffer {
-                data: buffer.vmo.take().ok_or(Error::ServerOmittedBufferVmo).context(format!(
-                    "Trying to ingest {}th buffer of {}: {:#?}",
-                    i, src.collection_info.buffer_count, buffer
-                ))?,
-                start: buffer.vmo_usable_start,
-                size: src.collection_info.settings.buffer_settings.size_bytes as u64,
+                data: buffer.vmo.take().ok_or(Error::ServerOmittedBufferVmo).with_context(
+                    || {
+                        format!(
+                            "Trying to ingest {}th buffer of {}: {:#?}",
+                            i, buffer_count, buffer
+                        )
+                    },
+                )?,
+                start: *buffer.vmo_usable_start.as_ref().unwrap(),
+                size: buffer_size,
             });
         }
 
@@ -233,7 +272,7 @@ impl TryFrom<BufferSetSpec> for BufferSet {
             proxy: src.proxy,
             buffers,
             buffer_lifetime_ordinal: src.buffer_lifetime_ordinal,
-            buffer_size: src.collection_info.settings.buffer_settings.size_bytes as usize,
+            buffer_size: buffer_size as usize,
         })
     }
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "power-support.h"
+#include "sdk/lib/driver/power/cpp/power-support.h"
 
 #include <dirent.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
@@ -542,6 +542,14 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
   }
 
   return fit::success(fidl::ToNatural(std::move(*add_result->value())));
+}
+
+fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
+    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description) {
+  return AddElement(power_broker, description.element_config_, std::move(description.tokens_),
+                    description.active_token_.borrow(), description.passive_token_.borrow(),
+                    std::move(description.level_control_servers_),
+                    std::move(description.lessor_server_));
 }
 
 }  // namespace fdf_power

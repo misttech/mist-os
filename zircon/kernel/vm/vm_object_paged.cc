@@ -41,9 +41,9 @@
 
 namespace {
 
-KCOUNTER(vmo_attribution_queries, "vm.attributed_pages.object.queries")
-KCOUNTER(vmo_attribution_cache_hits, "vm.attributed_pages.object.cache_hits")
-KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_pages.object.cache_misses")
+KCOUNTER(vmo_attribution_queries, "vm.attributed_memory.object.queries")
+KCOUNTER(vmo_attribution_cache_hits, "vm.attributed_memory.object.cache_hits")
+KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_memory.object.cache_misses")
 
 }  // namespace
 
@@ -241,9 +241,11 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   fbl::AllocChecker ac;
@@ -261,8 +263,8 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   fbl::RefPtr<VmCowPages> cow_pages;
-  status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
-                              ktl::move(discardable), &cow_pages);
+  zx_status_t status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
+                                          ktl::move(discardable), &cow_pages);
   if (status != ZX_OK) {
     return status;
   }
@@ -329,9 +331,11 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
                                             fbl::RefPtr<VmObjectPaged>* obj) {
   DEBUG_ASSERT(alignment_log2 < sizeof(uint64_t) * 8);
   // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   fbl::AllocChecker ac;
@@ -350,7 +354,8 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
   auto* page_source_ptr = page_source.get();
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size, &vmo);
+  zx_status_t status =
+      CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size, &vmo);
   if (status != ZX_OK) {
     // Ensure to close the page source we created, as it will not get closed by the VmCowPages since
     // that creation failed.
@@ -469,9 +474,11 @@ zx_status_t VmObjectPaged::CreateExternal(fbl::RefPtr<PageSource> src, uint32_t 
   }
 
   // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // External VMOs always support delayed PMM allocations, since they already have to tolerate
@@ -540,9 +547,11 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   }
 
   // Make sure size is page aligned.
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // Slice must be wholly contained. |size()| will read the size holding the lock. This is extra
@@ -585,7 +594,7 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     vmo->cache_policy_ = cache_policy_;
 
     fbl::RefPtr<VmCowPages> cow_pages;
-    status = cow_pages_locked()->CreateChildSliceLocked(offset, size, &cow_pages);
+    zx_status_t status = cow_pages_locked()->CreateChildSliceLocked(offset, size, &cow_pages);
     if (status != ZX_OK) {
       return status;
     }
@@ -724,10 +733,12 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // make sure size is page aligned
-  zx_status_t status = RoundSize(size, &size);
-  if (status != ZX_OK) {
-    return status;
+  // size must be page aligned and not too large.
+  if (!IS_PAGE_ALIGNED(size)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (size > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   uint32_t options = 0;
@@ -755,7 +766,8 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     }
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
-    status = cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
+    zx_status_t status =
+        cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
     if (status != ZX_OK) {
       return status;
     }
@@ -815,50 +827,51 @@ void VmObjectPaged::DumpLocked(uint depth, bool verbose) const {
   cow_pages_locked()->DumpLocked(depth, verbose);
 }
 
-VmObject::AttributionCounts VmObjectPaged::AttributedPagesInRangeLocked(uint64_t offset,
-                                                                        uint64_t len) const {
-  uint64_t new_len;
-  if (!TrimRange(offset, len, size_locked(), &new_len)) {
+VmObject::AttributionCounts VmObjectPaged::GetAttributedMemoryInRangeLocked(
+    uint64_t offset_bytes, uint64_t len_bytes) const {
+  uint64_t new_len_bytes;
+  if (!TrimRange(offset_bytes, len_bytes, size_locked(), &new_len_bytes)) {
     return AttributionCounts{};
   }
 
   vmo_attribution_queries.Add(1);
 
-  // A reference never has pages attributed to it. It points to the parent's VmCowPages, and we need
-  // to hold the invariant that every page is attributed to a single VMO.
+  // A reference never has memory attributed to it. It points to the parent's VmCowPages, and we
+  // need to hold the invariant that we don't double-count attributed memory.
   //
-  // TODO(https://fxbug.dev/42069078): Consider attributing pages to the current VmCowPages backlink
-  // for the case where the parent has gone away.
+  // TODO(https://fxbug.dev/42069078): Consider attributing memory to the current VmCowPages
+  // backlink for the case where the parent has gone away.
   if (is_reference()) {
     return AttributionCounts{};
   }
 
   uint64_t gen_count;
   bool update_cached_attribution = false;
-  // Use cached value if generation count has not changed since the last time we attributed pages.
+  // Use cached value if generation count has not changed since the last time we attributed memory.
   // Only applicable for attribution over the entire VMO, not a partial range.
-  if (offset == 0 && new_len == size_locked()) {
+  if (offset_bytes == 0 && new_len_bytes == size_locked()) {
     gen_count = GetHierarchyGenerationCountLocked();
 
-    if (cached_page_attribution_.generation_count == gen_count) {
+    if (cached_memory_attribution_.generation_count == gen_count) {
       vmo_attribution_cache_hits.Add(1);
-      return cached_page_attribution_.page_counts;
+      return cached_memory_attribution_.attribution_counts;
     } else {
       vmo_attribution_cache_misses.Add(1);
       update_cached_attribution = true;
     }
   }
 
-  AttributionCounts page_counts = cow_pages_locked()->AttributedPagesInRangeLocked(offset, new_len);
+  AttributionCounts counts =
+      cow_pages_locked()->GetAttributedMemoryInRangeLocked(offset_bytes, new_len_bytes);
 
   if (update_cached_attribution) {
-    // Cache attributed page count along with current generation count.
-    DEBUG_ASSERT(cached_page_attribution_.generation_count != gen_count);
-    cached_page_attribution_.generation_count = gen_count;
-    cached_page_attribution_.page_counts = page_counts;
+    // Cache attribution counts along with current generation count.
+    DEBUG_ASSERT(cached_memory_attribution_.generation_count != gen_count);
+    cached_memory_attribution_.generation_count = gen_count;
+    cached_memory_attribution_.attribution_counts = counts;
   }
 
-  return page_counts;
+  return counts;
 }
 
 zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bool pin,
@@ -1338,15 +1351,17 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
     return ZX_ERR_UNAVAILABLE;
   }
 
-  // round up the size to the next page size boundary and make sure we don't wrap
-  zx_status_t status = RoundSize(s, &s);
-  if (status != ZX_OK) {
-    return status;
+  // ensure the size is valid and that we will not wrap.
+  if (!IS_PAGE_ALIGNED(s)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (s > MAX_SIZE) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   Guard<CriticalMutex> guard{lock()};
 
-  status = cow_pages_locked()->ResizeLocked(s);
+  zx_status_t status = cow_pages_locked()->ResizeLocked(s);
   if (status != ZX_OK) {
     return status;
   }
@@ -1919,9 +1934,10 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
   // 3) vmo has no mappings
   // 4) vmo has no children
   // 5) vmo is not a child
-  // Counting attributed pages does a sufficient job of checking for committed pages since we also
+  // Counting attributed memory does a sufficient job of checking for committed pages since we also
   // require no children and no parent, so attribution == precisely our pages.
-  if (cow_pages_locked()->AttributedPagesInRangeLocked(0, size_locked()) != AttributionCounts{} &&
+  if (cow_pages_locked()->GetAttributedMemoryInRangeLocked(0, size_locked()) !=
+          AttributionCounts{} &&
       cache_policy_ != ARCH_MMU_FLAG_CACHED) {
     // We forbid to transitioning committed pages from any kind of uncached->cached policy as we do
     // not currently have a story for dealing with the speculative loads that may have happened

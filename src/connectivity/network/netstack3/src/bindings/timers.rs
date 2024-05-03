@@ -1,753 +1,682 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use std::{
-    collections::{
-        btree_map,
-        hash_map::{Entry, HashMap},
-        HashSet,
-    },
+    cmp,
+    collections::BinaryHeap,
     fmt::Debug,
-    hash::Hash,
-    ops::{Deref, DerefMut},
+    sync::{
+        atomic::{self, AtomicI64, AtomicUsize},
+        Arc,
+    },
+    task::Poll,
 };
 
-use derivative::Derivative;
+use async_utils::futures::YieldToExecutorOnce;
 use fuchsia_async as fasync;
-use futures::{
-    channel::mpsc,
-    future::{Fuse, FutureExt as _},
-    stream::StreamExt as _,
-};
+use futures::{future::FusedFuture, Future, FutureExt, StreamExt as _};
+use netstack3_core::sync::Mutex as CoreMutex;
 use tracing::{trace, warn};
 
-use netstack3_core::sync::RwLock as CoreRwLock;
+use crate::bindings::util::{NeedsDataNotifier, NeedsDataWatcher};
 
-use super::StackTime;
+pub(crate) use scheduled_instant::ScheduledInstant;
 
-// TODO(https://fxbug.dev/42083407): Remove this module when we've moved to the
-// new timers worker.
+/// A special time that is used as a marker for an unscheduled timer.
+const UNSCHEDULED_SENTINEL: fasync::Time = fasync::Time::INFINITE;
 
-/// The granularity of scheduled timer instants.
+/// The maximum number of timers that will fire without yielding to the
+/// executor.
 ///
-/// Timers that are requested to be fired at an instant that is not a multiple
-/// of the granularity will be rounded up the nearest granularity.
-///
-/// This is fine because none of the current set of timers expect lower than 1ms
-/// granularity:
-///
-/// Fragmented Packet Reassembly, [RFC 8200 section 4.5]:
-///
-///   If insufficient fragments are received to complete reassembly of a packet
-///   within 60 seconds of the reception of the first-arriving fragment of that
-///   packet, reassembly of that packet must be abandoned and all the fragments
-///   that have been received for that packet must be discarded.
-///
-/// Path MTU Discovery, [RFC 8201 section 4]:
-///
-///   An attempt to detect an increase (by sending a packet larger than the
-///   current estimate) must not be done less than 5 minutes after a Packet Too
-///   Big message has been received for the given path. The recommended
-///   setting for this timer is twice its minimum value (10 minutes).
-///
-/// NDP Router Advertisement Message Format, [RFC 4861 section 4.2]:
-///
-///      Router Lifetime
-///                     16-bit unsigned integer. The lifetime associated with
-///                     the default router in units of seconds. ...
-///
-///      Reachable Time 32-bit unsigned integer. The time, in milliseconds, that
-///                     a node assumes a neighbor is reachable after having
-///                     received a reachability confirmation. ...
-///
-///      Retrans Timer  32-bit unsigned integer. The time, in milliseconds,
-///                     between retransmitted Neighbor Solicitation messages.
-///                     ...
-///
-/// NDP Prefix Information, [RFC 4861 section 4.6.2]:
-///
-///      Valid Lifetime
-///                     32-bit unsigned integer. The length of time in seconds
-///                     (relative to the time the packet is sent) that the
-///                     prefix is valid for the purpose of on-link
-///                     determination. ...
-///
-///      Preferred Lifetime
-///                     32-bit unsigned integer. The length of time in seconds
-///                     (relative to the time the packet is sent) that addresses
-///                     generated from the prefix via stateless address
-///                     autoconfiguration remain preferred ...
-///
-/// NDP Protocol Constants, [RFC 4861 section 10]:
-///
-///   Router constants:
-///
-///            MAX_INITIAL_RTR_ADVERT_INTERVAL  16 seconds
-///
-///            MAX_INITIAL_RTR_ADVERTISEMENTS    3 transmissions
-///
-///            MAX_FINAL_RTR_ADVERTISEMENTS      3 transmissions
-///
-///            MIN_DELAY_BETWEEN_RAS             3 seconds
-///
-///            MAX_RA_DELAY_TIME                 .5 seconds
-///
-///   Host constants:
-///
-///            MAX_RTR_SOLICITATION_DELAY        1 second
-///
-///            RTR_SOLICITATION_INTERVAL         4 seconds
-///
-///            MAX_RTR_SOLICITATIONS             3 transmissions
-///
-///   Node constants:
-///
-///            MAX_MULTICAST_SOLICIT             3 transmissions
-///
-///            MAX_UNICAST_SOLICIT               3 transmissions
-///
-///            MAX_ANYCAST_DELAY_TIME            1 second
-///
-///            MAX_NEIGHBOR_ADVERTISEMENT        3 transmissions
-///
-///            REACHABLE_TIME               30,000 milliseconds
-///
-///            RETRANS_TIMER                 1,000 milliseconds
-///
-///            DELAY_FIRST_PROBE_TIME            5 seconds
-///
-///            MIN_RANDOM_FACTOR                 .5
-///
-///            MAX_RANDOM_FACTOR                 1.5
-///
-/// MLD, [RFC 2710]:
-///
-///  3.4.  Maximum Response Delay
-///
-///     The Maximum Response Delay field is meaningful only in Query
-///     messages, and specifies the maximum allowed delay before sending a
-///     responding Report, in units of milliseconds.
-///
-///  7.2.  Query Interval
-///
-///     The Query Interval is the interval between General Queries sent by
-///     the Querier.  Default: 125 seconds.
-///
-///  7.3.  Query Response Interval
-///
-///     The Maximum Response Delay inserted into the periodic General
-///     Queries.  Default: 10000 (10 seconds)
-///
-///
-///  7.8.  Last Listener Query Interval
-///
-///     The Last Listener Query Interval is the Maximum Response Delay
-///     inserted into Multicast-Address-Specific Queries sent in response to
-///     Done messages, and is also the amount of time between Multicast-
-///     Address-Specific Query messages.  Default: 1000 (1 second)
-///
-///  7.10.  Unsolicited Report Interval
-///
-///     The Unsolicited Report Interval is the time between repetitions of a
-///     node's initial report of interest in a multicast address.  Default:
-///     10 seconds.
-///
-/// TCP Retransmission Timeout, [RFC 6298 section 2],
-///
-///   Whenever RTO is computed, if it is less than 1 second, then the RTO SHOULD
-///   be rounded up to 1 second.
-///
-/// Note that although most of the quoted RFCs above are specific to IPv6, IPv4
-/// uses roughly the same constants as all of the IPv6 timeouts apply to IPv4 as
-/// well.
-///
-/// [RFC 8200 section 4.5]: https://datatracker.ietf.org/doc/html/rfc8200#section-4.5
-/// [RFC 8201 section 4]: https://datatracker.ietf.org/doc/html/rfc8201#section-4
-/// [RFC 4861 section 4.2]: https://datatracker.ietf.org/doc/html/rfc4861#section-4.2
-/// [RFC 4861 section 4.6.2]: https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.2
-/// [RFC 4861 section 10]: https://datatracker.ietf.org/doc/html/rfc4861#section-10
-/// [RFC 6298 section 2]: https://datatracker.ietf.org/doc/html/rfc6298#section-2
-/// [RFC 2710]: https://datatracker.ietf.org/doc/html/rfc2710
-const GRANULARITY: fasync::Duration = fasync::Duration::from_millis(1);
+/// This allows us to yield time to other tasks if there's a thundering herd of
+/// timers firing at the same time.
+const YIELD_TIMER_COUNT: usize = 10;
 
-/// Calculates the actual time a timer will fire at according to this
-/// timer dispatcher's [`GRANULARITY`].
-fn calc_fire_instant(requested_time: fasync::Time) -> fasync::Time {
-    // Round the time up to the nearest `GRANULARITY`. This should result in
-    // less timers scheduled with the executor and batching of timer firing
-    // events.
-    //
-    // We do not allow rounding down because the stack makes the assumption that
-    // a timer will never fire prematurely. Howevever, nothing can reliably know
-    // at what actual instant a timer will fire after its scheduled instant. For
-    // that reason, we exploit this and intentionally allow timers to fire
-    // slightly after the scheduled time but never before. This should result in
-    // less wake-ups for the timer dispatcher as well.
-    //
-    // See https://fxbug.dev/42076090 for more details.
-    const GRANULARITY_AS_NANOS: i64 = GRANULARITY.into_nanos();
-    let granularity_units =
-        requested_time.into_nanos().saturating_add(GRANULARITY_AS_NANOS - 1) / GRANULARITY_AS_NANOS;
-    // The calculation above doesn't properly handle the case where the instant
-    // is close to the maximum possible value because the add above is
-    // saturated.
-    //
-    // Lets say time was backed by `i8` instead of `i64`. `INFINITE` would be
-    // `i8::MAX` which is `127`. If we divide that by a granularity of say `10`,
-    // we end up with `12` units and `12 * 10 == 120` is less than the value we
-    // started at (`127`).
-    //
-    // Because of this, we know that the multiplication below will never
-    // overflow.
-    let tentative_fire_instant = fasync::Time::from_nanos(
-        GRANULARITY
-            .into_nanos()
-            .checked_mul(granularity_units)
-            .expect("granularity_units can never exeed what is held in a fasync::Time"),
-    );
-    if tentative_fire_instant >= requested_time {
-        tentative_fire_instant
-    } else {
-        // This means that our requested time is such a large number that we
-        // cannot round it up to the next `GRANULARITY` unit. Map all such
-        // values to the maximum possible value we can so we still get some
-        // amount of batching. This is condition is very unlikely to happen in
-        // practice but might as well guard for it.
-        fasync::Time::INFINITE
+pub(crate) struct TimerDispatcher<T> {
+    inner: Arc<TimerDispatcherInner<T>>,
+}
+
+impl<T> Default for TimerDispatcher<T> {
+    fn default() -> Self {
+        let notifier = NeedsDataNotifier::default();
+        let watcher = notifier.watcher();
+        Self {
+            inner: Arc::new(TimerDispatcherInner {
+                timer_count: AtomicUsize::new(0),
+                state: CoreMutex::new(TimerDispatcherState {
+                    heap: BinaryHeap::new(),
+                    notifier: Some(notifier),
+                    watcher: Some(watcher),
+                }),
+            }),
+        }
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct InternalId(u64);
-
-impl InternalId {
-    fn increment(&self) -> Self {
-        let Self(id) = self;
-        Self(id.wrapping_add(1))
-    }
-}
-
-/// Internal information to keep tabs on timers.
-struct TimerInfo {
-    id: InternalId,
-    instant: StackTime,
-}
-
-/// A context for specified for a timer type `T` that provides access to a
-/// [`TimerHandler`].
-pub(crate) trait TimerContext<T: Hash + Eq>: 'static + Clone {
-    type Handler: TimerHandler<T>;
-
-    fn handler(&self) -> Self::Handler;
-}
-
-/// An entity responsible for receiving expired timers.
-///
-/// `TimerHandler` is used to communicate expired timers from a
-/// [`TimerDispatcher`] that was spawned with some [`TimerContext`].
-pub(crate) trait TimerHandler<T: Hash + Eq>: Sized + 'static {
-    /// The provided `timer` is expired (its deadline arrived and it wasn't
-    /// cancelled or rescheduled).
-    fn handle_expired_timer(&mut self, timer: T);
-    /// Retrieve a mutable reference to the [`TimerDispatcher`] associated with
-    /// this `TimerHandler`. It *must* be the same `TimerDispatcher` instance
-    /// for which this handler's [`TimerContext`] was spawned with
-    /// [`TimerDispatcher::spawn`].
-    fn get_timer_dispatcher(&mut self) -> &TimerDispatcher<T>;
-}
-
-#[derive(Debug)]
-enum TimerRequestKind {
-    Schedule,
-    Cancel,
-}
-
-#[derive(Debug)]
-struct TimerRequest {
-    time: StackTime,
-    id: InternalId,
-    kind: TimerRequestKind,
-}
-
-impl TimerRequest {
-    fn new(time: StackTime, id: InternalId, kind: TimerRequestKind) -> Self {
-        Self { time, id, kind }
-    }
-
-    fn new_cancel(time: StackTime, id: InternalId) -> Self {
-        Self::new(time, id, TimerRequestKind::Cancel)
-    }
-
-    fn new_schedule(time: StackTime, id: InternalId) -> Self {
-        Self::new(time, id, TimerRequestKind::Schedule)
-    }
-}
-
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-struct TimerDispatcherInner<T: Hash + Eq> {
-    // Invariant: This dispatcher uses a HashMap keyed on an external identifier
-    // T and assigns an internal "versioning" ID every time a timer is
-    // scheduled. The "versioning" ID is just monotonically incremented and it
-    // is used to disambiguate different scheduling events of the same timer T.
-    // TimerInfo in the HashMap will always hold the latest allocated
-    // "versioning" identifier, meaning that:
-    //  - When a timer is rescheduled, we update TimerInfo::id to a new value
-    //  - To "commit" a timer firing (through commit_timer), the timer ID
-    //    given must carry the same "versioning" identifier as the one currently
-    //    held by the HashMap in TimerInfo::id.
-    //  - timer_ids will always/only hold the timer IDs that are still scheduled
-    //    keyed by their most recent "versioning" ID.
-    // The committing mechanism is invisible to external users, which just
-    // receive the expired timers through TimerHandler::handle_expired_timer.
-    // See TimerDispatcher::spawn for the critical section that makes versioning
-    // required.
-    timer_ids: HashMap<InternalId, T>,
-    timers: HashMap<T, TimerInfo>,
-    next_id: InternalId,
-    futures_sender: Option<mpsc::UnboundedSender<TimerRequest>>,
-}
-
-/// Helper struct to keep track of timers for the event loop.
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub(crate) struct TimerDispatcher<T: Hash + Eq> {
-    inner: CoreRwLock<TimerDispatcherInner<T>>,
-}
-
-impl<T> TimerDispatcher<T>
-where
-    T: Hash + Debug + Eq + Clone + Send + Sync + Unpin + 'static,
-{
-    /// Spawns a [`TimerContext`] that will observe events on this
-    /// `TimerDispatcher` through its [`TimerHandler`].
+impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
+    /// Spawns a worker for this `TimerDispatcher`.
+    ///
+    /// The worker task will only end when `close` is called on this
+    /// `TimerDispatcher`.
+    ///
+    /// `handler` is called whenever a timer is fired.
     ///
     /// # Panics
     ///
-    /// Panics if this `TimerDispatcher` was already spawned.
-    pub(crate) fn spawn<C: TimerContext<T> + Send + Sync>(&self, ctx: C) -> fasync::Task<()> {
-        let (sender, mut recv) = mpsc::unbounded();
-        {
-            let Self { inner } = self;
-            let mut inner = inner.write();
-            let TimerDispatcherInner { timer_ids: _, timers: _, next_id: _, futures_sender } =
-                inner.deref_mut();
-            assert!(futures_sender.replace(sender).is_none(), "TimerDispatcher already spawned");
-        }
-
-        #[derive(Default)]
-        struct TimerGroup {
-            ids: HashSet<InternalId>,
-            // A timer may be scheduled to fire before a group that already has
-            // registered a timer with the executor. In that case, we hold the
-            // timer here (to avoid recreating it later) and create a new one
-            // for the timer group that is scheduled to fire earlier. This lets
-            // us avoid creating redundant timers with the executor.
-            fut: Option<Fuse<fasync::Timer>>,
-        }
-
-        let mut timers = std::collections::BTreeMap::<fasync::Time, TimerGroup>::default();
-
-        fasync::Task::spawn(async move {
-            #[derive(Debug)]
-            enum PollResult {
-                InstallTimer(TimerRequest),
-                TimerFired,
-                ReceiverClosed,
-            }
-
-            loop {
-                // Get the group of timers that should fire next.
-                let mut timer_fut = if let Some(entry) = timers.first_entry() {
-                    let time = entry.key().clone();
-                    let TimerGroup { ids: _, fut } = entry.into_mut();
-
-                    // If we do not yet have a `fasync::Timer` for this group,
-                    // create one now. This reduces pressure on the executor's
-                    // heap of timers. The executor does not currently handle
-                    // aborting timers well (causes a memory leak) so we mitigate
-                    // the leak by deferring the creation of timers as much as
-                    // possible.
-                    //
-                    // See https://fxbug.dev/42076090 for more details.
-                    //
-                    // TODO(https://fxbug.dev/42076090): Revisit this bandaid for
-                    // the executor's memory leak.
-                    futures::future::Either::Left(
-                        fut.get_or_insert_with(|| fasync::Timer::new(time).fuse()),
-                    )
-                } else {
-                    // No timers scheduled, let this "future" never return.
-                    futures::future::Either::Right(futures::future::pending())
-                };
-
-                let r = futures::select! {
-                    r = recv.next() => match r {
-                        Some(req) => PollResult::InstallTimer(req),
-                        None => PollResult::ReceiverClosed
-                    },
-                    () = timer_fut => PollResult::TimerFired,
-                };
-                // NB: This is the critical section that makes it so that we
-                // need to version timers and verify the versioning through
-                // `commit_timer` before passing those over to the handler. At
-                // this point, the timer future has already resolved. It may
-                // already have been aborted, in which case the version ID
-                // doesn't matter. But it may also have been already fulfilled.
-                // The race comes from the fact that we don't currently have a
-                // lock on the context. If we are woken up to handle a timer,
-                // the timer ID we're currently holding may have been
-                // invalidated by another Task, before this task was woken up so
-                // it must NOT be given to to the handler.
-                //
-                // After this point, we know nothing else can cancel the timer
-                // since (as of writing) we use a single-threaded executor and
-                // we have no await points below.
-                //
-                // TODO(https://fxbug.dev/42073707): Fix timer dispatcher race
-                // with multithreaded executor/concurrent tasks.
-
-                trace!("TimerDispatcher work: {:?}", r);
-                match r {
-                    PollResult::InstallTimer(TimerRequest { time: StackTime(time), id, kind }) => {
-                        let time = calc_fire_instant(time);
-                        match kind {
-                            TimerRequestKind::Schedule => {
-                                assert!(timers.entry(time).or_default().ids.insert(id))
-                            }
-                            TimerRequestKind::Cancel => {
-                                let mut entry = match timers.entry(time) {
-                                    btree_map::Entry::Occupied(entry) => entry,
-                                    btree_map::Entry::Vacant(_) => continue,
-                                };
-
-                                let TimerGroup { ids, fut: _ } = entry.get_mut();
-
-                                // If the group has no more scheduled timers,
-                                // throw away the group (including the future).
-                                // If the group had a future registered with the
-                                // executor (`fasync::Timer`) it is likely that
-                                // the executor will clean that up soon since we
-                                // lazily create `fasync::Timer`s only for the
-                                // next-to-fire group. If the group had no future,
-                                // then there are no resources to clean up other
-                                // than the memory this entry allocated.
-                                let _: bool = ids.remove(&id);
-                                if ids.len() == 0 {
-                                    let _: (fasync::Time, TimerGroup) = entry.remove_entry();
-                                }
-                            }
-                        }
-                    }
-                    PollResult::TimerFired => {
-                        let mut handler = ctx.handler();
-
-                        // When a timer fires, fire as many timers as we can. Once
-                        // we hit a timer group which is expected to fire after
-                        // our current time, we go back to awaiting above.
-                        while let Some(entry) = timers.first_entry() {
-                            let now = fasync::Time::now();
-                            if now < entry.key().clone() {
-                                break;
-                            }
-
-                            let (fire_instant, TimerGroup { ids, fut: _ }) = entry.remove_entry();
-                            assert!(
-                                now >= fire_instant,
-                                "now={now:?}, fire_instant={fire_instant:?}"
-                            );
-
-                            for id in ids {
-                                match handler.get_timer_dispatcher().commit_timer(id) {
-                                    Ok(t) => {
-                                        trace!("TimerDispatcher: firing timer {:?}", t);
-                                        handler.handle_expired_timer(t);
-                                    }
-                                    Err(e) => {
-                                        trace!("TimerDispatcher: timer was stale {:?}", e);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    PollResult::ReceiverClosed => break,
-                }
-            }
-        })
+    /// Panics if this `TimerDispatcher` has already been spawned.
+    pub(crate) fn spawn<H: FnMut(T) + Send + Sync + 'static>(
+        &self,
+        handler: H,
+    ) -> fasync::Task<()> {
+        let watcher =
+            self.inner.state.lock().watcher.take().expect("timer dispatcher already spawned");
+        fasync::Task::spawn(Self::worker(handler, watcher, Arc::clone(&self.inner)))
     }
 
-    /// Schedule a new timer with identifier `timer_id` at `time`.
-    ///
-    /// If a timer with the same `timer_id` was already scheduled, the old timer
-    /// is unscheduled and its expiry time is returned.
-    pub(crate) fn schedule_timer(&self, timer_id: T, time: StackTime) -> Option<StackTime> {
-        let Self { inner } = self;
-        let mut inner = inner.write();
-        let TimerDispatcherInner { timer_ids, timers, next_id, futures_sender } = inner.deref_mut();
-
-        let next_id = {
-            let id = *next_id;
-
-            // Overflowing next_id should be safe enough to hold TimerDispatcher's
-            // invariant about around "versioning" timer identifiers. We'll
-            // overlflow after 2^64 timers are scheduled (which can take a while)
-            // and, even then, for it to break the invariant we'd need to still have
-            // a timer scheduled from long ago and be unlucky enough that ordering
-            // ends up giving it the same ID. That seems unlikely, so we just wrap
-            // around and overflow next_id.
-            *next_id = next_id.increment();
-
-            id
-        };
-
-        if let Some(sender) = futures_sender.as_ref() {
-            sender
-                .unbounded_send(TimerRequest::new_schedule(time, next_id))
-                .expect("TimerDispatcher should not stop");
-        } else {
-            // Timers are always stopped in tests.
-            warn!("TimerDispatcher not spawned, timer {:?} will not fire", timer_id);
-        }
-
-        assert_eq!(timer_ids.insert(next_id, timer_id.clone()), None);
-
-        match timers.entry(timer_id) {
-            Entry::Vacant(e) => {
-                // If we don't have any currently scheduled timers with this
-                // timer_id, we're just going to insert a new value into the
-                // vacant entry, marking it with next_id.
-                let _: &mut TimerInfo = e.insert(TimerInfo { id: next_id, instant: time });
-                None
-            }
-            Entry::Occupied(mut e) => {
-                // If we already have a scheduled timer with this timer_id, we
-                // must...
-                let info = e.get_mut();
-                // ...cancel the old timer with the timer dispatcher.
-                //
-                // Timers are always stopped in tests.
-                if let Some(sender) = futures_sender.as_ref() {
-                    sender
-                        .unbounded_send(TimerRequest::new_cancel(info.instant, info.id))
-                        .expect("TimerDispatcher should not stop")
-                }
-                // ...store the new "versioning" timer_id next_id, effectively
-                // marking this newest version as the only valid one, in case
-                // the old timer had already fired as is currently waiting to be
-                // committed.
-                let prev_id = info.id;
-                info.id = next_id;
-                // ...finally, we get the old instant information to be returned
-                // and update the TimerInfo entry with the new time value:
-                let old = Some(info.instant);
-                info.instant = time;
-
-                assert_eq!(timer_ids.remove(&prev_id).as_ref(), Some(e.key()));
-
-                old
-            }
+    /// Creates a new timer with identifier `dispatch` on this `dispatcher`.
+    pub(crate) fn new_timer(&self, dispatch: T) -> Timer<T> {
+        let _: usize = self.inner.timer_count.fetch_add(1, atomic::Ordering::SeqCst);
+        Timer {
+            heap: Arc::clone(&self.inner),
+            state: Arc::new(TimerState {
+                dispatch,
+                scheduled: AtomicI64::new(UNSCHEDULED_SENTINEL.into_nanos()),
+                gc_generation: AtomicUsize::new(0),
+            }),
+            _no_clone: NoCloneGuard,
         }
     }
 
-    /// Cancels a timer with identifier `timer_id`.
+    /// Stops this timer dispatcher.
     ///
-    /// If a timer with the provided `timer_id` was scheduled, returns the
-    /// expiry time for it after having cancelled it.
-    pub(crate) fn cancel_timer(&self, timer_id: &T) -> Option<StackTime> {
-        let Self { inner } = self;
-        let mut inner = inner.write();
-        let TimerDispatcherInner { timer_ids, timers, next_id: _, futures_sender } =
-            inner.deref_mut();
-        if let Some(t) = timers.remove(timer_id) {
-            assert_eq!(timer_ids.remove(&t.id).as_ref(), Some(timer_id));
-            // Timers are always stopped in tests.
-            if let Some(sender) = futures_sender.as_ref() {
-                sender
-                    .unbounded_send(TimerRequest::new_cancel(t.instant, t.id))
-                    .expect("TimerDispatcher should not stop")
-            }
-            Some(t.instant)
-        } else {
-            None
-        }
-    }
-
-    /// Cancels all timers with given filter.
-    ///
-    /// `f` will be called sequentially for all the currently scheduled timers.
-    /// If `f(id)` returns `true`, the timer with `id` will be cancelled.
-    pub(crate) fn cancel_timers_with<F: FnMut(&T) -> bool>(&self, mut f: F) {
-        let Self { inner } = self;
-        let mut inner = inner.write();
-        let TimerDispatcherInner { timer_ids: _, timers, next_id: _, futures_sender } =
-            inner.deref_mut();
-        timers.retain(|id, info| {
-            let discard = f(&id);
-            if discard {
-                // Timers are always stopped in tests.
-                if let Some(sender) = futures_sender.as_ref() {
-                    sender
-                        .unbounded_send(TimerRequest::new_cancel(info.instant, info.id))
-                        .expect("TimerDispatcher should not stop")
-                }
-            }
-            !discard
-        });
-    }
-
-    /// Gets the time a timer with identifier `timer_id` will be invoked.
-    ///
-    /// If a timer with the provided `timer_id` exists, returns the expiry
-    /// time for it; `None` otherwise.
-    pub(crate) fn scheduled_time(&self, timer_id: &T) -> Option<StackTime> {
-        let Self { inner } = self;
-        let inner = inner.read();
-        let TimerDispatcherInner { timer_ids: _, timers, next_id: _, futures_sender: _ } =
-            inner.deref();
-        timers.get(timer_id).map(|t| t.instant)
-    }
-
-    /// Retrieves the internal timer value of a timer ID.
-    ///
-    /// `commit_timer` will "commit" `id` for consumption, if `id` is
-    /// still valid to be triggered. If `commit_timer` returns `Ok`, then
-    /// `TimerDispatcher` will "forget" about the timer identifier referenced
-    /// by `id`, meaning subsequent calls to [`cancel_timer`] or
-    /// [`schedule_timer`] will return `Err`.
-    ///
-    /// [`cancel_timer`]: TimerDispatcher::cancel_timer
-    /// [`schedule_timer`]: TimerDispatcher::schedule_timer
-    fn commit_timer(&self, id: InternalId) -> Result<T, InternalId> {
-        let Self { inner } = self;
-        let mut inner = inner.write();
-        let TimerDispatcherInner { timer_ids, timers, next_id: _, futures_sender: _ } =
-            inner.deref_mut();
-        let external_id = timer_ids.remove(&id).ok_or(id)?;
-        let info = timers.remove(&external_id).ok_or(id)?;
-        assert_eq!(info.id, id);
-        Ok(external_id)
-    }
-
-    /// Stops the timer dispatcher.
-    ///
-    /// The task created in [`TimerDispatcher::spawn`] can be joined after
-    /// calling `stop`.
+    /// This causes a task previously returned by [`TimerDispatcher::spawn`] to
+    /// complete.
     ///
     /// # Panics
     ///
-    /// Panics if this `TimerDispatcher` hasn't been spawned or if `stop` was
-    /// already called on it.
+    /// If `stop` was already called.
     pub(crate) fn stop(&self) {
-        let Self { inner } = self;
-        let mut inner = inner.write();
-        let TimerDispatcherInner { timer_ids: _, timers: _, next_id: _, futures_sender } =
-            inner.deref_mut();
-        let _: mpsc::UnboundedSender<_> =
-            futures_sender.take().expect("timer dispatcher not running");
+        assert!(self.inner.state.lock().notifier.take().is_some(), "dispatcher already closed");
+    }
+
+    async fn worker<H: FnMut(T)>(
+        mut handler: H,
+        mut watcher: NeedsDataWatcher,
+        inner: Arc<TimerDispatcherInner<T>>,
+    ) {
+        let mut timer = TimerWaiter::new();
+        let mut gc_generation = 0;
+        loop {
+            let mut watcher_next = watcher.next().fuse();
+            futures::select! {
+                () = timer => (),
+                w = watcher_next => {
+                    match w {
+                        Some(()) => (),
+                        // Dispatcher is closed, break the loop.
+                        None => break,
+                    }
+                }
+            }
+
+            let (next_wakeup, heap_len) = Self::check_timer_heap(&mut handler, &inner.state).await;
+
+            trace!("next wakeup = {:?}, heap_len = {heap_len}", ScheduledInstant::new(next_wakeup));
+            // Update our timer to wake at the next wake up time according to
+            // the heap.
+            timer.set(next_wakeup);
+
+            // Our target heap size is the number of timers we have alive,
+            // capped to a minimum size to avoid too much GC thrash.
+            //
+            // We'll run a GC on the heap whenever we hit twice the target size,
+            // at which point we expect the GC to bring the number of entries
+            // down to around the target size.
+            let target_heap_len =
+                inner.timer_count.load(atomic::Ordering::SeqCst).max(MIN_TARGET_HEAP_SIZE);
+            timer.set_target_heap_size(target_heap_len);
+            if heap_len > target_heap_len * 2 {
+                gc_generation += 1;
+                let after = Self::gc_timer_heap(&inner.state, gc_generation);
+                trace!(
+                    "timer gc gen({}) triggered with heap_len={}, target={}, after={}",
+                    gc_generation,
+                    heap_len,
+                    target_heap_len,
+                    after
+                );
+            }
+        }
+        // Cleanup everything on the heap before returning.
+        inner.state.lock().heap.clear();
+    }
+
+    /// Walks the timer heap, removing any stale entries that might have
+    /// accumulated due to timer scheduling/cancelation thrash.
+    ///
+    /// Returns the heap length after GC.
+    fn gc_timer_heap(inner: &CoreMutex<TimerDispatcherState<T>>, generation: usize) -> usize {
+        let mut guard = inner.lock();
+        let TimerDispatcherState { heap, notifier: _, watcher: _ } = &mut *guard;
+        heap.retain(|TimeAndValue { time, value }| {
+            let current = fasync::Time::from_nanos(value.scheduled.load(atomic::Ordering::SeqCst));
+            // Retain all the entries that are still valid.
+            match ScheduledEntryValidity::new(current, *time) {
+                ScheduledEntryValidity::Valid | ScheduledEntryValidity::ValidForLaterTime => {
+                    // Only keep entries that we haven't seen yet on this GC
+                    // sweep. It is possible to observe many `ValidForLaterTime`
+                    // entries for a single timer and we want to keep only one
+                    // of them.
+                    value.gc_generation.swap(generation, atomic::Ordering::SeqCst) != generation
+                }
+                ScheduledEntryValidity::Invalid => false,
+            }
+        });
+        heap.len()
+    }
+
+    /// Checks the timer heap, firing any elapsed timers.
+    ///
+    /// Returns the next wakeup time for the worker task and the total number of
+    /// entries in the internal heap.
+    async fn check_timer_heap<H: FnMut(T)>(
+        handler: &mut H,
+        inner: &CoreMutex<TimerDispatcherState<T>>,
+    ) -> (fasync::Time, usize) {
+        let mut fired_count = 0;
+        loop {
+            let fire = {
+                let mut guard = inner.lock();
+                let TimerDispatcherState { heap, notifier: _, watcher: _ } = &mut *guard;
+                let heap_len = heap.len();
+                let Some(front) = heap.peek_mut() else {
+                    // Nothing to wait for.
+                    return (UNSCHEDULED_SENTINEL, heap_len);
+                };
+                if !front.should_fire_at(fasync::Time::now()) {
+                    // Wait until the time at the front of the heap to fire.
+                    return (front.time, heap_len);
+                }
+                // NB: This is an associated function, probably because
+                // PeekMut implements Deref.
+                let front = std::collections::binary_heap::PeekMut::pop(front);
+                match front.try_fire() {
+                    TryFireResult::Fire(f) => f,
+                    TryFireResult::Ignore => continue,
+                    TryFireResult::Reschedule(r) => {
+                        heap.push(r);
+                        continue;
+                    }
+                }
+            };
+            trace!("firing timer {fire:?}");
+            handler(fire);
+            fired_count += 1;
+            if fired_count % YIELD_TIMER_COUNT == 0 {
+                YieldToExecutorOnce::new().await;
+            }
+        }
+    }
+}
+
+struct TimerDispatcherState<T> {
+    heap: BinaryHeap<TimerScheduledEntry<T>>,
+    // Notifier is removed on close.
+    notifier: Option<NeedsDataNotifier>,
+    // Watcher is taken on spawn.
+    watcher: Option<NeedsDataWatcher>,
+}
+
+struct TimerDispatcherInner<T> {
+    timer_count: AtomicUsize,
+    state: CoreMutex<TimerDispatcherState<T>>,
+}
+
+/// A reusable struct to place a value and a timestamp in a [`BinaryHeap`].
+///
+/// Its `Ord` implementation is tuned to make [`BinaryHeap`] a min heap.
+struct TimeAndValue<T> {
+    time: fasync::Time,
+    value: T,
+}
+
+// Boilerplate to implement a heap entry.
+impl<T> PartialEq for TimeAndValue<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.time == other.time
+    }
+}
+
+impl<T> Eq for TimeAndValue<T> {}
+
+impl<T> Ord for TimeAndValue<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Note that we flip the argument order here to make the `BinaryHeap` a
+        // min heap.
+        Ord::cmp(&other.time, &self.time)
+    }
+}
+
+impl<T> PartialOrd for TimeAndValue<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(Ord::cmp(self, other))
+    }
+}
+
+/// An entry in the [`TimerDispatcher`] heap.
+type TimerScheduledEntry<T> = TimeAndValue<Arc<TimerState<T>>>;
+
+/// The validity state of a [`TimerScheduledEntry`].
+enum ScheduledEntryValidity {
+    /// This entry is valid and can cause a timer to fire.
+    Valid,
+    /// This entry is valid at a later time, loaded from the timer state.
+    ValidForLaterTime,
+    /// This entry is invalid and can be discarded.
+    Invalid,
+}
+
+impl ScheduledEntryValidity {
+    /// Evaluates the validity of a scheduled entry with `current_value` and
+    /// cached `scheduled_entry`.
+    fn new(current_value: fasync::Time, scheduled_entry: fasync::Time) -> Self {
+        if current_value == UNSCHEDULED_SENTINEL {
+            return Self::Invalid;
+        }
+        match current_value.cmp(&scheduled_entry) {
+            // If the timer state is holding a time before the one originally
+            // scheduled, this is a stale timer entry. We should ignore it.
+            cmp::Ordering::Less => Self::Invalid,
+            cmp::Ordering::Equal => Self::Valid,
+            // If the timer state is holding a time later than the originally
+            // scheduled, it needs to be replaced in the heap to be fired later.
+            cmp::Ordering::Greater => Self::ValidForLaterTime,
+        }
+    }
+}
+
+impl<T: Clone> TimerScheduledEntry<T> {
+    /// Consumes the entry in an attempt to fire the timer.
+    fn try_fire(self) -> TryFireResult<T> {
+        let Self { value: timer_state, time: scheduled_for } = self;
+        match timer_state.scheduled.compare_exchange(
+            scheduled_for.into_nanos(),
+            UNSCHEDULED_SENTINEL.into_nanos(),
+            atomic::Ordering::SeqCst,
+            atomic::Ordering::SeqCst,
+        ) {
+            // We may only fire the timer if the timer state is holding the same
+            // value that it had when it was put into the heap.
+            Ok(_) => TryFireResult::Fire(timer_state.dispatch.clone()),
+            Err(next) => {
+                let next = fasync::Time::from_nanos(next);
+                match ScheduledEntryValidity::new(next, scheduled_for) {
+                    // If the timer state is  valid for a later time, we need to
+                    // put it back into the heap to be fired later.
+                    ScheduledEntryValidity::ValidForLaterTime => {
+                        TryFireResult::Reschedule(Self { value: timer_state, time: next })
+                    }
+                    // Ignore stale and invalid entries.
+                    ScheduledEntryValidity::Invalid => TryFireResult::Ignore,
+                    // The valid case, when the current and scheduled_for times
+                    // are the same is covered by the Ok arm above.
+                    ScheduledEntryValidity::Valid => unreachable!(),
+                }
+            }
+        }
+    }
+
+    /// Returns whether this entry should fire for the current time.
+    fn should_fire_at(&self, now: fasync::Time) -> bool {
+        self.time <= now
+    }
+}
+
+/// The result of operating a valid timer entry.
+enum TryFireResult<T> {
+    /// Fire this timer with the provided dispatch id.
+    Fire(T),
+    /// Timer entry is stale, ignore it.
+    Ignore,
+    /// Reschedule with this new entry.
+    Reschedule(TimerScheduledEntry<T>),
+}
+
+/// The state kept in each timer.
+struct TimerState<T> {
+    /// Schedule holds the most up to date desired wake up time for a timer.
+    ///
+    /// This value is atomically read and compared to the cached time in
+    /// [`TimeAndValue`] to validate the desired wake up time hasn't changed.
+    scheduled: AtomicI64,
+    dispatch: T,
+    // State kept with each timer to help GC.
+    gc_generation: AtomicUsize,
+}
+
+/// This type is preventing [`Timer`] from evolving poorly and deriving `Clone`.
+struct NoCloneGuard;
+
+pub(crate) struct Timer<T> {
+    state: Arc<TimerState<T>>,
+    heap: Arc<TimerDispatcherInner<T>>,
+    /// This type must not become Clone, see explanation in [`Timer::schedule`].
+    _no_clone: NoCloneGuard,
+}
+
+impl<T> Debug for Timer<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Many structs in core that use timers are self-referential so we need
+        // to be careful in the Debug impl here, especially around the opaque
+        // type T.
+        let Self { state, heap: _, _no_clone: _ } = self;
+        let TimerState { scheduled, dispatch: _, gc_generation: _ } = &**state;
+        let scheduled = ScheduledInstant::new(fasync::Time::from_nanos(
+            scheduled.load(atomic::Ordering::Relaxed),
+        ));
+        f.debug_struct("Timer").field("scheduled", &scheduled).finish_non_exhaustive()
+    }
+}
+
+impl<T> Drop for Timer<T> {
+    fn drop(&mut self) {
+        let _: Option<ScheduledInstant> = self.cancel();
+        let _: usize = self.heap.timer_count.fetch_sub(1, atomic::Ordering::SeqCst);
+    }
+}
+
+impl<T> Timer<T> {
+    pub(crate) fn schedule(&mut self, when: fasync::Time) -> Option<ScheduledInstant> {
+        let prev = self.state.scheduled.swap(when.into_nanos(), atomic::Ordering::SeqCst);
+        let prev = fasync::Time::from_nanos(prev);
+
+        // CRITICAL SECTION HERE.
+        //
+        // A timer *cannot* be cloned because there must be only one instance of
+        // if that can schedule; the cloned state may only be used by the heap
+        // to invalidate, by setting the scheduled time to infinite future.
+        //
+        // If we raced with a different scheduling operation here the simple
+        // check to see if the previous value is in the future could cause
+        // problems.
+        //
+        // Given no cloning, the race here is prevented because the timer heap
+        // only writes infinite future and always checks it against the expected
+        // scheduled time. So if this timer was in the heap and it just fired,
+        // then the heap will take care of rescheduling it for the future if it
+        // was pushed later in time or drop it if it was pushed earlier in time.
+        // Those actions are compatible with what we do below: do nothing if
+        // we're re-scheduling for a later moment in time and push back to the
+        // heap otherwise.
+        //
+        // Note that cancelation will never hit this branch because it's the
+        // maximum value.
+        if prev > when {
+            // If the new timer is for an earlier moment in time, then we need
+            // to put this in the heap; the old entry will eventually be a
+            // no-op.
+            let mut guard = self.heap.state.lock();
+            let wake_notifier = {
+                let TimerDispatcherState { heap, notifier, watcher: _ } = &mut *guard;
+                if let Some(notifier) = notifier.as_ref() {
+                    let front = heap.peek().map(|c| c.time);
+                    heap.push(TimerScheduledEntry { time: when, value: Arc::clone(&self.state) });
+                    // Wake the timer task whenever the front of the heap changes.
+                    (front != heap.peek().map(|c| c.time)).then_some(notifier)
+                } else {
+                    // Avoid doing any work if the notifier is gone, that means
+                    // the timer is going away.
+                    warn!("TimerDispatcher is closed, timer will not fire");
+                    None
+                }
+            };
+            if let Some(notifier) = wake_notifier {
+                notifier.schedule();
+            }
+        } else {
+            // Updating the atomic is sufficient to reschedule a timer for a
+            // later instant. When the entry is popped from the heap, the
+            // updated value from `TimerState` informs the heap of the
+            // reschedule.
+        }
+        ScheduledInstant::new(prev)
+    }
+
+    pub(crate) fn cancel(&mut self) -> Option<ScheduledInstant> {
+        self.schedule(UNSCHEDULED_SENTINEL)
+    }
+
+    pub(crate) fn scheduled_time(&self) -> Option<ScheduledInstant> {
+        ScheduledInstant::new(fasync::Time::from_nanos(
+            self.state.scheduled.load(atomic::Ordering::SeqCst),
+        ))
+    }
+}
+
+const MIN_TARGET_HEAP_SIZE: usize = 10;
+
+/// This provides a means to reuse [`fasync::Timer`] across run loops of
+/// [`TimerDispatcher`], minimizing reallocations and decreasing leaks.
+///
+/// A `fasync::Timer` allocates backing memory that is only freed when the time
+/// it was created with expires.. `TimerWaiter` offers a self-contained reusable
+/// collection of timers that it decides to use based on the desired scheduled
+/// wait time.
+///
+/// It also works around the limitation that an `fasync::Timer` can only be
+/// rescheduled after it has fired.
+struct TimerWaiter {
+    timers: BinaryHeap<TimeAndValue<fasync::Timer>>,
+    selected: Option<TimeAndValue<fasync::Timer>>,
+    wakeup: fasync::Time,
+    /// The target heap size controls when we let go of expired fasync::Timers
+    /// instead of reusing them.
+    target_heap_size: usize,
+}
+
+impl TimerWaiter {
+    /// Creates a new `TimerWaiter`.
+    ///
+    /// In the default state, `TimerWaiter` is scheduled for `INFINITE_FUTURE`.
+    fn new() -> Self {
+        Self {
+            timers: Default::default(),
+            selected: None,
+            wakeup: UNSCHEDULED_SENTINEL,
+            target_heap_size: MIN_TARGET_HEAP_SIZE,
+        }
+    }
+
+    /// Sets the target heap size to `target`.
+    fn set_target_heap_size(&mut self, target: usize) {
+        self.target_heap_size = target;
+    }
+
+    /// Sets the time at which this future will resolve to ready.
+    ///
+    /// Note that an `INFINITE_FUTURE` wakeup time will cause `TimerWaiter` to
+    /// behave like a terminated future, i.e., `FusedFuture::is_terminated` is
+    /// `true` and polling it may panic.
+    fn set(&mut self, new_wakeup: fasync::Time) {
+        let Self { timers, selected, wakeup, target_heap_size: _ } = self;
+        if std::mem::replace(wakeup, new_wakeup) == new_wakeup {
+            return;
+        }
+        // If we have a new wakeup time, always give up on the currently
+        // selected timer and push to the heap.
+        if let Some(selected) = selected.take() {
+            timers.push(selected);
+        }
+
+        // Don't use timers for waiting until infinity. Our `FusedFuture`
+        // implementation will prevent this from being polled when that's the
+        // case.
+        if new_wakeup == UNSCHEDULED_SENTINEL {
+            return;
+        }
+
+        let time_and_value = timers
+            .peek_mut()
+            .and_then(|front| {
+                // This is a good candidate IFF the fasync time is scheduled
+                // before our new wakeup time or it matches it exactly.
+                (front.time <= new_wakeup)
+                    .then(|| std::collections::binary_heap::PeekMut::pop(front))
+            })
+            .unwrap_or_else(|| {
+                // If there are no timers available in the heap then we need to
+                // allocate a new timer.
+                TimeAndValue { time: new_wakeup, value: fasync::Timer::new(new_wakeup) }
+            });
+
+        *selected = Some(time_and_value);
+    }
+
+    fn maybe_return_fired_timer_to_pool(&mut self, entry: TimeAndValue<fasync::Timer>) {
+        // Place the timer back in the heap if we're not over the threshold.
+        //
+        // We don't store anything special in the heap saying this timer has
+        // already fired because fasync::Timer can be polled to discover that
+        // immediately, and that's resolved in our polling implementation.
+        // Whenever we observe `Ready` from the timer.
+        if self.timers.len() < self.target_heap_size {
+            self.timers.push(entry);
+        }
+    }
+}
+
+impl Future for TimerWaiter {
+    type Output = ();
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Self::Output> {
+        let Self { timers: _, selected, wakeup, target_heap_size: _ } = &mut *self;
+        // Must not poll without a selected timer.
+        let mut taken_selected = selected.take().unwrap();
+        match taken_selected.value.poll_unpin(cx) {
+            Poll::Ready(()) => (),
+            Poll::Pending => {
+                // Place it back while pending.
+                *selected = Some(taken_selected);
+                return Poll::Pending;
+            }
+        }
+        if *wakeup <= taken_selected.time {
+            self.maybe_return_fired_timer_to_pool(taken_selected);
+            return Poll::Ready(());
+        }
+        // If our selected timer was scheduled for earlier than our wakeup
+        // reset the timer now that it fired and poll again.
+        taken_selected.value.reset(*wakeup);
+        taken_selected.time = *wakeup;
+
+        match taken_selected.value.poll_unpin(cx) {
+            Poll::Ready(()) => {
+                self.maybe_return_fired_timer_to_pool(taken_selected);
+                Poll::Ready(())
+            }
+            Poll::Pending => {
+                // Still pending put it back.
+                *selected = Some(taken_selected);
+                Poll::Pending
+            }
+        }
+    }
+}
+
+impl FusedFuture for TimerWaiter {
+    fn is_terminated(&self) -> bool {
+        self.selected.is_none()
+    }
+}
+
+/// A separate module for [`ScheduledInstant`] so it can't be constructed
+/// violating its invariants.
+mod scheduled_instant {
+    use crate::bindings::StackTime;
+
+    use super::{fasync, UNSCHEDULED_SENTINEL};
+
+    /// A time that stands as a witness for a valid schedule time.
+    ///
+    /// It can only be constructed with an [`fasync::Time`] that is not
+    /// `INFINITE_FUTURE`.
+    #[derive(Eq, PartialEq)]
+    pub(crate) struct ScheduledInstant(fasync::Time);
+
+    impl std::fmt::Debug for ScheduledInstant {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let Self(time) = self;
+            f.debug_tuple("ScheduledInstant").field(&time.into_nanos()).finish()
+        }
+    }
+
+    impl ScheduledInstant {
+        /// Constructs a new `ScheduledInstant` if `time` is not
+        /// `INFINITE_FUTURE`.
+        pub(super) fn new(time: fasync::Time) -> Option<Self> {
+            (time != UNSCHEDULED_SENTINEL).then_some(Self(time))
+        }
+    }
+
+    impl From<ScheduledInstant> for fasync::Time {
+        fn from(ScheduledInstant(value): ScheduledInstant) -> Self {
+            value
+        }
+    }
+
+    impl From<ScheduledInstant> for StackTime {
+        fn from(value: ScheduledInstant) -> Self {
+            Self(value.into())
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::pin::pin;
+
     use crate::bindings::integration_tests::set_logger_for_test;
-    use assert_matches::assert_matches;
-    use futures::{Future, StreamExt};
-    use netstack3_core::sync::Mutex;
-    use std::{pin::pin, sync::Arc, task::Poll};
+
+    use fuchsia_zircon as zx;
+    use futures::channel::mpsc;
     use test_case::test_case;
 
-    type TestDispatcher = TimerDispatcher<usize>;
+    use super::*;
 
-    struct TestContextInner {
-        dispatcher: TestDispatcher,
-        fired: mpsc::UnboundedSender<usize>,
-        /// The task ends up with a clone of the context itself so we need to do
-        /// internal mutability here.
-        task: Mutex<Option<fasync::Task<()>>>,
-    }
-
-    impl Drop for TestContextInner {
-        fn drop(&mut self) {
-            let task = self.task.get_mut().take();
-            if task.is_some() {
-                panic!("dropped TestContext without joining task")
-            }
-        }
-    }
-    #[derive(Clone)]
-    struct TestContext {
-        inner: Arc<TestContextInner>,
-    }
-
-    impl TimerHandler<usize> for TestContext {
-        fn handle_expired_timer(&mut self, timer: usize) {
-            self.inner.fired.unbounded_send(timer).expect("Can't fire timer")
-        }
-        fn get_timer_dispatcher(&mut self) -> &TimerDispatcher<usize> {
-            &self.inner.dispatcher
+    impl TimerWaiter {
+        #[track_caller]
+        fn assert_timers<I: IntoIterator<Item = fasync::Time>>(
+            &self,
+            expect_heap: I,
+            expect_selected: Option<fasync::Time>,
+        ) {
+            let Self { timers, selected, wakeup: _, target_heap_size: _ } = self;
+            // Collect times and compare sorted vecs.
+            let mut expect_heap = expect_heap.into_iter().collect::<Vec<_>>();
+            expect_heap.sort();
+            let mut timers =
+                timers.iter().map(|TimeAndValue { time, value: _ }| *time).collect::<Vec<_>>();
+            timers.sort();
+            assert_eq!(timers, expect_heap);
+            assert_eq!(
+                selected.as_ref().map(|TimeAndValue { time, value: _ }| *time),
+                expect_selected
+            );
         }
     }
 
-    impl TestContext {
-        fn new() -> (Self, mpsc::UnboundedReceiver<usize>) {
-            let (fired, receiver) = mpsc::unbounded();
-            let this = TestContext {
-                inner: Arc::new(TestContextInner {
-                    dispatcher: TestDispatcher::default().into(),
-                    fired,
-                    task: Mutex::new(None),
-                }),
-            };
-            let task = this.inner.dispatcher.spawn(this.clone());
-            *this.inner.task.lock() = Some(task);
-            (this, receiver)
-        }
-
-        async fn shutdown(self) {
-            let task = self.inner.task.lock().take().unwrap();
-            self.inner.dispatcher.stop();
-            task.await;
-        }
-
-        fn dispatcher(&self) -> &TimerDispatcher<usize> {
-            &self.inner.dispatcher
-        }
-
-        fn shutdown_in_executor((this, mut executor): (Self, fasync::TestExecutor)) {
-            run_in_executor(&mut executor, this.shutdown())
-        }
-
-        fn with_disp_sync<R, F: FnOnce(&TestDispatcher) -> R>(&self, f: F) -> R {
-            f(&self.inner.dispatcher)
-        }
-    }
-
-    impl TimerContext<usize> for TestContext {
-        type Handler = Self;
-        fn handler(&self) -> Self {
-            self.clone()
-        }
-    }
-
-    // Returns a new test executor initialized with an initial time set to 0.
     fn new_test_executor() -> fasync::TestExecutor {
-        // Set to zero to simplify logs in tests.
-        new_test_executor_with_initial_time(fasync::Time::from_nanos(0))
-    }
-
-    fn new_test_executor_with_initial_time(time: fasync::Time) -> fasync::TestExecutor {
         let executor = fasync::TestExecutor::new_with_fake_time();
         // Set to zero to simplify logs in tests.
-        executor.set_fake_time(time);
+        executor.set_fake_time(T0);
         executor
     }
 
-    fn time_from_now(units: i64) -> StackTime {
-        StackTime(fasync::Time::after(GRANULARITY * units))
-    }
-
+    #[track_caller]
     fn run_in_executor<R, Fut: Future<Output = R>>(
         executor: &mut fasync::TestExecutor,
         f: Fut,
@@ -759,229 +688,336 @@ mod tests {
         }
     }
 
-    #[test_case(
-        fasync::Time::from_nanos(0),
-        fasync::Time::from_nanos(0)
-    ; "zero")]
-    #[test_case(
-        fasync::Time::from_nanos(1),
-        fasync::Time::from_nanos(GRANULARITY.into_nanos())
-    ; "smallest non-zero")]
-    #[test_case(
-        fasync::Time::from_nanos(GRANULARITY.into_nanos() - 1),
-        fasync::Time::from_nanos(GRANULARITY.into_nanos())
-    ; "slightly less than granularity")]
-    #[test_case(
-        fasync::Time::from_nanos(GRANULARITY.into_nanos()),
-        fasync::Time::from_nanos(GRANULARITY.into_nanos())
-    ; "exactly granularity")]
-    #[test_case(
-        fasync::Time::from_nanos(GRANULARITY.into_nanos() + 1),
-        fasync::Time::from_nanos(GRANULARITY.into_nanos() * 2)
-    ; "slightly more than granularity")]
-    #[test_case(
-        fasync::Time::INFINITE - fasync::Duration::from_nanos(1),
-        fasync::Time::INFINITE
-    ; "slightly less than infinite")]
-    #[test_case(
-        fasync::Time::INFINITE,
-        fasync::Time::INFINITE
-    ; "infinite")]
-    fn calc_fire_instant(req_time: fasync::Time, want_time: fasync::Time) {
-        assert_eq!(super::calc_fire_instant(req_time), want_time);
+    const T0: fasync::Time = fasync::Time::from_nanos(0);
+    const T1: fasync::Time = fasync::Time::from_nanos(1);
+    const T2: fasync::Time = fasync::Time::from_nanos(2);
+    const T3: fasync::Time = fasync::Time::from_nanos(3);
+    const T4: fasync::Time = fasync::Time::from_nanos(4);
+
+    #[derive(Debug, Eq, PartialEq, Clone)]
+    enum TimerId {
+        A,
+        B,
+        C,
+        Other(usize),
     }
 
-    #[fixture::teardown(TestContext::shutdown_in_executor)]
-    #[test_case(fasync::Time::from_nanos(0); "zero")]
-    #[test_case(fasync::Time::from_nanos(GRANULARITY.into_nanos()); "non-zero")]
-    fn test_timers_fire(initial_time: fasync::Time) {
-        set_logger_for_test();
-        let mut executor = new_test_executor_with_initial_time(initial_time);
+    struct TestContext {
+        dispatcher: TimerDispatcher<TimerId>,
+        fired: mpsc::UnboundedReceiver<TimerId>,
+        task: fasync::Task<()>,
+    }
 
-        const NANOSECOND: fasync::Duration = fasync::Duration::from_nanos(1);
-
-        let batches = [
-            [
-                StackTime(fasync::Time::after(NANOSECOND)),
-                StackTime(fasync::Time::after(NANOSECOND * 2)),
-                StackTime(fasync::Time::after(GRANULARITY)),
-            ],
-            [
-                StackTime(fasync::Time::after(GRANULARITY + NANOSECOND)),
-                StackTime(fasync::Time::after(GRANULARITY + NANOSECOND * 2)),
-                StackTime(fasync::Time::after(GRANULARITY + NANOSECOND * 2)),
-            ],
-        ];
-
-        let (t, mut fired) = TestContext::new();
-        run_in_executor(&mut executor, async {
-            let d = t.handler();
-
-            let mut id = 1;
-            for batch in batches {
-                for instant in batch {
-                    assert_eq!(d.dispatcher().schedule_timer(id, instant), None);
-                    id += 1;
-                }
-            }
-        });
-
-        let mut first_id = 1;
-        for batch in batches {
-            assert_matches!(fired.try_next(), Err(mpsc::TryRecvError { .. }));
-            executor.set_fake_time(fasync::Time::after(GRANULARITY));
-
-            let fired_ids = batch
-                .into_iter()
-                .map(|_: StackTime| run_in_executor(&mut executor, fired.next()).unwrap())
-                .collect::<HashSet<_>>();
-            let next_first_id = first_id + batch.len();
-            assert_eq!(fired_ids, HashSet::from_iter(first_id..next_first_id),);
-
-            first_id = next_first_id;
+    impl TestContext {
+        fn new() -> Self {
+            let dispatcher = TimerDispatcher::default();
+            let (sender, fired) = mpsc::unbounded();
+            let task = dispatcher
+                .spawn(move |t| sender.unbounded_send(t).expect("failed to send fired timer"));
+            Self { dispatcher, fired, task }
         }
 
-        (t, executor)
+        fn heap_len(&self) -> usize {
+            self.dispatcher.inner.state.lock().heap.len()
+        }
+
+        fn schedule_notifier(&self) {
+            self.dispatcher.inner.state.lock().notifier.as_ref().unwrap().schedule()
+        }
+
+        async fn shutdown(self) {
+            let Self { dispatcher, fired, task } = self;
+            dispatcher.stop();
+            task.await;
+            assert_eq!(fired.collect::<Vec<_>>().await, vec![], "unacknowledged fired timers");
+        }
+
+        fn shutdown_in_executor((this, mut executor): (Self, fasync::TestExecutor)) {
+            run_in_executor(&mut executor, this.shutdown());
+            assert_eq!(executor.wake_next_timer(), None, "timer leak");
+        }
+
+        #[track_caller]
+        fn assert_no_timers(&mut self, executor: &mut fasync::TestExecutor) {
+            assert_eq!(executor.run_until_stalled(&mut self.fired.next()), Poll::Pending);
+        }
+
+        #[track_caller]
+        fn next_timer(&mut self, executor: &mut fasync::TestExecutor) -> TimerId {
+            run_in_executor(executor, &mut self.fired.next()).unwrap()
+        }
     }
 
     #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
-    fn test_get_scheduled_instant() {
-        set_logger_for_test();
-        let executor = new_test_executor();
-        let (t, _) = TestContext::new();
-
-        let d = t.dispatcher();
-
-        // Timer 1 is scheduled.
-        let time1 = time_from_now(1);
-        assert_eq!(d.schedule_timer(1, time1), None);
-        assert_eq!(d.scheduled_time(&1).unwrap(), time1);
-
-        // Timer 2 does not exist yet.
-        assert_eq!(d.scheduled_time(&2), None);
-
-        // Timer 1 is scheduled.
-        let time2 = time_from_now(2);
-        assert_eq!(d.schedule_timer(2, time2), None);
-        assert_eq!(d.scheduled_time(&1).unwrap(), time1);
-        assert_eq!(d.scheduled_time(&2).unwrap(), time2);
-
-        // Cancel Timer 1.
-        assert_eq!(d.cancel_timer(&1).unwrap(), time1);
-        assert_eq!(d.scheduled_time(&1), None);
-
-        // Timer 2 should still be scheduled.
-        assert_eq!(d.scheduled_time(&2).unwrap(), time2);
-
-        (t, executor)
-    }
-
-    #[fixture::teardown(TestContext::shutdown_in_executor)]
-    #[test]
-    fn test_cancel() {
+    fn create_timer_and_fire() {
         set_logger_for_test();
         let mut executor = new_test_executor();
-        let (t, mut rcv) = TestContext::new();
+        let mut t = TestContext::new();
+        let mut timer_a = t.dispatcher.new_timer(TimerId::A);
+        let mut timer_b = t.dispatcher.new_timer(TimerId::B);
+        // Never scheduled should never be fired.
+        let _timer_c = t.dispatcher.new_timer(TimerId::C);
+        t.assert_no_timers(&mut executor);
+        // No timers are scheduled.
+        assert_eq!(executor.wake_next_timer(), None);
+        assert_eq!(timer_a.schedule(T1), None);
+        assert_eq!(timer_b.schedule(T3), None);
 
-        // timer 1 and 2 are scheduled.
-        // timer 1 is going to be cancelled even before we allow the loop to
-        // run.
+        executor.set_fake_time(T1);
+        assert_eq!(t.next_timer(&mut executor), TimerId::A);
 
-        let time1 = time_from_now(1);
-        let time2 = time_from_now(2);
-        let time3 = time_from_now(5);
-        t.with_disp_sync(|d| {
-            assert_eq!(d.schedule_timer(1, time1), None);
-            assert_eq!(d.schedule_timer(2, time2), None);
+        executor.set_fake_time(T3);
+        assert_eq!(t.next_timer(&mut executor), TimerId::B);
 
-            assert_eq!(d.cancel_timer(&1).unwrap(), time1);
-        });
-        executor.set_fake_time(time2.0);
-        let r = run_in_executor(&mut executor, rcv.next()).unwrap();
-        t.with_disp_sync(|d| {
-            // can't cancel 2 anymore, it has already fired
-            assert_eq!(d.cancel_timer(&2), None);
-        });
-        // only event 2 should come out because 1 was cancelled:
-        assert_eq!(r, 2);
-
-        // schedule another timer and wait for it, just to prove that timer 1's
-        // event never gets fired:
-        t.with_disp_sync(|d| {
-            assert_eq!(d.schedule_timer(3, time3), None);
-        });
-        executor.set_fake_time(time3.0);
-        let r = run_in_executor(&mut executor, rcv.next()).unwrap();
-        assert_eq!(r, 3);
+        // Reschedule for a time in the past should fire immediately.
+        assert_eq!(timer_a.schedule(T2), None);
+        assert_eq!(t.next_timer(&mut executor), TimerId::A);
 
         (t, executor)
     }
 
     #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
-    fn test_reschedule() {
+    fn reschedule_for_later() {
         set_logger_for_test();
         let mut executor = new_test_executor();
-        let (t, mut rcv) = TestContext::new();
+        let mut t = TestContext::new();
+        let mut timer = t.dispatcher.new_timer(TimerId::A);
+        assert_eq!(timer.schedule(T1), None);
+        assert_eq!(t.heap_len(), 1);
+        t.assert_no_timers(&mut executor);
+        assert_eq!(timer.schedule(T2).map(Into::into), Some(T1));
+        // Reschedule for later doesn't create a new heap entry.
+        assert_eq!(t.heap_len(), 1);
 
-        // timer 1 and 2 are scheduled.
-        // timer 1 is going to be rescheduled even before we allow the loop to
-        // run.
-        let time1 = time_from_now(1);
-        let time2 = time_from_now(2);
-        let resched1 = time_from_now(3);
-        let resched2 = time_from_now(4);
+        executor.set_fake_time(T1);
+        t.assert_no_timers(&mut executor);
 
-        t.with_disp_sync(|d| {
-            assert_eq!(d.schedule_timer(1, time1), None);
-            assert_eq!(d.schedule_timer(2, time2), None);
-            assert_eq!(d.schedule_timer(1, resched1).unwrap(), time1);
-        });
-        executor.set_fake_time(time2.0);
-        let r = run_in_executor(&mut executor, rcv.next()).unwrap();
-        // only event 2 should come out:
-        assert_eq!(r, 2);
-
-        t.with_disp_sync(|d| {
-            // we can schedule timer 2 again, and it returns None because it has
-            // already fired.
-            assert_eq!(d.schedule_timer(2, resched2), None);
-        });
-
-        // now we can go at it again and get the rescheduled timers:
-        executor.set_fake_time(resched2.0);
-        assert_eq!(run_in_executor(&mut executor, rcv.next()).unwrap(), 1);
-        assert_eq!(run_in_executor(&mut executor, rcv.next()).unwrap(), 2);
+        executor.set_fake_time(T2);
+        assert_eq!(t.next_timer(&mut executor), TimerId::A);
 
         (t, executor)
     }
 
     #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
-    fn test_cancel_with() {
+    fn reschedule_for_earlier() {
         set_logger_for_test();
         let mut executor = new_test_executor();
-        let (t, mut rcv) = TestContext::new();
+        let mut t = TestContext::new();
+        let mut timer = t.dispatcher.new_timer(TimerId::A);
+        assert_eq!(timer.schedule(T2), None);
+        assert_eq!(t.heap_len(), 1);
+        t.assert_no_timers(&mut executor);
+        assert_eq!(timer.schedule(T1).map(Into::into), Some(T2));
+        // Rescheduling for earlier creates a new heap entry.
+        assert_eq!(t.heap_len(), 2);
 
-        t.with_disp_sync(|d| {
-            // schedule 4 timers:
-            assert_eq!(d.schedule_timer(1, time_from_now(1)), None);
-            assert_eq!(d.schedule_timer(2, time_from_now(2)), None);
-            assert_eq!(d.schedule_timer(3, time_from_now(3)), None);
-            assert_eq!(d.schedule_timer(4, time_from_now(4)), None);
+        executor.set_fake_time(T1);
+        assert_eq!(t.next_timer(&mut executor), TimerId::A);
 
-            // cancel timers 1, 3, and 4.
-            d.cancel_timers_with(|id| *id != 2);
-            // check that only one timer remains
-            assert_eq!(d.inner.read().timers.len(), 1);
-        });
-        // advance time so that all timers would've been fired.
-        executor.set_fake_time(time_from_now(4).0);
-        // get the timer and assert that it is the timer with id == 2.
-        let r = run_in_executor(&mut executor, rcv.next()).unwrap();
-        assert_eq!(r, 2);
+        executor.set_fake_time(T2);
+        t.assert_no_timers(&mut executor);
 
         (t, executor)
+    }
+
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
+    #[test]
+    fn cancel() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut t = TestContext::new();
+        let mut timer = t.dispatcher.new_timer(TimerId::A);
+
+        // Can cancel an unscheduled timer.
+        assert_eq!(timer.cancel(), None);
+
+        assert_eq!(timer.schedule(T1), None);
+        t.assert_no_timers(&mut executor);
+        assert_eq!(timer.cancel().map(Into::into), Some(T1));
+
+        executor.set_fake_time(T1);
+        t.assert_no_timers(&mut executor);
+
+        // Can cancel an already canceled timer.
+        assert_eq!(timer.cancel(), None);
+
+        // Dropping the timer also cancels it.
+        assert_eq!(timer.schedule(T2), None);
+        std::mem::drop(timer);
+        executor.set_fake_time(T2);
+        t.assert_no_timers(&mut executor);
+
+        (t, executor)
+    }
+
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
+    #[test]
+    fn fire_in_order() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut t = TestContext::new();
+        let mut timer_a = t.dispatcher.new_timer(TimerId::A);
+        let mut timer_b = t.dispatcher.new_timer(TimerId::B);
+        let mut timer_c = t.dispatcher.new_timer(TimerId::C);
+        assert_eq!(timer_a.schedule(T1), None);
+        assert_eq!(timer_b.schedule(T2), None);
+        assert_eq!(timer_c.schedule(T3), None);
+
+        executor.set_fake_time(T3);
+        assert_eq!(
+            executor.run_until_stalled(&mut futures::future::pending::<()>()),
+            Poll::Pending
+        );
+
+        // All the timers should now be stashed in the receiver.
+        assert_eq!(
+            t.fired.by_ref().take(3).collect::<Vec<_>>().now_or_never(),
+            Some(vec![TimerId::A, TimerId::B, TimerId::C])
+        );
+
+        (t, executor)
+    }
+
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
+    #[test_case(1; "min_target_size")]
+    #[test_case(MIN_TARGET_HEAP_SIZE * 2; "timer_count")]
+    fn heap_gc(timer_count: usize) {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut t = TestContext::new();
+        assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), 0);
+        let mut timers =
+            (0..timer_count).map(|i| t.dispatcher.new_timer(TimerId::Other(i))).collect::<Vec<_>>();
+        let timer = &mut timers[0];
+        assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), timer_count);
+
+        assert_eq!(timer.schedule(T1), None);
+        assert_eq!(t.heap_len(), 1);
+
+        let mut reschedule = || {
+            let prev: fasync::Time = timer.cancel().unwrap().into();
+            assert_eq!(timer.schedule(prev + zx::Duration::from_seconds(1)), None);
+        };
+
+        // Canceling and rescheduling creates a new heap entry.
+        reschedule();
+        assert_eq!(t.heap_len(), 2);
+        // GC won't be triggered until we hit the gc threshold.
+        t.assert_no_timers(&mut executor);
+        assert_eq!(t.heap_len(), 2);
+        let threshold = timer_count.max(MIN_TARGET_HEAP_SIZE) * 2;
+        while t.heap_len() < threshold {
+            reschedule();
+        }
+
+        // Kick the notifier and check to check that GC doesn't run yet.
+        t.schedule_notifier();
+        t.assert_no_timers(&mut executor);
+        assert_eq!(t.heap_len(), threshold);
+
+        // Do one more round to push over the threshold and check that GC runs.
+        reschedule();
+        t.schedule_notifier();
+        t.assert_no_timers(&mut executor);
+        assert_eq!(t.heap_len(), 1);
+
+        // On drop the number of timers should decrease.
+        drop(timers);
+        assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), 0);
+
+        (t, executor)
+    }
+
+    #[test]
+    fn timer_waiter_starts_terminated() {
+        let tw = TimerWaiter::new();
+        assert_eq!(tw.is_terminated(), true);
+    }
+
+    #[test]
+    fn timer_waiter_reuse_timer() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut tw = TimerWaiter::new();
+        tw.assert_timers([], None);
+        tw.set(T1);
+        tw.assert_timers([], Some(T1));
+        assert_eq!(tw.is_terminated(), false);
+        assert_eq!(executor.wake_next_timer(), Some(T1));
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        assert_eq!(tw.is_terminated(), true);
+        assert_eq!(executor.wake_next_timer(), None);
+        tw.assert_timers([T1], None);
+        // Should be able to reuse the timer here.
+        tw.set(T2);
+        // Initially the timer is still cached to fire at T1, we haven't reset
+        // it.
+        tw.assert_timers([], Some(T1));
+        assert_eq!(executor.wake_next_timer(), None);
+        // Then we'll poll once which will update the timer.
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Pending);
+        tw.assert_timers([], Some(T2));
+        // Now unblock the future.
+        assert_eq!(executor.wake_next_timer(), Some(T2));
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        assert_eq!(tw.is_terminated(), true);
+
+        // We can now do everything again, but let's observe the future resolve
+        // all at once because time is in the future.
+        tw.set(T3);
+        tw.assert_timers([], Some(T2));
+        executor.set_fake_time(T3);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        assert_eq!(tw.is_terminated(), true);
+    }
+
+    #[test]
+    fn timer_waiter_cant_reuse() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut tw = TimerWaiter::new();
+        tw.set(T3);
+        tw.assert_timers([], Some(T3));
+        // A time that is earlier than our only available timer will cause us to
+        // create a new timer.
+        tw.set(T2);
+        tw.assert_timers([T3], Some(T2));
+        tw.set(T1);
+        tw.assert_timers([T2, T3], Some(T1));
+        // If we reschedule again to T3, the configuration remains the same
+        // because we always prefer our earliest timer.
+        tw.set(T3);
+        tw.assert_timers([T2, T3], Some(T1));
+
+        // Won't fire until we reach T3.
+        executor.set_fake_time(T1);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Pending);
+        tw.assert_timers([T2, T3], Some(T3));
+        executor.set_fake_time(T3);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+    }
+
+    #[test]
+    fn timer_waiter_target_heap_size() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut tw = TimerWaiter::new();
+        tw.target_heap_size = 2;
+
+        // Change the scheduled time in reverse to thrash timer creation.
+        tw.set(T4);
+        tw.set(T3);
+        tw.set(T2);
+        tw.set(T1);
+        tw.assert_timers([T2, T3, T4], Some(T1));
+        executor.set_fake_time(T1);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        // Timer is not reused because we hit the threshold. Note, however, that
+        // we're still above threshold because removal is only considered when
+        // the timer is observed to have fired.
+        tw.assert_timers([T2, T3, T4], None);
     }
 }

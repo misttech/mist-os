@@ -80,18 +80,6 @@ impl Mock {
         }
     }
 
-    /// Returns a new Mock for handling calls on the new connection.
-    async fn expect_clone(&mut self) -> Self {
-        match self.stream.try_next().await.unwrap() {
-            Some(fio::DirectoryRequest::Clone { flags, object, control_handle: _ }) => {
-                assert_eq!(flags, fio::OpenFlags::CLONE_SAME_RIGHTS);
-                Mock { stream: object.into_stream().unwrap().cast_stream() }
-            }
-            Some(other) => panic!("unexpected request: {other:?}"),
-            None => panic!("unexpected stream termination"),
-        }
-    }
-
     /// Consume directory requests, verifying they are requests to read directory entries.  Respond
     /// with dirents constructed from the given entries.
     ///
@@ -195,10 +183,10 @@ impl Mock {
         }
     }
 
-    /// Expects and handles a call to [`Client::filter_to_missing_blobs`], handling its internal
-    /// heuristic when more than 20 blobs are specified.  Verifies the call intends to determine
-    /// whether the blobs specified in `readable` and `missing` are readable or not, responding to
-    /// the check based on which collection the hash is in.
+    /// Expects and handles a call to [`Client::filter_to_missing_blobs`].
+    /// Verifies the call intends to determine whether the blobs specified in `readable` and
+    /// `missing` are readable or not, responding to the check based on which collection the hash is
+    /// in.
     ///
     /// # Panics
     ///
@@ -208,16 +196,7 @@ impl Mock {
         readable: &[Hash],
         missing: &[Hash],
     ) {
-        // TODO(https://fxbug.dev/42157763) re-evaluate filter_to_missing_blobs heuristic.
-        if readable.len() + missing.len() > 20 {
-            // heuristic path, handle the readdir, and trigger the fast path indicating
-            // none of the missing blobs may be present by excluding them from the readdir.
-            let mut readdir_connection = self.expect_clone().await;
-            readdir_connection.expect_readdir(readable.iter().copied()).await;
-            self.expect_readable_missing_checks(readable, &[]).await;
-        } else {
-            self.expect_readable_missing_checks(readable, missing).await;
-        }
+        self.expect_readable_missing_checks(readable, missing).await;
     }
 
     /// Asserts that the request stream closes without any further requests.

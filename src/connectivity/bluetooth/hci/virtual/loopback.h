@@ -4,42 +4,31 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_LOOPBACK_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_LOOPBACK_H_
 
-#include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async/cpp/wait.h>
-#include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/fit/thread_checker.h>
-#include <lib/zx/event.h>
-#include <threads.h>
-#include <zircon/compiler.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <zircon/device/bt-hci.h>
-#include <zircon/syscalls.h>
-#include <zircon/types.h>
-
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
 
 namespace bt_hci_virtual {
 
-// A driver that implements a ZX_PROTOCOL_BT_HCI device.
-// This driver is greatly taken from the bt_transport_uart driver. The key differences are that this
-// doesn't bind to service device but to a zx::channel as a virtual loopback UART device.
-class LoopbackDevice;
-using LoopbackDeviceType = ddk::Device<LoopbackDevice, ddk::Unbindable,
-                                       ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
+using AddChildCallback = fit::function<void(fuchsia_driver_framework::wire::NodeAddArgs)>;
 
-class LoopbackDevice : public LoopbackDeviceType,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
+class LoopbackDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
-  explicit LoopbackDevice(zx_device_t* parent);
+  explicit LoopbackDevice();
 
+  // Methods to control the LoopbackDevice's lifecycle. These are used by the VirtualController.
+  zx_status_t Initialize(zx_handle_t channel, std::string_view name, AddChildCallback callback);
+  void Shutdown();
+
+ private:
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
   void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
-
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -58,19 +47,11 @@ class LoopbackDevice : public LoopbackDeviceType,
                           OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
-
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // DDK Mixins
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
+  void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
 
-  // Bind this device to this underlying virtual UART channel.
-  zx_status_t Bind(zx_handle_t channel, std::string_view name) __TA_EXCLUDES(mutex_);
-
- private:
   // HCI UART packet indicators
   enum BtHciPacketIndicator : uint8_t {
     kHciNone = 0,
@@ -80,15 +61,8 @@ class LoopbackDevice : public LoopbackDeviceType,
     kHciEvent = 4,
   };
 
-  struct HciWriteCtx {
-    LoopbackDevice* ctx;
-    // Owned.
-    uint8_t* buffer;
-  };
-
-  // This wrapper around async_wait enables us to get a LoopbackDevice* in
-  // the handler. We use this instead of async::WaitMethod because
-  // async::WaitBase isn't thread safe.
+  // This wrapper around async_wait enables us to get a LoopbackDevice* in the handler.
+  // We use this instead of async::WaitMethod because async::WaitBase isn't thread safe.
   struct Wait : public async_wait {
     explicit Wait(LoopbackDevice* uart, zx::channel* channel);
     static void Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
@@ -100,32 +74,30 @@ class LoopbackDevice : public LoopbackDeviceType,
     zx::channel* channel;
   };
 
-  // Returns length of current event packet being received
+  // Returns length of current event packet being received.
   // Must only be called in the read callback (HciHandleUartReadEvents).
   size_t EventPacketLength();
 
-  // Returns length of current ACL data packet being received
+  // Returns length of current ACL data packet being received.
   // Must only be called in the read callback (HciHandleUartReadEvents).
   size_t AclPacketLength();
 
-  // Returns length of current SCO data packet being received
+  // Returns length of current SCO data packet being received.
   // Must only be called in the read callback (HciHandleUartReadEvents).
   size_t ScoPacketLength();
 
-  void ChannelCleanupLocked(zx::channel* channel) __TA_REQUIRES(mutex_);
+  void ChannelCleanup(zx::channel* channel);
 
-  void SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size_t length) __TA_REQUIRES(mutex_);
+  void SnoopChannelWrite(uint8_t flags, uint8_t* bytes, size_t length);
 
-  void HciBeginShutdown() __TA_EXCLUDES(mutex_);
+  void HciBeginShutdown();
 
-  void HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pending) __TA_EXCLUDES(mutex_);
+  void HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pending);
 
-  void HciHandleClientChannel(zx::channel* chan, zx_signals_t pending) __TA_EXCLUDES(mutex_);
+  void HciHandleClientChannel(zx::channel* chan, zx_signals_t pending);
 
-  void HciHandleUartReadEvents(const uint8_t* buf, size_t length) __TA_EXCLUDES(mutex_);
-
-  // Reads the next packet chunk from |uart_src| into |buffer| and
-  // increments |buffer_offset| and |uart_src| by the number of bytes read.
+  // Reads the next packet chunk from |uart_src| into |buffer| and increments |buffer_offset| and
+  // |uart_src| by the number of bytes read.
   // If a complete packet is read, it will be written to |channel|.
   using PacketLengthFunction = size_t (LoopbackDevice::*)();
   void ProcessNextUartPacketFromReadBuffer(uint8_t* buffer, size_t buffer_size,
@@ -134,98 +106,72 @@ class LoopbackDevice : public LoopbackDeviceType,
                                            PacketLengthFunction get_packet_length,
                                            zx::channel* channel, bt_hci_snoop_type_t snoop_type);
 
-  void HciReadComplete(zx_status_t status, const uint8_t* buffer, size_t length)
-      __TA_EXCLUDES(mutex_);
-
-  void HciWriteComplete(zx_status_t status) __TA_EXCLUDES(mutex_);
-
-  static int HciThread(void* arg) __TA_EXCLUDES(mutex_);
-
   void OnChannelSignal(Wait* wait, zx_status_t status, const zx_packet_signal_t* signal);
 
-  zx_status_t HciOpenChannel(zx::channel* in_channel, zx_handle_t in) __TA_EXCLUDES(mutex_);
-
-  zx_status_t ServeHciProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t HciOpenChannel(zx::channel* in_channel, zx_handle_t in);
 
   // 1 byte packet indicator + 3 byte header + payload
   static constexpr uint32_t kCmdBufSize = 255 + 4;
-
-  // The number of currently supported HCI channel endpoints. We currently
-  // have one channel for command/event flow and one for ACL data flow. The
-  // sniff channel is managed separately.
-  static constexpr uint8_t kNumChannels = 2;
-
-  // add one for the wakeup event
-  static constexpr uint8_t kNumWaitItems = kNumChannels + 1;
 
   // The maximum HCI ACL frame size used for data transactions
   // (1024 + 4 bytes for the ACL header + 1 byte packet indicator)
   static constexpr uint32_t kAclMaxFrameSize = 1029;
 
   // The maximum HCI SCO frame size used for data transactions.
-  // (255 byte payload + 3 bytes for the SCO header + 1 byte packet
-  // indicator)
+  // (255 byte payload + 3 bytes for the SCO header + 1 byte packet indicator)
   static constexpr uint32_t kScoMaxFrameSize = 259;
 
   // 1 byte packet indicator + 2 byte header + payload
   static constexpr uint32_t kEventBufSize = 255 + 3;
 
   // Backing channel for this device.
-  zx::channel in_channel_ __TA_GUARDED(mutex_);
-  Wait in_channel_wait_ __TA_GUARDED(mutex_){this, &in_channel_};
+  zx::channel in_channel_;
+  Wait in_channel_wait_{this, &in_channel_};
 
   // Upper channels.
-  zx::channel cmd_channel_ __TA_GUARDED(mutex_);
-  Wait cmd_channel_wait_ __TA_GUARDED(mutex_){this, &cmd_channel_};
+  zx::channel cmd_channel_;
+  Wait cmd_channel_wait_{this, &cmd_channel_};
 
-  zx::channel acl_channel_ __TA_GUARDED(mutex_);
-  Wait acl_channel_wait_ __TA_GUARDED(mutex_){this, &acl_channel_};
+  zx::channel acl_channel_;
+  Wait acl_channel_wait_{this, &acl_channel_};
 
-  zx::channel sco_channel_ __TA_GUARDED(mutex_);
-  Wait sco_channel_wait_ __TA_GUARDED(mutex_){this, &sco_channel_};
+  zx::channel sco_channel_;
+  Wait sco_channel_wait_{this, &sco_channel_};
 
-  zx::channel snoop_channel_ __TA_GUARDED(mutex_);
+  zx::channel snoop_channel_;
 
   std::atomic_bool shutting_down_ = false;
 
-  // type of current packet being read from the UART
+  // Type of current packet being read from the UART.
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   BtHciPacketIndicator cur_uart_packet_type_ = kHciNone;
 
-  // for accumulating HCI events
+  // For accumulating HCI events.
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   uint8_t event_buffer_[kEventBufSize];
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   size_t event_buffer_offset_ = 0;
 
-  // for accumulating ACL data packets
+  // For accumulating ACL data packets.
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   uint8_t acl_buffer_[kAclMaxFrameSize];
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   size_t acl_buffer_offset_ = 0;
 
-  // For accumulating SCO packets
+  // For accumulating SCO packets.
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   uint8_t sco_buffer_[kScoMaxFrameSize];
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   size_t sco_buffer_offset_ = 0;
 
-  // for sending outbound packets to the UART
-  // kAclMaxFrameSize is the largest frame size sent.
-  uint8_t write_buffer_[kAclMaxFrameSize] __TA_GUARDED(mutex_);
+  // For sending outbound packets to the UART.
+  // |kAclMaxFrameSize| is the largest frame size sent.
+  uint8_t write_buffer_[kAclMaxFrameSize];
 
-  std::mutex mutex_;
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
 
-  std::optional<async::Loop> loop_;
-  // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
-  async_dispatcher_t* dispatcher_ = nullptr;
-
-  // To expose a FIDL protocol from a driver in DFv1, we need to manually add the corresponding
-  // service to the outgoing directory of the driver and wait for the child driver to connect to.
-  // This object is the outgoing directory instance that this driver provides to the child device.
-  fdf::OutgoingDirectory outgoing_dir_;
-
-  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
+  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 };
 
 }  // namespace bt_hci_virtual

@@ -182,7 +182,6 @@ pub mod tests {
         fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
         moniker::{ChildName, Moniker},
-        std::sync::atomic::Ordering,
     };
 
     #[fuchsia::test]
@@ -402,8 +401,8 @@ pub mod tests {
             assert!(actions.contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
-            let rx = &actions.rep[&mock_action_key];
-            let refcount = rx.refcount.load(Ordering::Relaxed);
+            let action_controller = &actions.rep[&mock_action_key];
+            let refcount = action_controller.notifier.get_reference_count().unwrap();
 
             // expected reference count:
             // - 1 for the ActionSet that owns the notifier
@@ -509,8 +508,8 @@ pub mod tests {
             assert!(actions.contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
-            let rx = &actions.rep[&mock_action_key];
-            let refcount = rx.refcount.load(Ordering::Relaxed);
+            let action_controller = &actions.rep[&mock_action_key];
+            let refcount = action_controller.notifier.get_reference_count().unwrap();
 
             // expected reference count:
             // - 1 for the ActionSet that owns the notifier

@@ -24,9 +24,9 @@ class SegmentManagerTest : public F2fsFakeDevTestFixture {
   void MakeDirtySegments(size_t invalidate_ratio, int num_files) {
     fs_->GetGcManager().DisableFgGc();
     for (int file_no = 0; file_no < num_files; ++file_no) {
-      fbl::RefPtr<fs::Vnode> test_file;
-      EXPECT_EQ(root_dir_->Create(std::to_string(file_num++), S_IFREG, &test_file), ZX_OK);
-      auto vnode = fbl::RefPtr<File>::Downcast(std::move(test_file));
+      zx::result test_file = root_dir_->Create(std::to_string(file_num++), fs::CreationType::kFile);
+      ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+      auto vnode = fbl::RefPtr<File>::Downcast(*std::move(test_file));
       std::array<char, kPageSize> buf;
       std::memset(buf.data(), file_no, buf.size());
       for (size_t i = 0; i < fs_->GetSuperblockInfo().GetBlocksPerSeg(); ++i) {

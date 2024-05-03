@@ -21,6 +21,7 @@ group("config_capabilities") {
   visibility = [
     "//sdk/lib/driver_test_realm/*",
     "//src/connectivity/policy/http-client/*",
+    "//src/fonts/*",
     "//src/graphics/tests/vkext:*",
     "//src/graphics/tests/vkloop:*",
     "//src/sys/component_manager/tests/*",

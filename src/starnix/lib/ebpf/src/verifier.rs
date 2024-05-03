@@ -153,6 +153,29 @@ impl MappingVec for Vec<FieldMapping> {
 }
 
 #[derive(Clone, Debug)]
+pub enum MemoryParameterSize {
+    /// The memory buffer have the given size.
+    Value(u64),
+    /// The memory buffer size is given by the parameter in the given index.
+    Reference { index: u8 },
+}
+
+impl MemoryParameterSize {
+    fn size(&self, context: &ComputationContext) -> Result<u64, String> {
+        match self {
+            Self::Value(size) => Ok(*size),
+            Self::Reference { index } => {
+                let size_type = context.reg(index + 1)?;
+                match size_type {
+                    Type::ScalarValue { value, unknown_mask: 0, .. } => Ok(value),
+                    _ => Err(format!("cannot know buffer size at pc {}", context.pc)),
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Type {
     /// A number.
     ScalarValue {
@@ -211,7 +234,11 @@ pub enum Type {
     MemoryParameter {
         /// The index in the arguments list that contains a scalar value containing the size of the
         /// memory.
-        memory_length_index: u8,
+        size: MemoryParameterSize,
+        /// Whether this memory is read by the function.
+        input: bool,
+        /// Whether this memory is written by the function.
+        output: bool,
     },
     /// A function return value that is the same type as a parameter.
     AliasParameter {
@@ -541,6 +568,11 @@ impl Default for StackOffset {
 }
 
 impl StackOffset {
+    /// Whether the current offset is valid.
+    fn is_valid(&self) -> bool {
+        self.0 <= (BPF_STACK_SIZE as u64)
+    }
+
     /// The value of the register.
     fn reg(&self) -> u64 {
         self.0
@@ -623,6 +655,19 @@ impl Stack {
             original_buf[i + offset] = value_buf[i];
         }
         original
+    }
+
+    fn write_data_ptr(
+        &mut self,
+        pc: ProgramCounter,
+        mut offset: StackOffset,
+        bytes: u64,
+    ) -> Result<(), String> {
+        for i in 0..bytes {
+            self.store(pc, offset, Type::unknown_written_scalar_value(), DataWidth::U8)?;
+            offset += 1;
+        }
+        Ok(())
     }
 
     fn can_read_data_ptr(&self, mut offset: StackOffset, bytes: u64) -> bool {
@@ -1014,20 +1059,16 @@ impl ComputationContext {
                     mappings: Default::default(),
                 })
             }
-            Type::MemoryParameter { memory_length_index } => {
-                let buffer_size = self.reg(memory_length_index + 1)?;
-                if let Type::ScalarValue { value, unknown_mask: 0, .. } = buffer_size {
-                    let id = verification_context.next_id();
-                    Ok(Type::PtrToMemory {
-                        id: id.into(),
-                        offset: 0,
-                        buffer_size: value,
-                        fields: Default::default(),
-                        mappings: Default::default(),
-                    })
-                } else {
-                    Err(format!("unable to compute returned buffer size at pc {}", self.pc))
-                }
+            Type::MemoryParameter { size, .. } => {
+                let buffer_size = size.size(self)?;
+                let id = verification_context.next_id();
+                Ok(Type::PtrToMemory {
+                    id: id.into(),
+                    offset: 0,
+                    buffer_size,
+                    fields: Default::default(),
+                    mappings: Default::default(),
+                })
             }
             t => Ok(t.clone()),
         }
@@ -1827,9 +1868,10 @@ impl BpfVisitor for ComputationContext {
             return Err(format!("unknown external function {} at pc {}", index, self.pc));
         };
         debug_assert!(signature.args.len() <= 5);
+        let mut next = self.next()?;
         for (index, arg) in signature.args.iter().enumerate() {
-            let index = (index + 1) as u8;
-            match (arg, self.reg(index)?) {
+            let reg = (index + 1) as u8;
+            match (arg, self.reg(reg)?) {
                 (Type::ScalarValueParameter, Type::ScalarValue { unwritten_mask: 0, .. })
                 | (Type::ConstPtrToMapParameter, Type::ConstPtrToMap { .. }) => Ok(()),
                 (
@@ -1863,33 +1905,31 @@ impl BpfVisitor for ComputationContext {
                     }
                 }
                 (
-                    Type::MemoryParameter { memory_length_index },
+                    Type::MemoryParameter { size, .. },
                     Type::PtrToMemory { offset, buffer_size, .. },
                 ) => {
-                    let length_type = self.reg(memory_length_index + 1)?;
-                    match length_type {
-                        Type::ScalarValue { value, unknown_mask: 0, .. } => {
-                            if value <= buffer_size - offset {
-                                Ok(())
-                            } else {
-                                Err(format!("out of bound read at pc {}", self.pc))
-                            }
-                        }
-                        _ => Err(format!("cannot known expected buffer size at pc {}", self.pc)),
+                    let expected_size = size.size(self)?;
+                    if expected_size <= buffer_size - offset {
+                        Ok(())
+                    } else {
+                        Err(format!("out of bound read at pc {}", self.pc))
                     }
                 }
 
-                (Type::MemoryParameter { memory_length_index }, Type::PtrToStack { offset }) => {
-                    let length_type = self.reg(memory_length_index + 1)?;
-                    match length_type {
-                        Type::ScalarValue { value, unknown_mask: 0, .. } => {
-                            if self.stack.can_read_data_ptr(offset, value) {
-                                Ok(())
-                            } else {
-                                Err(format!("out of bound read at pc {}", self.pc))
-                            }
+                (Type::MemoryParameter { size, input, output }, Type::PtrToStack { offset }) => {
+                    let size = size.size(self)?;
+                    let buffer_end = offset + size;
+                    if !buffer_end.is_valid() {
+                        Err(format!("out of bound access at pc {}", self.pc))
+                    } else {
+                        if *output {
+                            next.stack.write_data_ptr(self.pc, offset, size)?;
                         }
-                        _ => Err(format!("cannot known expected buffer size at pc {}", self.pc)),
+                        if !input || self.stack.can_read_data_ptr(offset, size) {
+                            Ok(())
+                        } else {
+                            Err(format!("out of bound read at pc {}", self.pc))
+                        }
                     }
                 }
 
@@ -1898,11 +1938,10 @@ impl BpfVisitor for ComputationContext {
                     Type::PtrToMemory { id: id2, offset: 0, .. },
                 ) if *id1 == id2 => Ok(()),
 
-                _ => Err(format!("incorrect parameter at pc {}", self.pc)),
+                _ => Err(format!("incorrect parameter for index {index} at pc {}", self.pc)),
             }?;
         }
         // Parameters have been validated, specify the return value on return.
-        let mut next = self.next()?;
         if signature.invalidate_array_bounds {
             next.array_bounds.clear();
         }
@@ -2573,7 +2612,7 @@ impl BpfVisitor for ComputationContext {
             width.str(),
             display_register(dst),
             display_register(src),
-            print_offset(offset),
+            print_offset(offset)
         );
         let addr = self.reg(src)?.clone();
         let field = self.apply_mapping(context, &addr, Field::new(offset, width))?;

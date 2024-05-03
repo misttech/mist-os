@@ -36,8 +36,9 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, RecvFrameContext, ResourceCounterContext, RngContext,
-        SendFrameContext, TimerContext2, TimerHandler,
+        CoreTimerContext, CounterContext, HandleableTimer, NestedIntoCoreTimerCtx,
+        RecvFrameContext, ResourceCounterContext, RngContext, SendFrameContext, TimerContext,
+        TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -83,10 +84,10 @@ const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
 pub(crate) trait EthernetIpLinkDeviceBindingsContext:
-    RngContext + TimerContext2 + DeviceLayerTypes
+    RngContext + TimerContext + DeviceLayerTypes
 {
 }
-impl<BC: RngContext + TimerContext2 + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
+impl<BC: RngContext + TimerContext + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
 
 /// Provides access to an ethernet device's static state.
 pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
@@ -835,17 +836,17 @@ impl<I: Ip, D: device::WeakId> From<NudTimerId<I, EthernetLinkDevice, D>> for Et
     }
 }
 
-impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::WeakDeviceId>> for CC
+impl<CC, BC> HandleableTimer<CC, BC> for EthernetTimerId<CC::WeakDeviceId>
 where
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::WeakDeviceId>>
         + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::WeakDeviceId>>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: EthernetTimerId<CC::WeakDeviceId>) {
-        match id {
-            EthernetTimerId::Arp(id) => self.handle_timer(bindings_ctx, id),
-            EthernetTimerId::Nudv6(id) => self.handle_timer(bindings_ctx, id),
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+        match self {
+            EthernetTimerId::Arp(id) => core_ctx.handle_timer(bindings_ctx, id),
+            EthernetTimerId::Nudv6(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
     }
 }
@@ -1475,18 +1476,18 @@ impl DeviceStateSpec for EthernetLinkDevice {
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
-        BC: DeviceLayerTypes + TimerContext2,
+        BC: DeviceLayerTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         self_id: CC::WeakDeviceId,
         EthernetCreationProperties { mac, max_frame_size }: Self::CreationProperties,
     ) -> Self::Link<BC> {
-        let ipv4_arp = Mutex::new(ArpState::new(bindings_ctx, self_id.clone(), |arp| {
-            CC::convert_timer(EthernetTimerId::from(arp))
-        }));
-        let ipv6_nud = Mutex::new(NudState::new(bindings_ctx, self_id, |nud| {
-            CC::convert_timer(EthernetTimerId::from(nud))
-        }));
+        let ipv4_arp = Mutex::new(ArpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
+            bindings_ctx,
+            self_id.clone(),
+        ));
+        let ipv6_nud =
+            Mutex::new(NudState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, self_id));
         EthernetDeviceState {
             counters: Default::default(),
             ipv4_arp,
@@ -1510,6 +1511,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::net_mac;
     use net_types::ip::{AddrSubnet, IpAddr, IpVersion};
+    use netstack3_base::IntoCoreTimerCtx;
     use packet_formats::{
         ethernet::ETHERNET_MIN_BODY_LEN_NO_TAG,
         icmp::IcmpDestUnreachable,
@@ -1982,7 +1984,10 @@ mod tests {
                             FAKE_CONFIG_V4.local_mac,
                             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                         ),
-                        ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeDeviceId), Into::into),
+                        ArpState::new::<_, IntoCoreTimerCtx>(
+                            bindings_ctx,
+                            FakeWeakDeviceId(FakeDeviceId),
+                        ),
                     )
                 },
             );
@@ -2023,7 +2028,10 @@ mod tests {
             |bindings_ctx| {
                 FakeCoreCtx::with_inner_and_outer_state(
                     FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
-                    ArpState::new(bindings_ctx, FakeWeakDeviceId(FakeDeviceId), Into::into),
+                    ArpState::new::<_, IntoCoreTimerCtx>(
+                        bindings_ctx,
+                        FakeWeakDeviceId(FakeDeviceId),
+                    ),
                 )
             },
         );
@@ -2379,13 +2387,19 @@ mod tests {
         assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Del ip1 (ok)
-        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap();
+        assert_eq!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap().into_removed(),
+            as1
+        );
         assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(contains_addr(&ctx.core_ctx, &device, ip2));
         assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Del ip1 again (ip1 not found)
-        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1), Err(NotFoundError));
+        assert_matches!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1),
+            Err(NotFoundError)
+        );
         assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(contains_addr(&ctx.core_ctx, &device, ip2));
         assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
@@ -2472,11 +2486,9 @@ mod tests {
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 0);
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 0);
 
+        let as1 = AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap();
         // Add ip1 to device.
-        ctx.core_api()
-            .device_ip::<I>()
-            .add_ip_addr_subnet(&device, AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap())
-            .unwrap();
+        ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, as1).unwrap();
         assert!(contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(!contains_addr(&ctx.core_ctx, &device, ip2));
 
@@ -2497,7 +2509,10 @@ mod tests {
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 3);
 
         // Remove ip1
-        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap();
+        assert_eq!(
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap().into_removed(),
+            as1
+        );
         assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
         assert!(contains_addr(&ctx.core_ctx, &device, ip2));
 
@@ -2651,7 +2666,10 @@ mod tests {
         // Remove ip1 from the device.
         //
         // Should get packets destined for the solicited node address and ip2.
-        ctx.core_api().device_ip::<Ipv6>().del_ip_addr(&device, ip1).unwrap();
+        assert_eq!(
+            ctx.core_api().device_ip::<Ipv6>().del_ip_addr(&device, ip1).unwrap().into_removed(),
+            addr_sub1
+        );
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 5);
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 6);
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, sn_addr, 7);

@@ -62,11 +62,11 @@ def spawn(
         # breakpoints require us to load symbols proactively.
         if not breakpoints:
             attach_args.extend(
-                ["--execute", f"attach --weak --recursive {test.info.name}"]
+                ["--execute", f"attach --weak --recursive {test.name()}"]
             )
         else:
             attach_args.extend(
-                ["--execute", f"attach --recursive {test.info.name}"]
+                ["--execute", f"attach --recursive {test.name()}"]
             )
 
     # If only --breakpoint was specified on the command line (we won't get here if neither
@@ -127,7 +127,7 @@ def spawn(
 
         try:
             os.remove(fifo)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             # The tests for this don't actually create a file for the fifo, and we don't want to
             # throw an exception, since we were trying to remove the file anyway.
             pass

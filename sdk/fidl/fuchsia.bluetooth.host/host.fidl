@@ -28,6 +28,15 @@ type ProtocolRequest = flexible resource union {
     5: profile server_end:fuchsia.bluetooth.bredr.Profile;
 };
 
+/// A token protocol representing discovery being enabled.
+open protocol DiscoverySession {
+    /// Closes this DiscoverySession on the server end, ending discovery if this is the last open
+    /// DiscoverySession. This can be used to synchronize the closure on both ends of the protocol.
+    /// If synchronization is not required, the DiscoverySession protocol can simply be closed
+    /// instead.
+    flexible Stop();
+};
+
 /// Interface for interacting with a Bluetooth host device (bt-host)
 open protocol Host {
     /// Fulfills a given protocol request. bt-host will start processing FIDL messages. If the
@@ -94,21 +103,21 @@ open protocol Host {
     }) -> () error sys.Error;
 
     /// Initiates a general discovery procedure for BR/EDR and LE devices. On success, discovered
-    /// peers can be monitored using the [`fuchsia.bluetooth.host/Host.WatchPeers`] method.
+    /// peers can be monitored using the [`fuchsia.bluetooth.host/Host.WatchPeers`] method. On Error,
+    /// an epitaph will be returned from `token`. If the device does not support BR/EDR, only LE
+    /// discovery will be performed.
     ///
     /// On the LE transport, only general-discoverable and connectable peripherals will be reported.
     ///
-    /// Discovery will continue until it is terminated via StopDiscovery() or if the Host protocol
-    /// channel gets closed. If the device does not support BR/EDR, only LE discovery will be
-    /// performed.
-    flexible StartDiscovery() -> () error sys.Error;
-
-    /// Terminates discovery if one was started via StartDiscovery().
+    /// Discovery will continue until all discovery sessions are closed.
     ///
-    /// NOTE: If another client is performing discovery (e.g. via its own le.Central interface
-    /// handle), then the system will continue performing device discovery even if this method
-    /// results in success.
-    flexible StopDiscovery();
+    /// + request `token` The DiscoverySession protocol that must be held open as long as
+    ///     discovery should be enabled. Closing it will stop discovery if no other sessions
+    ///     are open.
+    flexible StartDiscovery(resource table {
+        /// Required.
+        1: token server_end:DiscoverySession;
+    });
 
     /// Sets whether this host should be connectable.
     flexible SetConnectable(struct {

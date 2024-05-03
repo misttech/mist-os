@@ -19,7 +19,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.MexecResource",
             ],

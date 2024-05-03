@@ -28,6 +28,10 @@
 
 namespace media_audio {
 
+namespace fad = fuchsia_audio_device;
+namespace fha = fuchsia_hardware_audio;
+namespace fhasp = fuchsia_hardware_audio_signalprocessing;
+
 /////////////////////
 // Codec tests
 //
@@ -86,7 +90,7 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_TRUE(info.token_id().has_value());
 
   ASSERT_TRUE(info.device_type().has_value());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kCodec);
+  EXPECT_EQ(*info.device_type(), fad::DeviceType::kCodec);
 
   ASSERT_TRUE(info.device_name().has_value());
   EXPECT_TRUE(!info.device_name()->empty());
@@ -101,7 +105,7 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_EQ(*info.unique_instance_id(), FakeCodec::kDefaultUniqueInstanceId);
 
   ASSERT_TRUE(info.is_input().has_value());
-  EXPECT_FALSE(info.is_input().value());
+  EXPECT_FALSE(*info.is_input());
 
   EXPECT_FALSE(info.ring_buffer_format_sets().has_value());
 
@@ -128,7 +132,7 @@ TEST_F(CodecTest, DistinctTokenIds) {
   ASSERT_TRUE(IsInitialized(device));
 
   // Set up a second, entirely distinct fake device.
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+  auto [client, server] = fidl::Endpoints<fha::Codec>::Create();
 
   auto fake_driver2 =
       std::make_shared<FakeCodec>(server.TakeChannel(), client.TakeChannel(), dispatcher());
@@ -227,7 +231,7 @@ TEST_F(CodecTest, InitialPlugState) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
 }
 
@@ -242,7 +246,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
   notify()->plug_state().reset();
 
@@ -251,7 +255,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_FALSE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kUnplugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
@@ -264,13 +268,12 @@ TEST_F(CodecTest, GetDaiFormats) {
   ASSERT_TRUE(AddObserver(device));
 
   bool received_get_dai_formats_callback = false;
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
       [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id,
-          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -297,13 +300,12 @@ TEST_F(CodecTest, SetDaiFormat) {
   ASSERT_TRUE(IsControlled(device));
 
   bool received_get_dai_formats_callback = false;
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
       [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id,
-          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -332,13 +334,12 @@ TEST_F(CodecTest, InitiallyStopped) {
   ASSERT_TRUE(IsControlled(device));
 
   bool received_get_dai_formats_callback = false;
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
       [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id,
-          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
           dai_formats.push_back(dai_format_set);
@@ -367,12 +368,11 @@ TEST_F(CodecTest, Start) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -396,12 +396,11 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -434,12 +433,11 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -472,12 +470,11 @@ TEST_F(CodecTest, StartStop) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -505,12 +502,11 @@ TEST_F(CodecTest, StartStart) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -539,12 +535,11 @@ TEST_F(CodecTest, StopStop) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -580,12 +575,11 @@ TEST_F(CodecTest, Reset) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
-  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       dai_element_id(),
-      [&dai_formats](ElementId element_id,
-                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+      [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
@@ -657,7 +651,7 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_TRUE(info.token_id().has_value());
 
   ASSERT_TRUE(info.device_type().has_value());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kComposite);
+  EXPECT_EQ(*info.device_type(), fad::DeviceType::kComposite);
 
   ASSERT_TRUE(info.device_name().has_value());
   EXPECT_FALSE(info.device_name()->empty());
@@ -775,7 +769,7 @@ TEST_F(CompositeTest, DistinctTokenIds) {
   ASSERT_TRUE(IsInitialized(device));
 
   // Set up a second, entirely distinct fake device.
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Composite>::Create();
+  auto [client, server] = fidl::Endpoints<fha::Composite>::Create();
 
   auto fake_driver2 =
       std::make_shared<FakeComposite>(server.TakeChannel(), client.TakeChannel(), dispatcher());
@@ -829,7 +823,7 @@ TEST_F(CompositeTest, DefaultClock) {
   auto device = InitializeDeviceForFakeComposite(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
-  EXPECT_EQ(device_clock(device)->domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(device_clock(device)->domain(), fha::kClockDomainMonotonic);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
   EXPECT_FALSE(device_clock(device)->adjustable());
 
@@ -838,7 +832,7 @@ TEST_F(CompositeTest, DefaultClock) {
 }
 
 TEST_F(CompositeTest, ClockInOtherDomain) {
-  const uint32_t kNonMonotonicClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic + 1;
+  const uint32_t kNonMonotonicClockDomain = fha::kClockDomainMonotonic + 1;
   auto fake_driver = MakeFakeComposite();
   fake_driver->set_clock_domain(kNonMonotonicClockDomain);
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -986,7 +980,7 @@ TEST_F(CompositeTest, SetDaiFormatNoChange) {
     ASSERT_FALSE(notify()->dai_format_errors().empty());
     auto error_match = notify()->dai_format_errors().find(dai_element_id);
     ASSERT_NE(error_match, notify()->dai_format_errors().end());
-    EXPECT_EQ(error_match->second, fuchsia_audio_device::ControlSetDaiFormatError(0));
+    EXPECT_EQ(error_match->second, fad::ControlSetDaiFormatError(0));
     format_match = notify()->dai_formats().find(dai_element_id);
     EXPECT_EQ(format_match, notify()->dai_formats().end());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
@@ -1015,7 +1009,7 @@ TEST_F(CompositeTest, SetDaiFormatChange) {
     auto format_match = notify()->dai_formats().find(dai_element_id);
     ASSERT_NE(format_match, notify()->dai_formats().end());
     ASSERT_TRUE(format_match->second.has_value());
-    EXPECT_TRUE(ValidateDaiFormat(format_match->second.value()));
+    EXPECT_TRUE(ValidateDaiFormat(*format_match->second));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
     EXPECT_TRUE(notify()->dai_format_errors().empty());
     notify()->clear_dai_format(dai_element_id);
@@ -1071,8 +1065,8 @@ TEST_F(CompositeTest, Reset) {
 
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1106,8 +1100,7 @@ TEST_F(CompositeTest, Reset) {
 //
 // Creating a RingBuffer should succeed.
 void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
-                                         ElementId element_id,
-                                         const fuchsia_hardware_audio::Format& safe_format) {
+                                         ElementId element_id, const fha::Format& safe_format) {
   std::stringstream stream;
   stream << "Validating CreateRingBuffer on element_id " << element_id << " with format "
          << *safe_format.pcm_format();
@@ -1119,12 +1112,11 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
 
   EXPECT_TRUE(device->CreateRingBuffer(
       element_id, safe_format, requested_ring_buffer_bytes,
-      [&callback_received, &rb_info](
-          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-              result) {
+      [&callback_received,
+       &rb_info](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         callback_received = true;
         ASSERT_TRUE(result.is_ok());
-        rb_info = std::move(result.value());
+        rb_info = std::move(*result);
       }));
 
   RunLoopUntilIdle();
@@ -1163,8 +1155,7 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
   EXPECT_TRUE(rb_info.ring_buffer.reference_clock()->is_valid());
 
   ASSERT_TRUE(rb_info.ring_buffer.reference_clock_domain().has_value());
-  EXPECT_EQ(*rb_info.ring_buffer.reference_clock_domain(),
-            fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(*rb_info.ring_buffer.reference_clock_domain(), fha::kClockDomainMonotonic);
 
   // Now client can drop its RingBuffer connection.
   device->DropRingBuffer(element_id);
@@ -1217,8 +1208,8 @@ TEST_F(CompositeTest, DeviceDroppedRingBuffer) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1259,8 +1250,8 @@ TEST_F(CompositeTest, RingBufferStartAndStop) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1275,7 +1266,7 @@ TEST_F(CompositeTest, RingBufferStartAndStop) {
                             [&callback_received, &start_time](zx::result<zx::time> result) {
                               callback_received = true;
                               EXPECT_TRUE(result.is_ok());
-                              start_time = result.value();
+                              start_time = *result;
                               EXPECT_LT(start_time.get(), zx::clock::get_monotonic().get());
                             });
 
@@ -1318,8 +1309,8 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1335,7 +1326,7 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
         element_id, channel_bitmask, [&callback_received, &set_time](zx::result<zx::time> result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
-          set_time = result.value();
+          set_time = *result;
           EXPECT_LT(set_time.get(), zx::clock::get_monotonic().get());
         });
 
@@ -1352,7 +1343,7 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
         element_id, channel_bitmask, [&callback_received, &set_time2](zx::result<zx::time> result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
-          set_time2 = result.value();
+          set_time2 = *result;
         });
 
     RunLoopUntilIdle();
@@ -1389,8 +1380,8 @@ TEST_F(CompositeTest, SetActiveChannelsUnsupported) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+        [&callback_received](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           callback_received = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1437,8 +1428,8 @@ TEST_F(CompositeTest, WatchDelayInfoInitial) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                                 Device::RingBufferInfo>& result) {
+        [&created_ring_buffer](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           created_ring_buffer = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1486,8 +1477,8 @@ TEST_F(CompositeTest, WatchDelayInfoUpdate) {
     Device::RingBufferInfo rb_info;
     ASSERT_TRUE(device->CreateRingBuffer(
         element_id, safe_format, requested_ring_buffer_bytes,
-        [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                                 Device::RingBufferInfo>& result) {
+        [&created_ring_buffer](
+            const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
           created_ring_buffer = true;
           EXPECT_TRUE(result.is_ok());
         }));
@@ -1552,8 +1543,10 @@ TEST_F(CompositeTest, GetElements) {
     ASSERT_TRUE(element.id().has_value());
     ASSERT_TRUE(elements->at(0).type().has_value());
     ASSERT_TRUE(element.description().has_value());
-    ASSERT_TRUE(element.can_disable().has_value());
-    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+    ASSERT_FALSE(element.can_disable().has_value());
+    ASSERT_TRUE(element.can_stop().has_value());
+    ASSERT_TRUE(element.can_bypass().has_value());
+    if (element.type() == fhasp::ElementType::kEndpoint) {
       ASSERT_TRUE(element.type_specific().has_value());
       ASSERT_TRUE(element.type_specific()->endpoint().has_value());
       ASSERT_TRUE(element.type_specific()->endpoint()->type().has_value());
@@ -1563,45 +1556,44 @@ TEST_F(CompositeTest, GetElements) {
 
   EXPECT_EQ(elements->at(0).id(), FakeComposite::kSourceDaiElementId);
   EXPECT_EQ(elements->at(1).id(), FakeComposite::kDestDaiElementId);
-  EXPECT_EQ(elements->at(0).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  EXPECT_EQ(elements->at(1).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  EXPECT_FALSE(elements->at(0).can_disable().value());
-  EXPECT_FALSE(elements->at(1).can_disable().value());
+  EXPECT_EQ(elements->at(0).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(1).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_FALSE(*elements->at(0).can_bypass());
+  EXPECT_FALSE(*elements->at(1).can_bypass());
+  EXPECT_TRUE(*elements->at(0).can_stop());
+  EXPECT_TRUE(*elements->at(1).can_stop());
   EXPECT_EQ(*elements->at(0).description(), *FakeComposite::kSourceDaiElement.description());
   EXPECT_EQ(*elements->at(1).description(), *FakeComposite::kDestDaiElement.description());
   EXPECT_EQ(*elements->at(0).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+            fhasp::EndpointType::kDaiInterconnect);
   EXPECT_EQ(*elements->at(1).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+            fhasp::EndpointType::kDaiInterconnect);
   EXPECT_EQ(elements->at(0).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify);
   EXPECT_EQ(elements->at(1).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify);
 
   EXPECT_EQ(elements->at(2).id(), FakeComposite::kSourceRbElementId);
   EXPECT_EQ(elements->at(3).id(), FakeComposite::kDestRbElementId);
-  EXPECT_EQ(elements->at(2).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  EXPECT_EQ(elements->at(3).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  EXPECT_FALSE(elements->at(2).can_disable().value());
-  EXPECT_FALSE(elements->at(3).can_disable().value());
+  EXPECT_EQ(elements->at(2).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(3).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_FALSE(*elements->at(2).can_bypass());
+  EXPECT_FALSE(*elements->at(3).can_bypass());
+  EXPECT_FALSE(*elements->at(2).can_stop());
+  EXPECT_FALSE(*elements->at(3).can_stop());
   EXPECT_EQ(*elements->at(2).description(), *FakeComposite::kSourceRbElement.description());
   EXPECT_EQ(*elements->at(3).description(), *FakeComposite::kDestRbElement.description());
-  EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
-  EXPECT_EQ(*elements->at(3).type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
+  EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
+  EXPECT_EQ(*elements->at(3).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
   EXPECT_EQ(elements->at(2).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+            fhasp::PlugDetectCapabilities::kHardwired);
   EXPECT_EQ(elements->at(3).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+            fhasp::PlugDetectCapabilities::kHardwired);
 
   EXPECT_EQ(elements->at(4).id(), FakeComposite::kMuteElementId);
-  EXPECT_EQ(elements->at(4).type(), fuchsia_hardware_audio_signalprocessing::ElementType::kMute);
-  EXPECT_TRUE(elements->at(4).can_disable().value());
+  EXPECT_EQ(elements->at(4).type(), fhasp::ElementType::kMute);
+  EXPECT_TRUE(*elements->at(4).can_bypass());
+  EXPECT_FALSE(*elements->at(4).can_stop());
   EXPECT_EQ(*elements->at(4).description(), *FakeComposite::kMuteElement.description());
   EXPECT_FALSE(elements->at(4).type_specific().has_value());
 }
@@ -1662,105 +1654,102 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
   auto state = states.find(FakeComposite::kSourceDaiElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kSourceDaiElementLatency.latency_time().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state1 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state1.has_value());
   ASSERT_TRUE(endpt_state1->plug_state().has_value());
   ASSERT_TRUE(endpt_state1->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state1->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state1->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state1->plug_state()->plug_state_time(), 0);
   ASSERT_EQ(state.vendor_specific_data()->size(), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 1u);
   EXPECT_EQ(state.vendor_specific_data()->at(7), 8u);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestDaiElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kDestDaiElementLatency.latency_time().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state2 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state2.has_value());
   ASSERT_TRUE(endpt_state2->plug_state().has_value());
   ASSERT_TRUE(endpt_state2->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state2->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state2->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state2->plug_state()->plug_state_time(), 0);
   ASSERT_EQ(state.vendor_specific_data()->size(), 9u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(8), 0u);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)
                   ->second.latency()
                   ->latency_frames()
                   .has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
             FakeComposite::kSourceRbElementLatency.latency_frames().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state3 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state3.has_value());
   ASSERT_TRUE(endpt_state3->plug_state().has_value());
   ASSERT_TRUE(endpt_state3->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state3->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state3->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state3->plug_state()->plug_state_time(), 0);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestRbElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   ASSERT_TRUE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_TRUE(*state.enabled());
-  ASSERT_EQ(state.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames);
+  ASSERT_EQ(state.latency()->Which(), fhasp::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(state.latency()->latency_frames().has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
             FakeComposite::kDestRbElementLatency.latency_frames().value());
-  ASSERT_EQ(state.type_specific()->Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
   const auto& endpt_state4 = state.type_specific()->endpoint();
   ASSERT_TRUE(endpt_state4.has_value());
   ASSERT_TRUE(endpt_state4->plug_state().has_value());
   ASSERT_TRUE(endpt_state4->plug_state()->plugged().has_value());
   EXPECT_TRUE(*endpt_state4->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state4->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  EXPECT_EQ(*endpt_state4->plug_state()->plug_state_time(), 0);
+  EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kMuteElementId)->second;
-  ASSERT_TRUE(state.enabled().has_value());
   EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.bypassed().has_value());
+  EXPECT_FALSE(state.enabled().has_value());
 
-  EXPECT_FALSE(*state.enabled());
+  EXPECT_TRUE(*state.bypassed());
 }
 
 TEST_F(CompositeTest, WatchElementStateUpdate) {
@@ -1774,8 +1763,7 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
   ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
   // Determine which states we can inject change into.
-  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
-      element_states_to_inject;
+  std::unordered_map<ElementId, fhasp::ElementState> element_states_to_inject;
   auto plug_change_time_to_inject = zx::clock::get_monotonic();
   for (const auto& element : elements) {
     auto element_id = *element.id();
@@ -1784,21 +1772,23 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     auto state = match_state->second;
 
     // Handle the Mute node
-    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kMute &&
-        element.can_disable().value_or(false)) {
-      // By configuration, our Mute starts disabled (we enable it as our ElementState change).
-      ASSERT_TRUE(state.enabled().has_value());
-      EXPECT_FALSE(*state.enabled());
+    if (element.type() == fhasp::ElementType::kMute && element.can_bypass().value_or(false)) {
+      // By configuration, our Mute starts bypassed (we activate it as our ElementState change).
+      EXPECT_FALSE(state.enabled().has_value());
+      ASSERT_TRUE(state.started().has_value());
+      EXPECT_TRUE(*state.started());
+      ASSERT_TRUE(state.bypassed().has_value());
+      EXPECT_TRUE(*state.bypassed());
       element_states_to_inject.insert_or_assign(
-          element_id, fuchsia_hardware_audio_signalprocessing::ElementState{{.enabled = true}});
+          element_id, fhasp::ElementState{{.started = true, .bypassed = false}});
       continue;
     }
 
     // Then weed out any non-pluggable elements.
-    if (element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
-        !element.type_specific().has_value() || !element.type_specific()->endpoint().has_value() ||
+    if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
+        !element.type_specific()->endpoint().has_value() ||
         element.type_specific()->endpoint()->plug_detect_capabilities() !=
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify) {
+            fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;
     }
     if (!state.type_specific().has_value() || !state.type_specific()->endpoint().has_value() ||
@@ -1808,20 +1798,18 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       continue;
     }
     auto was_plugged = state.type_specific()->endpoint()->plug_state()->plugged();
-    auto new_state = fuchsia_hardware_audio_signalprocessing::ElementState{{
-        .type_specific =
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
-                fuchsia_hardware_audio_signalprocessing::EndpointElementState{{
-                    fuchsia_hardware_audio_signalprocessing::PlugState{{
-                        !was_plugged,
-                        plug_change_time_to_inject.get(),
-                    }},
-                }}),
-        .enabled = true,
-        .latency =
-            fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(ZX_USEC(element_id)),
+    auto new_state = fhasp::ElementState{{
+        .type_specific = fhasp::TypeSpecificElementState::WithEndpoint(fhasp::EndpointElementState{{
+            fhasp::PlugState{{
+                !was_plugged,
+                plug_change_time_to_inject.get(),
+            }},
+        }}),
+        .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
+        .started = true,
+        .bypassed = false,
     }};
     ASSERT_EQ(new_state.vendor_specific_data()->size(), 17u) << "Test configuration error";
     element_states_to_inject.insert_or_assign(element_id, new_state);
@@ -1845,11 +1833,14 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     // Compare to actual static values we know.
     if (element_id == FakeComposite::kMuteElementId) {
       EXPECT_FALSE(state_received.type_specific().has_value());
-      ASSERT_TRUE(state_received.enabled().has_value());
       EXPECT_FALSE(state_received.latency().has_value());
       EXPECT_FALSE(state_received.vendor_specific_data().has_value());
 
-      EXPECT_EQ(state_received.enabled(), true);
+      EXPECT_FALSE(state_received.enabled().has_value());
+      ASSERT_TRUE(state_received.started().has_value());
+      EXPECT_TRUE(*state_received.started());
+      ASSERT_TRUE(state_received.bypassed().has_value());
+      EXPECT_FALSE(*state_received.bypassed());
     } else {
       ASSERT_TRUE(state_received.type_specific().has_value());
       ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
@@ -1860,17 +1851,19 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
                 plug_change_time_to_inject.get());
 
-      ASSERT_TRUE(state_received.enabled().has_value());
-      EXPECT_EQ(state_received.enabled(), true);
-
       ASSERT_TRUE(state_received.latency().has_value());
-      ASSERT_EQ(state_received.latency()->Which(),
-                fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+      ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
       EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
 
       ASSERT_TRUE(state_received.vendor_specific_data().has_value());
       ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
       EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+
+      EXPECT_FALSE(state_received.enabled().has_value());
+      ASSERT_TRUE(state_received.started().has_value());
+      EXPECT_TRUE(state_received.started());
+      ASSERT_TRUE(state_received.bypassed().has_value());
+      EXPECT_FALSE(*state_received.bypassed());
     }
 
     // Compare to what we injected.
@@ -1953,7 +1946,7 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
               notify()->element_states().end());
   notify()->clear_element_states();
-  fuchsia_hardware_audio_signalprocessing::ElementState state{{.enabled = true}};
+  fhasp::ElementState state{{.started = true, .bypassed = false}};
 
   EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
 
@@ -1961,11 +1954,16 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_FALSE(notify()->element_states().find(FakeComposite::kMuteElementId) ==
                notify()->element_states().end());
   auto new_state = notify()->element_states().find(FakeComposite::kMuteElementId)->second;
-  ASSERT_TRUE(new_state.enabled().has_value());
-  EXPECT_EQ(*new_state.enabled(), true);
-  EXPECT_FALSE(new_state.latency().has_value());
+
   EXPECT_FALSE(new_state.type_specific().has_value());
+  EXPECT_FALSE(new_state.latency().has_value());
   EXPECT_FALSE(new_state.vendor_specific_data().has_value());
+
+  EXPECT_FALSE(new_state.enabled().has_value());
+  ASSERT_TRUE(new_state.started().has_value());
+  EXPECT_TRUE(*new_state.started());
+  ASSERT_TRUE(new_state.bypassed().has_value());
+  EXPECT_FALSE(*new_state.bypassed());
 }
 
 /////////////////////
@@ -1983,7 +1981,7 @@ TEST_F(StreamConfigTest, Initialization) {
   EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kOutput);
+  EXPECT_EQ(device->device_type(), fad::DeviceType::kOutput);
 
   EXPECT_TRUE(device->has_stream_config_properties());
   EXPECT_TRUE(device->checked_for_signalprocessing());
@@ -2004,7 +2002,7 @@ TEST_F(StreamConfigTest, DeviceInfo) {
 
   EXPECT_TRUE(info.token_id());
   EXPECT_TRUE(info.device_type());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kOutput);
+  EXPECT_EQ(*info.device_type(), fad::DeviceType::kOutput);
   EXPECT_TRUE(info.device_name());
   // manufacturer is optional, but it can't be an empty string
   EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
@@ -2014,7 +2012,7 @@ TEST_F(StreamConfigTest, DeviceInfo) {
   EXPECT_TRUE(info.gain_caps());
   EXPECT_TRUE(info.plug_detect_caps());
   EXPECT_TRUE(info.clock_domain());
-  EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(*info.clock_domain(), fha::kClockDomainMonotonic);
 }
 
 TEST_F(StreamConfigTest, DistinctTokenIds) {
@@ -2023,7 +2021,7 @@ TEST_F(StreamConfigTest, DistinctTokenIds) {
   ASSERT_TRUE(IsInitialized(device));
 
   // Set up a second, entirely distinct fake device.
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
+  auto [client, server] = fidl::Endpoints<fha::StreamConfig>::Create();
 
   auto fake_driver2 =
       std::make_shared<FakeStreamConfig>(server.TakeChannel(), client.TakeChannel(), dispatcher());
@@ -2078,7 +2076,7 @@ TEST_F(StreamConfigTest, DefaultClock) {
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
-  EXPECT_EQ(device_clock(device)->domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_EQ(device_clock(device)->domain(), fha::kClockDomainMonotonic);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
   EXPECT_FALSE(device_clock(device)->adjustable());
 
@@ -2087,7 +2085,7 @@ TEST_F(StreamConfigTest, DefaultClock) {
 }
 
 TEST_F(StreamConfigTest, ClockInOtherDomain) {
-  const uint32_t kNonMonotonicClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic + 1;
+  const uint32_t kNonMonotonicClockDomain = fha::kClockDomainMonotonic + 1;
   auto fake_driver = MakeFakeStreamConfigInput();
   fake_driver->set_clock_domain(kNonMonotonicClockDomain);
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
@@ -2243,7 +2241,7 @@ TEST_F(StreamConfigTest, InitialPlugState) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time(0).get());
 }
 
@@ -2256,7 +2254,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_TRUE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kPlugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), zx::time(0).get());
   notify()->plug_state().reset();
 
@@ -2265,7 +2263,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   RunLoopUntilIdle();
   EXPECT_FALSE(device_plugged_state(device));
   ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->first, fad::PlugState::kUnplugged);
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
@@ -2279,10 +2277,9 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2327,10 +2324,9 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2356,8 +2352,8 @@ TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+      [&created_ring_buffer](
+          const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });
@@ -2386,8 +2382,8 @@ TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                                               Device::RingBufferInfo>& result) {
+      [&created_ring_buffer](
+          const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });
@@ -2429,10 +2425,9 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2457,10 +2452,9 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
-                           Device::RingBufferInfo>& result) {
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
-        auto& info = result.value();
+        auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
@@ -2489,7 +2483,6 @@ TEST_F(StreamConfigTest, SetActiveChannels) {
   SetInitialActiveChannelsAndExpect(device, ring_buffer_element_id(), 0x0002);
 }
 
-// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no set_time
-// change).
+// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no set_time change).
 
 }  // namespace media_audio

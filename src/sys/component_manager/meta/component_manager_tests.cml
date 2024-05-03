@@ -13,7 +13,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.RootResource",
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.process.Launcher",

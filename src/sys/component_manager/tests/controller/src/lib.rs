@@ -522,13 +522,20 @@ pub async fn start_when_already_started() {
 
 #[fuchsia::test]
 pub async fn get_exposed_dictionary() {
-    let (controller_proxy, _instance) = spawn_child_with_url("#meta/echo_server.cm").await;
+    let (controller_proxy, instance) = spawn_child_with_url("#meta/echo_server.cm").await;
     let (exposed_dict, server_end) = create_proxy().unwrap();
 
     controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();
     let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
-    let fsandbox::Capability::Sender(echo_sender) = echo_cap else { panic!("wrong type") };
-    let echo_sender = echo_sender.into_proxy().unwrap();
+    let fsandbox::Capability::Sender(echo_sender_capability) = echo_cap else {
+        panic!("wrong type")
+    };
+    let factory =
+        instance.root.connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>().unwrap();
+    let (echo_sender_client, echo_sender_server) =
+        fidl::endpoints::create_endpoints::<fsandbox::SenderMarker>();
+    factory.connect_to_sender(echo_sender_capability, echo_sender_server.into()).unwrap();
+    let echo_sender = echo_sender_client.into_proxy().unwrap();
     let (echo_proxy, server_end) = create_proxy::<fecho::EchoMarker>().unwrap();
     echo_sender.send_(server_end.into_channel().into()).unwrap();
     let response = echo_proxy.echo_string(Some("hello")).await.unwrap().unwrap();

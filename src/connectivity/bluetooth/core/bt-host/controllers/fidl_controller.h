@@ -106,6 +106,8 @@ class FidlController final : public pw::bluetooth::Controller {
   async::WaitMethod<FidlController, &FidlController::OnCommandSignal> command_wait_{this};
   async::WaitMethod<FidlController, &FidlController::OnScoSignal> sco_wait_{this};
   async::WaitMethod<FidlController, &FidlController::OnIsoSignal> iso_wait_{this};
+
+  bool shutting_down_ = false;
 };
 
 }  // namespace bt::controllers

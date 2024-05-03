@@ -95,6 +95,10 @@
                             ]
                         }
                     ]
+                },
+                "stable": {
+                    "description": "If true, the atom is subject to API compatibility policy. If false, it its experimental and may change without warning.",
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -107,7 +111,8 @@
                 "root",
                 "sources",
                 "name",
-                "type"
+                "type",
+                "stable"
             ]
         }
     ],

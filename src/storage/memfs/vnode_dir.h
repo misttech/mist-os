@@ -19,7 +19,7 @@ class VnodeDir final : public Vnode {
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
 
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
-  zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode>* out) final;
+  zx::result<fbl::RefPtr<fs::Vnode>> Create(std::string_view name, fs::CreationType vfs_type) final;
 
   // Create a vnode from a VMO.
   // Fails if the vnode already exists.

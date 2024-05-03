@@ -139,8 +139,8 @@ TEST(VerbsSettings, ParseSetCommand) {
 TEST_F(VerbsSettingsTest, GetSet) {
   console().FlushOutputEvents();
 
-  // "get" with no input.
-  EXPECT_EQ("", DoInput("get --value-only source-map"));
+  // "get" with no input. "double" is the default value for vector-format.
+  EXPECT_EQ("double", DoInput("get --value-only vector-format"));
 
   // "get" with an invalid object (there is no active filter).
   EXPECT_EQ("No current object of this type.", DoInput("filter get --value-only"));

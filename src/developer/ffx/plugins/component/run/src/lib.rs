@@ -13,7 +13,7 @@ use ffx_component::rcs::{
 };
 use ffx_component_run_args::RunComponentCommand;
 use ffx_core::macro_deps::errors::FfxError;
-use ffx_log::log_impl;
+use ffx_log::{log_impl, FfxConnector};
 use ffx_log_args::LogCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
@@ -26,6 +26,7 @@ async fn cmd_impl(
     rcs_proxy: rc::RemoteControlProxy,
     args: RunComponentCommand,
     mut writer: MachineWriter<LogEntry>,
+    connector: FfxConnector,
 ) -> Result<(), anyhow::Error> {
     let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
     let realm_query = connect_to_realm_query(&rcs_proxy).await?;
@@ -65,8 +66,7 @@ async fn cmd_impl(
     if args.follow_logs {
         let log_filter = args.moniker.to_string();
         let log_cmd = LogCommand { filter: vec![log_filter], ..LogCommand::default() };
-
-        log_impl(writer, rcs_proxy, target_collection_proxy, log_cmd).await?;
+        log_impl(writer, rcs_proxy, target_collection_proxy, log_cmd, Some(connector)).await?;
     }
     Ok(())
 }
@@ -78,6 +78,7 @@ pub struct RunTool {
     rcs: rc::RemoteControlProxy,
     #[with(daemon_protocol())]
     target_collection: TargetCollectionProxy,
+    connector: FfxConnector,
 }
 
 fho::embedded_plugin!(RunTool);
@@ -87,7 +88,7 @@ impl FfxMain for RunTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        cmd_impl(self.target_collection, self.rcs, self.cmd, writer).await?;
+        cmd_impl(self.target_collection, self.rcs, self.cmd, writer, self.connector).await?;
         Ok(())
     }
 }

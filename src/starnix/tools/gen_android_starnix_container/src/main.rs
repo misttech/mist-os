@@ -134,6 +134,7 @@ fn generate(cmd: Command) -> Result<()> {
     let mut builder = clone_package(&cmd.base, &cmd.outdir.to_string(), &mut deps)?;
     builder.name(&cmd.name);
     builder.published_name(&cmd.name);
+    builder.manifest_blobs_relative_to(fuchsia_pkg::RelativeTo::File);
 
     let system_files = add_ext4_image("system", &cmd.outdir, &cmd.system, &mut builder)?;
     deps.track_input(cmd.system.to_string());
@@ -244,6 +245,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use ext4_metadata::{Metadata, NodeInfo, ROOT_INODE_NUM};
+    use itertools::Itertools;
+    use serde_json::Value;
     use std::str::FromStr;
     use tempfile::TempDir;
 
@@ -261,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate() {
+    fn test_generate() -> Result<()> {
         let tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
         let base_manifest_path = fake_base(outdir);
@@ -289,13 +292,28 @@ mod tests {
         // Read the package manifest, and ensure the correct files are present as blobs, and the
         // HALs are listed as subpackages.
         let manifest_path = outdir.join("package_manifest.json");
-        let manifest = PackageManifest::try_load_from(manifest_path).unwrap();
+        let manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
         assert_eq!(manifest.name().as_ref(), "test-name");
         let (blobs, subpackages) = manifest.into_blobs_and_subpackages();
         assert_eq!(blobs.len(), 7);
         assert_eq!(subpackages.len(), 1);
-        let blob_filenames: Vec<String> = blobs.into_iter().map(|b| b.path).collect();
-        let subpackage_names: Vec<String> = subpackages.into_iter().map(|s| s.name).collect();
+        let blob_filenames: Vec<String> = blobs.iter().map(|b| b.path.clone()).collect();
+
+        // Check that the paths in the file are relative to the file, not the current directory.
+        // We can't use the typed reader since it will resolve them to absolute paths.
+        let manifest_file = File::open(&manifest_path)
+            .with_context(|| format!("Opening package manifest: {manifest_path}"))?;
+        let manifest_json: Value = serde_json::from_reader(manifest_file)?;
+
+        let blob_source_paths: Vec<String> = manifest_json["blobs"]
+            .as_array()
+            .context("checking relative manifest blobs")?
+            .into_iter()
+            .filter_map(|b| b["source_path"].as_str())
+            .map(|p| p.to_string())
+            .sorted()
+            .collect();
+
         assert_eq!(
             blob_filenames,
             vec![
@@ -308,7 +326,21 @@ mod tests {
                 "data/vendor/metadata.v1".to_string(),
             ]
         );
-        assert_eq!(subpackage_names, vec!["test-hal".to_string(),]);
+
+        assert_eq!(
+            blob_source_paths,
+            vec![
+                "data/test".to_string(),
+                "meta.far".to_string(),
+                "odm/metadata.v1".to_string(),
+                "system/13".to_string(),
+                "system/metadata.v1".to_string(),
+                "vendor/13".to_string(),
+                "vendor/metadata.v1".to_string(),
+            ]
+        );
+
+        Ok(())
     }
 
     #[test]

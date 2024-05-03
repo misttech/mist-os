@@ -154,6 +154,18 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
 
         // Align memory to page boundaries.
         size_t current = 0;
+
+        if (uart_periph_range) {
+          handoff_mem_config[current++] = *uart_periph_range;
+        }
+
+        if (test_ram_reserve) {
+          // TODO(mcgrathr): Note this will persist into the mexec handoff from
+          // the kernel and be elided from the next kernel.  But that will be
+          // fixed shortly when mexec handoff is handled directly here instead.
+          handoff_mem_config[current++] = *test_ram_reserve;
+        }
+
         for (auto mem_range : mem_config) {
           switch (mem_range.type) {
               // It is only safe to trim non aligned bytes from these ranges, since
@@ -197,22 +209,8 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
           handoff_mem_config[current++] = mem_range;
         }
 
-        ktl::span extra_ranges = handoff_mem_config.subspan(current);
-        size_t current_range = 0;
-
-        if (uart_periph_range) {
-          extra_ranges[current_range++] = *uart_periph_range;
-        }
-
-        if (test_ram_reserve) {
-          // TODO(mcgrathr): Note this will persist into the mexec handoff from
-          // the kernel and be elided from the next kernel.  But that will be
-          // fixed shortly when mexec handoff is handled directly here instead.
-          extra_ranges[current_range++] = *test_ram_reserve;
-        }
-
         // Adjust the size of valid ranges.
-        handoff_->mem_config.size_ = current + current_range;
+        handoff_->mem_config.size_ = current;
         break;
       }
 

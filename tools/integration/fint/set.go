@@ -340,6 +340,10 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		vars["dont_profile_source_files"] = []string{}
 	}
 
+	if contextSpec.PgoProfilePath != "" {
+		vars["pgo_profile_path"] = filepath.Join(contextSpec.PgoProfilePath)
+	}
+
 	if staticSpec.EnableGoCache {
 		vars["gocache_dir"] = filepath.Join(contextSpec.CacheDir, "go_cache")
 	} else if staticSpec.UseTemporaryGoCache {

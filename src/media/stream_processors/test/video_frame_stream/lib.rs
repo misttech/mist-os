@@ -4,8 +4,9 @@
 
 use anyhow::format_err;
 use async_trait::async_trait;
+use fidl_fuchsia_images2 as images2;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem as sysmem;
+use fuchsia_image_format::sysmem1_image_format_from_images2_image_format;
 use std::rc::Rc;
 use stream_processor_test::*;
 
@@ -13,7 +14,7 @@ use stream_processor_test::*;
 pub struct VideoFrame {
     // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
-    format: sysmem::ImageFormat2,
+    format: images2::ImageFormat,
     data: Vec<u8>,
 }
 
@@ -21,11 +22,11 @@ pub struct VideoFrame {
 impl VideoFrame {
     /// Generates a frame with specified `format`.
     /// `step` is for diagonally shifting the checkerboard pattern.
-    pub fn create(format: sysmem::ImageFormat2, step: usize) -> Self {
+    pub fn create(format: images2::ImageFormat, step: usize) -> Self {
         // For 4:2:0 YUV, the UV data is 1/2 the size of the Y data,
         // so the size of the frame is 3/2 the size of the Y plane.
-        let width = format.bytes_per_row as usize;
-        let height = format.coded_height as usize;
+        let width = *format.bytes_per_row.as_ref().unwrap() as usize;
+        let height = format.size.as_ref().unwrap().height as usize;
         let frame_size = width * height * 3usize / 2usize;
         let mut data = vec![128; frame_size];
 
@@ -100,11 +101,9 @@ impl OutputValidator for TimestampValidator {
     }
 }
 
-fn new_video_uncompressed_format(
-    image_format: fidl_fuchsia_sysmem::ImageFormat2,
-) -> VideoUncompressedFormat {
+fn new_video_uncompressed_format(image_format: images2::ImageFormat) -> VideoUncompressedFormat {
     VideoUncompressedFormat {
-        image_format,
+        image_format: sysmem1_image_format_from_images2_image_format(&image_format).unwrap(),
         fourcc: 0,
         primary_width_pixels: 0,
         primary_height_pixels: 0,
@@ -131,7 +130,7 @@ fn new_video_uncompressed_format(
 /// fed to an encoder StreamProcessor.
 pub struct VideoFrameStream {
     pub num_frames: usize,
-    pub format: sysmem::ImageFormat2,
+    pub format: images2::ImageFormat,
     pub encoder_settings: Rc<dyn Fn() -> EncoderSettings>,
     pub frames_per_second: usize,
     pub timebase: Option<u64>,
@@ -140,7 +139,7 @@ pub struct VideoFrameStream {
 
 impl VideoFrameStream {
     pub fn create(
-        format: sysmem::ImageFormat2,
+        format: images2::ImageFormat,
         num_frames: usize,
         encoder_settings: Rc<dyn Fn() -> EncoderSettings>,
         frames_per_second: usize,
@@ -205,11 +204,13 @@ impl ElementaryStream for VideoFrameStream {
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl_fuchsia_math::{RectU, SizeU};
+    use fuchsia_image_format::images2_image_format_from_sysmem_image_format;
     use fuchsia_zircon as zx;
 
     #[derive(Debug, Copy, Clone)]
     struct TestSpec {
-        pixel_format: sysmem::PixelFormatType,
+        pixel_format: images2::PixelFormat,
         coded_width: usize,
         coded_height: usize,
         display_width: usize,
@@ -219,22 +220,21 @@ mod test {
 
     impl Into<VideoUncompressedFormat> for TestSpec {
         fn into(self) -> VideoUncompressedFormat {
-            new_video_uncompressed_format(sysmem::ImageFormat2 {
-                pixel_format: sysmem::PixelFormat {
-                    type_: self.pixel_format,
-                    has_format_modifier: false,
-                    format_modifier: sysmem::FormatModifier { value: 0 },
-                },
-                coded_width: self.coded_width as u32,
-                coded_height: self.coded_height as u32,
-                bytes_per_row: self.bytes_per_row as u32,
-                display_width: self.display_width as u32,
-                display_height: self.display_height as u32,
-                layers: 0,
-                color_space: sysmem::ColorSpace { type_: sysmem::ColorSpaceType::Rec709 },
-                has_pixel_aspect_ratio: false,
-                pixel_aspect_ratio_width: 0,
-                pixel_aspect_ratio_height: 0,
+            new_video_uncompressed_format(images2::ImageFormat {
+                pixel_format: Some(self.pixel_format),
+                size: Some(SizeU {
+                    width: self.coded_width.try_into().unwrap(),
+                    height: self.coded_height.try_into().unwrap(),
+                }),
+                bytes_per_row: Some(self.bytes_per_row as u32),
+                display_rect: Some(RectU {
+                    x: 0,
+                    y: 0,
+                    width: self.display_width as u32,
+                    height: self.display_height as u32,
+                }),
+                color_space: Some(images2::ColorSpace::Rec709),
+                ..Default::default()
             })
         }
     }
@@ -242,7 +242,7 @@ mod test {
     #[fuchsia::test]
     fn stream_timestamps() {
         let test_spec = TestSpec {
-            pixel_format: sysmem::PixelFormatType::Nv12,
+            pixel_format: images2::PixelFormat::Nv12,
             coded_width: 16,
             coded_height: 16,
             display_height: 12,
@@ -252,7 +252,7 @@ mod test {
 
         let format: VideoUncompressedFormat = test_spec.into();
         let stream = VideoFrameStream::create(
-            format.image_format,
+            images2_image_format_from_sysmem_image_format(&format.image_format).unwrap(),
             /*num_frames=*/ 2,
             Rc::new(move || -> EncoderSettings {
                 EncoderSettings::H264(H264EncoderSettings {
@@ -278,7 +278,7 @@ mod test {
     #[fuchsia::test]
     fn pattern_check() {
         let test_spec = TestSpec {
-            pixel_format: sysmem::PixelFormatType::Nv12,
+            pixel_format: images2::PixelFormat::Nv12,
             coded_width: 8,
             coded_height: 8,
             display_height: 8,
@@ -287,7 +287,10 @@ mod test {
         };
 
         let format: VideoUncompressedFormat = test_spec.into();
-        let frame = VideoFrame::create(format.image_format.clone(), 0);
+        let frame = VideoFrame::create(
+            images2_image_format_from_sysmem_image_format(&format.image_format).unwrap(),
+            0,
+        );
         assert_eq!(
             frame.data,
             vec![

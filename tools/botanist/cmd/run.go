@@ -69,9 +69,6 @@ type RunCommand struct {
 	// syslogDir, if nonempty, is the directory in which system syslogs will be written.
 	syslogDir string
 
-	// SshKey is the path to a private SSH user key.
-	sshKey string
-
 	// serialLogDir, if nonempty, is the directory in which system serial logs will be written.
 	serialLogDir string
 
@@ -138,7 +135,6 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.Var(&r.zirconArgs, "zircon-args", "kernel command-line arguments")
 	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
 	f.StringVar(&r.syslogDir, "syslog-dir", "", "the directory to write all system logs to.")
-	f.StringVar(&r.sshKey, "ssh", "", "file containing a private SSH user key; if not provided, a private key will be generated.")
 	f.StringVar(&r.serialLogDir, "serial-log-dir", "", "the directory to write all serial logs to.")
 	f.StringVar(&r.repoURL, "repo", "", "URL at which to configure a package repository; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
 	f.StringVar(&r.blobURL, "blobs", "", "URL at which to serve a package repository's blobs; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
@@ -161,40 +157,41 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
 }
 
-func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget) (func(), error) {
+func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func(), error) {
 	var cleanup func()
 	if r.ffxPath == "" {
-		return cleanup, fmt.Errorf("ffx path must be provided with the -ffx flag.")
+		return nil, cleanup, fmt.Errorf("ffx path must be provided with the -ffx flag.")
 	}
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
 
 	extraConfigs := ffxutil.ConfigSettings{
 		Level: "global",
 		Settings: map[string]any{
-			"daemon.autostart":       false,
-			"discovery.mdns.enabled": false,
+			"daemon.autostart":              false,
+			"discovery.mdns.enabled":        false,
+			"ffx.target-list.local-connect": r.ffxExperimentLevel >= 2,
 		},
 	}
-	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, primaryTarget.Nodename(), primaryTarget.SSHKey(), ffxOutputsDir, extraConfigs)
+	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", "", ffxOutputsDir, extraConfigs)
 	if err != nil {
-		return cleanup, err
+		return nil, cleanup, err
 	}
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
 	defer flush()
 	ffx.SetStdoutStderr(stdout, stderr)
 	if r.ffxExperimentLevel > 0 {
 		if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
-			return cleanup, err
+			return ffx, cleanup, err
 		}
 	}
 	if err := ffx.Run(ctx, "config", "env"); err != nil {
-		return cleanup, err
+		return ffx, cleanup, err
 	}
 
 	cmd := ffx.Command("daemon", "start")
 	daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
 	if err != nil {
-		return cleanup, err
+		return ffx, cleanup, err
 	}
 	cmd.Stdout = daemonLog
 	logger.Debugf(ctx, "%s", cmd.Args)
@@ -202,7 +199,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 	// a direct call to the cancel function.
 	daemonCtx, daemonCancel := context.WithCancel(context.Background())
 	if err := cmd.Start(); err != nil {
-		return cleanup, err
+		return ffx, cleanup, err
 	}
 	// Wait for the daemon process to terminate in a separate goroutine
 	// and log when it finishes in order to detect if the process gets
@@ -233,19 +230,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		}
 	}
 
-	for _, t := range fuchsiaTargets {
-		// Start serial servers for all targets. Will no-op for targets that
-		// already have serial servers.
-		if err := t.StartSerialServer(); err != nil {
-			return cleanup, err
-		}
-		// Attach an ffx instance for all targets. All ffx instances will use the same
-		// config and daemon, but run commands against its own specified target.
-		ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
-		t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
-	}
-
-	return cleanup, ffx.WaitForDaemon(ctx)
+	return ffx, cleanup, ffx.WaitForDaemon(ctx)
 }
 
 func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuchsiaTargets []targets.FuchsiaTarget) error {
@@ -447,8 +432,28 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		return nil
 	}
 
+	ffx, cleanup, err := r.setupFFX(ctx)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
+		return err
+	}
+	sshKey, err := ffx.GetSshPrivateKey(ctx)
+	if err != nil {
+		return fmt.Errorf("Cannot get ssh private key path. Reason: %s", err)
+	}
+	authorizedKey, err := ffx.GetSshAuthorizedKeys(ctx)
+	if err != nil {
+		return fmt.Errorf("Cannot get authorized key path. Reason: %s", err)
+	}
+
 	// Parse targets out from the target configuration file.
-	baseTargets, fuchsiaTargets, err := r.deriveTargetsFromFile(ctx)
+	baseTargets, fuchsiaTargets, err := r.deriveTargetsFromFile(ctx, targets.Options{
+		Netboot:       r.netboot,
+		SSHKey:        sshKey,
+		AuthorizedKey: authorizedKey,
+	})
 	if err != nil {
 		return err
 	}
@@ -456,12 +461,16 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// streamed from.
 	primaryTarget := fuchsiaTargets[0]
 
-	cleanup, err := r.setupFFX(ctx, fuchsiaTargets, primaryTarget)
-	if cleanup != nil {
-		defer cleanup()
-	}
-	if err != nil {
-		return err
+	for _, t := range fuchsiaTargets {
+		// Start serial servers for all targets. Will no-op for targets that
+		// already have serial servers.
+		if err := t.StartSerialServer(); err != nil {
+			return err
+		}
+		// Attach an ffx instance for all targets. All ffx instances will use the same
+		// config and daemon, but run commands against its own specified target.
+		ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
+		t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -729,7 +738,7 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 	return subcommands.ExitSuccess
 }
 
-func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.Base, []targets.FuchsiaTarget, error) {
+func (r *RunCommand) deriveTargetsFromFile(ctx context.Context, targetOpts targets.Options) ([]targets.Base, []targets.FuchsiaTarget, error) {
 	data, err := os.ReadFile(r.configFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", constants.ReadConfigFileErrorMsg, err)
@@ -743,10 +752,7 @@ func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.Base,
 	var fuchsiaTargets []targets.FuchsiaTarget
 
 	for _, config := range configs {
-		t, err := targets.FromJSON(ctx, config, targets.Options{
-			Netboot: r.netboot,
-			SSHKey:  r.sshKey,
-		})
+		t, err := targets.FromJSON(ctx, config, targetOpts)
 		if err != nil {
 			return nil, nil, err
 		}

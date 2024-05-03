@@ -457,6 +457,19 @@ struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::AnotherDisco
   }
 };
 template <>
+struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::PlatformServer>> {
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::PlatformServer>& value) {
+    return os << "ClientEnd<" << "test_protocols::PlatformServer" << ">(" << value.channel().get() << ")";
+  }
+};
+
+template <>
+struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::PlatformServer>> {
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::PlatformServer>& value) {
+    return os << "ServerEnd<" << "test_protocols::PlatformServer" << ">(" << value.channel().get() << ")";
+  }
+};
+template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>& value) {
     return os << "ClientEnd<" << "test_protocols::HandleRightsProtocol" << ">(" << value.channel().get() << ")";
@@ -549,6 +562,14 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::PlatformServer>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::PlatformServer>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::PlatformServer>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::PlatformServer>>::Format(os, value);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>& value) {

@@ -10,6 +10,7 @@ library_headers("headers") {
     "lib/concurrent/copy.h",
     "lib/concurrent/seqlock.h",
     "lib/concurrent/seqlock.inc.h",
+    "lib/concurrent/chainlock.h",
   ]
 }
 
@@ -22,6 +23,9 @@ source_set("concurrent") {
     sources += [ "seqlock_usermode_posix.cc" ]
   }
 
-  public_deps = [ ":headers" ]
+  public_deps = [
+    ":headers",
+    "//zircon/kernel/lib/arch:headers",
+  ]
   deps = [ "//sdk/lib/stdcompat" ]
 }

@@ -35,7 +35,7 @@
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
 
-use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug, time::Duration};
+use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug};
 
 use lock_order::Unlocked;
 
@@ -46,12 +46,12 @@ use crate::{
     counters::Counter,
     marker::{BindingsContext, BindingsTypes},
     state::StackState,
-    sync, Instant,
 };
 
 pub use netstack3_base::{
-    ContextPair, CoreTimerContext, InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx,
-    TimerBindingsTypes, TimerContext2,
+    ContextPair, CoreTimerContext, DeferredResourceRemovalContext, HandleableTimer,
+    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers,
+    TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -64,90 +64,6 @@ pub use netstack3_base::{
 pub(crate) trait NonTestCtxMarker {}
 
 impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
-
-/// An [`InstantContext`] which stores a cached value for the current time.
-///
-/// `CachedInstantCtx`s are constructed via [`new_cached_instant_context`].
-pub(crate) struct CachedInstantCtx<I>(I);
-
-impl<I: Instant + 'static> InstantBindingsTypes for CachedInstantCtx<I> {
-    type Instant = I;
-}
-
-impl<I: Instant + 'static> InstantContext for CachedInstantCtx<I> {
-    fn now(&self) -> I {
-        self.0.clone()
-    }
-}
-
-/// Construct a new `CachedInstantCtx` from the current time.
-///
-/// This is a hack until we figure out a strategy for splitting context objects.
-/// Currently, since most context methods take a `&mut self` argument, lifetimes
-/// which don't need to conflict in principle - such as the lifetime of state
-/// obtained mutably from [`StateContext`] and the lifetime required to call the
-/// [`InstantContext::now`] method on the same object - do conflict, and thus
-/// cannot overlap. Until we figure out an approach to deal with that problem,
-/// this exists as a workaround.
-pub(crate) fn new_cached_instant_context<I: InstantContext + ?Sized>(
-    bindings_ctx: &I,
-) -> CachedInstantCtx<I::Instant> {
-    CachedInstantCtx(bindings_ctx.now())
-}
-
-/// A context that supports scheduling timers.
-pub trait TimerContext<Id>: InstantContext {
-    /// Schedule a timer to fire after some duration.
-    ///
-    /// `schedule_timer` schedules the given timer to be fired after `duration`
-    /// has elapsed, overwriting any previous timer with the same ID.
-    ///
-    /// If there was previously a timer with that ID, return the time at which
-    /// is was scheduled to fire.
-    ///
-    /// # Panics
-    ///
-    /// `schedule_timer` may panic if `duration` is large enough that
-    /// `self.now() + duration` overflows.
-    fn schedule_timer(&mut self, duration: Duration, id: Id) -> Option<Self::Instant> {
-        self.schedule_timer_instant(self.now().checked_add(duration).unwrap(), id)
-    }
-
-    /// Schedule a timer to fire at some point in the future.
-    ///
-    /// `schedule_timer` schedules the given timer to be fired at `time`,
-    /// overwriting any previous timer with the same ID.
-    ///
-    /// If there was previously a timer with that ID, return the time at which
-    /// is was scheduled to fire.
-    fn schedule_timer_instant(&mut self, time: Self::Instant, id: Id) -> Option<Self::Instant>;
-
-    /// Cancel a timer.
-    ///
-    /// If a timer with the given ID exists, it is canceled and the instant at
-    /// which it was scheduled to fire is returned.
-    fn cancel_timer(&mut self, id: Id) -> Option<Self::Instant>;
-
-    /// Cancel all timers which satisfy a predicate.
-    ///
-    /// `cancel_timers_with` calls `f` on each scheduled timer, and cancels any
-    /// timer for which `f` returns true.
-    fn cancel_timers_with<F: FnMut(&Id) -> bool>(&mut self, f: F);
-
-    /// Get the instant a timer will fire, if one is scheduled.
-    ///
-    /// Returns the [`Instant`] a timer with ID `id` will be invoked. If no
-    /// timer with the given ID exists, `scheduled_instant` will return `None`.
-    fn scheduled_instant(&self, id: Id) -> Option<Self::Instant>;
-}
-
-/// A handler for timer firing events.
-///
-/// A `TimerHandler` is a type capable of handling the event of a timer firing.
-pub trait TimerHandler<BC, Id> {
-    /// Handle a timer firing.
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
-}
 
 // NOTE:
 // - Code in this crate is required to only obtain random values through an
@@ -263,22 +179,6 @@ pub trait TracingContext {
     /// Care should be taken to avoid a duration's scope spanning an `await`
     /// point in asynchronous code.
     fn duration(&self, name: &'static CStr) -> Self::DurationScope;
-}
-
-/// A context trait determining the types to be used for reference notifications.
-pub trait ReferenceNotifiers {
-    /// The receiver for shared reference destruction notifications.
-    type ReferenceReceiver<T: 'static>: 'static;
-    /// The notifier for shared reference destruction notifications.
-    type ReferenceNotifier<T: Send + 'static>: sync::RcNotifier<T> + 'static;
-
-    /// Creates a new Notifier/Receiver pair for `T`.
-    ///
-    /// `debug_references` is given to provide information on outstanding
-    /// references that caused the notifier to be requested.
-    fn new_reference_notifier<T: Send + 'static, D: Debug>(
-        debug_references: D,
-    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
 }
 
 /// Provides access to core context implementations.
@@ -447,17 +347,17 @@ mod locked {
 /// will take care of the rest.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
-    use alloc::{boxed::Box, collections::BinaryHeap, format, string::String, sync::Arc, vec::Vec};
+    use alloc::{boxed::Box, sync::Arc, vec::Vec};
     #[cfg(test)]
-    use alloc::{collections::HashMap, vec};
-    use core::{convert::Infallible as Never, fmt::Debug, hash::Hash};
+    use alloc::{
+        collections::{BinaryHeap, HashMap},
+        vec,
+    };
+    use core::{convert::Infallible as Never, fmt::Debug};
     #[cfg(test)]
-    use core::{marker::PhantomData, ops};
+    use core::{hash::Hash, marker::PhantomData, time::Duration};
 
-    #[cfg(test)]
-    use assert_matches::assert_matches;
     use derivative::Derivative;
-
     use net_types::ip::IpVersion;
 
     #[cfg(test)]
@@ -466,11 +366,10 @@ pub(crate) mod testutil {
 
     use super::*;
     use crate::{
-        data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
         device::{link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes},
         filter::FilterBindingsTypes,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
-        sync::Mutex,
+        sync::{DynDebugReferences, Mutex},
         testutil::FakeCryptoRng,
     };
     #[cfg(test)]
@@ -480,539 +379,10 @@ pub(crate) mod testutil {
         testutil::DispatchedFrame,
     };
 
-    pub use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
-
-    /// Arbitrary data of type `D` attached to a `FakeInstant`.
-    ///
-    /// `InstantAndData` implements `Ord` and `Eq` to be used in a `BinaryHeap`
-    /// and ordered by `FakeInstant`.
-    #[derive(Clone, Debug)]
-    pub(crate) struct InstantAndData<D>(pub(crate) FakeInstant, pub(crate) D);
-
-    impl<D> InstantAndData<D> {
-        pub(crate) fn new(time: FakeInstant, data: D) -> Self {
-            Self(time, data)
-        }
-    }
-
-    impl<D> Eq for InstantAndData<D> {}
-
-    impl<D> PartialEq for InstantAndData<D> {
-        fn eq(&self, other: &Self) -> bool {
-            self.0 == other.0
-        }
-    }
-
-    impl<D> Ord for InstantAndData<D> {
-        fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-            other.0.cmp(&self.0)
-        }
-    }
-
-    impl<D> PartialOrd for InstantAndData<D> {
-        fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    /// A fake [`TimerContext`] which stores time as a [`FakeInstantCtx`].
-    pub(crate) struct FakeTimerCtx<Id> {
-        pub(crate) instant: FakeInstantCtx,
-        timers: BinaryHeap<InstantAndData<Id>>,
-    }
-
-    impl<Id> Default for FakeTimerCtx<Id> {
-        fn default() -> FakeTimerCtx<Id> {
-            FakeTimerCtx { instant: FakeInstantCtx::default(), timers: BinaryHeap::default() }
-        }
-    }
-
-    impl<Id> AsMut<FakeTimerCtx<Id>> for FakeTimerCtx<Id> {
-        fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
-            self
-        }
-    }
-
-    impl<Id: Clone> FakeTimerCtx<Id> {
-        /// Get an ordered list of all currently-scheduled timers.
-        #[cfg(test)]
-        pub(crate) fn timers(&self) -> Vec<(FakeInstant, Id)> {
-            self.timers
-                .clone()
-                .into_sorted_vec()
-                .into_iter()
-                .map(|InstantAndData(i, id)| (i, id))
-                .collect()
-        }
-    }
-
-    #[cfg(test)]
-    impl<Id: Debug + Clone + Hash + Eq> FakeTimerCtx<Id> {
-        /// Asserts that `self` contains exactly the timers in `timers`.
-        ///
-        /// # Panics
-        ///
-        /// Panics if `timers` contains the same ID more than once or if `self`
-        /// does not contain exactly the timers in `timers`.
-        ///
-        /// [`RangeBounds<FakeInstant>`]: core::ops::RangeBounds
-        #[track_caller]
-        pub(crate) fn assert_timers_installed<I: IntoIterator<Item = (Id, FakeInstant)>>(
-            &self,
-            timers: I,
-        ) {
-            self.assert_timers_installed_range(
-                timers.into_iter().map(|(id, instant)| (id, instant..=instant)),
-            );
-        }
-
-        /// Like [`assert_timers_installed`] but receives a range instants to
-        /// match.
-        ///
-        /// Each timer must be present, and its deadline must fall into the
-        /// specified range.
-        #[track_caller]
-        pub(crate) fn assert_timers_installed_range<
-            R: ops::RangeBounds<FakeInstant> + Debug,
-            I: IntoIterator<Item = (Id, R)>,
-        >(
-            &self,
-            timers: I,
-        ) {
-            self.assert_timers_installed_inner(timers, true);
-        }
-
-        /// Asserts that `self` contains at least the timers in `timers`.
-        ///
-        /// Like [`assert_timers_installed`], but only asserts that `timers` is
-        /// a subset of the timers installed; other timers may be installed in
-        /// addition to those in `timers`.
-        #[track_caller]
-        pub(crate) fn assert_some_timers_installed<I: IntoIterator<Item = (Id, FakeInstant)>>(
-            &self,
-            timers: I,
-        ) {
-            self.assert_some_timers_installed_range(
-                timers.into_iter().map(|(id, instant)| (id, instant..=instant)),
-            );
-        }
-
-        /// Like [`assert_some_timers_installed`] but receives instant ranges
-        /// to match like [`assert_timers_installed_range`].
-        #[track_caller]
-        pub(crate) fn assert_some_timers_installed_range<
-            R: ops::RangeBounds<FakeInstant> + Debug,
-            I: IntoIterator<Item = (Id, R)>,
-        >(
-            &self,
-            timers: I,
-        ) {
-            self.assert_timers_installed_inner(timers, false);
-        }
-
-        /// Asserts that no timers are installed.
-        ///
-        /// # Panics
-        ///
-        /// Panics if any timers are installed.
-        #[track_caller]
-        pub(crate) fn assert_no_timers_installed(&self) {
-            self.assert_timers_installed([]);
-        }
-
-        #[track_caller]
-        fn assert_timers_installed_inner<
-            R: ops::RangeBounds<FakeInstant> + Debug,
-            I: IntoIterator<Item = (Id, R)>,
-        >(
-            &self,
-            timers: I,
-            exact: bool,
-        ) {
-            let mut timers = timers.into_iter().fold(HashMap::new(), |mut timers, (id, range)| {
-                assert_matches!(timers.insert(id, range), None);
-                timers
-            });
-
-            enum Error<Id, R: ops::RangeBounds<FakeInstant>> {
-                ExpectedButMissing { id: Id, range: R },
-                UnexpectedButPresent { id: Id, instant: FakeInstant },
-                UnexpectedInstant { id: Id, range: R, instant: FakeInstant },
-            }
-
-            let mut errors = Vec::new();
-
-            // Make sure that all installed timers were expected (present in
-            // `timers`).
-            for InstantAndData(instant, id) in self.timers.iter().cloned() {
-                match timers.remove(&id) {
-                    None => {
-                        if exact {
-                            errors.push(Error::UnexpectedButPresent { id, instant })
-                        }
-                    }
-                    Some(range) => {
-                        if !range.contains(&instant) {
-                            errors.push(Error::UnexpectedInstant { id, range, instant })
-                        }
-                    }
-                }
-            }
-
-            // Make sure that all expected timers were already found in
-            // `self.timers` (and removed from `timers`).
-            errors
-                .extend(timers.drain().map(|(id, range)| Error::ExpectedButMissing { id, range }));
-
-            if errors.len() > 0 {
-                let mut s = String::from("Unexpected timer contents:");
-                for err in errors {
-                    s += &match err {
-                        Error::ExpectedButMissing { id, range } => {
-                            format!("\n\tMissing timer {:?} with deadline {:?}", id, range)
-                        }
-                        Error::UnexpectedButPresent { id, instant } => {
-                            format!("\n\tUnexpected timer {:?} with deadline {:?}", id, instant)
-                        }
-                        Error::UnexpectedInstant { id, range, instant } => format!(
-                            "\n\tTimer {:?} has unexpected deadline {:?} (wanted {:?})",
-                            id, instant, range
-                        ),
-                    };
-                }
-                panic!("{}", s);
-            }
-        }
-    }
-
-    impl<Id> AsRef<FakeInstantCtx> for FakeTimerCtx<Id> {
-        fn as_ref(&self) -> &FakeInstantCtx {
-            &self.instant
-        }
-    }
-
-    impl<Id: PartialEq> FakeTimerCtx<Id> {
-        // Just like `TimerContext::cancel_timer`, but takes a reference to `Id`
-        // rather than a value. This allows us to implement
-        // `schedule_timer_instant`, which needs to retain ownership of the
-        // `Id`.
-        fn cancel_timer_inner(&mut self, id: &Id) -> Option<FakeInstant> {
-            let mut r: Option<FakeInstant> = None;
-            // NOTE(brunodalbo): Cancelling timers can be made a faster than
-            // this if we keep two data structures and require that `Id: Hash`.
-            self.timers = self
-                .timers
-                .drain()
-                .filter(|t| {
-                    if &t.1 == id {
-                        r = Some(t.0);
-                        false
-                    } else {
-                        true
-                    }
-                })
-                .collect::<Vec<_>>()
-                .into();
-            r
-        }
-    }
-
-    // TODO(https://fxbug.dev/42083407): Improve the fake timer implementation
-    // to not rely on hashing the dispatch IDs. This implementation gives us a
-    // way to soft transition to the new world, but the new API is not asking
-    // for DispatchId uniqueness between timers, even though that's how current
-    // usage works.
-    impl<Id: Debug + Clone + Send + Sync> TimerBindingsTypes for FakeTimerCtx<Id> {
-        type Timer = Id;
-        type DispatchId = Id;
-    }
-
-    impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext2 for FakeTimerCtx<Id> {
-        fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-            id
-        }
-
-        fn schedule_timer_instant2(
-            &mut self,
-            time: Self::Instant,
-            timer: &mut Self::Timer,
-        ) -> Option<Self::Instant> {
-            self.schedule_timer_instant(time, timer.clone())
-        }
-
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.cancel_timer(timer.clone())
-        }
-
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.scheduled_instant(timer.clone())
-        }
-    }
-
-    impl<Id: PartialEq> TimerContext<Id> for FakeTimerCtx<Id> {
-        fn schedule_timer_instant(&mut self, time: FakeInstant, id: Id) -> Option<FakeInstant> {
-            let ret = self.cancel_timer_inner(&id);
-            self.timers.push(InstantAndData::new(time, id));
-            ret
-        }
-
-        fn cancel_timer(&mut self, id: Id) -> Option<FakeInstant> {
-            self.cancel_timer_inner(&id)
-        }
-
-        fn cancel_timers_with<F: FnMut(&Id) -> bool>(&mut self, mut f: F) {
-            self.timers = self.timers.drain().filter(|t| !f(&t.1)).collect::<Vec<_>>().into();
-        }
-
-        fn scheduled_instant(&self, id: Id) -> Option<FakeInstant> {
-            self.timers.iter().find_map(|x| if x.1 == id { Some(x.0) } else { None })
-        }
-    }
-
-    /// Adds methods for interacting with [`FakeTimerCtx`] and its wrappers.
-    pub trait FakeTimerCtxExt<Id>: Sized {
-        /// Triggers the next timer, if any, by using the provided `handler`.
-        ///
-        /// `trigger_next_timer` triggers the next timer, if any, advances the
-        /// internal clock to the timer's scheduled time, and returns its ID.
-        fn trigger_next_timer<H: TimerHandler<Self, Id>>(&mut self, handler: &mut H) -> Option<Id>;
-
-        /// Skips the current time forward until `instant`, triggering all
-        /// timers until then, inclusive, by calling `f` on them.
-        ///
-        /// Returns the timers which were triggered.
-        ///
-        /// # Panics
-        ///
-        /// Panics if `instant` is in the past.
-        fn trigger_timers_until_instant<H: TimerHandler<Self, Id>>(
-            &mut self,
-            instant: FakeInstant,
-            handler: &mut H,
-        ) -> Vec<Id>;
-
-        /// Skips the current time forward by `duration`, triggering all timers
-        /// until then, inclusive, by passing them to the `handler`.
-        ///
-        /// Returns the timers which were triggered.
-        fn trigger_timers_for<H: TimerHandler<Self, Id>>(
-            &mut self,
-            duration: Duration,
-            handler: &mut H,
-        ) -> Vec<Id>;
-
-        /// Triggers timers and expects them to be the given timers.
-        ///
-        /// The number of timers to be triggered is taken to be the number of
-        /// timers produced by `timers`. Timers may be triggered in any order.
-        ///
-        /// # Panics
-        ///
-        /// Panics under the following conditions:
-        /// - Fewer timers could be triggered than expected
-        /// - Timers were triggered that were not expected
-        /// - Timers that were expected were not triggered
-        #[track_caller]
-        fn trigger_timers_and_expect_unordered<
-            I: IntoIterator<Item = Id>,
-            H: TimerHandler<Self, Id>,
-        >(
-            &mut self,
-            timers: I,
-            handler: &mut H,
-        ) where
-            Id: Debug + Hash + Eq;
-
-        /// Triggers timers until `instant` and expects them to be the given
-        /// timers.
-        ///
-        /// Like `trigger_timers_and_expect_unordered`, except that timers will
-        /// only be triggered until `instant` (inclusive).
-        fn trigger_timers_until_and_expect_unordered<
-            I: IntoIterator<Item = Id>,
-            H: TimerHandler<Self, Id>,
-        >(
-            &mut self,
-            instant: FakeInstant,
-            timers: I,
-            handler: &mut H,
-        ) where
-            Id: Debug + Hash + Eq;
-
-        /// Triggers timers for `duration` and expects them to be the given
-        /// timers.
-        ///
-        /// Like `trigger_timers_and_expect_unordered`, except that timers will
-        /// only be triggered for `duration` (inclusive).
-        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, H: TimerHandler<Self, Id>>(
-            &mut self,
-            duration: Duration,
-            timers: I,
-            handler: &mut H,
-        ) where
-            Id: Debug + Hash + Eq;
-    }
-
-    // TODO(https://fxbug.dev/42081080): hold lock on `FakeTimerCtx` across entire
-    // method to avoid potential race conditions.
-    impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
-        /// Triggers the next timer, if any, by calling `f` on it.
-        ///
-        /// `trigger_next_timer` triggers the next timer, if any, advances the
-        /// internal clock to the timer's scheduled time, and returns its ID.
-        fn trigger_next_timer<H: TimerHandler<Self, Id>>(&mut self, handler: &mut H) -> Option<Id> {
-            self.with_fake_timer_ctx_mut(|timers| {
-                timers.timers.pop().map(|InstantAndData(t, id)| {
-                    timers.instant.time = t;
-                    id
-                })
-            })
-            .map(|id| {
-                handler.handle_timer(self, id.clone());
-                id
-            })
-        }
-
-        /// Skips the current time forward until `instant`, triggering all
-        /// timers until then, inclusive, by giving them to `handler`.
-        ///
-        /// Returns the timers which were triggered.
-        ///
-        /// # Panics
-        ///
-        /// Panics if `instant` is in the past.
-        fn trigger_timers_until_instant<H: TimerHandler<Self, Id>>(
-            &mut self,
-            instant: FakeInstant,
-            handler: &mut H,
-        ) -> Vec<Id> {
-            assert!(instant >= self.with_fake_timer_ctx(|ctx| ctx.now()));
-            let mut timers = Vec::new();
-
-            while self.with_fake_timer_ctx_mut(|ctx| {
-                ctx.timers.peek().map(|InstantAndData(i, _id)| i <= &instant).unwrap_or(false)
-            }) {
-                timers.push(self.trigger_next_timer(handler).unwrap())
-            }
-
-            self.with_fake_timer_ctx_mut(|ctx| {
-                assert!(ctx.now() <= instant);
-                ctx.instant.time = instant;
-            });
-
-            timers
-        }
-
-        /// Skips the current time forward by `duration`, triggering all timers
-        /// until then, inclusive, by calling `f` on them.
-        ///
-        /// Returns the timers which were triggered.
-        fn trigger_timers_for<H: TimerHandler<Self, Id>>(
-            &mut self,
-            duration: Duration,
-            handler: &mut H,
-        ) -> Vec<Id> {
-            let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
-            // We know the call to `self.trigger_timers_until_instant` will not
-            // panic because we provide an instant that is greater than or equal
-            // to the current time.
-            self.trigger_timers_until_instant(instant, handler)
-        }
-
-        /// Triggers timers and expects them to be the given timers.
-        ///
-        /// The number of timers to be triggered is taken to be the number of
-        /// timers produced by `timers`. Timers may be triggered in any order.
-        ///
-        /// # Panics
-        ///
-        /// Panics under the following conditions:
-        /// - Fewer timers could be triggered than expected
-        /// - Timers were triggered that were not expected
-        /// - Timers that were expected were not triggered
-        #[track_caller]
-        fn trigger_timers_and_expect_unordered<
-            I: IntoIterator<Item = Id>,
-            H: TimerHandler<Self, Id>,
-        >(
-            &mut self,
-            timers: I,
-            handler: &mut H,
-        ) where
-            Id: Debug + Hash + Eq,
-        {
-            let mut timers = RefCountedHashSet::from_iter(timers);
-
-            for _ in 0..timers.len() {
-                let id = self.trigger_next_timer(handler).expect("ran out of timers to trigger");
-                match timers.remove(id.clone()) {
-                    RemoveResult::Removed(()) | RemoveResult::StillPresent => {}
-                    RemoveResult::NotPresent => panic!("triggered unexpected timer: {:?}", id),
-                }
-            }
-
-            if timers.len() > 0 {
-                let mut s = String::from("Expected timers did not trigger:");
-                for (id, count) in timers.iter_counts() {
-                    s += &format!("\n\t{count}x {id:?}");
-                }
-                panic!("{}", s);
-            }
-        }
-
-        /// Triggers timers until `instant` and expects them to be the given
-        /// timers.
-        ///
-        /// Like `trigger_timers_and_expect_unordered`, except that timers will
-        /// only be triggered until `instant` (inclusive).
-        fn trigger_timers_until_and_expect_unordered<
-            I: IntoIterator<Item = Id>,
-            H: TimerHandler<Self, Id>,
-        >(
-            &mut self,
-            instant: FakeInstant,
-            timers: I,
-            handler: &mut H,
-        ) where
-            Id: Debug + Hash + Eq,
-        {
-            let mut timers = RefCountedHashSet::from_iter(timers);
-
-            let triggered_timers = self.trigger_timers_until_instant(instant, handler);
-
-            for id in triggered_timers {
-                match timers.remove(id.clone()) {
-                    RemoveResult::Removed(()) | RemoveResult::StillPresent => {}
-                    RemoveResult::NotPresent => panic!("triggered unexpected timer: {:?}", id),
-                }
-            }
-
-            if timers.len() > 0 {
-                let mut s = String::from("Expected timers did not trigger:");
-                for (id, count) in timers.iter_counts() {
-                    s += &format!("\n\t{count}x {id:?}");
-                }
-                panic!("{}", s);
-            }
-        }
-
-        /// Triggers timers for `duration` and expects them to be the given
-        /// timers.
-        ///
-        /// Like `trigger_timers_and_expect_unordered`, except that timers will
-        /// only be triggered for `duration` (inclusive).
-        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, H: TimerHandler<Self, Id>>(
-            &mut self,
-            duration: Duration,
-            timers: I,
-            handler: &mut H,
-        ) where
-            Id: Debug + Hash + Eq,
-        {
-            let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
-            self.trigger_timers_until_and_expect_unordered(instant, timers, handler);
-        }
-    }
+    pub use netstack3_base::testutil::{
+        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
+        WithFakeTimerContext,
+    };
 
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {
@@ -1260,47 +630,27 @@ pub(crate) mod testutil {
         type DispatchId = <FakeTimerCtx<Id> as TimerBindingsTypes>::DispatchId;
     }
 
-    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext2
+    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext
         for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
             self.timers.new_timer(id)
         }
 
-        fn schedule_timer_instant2(
+        fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             timer: &mut Self::Timer,
         ) -> Option<Self::Instant> {
-            self.timers.schedule_timer_instant2(time, timer)
+            self.timers.schedule_timer_instant(time, timer)
         }
 
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.cancel_timer2(timer)
+        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.cancel_timer(timer)
         }
 
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.scheduled_instant2(timer)
-        }
-    }
-
-    impl<Id: Debug + PartialEq, Event: Debug, State, FrameMeta> TimerContext<Id>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn schedule_timer_instant(&mut self, time: FakeInstant, id: Id) -> Option<FakeInstant> {
-            self.timers.schedule_timer_instant(time, id)
-        }
-
-        fn cancel_timer(&mut self, id: Id) -> Option<FakeInstant> {
-            self.timers.cancel_timer(id)
-        }
-
-        fn cancel_timers_with<F: FnMut(&Id) -> bool>(&mut self, f: F) {
-            self.timers.cancel_timers_with(f);
-        }
-
-        fn scheduled_instant(&self, id: Id) -> Option<FakeInstant> {
-            self.timers.scheduled_instant(id)
+        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
+            self.timers.scheduled_instant(timer)
         }
     }
 
@@ -1326,15 +676,15 @@ pub(crate) mod testutil {
         type Notifier = FakeLinkResolutionNotifier<D>;
     }
 
-    impl<Id, Event: Debug, State, FrameMeta> crate::ReferenceNotifiers
+    impl<Id, Event: Debug, State, FrameMeta> ReferenceNotifiers
         for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         type ReferenceReceiver<T: 'static> = Never;
 
         type ReferenceNotifier<T: Send + 'static> = Never;
 
-        fn new_reference_notifier<T: Send + 'static, D: Debug>(
-            debug_references: D,
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
         ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
             // NB: We don't want deferred destruction in core tests. These are
             // always single-threaded and single-task, and we want to encourage
@@ -1344,6 +694,14 @@ pub(crate) mod testutil {
                 debug_references={debug_references:?}",
                 core::any::type_name::<T>()
             );
+        }
+    }
+
+    impl<Id, Event: Debug, State, FrameMeta> DeferredResourceRemovalContext
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
+        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+            match receiver {}
         }
     }
 
@@ -1367,15 +725,6 @@ pub(crate) mod testutil {
             assert_eq!(*inner, None, "resolved link address was set more than once");
             *inner = Some(result);
         }
-    }
-
-    pub(crate) trait WithFakeTimerContext<TimerId> {
-        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O;
-
-        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O;
     }
 
     #[cfg(test)]
@@ -1974,13 +1323,13 @@ pub(crate) mod testutil {
                 // timer for the same or older FakeInstant.
                 let mut timers = Vec::<Ctx::TimerId>::new();
                 ctx.with_fake_timer_ctx_mut(|ctx| {
-                    while let Some(InstantAndData(t, id)) = ctx.timers.peek() {
+                    while let Some(InstantAndData(t, timer)) = ctx.timers.peek() {
                         // TODO(https://github.com/rust-lang/rust/issues/53667):
                         // Remove this break once let_chains is stable.
                         if *t > ctx.now() {
                             break;
                         }
-                        timers.push(id.clone());
+                        timers.push(timer.dispatch_id.clone());
                         assert_ne!(ctx.timers.pop(), None);
                     }
                 });
@@ -2154,162 +1503,5 @@ pub(crate) mod testutil {
                     .collect::<Vec<_>>()
             }
         })
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use crate::device::testutil::FakeDeviceId;
-
-        use super::*;
-
-        const ONE_SEC: Duration = Duration::from_secs(1);
-        const ONE_SEC_INSTANT: FakeInstant = FakeInstant { offset: ONE_SEC };
-
-        #[test]
-        fn test_instant_and_data() {
-            // Verify implementation of InstantAndData to be used as a complex
-            // type in a BinaryHeap.
-            let mut heap = BinaryHeap::<InstantAndData<usize>>::new();
-            let now = FakeInstant::default();
-
-            fn new_data(time: FakeInstant, id: usize) -> InstantAndData<usize> {
-                InstantAndData::new(time, id)
-            }
-
-            heap.push(new_data(now + Duration::from_secs(1), 1));
-            heap.push(new_data(now + Duration::from_secs(2), 2));
-
-            // Earlier timer is popped first.
-            assert_eq!(heap.pop().unwrap().1, 1);
-            assert_eq!(heap.pop().unwrap().1, 2);
-            assert_eq!(heap.pop(), None);
-
-            heap.push(new_data(now + Duration::from_secs(1), 1));
-            heap.push(new_data(now + Duration::from_secs(1), 1));
-
-            // Can pop twice with identical data.
-            assert_eq!(heap.pop().unwrap().1, 1);
-            assert_eq!(heap.pop().unwrap().1, 1);
-            assert_eq!(heap.pop(), None);
-        }
-
-        #[test]
-        fn test_fake_timer_context() {
-            // An implementation of `TimerContext` that uses `usize` timer IDs
-            // and stores every timer in a `Vec`.
-            impl<M, E: Debug, D, S, F> TimerHandler<FakeBindingsCtx<usize, E, S, F>, usize>
-                for FakeCoreCtx<Vec<(usize, FakeInstant)>, M, D>
-            {
-                fn handle_timer(
-                    &mut self,
-                    bindings_ctx: &mut FakeBindingsCtx<usize, E, S, F>,
-                    id: usize,
-                ) {
-                    let now = bindings_ctx.now();
-                    self.get_mut().push((id, now));
-                }
-            }
-
-            let new_ctx =
-                || FakeCtx::<Vec<(usize, FakeInstant)>, usize, (), (), FakeDeviceId, ()>::default();
-
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-
-            // When no timers are installed, `trigger_next_timer` should return
-            // `false`.
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
-            assert_eq!(core_ctx.get_ref().as_slice(), []);
-
-            // When one timer is installed, it should be triggered.
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-
-            // No timer with id `0` exists yet.
-            assert_eq!(bindings_ctx.scheduled_instant(0), None);
-
-            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
-
-            // Timer with id `0` scheduled to execute at `ONE_SEC_INSTANT`.
-            assert_eq!(bindings_ctx.scheduled_instant(0).unwrap(), ONE_SEC_INSTANT);
-
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(0));
-            assert_eq!(core_ctx.get_ref().as_slice(), [(0, ONE_SEC_INSTANT)]);
-
-            // After the timer fires, it should not still be scheduled at some
-            // instant.
-            assert_eq!(bindings_ctx.scheduled_instant(0), None);
-
-            // The time should have been advanced.
-            assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
-
-            // Once it's been triggered, it should be canceled and not
-            // triggerable again.
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
-            assert_eq!(core_ctx.get_ref().as_slice(), []);
-
-            // If we schedule a timer but then cancel it, it shouldn't fire.
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-
-            assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
-            assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
-            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
-            assert_eq!(core_ctx.get_ref().as_slice(), []);
-
-            // If we schedule a timer but then schedule the same ID again, the
-            // second timer should overwrite the first one.
-            let FakeCtx { core_ctx: _, mut bindings_ctx } = new_ctx();
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None);
-            assert_eq!(
-                bindings_ctx.schedule_timer(ONE_SEC, 0),
-                Some(Duration::from_secs(0).into())
-            );
-            assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
-
-            // If we schedule three timers and then run `trigger_timers_until`
-            // with the appropriate value, only two of them should fire.
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None,);
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(1), 1), None,);
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 2), None,);
-            assert_eq!(
-                bindings_ctx.trigger_timers_until_instant(ONE_SEC_INSTANT, &mut core_ctx),
-                vec![0, 1],
-            );
-
-            // The first two timers should have fired.
-            assert_eq!(
-                core_ctx.get_ref().as_slice(),
-                [(0, FakeInstant::from(Duration::from_secs(0))), (1, ONE_SEC_INSTANT)]
-            );
-
-            // They should be canceled now.
-            assert_eq!(bindings_ctx.cancel_timer(0), None);
-            assert_eq!(bindings_ctx.cancel_timer(1), None);
-
-            // The clock should have been updated.
-            assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
-
-            // The last timer should not have fired.
-            assert_eq!(
-                bindings_ctx.cancel_timer(2),
-                Some(FakeInstant::from(Duration::from_secs(2)))
-            );
-        }
-
-        #[test]
-        fn test_trigger_timers_until_and_expect_unordered() {
-            // If the requested instant does not coincide with a timer trigger
-            // point, the time should still be advanced.
-            let FakeCtx { mut core_ctx, mut bindings_ctx } =
-                FakeCtx::<Vec<(usize, FakeInstant)>, usize, (), (), FakeDeviceId, ()>::default();
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(0), 0), None);
-            assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 1), None);
-            bindings_ctx.trigger_timers_until_and_expect_unordered(
-                ONE_SEC_INSTANT,
-                vec![0],
-                &mut core_ctx,
-            );
-            assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
-        }
     }
 }

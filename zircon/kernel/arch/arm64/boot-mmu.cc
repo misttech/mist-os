@@ -16,7 +16,7 @@
 // basic code.
 namespace {
 
-constexpr size_t kNumBootPageTables = 16;
+constexpr size_t kNumBootPageTables = 32;
 alignas(PAGE_SIZE) uint64_t boot_page_tables[MMU_KERNEL_PAGE_TABLE_ENTRIES * kNumBootPageTables];
 
 // Will track the physical address of the page table array above. Starts off initialized to the

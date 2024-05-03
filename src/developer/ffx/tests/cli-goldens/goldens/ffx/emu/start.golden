@@ -38,6 +38,18 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "dev-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--dev-config",
+      "short": null,
+      "description": "specify developer config file to append onto the configuration. This is a JSON file with the object structure: {{   \"args\": [],   \"kernel_args\": [],   \"env\" : {{\"key\": \"value\"}}  }}",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--console",

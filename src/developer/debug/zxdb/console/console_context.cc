@@ -924,7 +924,7 @@ void ConsoleContext::OnDownloadsStopped(size_t success, size_t fail) {
   if (fail > 0) {
     Console::get()->Output(
         "\nSome files failed to download. If you think this is in error, please file a bug:\n"
-        "https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=zxdb\n");
+        "https://fxbug.dev/issues/new?component=1389559&template=1849567\n");
   }
 }
 

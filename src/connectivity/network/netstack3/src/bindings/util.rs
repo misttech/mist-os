@@ -22,9 +22,7 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{task::AtomicWaker, FutureExt as _, Stream, StreamExt as _};
+use futures::{task::AtomicWaker, Future, FutureExt as _, Stream, StreamExt as _};
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -44,7 +42,7 @@ use netstack3_core::{
     socket::{
         self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
     },
-    sync::{RemoveResourceResult, RemoveResourceResultWithContext},
+    sync::RemoveResourceResult,
     types::WorkQueueReport,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -280,36 +278,19 @@ pub(crate) async fn yielding_data_notifier_loop<F: FnMut() -> Option<WorkQueueRe
     }
 }
 
-pub(crate) async fn wait_for_resource_removal<T: 'static>(
-    resource_name: &'static str,
-    resource_id: &impl Debug,
-    result: RemoveResourceResultWithContext<T, BindingsCtx>,
-    debug_refs: &impl Debug,
-) -> T {
-    let mut receiver = match result {
-        RemoveResourceResult::Removed(r) => {
-            tracing::trace!("{resource_name} {resource_id:?} removal completed synchronously");
-            return r;
+pub(crate) trait RemoveResourceResultExt<T> {
+    fn into_future(self) -> impl Future<Output = T>;
+}
+
+impl<T, F> RemoveResourceResultExt<T> for RemoveResourceResult<T, F>
+where
+    F: Future<Output = T>,
+{
+    fn into_future(self) -> impl Future<Output = T> {
+        match self {
+            Self::Removed(r) => futures::future::Either::Left(futures::future::ready(r)),
+            Self::Deferred(d) => futures::future::Either::Right(d),
         }
-        RemoveResourceResult::Deferred(receiver) => receiver,
-    };
-
-    tracing::debug!(
-        "{resource_name} {resource_id:?} removal is pending references: {debug_refs:?}"
-    );
-    // If we get stuck trying to remove the resource, log the remaining refs at a
-    // low frequency to aid debugging.
-    let mut interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
-        .map(|()| {
-            tracing::warn!(
-                "{resource_name} {resource_id:?} removal is pending references: {debug_refs:?}"
-            )
-        })
-        .collect::<()>();
-
-    futures::select! {
-        () = interval_logging => unreachable!("interval channel never completes"),
-        r = receiver => r.expect("sender dropped without notifying")
     }
 }
 

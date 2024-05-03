@@ -26,6 +26,11 @@
 #include <lockdep/thread_lock_state.h>
 #include <vm/page_state.h>
 
+// Fwd decl.  Concrete definition is in lib/kconcurrent/chain_lock.h
+namespace kconcurrent {
+class ChainLockTransaction;
+}
+
 struct percpu {
   explicit percpu(cpu_num_t cpu_num);
 
@@ -48,6 +53,10 @@ struct percpu {
   // state for runtime lock validation when in irq context
   lockdep::ThreadLockState lock_state;
 #endif
+
+  // The state of the currently active chain-lock transaction if any, nullptr
+  // otherwise.
+  kconcurrent::ChainLockTransaction* active_cl_transaction{nullptr};
 
   // guest entry/exit statistics
   struct guest_stats gstats;

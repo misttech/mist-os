@@ -119,9 +119,9 @@ class VmAddressRegionOrMapping
   uint32_t flags() const { return flags_; }
   const fbl::RefPtr<VmAspace>& aspace() const { return aspace_; }
 
-  // Recursively compute the number of allocated pages within this region
+  // Recursively compute the amount of attributed memory within this region
   using AttributionCounts = VmObject::AttributionCounts;
-  virtual AttributionCounts AllocatedPages();
+  virtual AttributionCounts GetAttributedMemory();
 
   // Subtype information and safe down-casting
   bool is_mapping() const { return is_mapping_; }
@@ -228,7 +228,7 @@ class VmAddressRegionOrMapping
 
   virtual zx_status_t DestroyLocked() TA_REQ(lock()) = 0;
 
-  virtual AttributionCounts AllocatedPagesLocked() TA_REQ(lock()) = 0;
+  virtual AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) = 0;
 
   // Applies the given memory priority to this VMAR, which may or may not result in a change. Up to
   // the derived type to know how to apply and update the |memory_priority_| field.
@@ -723,7 +723,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   // constructor for use in creating the kernel aspace singleton
   explicit VmAddressRegion(VmAspace& kernel_aspace);
   // Count the allocated pages, caller must be holding the aspace lock
-  AttributionCounts AllocatedPagesLocked() TA_REQ(lock()) override;
+  AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) override;
 
   // Used to implement VmAspace::EnumerateChildren.
   // |aspace_->lock()| must be held.
@@ -1053,19 +1053,19 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // For this the function requires you to hand in your last remaining refptr to the mapping.
   static void MarkMergeable(fbl::RefPtr<VmMapping>&& mapping);
 
-  // Used to cache the page attribution count for this vmo range. Also tracks the vmo hierarchy
-  // generation count and the mapping generation count at the time of caching the attributed page
-  // count.
-  struct CachedPageAttribution {
+  // Used to cache the memory attribution counts for this vmo range. Also tracks the vmo hierarchy
+  // generation count and the mapping generation count at the time of caching the attribution
+  // counts.
+  struct CachedMemoryAttribution {
     uint64_t mapping_generation_count = 0;
     uint64_t vmo_generation_count = 0;
-    AttributionCounts page_counts;
+    AttributionCounts attribution_counts;
   };
 
   // Exposed for testing.
-  CachedPageAttribution GetCachedPageAttribution() {
+  CachedMemoryAttribution GetCachedMemoryAttribution() {
     Guard<CriticalMutex> guard{lock()};
-    return cached_page_attribution_;
+    return cached_memory_attribution_;
   }
 
   // Exposed for testing.
@@ -1123,7 +1123,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   static zx_status_t ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr_t base, size_t size,
                                     uint new_arch_mmu_flags);
 
-  AttributionCounts AllocatedPagesLocked() TA_REQ(lock()) override;
+  AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) override;
 
   zx_status_t SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority priority) override
       TA_REQ(lock());
@@ -1153,7 +1153,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   void TryMergeRightNeighborLocked(VmMapping* right_candidate) TA_REQ(lock());
 
   // This should be called whenever a change is made to the vmo range we are mapping, that could
-  // result in the page attribution count of that range changing.
+  // result in the memory attribution counts of that range changing.
   void IncrementMappingGenerationCountLocked() TA_REQ(lock()) {
     DEBUG_ASSERT(mapping_generation_count_ != 0);
     mapping_generation_count_++;
@@ -1231,17 +1231,17 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return protection_ranges_;
   }
 
-  // Tracks the last cached page attribution count for the vmo range we are mapping.
+  // Tracks the last cached attribution counts for the vmo range we are mapping.
   // Only used when |object_| is a VmObjectPaged.
-  mutable CachedPageAttribution cached_page_attribution_ TA_GUARDED(lock()) = {};
+  mutable CachedMemoryAttribution cached_memory_attribution_ TA_GUARDED(lock()) = {};
 
   // The mapping's generation count is incremented on any change to the vmo range that is mapped.
   //
-  // This is used to implement caching for page attribution counts, which get queried frequently to
-  // periodically track memory usage on the system. Attributing pages to a VMO is an expensive
+  // This is used to implement caching for attribution counts, which get queried frequently to
+  // periodically track memory usage on the system. Attributing memory to a VMO is an expensive
   // operation and involves walking the VMO tree, quite often multiple times. If the generation
   // counts for the vmo *and* the mapping do not change between two successive queries, we can avoid
-  // re-counting attributed pages, and simply return the previously cached value.
+  // re-counting attributed memory, and simply return the previously cached value.
   //
   // The generation count starts at 1 to ensure that there can be no cached values initially; the
   // cached generation count starts at 0.

@@ -35,4 +35,5 @@ bazel_input_resource("workbench_session_bazel_inputs") {
   deps = [ ":workbench_session_archive" ]
   sources = get_target_outputs(":workbench_session_archive")
   outputs = [ "{{source_file_part}}" ]
+  gn_targets_name = "workbench_session_archive"
 }
