@@ -41,3 +41,13 @@ where
         C::contexts(self)
     }
 }
+
+/// A marker trait indicating that the implementor is not a test context.
+///
+/// This trait allows us to sidestep some blanket `Handler` implementations that
+/// are provided by core types and overridden in specific test contexts.
+///
+/// See [this issue] for details on why this is needed in some other cases.
+///
+/// [this issue]: https://github.com/rust-lang/rust/issues/97811
+pub trait NonTestCtxMarker {}

@@ -49,18 +49,10 @@ use crate::{
 pub use netstack3_base::{
     ContextPair, CoreEventContext, CoreTimerContext, CounterContext,
     DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
-    InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers, ResourceCounterContext, RngContext,
-    TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    InstantContext, NestedIntoCoreTimerCtx, NonTestCtxMarker, ReferenceNotifiers,
+    ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
+    TracingContext,
 };
-
-/// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
-/// type found in test environments.
-///
-/// See [this issue] for details on why this is needed.
-///
-/// [`FakeCoreCtx`]: testutil::FakeCoreCtx
-/// [this issue]: https://github.com/rust-lang/rust/issues/97811
-pub(crate) trait NonTestCtxMarker {}
 
 impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
 

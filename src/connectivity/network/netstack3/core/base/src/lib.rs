@@ -22,7 +22,7 @@ mod rng;
 mod time;
 mod trace;
 
-pub use context::ContextPair;
+pub use context::{ContextPair, NonTestCtxMarker};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use event::{CoreEventContext, EventContext};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
