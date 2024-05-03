@@ -17,11 +17,16 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.i2cimpl.Service" },
+        { service: "fuchsia.hardware.serialimpl.Service" },
     ],
     use: [],
     expose: [
         {
             service: "fuchsia.hardware.i2cimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.serialimpl.Service",
             from: "self",
         },
     ],

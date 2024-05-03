@@ -5,7 +5,6 @@
 #include "ftdi.h"
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
@@ -50,36 +49,6 @@ static zx_status_t FtdiBindFail(zx_status_t status) {
 
 namespace ftdi_serial {
 
-void FtdiDevice::NotifyCallback() {
-  if (!need_to_notify_cb_) {
-    return;
-  }
-
-  need_to_notify_cb_ = false;
-  if (notify_cb_.callback) {
-    notify_cb_.callback(notify_cb_.ctx, state_);
-  }
-
-  if (state_ & SERIAL_STATE_WRITABLE) {
-    sync_completion_signal(&serial_writable_);
-  } else {
-    sync_completion_reset(&serial_writable_);
-  }
-}
-
-void FtdiDevice::CheckStateLocked() {
-  uint32_t state = 0;
-
-  state |= free_write_queue_.is_empty() ? 0 : SERIAL_STATE_WRITABLE;
-
-  state |= completed_reads_queue_.is_empty() ? 0 : SERIAL_STATE_READABLE;
-
-  if (state != state_) {
-    state_ = state;
-    need_to_notify_cb_ = true;
-  }
-}
-
 void FtdiDevice::ReadComplete(usb_request_t* request) {
   usb::Request<> req(request, parent_req_size_);
   if (req.request()->response.status == ZX_ERR_IO_NOT_PRESENT) {
@@ -87,6 +56,9 @@ void FtdiDevice::ReadComplete(usb_request_t* request) {
     return;
   }
 
+  uint8_t buffer[USB_BUF_SIZE];
+  fuchsia_hardware_serialimpl::wire::DeviceReadResponse response;
+  std::optional<ReadCompleter::Async> read_completer;
   bool signal_readable = false;
 
   zx_status_t status = req.request()->response.status;
@@ -98,11 +70,22 @@ void FtdiDevice::ReadComplete(usb_request_t* request) {
   {
     fbl::AutoLock lock(&mutex_);
 
-    if (status == ZX_OK) {
+    if (read_completer_ && status == ZX_OK) {
+      // The USB request succeeded and there is a pending read. Copy the serial data out and use it
+      // to populate the response.
+      ZX_ASSERT(request->response.actual <= std::size(buffer));
+      size_t actual = CopyFromRequest(req, 0, {buffer, std::size(buffer)});
+      response.data = fidl::VectorView<uint8_t>::FromExternal(buffer, actual);
+    }
+
+    if (!read_completer_ && status == ZX_OK) {
+      // The USB request succeeded and there is no pending read. Add the request to the queue to be
+      // read by the client.
       completed_reads_queue_.push(std::move(req));
       signal_readable = true;
-      CheckStateLocked();
     } else {
+      // The USB request did not succeed, or there is a pending read that will consume the entire
+      // buffer. Re-queue the request to receive the next batch of serial data.
       usb_request_complete_callback_t complete = {
           .callback =
               [](void* ctx, usb_request_t* request) {
@@ -112,13 +95,19 @@ void FtdiDevice::ReadComplete(usb_request_t* request) {
       };
       usb_client_.RequestQueue(req.take(), &complete);
     }
+
+    // Swap out the completer so that we can reply after releasing the lock.
+    read_completer_.swap(read_completer);
+  }
+
+  if (read_completer) {
+    fdf::Arena arena('FTDI');
+    read_completer->buffer(arena).Reply(zx::make_result(status, &response));
   }
 
   if (signal_readable) {
     sync_completion_signal(&serial_readable_);
   }
-
-  NotifyCallback();
 }
 
 void FtdiDevice::WriteComplete(usb_request_t* request) {
@@ -127,14 +116,44 @@ void FtdiDevice::WriteComplete(usb_request_t* request) {
     return;
   }
 
+  std::optional<WriteContext> write_context;
+
   {
     fbl::AutoLock lock(&mutex_);
 
+    if (!write_context_) {
+      // This should only happen while we're unbinding.
+      free_write_queue_.push(std::move(req));
+      return;
+    }
+
+    ZX_ASSERT(write_context_->pending_requests > 0);
+
+    if (req.request()->response.status != ZX_OK && write_context_->status == ZX_OK) {
+      write_context_->data = {};
+      write_context_->status = req.request()->response.status;
+      usb_client_.CancelAll(bulk_out_addr_);
+    }
+
+    if (!write_context_->data.empty()) {
+      // There is more data to write, refill the request and queue it up to be sent.
+      write_context_->data = QueueWriteRequest(write_context->data, std::move(req));
+      return;
+    }
+
     free_write_queue_.push(std::move(req));
-    CheckStateLocked();
+    write_context_->pending_requests--;
+    if (write_context_->pending_requests == 0) {
+      // All requests have been completed, possibly with errors. Swap out the completer so that we
+      // can reply after releasing the lock.
+      write_context_.swap(write_context);
+    }
   }
 
-  NotifyCallback();
+  if (write_context) {
+    fdf::Arena arena('FTDI');
+    write_context->Complete(arena);
+  }
 }
 
 zx_status_t FtdiDevice::CalcDividers(uint32_t* baudrate, uint32_t clock, uint32_t divisor,
@@ -186,27 +205,38 @@ cpp20::span<const uint8_t> FtdiDevice::QueueWriteRequest(cpp20::span<const uint8
   return data.subspan(actual);
 }
 
-zx_status_t FtdiDevice::SerialImplWrite(const uint8_t* buf, size_t length, size_t* actual) {
+void FtdiDevice::Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request,
+                       fdf::Arena& arena, WriteCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
 
   {
     fbl::AutoLock lock(&mutex_);
 
-    std::optional<usb::Request<>> req = free_write_queue_.pop();
-    if (!req) {
-      status = ZX_ERR_SHOULD_WAIT;
-      *actual = 0;
-      return status;
+    if (write_context_) {
+      // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUND should be returned if the client makes a
+      // write request when one was already in progress.
+      status = ZX_ERR_ALREADY_BOUND;
+    } else if (request->data.count() > 0) {
+      cpp20::span<const uint8_t> data = request->data.get();
+      size_t pending_write_requests = 0;
+      while (!data.empty()) {
+        if (std::optional<usb::Request<>> req = free_write_queue_.pop(); req) {
+          data = QueueWriteRequest(data, *std::move(req));
+          pending_write_requests++;
+        } else {
+          break;
+        }
+      }
+
+      // Copy the remaining write data to the vector, resizing if necessary.
+      write_buffer_.clear();
+      write_buffer_.insert(write_buffer_.begin(), data.begin(), data.end());
+      write_context_.emplace(completer.ToAsync(), write_buffer_, pending_write_requests);
+      return;
     }
-
-    *actual = length - QueueWriteRequest({buf, length}, *std::move(req)).size();
-
-    CheckStateLocked();
   }
 
-  NotifyCallback();
-
-  return status;
+  completer.buffer(arena).Reply(zx::make_result(status));
 }
 
 size_t FtdiDevice::CopyFromRequest(usb::Request<>& request, size_t request_offset,
@@ -260,18 +290,32 @@ size_t FtdiDevice::ReadAtMost(uint8_t* buffer, size_t len) {
   return bytes_copied;
 }
 
-zx_status_t FtdiDevice::SerialImplRead(uint8_t* data, size_t len, size_t* actual) {
+void FtdiDevice::Read(fdf::Arena& arena, ReadCompleter::Sync& completer) {
+  // This was the maximum size for reads from the serial core driver at the time of our conversion
+  // from Banjo to FIDL.
+  uint8_t buffer[fuchsia_io::wire::kMaxBuf];
+  fuchsia_hardware_serialimpl::wire::DeviceReadResponse response;
+  zx_status_t status = ZX_OK;
+
   {
     fbl::AutoLock lock(&mutex_);
 
-    *actual = ReadAtMost(data, len);
-
-    CheckStateLocked();
+    // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUNDD should be returned if the client makes a
+    // read request when one was already in progress.
+    if (read_completer_) {
+      status = ZX_ERR_ALREADY_BOUND;
+    } else {
+      size_t actual = ReadAtMost(buffer, std::size(buffer));
+      if (actual == 0) {
+        // No data is available to read, respond to this request asynchronously.
+        read_completer_.emplace(completer.ToAsync());
+        return;
+      }
+      response.data = fidl::VectorView<uint8_t>::FromExternal(buffer, actual);
+    }
   }
 
-  NotifyCallback();
-
-  return ZX_OK;
+  completer.buffer(arena).Reply(zx::make_result(status, &response));
 }
 
 zx_status_t FtdiDevice::SetBaudrate(uint32_t baudrate) {
@@ -318,34 +362,75 @@ zx_status_t FtdiDevice::SetBitMode(uint8_t line_mask, uint8_t mode) {
   return status;
 }
 
-zx_status_t FtdiDevice::SerialImplConfig(uint32_t baudrate, uint32_t flags) {
-  if (baudrate != baudrate_) {
-    return SetBaudrate(baudrate);
+void FtdiDevice::Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request,
+                        fdf::Arena& arena, ConfigCompleter::Sync& completer) {
+  if (request->baud_rate != baudrate_) {
+    return completer.buffer(arena).Reply(zx::make_result(SetBaudrate(request->baud_rate)));
   }
 
-  return ZX_OK;
+  return completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t FtdiDevice::SerialImplGetInfo(serial_port_info_t* info) {
-  memcpy(info, &serial_port_info_, sizeof(*info));
-  return ZX_OK;
-}
-
-zx_status_t FtdiDevice::SerialImplEnable(bool enable) {
-  return ZX_OK;
-}
-
-zx_status_t FtdiDevice::SerialImplSetNotifyCallback(const serial_notify_t* cb) {
-  notify_cb_ = *cb;
-
+void FtdiDevice::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
   fbl::AutoLock lock(&mutex_);
+  completer.buffer(arena).ReplySuccess(serial_port_info_);
+}
 
-  CheckStateLocked();
+void FtdiDevice::Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request,
+                        fdf::Arena& arena, EnableCompleter::Sync& completer) {
+  completer.buffer(arena).ReplySuccess();
+}
 
-  lock.release();
-  NotifyCallback();
+void FtdiDevice::CancelAll(std::optional<CancelAllCompleter::Async> completer) {
+  std::optional<ReadCompleter::Async> read_completer;
+  std::optional<WriteContext> write_context;
 
-  return ZX_OK;
+  {
+    fbl::AutoLock lock(&mutex_);
+
+    // Clients should not call CancelAll() when a previous request is still pending.
+    if (completer && write_context_ && write_context_->cancel_all_completer) {
+      completer->Close(ZX_ERR_BAD_STATE);
+      return;
+    }
+
+    read_completer_.swap(read_completer);
+
+    if (!completer) {
+      // If completer is not set, we are unbinding and need to abort the write immediately.
+      write_context_.swap(write_context);
+    } else if (write_context_) {
+      // Otherwise complete the CancelAll request after all outstanding writes have completed.
+      write_context_->cancel_all_completer.swap(completer);
+    }
+  }
+
+  fdf::Arena arena('FTDI');
+
+  if (read_completer) {
+    read_completer->buffer(arena).ReplyError(ZX_ERR_CANCELED);
+  }
+
+  if (write_context) {
+    write_context->status = ZX_ERR_CANCELED;
+    write_context->Complete(arena);
+  }
+
+  if (completer) {
+    completer->buffer(arena).Reply();
+  }
+}
+
+void FtdiDevice::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
+  usb_client_.CancelAll(bulk_in_addr_);
+  usb_client_.CancelAll(bulk_out_addr_);
+  CancelAll(completer.ToAsync());
+}
+
+void FtdiDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method ordinal %lu", metadata.method_ordinal);
 }
 
 zx_status_t FtdiDevice::Read(uint8_t* buf, size_t len) {
@@ -375,33 +460,23 @@ zx_status_t FtdiDevice::Read(uint8_t* buf, size_t len) {
 }
 
 zx_status_t FtdiDevice::Write(uint8_t* buf, size_t len) {
-  const uint8_t* buf_index = buf;
-  size_t write_len = 0;
-
-  while (write_len < len) {
-    size_t actual;
-    zx_status_t status = SerialImplWrite(buf_index, len - write_len, &actual);
-    if (status == ZX_ERR_SHOULD_WAIT || (actual == 0)) {
-      status = sync_completion_wait_deadline(&serial_writable_,
-                                             zx::deadline_after(kSerialReadWriteTimeout).get());
-      if (status != ZX_OK) {
-        return status;
-      }
-      continue;
-    }
-    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
-      return status;
-    }
-    write_len += actual;
-    buf_index += actual;
+  fdf::Arena arena('FTDI');
+  auto result =
+      device_client_.buffer(arena)->Write(fidl::VectorView<uint8_t>::FromExternal(buf, len));
+  if (!result.ok()) {
+    return result.status();
   }
-
+  if (result->is_error()) {
+    return result->error_value();
+  }
   return ZX_OK;
 }
 
 FtdiDevice::~FtdiDevice() {}
 
 void FtdiDevice::DdkUnbind(ddk::UnbindTxn txn) {
+  CancelAll();
+
   cancel_thread_ = std::thread([this, unbind_txn = std::move(txn)]() mutable {
     usb_client_.CancelAll(bulk_in_addr_);
     usb_client_.CancelAll(bulk_out_addr_);
@@ -437,6 +512,13 @@ zx_status_t ftdi_bind_fail(zx_status_t status) {
 
 zx_status_t FtdiDevice::Bind() {
   zx_status_t status = ZX_OK;
+
+  {
+    auto [client, server] = fdf::Endpoints<fuchsia_hardware_serialimpl::Device>::Create();
+    device_client_.Bind(std::move(client));
+    bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->get(), std::move(server), this,
+                         fidl::kIgnoreBindingClosure);
+  }
 
   if (!usb_client_.is_valid()) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -507,9 +589,34 @@ zx_status_t FtdiDevice::Bind() {
     return FtdiBindFail(status);
   }
 
-  serial_port_info_.serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kGeneric);
+  serial_port_info_.serial_class = fuchsia_hardware_serial::Class::kGeneric;
 
-  status = DdkAdd("ftdi-uart");
+  {
+    fuchsia_hardware_serialimpl::Service::InstanceHandler handler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+    auto result = outgoing_.AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
+    if (result.is_error()) {
+      zxlogf(ERROR, "AddService failed: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  {
+    auto result = outgoing_.Serve(std::move(directory_server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_serialimpl::Service::Name};
+  status = DdkAdd(ddk::DeviceAddArgs("ftdi-uart")
+                      .set_outgoing_dir(directory_client.TakeChannel())
+                      .set_runtime_service_offers(fidl_service_offers));
   if (status != ZX_OK) {
     zxlogf(ERROR, "ftdi_uart: device_add failed");
     return FtdiBindFail(status);

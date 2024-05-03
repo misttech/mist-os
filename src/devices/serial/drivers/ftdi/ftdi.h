@@ -6,20 +6,24 @@
 #define SRC_DEVICES_SERIAL_DRIVERS_FTDI_FTDI_H_
 
 #include <fidl/fuchsia.hardware.ftdi/cpp/wire.h>
-#include <fuchsia/hardware/serialimpl/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
 
+#include <optional>
 #include <thread>
+#include <vector>
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
+
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 
 namespace ftdi_serial {
 
@@ -90,10 +94,11 @@ class FtdiDevice;
 using DeviceType = ddk::Device<FtdiDevice, ddk::Unbindable,
                                ddk::Messageable<fuchsia_hardware_ftdi::Device>::Mixin>;
 class FtdiDevice : public DeviceType,
-                   public ddk::SerialImplProtocol<FtdiDevice, ddk::base_protocol>,
+                   public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
                    public FtdiSerial {
  public:
-  explicit FtdiDevice(zx_device_t* parent) : DeviceType(parent), usb_client_(parent) {}
+  explicit FtdiDevice(zx_device_t* parent)
+      : DeviceType(parent), usb_client_(parent), outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
   ~FtdiDevice();
 
   zx_status_t Bind();
@@ -101,26 +106,6 @@ class FtdiDevice : public DeviceType,
   void DdkUnbind(ddk::UnbindTxn txn);
 
   void DdkRelease();
-
-  static zx_status_t Bind(zx_device_t* device);
-
-  // |ddk::SerialImpl|
-  zx_status_t SerialImplGetInfo(serial_port_info_t* info);
-
-  // |ddk::SerialImpl|
-  zx_status_t SerialImplConfig(uint32_t baud_rate, uint32_t flags);
-
-  // |ddk::SerialImpl|
-  zx_status_t SerialImplEnable(bool enable);
-
-  // |ddk::SerialImpl|
-  zx_status_t SerialImplRead(uint8_t* data, size_t len, size_t* actual);
-
-  // |ddk::SerialImpl|
-  zx_status_t SerialImplWrite(const uint8_t* buf, size_t length, size_t* actual);
-
-  // |ddk::SerialImpl|
-  zx_status_t SerialImplSetNotifyCallback(const serial_notify_t* cb);
 
   // |FtdiSerial::Read|
   zx_status_t Read(uint8_t* buf, size_t len) override;
@@ -130,6 +115,51 @@ class FtdiDevice : public DeviceType,
 
  private:
   static constexpr zx::duration kSerialReadWriteTimeout = zx::sec(1);
+
+  struct WriteContext {
+    WriteContext(WriteCompleter::Async completer, cpp20::span<const uint8_t> data,
+                 size_t pending_requests)
+        : completer(std::move(completer)), data(data), pending_requests(pending_requests) {}
+
+    void Complete(fdf::Arena& arena) {
+      if (cancel_all_completer) {
+        cancel_all_completer->buffer(arena).Reply();
+      }
+      completer.buffer(arena).Reply(zx::make_result(status));
+    }
+
+    WriteCompleter::Async completer;
+    cpp20::span<const uint8_t> data;
+    size_t pending_requests;
+    zx_status_t status = ZX_OK;
+    std::optional<CancelAllCompleter::Async> cancel_all_completer;
+  };
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::GetInfo|
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override;
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::Config|
+  void Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override;
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::Enable|
+  void Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override;
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::Read|
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override;
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::Write|
+  void Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request, fdf::Arena& arena,
+             WriteCompleter::Sync& completer) override;
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::CancelAll|
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override;
+
+  // |fdf::WireServer<fuchsia_hardware_serialimpl::Device>::handle_unknown_method|
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void CreateI2C(CreateI2CRequestView request, CreateI2CCompleter::Sync& _completer) override;
 
@@ -145,28 +175,20 @@ class FtdiDevice : public DeviceType,
   // Copies starting at request_offset bytes into request, and returns the number of bytes copied.
   static size_t CopyFromRequest(usb::Request<>& request, size_t request_offset,
                                 cpp20::span<uint8_t> buffer);
+  // The FIDL Read method reads as many bytes as possible. This helper reads at most len bytes.
   size_t ReadAtMost(uint8_t* buffer, size_t len) __TA_REQUIRES(mutex_);
   // Writes as much data as possible with a single USB request, and returns a subspan pointing to
   // the remaining data that did not fit into the request.
   cpp20::span<const uint8_t> QueueWriteRequest(cpp20::span<const uint8_t> data, usb::Request<> req)
       __TA_REQUIRES(mutex_);
+  void CancelAll(std::optional<CancelAllCompleter::Async> completer = std::nullopt);
 
-  // Notifies the callback if the state is updated (|need_to_notify_cb| is true), and
-  // resets |need_to_notify_cb| to false.
-  void NotifyCallback() __TA_EXCLUDES(mutex_);
-
-  // Checks the readable and writeable state of the system. Updates |state_| and
-  // |need_to_notify_cb|. Any caller of this is responsible for calling NotifyCallback
-  // once the lock is released.
-  void CheckStateLocked() __TA_REQUIRES(mutex_);
   zx_status_t SetBitMode(uint8_t line_mask, uint8_t mode);
 
   ddk::UsbProtocolClient usb_client_ = {};
 
   uint16_t ftditype_ = 0;
   uint32_t baudrate_ = 0;
-
-  uint32_t state_ = 0;
 
   size_t read_offset_ = 0;
 
@@ -182,13 +204,21 @@ class FtdiDevice : public DeviceType,
   // list of received packets not yet read by upper layer
   usb::RequestQueue<> completed_reads_queue_ __TA_GUARDED(mutex_);
 
-  serial_port_info_t serial_port_info_ __TA_GUARDED(mutex_);
+  std::optional<ReadCompleter::Async> read_completer_ __TA_GUARDED(mutex_);
+
+  std::vector<uint8_t> write_buffer_ __TA_GUARDED(mutex_);
+  std::optional<WriteContext> write_context_ __TA_GUARDED(mutex_);
+
+  fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_ __TA_GUARDED(mutex_);
   bool need_to_notify_cb_ = false;
-  serial_notify_t notify_cb_ = {};
   std::thread cancel_thread_;
 
   sync_completion_t serial_readable_;
-  sync_completion_t serial_writable_;
+
+  fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> bindings_;
+  // Keep a client so that we can make synchronous Write() calls on ourself when requested by MPSSE.
+  fdf::WireSyncClient<fuchsia_hardware_serialimpl::Device> device_client_;
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace ftdi_serial
