@@ -374,6 +374,12 @@ impl Client {
     }
 
     /// Returns whether blobfs has a blob with the given hash.
+    /// On c++blobfs, this should only be called if there are no concurrent attempts to write the
+    /// blob. On c++blobfs, open connections to even partially written blobs keep the blob alive,
+    /// and so if this call overlaps with a concurrent attempt to create the blob that fails and
+    /// is then retried, this open connection will prevent the partially written blob from being
+    /// removed and block the creation of the new write connection.
+    /// TODO(https://fxbug.dev/294286136) Add GetVmo support to c++blobfs.
     pub async fn has_blob(&self, blob: &Hash) -> bool {
         if let Some(reader) = &self.reader {
             // TODO(https://fxbug.dev/295552228): Use faster API for determining blob presence.
@@ -444,6 +450,15 @@ impl Client {
     /// included.
     /// `all_known` is used to skip the expensive per-blob readable check for blobs that we are
     /// sure are missing.
+    /// TODO(https://fxbug.dev/338477132) This fn is used during resolves after a meta.far is
+    /// fetched to determine which content blobs and subpackage meta.fars need to be fetched.
+    /// On c++blobfs, opening a partially written blob keeps that blob alive, creating the
+    /// following race condition:
+    /// 1. blob is partially written by resolve A
+    /// 2. blob is opened by this fn to check for presence by concurrent resolve B
+    /// 3. resolve A encounters an error and retries the fetch, which attempts to open the blob for
+    ///    write, which collides with the partially written blob from (1) that is being kept alive
+    ///    by (2) and so fails
     pub async fn filter_to_missing_blobs(
         &self,
         candidates: &HashSet<Hash>,
@@ -483,8 +498,8 @@ impl Client {
         stream::iter(candidates.clone())
             .map(move |blob| {
                 async move {
-                    // We still need to check `has_blob()` even if the blob is in `all_known`,
-                    // because it might not have been fully written yet.
+                    // Local storage says there are types of metadata corruption that will not be
+                    // caught by ReadDirents and that we should make sure the blob can be opened.
                     if all_known.map(|blobs| blobs.contains(&blob)) == Some(false)
                         || !self.has_blob(&blob).await
                     {
