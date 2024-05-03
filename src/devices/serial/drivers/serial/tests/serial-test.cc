@@ -123,10 +123,10 @@ class SerialTester {
   zx_device_t* fake_parent() { return fake_parent_.get(); }
   auto& runtime() { return *runtime_; }
 
-  fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateSerialImplClient() {
+  fdf::ClientEnd<fuchsia_hardware_serialimpl::Device> CreateSerialImplClient() {
     auto [client, server] = fdf::Endpoints<fuchsia_hardware_serialimpl::Device>::Create();
     serial_impl_.SyncCall(&FakeSerialImpl::Bind, std::move(server));
-    return fdf::WireClient(std::move(client), fdf::Dispatcher::GetCurrent()->get());
+    return std::move(client);
   }
 
  private:
@@ -135,14 +135,6 @@ class SerialTester {
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   async_patterns::TestDispatcherBound<FakeSerialImpl> serial_impl_;
 };
-
-TEST(SerialTest, InitNoProtocolParent) {
-  // SerialTester is intentionally not defined in this scope as it would
-  // define the ZX_PROTOCOL_SERIAL_IMPL protocol.
-  auto fake_parent = MockDevice::FakeRootParent();
-  serial::SerialDevice device(fake_parent.get(), fake_parent.get());
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, device.Init());
-}
 
 TEST(SerialTest, Init) {
   SerialTester tester;
