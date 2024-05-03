@@ -44,7 +44,7 @@ pub mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{test_utils::is_stopped, ActionSet},
+            actions::{test_utils::is_stopped, ActionsManager},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             testing::{
                 test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -73,7 +73,7 @@ pub mod tests {
         // Register `stopped` action, and wait for it. Component should be stopped.
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        ActionSet::register(component_a.clone(), StopAction::new(false))
+        ActionsManager::register(component_a.clone(), StopAction::new(false))
             .await
             .expect("stop failed");
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
@@ -91,7 +91,7 @@ pub mod tests {
         }
 
         // Execute action again, same state and no new events.
-        ActionSet::register(component_a.clone(), StopAction::new(false))
+        ActionsManager::register(component_a.clone(), StopAction::new(false))
             .await
             .expect("stop failed");
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
@@ -177,8 +177,8 @@ pub mod tests {
         test.start(vec!["a"].try_into().unwrap()).await;
 
         // Register `stopped` action, and make sure there are two clients waiting on the action
-        // (the test, and the task spawned by the exit listener), plus the reference in ActionSet,
-        // for a total of 3
+        // (the test, and the task spawned by the exit listener), plus the reference in
+        // ActionsManager, plus a reference we take to check the count from, for a total of 4
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let mut actions = component_a.lock_actions().await;
@@ -187,8 +187,8 @@ pub mod tests {
         stopped_rx.await.unwrap();
 
         let actions = component_a.lock_actions().await;
-        let action_controller = &actions.rep[&ActionKey::Stop];
-        assert_eq!(action_controller.notifier.get_reference_count().unwrap(), 3);
+        let action_notifier = actions.wait(StopAction::new(false)).await.unwrap();
+        assert_eq!(action_notifier.get_reference_count().unwrap(), 4);
         drop(actions);
 
         // Let the stop continue.

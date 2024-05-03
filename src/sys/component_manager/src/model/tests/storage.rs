@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{ActionSet, DestroyAction, ShutdownType},
+        actions::{ActionsManager, DestroyAction, ShutdownType},
         component::StartReason,
         routing::route_and_open_capability,
         start::Start,
@@ -1684,7 +1684,7 @@ fn storage_does_not_block_shutdown_when_backing_dir_hangs() {
             .await
             .expect("Storage connection should finish");
 
-        ActionSet::register(root.clone(), DestroyAction::new()).await.expect("destroy failed");
+        ActionsManager::register(root.clone(), DestroyAction::new()).await.expect("destroy failed");
     });
     executor.run_until_stalled(&mut test_body).unwrap();
 }

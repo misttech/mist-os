@@ -5,7 +5,7 @@
 use {
     crate::model::{
         actions::{
-            Action, ActionKey, ActionSet, DiscoverAction, ResolveAction, ShutdownAction,
+            Action, ActionKey, ActionsManager, DiscoverAction, ResolveAction, ShutdownAction,
             ShutdownType, StartAction,
         },
         component::instance::InstanceState,
@@ -55,14 +55,14 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         // Require the component to be discovered before deleting it so a Destroyed event is
         // always preceded by a Discovered.
         // TODO: wait for a discover, don't register a new one
-        ActionSet::register(component.clone(), DiscoverAction::new(ComponentInput::default()))
+        ActionsManager::register(component.clone(), DiscoverAction::new(ComponentInput::default()))
             .await?;
 
         // For destruction to behave correctly, the component has to be shut down first.
         // NOTE: This will recursively shut down the whole subtree. If this component has children,
         // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
         // the parent's subtree was shutdown, this shutdown is a no-op.
-        ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .map_err(|e| DestroyActionError::ShutdownFailed { err: Box::new(e) })?;
 
@@ -201,7 +201,7 @@ pub mod tests {
         assert!(component_a.is_started().await);
 
         // Register shutdown first because DestroyChild requires the component to be shut down.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         // Destroy the child, and wait for it. Component should be destroyed.
@@ -299,7 +299,7 @@ pub mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         assert!(execution_is_shut_down(&component_a.clone()).await);
@@ -383,10 +383,10 @@ pub mod tests {
             MockAction::new(mock_action_key.clone(), mock_action_result);
 
         // Spawn a mock action on 'a' that stalls
-        {
+        let action_notifier = {
             let mut actions = component_a.lock_actions().await;
-            let _ = actions.register_no_wait(&component_a, mock_action).await;
-        }
+            actions.register_no_wait(&component_a, mock_action).await
+        };
 
         // Spawn a task to destroy the child `a` under root.
         // This eventually leads to a destroy action on `a`.
@@ -401,13 +401,13 @@ pub mod tests {
             assert!(actions.contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
-            let action_controller = &actions.rep[&mock_action_key];
-            let refcount = action_controller.notifier.get_reference_count().unwrap();
+            let refcount = action_notifier.get_reference_count().unwrap();
 
             // expected reference count:
-            // - 1 for the ActionSet that owns the notifier
+            // - 1 for the Actions that owns the notifier
             // - 1 for destroy action to wait on the mock action
-            if refcount == 2 {
+            // - 1 for the notifier we're holding to check the reference count
+            if refcount == 3 {
                 assert!(actions.contains(ActionKey::Destroy).await);
                 break;
             }
@@ -490,10 +490,10 @@ pub mod tests {
             MockAction::new(mock_action_key.clone(), Ok(()));
 
         // Spawn a mock action on 'a' that stalls
-        {
+        let action_notifier = {
             let mut actions = component_a.lock_actions().await;
-            let _ = actions.register_no_wait(&component_a, mock_action).await;
-        }
+            actions.register_no_wait(&component_a, mock_action).await
+        };
 
         // Spawn a task to destroy the child `a` under root.
         // This eventually leads to a destroy action on `a`.
@@ -508,13 +508,13 @@ pub mod tests {
             assert!(actions.contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
-            let action_controller = &actions.rep[&mock_action_key];
-            let refcount = action_controller.notifier.get_reference_count().unwrap();
+            let refcount = action_notifier.get_reference_count().unwrap();
 
             // expected reference count:
-            // - 1 for the ActionSet that owns the notifier
+            // - 1 for the Actions that owns the notifier
             // - 1 for destroy action to wait on the mock action
-            if refcount == 2 {
+            // - 1 for the notifier we're holding to check the reference count
+            if refcount == 3 {
                 assert!(actions.contains(ActionKey::Destroy).await);
                 break;
             }
@@ -566,7 +566,7 @@ pub mod tests {
             .clone();
 
         // Register destroy action on "a", and wait for it.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         component_root.destroy_child("a".try_into().unwrap(), 0).await.expect("destroy failed");
@@ -650,7 +650,7 @@ pub mod tests {
         // Register destroy action on "a", and wait for it. This should cause all components
         // in "a"'s component to be shut down and destroyed, in bottom-up order, but "x" is still
         // running.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         component_root
@@ -766,7 +766,7 @@ pub mod tests {
 
         // Register destroy action on "a", and wait for it. This should cause all components
         // that were started to be destroyed, in bottom-up order.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         component_root

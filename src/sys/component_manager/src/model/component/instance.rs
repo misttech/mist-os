@@ -11,7 +11,7 @@ use {
                 resolve::sandbox_construction::{
                     self, build_component_sandbox, extend_dict_with_offers,
                 },
-                shutdown, ActionKey, ActionSet, DiscoverAction, StopAction,
+                shutdown, ActionKey, ActionsManager, DiscoverAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
@@ -1031,7 +1031,7 @@ impl ResolvedInstanceState {
             let child_name =
                 Name::new(child_name.name.as_str()).expect("child is static so name is not long");
             let child_input = child_inputs.remove(&child_name).expect("missing child dict");
-            ActionSet::register(child_instance.clone(), DiscoverAction::new(child_input))
+            ActionsManager::register(child_instance.clone(), DiscoverAction::new(child_input))
                 .await
                 .expect("failed to discover child");
         }

@@ -573,7 +573,7 @@ mod tests {
     use super::*;
     use {
         crate::model::{
-            actions::{ActionSet, ShutdownAction, ShutdownType, StopAction},
+            actions::{ActionsManager, ShutdownAction, ShutdownType, StopAction},
             component::instance::{ResolvedInstanceState, UnresolvedInstanceState},
             component::{Component, WeakComponentInstance},
             hooks::{EventType, Hook, HooksRegistration},
@@ -607,7 +607,7 @@ mod tests {
     impl Hook for ShutdownOnStartHook {
         async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
             fasync::Task::spawn(async move {
-                ActionSet::register(
+                ActionsManager::register(
                     self.component.clone(),
                     ShutdownAction::new(ShutdownType::Instance),
                 )
@@ -637,7 +637,7 @@ mod tests {
             )])
             .await;
 
-        ActionSet::register(
+        ActionsManager::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
@@ -674,7 +674,7 @@ mod tests {
     impl Hook for StopOnStartHook {
         async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
             fasync::Task::spawn(async move {
-                ActionSet::register(self.component.clone(), StopAction::new(false))
+                ActionsManager::register(self.component.clone(), StopAction::new(false))
                     .await
                     .expect("stop failed");
                 self.done.lock().unwrap().try_send(()).unwrap();
@@ -701,7 +701,7 @@ mod tests {
             )])
             .await;
 
-        ActionSet::register(
+        ActionsManager::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
@@ -736,11 +736,11 @@ mod tests {
         let (test_topology, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         // Run start and stop in random order.
-        let start_fut = ActionSet::register(
+        let start_fut = ActionsManager::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         );
-        let stop_fut = ActionSet::register(child.clone(), StopAction::new(false));
+        let stop_fut = ActionsManager::register(child.clone(), StopAction::new(false));
         let mut futs = vec![start_fut.boxed(), stop_fut.boxed()];
         futs.shuffle(&mut rand::thread_rng());
         let stream: FuturesUnordered<_> = futs.into_iter().collect();
@@ -814,7 +814,7 @@ mod tests {
 
         {
             let timestamp = zx::Time::get_monotonic();
-            ActionSet::register(
+            ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
             )
@@ -826,7 +826,7 @@ mod tests {
         }
 
         {
-            ActionSet::register(child.clone(), StopAction::new(false))
+            ActionsManager::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
             let state = child.lock_state().await;
@@ -835,7 +835,7 @@ mod tests {
 
         {
             let timestamp = zx::Time::get_monotonic();
-            ActionSet::register(
+            ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
             )
@@ -853,7 +853,7 @@ mod tests {
 
         {
             let timestamp = zx::Time::get_monotonic();
-            ActionSet::register(
+            ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
             )
@@ -865,7 +865,7 @@ mod tests {
         }
 
         {
-            let () = ActionSet::register(child.clone(), StopAction::new(false))
+            let () = ActionsManager::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
             let state = child.lock_state().await;
@@ -879,7 +879,7 @@ mod tests {
         modified_decl.children.push(ChildBuilder::new().name("foo").build());
         resolver.add_component(TEST_CHILD_NAME, modified_decl.clone());
 
-        ActionSet::register(
+        ActionsManager::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
@@ -985,7 +985,7 @@ mod tests {
     async fn check_already_started() {
         let (_test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
-        ActionSet::register(
+        ActionsManager::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )

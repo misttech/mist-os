@@ -93,7 +93,7 @@ pub mod tests {
     use {
         crate::model::{
             actions::test_utils::{is_destroyed, is_discovered, is_resolved, is_shutdown},
-            actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
+            actions::{ActionsManager, ShutdownAction, ShutdownType, UnresolveAction},
             component::{ComponentInstance, StartReason},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
@@ -138,7 +138,7 @@ pub mod tests {
         assert!(is_resolved(&component_c).await);
 
         // Unresolve, recursively.
-        ActionSet::register(component_a.clone(), UnresolveAction::new())
+        ActionsManager::register(component_a.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
         assert!(is_resolved(&component_root).await);
@@ -152,7 +152,7 @@ pub mod tests {
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_matches!(
-            ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
+            ActionsManager::register(component_a.clone(), UnresolveAction::new()).await,
             Ok(())
         );
         // Still Discovered.
@@ -196,7 +196,7 @@ pub mod tests {
         let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Unresolve, recursively.
-        ActionSet::register(component_a.clone(), UnresolveAction::new())
+        ActionsManager::register(component_a.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
 
@@ -335,7 +335,7 @@ pub mod tests {
             start_collection(durability).await;
 
         // Stop the collection.
-        ActionSet::register(
+        ActionsManager::register(
             component_container.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -343,7 +343,7 @@ pub mod tests {
         .expect("shutdown failed");
         assert!(is_destroyed(&component_a).await);
         assert!(is_destroyed(&component_b).await);
-        ActionSet::register(component_container.clone(), UnresolveAction::new())
+        ActionsManager::register(component_container.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
         assert!(is_discovered(&component_container).await);
@@ -351,7 +351,7 @@ pub mod tests {
         // Trying to unresolve a child fails because the children of a collection are destroyed when
         // the collection is stopped. Then it's an error to unresolve a Destroyed component.
         assert_matches!(
-            ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
+            ActionsManager::register(component_a.clone(), UnresolveAction::new()).await,
             Err(ActionError::UnresolveError {
                 err: UnresolveActionError::InstanceDestroyed { .. }
             })

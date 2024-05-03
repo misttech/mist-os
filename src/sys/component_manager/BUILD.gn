@@ -183,6 +183,7 @@ rustc_binary("bin") {
     "src/model/actions/mod.rs",
     "src/model/actions/resolve/mod.rs",
     "src/model/actions/resolve/sandbox_construction.rs",
+    "src/model/actions/set.rs",
     "src/model/actions/shutdown.rs",
     "src/model/actions/start.rs",
     "src/model/actions/stop.rs",

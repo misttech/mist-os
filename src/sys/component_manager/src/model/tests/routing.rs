@@ -17,7 +17,8 @@ use {
         capability::CapabilitySource,
         model::{
             actions::{
-                ActionSet, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+                ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction,
+                StopAction,
             },
             component::{IncomingCapabilities, StartReason},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
@@ -114,7 +115,7 @@ fn namespace_teardown_processes_final_request() {
         let root_component = test.model.root().clone();
         let ehandle = ehandle_rx.recv().unwrap();
         let scope = ExecutionScope::build().executor(ehandle).new();
-        ActionSet::register(
+        ActionsManager::register(
             root_component.clone(),
             StartAction::new_with_scope(
                 StartReason::Debug,
@@ -1879,10 +1880,10 @@ async fn use_from_destroyed_but_not_removed() {
     // Destroy `b` but keep alive its reference from the parent.
     // TODO: If we had a "pre-destroy" event we could delete the child through normal means and
     // block on the event instead of explicitly registering actions.
-    ActionSet::register(component_b.clone(), ShutdownAction::new(ShutdownType::Instance))
+    ActionsManager::register(component_b.clone(), ShutdownAction::new(ShutdownType::Instance))
         .await
         .expect("shutdown failed");
-    ActionSet::register(component_b, DestroyAction::new()).await.expect("destroy failed");
+    ActionsManager::register(component_b, DestroyAction::new()).await.expect("destroy failed");
     test.check_use(
         vec!["c"].try_into().unwrap(),
         CheckUse::Protocol {
@@ -3406,7 +3407,7 @@ async fn source_component_stopping_when_routing() {
 
     // Start to stop the component. This will stall because the framework will be
     // waiting the controller to respond.
-    let mut stop_fut = pin!(ActionSet::register(root.clone(), StopAction::new(false)));
+    let mut stop_fut = pin!(ActionsManager::register(root.clone(), StopAction::new(false)));
     assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
 
     // Start to request a capability from the component.

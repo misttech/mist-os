@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{ActionKey, ActionSet, DiscoverAction},
+        actions::{ActionKey, ActionsManager, DiscoverAction},
         component::{manager::ComponentManagerInstance, ComponentInstance, StartReason},
         context::ModelContext,
         environment::Environment,
@@ -89,7 +89,7 @@ impl Model {
 
     /// Discovers the root component, providing it with `dict_for_root`.
     pub async fn discover_root_component(self: &Arc<Model>, input_for_root: ComponentInput) {
-        ActionSet::register(self.root.clone(), DiscoverAction::new(input_for_root))
+        ActionsManager::register(self.root.clone(), DiscoverAction::new(input_for_root))
             .await
             .expect("failed to discover root component");
     }
@@ -136,7 +136,7 @@ impl Model {
 pub mod tests {
     use {
         crate::model::{
-            actions::{ActionSet, ShutdownAction, ShutdownType},
+            actions::{ActionsManager, ShutdownAction, ShutdownType},
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
             structured_dict::ComponentInput,
@@ -161,10 +161,12 @@ pub mod tests {
         let TestModelResult { model, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        let _ =
-            ActionSet::register(model.root.clone(), ShutdownAction::new(ShutdownType::Instance))
-                .await
-                .unwrap();
+        let _ = ActionsManager::register(
+            model.root.clone(),
+            ShutdownAction::new(ShutdownType::Instance),
+        )
+        .await
+        .unwrap();
 
         model.start(ComponentInput::default()).await;
     }

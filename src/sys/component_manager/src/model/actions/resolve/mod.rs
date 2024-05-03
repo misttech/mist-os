@@ -184,7 +184,7 @@ pub mod tests {
         crate::model::{
             actions::test_utils::{is_resolved, is_stopped},
             actions::{
-                Action, ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction,
+                Action, ActionsManager, ResolveAction, ShutdownAction, ShutdownType, StartAction,
                 StopAction,
             },
             component::{IncomingCapabilities, StartReason},
@@ -212,28 +212,28 @@ pub mod tests {
         assert!(is_resolved(&component_a).await);
 
         // Stop, then it's ok to resolve again.
-        ActionSet::register(component_a.clone(), StopAction::new(false)).await.unwrap();
+        ActionsManager::register(component_a.clone(), StopAction::new(false)).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
 
-        ActionSet::register(component_a.clone(), ResolveAction::new()).await.unwrap();
+        ActionsManager::register(component_a.clone(), ResolveAction::new()).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
 
         // Start it again then shut it down.
-        ActionSet::register(
+        ActionsManager::register(
             component_a.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .unwrap();
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .unwrap();
 
         // Error to resolve a shut-down component.
         assert_matches!(
-            ActionSet::register(component_a.clone(), ResolveAction::new()).await,
+            ActionsManager::register(component_a.clone(), ResolveAction::new()).await,
             Err(ActionError::ResolveError { err: ResolveActionError::InstanceShutDown { .. } })
         );
         assert!(!is_resolved(&component_a).await);

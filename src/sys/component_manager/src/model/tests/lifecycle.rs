@@ -6,7 +6,7 @@ use {
     crate::{
         builtin_environment::BuiltinEnvironment,
         model::{
-            actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
+            actions::{ActionsManager, ShutdownAction, ShutdownType, StartAction, StopAction},
             component::instance::InstanceState,
             component::{ComponentInstance, IncomingCapabilities, StartReason},
             events::registry::EventSubscription,
@@ -549,7 +549,7 @@ async fn on_terminate_stop_triggers_reboot() {
     root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let stop = async move {
-        ActionSet::register(component.clone(), StopAction::new(false)).await.unwrap();
+        ActionsManager::register(component.clone(), StopAction::new(false)).await.unwrap();
     };
     let recv_reboot = async move {
         let reason = match receiver.next().await.unwrap() {
@@ -637,7 +637,7 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
     // receive a reboot request.
     root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
-    ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
+    ActionsManager::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
         .await
         .unwrap();
     assert!(!test.model.top_instance().has_reboot_task().await);
