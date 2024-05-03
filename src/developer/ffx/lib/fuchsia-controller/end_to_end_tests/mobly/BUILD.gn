@@ -10,9 +10,11 @@ assert(is_host)
 group("fuchsia_controller_tests") {
   testonly = true
   deps = [
+    ":nuc_target_identity_tests",
     ":reboot_test",
-    ":target_identity_tests",
     ":tracing_test",
+    ":vim3_target_identity_tests",
+    ":x64_target_identity_tests",
   ]
 }
 
@@ -21,27 +23,53 @@ group("fuchsia_controller_tests_staging") {
   deps = [ ":echo_stress_test" ]
 }
 
-python_mobly_test("target_identity_tests") {
+target_identity_deps = [
+  "//sdk/fidl/fuchsia.device:fuchsia.device_host_test_data",
+  "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data",
+  "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
+  "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
+  "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
+  "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
+  "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+]
+
+python_mobly_test("x64_target_identity_tests") {
+  enable_mypy = true
   main_source = "target_identity_tests.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
+  params_source = "params_x64.yaml"
   transport = "fuchsia-controller"
-  environments = [
-    emu_env,
-    vim3_env,
-    nuc_env,
+  environments = [ emu_env ]
+  deps = target_identity_deps
+}
+
+python_mobly_test("vim3_target_identity_tests") {
+  enable_mypy = true
+  main_source = "target_identity_tests.py"
+  libraries = [
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
-  deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_host_test_data",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
-    "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
-    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+  params_source = "params_vim3.yaml"
+  transport = "fuchsia-controller"
+  environments = [ vim3_env ]
+  deps = target_identity_deps
+}
+
+python_mobly_test("nuc_target_identity_tests") {
+  enable_mypy = true
+  main_source = "target_identity_tests.py"
+  libraries = [
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
+  params_source = "params_x64.yaml"
+  transport = "fuchsia-controller"
+  environments = [ nuc_env ]
+  deps = target_identity_deps
 }
 
 python_mobly_test("echo_stress_test") {
