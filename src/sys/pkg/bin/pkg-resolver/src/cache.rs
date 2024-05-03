@@ -443,6 +443,7 @@ pub async fn merkle_for_url(
     url: &AbsolutePackageUrl,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
 ) -> Result<BlobId, MerkleForError> {
+    // TODO(https://fxbug.dev/338012491): Stop adding variants to package URLs.
     let target_path = TargetPath::new(format!(
         "{}/{}",
         url.name(),

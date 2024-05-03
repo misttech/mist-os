@@ -750,6 +750,7 @@ fn hash_from_cache_packages_manifest(
     url: &AbsolutePackageUrl,
     system_cache_list: &CachePackages,
 ) -> Option<BlobId> {
+    // TODO(https://fxbug.dev/335388895)
     // We are in the process of removing the concept of package variant
     // (generalizing fuchsia-pkg URL paths to be `(first-segment)(/more-segments)*`
     // instead of requiring that paths are `(name)/(variant)`. Towards this goal,

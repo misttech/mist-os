@@ -171,7 +171,7 @@ pub(crate) async fn resolve_base_package(
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> Result<fuchsia_hash::Hash, ResolverError> {
-    // TODO(https://fxbug.dev/42131375) Remove zero-variant fallback once variant concept is gone.
+    // TODO(https://fxbug.dev/335388895) Remove zero-variant fallback once variant concept is gone.
     // Base packages must have a variant of zero, and the variant is cleared before adding the URL
     // to the base_packages map. Clients are allowed to specify or omit the variant (clients
     // generally omit so we minimize the number of allocations in that case).

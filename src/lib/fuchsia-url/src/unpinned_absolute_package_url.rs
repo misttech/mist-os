@@ -18,6 +18,7 @@ use crate::{
 pub struct UnpinnedAbsolutePackageUrl {
     repo: RepositoryUrl,
     name: PackageName,
+    // TODO(https://fxbug.dev/335388895): Remove variant concept
     variant: Option<PackageVariant>,
 }
 
