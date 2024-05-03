@@ -22,6 +22,8 @@ const (
 	productBundleDirKind
 )
 
+// If the useLatestFfx flag is set to true then use the latest ffx tool,
+// else the ffx tool from the build will be used.
 type BuildConfig struct {
 	archiveConfig    *ArchiveConfig
 	deviceConfig     *DeviceConfig
@@ -30,6 +32,7 @@ type BuildConfig struct {
 	buildID          string
 	fuchsiaBuildDir  string
 	productBundleDir string
+	useLatestFfx     bool
 }
 
 func NewBuildConfig(
@@ -38,7 +41,7 @@ func NewBuildConfig(
 	deviceConfig *DeviceConfig,
 	defaultBuildID string,
 ) *BuildConfig {
-	return NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, defaultBuildID, "")
+	return NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, defaultBuildID, "", false)
 }
 
 func NewBuildConfigWithPrefix(
@@ -47,11 +50,13 @@ func NewBuildConfigWithPrefix(
 	deviceConfig *DeviceConfig,
 	defaultBuildID string,
 	prefix string,
+	useLatestFfx bool,
 ) *BuildConfig {
 	c := &BuildConfig{
 		prefix:        prefix,
 		archiveConfig: archiveConfig,
 		deviceConfig:  deviceConfig,
+		useLatestFfx:  useLatestFfx,
 	}
 
 	fs.StringVar(&c.builderName, fmt.Sprintf("%sbuilder-name", prefix), "", "Pave to the latest version of this builder")
@@ -122,10 +127,15 @@ func (c *BuildConfig) GetBuild(
 
 	var build artifacts.Build
 	if buildID != "" {
+		ffxPath := ""
+		if c.useLatestFfx {
+			ffxPath = c.deviceConfig.ffxPath
+		}
 		build, err = c.archiveConfig.BuildArchive().GetBuildByID(
 			ctx,
 			buildID,
 			outputDir,
+			ffxPath,
 		)
 	} else if c.fuchsiaBuildDir != "" {
 		build, err = artifacts.NewFuchsiaDirBuild(c.fuchsiaBuildDir), nil
@@ -203,6 +213,7 @@ func (c *RepeatableBuildConfig) GetBuilds(
 				ctx,
 				buildID,
 				outputDir,
+				c.deviceConfig.ffxPath,
 			)
 			if err != nil {
 				return nil, err
@@ -214,6 +225,7 @@ func (c *RepeatableBuildConfig) GetBuilds(
 				ctx,
 				b.value,
 				outputDir,
+				c.deviceConfig.ffxPath,
 			)
 			if err != nil {
 				return nil, err
@@ -235,6 +247,7 @@ func (c *RepeatableBuildConfig) GetBuilds(
 			ctx,
 			c.defaultBuildID,
 			outputDir,
+			c.deviceConfig.ffxPath,
 		)
 		if err != nil {
 			return nil, err

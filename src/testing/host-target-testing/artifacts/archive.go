@@ -49,6 +49,7 @@ func (a *Archive) GetBuildByID(
 	ctx context.Context,
 	id string,
 	dir string,
+	ffxPath string,
 ) (*ArtifactsBuild, error) {
 	// Make sure the build exists.
 	srcs, err := a.list(ctx, id)
@@ -66,6 +67,7 @@ func (a *Archive) GetBuildByID(
 		archive: a,
 		dir:     dir,
 		srcs:    srcsMap,
+		ffxPath: ffxPath,
 	}, nil
 }
 

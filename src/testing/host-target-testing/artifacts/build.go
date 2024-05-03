@@ -85,6 +85,7 @@ type ArtifactsBuild struct {
 	packages      *packages.Repository
 	buildImageDir string
 	srcs          map[string]struct{}
+	ffxPath       string
 }
 
 func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
@@ -121,9 +122,18 @@ func (b *ArtifactsBuild) GetFfx(
 		return nil, err
 	}
 
+	currentBuildId := os.Getenv("BUILDBUCKET_ID")
+	if currentBuildId == "" {
+		currentBuildId = b.id
+	}
+
 	// Use the latest ffx
 	ffxPath := filepath.Join(buildImageDir, "ffx")
-	if err := b.archive.download(ctx, b.id, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
+	if b.ffxPath != "" {
+		ffxPath = b.ffxPath
+	}
+
+	if err := b.archive.download(ctx, currentBuildId, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
 		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
 	}
 
