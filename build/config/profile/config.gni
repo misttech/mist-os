@@ -13,6 +13,8 @@ declare_args() {
   # List of GN paths to source files to NOT instrument by `profile` variants.
   # These take precedence over `profile_source_files`.
   dont_profile_source_files = [
+    # Do not instrument system headers that are under //prebuilt.
+    "//prebuilt/*",
     # https://fxbug.dev/42061298: don't profile //third_party.
     # https://fxbug.dev/42067345: uncomment the below when issue is fixed.
     # Also, change the expression to not reject //third_party/cobalt/*
