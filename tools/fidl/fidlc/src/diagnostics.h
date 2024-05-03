@@ -302,9 +302,9 @@ constexpr ErrorDef<151, std::string_view> ErrMissingLibraryAvailability(
     "`library {0};` declaration in one of the library's files");
 constexpr ErrorDef<152, std::string_view> ErrInvalidPlatform(
     "invalid platform '{0}'; must match the regex [a-z][a-z0-9]*");
-constexpr ErrorDef<153, uint64_t> ErrInvalidVersion(
-    "invalid version '{0}'; must be an integer from 1 to 2^63-1 inclusive, or "
-    "the special constant `HEAD`");
+constexpr ErrorDef<153, std::string_view> ErrInvalidVersion(
+    "invalid version '{0}'; must be an integer from 1 to 2^31-1 inclusive, or "
+    "one of the special constants `NEXT` or `HEAD`");
 constexpr ErrorDef<154, std::string_view> ErrInvalidAvailabilityOrder(
     "invalid @available attribute; must have {0}");
 constexpr ErrorDef<155, const AttributeArg *, std::string_view, const AttributeArg *,

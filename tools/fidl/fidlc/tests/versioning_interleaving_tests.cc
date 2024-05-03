@@ -524,7 +524,7 @@ TEST(VersioningInterleavingTests, Error0055) {
   library.AddFile("bad/fi-0055.test.fidl");
   library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrInvalidReferenceToDeprecated, "alias 'RGB'",
-                     VersionRange(Version::From(3).value(), Version::PosInf()),
+                     VersionRange(Version::From(3).value(), Version::kPosInf),
                      Platform::Parse("test").value(), "table member 'color'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -539,9 +539,9 @@ TEST(VersioningInterleavingTests, Error0056) {
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0056-b.test.fidl");
   library.ExpectFail(ErrInvalidReferenceToDeprecatedOtherPlatform, "alias 'RGB'",
-                     VersionRange(Version::From(2).value(), Version::PosInf()),
+                     VersionRange(Version::From(2).value(), Version::kPosInf),
                      Platform::Parse("foo").value(), "table member 'color'",
-                     VersionRange(Version::From(3).value(), Version::PosInf()),
+                     VersionRange(Version::From(3).value(), Version::kPosInf),
                      Platform::Parse("bar").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

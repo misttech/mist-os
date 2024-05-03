@@ -205,7 +205,8 @@ struct Builtin : public Decl {
     // Constraints
     kOptional,
     kMax,
-    // Constants
+    // Version constants
+    kNext,
     kHead,
   };
 

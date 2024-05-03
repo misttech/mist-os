@@ -212,41 +212,27 @@ void AttributeSchema::ResolveArgs(CompileStep* step, Attribute* attribute) const
   }
 }
 
-static bool RefersToHead(const std::vector<std::string_view>& components, const Decl* head_decl) {
-  return components.size() == 1 && components[0] == head_decl->name.decl_name();
-}
-
-bool AttributeArgSchema::TryResolveAsHead(CompileStep* step, Reference& reference) const {
-  Decl* head_decl =
-      step->all_libraries()->root_library()->declarations.LookupBuiltin(Builtin::Identity::kHead);
-  switch (reference.state()) {
-    // Usually the reference will be kRawSourced because we are coming here from
-    // the AvailabilityStep via CompileStep::CompileAttributeEarly (i.e. before
-    // the ResolveStep so nothing is resolved yet).
-    case Reference::State::kRawSourced:
-      if (RefersToHead(reference.raw_sourced().components, head_decl)) {
-        auto name = head_decl->name;
-        reference.SetKey(Reference::Key(name.library(), name.decl_name()));
-        reference.ResolveTo(Reference::Target(head_decl));
-        return true;
-      }
-      return false;
-    // However, there is one scenario where the reference is already resolved:
-    //
-    // * The @available attribute occurs (incorrectly) on the library
-    //   declaration in two of the library's .fidl files.
-    // * The AvailabilityStep uses attributes->Get("available"), which just
-    //   returns the first one, and compiles it early.
-    // * The second one, e.g. @available(added=HEAD), gets resolved and compiled
-    //   as normal, so it's already resolved at this point.
-    //
-    // In this case the CompileStep will fail with ErrDuplicateAttribute soon
-    // after returning from here.
-    case Reference::State::kResolved:
-      return reference.resolved().element() == head_decl;
-    default:
-      ZX_PANIC("unexpected reference state");
+static bool ResolveAsSpecialVersion(CompileStep* step, IdentifierConstant* constant) {
+  auto& components = constant->reference.raw_sourced().components;
+  if (components.size() != 1)
+    return false;
+  auto name = components[0];
+  auto& decls = step->all_libraries()->root_library()->declarations;
+  Builtin* builtin;
+  std::optional<Version> version;
+  if (name == Version::kNext.name()) {
+    builtin = decls.LookupBuiltin(Builtin::Identity::kNext);
+    version = Version::kNext;
+  } else if (name == Version::kHead.name()) {
+    builtin = decls.LookupBuiltin(Builtin::Identity::kHead);
+    version = Version::kHead;
+  } else {
+    return false;
   }
+  constant->reference.ResolveTo(Reference::Target(builtin));
+  constant->ResolveTo(std::make_unique<NumericConstantValue<uint32_t>>(version->number()),
+                      step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint32));
+  return true;
 }
 
 void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, AttributeArg* arg,
@@ -259,15 +245,12 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
   if (auto special_case = std::get_if<SpecialCase>(&type_)) {
     switch (*special_case) {
       case SpecialCase::kVersion:
-        kind = ConstantValue::Kind::kUint64;
         if (constant->kind == Constant::Kind::kIdentifier) {
-          if (TryResolveAsHead(step, static_cast<IdentifierConstant*>(constant)->reference)) {
-            constant->ResolveTo(
-                std::make_unique<NumericConstantValue<uint64_t>>(Version::Head().ordinal()),
-                step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint64));
-            return;
-          }
+          if (!ResolveAsSpecialVersion(step, static_cast<IdentifierConstant*>(constant)))
+            reporter->Fail(ErrInvalidVersion, arg->span, arg->value->span.data());
+          return;
         }
+        kind = ConstantValue::Kind::kUint32;
         break;
     }
   } else {

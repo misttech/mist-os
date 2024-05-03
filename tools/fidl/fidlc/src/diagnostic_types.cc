@@ -149,35 +149,17 @@ std::string Display(const Platform& p) { return p.name(); }
 std::string Display(Version v) { return v.ToString(); }
 
 std::string Display(VersionRange r) {
-  // Here we assume the version range is for an error about a versioned element.
-  // We handle 4 special cases (-inf, +inf, HEAD, LEGACY) for each endpoint.
   auto [a, b] = r.pair();
   std::stringstream ss;
-  if (a == Version::NegInf()) {
-    ZX_PANIC("versioned elements cannot start at -inf");
-  } else if (a == Version::PosInf()) {
-    ZX_PANIC("versioned elements cannot start at +inf");
-  } else if (a == Version::Head() || a == Version::Legacy()) {
-    ZX_ASSERT_MSG(b == Version::PosInf(), "unexpected end version");
-    // Technically [HEAD, +inf) includes LEGACY, but we just say "at version
-    // HEAD" because this will show up in contexts where mentioning LEGACY would
-    // be confusing (e.g. when the `legacy` argument is not used at all).
+  // Ranges with these values should never show up in error messages.
+  ZX_ASSERT(a != Version::kNegInf && a != Version::kPosInf);
+  ZX_ASSERT(b != Version::kNegInf && b != Version::kLegacy);
+  if (b == Version::kPosInf) {
+    ss << "from version " << Display(a) << " onward";
+  } else if (auto b_inclusive = b.Predecessor(); a == b_inclusive) {
     ss << "at version " << Display(a);
   } else {
-    if (b == Version::NegInf()) {
-      ZX_PANIC("versioned elements cannot end at -inf");
-    } else if (b == Version::PosInf()) {
-      ss << "from version " << Display(a) << " onward";
-    } else if (b == Version::Head()) {
-      ss << "from version " << Display(a) << " to " << Display(b);
-    } else if (b == Version::Legacy()) {
-      ZX_PANIC("versioned elements cannot end at LEGACY");
-    } else if (a.ordinal() + 1 == b.ordinal()) {
-      ss << "at version " << Display(a);
-    } else {
-      ss << "from version " << Display(a) << " to "
-         << Display(Version::From(b.ordinal() - 1).value());
-    }
+    ss << "from version " << Display(a) << " to " << Display(b_inclusive);
   }
   return ss.str();
 }
@@ -187,7 +169,7 @@ std::string Display(const VersionSet& s) {
   if (!maybe_y) {
     return Display(x);
   }
-  ZX_ASSERT_MSG(x.pair().second != Version::PosInf(),
+  ZX_ASSERT_MSG(x.pair().second != Version::kPosInf,
                 "first range must have finite end if there are two");
   return Display(x) + " and " + Display(maybe_y.value());
 }

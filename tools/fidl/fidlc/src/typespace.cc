@@ -222,6 +222,7 @@ Type* Typespace::Creator::Create() {
       return CreateInternalType(BuiltinToInternalSubtype(builtin->id).value());
     case Builtin::Identity::kOptional:
     case Builtin::Identity::kMax:
+    case Builtin::Identity::kNext:
     case Builtin::Identity::kHead:
       reporter()->Fail(ErrExpectedType, layout_.span());
       return nullptr;

@@ -53,9 +53,7 @@ library example;
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  // TODO(https://fxbug.dev/42062904): Check for duplicate attributes earlier in
-  // compilation so that this is ErrDuplicateAttribute instead.
-  library.ExpectFail(ErrReferenceInLibraryAttribute);
+  library.ExpectFail(ErrDuplicateAttribute, "available", "first.fidl:2:2");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -214,82 +212,113 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningAttributeTests, BadInvalidVersionBelowMin) {
+TEST(VersioningAttributeTests, BadInvalidVersionZero) {
   TestLibrary library(R"FIDL(
 @available(added=0)
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrInvalidVersion, 0);
+  library.ExpectFail(ErrInvalidVersion, "0");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningAttributeTests, GoodVersionMaxNumeric) {
+TEST(VersioningAttributeTests, GoodVersionMinNormal) {
   TestLibrary library(R"FIDL(
-@available(added=9223372036854775807) // 2^63-1
+@available(added=1)
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
+  EXPECT_EQ(library.version_added(), Version::From(1).value());
 }
 
-TEST(VersioningAttributeTests, BadInvalidVersionAboveMaxNumeric) {
+TEST(VersioningAttributeTests, GoodVersionMaxNormal) {
   TestLibrary library(R"FIDL(
-@available(added=9223372036854775808) // 2^63
-library example;
-)FIDL");
-  library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrInvalidVersion, 9223372036854775808u);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningAttributeTests, BadInvalidVersionBeforeHeadOrdinal) {
-  TestLibrary library(R"FIDL(
-@available(added=18446744073709551613) // 2^64-3
-library example;
-)FIDL");
-  library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrInvalidVersion, 18446744073709551613u);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningAttributeTests, GoodVersionHeadOrdinal) {
-  TestLibrary library(R"FIDL(
-@available(added=18446744073709551614) // 2^64-2
+@available(added=0x7fffffff) // 2^31-1
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
+  EXPECT_EQ(library.version_added(), Version::From(0x7fffffff).value());
 }
 
-TEST(VersioningAttributeTests, BadInvalidVersionLegacyOrdinal) {
+TEST(VersioningAttributeTests, BadInvalidVersionAboveMaxNormal) {
   TestLibrary library(R"FIDL(
-@available(added=18446744073709551615) // 2^64-1
+@available(added=0x80000000) // 2^31
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrInvalidVersion, 18446744073709551615u);
+  library.ExpectFail(ErrInvalidVersion, "0x80000000");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningAttributeTests, BadInvalidVersionAfterLegacyOrdinal) {
+TEST(VersioningAttributeTests, BadInvalidVersionUnknownReserved) {
   TestLibrary library(R"FIDL(
-@available(added=18446744073709551616) // 2^64
+@available(added=0x8abc1234)
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrCouldNotResolveAttributeArg);
-  library.ExpectFail(ErrConstantOverflowsType, "18446744073709551616", "uint64");
+  library.ExpectFail(ErrInvalidVersion, "0x8abc1234");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningAttributeTests, BadInvalidVersionLegacy) {
+TEST(VersioningAttributeTests, GoodVersionNextName) {
+  TestLibrary library(R"FIDL(
+@available(added=NEXT)
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.version_added(), Version::kNext);
+}
+
+TEST(VersioningAttributeTests, GoodVersionNextNumber) {
+  TestLibrary library(R"FIDL(
+@available(added=0xFFD00000)
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.version_added(), Version::kNext);
+}
+
+TEST(VersioningAttributeTests, GoodVersionHeadName) {
+  TestLibrary library(R"FIDL(
+@available(added=HEAD)
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.version_added(), Version::kHead);
+}
+
+TEST(VersioningAttributeTests, GoodVersionHeadNumber) {
+  TestLibrary library(R"FIDL(
+@available(added=0xFFE00000)
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.version_added(), Version::kHead);
+}
+
+TEST(VersioningAttributeTests, BadInvalidVersionLegacyName) {
   TestLibrary library(R"FIDL(
 @available(added=LEGACY)
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrAttributeArgRequiresLiteral, "added", "available");
+  library.ExpectFail(ErrInvalidVersion, "LEGACY");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadInvalidVersionLegacyNumber) {
+  TestLibrary library(R"FIDL(
+@available(added=0xFFF00000)
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrInvalidVersion, "0xFFF00000");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -300,7 +329,18 @@ library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
-  library.ExpectFail(ErrConstantOverflowsType, "-1", "uint64");
+  library.ExpectFail(ErrConstantOverflowsType, "-1", "uint32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadInvalidVersionOverflowUint32) {
+  TestLibrary library(R"FIDL(
+@available(added=0x100000000) // 2^32
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(ErrConstantOverflowsType, "0x100000000", "uint32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

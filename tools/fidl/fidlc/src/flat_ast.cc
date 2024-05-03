@@ -170,6 +170,7 @@ bool Builtin::IsInternal() const {
     case Identity::kByte:
     case Identity::kOptional:
     case Identity::kMax:
+    case Identity::kNext:
     case Identity::kHead:
       return false;
     case Identity::kFrameworkErr:
@@ -253,7 +254,7 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   auto library = std::make_unique<Library>();
   library->name = "fidl";
   library->platform = Platform::Unversioned();
-  library->availability.Init({.added = Version::Head()});
+  library->availability.Init({.added = Version::kHead});
   library->availability.Inherit(Availability::Unbounded());
   auto insert = [&](const char* name, Builtin::Identity id) {
     auto decl = std::make_unique<Builtin>(id, Name::CreateIntrinsic(library.get(), name));
@@ -289,12 +290,13 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   insert("FrameworkErr", Builtin::Identity::kFrameworkErr);
   insert("optional", Builtin::Identity::kOptional);
   insert("MAX", Builtin::Identity::kMax);
+  insert("NEXT", Builtin::Identity::kNext);
   insert("HEAD", Builtin::Identity::kHead);
 
   // Simulate narrowing availabilities to maintain the invariant that they
   // always reach kNarrowed (except for the availability of `library`).
   library->TraverseElements([](Element* element) {
-    element->availability.Narrow(VersionRange(Version::Head(), Version::PosInf()));
+    element->availability.Narrow(VersionRange(Version::kHead, Version::kPosInf));
   });
 
   return library;

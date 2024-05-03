@@ -558,7 +558,7 @@ TEST(ConstsTests, BadConstTestAssignBuiltinType) {
 }
 
 TEST(ConstsTests, BadConstTestAssignBuiltinNonType) {
-  for (auto builtin : {"MAX", "HEAD", "optional"}) {
+  for (auto builtin : {"MAX", "optional", "NEXT", "HEAD"}) {
     std::ostringstream ss;
     ss << "library example;\n";
     ss << "const FOO uint32 = " << builtin << ";\n";

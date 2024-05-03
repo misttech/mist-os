@@ -51,7 +51,6 @@ class Compiler final {
 
     bool Run();
 
-   protected:
     Compiler* compiler() { return compiler_; }
     Reporter* reporter() { return compiler_->reporter_; }
     Library* library() { return compiler_->library_.get(); }
@@ -189,8 +188,9 @@ struct Compilation {
 
   // The platform the library is versioned under.
   const Platform* platform;
-  // The version at which the library was added.
-  Version version_added = Version::Head();
+  // The version at which the library was added. It has the invalid value -inf
+  // by default, to allow default-constructing Compilation.
+  Version version_added = Version::kNegInf;
   // The target library name and attributes. Note, we purposely do not store a
   // Library* to avoid accidentally reaching into its unfiltered decls.
   std::string_view library_name;

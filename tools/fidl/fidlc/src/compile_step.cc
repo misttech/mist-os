@@ -599,7 +599,7 @@ void CompileStep::CompileAttribute(Attribute* attribute, bool early) {
 
   const AttributeSchema& schema = all_libraries()->RetrieveAttributeSchema(attribute);
   if (early) {
-    ZX_ASSERT_MSG(schema.CanCompileEarly(), "attribute is not allowed to be compiled early");
+    ZX_ASSERT_MSG(schema.IsCompileEarly(), "attribute is not allowed to be compiled early");
   }
   schema.ResolveArgs(this, attribute);
   attribute->compiled = true;

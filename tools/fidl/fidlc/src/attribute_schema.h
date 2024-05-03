@@ -27,7 +27,7 @@ class AttributeArgSchema {
   };
 
   enum class SpecialCase : uint8_t {
-    // Allows a uint64 literal or the special constant `HEAD`.
+    // Allows a uint32 literal or the special constant `NEXT` or `HEAD`.
     kVersion,
   };
 
@@ -43,11 +43,6 @@ class AttributeArgSchema {
 
   void ResolveArg(CompileStep* step, Attribute* attribute, AttributeArg* arg,
                   bool literal_only) const;
-
-  // Attempts to resolve `reference` as the builtin HEAD by approximating what
-  // the ResolveStep would do, and returns true if successful. We need this to
-  // resolve HEAD earlier than usual, in the AvailabilityStep.
-  bool TryResolveAsHead(CompileStep* step, Reference& reference) const;
 
  private:
   const std::variant<ConstantValue::Kind, SpecialCase> type_;
@@ -89,7 +84,7 @@ class AttributeSchema {
   static const AttributeSchema kUserDefined;
 
   // Returns true if this schema allows early compilations.
-  bool CanCompileEarly() const { return kind_ == Kind::kCompileEarly; }
+  bool IsCompileEarly() const { return kind_ == Kind::kCompileEarly; }
 
   // Resolves constants in the attribute's arguments. In the case of an
   // anonymous argument like @foo("abc"), infers the argument's name too.

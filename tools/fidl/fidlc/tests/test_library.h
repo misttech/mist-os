@@ -255,6 +255,7 @@ class TestLibrary final : public SharedInterface {
 
   std::string_view name() const { return compilation_->library_name; }
   const Platform& platform() const { return *compilation_->platform; }
+  Version version_added() const { return compilation_->version_added; }
   const AttributeList* attributes() { return compilation_->library_attributes; }
   const std::vector<const Struct*>& external_structs() const {
     return compilation_->external_structs;

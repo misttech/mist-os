@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <limits>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -17,10 +16,10 @@ using InheritResult = Availability::InheritResult;
 using Status = InheritResult::Status;
 using LegacyStatus = InheritResult::LegacyStatus;
 
-Version v(uint64_t x) { return Version::From(x).value(); }
-VersionRange range(uint64_t x, uint64_t y) { return VersionRange(v(x), v(y)); }
-VersionSet set(uint64_t x, uint64_t y) { return VersionSet(range(x, y)); }
-VersionSet set(std::pair<uint64_t, uint64_t> a, std::pair<uint64_t, uint64_t> b) {
+Version v(uint32_t x) { return Version::From(x).value(); }
+VersionRange range(uint32_t x, uint32_t y) { return VersionRange(v(x), v(y)); }
+VersionSet set(uint32_t x, uint32_t y) { return VersionSet(range(x, y)); }
+VersionSet set(std::pair<uint32_t, uint32_t> a, std::pair<uint32_t, uint32_t> b) {
   return VersionSet(range(a.first, a.second), range(b.first, b.second));
 }
 
@@ -49,63 +48,63 @@ TEST(VersioningTypesTests, GoodPlatformEquality) {
   EXPECT_NE(Platform::Parse("foo").value(), Platform::Unversioned());
 }
 
-TEST(VersioningTypesTests, GoodVersionFromMinNumeric) {
+TEST(VersioningTypesTests, GoodVersionFromMinNormal) {
   auto maybe_version = Version::From(1);
   ASSERT_TRUE(maybe_version.has_value());
-  EXPECT_EQ(maybe_version.value().ordinal(), 1u);
+  EXPECT_EQ(maybe_version.value().number(), 1u);
   EXPECT_EQ(maybe_version.value().ToString(), "1");
 }
 
-TEST(VersioningTypesTests, GoodVersionFromMaxNumeric) {
-  uint64_t ordinal = (1ull << 63) - 1;
-  auto maybe_version = Version::From(ordinal);
+TEST(VersioningTypesTests, GoodVersionFromMaxNormal) {
+  uint32_t number = (1u << 31) - 1;
+  auto maybe_version = Version::From(number);
   ASSERT_TRUE(maybe_version.has_value());
-  EXPECT_EQ(maybe_version.value().ordinal(), ordinal);
-  EXPECT_EQ(maybe_version.value().ToString(), std::to_string(ordinal));
-  // Confirm this is in fact the last valid ordinal.
-  EXPECT_EQ(Version::From(ordinal + 1), std::nullopt);
+  EXPECT_EQ(maybe_version.value().number(), number);
+  EXPECT_EQ(maybe_version.value().ToString(), std::to_string(number));
+  // Confirm this is in fact the last valid number.
+  EXPECT_EQ(Version::From(number + 1), std::nullopt);
 }
 
 TEST(VersioningTypesTests, GoodVersionFromHead) {
-  uint64_t ordinal = std::numeric_limits<uint64_t>::max() - 1;
-  auto maybe_version = Version::From(ordinal);
+  uint32_t number = 0xFFE00000;
+  auto maybe_version = Version::From(number);
   ASSERT_TRUE(maybe_version.has_value());
-  EXPECT_EQ(maybe_version.value().ordinal(), ordinal);
+  EXPECT_EQ(maybe_version.value().number(), number);
   EXPECT_EQ(maybe_version.value().ToString(), "HEAD");
 }
 
 TEST(VersioningTypesTests, GoodVersionFromLegacy) {
-  uint64_t ordinal = std::numeric_limits<uint64_t>::max();
-  auto maybe_version = Version::From(ordinal);
+  uint32_t number = 0xFFF00000;
+  auto maybe_version = Version::From(number);
   ASSERT_TRUE(maybe_version.has_value());
-  EXPECT_EQ(maybe_version.value().ordinal(), ordinal);
+  EXPECT_EQ(maybe_version.value().number(), number);
   EXPECT_EQ(maybe_version.value().ToString(), "LEGACY");
 }
 
 TEST(VersioningTypesTests, BadVersionFrom) {
   ASSERT_EQ(Version::From(0), std::nullopt);
-  ASSERT_EQ(Version::From(1ull << 63), std::nullopt);
-  ASSERT_EQ(Version::From(std::numeric_limits<uint64_t>::max() - 2), std::nullopt);
+  ASSERT_EQ(Version::From(1u << 31), std::nullopt);
+  ASSERT_EQ(Version::From(UINT32_MAX), std::nullopt);
 }
 
 TEST(VersioningTypesTests, GoodVersionParse) {
-  uint64_t max_numeric_ordinal = (1ull << 63) - 1;
-  uint64_t head_ordinal = std::numeric_limits<uint64_t>::max() - 1;
-  uint64_t legacy_ordinal = std::numeric_limits<uint64_t>::max();
+  uint32_t max_numeric = (1u << 31) - 1;
+  uint32_t head = 0xFFE00000;
+  uint32_t legacy = 0xFFF00000;
 
   EXPECT_EQ(Version::Parse("1"), v(1));
-  EXPECT_EQ(Version::Parse(std::to_string(max_numeric_ordinal)), v(max_numeric_ordinal));
-  EXPECT_EQ(Version::Parse(std::to_string(head_ordinal)), v(head_ordinal));
-  EXPECT_EQ(Version::Parse(std::to_string(legacy_ordinal)), v(legacy_ordinal));
-  EXPECT_EQ(Version::Parse("HEAD"), v(head_ordinal));
-  EXPECT_EQ(Version::Parse("LEGACY"), v(legacy_ordinal));
+  EXPECT_EQ(Version::Parse(std::to_string(max_numeric)), v(max_numeric));
+  EXPECT_EQ(Version::Parse(std::to_string(head)), v(head));
+  EXPECT_EQ(Version::Parse(std::to_string(legacy)), v(legacy));
+  EXPECT_EQ(Version::Parse("HEAD"), v(head));
+  EXPECT_EQ(Version::Parse("LEGACY"), v(legacy));
 }
 
 TEST(VersioningTypesTests, BadVersionParse) {
   EXPECT_EQ(Version::Parse(""), std::nullopt);
   EXPECT_EQ(Version::Parse("0"), std::nullopt);
-  EXPECT_EQ(Version::Parse("9223372036854775808"), std::nullopt);   // 2^63
-  EXPECT_EQ(Version::Parse("18446744073709551616"), std::nullopt);  // 2^64
+  EXPECT_EQ(Version::Parse("2147483648"), std::nullopt);  // 2^31
+  EXPECT_EQ(Version::Parse("4294967296"), std::nullopt);  // 2^32
   EXPECT_EQ(Version::Parse("-1"), std::nullopt);
 }
 

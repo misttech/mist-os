@@ -93,7 +93,7 @@ void ResolveStep::RunImpl() {
         auto [a, b] = range.pair();
         auto [x, maybe_y] = decl_present.ranges();
         auto removed = x.pair().second;
-        ZX_ASSERT_MSG(a >= removed && b <= Version::Legacy(),
+        ZX_ASSERT_MSG(a >= removed && b <= Version::kLegacy,
                       "skipped range must lie within [removed, LEGACY)");
       }
       prev = *it;
@@ -109,6 +109,10 @@ void ResolveStep::RunImpl() {
 
 void ResolveStep::VisitElement(Element* element, Context context) {
   for (auto& attribute : element->attributes->attributes) {
+    // Skip attributes that are compiled early, e.g. @available.
+    if (all_libraries()->RetrieveAttributeSchema(attribute.get()).IsCompileEarly()) {
+      continue;
+    }
     for (auto& arg : attribute->args) {
       VisitConstant(arg->value.get(), context);
     }
@@ -404,12 +408,6 @@ void ResolveStep::VisitReference(Reference& ref, Context context) {
   }
 }
 
-// Returns true if ref (assumed to be resolved) refers to HEAD.
-static bool IsResolvedToHead(const Reference& ref) {
-  return ref.resolved().element()->kind == Element::Kind::kBuiltin &&
-         static_cast<Builtin*>(ref.resolved().element())->id == Builtin::Identity::kHead;
-}
-
 void ResolveStep::ParseReference(Reference& ref, Context context) {
   auto initial_state = ref.state();
   auto checkpoint = reporter()->Checkpoint();
@@ -420,11 +418,6 @@ void ResolveStep::ParseReference(Reference& ref, Context context) {
     case Reference::State::kRawSourced:
       ParseSourcedReference(ref, context);
       break;
-    case Reference::State::kResolved:
-      // This can only happen for the early compilation of HEAD in
-      // AttributeArgSchema::TryResolveAsHead.
-      ZX_ASSERT(IsResolvedToHead(ref));
-      return;
     default:
       ZX_PANIC("unexpected reference state");
   }
@@ -433,10 +426,10 @@ void ResolveStep::ParseReference(Reference& ref, Context context) {
     ref.MarkFailed();
     return;
   }
-  // A library element can reference things via attribute arguments. Other than
-  // HEAD, which causes an early return above, we don't allow this: how would we
-  // decide what value to use if the const it's referencing has different values
-  // at different versions?
+  // If the enclosing element is the library, we must be visiting an identifier
+  // constant in one of its attributes, e.g. `@foo(CONSTANT) library example;`.
+  // This isn't allowed because it's unclear what it would mean in a versioned
+  // library where CONSTANT takes on different values at different versions.
   if (context.enclosing->kind == Element::Kind::kLibrary) {
     reporter()->Fail(ErrReferenceInLibraryAttribute, ref.span());
     ref.MarkFailed();
@@ -637,14 +630,6 @@ void ResolveStep::ValidateReference(const Reference& ref, Context context) {
   }
   if (!ref.IsSynthetic() && ref.resolved().name().as_anonymous()) {
     reporter()->Fail(ErrAnonymousNameReference, ref.span(), ref.resolved().name());
-  }
-  if (context.enclosing->kind == Element::Kind::kLibrary) {
-    // A library element can reference things via attribute arguments. The only
-    // such reference we allow is to HEAD (see ResolveStep::ParseReference).
-    // Return early since the library's availability never advances to
-    // kNarrowed, which is assumed below.
-    ZX_ASSERT(IsResolvedToHead(ref));
-    return;
   }
 
   auto source = context.enclosing;

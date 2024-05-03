@@ -141,7 +141,7 @@ TEST_P(VersioningOverlapTest, BadExample) {
   library.AddFile("bad/fi-0036.test.fidl");
   library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrNameOverlap, Element::Kind::kEnum, "Color", Element::Kind::kEnum,
-                     "bad/fi-0036.test.fidl:7:6", VersionSet(VersionRange(V2, Version::PosInf())),
+                     "bad/fi-0036.test.fidl:7:6", VersionSet(VersionRange(V2, Version::kPosInf)),
                      Platform::Parse("test").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -152,7 +152,7 @@ TEST_P(VersioningOverlapTest, BadExampleCanonical) {
   library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kProtocol, "Color",
                      Element::Kind::kConst, "COLOR", "bad/fi-0037.test.fidl:7:7", "color",
-                     VersionSet(VersionRange(V2, Version::PosInf())),
+                     VersionSet(VersionRange(V2, Version::kPosInf)),
                      Platform::Parse("test").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -236,7 +236,7 @@ type Foo = table {};
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kTable, "Foo", Element::Kind::kStruct,
                      "example.fidl:6:6",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -254,7 +254,7 @@ type FOO = table {};
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kStruct, "foo", Element::Kind::kTable,
                      "FOO", "example.fidl:8:6", "foo",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -272,7 +272,7 @@ type Foo = table {};
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kTable, "Foo", Element::Kind::kStruct,
                      "example.fidl:6:6",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -290,7 +290,7 @@ type FOO = table {};
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kStruct, "foo", Element::Kind::kTable,
                      "FOO", "example.fidl:8:6", "foo",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -308,11 +308,10 @@ const Foo uint32 = 0;
 )FIDL");
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kStruct, "Foo", Element::Kind::kConst,
-                     "example.fidl:9:7",
-                     VersionSet(VersionRange(Version::Head(), Version::PosInf())),
+                     "example.fidl:9:7", VersionSet(VersionRange(Version::kHead, Version::kPosInf)),
                      Platform::Parse("example").value());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kTable, "Foo", Element::Kind::kStruct,
-                     "example.fidl:5:6", VersionSet(VersionRange(V3, Version::PosInf())),
+                     "example.fidl:5:6", VersionSet(VersionRange(V3, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -474,7 +473,7 @@ type Foo = struct {
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kStructMember, "member",
                      Element::Kind::kStructMember, "example.fidl:7:5",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -494,7 +493,7 @@ type Foo = struct {
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kStructMember, "MEMBER",
                      Element::Kind::kStructMember, "member", "example.fidl:7:5", "member",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -514,7 +513,7 @@ type Foo = struct {
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kStructMember, "member",
                      Element::Kind::kStructMember, "example.fidl:7:5",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -534,7 +533,7 @@ type Foo = struct {
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kStructMember, "MEMBER",
                      Element::Kind::kStructMember, "member", "example.fidl:7:5", "member",
-                     VersionSet(VersionRange(Version::Legacy(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kLegacy, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -555,11 +554,11 @@ type Foo = struct {
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kStructMember, "member",
                      Element::Kind::kStructMember, "example.fidl:6:5",
-                     VersionSet(VersionRange(V3, Version::PosInf())),
+                     VersionSet(VersionRange(V3, Version::kPosInf)),
                      Platform::Parse("example").value());
   library.ExpectFail(ErrNameOverlap, Element::Kind::kStructMember, "member",
                      Element::Kind::kStructMember, "example.fidl:6:5",
-                     VersionSet(VersionRange(Version::Head(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kHead, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -580,11 +579,11 @@ type Foo = struct {
   library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kStructMember, "Member",
                      Element::Kind::kStructMember, "member", "example.fidl:6:5", "member",
-                     VersionSet(VersionRange(V3, Version::PosInf())),
+                     VersionSet(VersionRange(V3, Version::kPosInf)),
                      Platform::Parse("example").value());
   library.ExpectFail(ErrNameOverlapCanonical, Element::Kind::kStructMember, "MEMBER",
                      Element::Kind::kStructMember, "member", "example.fidl:6:5", "member",
-                     VersionSet(VersionRange(Version::Head(), Version::PosInf())),
+                     VersionSet(VersionRange(Version::kHead, Version::kPosInf)),
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
