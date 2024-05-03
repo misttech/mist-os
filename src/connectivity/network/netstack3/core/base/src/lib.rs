@@ -22,7 +22,7 @@ mod rng;
 mod time;
 
 pub use context::ContextPair;
-pub use counters::Counter;
+pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use event::{CoreEventContext, EventContext};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use resource_references::{

@@ -42,15 +42,15 @@ use lock_order::Unlocked;
 use packet::{BufferMut, Serializer};
 
 use crate::{
-    counters::Counter,
     marker::{BindingsContext, BindingsTypes},
     state::StackState,
 };
 
 pub use netstack3_base::{
-    ContextPair, CoreEventContext, CoreTimerContext, DeferredResourceRemovalContext, EventContext,
-    HandleableTimer, InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
+    ContextPair, CoreEventContext, CoreTimerContext, CounterContext,
+    DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
+    InstantContext, NestedIntoCoreTimerCtx, ReferenceNotifiers, ResourceCounterContext, RngContext,
+    TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -101,33 +101,6 @@ pub trait SendFrameContext<BC, Meta> {
     where
         S: Serializer,
         S::Buffer: BufferMut;
-}
-
-/// A context that stores counters.
-///
-/// `CounterContext` exposes access to counters for observation and debugging.
-pub trait CounterContext<T> {
-    /// Call the function with an immutable reference to counter type T.
-    fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O;
-
-    /// Increments the counter returned by the callback.
-    fn increment<F: FnOnce(&T) -> &Counter>(&self, cb: F) {
-        self.with_counters(|counters| cb(counters).increment());
-    }
-}
-
-/// A context that provides access to per-resource counters for observation and
-/// debugging.
-pub trait ResourceCounterContext<R, T>: CounterContext<T> {
-    /// Call `cb` with an immutable reference to the set of counters on `resource`.
-    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&mut self, resource: &R, cb: F) -> O;
-
-    /// Increments both the per-resource and stackwide versions of
-    /// the counter returned by the callback.
-    fn increment<F: Fn(&T) -> &Counter>(&mut self, resource: &R, cb: F) {
-        self.with_per_resource_counters(resource, |counters| cb(counters).increment());
-        self.with_counters(|counters| cb(counters).increment());
-    }
 }
 
 /// A context for emitting tracing data.
