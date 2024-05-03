@@ -2152,23 +2152,30 @@ mod tests {
         // functionality works as well. For a mutable buffer, the implementation also
         // modifies the bytes that were consumed so tests can make sure that the
         // `parse_mut` function was actually called and that the bytes are mutable.
-        impl<B: ByteSlice> ParsablePacket<B, &[u8]> for () {
+        struct TestParsablePacket {}
+        impl<B: ByteSlice> ParsablePacket<B, &[u8]> for TestParsablePacket {
             type Error = ();
-            fn parse<BV: BufferView<B>>(mut buffer: BV, args: &[u8]) -> Result<(), ()> {
+            fn parse<BV: BufferView<B>>(
+                mut buffer: BV,
+                args: &[u8],
+            ) -> Result<TestParsablePacket, ()> {
                 assert_eq!(buffer.as_ref(), args);
                 let _: B = buffer.take_front(1).unwrap();
                 let _: B = buffer.take_back(1).unwrap();
-                Ok(())
+                Ok(TestParsablePacket {})
             }
 
-            fn parse_mut<BV: BufferViewMut<B>>(mut buffer: BV, args: &[u8]) -> Result<(), ()>
+            fn parse_mut<BV: BufferViewMut<B>>(
+                mut buffer: BV,
+                args: &[u8],
+            ) -> Result<TestParsablePacket, ()>
             where
                 B: ByteSliceMut,
             {
                 assert_eq!(buffer.as_ref(), args);
                 buffer.take_front(1).unwrap().as_mut()[0] += 1;
                 buffer.take_back(1).unwrap().as_mut()[0] += 2;
-                Ok(())
+                Ok(TestParsablePacket {})
             }
 
             fn parse_metadata(&self) -> ParseMetadata {
@@ -2179,28 +2186,35 @@ mod tests {
         // immutable byte slices
 
         let mut buf = &[0, 1, 2, 3, 4, 5, 6, 7][..];
-        buf.parse_with::<_, ()>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
         // test that, after parsing, the bytes consumed are consumed permanently
-        buf.parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
 
         // test that different temporary values do not affect one another and
         // also that slicing works properly (in that the elements outside of the
         // slice are not exposed in the BufferView[Mut]; this is fairly obvious
         // for slices, but less obvious for Buf, which we test below)
         let buf = &[0, 1, 2, 3, 4, 5, 6, 7][..];
-        (&buf[1..7]).parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
-        (&buf[1..7]).parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            (&buf[1..7]).parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            (&buf[1..7]).parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
 
         // mutable byte slices
 
         let mut bytes = [0, 1, 2, 3, 4, 5, 6, 7];
         let mut buf = &mut bytes[..];
-        buf.parse_with::<_, ()>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
         // test that, after parsing, the bytes consumed are consumed permanently
-        buf.parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
         // test that this also works with parse_with_mut
-        buf.parse_with_mut::<_, ()>(&[2, 3, 4, 5]).unwrap();
-        buf.parse_with_mut::<_, ()>(&[3, 4]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with_mut::<_, TestParsablePacket>(&[2, 3, 4, 5]).unwrap();
+        let TestParsablePacket {} = buf.parse_with_mut::<_, TestParsablePacket>(&[3, 4]).unwrap();
         assert_eq!(bytes, [0, 1, 3, 4, 6, 7, 6, 7]);
 
         // test that different temporary values do not affect one another and
@@ -2208,51 +2222,64 @@ mod tests {
         // slice are not exposed in the BufferView[Mut]; this is fairly obvious
         // for slices, but less obvious for Buf, which we test below)
         let buf = &mut [0, 1, 2, 3, 4, 5, 6, 7][..];
-        (&buf[1..7]).parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
-        (&buf[1..7]).parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
-        (&mut buf[1..7]).parse_with_mut::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
-        (&mut buf[1..7]).parse_with_mut::<_, ()>(&[2, 2, 3, 4, 5, 8]).unwrap();
+        let TestParsablePacket {} =
+            (&buf[1..7]).parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            (&buf[1..7]).parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            (&mut buf[1..7]).parse_with_mut::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            (&mut buf[1..7]).parse_with_mut::<_, TestParsablePacket>(&[2, 2, 3, 4, 5, 8]).unwrap();
         assert_eq!(buf, &[0, 3, 2, 3, 4, 5, 10, 7][..]);
 
         // Buf with immutable byte slice
 
         let mut buf = Buf::new(&[0, 1, 2, 3, 4, 5, 6, 7][..], ..);
-        buf.parse_with::<_, ()>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
         // test that, after parsing, the bytes consumed are consumed permanently
-        buf.parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
 
         // the same test again, but this time with Buf's range set
         let mut buf = Buf::new(&[0, 1, 2, 3, 4, 5, 6, 7][..], 1..7);
-        buf.parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
         // test that, after parsing, the bytes consumed are consumed permanently
-        buf.parse_with::<_, ()>(&[2, 3, 4, 5]).unwrap();
+        let TestParsablePacket {} = buf.parse_with::<_, TestParsablePacket>(&[2, 3, 4, 5]).unwrap();
 
         // Buf with mutable byte slice
 
         let mut bytes = [0, 1, 2, 3, 4, 5, 6, 7];
         let buf = &mut bytes[..];
         let mut buf = Buf::new(&mut buf[..], ..);
-        buf.parse_with::<_, ()>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap();
         // test that, after parsing, the bytes consumed are consumed permanently
-        buf.parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
         // test that this also works with parse_with_mut
-        buf.parse_with_mut::<_, ()>(&[2, 3, 4, 5]).unwrap();
-        buf.parse_with_mut::<_, ()>(&[3, 4]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with_mut::<_, TestParsablePacket>(&[2, 3, 4, 5]).unwrap();
+        let TestParsablePacket {} = buf.parse_with_mut::<_, TestParsablePacket>(&[3, 4]).unwrap();
         assert_eq!(bytes, [0, 1, 3, 4, 6, 7, 6, 7]);
         // the same test again, but this time with Buf's range set
         let mut bytes = [0, 1, 2, 3, 4, 5, 6, 7];
         let buf = &mut bytes[..];
         let mut buf = Buf::new(&mut buf[..], 1..7);
-        buf.parse_with::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
         // test that, after parsing, the bytes consumed are consumed permanently
-        buf.parse_with::<_, ()>(&[2, 3, 4, 5]).unwrap();
+        let TestParsablePacket {} = buf.parse_with::<_, TestParsablePacket>(&[2, 3, 4, 5]).unwrap();
         assert_eq!(bytes, [0, 1, 2, 3, 4, 5, 6, 7]);
         // test that this also works with parse_with_mut
         let mut bytes = [0, 1, 2, 3, 4, 5, 6, 7];
         let buf = &mut bytes[..];
         let mut buf = Buf::new(&mut buf[..], 1..7);
-        buf.parse_with_mut::<_, ()>(&[1, 2, 3, 4, 5, 6]).unwrap();
-        buf.parse_with_mut::<_, ()>(&[2, 3, 4, 5]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with_mut::<_, TestParsablePacket>(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let TestParsablePacket {} =
+            buf.parse_with_mut::<_, TestParsablePacket>(&[2, 3, 4, 5]).unwrap();
         assert_eq!(bytes, [0, 2, 3, 3, 4, 7, 8, 7]);
     }
 
