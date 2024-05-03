@@ -424,7 +424,7 @@ class TestEnvironment:
         if not self.use_local_pb or not os.path.exists(self.local_pb_path):
             shutil.rmtree(self.local_pb_path, ignore_errors=True)
             self.env_logger.info("Download emulator image")
-            product_bundle = "terminal." + self.triple_to_arch(self.target)
+            product_bundle = "minimal." + self.triple_to_arch(self.target)
             sdk_version = self.read_sdk_version()
             output = subprocess.check_output(
                 [
