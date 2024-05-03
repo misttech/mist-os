@@ -6,7 +6,6 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/zx/vmo.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -28,12 +27,8 @@
 namespace display {
 
 Image::Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id,
-             zx::vmo vmo, inspect::Node* parent_node, ClientId client_id)
-    : driver_id_(driver_id),
-      metadata_(metadata),
-      controller_(controller),
-      client_id_(client_id),
-      vmo_(std::move(vmo)) {
+             inspect::Node* parent_node, ClientId client_id)
+    : driver_id_(driver_id), metadata_(metadata), controller_(controller), client_id_(client_id) {
   ZX_DEBUG_ASSERT(metadata.tiling_type() != kImageTilingTypeCapture);
   InitializeInspect(parent_node);
 }

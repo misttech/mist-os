@@ -180,7 +180,7 @@ zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, B
 
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<Image> image = fbl::AdoptRef(new (&alloc_checker) Image(
-      controller_, image_metadata, driver_image_id, zx::vmo(), &proxy_->node(), id_));
+      controller_, image_metadata, driver_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
     return ZX_ERR_NO_MEMORY;
