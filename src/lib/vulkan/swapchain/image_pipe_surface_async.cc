@@ -470,7 +470,6 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
 
   auto& present = queue_.front();
   TRACE_FLOW_END("gfx", "image_pipe_swapchain_to_present", present.image_id);
-  TRACE_FLOW_BEGIN("gfx", "Flatland::Present", present.image_id);
 
   TRACE_FLOW_BEGIN("gfx", PER_APP_PRESENT_TRACING_NAME.c_str(), present.image_id);
   if (!channel_closed_) {
