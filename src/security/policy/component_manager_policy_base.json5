@@ -14,13 +14,6 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
-                source_name: "fuchsia.boot.RootResource",
-                capability: "protocol",
-                target_monikers: [],
-            },
-            {
-                source_moniker: "<component_manager>",
-                source: "component",
                 source_name: "fuchsia.kernel.CpuResource",
                 capability: "protocol",
                 target_monikers: [
