@@ -22,7 +22,7 @@ TEST(VmoCloneTestCase, SizeAlign) {
   // create clones with different sizes, make sure the created size is a multiple of a page size
   for (uint64_t s = 0; s < zx_system_get_page_size() * 4; s++) {
     zx::vmo clone_vmo;
-    EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, s, true, &clone_vmo), "vm_clone");
+    EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, s, &clone_vmo), "vm_clone");
 
     // should be the size rounded up to the nearest page boundary
     uint64_t size = 0x99999999;
@@ -32,13 +32,17 @@ TEST(VmoCloneTestCase, SizeAlign) {
               "clone_vmo.get_size");
 
     // close the handle
-    { auto hptr = clone_vmo.release(); }
+    {
+      auto hptr = clone_vmo.release();
+    }
 
     EXPECT_FALSE(clone_vmo.is_valid());
   }
 
   // close the handle
-  { auto hptr = vmo.release(); }
+  {
+    auto hptr = vmo.release();
+  }
 
   EXPECT_FALSE(vmo.is_valid());
 }
@@ -54,7 +58,8 @@ TEST(VmoCloneTestCase, NameProperty) {
   EXPECT_OK(vmo.set_property(ZX_PROP_NAME, "test1", 5), "zx_object_set_property");
 
   // clone it
-  EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, size, true, &clone_vmo[0]), "vm_clone");
+  clone_vmo[0].reset();
+  EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, size, &clone_vmo[0]), "vm_clone");
   EXPECT_TRUE(clone_vmo[0].is_valid(), "vm_clone_handle");
   char name[ZX_MAX_NAME_LEN];
   EXPECT_OK(clone_vmo[0].get_property(ZX_PROP_NAME, name, ZX_MAX_NAME_LEN),
@@ -62,14 +67,18 @@ TEST(VmoCloneTestCase, NameProperty) {
   EXPECT_TRUE(!strcmp(name, "test1"), "get_name");
 
   // clone it a second time w/o the rights property
-  EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, size, false, &clone_vmo[1]), "vm_clone");
+  // EXPECT_OK(zx_handle_replace(vmo, ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHTS_PROPERTY, &vmo));
+  clone_vmo[1].reset();
+  EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, size, &clone_vmo[1]), "vm_clone");
   EXPECT_TRUE(clone_vmo[1].is_valid(), "vm_clone_handle");
   EXPECT_OK(clone_vmo[1].get_property(ZX_PROP_NAME, name, ZX_MAX_NAME_LEN),
             "zx_object_get_property");
   EXPECT_FALSE(!strcmp(name, "test1"), "get_name");
 
   // close the original handle
-  { auto hptr = vmo.release(); }
+  {
+    auto hptr = vmo.release();
+  }
 
   EXPECT_FALSE(vmo.is_valid());
 

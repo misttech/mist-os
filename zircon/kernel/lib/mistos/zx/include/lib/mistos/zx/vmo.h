@@ -100,11 +100,7 @@ class vmo final : public object<vmo> {
     return get_property(ZX_PROP_VMO_CONTENT_SIZE, size, sizeof(*size));
   }
 
-  zx_status_t create_child(uint32_t options, uint64_t offset, uint64_t size, bool copy_prop,
-                           vmo* result) const;
-  zx_status_t create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const {
-    return create_child(options, offset, size, true, result);
-  }
+  zx_status_t create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const;
 
   zx_status_t op_range(uint32_t op, uint64_t offset, uint64_t size, void* buffer,
                        size_t buffer_size) const {

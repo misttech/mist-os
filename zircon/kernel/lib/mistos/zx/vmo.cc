@@ -49,11 +49,12 @@ zx::result<CreateStats> parse_create_syscall_flags(uint32_t flags, size_t size) 
     flags &= ~ZX_VMO_DISCARDABLE;
   }
   if (flags & ZX_VMO_UNBOUNDED) {
-    if (size != 0) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
     flags &= ~ZX_VMO_UNBOUNDED;
     res.size = VmObjectPaged::max_size();
+  } else {
+    if (zx_status_t status = VmObject::RoundSize(size, &res.size); status != ZX_OK) {
+      return zx::error(status);
+    }
   }
 
   if (flags) {
@@ -147,8 +148,7 @@ zx_status_t vmo::write(const void* data, uint64_t offset, size_t len) const {
   return tmp->vmo_->Write(data, offset, len);
 }
 
-zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, bool copy_prop,
-                              vmo* result) const {
+zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const {
   LTRACE;
   if (!get()) {
     return ZX_ERR_BAD_HANDLE;
@@ -157,6 +157,12 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
   zx_status_t status;
   fbl::RefPtr<VmObject> child_vmo;
   bool no_write = false;
+
+  uint64_t vmo_size = 0;
+  status = VmObject::RoundSize(size, &vmo_size);
+  if (status != ZX_OK) {
+    return status;
+  }
 
   // Resizing a VMO requires the WRITE permissions, but NO_WRITE forbids the WRITE permissions, as
   // such it does not make sense to create a VMO with both of these.
@@ -175,10 +181,11 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
   zx_rights_t in_rights = get()->rights_;
 
   // VmObjectDispatcher::CreateChild
-  LTRACEF("options 0x%x offset %#" PRIx64 " size %#" PRIx64 "\n", options, offset, size);
+  LTRACEF("options 0x%x offset %#" PRIx64 " size %#" PRIx64 "\n", options, offset, vmo_size);
 
   // clone the vmo into a new one
-  status = create_child_internal(options, offset, size, copy_prop, &child_vmo);
+  status = create_child_internal(options, offset, vmo_size, in_rights & ZX_RIGHT_GET_PROPERTY,
+                                 &child_vmo);
   DEBUG_ASSERT((status == ZX_OK) == (child_vmo != nullptr));
   if (status != ZX_OK)
     return status;
