@@ -304,7 +304,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 let query = TargetInfoQuery::from(query.string_matcher.clone());
 
                 // Get a previously used target first, otherwise fall back to discovery + use.
-                let result = match target_collection.query_single_enabled_target(&query) {
+                let result = match target_collection.query_single_connected_target(&query) {
                     Ok(Some(target)) => Ok(target),
                     Ok(None) => {
                         target_collection
