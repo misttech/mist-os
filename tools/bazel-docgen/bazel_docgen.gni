@@ -1,0 +1,107 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+
+# Provides a mechanism for creating a zip file containing all of the
+# documentation defined in the bazel build rules.
+#
+# Args:
+#   textproto_targets: (required)
+#     The set of targets that generate the text protos.
+#     This target should be an `extract_bazel_doc_textproto()` target.
+#     Type: list of strings (GN labels)
+#
+#   output_name: (optional)
+#     The name of the zip file to create. This file will be created relative to
+#     the target_gen_dir.
+#     Default: docs.zip
+#     Type: String
+#
+#   deps:
+#   testonly:
+#   visibility:
+#     Usual GN meaning.
+template("bazel_docgen") {
+  assert(defined(invoker.textproto_targets),
+         "textproto_targets must be defined")
+
+  compiled_action(target_name) {
+    tool = "//tools/bazel-docgen:bin"
+    tool_output_name = "bazel-docgen"
+
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    proto_args = []
+
+    foreach(target, invoker.textproto_targets) {
+      gen_dir = get_label_info(target, "target_out_dir")
+      file_name = get_label_info(target, "name") + ".docs.textproto"
+      proto = rebase_path(gen_dir + "/" + file_name, root_build_dir)
+
+      proto_args += [
+        "--proto",
+        proto,
+      ]
+    }
+
+    zip_file = "docs.zip"
+    if (defined(invoker.output_name)) {
+      zip_file = invoker.output_name
+    }
+
+    args = proto_args + [
+             "--zip_file",
+             rebase_path("${target_gen_dir}/${zip_file}", root_build_dir),
+           ]
+
+    outputs = [ "${target_gen_dir}/${zip_file}" ]
+
+    deps = invoker.textproto_targets
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+  }
+}
+
+# Wraps a `starlark_doc_extract()` in a `BUILD.bazel` file.
+# Use this template to create a textproto from the given target.
+#
+# Args:
+#   bazel_target: (required)
+#     Bazel target to wrap.
+#     This target should be a `starlark_doc_extract()` target and should not
+#     include the textproto ending.
+#
+#   deps:
+#   testonly:
+#   visibility:
+#     Usual GN meaning.
+template("extract_bazel_doc_textproto") {
+  assert(defined(invoker.bazel_target), "bazel_target must be defined")
+  bazel_target = invoker.bazel_target
+
+  bazel_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "bazel_inputs",
+                             "deps",
+                             "metadata",
+                             "testonly",
+                             "visibility",
+                           ])
+    command = "build"
+    bazel_targets = [ bazel_target + ".textproto" ]
+    copy_outputs = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
+        ninja = "${target_name}.docs.textproto"
+      },
+    ]
+  }
+}
