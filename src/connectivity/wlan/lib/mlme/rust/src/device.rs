@@ -119,7 +119,7 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 }
 
 pub struct Device {
-    frame_processor: Option<Pin<Box<FrameProcessor>>>,
+    frame_processor: Option<FrameProcessor>,
     frame_sender: FrameSender,
     wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeProxy,
     minstrel: Option<crate::MinstrelWrapper>,
@@ -182,7 +182,7 @@ pub trait DeviceOps {
     fn start(
         &mut self,
         ifc_bridge: fidl::endpoints::ClientEnd<fidl_softmac::WlanSoftmacIfcBridgeMarker>,
-        frame_processor: Pin<Box<FrameProcessor>>,
+        frame_processor: FrameProcessor,
     ) -> impl Future<Output = Result<fidl::Channel, zx::Status>>;
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
     /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
@@ -377,24 +377,25 @@ impl DeviceOps for Device {
     async fn start(
         &mut self,
         ifc_bridge: fidl::endpoints::ClientEnd<fidl_softmac::WlanSoftmacIfcBridgeMarker>,
-        frame_processor: Pin<Box<FrameProcessor>>,
+        frame_processor: FrameProcessor,
     ) -> Result<fidl::Channel, zx::Status> {
-        self.frame_processor = Some(frame_processor);
-
-        // Safety: This call is safe because `self.frame_processor` will outlive all uses of the
+        // Safety: This call is safe because `frame_processor` will outlive all uses of the
         // constructed `FfiFrameProcessor` across the FFI boundary. This includes during unbind when
         // the C++ portion of wlansoftmac will ensure no additional calls will be made through
         // `FfiFrameProcessor` after unbind begins.
-        let mut frame_processor =
-            unsafe { self.frame_processor.as_mut().unwrap().as_mut().to_c_binding() };
+        let mut ffi_frame_processor = unsafe { frame_processor.to_ffi() };
 
-        // Re-bind `frame_processor` to an exclusive reference that stays in scope across the
+        // Re-bind `ffi_frame_processor` to an exclusive reference that stays in scope across the
         // await. The exclusive reference guarantees the consumer of the reference across the FIDL
         // hop is the only accessor and that the reference is valid during the await.
-        let frame_processor = &mut frame_processor;
+        let ffi_frame_processor = &mut ffi_frame_processor;
+
+        // Moving `frame_processor` despite generating an `FfiFrameProcessor` because the
+        // the pointee of the `ctx` field is immovable.
+        self.frame_processor = Some(frame_processor);
 
         self.wlan_softmac_bridge_proxy
-            .start(ifc_bridge, frame_processor as *const FfiFrameProcessor as u64)
+            .start(ifc_bridge, ffi_frame_processor as *mut FfiFrameProcessor as u64)
             .await
             .map_err(|error| {
                 error!("Start failed with FIDL error: {:?}", error);
@@ -626,176 +627,28 @@ impl DeviceOps for Device {
 }
 
 #[repr(C)]
-pub struct FfiFrameProcessorOps {
-    wlan_rx: unsafe extern "C" fn(ctx: &DriverEventSink, request: *const u8, request_size: usize),
+pub struct FfiFrameProcessorCtx {
+    sink: DriverEventSink,
+    pin: PhantomPinned,
+}
+
+#[repr(C)]
+pub struct FfiFrameProcessor {
+    ctx: *const FfiFrameProcessorCtx,
+    wlan_rx: unsafe extern "C" fn(
+        ctx: *const FfiFrameProcessorCtx,
+        request: *const u8,
+        request_size: usize,
+    ),
     ethernet_tx: unsafe extern "C" fn(
-        ctx: &DriverEventSink,
+        ctx: *const FfiFrameProcessorCtx,
         request: *const u8,
         request_size: usize,
     ) -> zx::zx_status_t,
 }
 
-/// Queues a WLAN MAC frame into a `DriverEventSink` for processing.
-///
-/// # Safety
-///
-/// Behavior is undefined unless `payload` points to a persisted
-/// `fuchsia.wlan.softmac/FrameProcessor.WlanRx` request of length `payload_len` that is properly
-/// aligned.
-#[no_mangle]
-unsafe extern "C" fn wlan_rx(ctx: &DriverEventSink, payload: *const u8, payload_len: usize) {
-    wtrace::duration!(c"wlan_rx");
-
-    // Safety: This call is safe because the caller promises `payload` points to a persisted
-    // `fuchsia.wlan.softmac/FrameProcessor.WlanRx` request of length `payload_len` that is properly
-    // aligned.
-    let payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
-    let payload = match fidl::unpersist::<fidl_softmac::FrameProcessorWlanRxRequest>(payload) {
-        Ok(payload) => payload,
-        Err(e) => {
-            error!("Unable to unpersist FrameProcessor.WlanRx request: {}", e);
-            return;
-        }
-    };
-
-    let async_id = match payload.async_id.with_name("async_id").try_unpack() {
-        Ok(x) => x,
-        Err(e) => {
-            let e = e.context("Missing required field in FrameProcessorWlanRxRequest.");
-            error!("{}", e);
-            return;
-        }
-    };
-
-    let (packet_address, packet_size, packet_info) = match (
-        payload.packet_address.with_name("packet_address"),
-        payload.packet_size.with_name("packet_size"),
-        payload.packet_info.with_name("packet_info"),
-    )
-        .try_unpack()
-    {
-        Ok(x) => x,
-        Err(e) => {
-            let e = e.context("Missing required field(s) in FrameProcessorWlanRxRequest.");
-            error!("{}", e);
-            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
-            return;
-        }
-    };
-
-    let packet_ptr = packet_address as *const u8;
-    if packet_ptr.is_null() {
-        let e = format_err!("FrameProcessor.WlanRx request contained NULL packet_address");
-        error!("{:?}", e);
-        wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
-        return;
-    }
-
-    // Safety: This call is safe because a `WlanRx` request is defined such that a slice
-    // such as this one can be constructed from the `packet_address` and `packet_size` fields.
-    let packet_bytes: Vec<u8> =
-        unsafe { std::slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
-
-    let _: Result<(), ()> = ctx
-        .unbounded_send(DriverEvent::MacFrameRx {
-            bytes: packet_bytes,
-            rx_info: packet_info,
-            async_id: async_id.into(),
-        })
-        .map_err(|e| {
-            let e = format_err!("Failed to queue FrameProcessor.WlanRx request: {:?}", e);
-            error!("{:?}", e);
-            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
-        });
-}
-
-/// Queues an Ethernet frame into a `DriverEventSink` for processing.
-///
-/// The caller should either end the async
-/// trace event corresponding to |async_id| if an error occurs or deferred ending the trace to a later call
-/// into the C++ portion of wlansoftmac.
-///
-/// Assuming no errors occur, the Rust portion of wlansoftmac will eventually
-/// rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
-/// wlansoftmac will assume responsibility for ending the async trace event.
-///
-/// # Safety
-///
-/// Behavior is undefined unless `payload` points to a persisted
-/// `fuchsia.wlan.softmac/FrameProcessor.EthernetTx` request of length `payload_len` that is properly
-/// aligned.
-#[no_mangle]
-unsafe extern "C" fn ethernet_tx(
-    ctx: &DriverEventSink,
-    payload: *const u8,
-    payload_len: usize,
-) -> zx::zx_status_t {
-    wtrace::duration!(c"ethernet_rx");
-
-    // Safety: This call is safe because the caller promises `payload` points to a persisted
-    // `fuchsia.wlan.softmac/FrameProcessor.EthernetTx` request of length `payload_len` that is properly
-    // aligned.
-    let payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
-    let payload = match fidl::unpersist::<fidl_softmac::FrameProcessorEthernetTxRequest>(payload) {
-        Ok(payload) => payload,
-        Err(e) => {
-            error!("Unable to unpersist FrameProcessor.EthernetTx request: {}", e);
-            return zx::Status::INTERNAL.into_raw();
-        }
-    };
-
-    let async_id = match payload.async_id.with_name("async_id").try_unpack() {
-        Ok(x) => x,
-        Err(e) => {
-            let e = e.context("Missing required field in FrameProcessorEthernetTxRequest.");
-            error!("{}", e);
-            return zx::Status::INVALID_ARGS.into_raw();
-        }
-    };
-
-    let (packet_address, packet_size) = match (
-        payload.packet_address.with_name("packet_address"),
-        payload.packet_size.with_name("packet_size"),
-    )
-        .try_unpack()
-    {
-        Ok(x) => x,
-        Err(e) => {
-            let e = e.context("Missing required field(s) in FrameProcessorEthernetTxRequest.");
-            error!("{}", e);
-            return zx::Status::INVALID_ARGS.into_raw();
-        }
-    };
-
-    let packet_ptr = packet_address as *const u8;
-    if packet_ptr.is_null() {
-        let e = format_err!("FrameProcessor.EthernetTx request contained NULL packet_address");
-        error!("{:?}", e);
-        return zx::Status::INVALID_ARGS.into_raw();
-    }
-
-    // Safety: This call is safe because a `EthernetTx` request is defined such that a slice
-    // such as this one can be constructed from the `packet_address` and `packet_size` fields.
-    let packet_bytes: Vec<u8> =
-        unsafe { std::slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
-
-    match ctx
-        .unbounded_send(DriverEvent::EthFrameTx { bytes: packet_bytes, async_id: async_id.into() })
-    {
-        Err(e) => {
-            let e = format_err!("Failed to queue FrameProcessor.EthernetTx request: {:?}", e);
-            error!("{:?}", e);
-            zx::Status::INTERNAL.into_raw()
-        }
-        Ok(()) => zx::Status::OK.into_raw(),
-    }
-}
-
-const FRAME_PROCESSOR_OPS: FfiFrameProcessorOps = FfiFrameProcessorOps { wlan_rx, ethernet_tx };
-
 pub struct FrameProcessor {
-    sink: DriverEventSink,
-    _pin: PhantomPinned,
+    ctx: Pin<Box<FfiFrameProcessorCtx>>,
 }
 
 impl FrameProcessor {
@@ -803,8 +656,8 @@ impl FrameProcessor {
     ///
     /// Pinning the returned value is imperative to ensure future `to_c_binding()` calls will return
     /// pointers that are valid for the lifetime of the returned value.
-    pub fn new(sink: DriverEventSink) -> Pin<Box<Self>> {
-        Box::pin(Self { sink, _pin: PhantomPinned })
+    pub fn new(sink: DriverEventSink) -> Self {
+        Self { ctx: Box::pin(FfiFrameProcessorCtx { sink, pin: PhantomPinned }) }
     }
 
     /// Returns a `FfiFrameProcessor` containing pointers to the static `FRAME_PROCESSOR_OPS`
@@ -821,20 +674,182 @@ impl FrameProcessor {
     ///
     /// By using this method, the caller promises the lifetime of `DriverEventSink` will exceed the
     /// `ctx` pointer used across the FFI boundary.
-    unsafe fn to_c_binding(self: Pin<&mut Self>) -> FfiFrameProcessor {
-        FfiFrameProcessor { ops: &FRAME_PROCESSOR_OPS, ctx: &self.sink }
+    unsafe fn to_ffi(&self) -> FfiFrameProcessor {
+        FfiFrameProcessor {
+            ctx: &*self.ctx.as_ref() as *const FfiFrameProcessorCtx,
+            wlan_rx: Self::wlan_rx,
+            ethernet_tx: Self::ethernet_tx,
+        }
     }
-}
 
-/// Type containing pointers to the static `FRAME_PROCESSOR_OPS` and a `DriverEventSink`.
-///
-/// The wlansoftmac driver copies the pointers from `FfiFrameProcessor` which means the code
-/// constructing this type must ensure those pointers remain valid for their lifetime in
-/// wlansoftmac.
-#[repr(C)]
-pub struct FfiFrameProcessor {
-    ops: *const FfiFrameProcessorOps,
-    ctx: *const DriverEventSink,
+    /// Queues a WLAN MAC frame into a `DriverEventSink` for processing.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined unless `payload` points to a persisted
+    /// `fuchsia.wlan.softmac/FrameProcessor.WlanRx` request of length `payload_len` that is properly
+    /// aligned.
+    #[no_mangle]
+    unsafe extern "C" fn wlan_rx(
+        ctx: *const FfiFrameProcessorCtx,
+        payload: *const u8,
+        payload_len: usize,
+    ) {
+        wtrace::duration!(c"wlan_rx");
+
+        // Safety: This call is safe because the caller promises `payload` points to a persisted
+        // `fuchsia.wlan.softmac/FrameProcessor.WlanRx` request of length `payload_len` that is properly
+        // aligned.
+        let payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
+        let payload = match fidl::unpersist::<fidl_softmac::FrameProcessorWlanRxRequest>(payload) {
+            Ok(payload) => payload,
+            Err(e) => {
+                error!("Unable to unpersist FrameProcessor.WlanRx request: {}", e);
+                return;
+            }
+        };
+
+        let async_id = match payload.async_id.with_name("async_id").try_unpack() {
+            Ok(x) => x,
+            Err(e) => {
+                let e = e.context("Missing required field in FrameProcessorWlanRxRequest.");
+                error!("{}", e);
+                return;
+            }
+        };
+
+        let (packet_address, packet_size, packet_info) = match (
+            payload.packet_address.with_name("packet_address"),
+            payload.packet_size.with_name("packet_size"),
+            payload.packet_info.with_name("packet_info"),
+        )
+            .try_unpack()
+        {
+            Ok(x) => x,
+            Err(e) => {
+                let e = e.context("Missing required field(s) in FrameProcessorWlanRxRequest.");
+                error!("{}", e);
+                wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+                return;
+            }
+        };
+
+        let packet_ptr = packet_address as *const u8;
+        if packet_ptr.is_null() {
+            let e = format_err!("FrameProcessor.WlanRx request contained NULL packet_address");
+            error!("{:?}", e);
+            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+            return;
+        }
+
+        // Safety: This call is safe because a `WlanRx` request is defined such that a slice
+        // such as this one can be constructed from the `packet_address` and `packet_size` fields.
+        let packet_bytes: Vec<u8> =
+            unsafe { std::slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+
+        // Safety: This dereference is safe because the lifetime of this pointer was promised to
+        // live as long as function could be called when `FrameProcessor::to_ffi` was called.
+        let _: Result<(), ()> = unsafe {
+            (*ctx).sink.unbounded_send(DriverEvent::MacFrameRx {
+                bytes: packet_bytes,
+                rx_info: packet_info,
+                async_id: async_id.into(),
+            })
+        }
+        .map_err(|e| {
+            let e = format_err!("Failed to queue FrameProcessor.WlanRx request: {:?}", e);
+            error!("{:?}", e);
+            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+        });
+    }
+
+    /// Queues an Ethernet frame into a `DriverEventSink` for processing.
+    ///
+    /// The caller should either end the async
+    /// trace event corresponding to |async_id| if an error occurs or deferred ending the trace to a later call
+    /// into the C++ portion of wlansoftmac.
+    ///
+    /// Assuming no errors occur, the Rust portion of wlansoftmac will eventually
+    /// rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
+    /// wlansoftmac will assume responsibility for ending the async trace event.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined unless `payload` points to a persisted
+    /// `fuchsia.wlan.softmac/FrameProcessor.EthernetTx` request of length `payload_len` that is properly
+    /// aligned.
+    #[no_mangle]
+    unsafe extern "C" fn ethernet_tx(
+        ctx: *const FfiFrameProcessorCtx,
+        payload: *const u8,
+        payload_len: usize,
+    ) -> zx::zx_status_t {
+        wtrace::duration!(c"ethernet_rx");
+
+        // Safety: This call is safe because the caller promises `payload` points to a persisted
+        // `fuchsia.wlan.softmac/FrameProcessor.EthernetTx` request of length `payload_len` that is properly
+        // aligned.
+        let payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
+        let payload =
+            match fidl::unpersist::<fidl_softmac::FrameProcessorEthernetTxRequest>(payload) {
+                Ok(payload) => payload,
+                Err(e) => {
+                    error!("Unable to unpersist FrameProcessor.EthernetTx request: {}", e);
+                    return zx::Status::INTERNAL.into_raw();
+                }
+            };
+
+        let async_id = match payload.async_id.with_name("async_id").try_unpack() {
+            Ok(x) => x,
+            Err(e) => {
+                let e = e.context("Missing required field in FrameProcessorEthernetTxRequest.");
+                error!("{}", e);
+                return zx::Status::INVALID_ARGS.into_raw();
+            }
+        };
+
+        let (packet_address, packet_size) = match (
+            payload.packet_address.with_name("packet_address"),
+            payload.packet_size.with_name("packet_size"),
+        )
+            .try_unpack()
+        {
+            Ok(x) => x,
+            Err(e) => {
+                let e = e.context("Missing required field(s) in FrameProcessorEthernetTxRequest.");
+                error!("{}", e);
+                return zx::Status::INVALID_ARGS.into_raw();
+            }
+        };
+
+        let packet_ptr = packet_address as *const u8;
+        if packet_ptr.is_null() {
+            let e = format_err!("FrameProcessor.EthernetTx request contained NULL packet_address");
+            error!("{:?}", e);
+            return zx::Status::INVALID_ARGS.into_raw();
+        }
+
+        // Safety: This call is safe because a `EthernetTx` request is defined such that a slice
+        // such as this one can be constructed from the `packet_address` and `packet_size` fields.
+        let packet_bytes: Vec<u8> =
+            unsafe { std::slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+
+        // Safety: This dereference is safe because the lifetime of this pointer was promised to
+        // live as long as function could be called when `FrameProcessor::to_ffi` was called.
+        match unsafe {
+            (*ctx).sink.unbounded_send(DriverEvent::EthFrameTx {
+                bytes: packet_bytes,
+                async_id: async_id.into(),
+            })
+        } {
+            Err(e) => {
+                let e = format_err!("Failed to queue FrameProcessor.EthernetTx request: {:?}", e);
+                error!("{:?}", e);
+                zx::Status::INTERNAL.into_raw()
+            }
+            Ok(()) => zx::Status::OK.into_raw(),
+        }
+    }
 }
 
 #[repr(C)]
@@ -1391,7 +1406,7 @@ pub mod test_utils {
         async fn start(
             &mut self,
             ifc_bridge: fidl::endpoints::ClientEnd<fidl_softmac::WlanSoftmacIfcBridgeMarker>,
-            _frame_processor: Pin<Box<FrameProcessor>>,
+            _frame_processor: FrameProcessor,
         ) -> Result<fidl::Channel, zx::Status> {
             let mut state = self.state.lock();
 

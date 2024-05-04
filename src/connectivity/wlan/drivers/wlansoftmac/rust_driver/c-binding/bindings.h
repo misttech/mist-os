@@ -86,20 +86,9 @@ typedef struct {
 } wlansoftmac_buffer_provider_ops_t;
 
 typedef struct {
+  const void *ctx;
   void (*wlan_rx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
   zx_status_t (*ethernet_tx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
-} frame_processor_ops_t;
-
-/**
- * Type containing pointers to the static `FRAME_PROCESSOR_OPS` and a `DriverEventSink`.
- *
- * The wlansoftmac driver copies the pointers from `FfiFrameProcessor` which means the code
- * constructing this type must ensure those pointers remain valid for their lifetime in
- * wlansoftmac.
- */
-typedef struct {
-  const frame_processor_ops_t *ops;
-  const void *ctx;
 } frame_processor_t;
 
 /**

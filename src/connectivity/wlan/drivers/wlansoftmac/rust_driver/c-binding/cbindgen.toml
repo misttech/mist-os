@@ -29,8 +29,8 @@ exclude = [
     "LinkStatus",
 
     # Voided types.
-    "DriverEventSink",
     "FfiBufferCtx",
+    "FfiFrameProcessorCtx",
 ]
 
 [export.rename]
@@ -40,12 +40,11 @@ exclude = [
 
 # wlan-mlme types
 "FfiFrameProcessor" = "frame_processor_t"
-"FfiFrameProcessorOps" = "frame_processor_ops_t"
 "FfiFrameSender" = "frame_sender_t"
 
 # This struct is used for void* context fields for data path operations.
-"DriverEventSink" = "void"
 "FfiBufferCtx" = "void"
+"FfiFrameProcessorCtx" = "void"
 
 [fn]
 prefix = 'extern "C"'
