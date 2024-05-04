@@ -417,8 +417,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 (
                     "fx",
                     "build",
-                    "src/sys:foo_test_package",
-                    "--host",
+                    "--default",
+                    "//src/sys:foo_test_package",
+                    "--toolchain=//build/toolchain/host:x64",
                     "//src/sys:bar_test",
                 ),
                 ("fx", "ffx", "repository", "publish"),

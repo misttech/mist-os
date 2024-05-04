@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import atexit
+from collections import defaultdict
 from dataclasses import dataclass
 from dataclasses import field
 import functools
@@ -631,31 +632,39 @@ async def do_build(
     # Labels start with // and end with a toolchain, starting with
     # '('. Both toolchain and '//' need to be omitted for building
     # device tests through fx build.
-    label_to_rule = re.compile(r"//([^()]+)\(")
-    build_command_line = []
+    label_to_rule = re.compile(r"//([^()]+)\((.+)\)")
+    build_targets_by_toolchain: defaultdict[str, list[str]] = defaultdict(list)
     for selection in tests.selected:
         label = selection.build.test.package_label or selection.build.test.label
-        path = selection.build.test.path
-        if path is not None:
-            # Host tests are built by output name.
-            match = label_to_rule.match(label)
-            if match:
-                # NOTE: Prepend // for host labels, since that seems to be required.
-                build_command_line.extend(["--host", "//" + match.group(1)])
-        elif label:
-            # Other tests are built by label content, without toolchain.
-            match = label_to_rule.match(label)
-            if match:
-                build_command_line.append(match.group(1))
+        match = label_to_rule.match(label)
+
+        if match:
+            target = match.group(1)
+            toolchain = match.group(2)
+            assert isinstance(toolchain, str)
+
+            build_targets_by_toolchain[toolchain].append(f"//{target}")
         else:
             recorder.emit_warning_message(f"Unknown entry {selection}")
             return False
+
+    build_command_line = []
+    for key, vals in sorted(list(build_targets_by_toolchain.items())):
+        if "fuchsia:" in key:
+            # Use --default instead of fuchsia toolchains, otherwise some
+            # ZBI tests fail to build.
+            build_command_line.append("--default")
+        else:
+            build_command_line.append(f"--toolchain={key}")
+        build_command_line.extend(vals)
 
     build_id = recorder.emit_build_start(targets=build_command_line)
     recorder.emit_instruction_message("Use --no-build to skip building")
 
     status_suffix = " Status output suspended." if termout.is_init() else ""
     recorder.emit_info_message(f"\nExecuting build.{status_suffix}")
+
+    await asyncio.sleep(0.1)
 
     return_code = await run_build_with_suspended_output(
         build_command_line, show_output=not exec_env.log_to_stdout()
