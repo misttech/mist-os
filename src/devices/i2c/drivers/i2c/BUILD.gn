@@ -22,7 +22,7 @@ fuchsia_driver("i2c-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
-    "i2c-child-server.cc",
+    "i2c-child.cc",
     "i2c.cc",
   ]
   deps = [
@@ -30,12 +30,15 @@ fuchsia_driver("i2c-driver") {
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
-    "//src/lib/ddk:ddk_metadata",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
@@ -59,9 +62,10 @@ test("i2c-test-bin") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "fake-i2c-impl.cc",
-    "i2c-child-server.cc",
+    "fake-incoming-namespace.cc",
+    "i2c-child-test.cc",
+    "i2c-child.cc",
     "i2c-test.cc",
-    "i2c-transaction-test.cc",
     "i2c.cc",
   ]
   deps = [
@@ -69,18 +73,19 @@ test("i2c-test-bin") {
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
-    "//src/lib/ddk:ddk_metadata",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/predicates",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/outgoing/cpp",
+    "//src/devices/testing/mock-ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/async-default",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
   ]
 }
 

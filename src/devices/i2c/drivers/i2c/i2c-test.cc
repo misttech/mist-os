@@ -2,97 +2,100 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/i2c/drivers/i2c/i2c-test-env.h"
+#include "i2c.h"
 
-namespace i2c {
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/fdf/env.h>
+
+#include <ddktl/device.h>
+#include <zxtest/zxtest.h>
+
+#include "fake-incoming-namespace.h"
+#include "lib/ddk/metadata.h"
+#include "src/devices/i2c/drivers/i2c/i2c-child.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
+namespace fi2c = fuchsia_hardware_i2c_businfo::wire;
 
-fuchsia_hardware_i2c_businfo::I2CChannel CreateChannel(uint32_t address, uint32_t i2c_class,
-                                                       uint32_t vid, uint32_t pid, uint32_t did) {
-  return fuchsia_hardware_i2c_businfo::I2CChannel{{
-      .address = address,
-      .i2c_class = i2c_class,
-      .vid = vid,
-      .pid = pid,
-      .did = did,
-  }};
+fi2c::I2CChannel MakeChannel(fidl::AnyArena& arena, uint16_t addr) {
+  return fi2c::I2CChannel::Builder(arena).address(addr).Build();
 }
 
-fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata CreateMetadata(
-    fidl::AnyArena& arena, std::vector<fuchsia_hardware_i2c_businfo::I2CChannel> channels,
-    uint32_t bus_id) {
-  return fidl::ToWire(arena, fuchsia_hardware_i2c_businfo::I2CBusMetadata{{
-                                 .channels = channels,
-                                 .bus_id = bus_id,
-                             }});
-}
 }  // namespace
 
-class I2cDriverTest : public fdf_testing::DriverTestFixture<TestConfig> {
+class I2cMetadataTest : public zxtest::Test {
  public:
-  void Init(fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata) {
-    RunInEnvironmentTypeContext([metadata](TestEnvironment& env) { env.AddMetadata(metadata); });
-    EXPECT_TRUE(StartDriver().is_ok());
+  void TearDown() override {
+    auto* parent = fake_root_.get();
+    for (auto& device : parent->children()) {
+      device_async_remove(device.get());
+    }
+
+    mock_ddk::ReleaseFlaggedDevices(parent);
   }
+
+ protected:
+  void CreateDevice(fi2c::I2CBusMetadata& metadata) {
+    // Setup i2c impl parent
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    incoming_.SyncCall(&i2c::FakeIncomingNamespace::AddI2cImplService, std::move(endpoints.server));
+    fake_root_->AddFidlService(fuchsia_hardware_i2cimpl::Service::Name,
+                               std::move(endpoints.client));
+
+    // Setup metadata
+    fit::result metadata_bytes = fidl::Persist(metadata);
+    ASSERT_TRUE(metadata_bytes.is_ok());
+    fake_root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, metadata_bytes->data(),
+                            metadata_bytes->size());
+
+    ASSERT_OK(i2c::I2cDevice::Create(nullptr, fake_root_.get()));
+    ASSERT_EQ(fake_root_->child_count(), 1);
+    i2c_ = fake_root_->GetLatestChild()->GetDeviceContext<i2c::I2cDevice>();
+    ASSERT_NOT_NULL(i2c_);
+  }
+
+  i2c::I2cDevice* i2c() { return i2c_; }
+
+ private:
+  std::shared_ptr<zx_device> fake_root_ = MockDevice::FakeRootParent();
+  i2c::I2cDevice* i2c_;
+
+  fdf::UnownedSynchronizedDispatcher incoming_dispatcher_{
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher()};
+  async_patterns::TestDispatcherBound<i2c::FakeIncomingNamespace> incoming_{
+      incoming_dispatcher_->async_dispatcher(), std::in_place, 64};
 };
 
-TEST_F(I2cDriverTest, OneChannel) {
-  const fuchsia_hardware_i2c_businfo::I2CChannel kChannel = CreateChannel(5, 10, 2, 4, 6);
-  const uint32_t kBusId = 32;
+TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
+  std::vector<fi2c::I2CChannel> channels;
+  fidl::Arena<> arena;
+  channels.emplace_back(MakeChannel(arena, 0xa));
+  channels.emplace_back(MakeChannel(arena, 0xb));
+  auto channels_view = fidl::VectorView<fi2c::I2CChannel>::FromExternal(channels);
+  auto metadata = fi2c::I2CBusMetadata::Builder(arena).channels(channels_view).Build();
 
-  fidl::Arena arena;
-  Init(CreateMetadata(arena, {kChannel}, kBusId));
+  CreateDevice(metadata);
 
-  RunInNodeContext([](fdf_testing::TestNode& node) {
-    EXPECT_EQ(1u, node.children().size());
-    EXPECT_TRUE(node.children().count("i2c-32-5"));
-  });
+  zx_device_t* i2c_device = i2c()->zxdev();
+  // There should be two devices per channel.
+  ASSERT_EQ(i2c_device->child_count(), 2);
+
+  for (auto& child : i2c_device->children()) {
+    uint16_t expected_addr = 0xff;
+    for (const auto& prop : child->GetProperties()) {
+      if (prop.id == BIND_I2C_ADDRESS) {
+        expected_addr = static_cast<uint16_t>(prop.value);
+      }
+    }
+
+    auto decoded =
+        ddk::GetEncodedMetadata<fi2c::I2CChannel>(child.get(), DEVICE_METADATA_I2C_DEVICE);
+    ASSERT_TRUE(decoded.is_ok());
+    ASSERT_EQ(decoded->address(), expected_addr);
+  }
 }
-
-TEST_F(I2cDriverTest, NoMetadata) { EXPECT_TRUE(StartDriver().is_error()); }
-
-TEST_F(I2cDriverTest, MultipleChannels) {
-  const fuchsia_hardware_i2c_businfo::I2CChannel kChannel1 = CreateChannel(5, 10, 2, 4, 6);
-  const fuchsia_hardware_i2c_businfo::I2CChannel kChannel2 = CreateChannel(15, 30, 3, 6, 9);
-  const uint32_t kBusId = 32;
-
-  fidl::Arena arena;
-  Init(CreateMetadata(arena, {kChannel1, kChannel2}, kBusId));
-
-  RunInNodeContext([](fdf_testing::TestNode& node) {
-    EXPECT_EQ(2u, node.children().size());
-    EXPECT_TRUE(node.children().count("i2c-32-5"));
-    EXPECT_TRUE(node.children().count("i2c-32-15"));
-  });
-}
-
-TEST_F(I2cDriverTest, GetName) {
-  const std::string kTestChildName = "i2c-16-5";
-  const std::string kChannelName = "xyz";
-  fuchsia_hardware_i2c_businfo::I2CChannel channel = CreateChannel(5, 10, 2, 4, 6);
-  channel.name(kChannelName);
-
-  constexpr uint32_t kBusId = 16;
-
-  fidl::Arena arena;
-  Init(CreateMetadata(arena, {channel}, kBusId));
-
-  RunInNodeContext([expected_name = kTestChildName](fdf_testing::TestNode& node) {
-    EXPECT_EQ(1u, node.children().size());
-    EXPECT_TRUE(node.children().count("i2c-16-5"));
-  });
-
-  zx::result connect_result = Connect<fuchsia_hardware_i2c::Service::Device>(kTestChildName);
-  ASSERT_TRUE(connect_result.is_ok());
-  zx::result run_result = RunInBackground(
-      [client_end = std::move(connect_result.value()), expected_name = kChannelName]() mutable {
-        auto name_result = fidl::WireCall(client_end)->GetName();
-        ASSERT_OK(name_result.status());
-        ASSERT_TRUE(name_result->is_ok());
-        ASSERT_EQ(std::string(name_result->value()->name.get()), expected_name);
-      });
-  ASSERT_OK(run_result.status_value());
-}
-
-}  // namespace i2c

@@ -14,7 +14,7 @@
         },
         {
             "name": "top_board",
-            "topo_path_suffix": "/aml-i2c/i2c-0-112/shtv3"
+            "topo_path_suffix": "/aml-i2c/i2c/i2c-0-112/shtv3"
         }
     ],
     "power_drivers": [
