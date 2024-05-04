@@ -10,7 +10,7 @@ use crate::{
         overlayfs::OverlayFs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
     },
     mutable_state::{state_accessor, state_implementation},
-    security::fs::selinux_fs,
+    security::selinux_fs,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
     time::utc,
     vfs::{

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    task::{CurrentTask, Task},
+    task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fs_node_impl_dir_readonly,
@@ -21,16 +21,8 @@ use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::{
-    device_type::DeviceType,
-    errno, error,
-    errors::Errno,
-    file_mode::mode,
-    off_t,
-    open_flags::OpenFlags,
-    ownership::{TempRef, WeakRef},
-    statfs,
-    vfs::default_statfs,
-    SELINUX_MAGIC,
+    device_type::DeviceType, errno, error, errors::Errno, file_mode::mode, off_t,
+    open_flags::OpenFlags, statfs, vfs::default_statfs, SELINUX_MAGIC,
 };
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
@@ -600,116 +592,6 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
                 dir.build(current_task)
             })
             .clone())
-    }
-}
-
-pub fn selinux_proc_attrs(
-    current_task: &CurrentTask,
-    task: &TempRef<'_, Task>,
-    dir: &mut StaticDirectoryBuilder<'_>,
-) {
-    use SeProcAttrNodeType::*;
-    dir.entry(current_task, "current", Current.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "exec", Exec.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "fscreate", FsCreate.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "keycreate", KeyCreate.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "prev", Previous.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "sockcreate", SockCreate.new_node(task), mode!(IFREG, 0o666));
-}
-
-#[derive(Debug)]
-enum SeProcAttrNodeType {
-    Current,
-    Exec,
-    FsCreate,
-    KeyCreate,
-    Previous,
-    SockCreate,
-}
-
-struct SeProcAttrNode {
-    attr: SeProcAttrNodeType,
-    task: WeakRef<Task>,
-}
-
-impl SeProcAttrNodeType {
-    fn new_node(self, task: &TempRef<'_, Task>) -> impl FsNodeOps {
-        BytesFile::new_node(SeProcAttrNode { attr: self, task: WeakRef::from(task) })
-    }
-}
-
-impl BytesFileOps for SeProcAttrNode {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let task = Task::from_weak(&self.task)?;
-
-        // If SELinux is disabled then no writes are accepted.
-        let security_server = task.kernel().security_server.as_ref().ok_or(errno!(EINVAL))?;
-
-        // If the current task is not the target then writes are not allowed.
-        if current_task.temp_task() != task {
-            return error!(EPERM);
-        }
-
-        // Attempt to convert the Security Context string to a SID.
-        // Writes that consist of a single NUL or a newline clear the SID.
-        let context = data.as_slice().trim_end_with(|c| c == '\0');
-        let sid = match context {
-            b"\x0a" => None,
-            slice => {
-                Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?)
-            }
-        };
-
-        // SELinux is enabled, so the task must have `security_state`. Lock it for writing
-        // and update it.
-        let mut tg = task.thread_group.write();
-
-        use SeProcAttrNodeType::*;
-        match self.attr {
-            Current => tg.security_state.0.current_sid = sid.ok_or(errno!(EINVAL))?,
-            Exec => tg.security_state.0.exec_sid = sid,
-            FsCreate => tg.security_state.0.fscreate_sid = sid,
-            KeyCreate => tg.security_state.0.keycreate_sid = sid,
-            Previous => {
-                return error!(EINVAL);
-            }
-            SockCreate => tg.security_state.0.sockcreate_sid = sid,
-        };
-
-        Ok(())
-    }
-
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        use SeProcAttrNodeType::*;
-        let task = Task::from_weak(&self.task)?;
-
-        // If SELinux is disabled then all reads are rejected, except for "current".
-        match &task.kernel().security_server {
-            Some(security_server) => {
-                // Read the specified SELinux attribute's SID.
-                let sid = {
-                    let tg = task.thread_group.read();
-                    match self.attr {
-                        Current => Some(tg.security_state.0.current_sid),
-                        Exec => tg.security_state.0.exec_sid,
-                        FsCreate => tg.security_state.0.fscreate_sid,
-                        KeyCreate => tg.security_state.0.keycreate_sid,
-                        Previous => Some(tg.security_state.0.previous_sid),
-                        SockCreate => tg.security_state.0.sockcreate_sid,
-                    }
-                };
-
-                // Convert it to a Security Context string.
-                let security_context =
-                    sid.and_then(|sid| security_server.sid_to_security_context(sid));
-
-                Ok(security_context.unwrap_or_else(Vec::new).into())
-            }
-            None => match self.attr {
-                Current => Ok(b"unconfined".to_vec().into()),
-                _ => error!(EINVAL),
-            },
-        }
     }
 }
 

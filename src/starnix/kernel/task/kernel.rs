@@ -109,7 +109,7 @@ pub struct Kernel {
     pub proc_fs: OnceCell<FileSystemHandle>,
     // Owned by sysfs.rs
     pub sys_fs: OnceCell<FileSystemHandle>,
-    // Owned by selinux/fs.rs
+    // Owned by security/selinux_hooks/fs.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
     // The SELinux security server. Initialized if SELinux is enabled.
     pub security_server: Option<Arc<SecurityServer>>,

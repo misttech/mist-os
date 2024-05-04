@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub(super) mod fs;
+
+use super::ProcAttr;
+
 use selinux::{
     permission_check::PermissionCheck, security_server::SecurityServer, InitialSid, SecurityId,
 };
@@ -171,6 +175,63 @@ pub(super) fn check_ptrace_access_and_update_state(
         tracee_security_state.ptracer_sid = Some(tracer_sid);
         Ok(())
     })
+}
+
+/// Returns the Security Context associated with the `name`ed entry for the specified `target` task.
+/// `source` describes the calling task, `target` the state of the task for which to return the attribute.
+pub fn get_procattr(
+    security_server: &SecurityServer,
+    _source: SecurityId,
+    target: &ThreadGroupState,
+    attr: ProcAttr,
+) -> Result<Vec<u8>, Errno> {
+    // TODO(b/322849067): Validate that the `source` has the required access.
+
+    let sid = match attr {
+        ProcAttr::Current => Some(target.current_sid),
+        ProcAttr::Exec => target.exec_sid,
+        ProcAttr::FsCreate => target.fscreate_sid,
+        ProcAttr::KeyCreate => target.keycreate_sid,
+        ProcAttr::Previous => Some(target.previous_sid),
+        ProcAttr::SockCreate => target.sockcreate_sid,
+    };
+
+    // Convert it to a Security Context string.
+    Ok(sid.and_then(|sid| security_server.sid_to_security_context(sid)).unwrap_or_default())
+}
+
+/// Sets the Security Context associated with the `attr` entry in the task security state.
+pub fn set_procattr(
+    security_server: &SecurityServer,
+    _source: SecurityId,
+    target: &mut ThreadGroupState,
+    attr: ProcAttr,
+    context: &[u8],
+) -> Result<(), Errno> {
+    use bstr::ByteSlice;
+
+    // TODO(b/322849067): Does the `source` have the required permission(s)?
+
+    // Attempt to convert the Security Context string to a SID.
+    // Writes that consist of a single NUL or a newline clear the SID.
+    let context = context.trim_end_with(|c| c == '\0');
+    let sid = match context {
+        b"\x0a" => None,
+        slice => Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?),
+    };
+
+    match attr {
+        ProcAttr::Current => target.current_sid = sid.ok_or(errno!(EINVAL))?,
+        ProcAttr::Exec => target.exec_sid = sid,
+        ProcAttr::FsCreate => target.fscreate_sid = sid,
+        ProcAttr::KeyCreate => target.keycreate_sid = sid,
+        ProcAttr::Previous => {
+            return error!(EINVAL);
+        }
+        ProcAttr::SockCreate => target.sockcreate_sid = sid,
+    };
+
+    Ok(())
 }
 
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.

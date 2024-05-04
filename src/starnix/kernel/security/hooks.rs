@@ -20,29 +20,41 @@ pub const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 
 /// Executes the `hook` closure, dependent on the state of SELinux.
 ///
-/// If SELinux is enabled in the kernel, and has a policy loaded, then the closure is executed.
-/// Otherwise the default success result is returned.
+/// If SELinux is not enabled, or is enabled but has no policy loaded, then the `not_enabled`
+/// closure is executed, to determine the result. Otherwise, the `hook()` is executed on
+/// behalf of the caller.
 ///
-/// If SELinux is "permissive" (non-enforcing) then error results are logged and the default
-/// success result is returned.
-fn check_if_selinux<F, R>(task: &Task, hook: F) -> Result<R, Errno>
+/// TODO(b/331375792): Move permission & fake mode handling inside the SELinux logic.
+/// If SELinux is enabled with a policy, and in permissive or fake mode, then the `hook()`
+/// result is ignored, and the return type's default value always returned.
+fn check_if_selinux_else<H, R, D>(task: &Task, hook: H, not_enabled: D) -> Result<R, Errno>
 where
-    F: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
+    H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
+    D: FnOnce() -> Result<R, Errno>,
     R: Default,
 {
     if let Some(security_server) = &task.kernel().security_server {
         if !security_server.has_policy() {
-            return Ok(R::default());
+            return not_enabled();
         }
         let result = hook(security_server);
         // TODO(b/331375792): Relocate "enforcing" check into the AVC.
-        if !security_server.is_enforcing() || security_server.is_fake() {
+        if result.is_err() && (!security_server.is_enforcing() || security_server.is_fake()) {
             return Ok(R::default());
         }
         result
     } else {
-        Ok(R::default())
+        not_enabled()
     }
+}
+
+fn check_if_selinux<H, R>(task: &Task, hook: H) -> Result<R, Errno>
+where
+    H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
+    R: Default,
+{
+    let success = || Ok(R::default());
+    check_if_selinux_else(task, hook, success)
 }
 
 /// Executes the infallible `hook` closure, dependent on the state of SELinux.
@@ -271,6 +283,68 @@ pub fn post_setxattr(current_task: &CurrentTask, fs_node: &FsNode, name: &FsStr,
     });
 }
 
+/// Identifies one of the Security Context attributes associated with a task.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProcAttr {
+    Current,
+    Exec,
+    FsCreate,
+    KeyCreate,
+    Previous,
+    SockCreate,
+}
+
+/// Returns the Security Context associated with the `name`ed entry for the specified `target` task.
+pub fn get_procattr(
+    current_task: &CurrentTask,
+    target: &Task,
+    attr: ProcAttr,
+) -> Result<Vec<u8>, Errno> {
+    check_if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::get_procattr(
+                security_server,
+                get_current_sid(&current_task.thread_group),
+                &target.thread_group.read().security_state.0,
+                attr,
+            )
+        },
+        // If SELinux is disabled then there are no values to return.
+        || {
+            if attr == ProcAttr::Current {
+                // Without SELinux the "current" attribute reports a placeholder value.
+                Ok(b"unconfined".to_vec())
+            } else {
+                error!(EINVAL)
+            }
+        },
+    )
+}
+
+/// Sets the Security Context associated with the `name`ed entry for the current task.
+pub fn set_procattr(
+    current_task: &CurrentTask,
+    attr: ProcAttr,
+    context: &[u8],
+) -> Result<(), Errno> {
+    check_if_selinux_else(
+        current_task,
+        |security_server| {
+            let mut thread_group_state = current_task.thread_group.write();
+            selinux_hooks::set_procattr(
+                security_server,
+                thread_group_state.security_state.0.current_sid,
+                &mut thread_group_state.security_state.0,
+                attr,
+                context,
+            )
+        },
+        // If SELinux is disabled then no writes are accepted.
+        || error!(EINVAL),
+    )
+}
+
 /// Returns a security id that should be used for SELinux access control checks on `fs_node`. This
 /// computation will attempt to load the security id associated with an extended attribute value. If
 /// a meaningful security id cannot be determined, then the `unlabeled` security id is returned.
@@ -335,8 +409,8 @@ mod tests {
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::{device_type::DeviceType, error, file_mode::FileMode, signals::SIGTERM};
 
-    const VALID_SECURITY_CONTEXT: &'static str = "u:object_r:test_valid_t:s0";
-    const DIFFERENT_VALID_SECURITY_CONTEXT: &'static str = "u:object_r:test_different_valid_t:s0";
+    const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
+    const DIFFERENT_VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_different_valid_t:s0";
 
     const HOOKS_TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
@@ -517,7 +591,10 @@ mod tests {
         let (_kernel, task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
-        assert_eq!(check_exec_access(&task, executable_node), Ok(None));
+        // Expect that access is granted, and a `ResolvedElfState` is returned.
+        let result = check_exec_access(&task, executable_node);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_some());
     }
 
     #[fuchsia::test]
@@ -527,7 +604,10 @@ mod tests {
         let (_kernel, task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
-        assert_eq!(check_exec_access(&task, executable_node), Ok(None));
+        // Expect that access is granted, and a `ResolvedElfState` is returned.
+        let result = check_exec_access(&task, executable_node);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_some());
     }
 
     #[fuchsia::test]
@@ -915,6 +995,68 @@ mod tests {
         let second_sid = node.cached_sid().unwrap();
 
         assert_ne!(first_sid, second_sid);
+    }
+
+    #[fuchsia::test]
+    async fn set_get_procattr() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(Vec::new())
+        );
+
+        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()), Ok(()));
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(VALID_SECURITY_CONTEXT.into())
+        );
+
+        assert!(get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current).is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn set_get_procattr_selinux_permissive() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(false);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(Vec::new())
+        );
+
+        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()), Ok(()));
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(VALID_SECURITY_CONTEXT.into())
+        );
+
+        assert!(get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current).is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn set_get_procattr_selinux_disabled() {
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        assert_eq!(
+            set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
+            error!(EINVAL)
+        );
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            error!(EINVAL)
+        );
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current),
+            Ok(b"unconfined".to_vec())
+        );
     }
 
     #[fuchsia::test]
