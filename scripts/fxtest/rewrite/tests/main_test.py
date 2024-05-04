@@ -286,16 +286,23 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(selection_event.selected), 1)
 
     @parameterized.expand(
-        [("--host", HOST_TESTS_IN_INPUT), ("--device", DEVICE_TESTS_IN_INPUT)]
+        [
+            (["--host"], HOST_TESTS_IN_INPUT - E2E_TESTS_IN_INPUT),
+            (["--device"], DEVICE_TESTS_IN_INPUT),
+            (["--only-e2e"], E2E_TESTS_IN_INPUT),
+            # TODO(https://fxbug.dev/338667899): Enable when we determine how to handle opt-in e2e.
+            # ([], TOTAL_NON_E2E_TESTS_IN_INPUT),
+            (["--e2e"], TOTAL_TESTS_IN_INPUT),
+        ]
     )
     async def test_selection_flags(
-        self, flag_name: str, expected_count: int
+        self, extra_flags: list[str], expected_count: int
     ) -> None:
-        """Test that the correct --device or --host tests are selected"""
+        """Test that the correct --device, --host, or --e2e tests are selected"""
 
         recorder = event.EventRecorder()
         ret = await main.async_main_wrapper(
-            args.parse_args(["--simple", "--dry"] + [flag_name]),
+            args.parse_args(["--simple", "--dry"] + extra_flags),
             recorder=recorder,
         )
         self.assertEqual(ret, 0)

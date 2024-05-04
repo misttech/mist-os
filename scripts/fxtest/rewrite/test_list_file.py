@@ -153,7 +153,9 @@ class Test:
         return self.build.test.package_url is not None
 
     def is_host_test(self) -> bool:
-        return self.build.test.path is not None
+        # These are "pure" host tests, which excludes E2E tests
+        # that require a device.
+        return self.build.test.path is not None and not self.is_e2e_test()
 
     def join_info(self, entries: dict[str, TestListEntry]) -> None:
         """Add info from test-list.json to this test.

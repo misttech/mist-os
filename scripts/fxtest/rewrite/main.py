@@ -677,43 +677,47 @@ async def do_build(
         recorder.emit_end(error, id=build_id)
         return False
 
-    amber_directory = os.path.join(exec_env.out_dir, "amber-files")
-    delivery_blob_type = read_delivery_blob_type(exec_env, recorder)
-    publish_args = (
-        [
-            "fx",
-            "ffx",
-            "repository",
-            "publish",
-            "--trusted-root",
-            os.path.join(amber_directory, "repository/root.json"),
-            "--ignore-missing-packages",
-            "--time-versioning",
-        ]
-        + (
-            ["--delivery-blob-type", str(delivery_blob_type)]
-            if delivery_blob_type is not None
-            else []
+    if tests.has_device_test():
+        amber_directory = os.path.join(exec_env.out_dir, "amber-files")
+        delivery_blob_type = read_delivery_blob_type(exec_env, recorder)
+        publish_args = (
+            [
+                "fx",
+                "ffx",
+                "repository",
+                "publish",
+                "--trusted-root",
+                os.path.join(amber_directory, "repository/root.json"),
+                "--ignore-missing-packages",
+                "--time-versioning",
+            ]
+            + (
+                ["--delivery-blob-type", str(delivery_blob_type)]
+                if delivery_blob_type is not None
+                else []
+            )
+            + [
+                "--package-list",
+                os.path.join(exec_env.out_dir, "all_package_manifests.list"),
+                amber_directory,
+            ]
         )
-        + [
-            "--package-list",
-            os.path.join(exec_env.out_dir, "all_package_manifests.list"),
-            amber_directory,
-        ]
-    )
 
-    output = await execution.run_command(
-        *publish_args,
-        recorder=recorder,
-        parent=build_id,
-        print_verbatim=True,
-        env={"CWD": exec_env.out_dir},
-    )
-    if not output:
-        error = "Failure publishing packages."
-    elif output.return_code != 0:
-        error = f"Publish returned non-zero exit code {output.return_code}"
-    elif not await post_build_checklist(tests, recorder, exec_env, build_id):
+        output = await execution.run_command(
+            *publish_args,
+            recorder=recorder,
+            parent=build_id,
+            print_verbatim=True,
+            env={"CWD": exec_env.out_dir},
+        )
+        if not output:
+            error = "Failure publishing packages."
+        elif output.return_code != 0:
+            error = f"Publish returned non-zero exit code {output.return_code}"
+
+    if not error and not await post_build_checklist(
+        tests, recorder, exec_env, build_id
+    ):
         error = "Post build checklist failed"
 
     recorder.emit_end(error, id=build_id)
