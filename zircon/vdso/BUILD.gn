@@ -146,6 +146,7 @@ group("public") {
 # implementation, which are seen as <lib/syscalls/...>.
 group("private") {
   visibility = [
+    "//zircon/kernel/lib/mistos/zx_syscalls/*",
     "//zircon/kernel/lib/syscalls/*",
     "//zircon/kernel/lib/userabi/*",
     "//zircon/system/ulib/syscalls-headers/*",
