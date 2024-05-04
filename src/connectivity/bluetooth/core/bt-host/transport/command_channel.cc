@@ -14,7 +14,7 @@
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 #include <pw_bluetooth/hci_common.emb.h>
-#include <pw_bluetooth/hci_vendor.emb.h>
+#include <pw_bluetooth/hci_android.emb.h>
 
 namespace bt::hci {
 
