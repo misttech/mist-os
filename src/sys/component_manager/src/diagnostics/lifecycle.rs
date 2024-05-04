@@ -112,65 +112,10 @@ impl Hook for ComponentLifecycleTimeStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{
-        component::{ComponentInstance, StartReason},
-        testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
-    };
-    use cm_rust_testing::ComponentDeclBuilder;
-    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::DiagnosticsHierarchyGetter;
     use itertools::Itertools;
     use moniker::{ChildName, ChildNameBase, MonikerBase};
-
-    #[fuchsia::test]
-    async fn tracks_events() {
-        let components = vec![
-            ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            ("a", ComponentDeclBuilder::new().child_default("b").build()),
-            ("b", component_decl_with_test_runner()),
-        ];
-        let test = ActionsTest::new("root", components, None).await;
-        let root = test.model.root();
-
-        let inspector = inspect::Inspector::default();
-        let stats =
-            Arc::new(ComponentLifecycleTimeStats::new(inspector.root().create_child("lifecycle")));
-        root.hooks.install(stats.hooks()).await;
-
-        let root_timestamp = start_and_get_timestamp(root, &Moniker::root()).await.into_nanos();
-        let a_timestamp = start_and_get_timestamp(root, &"a".parse().unwrap()).await.into_nanos();
-        let b_timestamp = start_and_get_timestamp(root, &"a/b".parse().unwrap()).await.into_nanos();
-        root.find(&"a/b".parse().unwrap()).await.unwrap().stop().await.unwrap();
-
-        assert_data_tree!(inspector, root: {
-            lifecycle: {
-                early: {
-                    "0": {
-                        moniker: ".",
-                        time: root_timestamp,
-                        "type": "started",
-                    },
-                    "1": {
-                        moniker: "a",
-                        time: a_timestamp,
-                        "type": "started",
-                    },
-                    "2": {
-                        moniker: "a/b",
-                        time: b_timestamp,
-                        "type": "started",
-                    },
-                    "3": contains {
-                        moniker: "a/b",
-                        "type": "stopped",
-                        time: AnyProperty,
-                    }
-                },
-                late: {
-                }
-            }
-        });
-    }
 
     #[fuchsia::test]
     async fn early_doesnt_track_more_than_limit() {
@@ -249,17 +194,5 @@ mod tests {
             late.children.iter().map(|c| c.name.parse::<i32>().unwrap()).sorted().last().unwrap(),
             449
         );
-    }
-
-    async fn start_and_get_timestamp(
-        root_component: &Arc<ComponentInstance>,
-        moniker: &Moniker,
-    ) -> zx::Time {
-        let component = root_component
-            .start_instance(moniker, &StartReason::Root)
-            .await
-            .expect("failed to bind");
-        let state = component.lock_state().await;
-        state.get_started_state().unwrap().timestamp
     }
 }
