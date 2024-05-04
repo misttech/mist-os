@@ -31,6 +31,7 @@ exclude = [
     # Voided types.
     "FfiBufferCtx",
     "FfiFrameProcessorCtx",
+    "FfiFrameSenderCtx",
 ]
 
 [export.rename]
@@ -45,6 +46,7 @@ exclude = [
 # This struct is used for void* context fields for data path operations.
 "FfiBufferCtx" = "void"
 "FfiFrameProcessorCtx" = "void"
+"FfiFrameSenderCtx" = "void"
 
 [fn]
 prefix = 'extern "C"'

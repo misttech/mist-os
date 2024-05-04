@@ -9,7 +9,12 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::{channel::mpsc, Future},
     ieee80211::MacAddr,
-    std::{ffi::c_void, fmt::Display, marker::PhantomPinned, pin::Pin, sync::Arc},
+    std::{
+        fmt::Display,
+        marker::{PhantomData, PhantomPinned},
+        pin::Pin,
+        sync::Arc,
+    },
     trace::Id as TraceId,
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
@@ -852,9 +857,17 @@ impl FrameProcessor {
     }
 }
 
+// Define FfiFrameSenderCtx as an opaque type as suggested by
+// https://doc.rust-lang.org/nomicon/ffi.html#representing-opaque-structs.
+#[repr(C)]
+pub struct FfiFrameSenderCtx {
+    _data: [u8; 0],
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
+}
+
 #[repr(C)]
 pub struct FfiFrameSender {
-    ctx: *mut c_void,
+    ctx: *mut FfiFrameSenderCtx,
     /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
     ///
     /// # Safety
@@ -862,7 +875,7 @@ pub struct FfiFrameSender {
     /// Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
     /// and `payload_len` is the length of the persisted byte array.
     wlan_tx: unsafe extern "C" fn(
-        ctx: *mut c_void,
+        ctx: *mut FfiFrameSenderCtx,
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
@@ -873,45 +886,19 @@ pub struct FfiFrameSender {
     /// Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
     /// and `payload_len` is the length of the persisted byte array.
     ethernet_rx: unsafe extern "C" fn(
-        ctx: *mut c_void,
+        ctx: *mut FfiFrameSenderCtx,
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
 }
 
 pub struct FrameSender {
-    ctx: *mut c_void,
-    /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
-    ///
-    /// # Safety
-    ///
-    /// Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
-    /// and `payload_len` is the length of the persisted byte array.
-    wlan_tx: unsafe extern "C" fn(
-        ctx: *mut c_void,
-        payload: *const u8,
-        payload_len: usize,
-    ) -> zx::zx_status_t,
-    /// Sends an Ethernet frame to the C++ portion of wlansoftmac.
-    ///
-    /// # Safety
-    ///
-    /// Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
-    /// and `payload_len` is the length of the persisted byte array.
-    ethernet_rx: unsafe extern "C" fn(
-        ctx: *mut c_void,
-        payload: *const u8,
-        payload_len: usize,
-    ) -> zx::zx_status_t,
+    inner: FfiFrameSender,
 }
 
 impl From<FfiFrameSender> for FrameSender {
     fn from(frame_sender: FfiFrameSender) -> Self {
-        Self {
-            ctx: frame_sender.ctx,
-            wlan_tx: frame_sender.wlan_tx,
-            ethernet_rx: frame_sender.ethernet_rx,
-        }
+        Self { inner: frame_sender }
     }
 }
 
@@ -930,7 +917,7 @@ impl FrameSender {
                 // Safety: The `self.wlan_tx` call is safe because the payload is a persisted
                 // `FrameSender.EthernetRx` request.
                 zx::Status::from_raw(unsafe {
-                    (self.wlan_tx)(self.ctx, payload.as_slice().as_ptr(), payload.len())
+                    (self.inner.wlan_tx)(self.inner.ctx, payload.as_slice().as_ptr(), payload.len())
                 })
                 .into()
             }
@@ -952,7 +939,7 @@ impl FrameSender {
                 // Safety: The `self.ethernet_rx` call is safe because the payload is a persisted
                 // `FrameSender.EthernetRx` request.
                 zx::Status::from_raw(unsafe {
-                    (self.ethernet_rx)(self.ctx, payload.as_ptr(), payload.len())
+                    (self.inner.ethernet_rx)(self.inner.ctx, payload.as_ptr(), payload.len())
                 })
                 .into()
             }
