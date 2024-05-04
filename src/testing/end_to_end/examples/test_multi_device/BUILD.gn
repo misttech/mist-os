@@ -17,7 +17,7 @@ python_mobly_test("multi_device_test_sl4f") {
   ]
   multi_fuchsia_device = true
   params_source = "params.yaml"
-  transport = "sl4f"
+  transport = "fuchsia-controller-preferred"
 }
 
 group("tests") {
