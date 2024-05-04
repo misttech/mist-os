@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        events::{event::Event, registry::ComponentEventRoute},
-        hooks::{Event as ComponentEvent, EventPayload, TransferEvent},
-    },
+    crate::model::events::{event::Event, registry::ComponentEventRoute},
     ::routing::event::EventFilter,
     anyhow::{format_err, Error},
     cm_rust::DictionaryValue,
     futures::{channel::mpsc, lock::Mutex, sink::SinkExt},
+    hooks::{Event as ComponentEvent, EventPayload, TransferEvent},
     maplit::btreemap,
     moniker::{ExtendedMoniker, MonikerBase},
 };
@@ -159,9 +157,8 @@ impl EventDispatcherScope {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::model::hooks::CapabilityReceiver, assert_matches::assert_matches,
-        fuchsia_zircon as zx, futures::StreamExt, moniker::Moniker, sandbox::Message,
-        std::sync::Arc,
+        super::*, assert_matches::assert_matches, fuchsia_zircon as zx, futures::StreamExt,
+        hooks::CapabilityReceiver, moniker::Moniker, sandbox::Message, std::sync::Arc,
     };
 
     struct EventDispatcherFactory {

@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
     async_trait::async_trait,
     errors::ModelError,
     fuchsia_inspect as inspect, fuchsia_inspect_contrib as inspect_contrib,
     fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
+    hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
     moniker::Moniker,
     std::sync::{Arc, Weak},
 };

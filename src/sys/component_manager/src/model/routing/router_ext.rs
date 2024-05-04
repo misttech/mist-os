@@ -274,7 +274,7 @@ pub trait WeakComponentTokenExt {
 // We need this extra struct because WeakComponentInstance isn't defined in this
 // crate so we can't implement WeakComponentTokenAny for it.
 #[derive(Debug)]
-struct WeakComponentInstanceExt {
+pub struct WeakComponentInstanceExt {
     inner: WeakComponentInstance,
 }
 impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {

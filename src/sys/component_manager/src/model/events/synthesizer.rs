@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        events::{dispatcher::EventDispatcherScope, event::Event, registry::ComponentEventRoute},
-        hooks::{Event as HookEvent, EventType},
+    crate::model::events::{
+        dispatcher::EventDispatcherScope, event::Event, registry::ComponentEventRoute,
     },
     ::routing::event::EventFilter,
     cm_types::Name,
     cm_util::TaskGroup,
     errors::ModelError,
     futures::{channel::mpsc, future::join_all, SinkExt},
+    hooks::{Event as HookEvent, EventType},
     moniker::ExtendedMoniker,
     std::{collections::HashMap, sync::Arc},
     tracing::error,

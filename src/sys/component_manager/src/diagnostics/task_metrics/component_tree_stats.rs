@@ -3,17 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        diagnostics::task_metrics::{
-            component_stats::ComponentStats,
-            constants::*,
-            measurement::{Measurement, MeasurementsQueue},
-            runtime_stats_source::{
-                ComponentStartedInfo, RuntimeStatsContainer, RuntimeStatsSource,
-            },
-            task_info::{create_cpu_histogram, TaskInfo},
-        },
-        model::hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
+    crate::diagnostics::task_metrics::{
+        component_stats::ComponentStats,
+        constants::*,
+        measurement::{Measurement, MeasurementsQueue},
+        runtime_stats_source::{ComponentStartedInfo, RuntimeStatsContainer, RuntimeStatsSource},
+        task_info::{create_cpu_histogram, TaskInfo},
     },
     async_trait::async_trait,
     errors::ModelError,
@@ -26,6 +21,7 @@ use {
         lock::Mutex,
         FutureExt, StreamExt,
     },
+    hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
     injectable_time::{MonotonicTime, TimeSource},
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},

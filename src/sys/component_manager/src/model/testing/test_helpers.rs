@@ -10,7 +10,6 @@ use {
             component::instance::InstanceState,
             component::{ComponentInstance, StartReason, WeakComponentInstance},
             events::{registry::EventSubscription, source::EventSource, stream::EventStream},
-            hooks::HooksRegistration,
             model::Model,
             testing::{
                 mocks::{ControlMessage, MockResolver, MockRunner},
@@ -31,6 +30,7 @@ use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
+    hooks::HooksRegistration,
     moniker::{ChildName, Moniker},
     std::collections::HashSet,
     std::sync::Arc,

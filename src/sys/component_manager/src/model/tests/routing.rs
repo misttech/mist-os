@@ -21,7 +21,6 @@ use {
                 StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::router_ext::WeakComponentTokenExt,
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{
@@ -59,6 +58,7 @@ use {
         lock::Mutex,
         StreamExt,
     },
+    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::component_instance::ComponentInstanceInterface,
@@ -3608,7 +3608,7 @@ impl Hook for BlockingResolvedHook {
         match &event.payload {
             EventPayload::Resolved { component, .. } => {
                 let expected_moniker = self.receiver.lock().await.next().await.unwrap();
-                assert_eq!(component.moniker, expected_moniker);
+                assert_eq!(component.moniker(), expected_moniker);
             }
             _ => (),
         };

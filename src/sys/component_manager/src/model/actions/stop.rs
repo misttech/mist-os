@@ -45,7 +45,6 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::{test_utils::is_stopped, ActionsManager},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             testing::{
                 test_helpers::{component_decl_with_test_runner, ActionsTest},
                 test_hook::Lifecycle,
@@ -55,6 +54,7 @@ pub mod tests {
         errors::ModelError,
         futures::channel::oneshot,
         futures::lock::Mutex,
+        hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         moniker::{Moniker, MonikerBase},
         std::sync::Weak,
     };

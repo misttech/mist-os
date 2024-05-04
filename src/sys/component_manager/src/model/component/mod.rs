@@ -16,7 +16,6 @@ use {
             },
             context::ModelContext,
             environment::Environment,
-            hooks::{Event, EventPayload, Hooks},
             routing::{self, RoutingError},
             start::Start,
         },
@@ -51,6 +50,7 @@ use {
         future::{join_all, BoxFuture},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
+    hooks::{Event, EventPayload, Hooks},
     instance::{
         InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
         StopOutcomeWithEscrow,
@@ -1349,8 +1349,9 @@ impl std::fmt::Debug for ComponentInstance {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::model::{events::stream::EventStream, hooks::EventType};
+    use crate::model::events::stream::EventStream;
     use fuchsia_zircon as zx;
+    use hooks::EventType;
     use moniker::{Moniker, MonikerBase};
 
     pub async fn wait_until_event_get_timestamp(
@@ -1369,7 +1370,6 @@ pub mod tests {
         crate::model::{
             actions::{shutdown, test_utils::is_discovered, StopAction},
             events::registry::EventSubscription,
-            hooks::EventType,
             structured_dict::ComponentInput,
             testing::{
                 mocks::ControllerActionResponse,
@@ -1392,6 +1392,7 @@ pub mod tests {
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, AsHandleRef},
         futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt},
+        hooks::EventType,
         instance::UnresolvedInstanceState,
         routing_test_helpers::component_id_index::make_index_file,
         std::{panic, task::Poll},

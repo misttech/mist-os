@@ -7,7 +7,6 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
             routing::{CapabilityOpenRequest, CapabilitySource, RouteSource},
         },
@@ -28,6 +27,7 @@ use {
         lock::Mutex,
         stream::TryStreamExt,
     },
+    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     routing::capability_source::{
         AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,

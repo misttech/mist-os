@@ -13,6 +13,7 @@ group("non_hermetic_tests") {
 group("hermetic_tests") {
   testonly = true
   deps = [
+    "hooks:tests",
     "processargs:tests",
     "sandbox:tests",
     "serve_processargs:tests",

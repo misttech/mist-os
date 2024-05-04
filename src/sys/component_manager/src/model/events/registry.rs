@@ -13,7 +13,6 @@ use {
                 stream::EventStream,
                 synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer},
             },
-            hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
             model::Model,
             routing::RouteSource,
         },
@@ -30,6 +29,7 @@ use {
     cm_types::Name,
     errors::{EventsError, ModelError},
     futures::lock::Mutex,
+    hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
@@ -411,14 +411,12 @@ impl Hook for EventRegistry {
 mod tests {
     use {
         super::*,
-        crate::model::{
-            hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
-            testing::test_helpers::*,
-        },
+        crate::model::testing::test_helpers::*,
         assert_matches::assert_matches,
         cm_rust::{Availability, UseSource},
         fuchsia_zircon as zx,
         futures::StreamExt,
+        hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
         sandbox::Message,
         std::str::FromStr,
     };

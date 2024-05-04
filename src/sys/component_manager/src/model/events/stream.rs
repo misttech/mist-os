@@ -19,7 +19,7 @@ use {
 
 #[cfg(test)]
 use {
-    crate::model::hooks::{EventType, HasEventType},
+    hooks::{EventType, HasEventType},
     moniker::Moniker,
 };
 

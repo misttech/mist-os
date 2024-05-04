@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::hooks::RuntimeInfo,
     async_trait::async_trait,
     fidl_fuchsia_diagnostics_types::{ComponentDiagnostics, Task as DiagnosticsTask, TaskUnknown},
     fuchsia_zircon::sys as zx_sys,
     fuchsia_zircon::{self as zx, AsHandleRef, Task},
     futures::channel::oneshot,
+    hooks::RuntimeInfo,
 };
 
 /// Trait that all structs that behave as Task's implement.

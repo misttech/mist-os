@@ -10,13 +10,14 @@ use {
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
         component::{Component, WeakComponentInstance},
-        hooks::EventPayload,
         resolver::Resolver,
+        routing::router_ext::WeakComponentTokenExt,
     },
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::{AbortError, AbortHandle, AbortableScope},
     errors::{ActionError, ResolveActionError},
+    hooks::EventPayload,
     std::{ops::DerefMut, sync::Arc},
 };
 
@@ -167,10 +168,9 @@ async fn do_resolve(
         return Ok(());
     }
 
-    let event = component.new_event(EventPayload::Resolved {
-        component: WeakComponentInstance::from(component),
-        decl: component_info.decl.clone(),
-    });
+    let weak = sandbox::WeakComponentToken::new(WeakComponentInstance::new(component));
+    let event = component
+        .new_event(EventPayload::Resolved { component: weak, decl: component_info.decl.clone() });
     component.hooks.dispatch(&event).await;
     Ok(())
 }

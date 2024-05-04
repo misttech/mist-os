@@ -10,7 +10,6 @@ use {
             component::instance::InstanceState,
             component::{ComponentInstance, IncomingCapabilities, StartReason},
             events::registry::EventSubscription,
-            hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
             start::Start,
             structured_dict::ComponentInput,
@@ -39,6 +38,7 @@ use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
+    hooks::{Event, EventType, Hook, HooksRegistration},
     moniker::{ChildName, Moniker, MonikerBase},
     std::{
         collections::HashSet,

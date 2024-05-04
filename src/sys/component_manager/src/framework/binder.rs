@@ -118,7 +118,6 @@ mod tests {
             builtin_environment::BuiltinEnvironment,
             model::{
                 events::{source::EventSource, stream::EventStream},
-                hooks::EventType,
                 testing::test_helpers::*,
             },
         },
@@ -129,6 +128,7 @@ mod tests {
         fidl::{client::Client, handle::AsyncChannel},
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
+        hooks::EventType,
         moniker::{Moniker, MonikerBase},
         std::sync::Arc,
         vfs::{

@@ -20,7 +20,6 @@ use {
             context::ModelContext,
             environment::Environment,
             escrow::{self, EscrowedState},
-            hooks::{CapabilityReceiver, EventPayload},
             namespace::create_namespace,
             routing::{
                 self,
@@ -63,6 +62,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::{BoxFuture, FutureExt},
+    hooks::{CapabilityReceiver, EventPayload},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{
         Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,

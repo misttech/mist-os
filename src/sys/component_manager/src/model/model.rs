@@ -136,15 +136,15 @@ impl Model {
 pub mod tests {
     use {
         crate::model::{
-            actions::{ActionsManager, ShutdownAction, ShutdownType},
-            hooks::{Event, EventType, Hook, HooksRegistration},
-            model::Model,
+            actions::{ShutdownAction, ShutdownType},
+            model::{ActionsManager, Model},
             structured_dict::ComponentInput,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         async_trait::async_trait,
         cm_rust_testing::*,
         errors::ModelError,
+        hooks::{Event, EventType, Hook, HooksRegistration},
         moniker::Moniker,
         std::sync::{Arc, Weak},
     };

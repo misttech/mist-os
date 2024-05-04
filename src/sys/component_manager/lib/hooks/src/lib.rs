@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::component::WeakComponentInstance,
     anyhow::format_err,
     async_trait::async_trait,
     cm_rust::ComponentDecl,
@@ -13,7 +12,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},
     moniker::{ExtendedMoniker, Moniker},
-    sandbox::{Receiver, Sender},
+    sandbox::{Receiver, Sender, WeakComponentToken},
     std::{
         collections::HashMap,
         fmt,
@@ -236,7 +235,7 @@ pub enum EventPayload {
     Discovered,
     Destroyed,
     Resolved {
-        component: WeakComponentInstance,
+        component: WeakComponentToken,
         decl: ComponentDecl,
     },
     Unresolved,
@@ -403,7 +402,6 @@ impl Hooks {
     ///
     /// This is test-only because in general it shouldn't matter what order hooks are executed
     /// in. This is useful for tests that need guarantees about hook execution order.
-    #[cfg(test)]
     pub async fn install_front_for_test(&self, hooks: Vec<HooksRegistration>) {
         let mut hooks_map = self.hooks_map.lock().await;
         for hook in hooks {

@@ -16,7 +16,7 @@ use fuchsia_zircon as zx;
 use inspect::HistogramProperty;
 use moniker::Moniker;
 
-use crate::model::hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
+use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 
 const STARTED_DURATIONS: &str = "started_durations";
 const STOPPED_DURATIONS: &str = "stopped_durations";
