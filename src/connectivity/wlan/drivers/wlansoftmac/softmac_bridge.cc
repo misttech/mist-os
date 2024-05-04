@@ -435,7 +435,7 @@ wlansoftmac_buffer_t SoftmacBridge::IntoRustBuffer(std::unique_ptr<Buffer> buffe
             WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_in_buf_t.free_buffer");
             std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset();
           },
-      .raw = released_buffer,
+      .ctx = released_buffer,
       .data = released_buffer->data(),
       .capacity = released_buffer->capacity(),
   };

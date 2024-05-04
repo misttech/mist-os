@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        buffer::FinalizedBuffer, common::mac::WlanGi, error::Error, DriverEvent, DriverEventSink,
-    },
+    crate::{common::mac::WlanGi, error::Error, DriverEvent, DriverEventSink},
     anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
@@ -15,6 +13,7 @@ use {
     trace::Id as TraceId,
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
+    wlan_ffi_transport::FinalizedBuffer,
     wlan_fidl_ext::{TryUnpack, WithName},
     wlan_trace as wtrace,
 };
@@ -383,9 +382,9 @@ impl DeviceOps for Device {
         self.frame_processor = Some(frame_processor);
 
         // Safety: This call is safe because `self.frame_processor` will outlive all uses of the
-        // constructed `CFrameProcessor` across the FFI boundary. This includes during unbind when
+        // constructed `FfiFrameProcessor` across the FFI boundary. This includes during unbind when
         // the C++ portion of wlansoftmac will ensure no additional calls will be made through
-        // `CFrameProcessor` after unbind begins.
+        // `FfiFrameProcessor` after unbind begins.
         let mut frame_processor =
             unsafe { self.frame_processor.as_mut().unwrap().as_mut().to_c_binding() };
 
@@ -395,7 +394,7 @@ impl DeviceOps for Device {
         let frame_processor = &mut frame_processor;
 
         self.wlan_softmac_bridge_proxy
-            .start(ifc_bridge, frame_processor as *const CFrameProcessor as u64)
+            .start(ifc_bridge, frame_processor as *const FfiFrameProcessor as u64)
             .await
             .map_err(|error| {
                 error!("Start failed with FIDL error: {:?}", error);
@@ -627,7 +626,7 @@ impl DeviceOps for Device {
 }
 
 #[repr(C)]
-pub struct CFrameProcessorOps {
+pub struct FfiFrameProcessorOps {
     wlan_rx: unsafe extern "C" fn(ctx: &DriverEventSink, request: *const u8, request_size: usize),
     ethernet_tx: unsafe extern "C" fn(
         ctx: &DriverEventSink,
@@ -792,7 +791,7 @@ unsafe extern "C" fn ethernet_tx(
     }
 }
 
-const FRAME_PROCESSOR_OPS: CFrameProcessorOps = CFrameProcessorOps { wlan_rx, ethernet_tx };
+const FRAME_PROCESSOR_OPS: FfiFrameProcessorOps = FfiFrameProcessorOps { wlan_rx, ethernet_tx };
 
 pub struct FrameProcessor {
     sink: DriverEventSink,
@@ -808,7 +807,7 @@ impl FrameProcessor {
         Box::pin(Self { sink, _pin: PhantomPinned })
     }
 
-    /// Returns a `CFrameProcessor` containing pointers to the static `FRAME_PROCESSOR_OPS`
+    /// Returns a `FfiFrameProcessor` containing pointers to the static `FRAME_PROCESSOR_OPS`
     /// and `self.sink`.
     ///
     /// Note that those pointers are to a static value and a pinned value, i.e., the former pointer
@@ -822,24 +821,24 @@ impl FrameProcessor {
     ///
     /// By using this method, the caller promises the lifetime of `DriverEventSink` will exceed the
     /// `ctx` pointer used across the FFI boundary.
-    unsafe fn to_c_binding(self: Pin<&mut Self>) -> CFrameProcessor {
-        CFrameProcessor { ops: &FRAME_PROCESSOR_OPS, ctx: &self.sink }
+    unsafe fn to_c_binding(self: Pin<&mut Self>) -> FfiFrameProcessor {
+        FfiFrameProcessor { ops: &FRAME_PROCESSOR_OPS, ctx: &self.sink }
     }
 }
 
 /// Type containing pointers to the static `FRAME_PROCESSOR_OPS` and a `DriverEventSink`.
 ///
-/// The wlansoftmac driver copies the pointers from `CFrameProcessor` which means the code
+/// The wlansoftmac driver copies the pointers from `FfiFrameProcessor` which means the code
 /// constructing this type must ensure those pointers remain valid for their lifetime in
 /// wlansoftmac.
 #[repr(C)]
-pub struct CFrameProcessor {
-    ops: *const CFrameProcessorOps,
+pub struct FfiFrameProcessor {
+    ops: *const FfiFrameProcessorOps,
     ctx: *const DriverEventSink,
 }
 
 #[repr(C)]
-pub struct CFrameSender {
+pub struct FfiFrameSender {
     ctx: *mut c_void,
     /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
     ///
@@ -891,8 +890,8 @@ pub struct FrameSender {
     ) -> zx::zx_status_t,
 }
 
-impl From<CFrameSender> for FrameSender {
-    fn from(frame_sender: CFrameSender) -> Self {
+impl From<FfiFrameSender> for FrameSender {
+    fn from(frame_sender: FfiFrameSender) -> Self {
         Self {
             ctx: frame_sender.ctx,
             wlan_tx: frame_sender.wlan_tx,
@@ -949,15 +948,13 @@ impl FrameSender {
 pub mod test_utils {
     use {
         super::*,
-        crate::{
-            buffer::{CBufferProvider, FakeCBufferProvider},
-            ddk_converter,
-        },
+        crate::ddk_converter,
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_sync::Mutex,
         paste::paste,
         std::collections::VecDeque,
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
     };
 
     pub trait FromMlmeEvent {
@@ -1255,7 +1252,7 @@ pub mod test_utils {
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
-        pub buffer_provider: CBufferProvider,
+        pub buffer_provider: BufferProvider,
         pub install_key_results: VecDeque<Result<(), zx::Status>>,
         pub captured_update_wmm_parameters_request:
             Option<fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest>,
@@ -1304,7 +1301,7 @@ pub mod test_utils {
                 beacon_config: None,
                 link_status: LinkStatus::DOWN,
                 assocs: std::collections::HashMap::new(),
-                buffer_provider: FakeCBufferProvider::new(),
+                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 install_key_results: VecDeque::new(),
                 captured_update_wmm_parameters_request: None,
             }));

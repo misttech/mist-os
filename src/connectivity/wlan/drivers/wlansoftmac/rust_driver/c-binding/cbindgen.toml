@@ -17,12 +17,12 @@ sys_includes = [ "zircon/types.h" ]
 
 [parse]
 parse_deps = true
-include = ["wlan_mlme"]
+include = ["wlan_mlme", "wlan_ffi_transport"]
 
 [export]
 include = [
-    "CFrameProcessor",
-    "CFrameProcessorOps",
+    "FfiFrameProcessor",
+    "FfiFrameProcessorOps",
 ]
 exclude = [
     # Unused types
@@ -30,18 +30,22 @@ exclude = [
 
     # Voided types.
     "DriverEventSink",
+    "FfiBufferCtx",
 ]
 
 [export.rename]
+# wlan-ffi-transport types
+"FfiBuffer" = "wlansoftmac_buffer_t"
+"FfiBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
+
 # wlan-mlme types
-"CBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
-"CBuffer" = "wlansoftmac_buffer_t"
-"CFrameProcessor" = "frame_processor_t"
-"CFrameProcessorOps" = "frame_processor_ops_t"
-"CFrameSender" = "frame_sender_t"
+"FfiFrameProcessor" = "frame_processor_t"
+"FfiFrameProcessorOps" = "frame_processor_ops_t"
+"FfiFrameSender" = "frame_sender_t"
 
 # This struct is used for void* context fields for data path operations.
 "DriverEventSink" = "void"
+"FfiBufferCtx" = "void"
 
 [fn]
 prefix = 'extern "C"'

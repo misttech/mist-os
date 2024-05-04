@@ -14,7 +14,6 @@ mod akm_algorithm;
 pub mod ap;
 pub mod auth;
 mod block_ack;
-pub mod buffer;
 pub mod client;
 mod ddk_converter;
 pub mod device;
@@ -39,6 +38,7 @@ use {
     },
     std::{cmp, fmt, sync::Arc, time::Duration},
     tracing::info,
+    wlan_ffi_transport::BufferProvider,
     wlan_fidl_ext::{ResponderExt, SendResultExt},
     wlan_trace as wtrace,
 };
@@ -119,7 +119,7 @@ pub trait MlmeImpl {
     fn new(
         config: Self::Config,
         device: Self::Device,
-        buffer_provider: buffer::CBufferProvider,
+        buffer_provider: BufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
     ) -> impl Future<Output = Result<Self, Error>>
     where
@@ -281,7 +281,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     init_sender: oneshot::Sender<Result<(), zx::Status>>,
     config: T::Config,
     mut device: T::Device,
-    buffer_provider: buffer::CBufferProvider,
+    buffer_provider: BufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
 ) -> Result<(), Error> {
@@ -418,7 +418,7 @@ pub mod test_utils {
         async fn new(
             _config: Self::Config,
             device: Self::Device,
-            _buffer_provider: buffer::CBufferProvider,
+            _buffer_provider: BufferProvider,
             _scheduler: wlan_common::timer::Timer<Self::TimerEvent>,
         ) -> Result<Self, Error> {
             Ok(Self { device })
@@ -538,10 +538,11 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests {
     use {
-        super::{buffer::FakeCBufferProvider, device::FakeDevice, test_utils::FakeMlme, *},
+        super::{device::FakeDevice, test_utils::FakeMlme, *},
         fuchsia_async::TestExecutor,
         std::task::Poll,
         wlan_common::assert_variant,
+        wlan_ffi_transport::FakeFfiBufferProvider,
     };
 
     // The following type definitions emulate the definition of FIDL requests and responder types.
@@ -617,7 +618,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn start_and_stop_main_loop() {
         let (fake_device, _fake_device_state) = FakeDevice::new().await;
-        let buffer_provider = FakeCBufferProvider::new();
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
         let (init_sender, mut init_receiver) = oneshot::channel::<Result<(), zx::Status>>();

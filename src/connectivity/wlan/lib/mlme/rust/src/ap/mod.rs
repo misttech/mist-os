@@ -9,7 +9,6 @@ mod remote_client;
 
 use {
     crate::{
-        buffer::{Buffer, CBufferProvider},
         ddk_converter,
         device::{self, DeviceOps},
         error::Error,
@@ -25,6 +24,7 @@ use {
         timer::{EventId, Timer},
         TimeUnit,
     },
+    wlan_ffi_transport::{Buffer, BufferProvider},
     wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
@@ -135,7 +135,7 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     async fn new(
         config: Self::Config,
         device: D,
-        buffer_provider: CBufferProvider,
+        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error>
     where
@@ -180,7 +180,7 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
 impl<D> Ap<D> {
     pub fn new(
         device: D,
-        buffer_provider: CBufferProvider,
+        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
@@ -480,7 +480,6 @@ mod tests {
     use {
         super::*,
         crate::{
-            buffer::FakeCBufferProvider,
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::MockWlanRxInfo,
         },
@@ -494,6 +493,7 @@ mod tests {
             assert_variant, big_endian::BigEndianU16, test_utils::fake_frames::fake_wpa2_rsne,
             timer,
         },
+        wlan_ffi_transport::FakeFfiBufferProvider,
         wlan_frame_writer::write_frame_with_dynamic_buffer,
         wlan_sme::responder::Responder,
     };
@@ -538,7 +538,7 @@ mod tests {
         )
         .await;
         (
-            Ap::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID),
+            Ap::new(fake_device, BufferProvider::new(FakeFfiBufferProvider::new()), timer, *BSSID),
             fake_device_state,
             time_stream,
         )

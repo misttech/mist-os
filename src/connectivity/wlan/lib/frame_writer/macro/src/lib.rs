@@ -130,7 +130,7 @@ mod ie;
 ///
 /// # Examples
 /// ```
-/// let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
+/// let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
 ///     headers: {
 ///         mac::MgmtHdr: &mac::MgmtHdr {
 ///             frame_ctrl: mac::FrameControl(0)

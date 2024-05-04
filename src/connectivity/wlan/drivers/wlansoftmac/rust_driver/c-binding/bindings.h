@@ -47,17 +47,18 @@ typedef struct {
    * # Safety
    *
    * The `free` function is unsafe because the function cannot guarantee the pointer it's
-   * called with is the `raw` field in this struct.
+   * called with is the `ctx` field in this struct.
    *
-   * By calling `free`, the caller promises the pointer it's called with is the `raw` field
+   * By calling `free`, the caller promises the pointer it's called with is the `ctx` field
    * in this struct.
    */
-  void (*free)(void *raw);
+  void (*free)(void *ctx);
   /**
    * Pointer to the buffer allocated in the C++ portion of wlansoftmac and owned by the Rust
-   * portion of wlansoftmac.
+   * portion of wlansoftmac. An `FfiBufferProvider` sets this pointer to null when the allocation
+   * failed.
    */
-  void *raw;
+  void *ctx;
   /**
    * Pointer to the start of bytes written in the buffer.
    */
@@ -73,19 +74,13 @@ typedef struct {
    * Allocate and take ownership of a buffer allocated by the C++ portion of wlansoftmac
    * with at least `min_capacity` bytes of capacity.
    *
-   * The returned `CBuffer` contains a pointer whose pointee the caller now owns, unless that
+   * If the requested allocation is zero bytes, this function should return an `FfiBuffer`
+   * with a null `ctx` pointer indicating the allocation failed.
+   *
+   * The returned `FfiBuffer` contains a pointer whose pointee the caller now owns, unless that
    * pointer is the null pointer. If the pointer is non-null, then the `Drop` implementation of
-   * `CBuffer` ensures its `free` will be called if its dropped. If the pointer is null, the
-   * allocation failed, and the caller must discard the `CBuffer` without calling its `Drop`
-   * implementation.
-   *
-   * # Safety
-   *
-   * This function is unsafe because the returned `CBuffer` could contain null pointers,
-   * indicating the allocation failed.
-   *
-   * By calling this function, the caller promises to call `mem::forget` on the returned
-   * `CBuffer` if either the `raw` or `data` fields in the `CBuffer` are null.
+   * `FfiBuffer` ensures its `free` will be called if its dropped. Otherwise, `free` will not,
+   * and should not, be called.
    */
   wlansoftmac_buffer_t (*get_buffer)(uintptr_t min_capacity);
 } wlansoftmac_buffer_provider_ops_t;
@@ -98,7 +93,7 @@ typedef struct {
 /**
  * Type containing pointers to the static `FRAME_PROCESSOR_OPS` and a `DriverEventSink`.
  *
- * The wlansoftmac driver copies the pointers from `CFrameProcessor` which means the code
+ * The wlansoftmac driver copies the pointers from `FfiFrameProcessor` which means the code
  * constructing this type must ensure those pointers remain valid for their lifetime in
  * wlansoftmac.
  */

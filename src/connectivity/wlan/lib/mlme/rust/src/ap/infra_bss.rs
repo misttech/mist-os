@@ -9,7 +9,6 @@ use {
             remote_client::{ClientRejection, RemoteClient},
             BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
         },
-        buffer::Buffer,
         ddk_converter::softmac_key_configuration_from_mlme,
         device::{self, DeviceOps},
         error::Error,
@@ -31,6 +30,7 @@ use {
         timer::EventId,
         TimeUnit,
     },
+    wlan_ffi_transport::Buffer,
     zerocopy::ByteSlice,
 };
 
@@ -639,7 +639,6 @@ mod tests {
         super::*,
         crate::{
             ap::remote_client::ClientEvent,
-            buffer::FakeCBufferProvider,
             device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -655,6 +654,7 @@ mod tests {
             test_utils::fake_frames::fake_wpa2_rsne,
             timer::{self, create_timer},
         },
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
     };
 
     lazy_static! {
@@ -668,7 +668,15 @@ mod tests {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID), time_stream)
+        (
+            Context::new(
+                fake_device,
+                BufferProvider::new(FakeFfiBufferProvider::new()),
+                timer,
+                *BSSID,
+            ),
+            time_stream,
+        )
     }
 
     async fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
