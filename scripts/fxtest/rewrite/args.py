@@ -17,6 +17,7 @@ LOG_TO_STDOUT_OPTION = "-"
 
 class PrevOption(enum.StrEnum):
     LOG = "log"
+    PATH = "path"
     HELP = "help"
 
     def help(self) -> str:
@@ -30,6 +31,8 @@ class PrevOption(enum.StrEnum):
         """
         if self is PrevOption.LOG:
             return "Print all test logs from the previous run. Logs are grouped by test suite."
+        elif self is PrevOption.PATH:
+            return "Print the path of the log from the previous run."
         elif self is PrevOption.HELP:
             return "Print this help output."
         else:

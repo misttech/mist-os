@@ -141,7 +141,13 @@ def do_process_previous(flags: args.Flags) -> int:
     assert_no_selection(flags, f"-pr {flags.previous}")
     if flags.previous is args.PrevOption.LOG:
         return do_print_logs(flags)
-    if flags.previous is args.PrevOption.HELP:
+    elif flags.previous is args.PrevOption.PATH:
+        env = environment.ExecutionEnvironment.initialize_from_args(
+            flags, create_log_file=False
+        )
+        print(env.get_most_recent_log())
+        return 0
+    elif flags.previous is args.PrevOption.HELP:
         print("--previous options:")
         for arg in args.PrevOption:
             prefix = f"{arg:>8}: "
