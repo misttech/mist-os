@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::diagnostics::task_metrics::constants::*,
+    crate::task_metrics::constants::*,
     core::cmp::Reverse,
     fuchsia_inspect::{self as inspect, ArrayProperty},
     fuchsia_zircon as zx,

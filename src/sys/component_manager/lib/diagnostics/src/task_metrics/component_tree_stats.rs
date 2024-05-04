@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::diagnostics::task_metrics::{
+    crate::task_metrics::{
         component_stats::ComponentStats,
         constants::*,
         measurement::{Measurement, MeasurementsQueue},
@@ -545,15 +545,11 @@ impl AggregatedStats {
 mod tests {
     use {
         super::*,
-        crate::{
-            diagnostics::task_metrics::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask},
-            model::testing::routing_test_helpers::RoutingTest,
-        },
-        cm_rust_testing::*,
+        crate::task_metrics::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask},
         diagnostics_assertions::{assert_data_tree, AnyProperty},
         diagnostics_hierarchy::DiagnosticsHierarchy,
         fuchsia_inspect::DiagnosticsHierarchyGetter,
-        fuchsia_zircon::{AsHandleRef, DurationNum},
+        fuchsia_zircon::DurationNum,
         injectable_time::{FakeTime, IncrementingFakeTime},
     };
 
@@ -1169,31 +1165,6 @@ mod tests {
         let (timestamps, _, _) = get_data(&hierarchy, "a", Some("1"));
         assert_eq!(timestamps.len(), 2);
         assert!(timestamps[1] > timestamps[0]);
-    }
-
-    #[fuchsia::test]
-    async fn component_manager_stats_are_tracked() {
-        // Set up the test
-        let test = RoutingTest::new(
-            "root",
-            vec![(
-                "root",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("a").eager().build())
-                    .build(),
-            )],
-        )
-        .await;
-
-        let koid =
-            fuchsia_runtime::job_default().basic_info().expect("got basic info").koid.raw_koid();
-
-        let hierarchy = test.builtin_environment.inspector().get_diagnostics_hierarchy();
-        let (timestamps, cpu_times, queue_times) =
-            get_data(&hierarchy, "<component_manager>", Some(&koid.to_string()));
-        assert_eq!(timestamps.len(), 1);
-        assert_eq!(cpu_times.len(), 1);
-        assert_eq!(queue_times.len(), 1);
     }
 
     #[fuchsia::test]

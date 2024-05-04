@@ -5,7 +5,7 @@
 #![cfg(test)]
 
 use {
-    crate::diagnostics::task_metrics::{
+    crate::task_metrics::{
         runtime_stats_source::*,
         task_info::{TaskInfo, TaskState},
     },

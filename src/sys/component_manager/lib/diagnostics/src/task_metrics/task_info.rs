@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::diagnostics::task_metrics::{
+    crate::task_metrics::{
         constants::{COMPONENT_CPU_MAX_SAMPLES, CPU_SAMPLE_PERIOD},
         measurement::{Measurement, MeasurementsQueue},
         runtime_stats_source::RuntimeStatsSource,
@@ -296,7 +296,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostics::task_metrics::testing::FakeTask;
+    use crate::task_metrics::testing::FakeTask;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchyGetter, LinearHistogram};

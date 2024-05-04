@@ -27,7 +27,7 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
         },
         capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
-        diagnostics::{lifecycle::ComponentLifecycleTimeStats, task_metrics::ComponentTreeStats},
+        diagnostics::lifecycle::ComponentLifecycleTimeStats,
         framework::{
             binder::BinderFrameworkCapability,
             factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
@@ -60,6 +60,7 @@ use {
         root_stop_notifier::RootStopNotifier,
         sandbox_util::LaunchTaskOnReceive,
     },
+    ::diagnostics::task_metrics::ComponentTreeStats,
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
         component_instance::TopInstanceInterface,
