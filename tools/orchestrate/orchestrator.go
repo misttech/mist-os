@@ -338,8 +338,8 @@ func (r *TestOrchestrator) reachDevice() error {
 	if _, err := r.ffx.RunCmdSync("target", "wait"); err != nil {
 		return fmt.Errorf("ffx target wait: %w", err)
 	}
-	if _, err := r.ffx.RunCmdSync("target", "list"); err != nil {
-		return fmt.Errorf("ffx target list: %w", err)
+	if _, err := r.ffx.RunCmdSync("target", "show"); err != nil {
+		return fmt.Errorf("ffx target show: %w", err)
 	}
 	if err := r.dumpFfxLog(); err != nil {
 		return fmt.Errorf("dumpFfxLog: %w", err)
