@@ -12,6 +12,14 @@
       "short": null,
       "description": "display usage information",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--all",
+      "short": null,
+      "description": "remove all manually added targets",
+      "hidden": false
     }
   ],
   "notes": [
@@ -22,7 +30,7 @@
     {
       "name": "name_or_addr",
       "description": "name or IP address of the target.",
-      "optionality": "required",
+      "optionality": "optional",
       "hidden": false
     }
   ],
