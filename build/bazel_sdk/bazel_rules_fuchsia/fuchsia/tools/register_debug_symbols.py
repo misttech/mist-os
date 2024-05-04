@@ -9,6 +9,8 @@ import subprocess
 
 from pathlib import Path
 
+from fuchsia_task_lib import Terminal
+
 
 def run(*command) -> None:
     try:
@@ -72,7 +74,7 @@ def main():
     args = parse_args()
 
     if not args.build_id_dirs:
-        print("No debug symbols to register.")
+        print(Terminal.warn("No debug symbols to register."))
 
     for build_id_dir, _build_dir in zip(args.build_id_dirs, args.build_dirs):
         build_dir_args = []
@@ -82,7 +84,7 @@ def main():
         if build_dir.is_dir():
             build_dir_args = ["--build-dir", build_dir]
         else:
-            print(f"Error: Invalid build directory {_build_dir}")
+            print(Terminal.error(f"Invalid build directory {_build_dir}"))
         run(
             args.ffx,
             "debug",

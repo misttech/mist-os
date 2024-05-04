@@ -26,6 +26,11 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
             required=True,
         )
         parser.add_argument(
+            "--package-manifest",
+            type=parser.path_arg(),
+            help="A path to the package manifest json file.",
+        )
+        parser.add_argument(
             "--disable-url",
             type=str,
             help="The pre-existed component url we want to disable.",
@@ -42,13 +47,18 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
     def run(self, parser: ScopedArgumentParser) -> None:
         args = self.parse_args(parser)
         ffx = [args.ffx] + (["--target", args.target] if args.target else [])
+        package_name = (
+            json.loads(args.package_manifest.read_text())["package"]["name"]
+            if args.package_manifest
+            else "{{PACKAGE_NAME}}"
+        )
 
         subprocess.check_call(
             [
                 *ffx,
                 "driver",
                 "register",
-                args.url,
+                args.url.replace("{{PACKAGE_NAME}}", package_name),
             ]
         )
 
@@ -61,7 +71,7 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
                     *ffx,
                     "driver",
                     "disable",
-                    args.disable_url,
+                    args.disable_url.replace("{{PACKAGE_NAME}}", package_name),
                 ]
             )
 

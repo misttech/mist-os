@@ -10,13 +10,16 @@ load(":providers.bzl", "FuchsiaPackageInfo")
 def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     repo = ctx.attr.repository
-    package = ctx.attr.package[FuchsiaPackageInfo].package_name
+    package = getattr(ctx.attr.package[FuchsiaPackageInfo], "package_name", "{{PACKAGE_NAME}}")
+    package_manifest = ctx.attr.package[FuchsiaPackageInfo].package_manifest
 
     component = None
+    manifest = None
     for packaged_component in ctx.attr.package[FuchsiaPackageInfo].packaged_components:
         component_info = packaged_component.component_info
         if component_info.run_tag == ctx.attr.run_tag:
             component = component_info
+            manifest = packaged_component.dest
             break
 
     if component == None:
@@ -26,8 +29,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
         fail("`test_realm` is not applicable to non-test components.")
 
     component_name = component.name
-    manifest = component.manifest.basename
-    url = "fuchsia-pkg://%s/%s#meta/%s" % (repo, package, manifest)
+    url = "fuchsia-pkg://%s/%s#%s" % (repo, package, manifest)
     moniker = ctx.attr.moniker or "/core/ffx-laboratory:%s" % component_name
     if component.is_driver:
         args = [
@@ -35,6 +37,8 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             sdk.ffx_driver,
             "--url",
             url,
+            "--package-manifest",
+            package_manifest,
         ]
         if ctx.attr.disable_repository:
             disable_url = "fuchsia-pkg://%s/%s#meta/%s" % (ctx.attr.disable_repository, package, manifest)
@@ -56,6 +60,8 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             sdk.ffx_test,
             "--url",
             url,
+            "--package-manifest",
+            package_manifest,
         ]
         if ctx.attr.test_realm:
             args += [
@@ -80,6 +86,8 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
                 moniker,
                 "--url",
                 url,
+                "--package-manifest",
+                package_manifest,
             ],
         )
 

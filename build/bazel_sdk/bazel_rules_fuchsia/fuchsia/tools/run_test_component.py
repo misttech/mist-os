@@ -26,6 +26,11 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
             required=True,
         )
         parser.add_argument(
+            "--package-manifest",
+            type=parser.path_arg(),
+            help="A path to the package manifest json file.",
+        )
+        parser.add_argument(
             "--target",
             help="Optionally specify the target fuchsia device.",
             required=False,
@@ -42,6 +47,16 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
     def run(self, parser: ScopedArgumentParser) -> None:
         args = self.parse_args(parser)
         ffx = [args.ffx] + (["--target", args.target] if args.target else [])
+        url = (
+            args.url.replace(
+                "{{PACKAGE_NAME}}",
+                json.loads(args.package_manifest.read_text())["package"][
+                    "name"
+                ],
+            )
+            if args.package_manifest
+            else args.url
+        )
 
         try:
             subprocess.check_call(
@@ -50,7 +65,7 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
                     "test",
                     "run",
                     *(["--realm", args.realm] if args.realm else []),
-                    args.url,
+                    url,
                 ]
             )
         except subprocess.CalledProcessError as e:

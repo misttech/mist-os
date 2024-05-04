@@ -4,12 +4,51 @@
 
 """Implement fuchsia_prebuilt_package() rule."""
 
-load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
-load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
+load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
+load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaDebugSymbolInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 load("@bazel_skylib//rules:select_file.bzl", "select_file")
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
+
+def _component_basename(cm_str):
+    return cm_str.rpartition("/")[-1].removesuffix(".cm")
+
+def _make_component_info(ctx):
+    return [
+        FuchsiaPackagedComponentInfo(
+            dest = c,
+            component_info = FuchsiaComponentInfo(
+                name = _component_basename(c),
+                is_driver = False,
+                is_test = False,
+                run_tag = _component_basename(c),
+            ),
+        )
+        for c in ctx.attr.components
+    ] + [
+        FuchsiaPackagedComponentInfo(
+            dest = d,
+            component_info = FuchsiaComponentInfo(
+                name = _component_basename(d),
+                is_driver = True,
+                is_test = False,
+                run_tag = _component_basename(d),
+            ),
+        )
+        for d in ctx.attr.drivers
+    ] + [
+        FuchsiaPackagedComponentInfo(
+            dest = t,
+            component_info = FuchsiaComponentInfo(
+                name = _component_basename(t),
+                is_driver = False,
+                is_test = True,
+                run_tag = _component_basename(t),
+            ),
+        )
+        for t in ctx.attr.test_components
+    ]
 
 def _unpack_prebuilt_package_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -117,48 +156,34 @@ def _unpack_prebuilt_package_impl(ctx):
         DefaultInfo(files = depset(output_files)),
         FuchsiaPackageInfo(
             package_manifest = rebased_package_manifest_json,
-            far_file = ctx.files.archive,
-            packaged_components = [
-                                      FuchsiaPackagedComponentInfo(
-                                          dest = d,
-                                          component_info = FuchsiaComponentInfo(
-                                              is_driver = True,
-                                              is_test = False,
-                                          ),
-                                      )
-                                      for d in ctx.attr.drivers
-                                  ] +
-                                  [
-                                      FuchsiaPackagedComponentInfo(
-                                          dest = c,
-                                          component_info = FuchsiaComponentInfo(
-                                              is_driver = False,
-                                              is_test = False,
-                                          ),
-                                      )
-                                      for c in ctx.attr.components
-                                  ],
+            far_file = far_archive,
+            packaged_components = _make_component_info(ctx),
             files = output_files,
         ),
+        # TODO(https://fxbug.dev/338180287): Add debug symbols support.
+        FuchsiaDebugSymbolInfo(build_id_dirs = {}),
     ]
 
 _unpack_prebuilt_package = rule(
-    doc = """Provides access to a fuchsia package from a prebuilt package archive (.far).
-""",
+    doc = """Provides access to a fuchsia package from a prebuilt package archive (.far).""",
     implementation = _unpack_prebuilt_package_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "archive": attr.label(
-            doc = "The fuchsia archive",
+            doc = "The fuchsia archive (typically a .far file).",
             allow_single_file = True,
             mandatory = True,
         ),
         "components": attr.string_list(
-            doc = "components of this driver",
+            doc = "ordinary components in this package",
             default = [],
         ),
         "drivers": attr.string_list(
-            doc = "drivers of this driver",
+            doc = "driver components in this package",
+            default = [],
+        ),
+        "test_components": attr.string_list(
+            doc = "test components in this package",
             default = [],
         ),
         "_rebase_package_manifest": attr.label(
@@ -207,15 +232,15 @@ def _pack_prebuilt_package_impl(ctx):
         FuchsiaPackageInfo(
             package_manifest = manifest,
             far_file = far_file,
-            packaged_components = [FuchsiaPackagedComponentInfo(dest = d, component_info = FuchsiaComponentInfo(is_driver = True, is_test = False)) for d in ctx.attr.drivers] +
-                                  [FuchsiaPackagedComponentInfo(dest = c, component_info = FuchsiaComponentInfo(is_driver = False, is_test = False)) for c in ctx.attr.components],
+            packaged_components = _make_component_info(ctx),
             files = output_files + input_files,
         ),
+        # TODO(https://fxbug.dev/338180287): Add debug symbols support.
+        FuchsiaDebugSymbolInfo(build_id_dirs = {}),
     ]
 
 _pack_prebuilt_package = rule(
-    doc = """Provides access to a fuchsia package from a package manifest.
-""",
+    doc = """Provides access to a fuchsia package from a package manifest.""",
     implementation = _pack_prebuilt_package_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
@@ -230,46 +255,112 @@ _pack_prebuilt_package = rule(
             mandatory = True,
         ),
         "components": attr.string_list(
-            doc = "components of this driver",
+            doc = "ordinary components in this package",
             default = [],
         ),
         "drivers": attr.string_list(
-            doc = "drivers of this driver",
+            doc = "driver components in this package",
+            default = [],
+        ),
+        "test_components": attr.string_list(
+            doc = "test components in this package",
             default = [],
         ),
     },
 )
 
-# buildifier: disable=function-docstring
-def fuchsia_prebuilt_package(*, name, archive = None, manifest = None, files = [], components = [], drivers = [], **kwargs):
+def _make_prebuilt_package(
+        *,
+        name,
+        archive,
+        manifest,
+        files,
+        components = [],
+        drivers = [],
+        test_components = [],
+        **kwargs):
     if (archive and files) or bool(archive) == bool(manifest):
         fail("Must specify exactly either `archive` or `manifest + files`.")
     if archive:
         _unpack_prebuilt_package(
-            name = name,
+            name = "%s_fuchsia_package" % name,
             archive = archive,
-            components = components,
             drivers = drivers,
+            components = components,
+            test_components = test_components,
             **kwargs
         )
     else:
         _pack_prebuilt_package(
-            name = name,
+            name = "%s_fuchsia_package" % name,
             manifest = manifest,
             files = files,
-            components = components,
             drivers = drivers,
+            components = components,
+            test_components = test_components,
             **kwargs
         )
 
         select_file(
             name = name + ".far",
-            srcs = ":" + name,
+            srcs = "%s_fuchsia_package" % name,
             subpath = name + ".far",
         )
 
-    fuchsia_task_publish(
-        name = "%s.publish" % name,
-        packages = [name],
+# buildifier: disable=function-docstring
+def fuchsia_prebuilt_package(
+        *,
+        name,
+        archive = None,
+        manifest = None,
+        files = [],
+        components = [],
+        drivers = [],
+        **kwargs):
+    _make_prebuilt_package(
+        name = name,
+        archive = archive,
+        manifest = manifest,
+        files = files,
+        components = components,
+        drivers = drivers,
+        **kwargs
+    )
+
+    fuchsia_package_tasks(
+        name = name,
+        package = "%s_fuchsia_package" % name,
+        component_run_tags = [_component_basename(c) for c in components + drivers],
+        **kwargs
+    )
+
+# buildifier: disable=function-docstring
+def fuchsia_prebuilt_test_package(
+        *,
+        name,
+        archive = None,
+        manifest = None,
+        files = [],
+        test_components = [],
+        test_realm = None,
+        **kwargs):
+    _make_prebuilt_package(
+        name = name,
+        archive = archive,
+        manifest = manifest,
+        files = files,
+        test_components = test_components,
+        testonly = True,
+        **kwargs
+    )
+
+    fuchsia_package_tasks(
+        name = name,
+        package = "%s_fuchsia_package" % name,
+        component_run_tags = [_component_basename(c) for c in test_components],
+        is_test = True,
+        enumerate_test_components = True,
+        test_realm = test_realm,
+        testonly = True,
         **kwargs
     )

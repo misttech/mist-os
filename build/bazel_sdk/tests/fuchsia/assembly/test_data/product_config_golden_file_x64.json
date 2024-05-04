@@ -46,7 +46,7 @@
                 "components": [
                     "meta/backlight_driver.cm"
                 ],
-                "package": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_driver_expanded/rebased_package_manifest.json"
+                "package": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_driver_fuchsia_package_expanded/rebased_package_manifest.json"
             }
         ],
         "packages": {
@@ -58,12 +58,12 @@
                             "source": "fuchsia/assembly/test_data/config_data.json"
                         }
                     ],
-                    "manifest": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_expanded/rebased_package_manifest.json"
+                    "manifest": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_fuchsia_package_expanded/rebased_package_manifest.json"
                 }
             ],
             "cache": [
                 {
-                    "manifest": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_expanded/rebased_package_manifest.json"
+                    "manifest": "bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_fuchsia_package_expanded/rebased_package_manifest.json"
                 }
             ]
         },

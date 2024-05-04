@@ -42,11 +42,20 @@ class Terminal:
     def green(text: str) -> str:
         return Terminal._style(text, 92)
 
+    def yellow(text: str) -> str:
+        return Terminal._style(text, 93)
+
     def purple(text: str) -> str:
         return Terminal._style(text, 95)
 
     def cyan(text: str) -> str:
         return Terminal._style(text, 96)
+
+    def warn(printable: Any, prefix: str = "Warning") -> str:
+        return f"{Terminal.yellow(f'{prefix}:')} {printable}"
+
+    def error(printable: Any, prefix: str = "Error") -> str:
+        return f"{Terminal.red(f'{prefix}:')} {printable}"
 
     def supports_color() -> bool:
         return (
@@ -276,7 +285,7 @@ class FuchsiaTask:
             with task.apply_environment():
                 task.run(parser)
         except TaskExecutionException as e:
-            print(f'{Terminal.red("Fatal:")} {e}')
+            print(Terminal.error(e, prefix="Fatal"))
             if e.is_caught_failure:
                 task.workflow_state["workflow"]["halt_execution"] = True
             else:

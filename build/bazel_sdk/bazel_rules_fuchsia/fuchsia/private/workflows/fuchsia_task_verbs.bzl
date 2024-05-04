@@ -60,6 +60,7 @@ repo_add
 start
 set_channel
 stop
+test_enumerated
 wait
 zip
 """.strip().split("\n"))
