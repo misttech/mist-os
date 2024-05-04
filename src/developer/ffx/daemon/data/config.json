@@ -6,9 +6,6 @@
         "zedboot": {
             "enabled": false
         },
-        "mdns": {
-            "enabled": true
-        },
         "timeout": 2000
     },
     "ssh": {
