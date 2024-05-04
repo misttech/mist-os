@@ -67,9 +67,14 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         ssh_private_key: str | None = None,
         ssh_user: str | None = None,
     ) -> None:
+        _LOGGER.debug(
+            "Initializing Fuchsia-Controller-Preferred based FuchsiaDevice"
+        )
+
         super().__init__(
             device_name, ffx_config, device_ip_port, ssh_private_key, ssh_user
         )
+
         _LOGGER.debug(
             "Initialized Fuchsia-Controller-Preferred based FuchsiaDevice"
         )

@@ -7,20 +7,6 @@ import("//build/testing/environments.gni")
 
 assert(is_host, "Python E2E tests are host-only")
 
-python_mobly_test("power_cycle_test_sl4f") {
-  main_source = "test_power_cycle.py"
-  libraries = [
-    "//src/testing/end_to_end/honeydew",
-    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-  ]
-
-  params_source = "params.yaml"
-  local_config_source = "PowerCycleTestbed.yaml"
-  transport = "sl4f"
-
-  environments = [ vim3_env ]
-}
-
 python_mobly_test("power_cycle_test_fc") {
   main_source = "test_power_cycle.py"
   libraries = [
@@ -37,8 +23,5 @@ python_mobly_test("power_cycle_test_fc") {
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":power_cycle_test_fc($host_toolchain)",
-    ":power_cycle_test_sl4f($host_toolchain)",
-  ]
+  public_deps = [ ":power_cycle_test_fc($host_toolchain)" ]
 }

@@ -61,18 +61,11 @@ $ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_r
 
 ### Soft Reboot Test
 
-Use below commands to run SoftReboot Lacewing test locally using both SL4F and
-Fuchsia-Controller transports:
+Use below commands to run SoftReboot Lacewing test locally :
 
 ```shell
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
-
-# Run SoftRebootTest using SL4F
-$ fx set core.x64 \
-    --args=core_realm_shards+="[\"//src/testing/sl4f:sl4f_core_shard\"]" \
-    --with //src/testing/end_to_end/examples
-$ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_sl4f --e2e --output
 
 # Run SoftRebootTest using Fuchsia-Controller
 $ fx set core.x64 --with //src/testing/end_to_end/examples

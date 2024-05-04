@@ -75,16 +75,13 @@ device and if your host has only that one device connected.
 
   Here is an example to run a functional test on emulator
   ```shell
-  $ fx set core.x64 \
-      --args=core_realm_shards+="[\"//src/testing/sl4f:sl4f_core_shard\"]" \
-      --with //src/testing/end_to_end/honeydew/tests/functional_tests
+  $ fx set core.x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests
 
   # start the emulator with networking enabled
   $ ffx emu stop ; ffx emu start -H --net tap
 
-  $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test_sl4f --e2e --output
-
-  $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc --e2e --output
+  # TODO (b/338249539): Update the path to not include 'host_x64/obj'
+  $ fx test --exact host_x64/obj/src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device/x64_emu_test_fc.sh --e2e --output
   ```
 
 ## How to add a new test to run in infra
