@@ -33,7 +33,6 @@ mod builtin;
 mod builtin_environment;
 mod capability;
 mod constants;
-mod diagnostics;
 mod framework;
 mod inspect_sink_provider;
 mod model;
