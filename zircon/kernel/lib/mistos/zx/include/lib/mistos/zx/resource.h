@@ -17,6 +17,10 @@ class resource final : public object<resource> {
 
   constexpr resource() = default;
 
+  explicit resource(zx_handle_t value) : object(value) {}
+
+  explicit resource(handle&& h) : object(h.release()) {}
+
   resource(resource&& other) : object(other.release()) {}
 
   resource& operator=(resource&& other) {

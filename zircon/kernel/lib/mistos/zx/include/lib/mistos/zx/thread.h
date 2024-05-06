@@ -8,8 +8,7 @@
 
 #include <lib/mistos/zx/object.h>
 #include <lib/mistos/zx/task.h>
-
-#include <object/thread_dispatcher.h>
+#include <zircon/process.h>
 
 namespace zx {
 class process;
@@ -20,7 +19,9 @@ class thread final : public task<thread> {
 
   constexpr thread() = default;
 
-  explicit thread(fbl::RefPtr<ThreadDispatcher> value) : task(value) {}
+  explicit thread(zx_handle_t value) : task(value) {}
+
+  explicit thread(handle&& h) : task(h.release()) {}
 
   thread(thread&& other) : task(other.release()) {}
 
@@ -39,27 +40,27 @@ class thread final : public task<thread> {
   // launching threads in remote processes. The second variant is for
   // conveniently launching threads in the current process.
   zx_status_t start(uintptr_t thread_entry, uintptr_t stack, uintptr_t arg1, uintptr_t arg2) const {
-    /*LTRACEF("handle %p, entry %#" PRIxPTR ", sp %#" PRIxPTR ", arg1 %#" PRIxPTR ", arg2 %#"
-       PRIxPTR
-            "\n",
-            get().get(), thread_entry, stack, arg1, arg2);*/
-    return get()->Start(ThreadDispatcher::EntryState{thread_entry, stack, arg1, arg2},
-                        /* ensure_initial_thread= */ false);
+    return zx_thread_start(get(), thread_entry, stack, arg1, arg2);
   }
   zx_status_t start(void (*thread_entry)(uintptr_t arg1, uintptr_t arg2), void* stack,
                     uintptr_t arg1, uintptr_t arg2) const {
-    return start(reinterpret_cast<uintptr_t>(thread_entry), reinterpret_cast<uintptr_t>(stack),
-                 arg1, arg2);
+    return zx_thread_start(get(), reinterpret_cast<uintptr_t>(thread_entry),
+                           reinterpret_cast<uintptr_t>(stack), arg1, arg2);
   }
 
   zx_status_t read_state(uint32_t kind, void* buffer, size_t len) const {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx_thread_read_state(get(), kind, buffer, len);
   }
   zx_status_t write_state(uint32_t kind, const void* buffer, size_t len) const {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx_thread_write_state(get(), kind, buffer, len);
   }
 
-  static inline unowned<thread> self() { return unowned<thread>(nullptr); }
+  static inline zx_status_t raise_exception(uint32_t options, zx_excp_type_t type,
+                                            const zx_exception_context_t* context) {
+    return zx_thread_raise_exception(options, type, context);
+  }
+
+  static inline unowned<thread> self() { return unowned<thread>(zx_thread_self()); }
 };
 
 using unowned_thread = unowned<thread>;

@@ -8,16 +8,6 @@
 
 #include <zircon/types.h>
 
-#include <fbl/ref_ptr.h>
-#include <vm/content_size_manager.h>
-#include <vm/vm_address_region.h>
-#include <vm/vm_object.h>
-
-class ProcessDispatcher;
-class ThreadDispatcher;
-class JobDispatcher;
-class EventDispatcher;
-
 namespace zx {
 
 class job;
@@ -30,26 +20,26 @@ class thread;
 class vmar;
 class vmo;
 
-class VmoStorage;
-
-typedef void* raw_ptr_t;
-
 // The default traits supports:
+// - bti
+// - event
+// - iommu
+// - profile
+// - timer
+// - vmo
 template <typename T>
 struct object_traits {
-  using StorageType = raw_ptr_t;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = false;
   static constexpr bool supports_set_profile = false;
   static constexpr bool supports_user_signal = true;
-  static constexpr bool supports_wait = false;
+  static constexpr bool supports_wait = true;
   static constexpr bool supports_kill = false;
   static constexpr bool has_peer_handle = false;
 };
 
 template <>
 struct object_traits<event> {
-  using StorageType = fbl::RefPtr<EventDispatcher>;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = false;
   static constexpr bool supports_set_profile = false;
@@ -61,19 +51,6 @@ struct object_traits<event> {
 
 template <>
 struct object_traits<log> {
-  using StorageType = raw_ptr_t;
-  static constexpr bool supports_duplication = true;
-  static constexpr bool supports_get_child = false;
-  static constexpr bool supports_set_profile = false;
-  static constexpr bool supports_user_signal = true;
-  static constexpr bool supports_wait = false;
-  static constexpr bool supports_kill = false;
-  static constexpr bool has_peer_handle = false;
-};
-
-template <>
-struct object_traits<vmo> {
-  using StorageType = fbl::RefPtr<VmoStorage>;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = false;
   static constexpr bool supports_set_profile = false;
@@ -85,7 +62,6 @@ struct object_traits<vmo> {
 
 template <>
 struct object_traits<vmar> {
-  using StorageType = fbl::RefPtr<VmAddressRegion>;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = false;
   static constexpr bool supports_set_profile = true;
@@ -97,7 +73,6 @@ struct object_traits<vmar> {
 
 template <>
 struct object_traits<job> {
-  using StorageType = fbl::RefPtr<JobDispatcher>;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = true;
   static constexpr bool supports_set_profile = false;
@@ -109,7 +84,6 @@ struct object_traits<job> {
 
 template <>
 struct object_traits<process> {
-  using StorageType = fbl::RefPtr<ProcessDispatcher>;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = true;
   static constexpr bool supports_set_profile = false;
@@ -121,7 +95,6 @@ struct object_traits<process> {
 
 template <>
 struct object_traits<thread> {
-  using StorageType = fbl::RefPtr<ThreadDispatcher>;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = false;
   static constexpr bool supports_set_profile = true;
@@ -133,7 +106,6 @@ struct object_traits<thread> {
 
 template <>
 struct object_traits<resource> {
-  using StorageType = raw_ptr_t;
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = true;
   static constexpr bool supports_set_profile = false;

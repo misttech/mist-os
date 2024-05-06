@@ -20,7 +20,9 @@ class event final : public object<event> {
 
   constexpr event() = default;
 
-  explicit event(fbl::RefPtr<EventDispatcher> value) : object(value) {}
+  explicit event(zx_handle_t value) : object(value) {}
+
+  explicit event(handle&& h) : object(h.release()) {}
 
   event(event&& other) : object(other.release()) {}
 
@@ -29,10 +31,10 @@ class event final : public object<event> {
     return *this;
   }
 
-  static zx_status_t create(uint32_t options, event* result) ZX_AVAILABLE_SINCE(7);
-} ZX_AVAILABLE_SINCE(7);
+  static zx_status_t create(uint32_t options, event* result);
+};
 
-using unowned_event = unowned<event> ZX_AVAILABLE_SINCE(7);
+using unowned_event = unowned<event>;
 
 }  // namespace zx
 

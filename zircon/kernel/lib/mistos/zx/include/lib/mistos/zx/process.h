@@ -6,13 +6,10 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_PROCESS_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_PROCESS_H_
 
-#include <lib/mistos/util/process.h>
 #include <lib/mistos/zx/object.h>
 #include <lib/mistos/zx/task.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
-
-#include <object/process_dispatcher.h>
 
 namespace zx {
 class job;
@@ -24,7 +21,9 @@ class process final : public task<process> {
 
   constexpr process() = default;
 
-  explicit process(fbl::RefPtr<ProcessDispatcher> value) : task(value) {}
+  explicit process(zx_handle_t value) : task(value) {}
+
+  explicit process(handle&& h) : task(h.release()) {}
 
   process(process&& other) : task(other.release()) {}
 
@@ -37,16 +36,14 @@ class process final : public task<process> {
                             process* proc, vmar* root_vmar);
 
   zx_status_t start(const thread& thread_handle, uintptr_t entry, uintptr_t stack,
-                    /*handle arg_handle*/ uintptr_t arg1, uintptr_t arg2) const;
+                    handle arg_handle, uintptr_t arg2) const;
 
   zx_status_t read_memory(uintptr_t vaddr, void* buffer, size_t len, size_t* actual) const {
-    // return zx_process_read_memory(get(), vaddr, buffer, len, actual);
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx_process_read_memory(get(), vaddr, buffer, len, actual);
   }
 
   zx_status_t write_memory(uintptr_t vaddr, const void* buffer, size_t len, size_t* actual) const {
-    // return zx_process_write_memory(get(), vaddr, buffer, len, actual);
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx_process_write_memory(get(), vaddr, buffer, len, actual);
   }
 
   // Provide strongly-typed overload, in addition to get_child(handle*).
@@ -54,9 +51,6 @@ class process final : public task<process> {
   zx_status_t get_child(uint64_t koid, zx_rights_t rights, thread* result) const;
 
   static inline unowned<process> self() { return unowned<process>(zx_process_self()); }
-
-  zx_status_t get_info(uint32_t topic, void* buffer, size_t buffer_size, size_t* actual_count,
-                       size_t* avail_count) const final;
 };
 
 using unowned_process = unowned<process>;

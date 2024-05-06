@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/mistos/zx/event.h>
 #include <lib/mistos/zx/object.h>
-#include <lib/mistos/zx/vmo.h>
 
 #include <set>
 
@@ -13,22 +13,20 @@
 namespace {
 
 TEST(ZxUnowned, UsableInContainers) {
-  std::set<zx::unowned_vmo> set;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(0u, 0, &vmo));
-  ASSERT_TRUE(vmo.is_valid());
-  set.emplace(vmo);
+  std::set<zx::unowned_event> set;
+  zx::event event;
+  ASSERT_OK(zx::event::create(0u, &event));
+  set.emplace(event);
   EXPECT_EQ(set.size(), 1u);
-  EXPECT_EQ(*set.begin(), vmo.get());
+  EXPECT_EQ(*set.begin(), event.get());
 }
 
 TEST(ZxObject, BorrowReturnsUnownedObjectOfSameHandle) {
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(0u, 0, &vmo));
+  zx::event event;
+  ASSERT_OK(zx::event::create(0u, &event));
 
-  ASSERT_TRUE(vmo.is_valid());
-  ASSERT_EQ(vmo.get(), vmo.borrow());
-  ASSERT_EQ(zx::unowned_vmo(vmo), vmo.borrow());
+  ASSERT_EQ(event.get(), event.borrow());
+  ASSERT_EQ(zx::unowned_event(event), event.borrow());
 }
 
 }  // namespace

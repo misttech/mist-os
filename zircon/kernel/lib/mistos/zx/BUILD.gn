@@ -14,11 +14,11 @@ zx_library("zx") {
     "thread.cc",
     "vmar.cc",
     "vmo.cc",
-    "time.cc",
   ]
 
   public_deps = [
     "//zircon/kernel/lib/mistos/util",
+    "//zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/vm:headers",
   ]
 

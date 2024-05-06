@@ -10,7 +10,7 @@
 
 namespace zx {
 
-using handle = object<raw_ptr_t>;
+using handle = object<void>;
 using unowned_handle = unowned<handle>;
 
 }  // namespace zx

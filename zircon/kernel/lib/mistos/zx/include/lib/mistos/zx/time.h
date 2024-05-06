@@ -6,10 +6,11 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_TIME_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_TIME_H_
 
-#include <lib/mistos/util/time.h>
 #include <stdint.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls.h>
+#include <zircon/time.h>
 
 #include <ctime>
 #include <limits>
@@ -307,7 +308,9 @@ constexpr inline duration min(int64_t n) { return duration(ZX_MIN(n)); }
 
 constexpr inline duration hour(int64_t n) { return duration(ZX_HOUR(n)); }
 
-zx_status_t nanosleep(zx::time deadline) ZX_AVAILABLE_SINCE(7);
+inline zx_status_t nanosleep(zx::time deadline) ZX_AVAILABLE_SINCE(7) {
+  return zx_nanosleep(deadline.get());
+}
 
 inline time deadline_after(zx::duration nanoseconds) ZX_AVAILABLE_SINCE(7) {
   return time(zx_deadline_after(nanoseconds.get()));

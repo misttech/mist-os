@@ -9,51 +9,10 @@
 #include <lib/mistos/zx/handle.h>
 #include <lib/mistos/zx/object.h>
 #include <lib/mistos/zx/resource.h>
-#include <zircon/errors.h>
-
-#include <utility>
-
-#include <fbl/ref_ptr.h>
-#include <object/vm_object_dispatcher.h>
-#include <vm/content_size_manager.h>
-#include <vm/vm_object.h>
-#include <vm/vm_object_paged.h>
 
 namespace zx {
 
-class vmo;
-
-class VmoStorage : public fbl::RefCounted<VmoStorage> {
- public:
-  explicit VmoStorage(
-      fbl::RefPtr<VmObject> vmo, fbl::RefPtr<ContentSizeManager> content_size_mgr,
-      /*zx_koid_t pager_koid,*/ VmObjectDispatcher::InitialMutability initial_mutability);
-
-  const fbl::RefPtr<VmObject>& vmo() const { return vmo_; }
-
- private:
-  friend class vmo;
-
-  const zx_koid_t koid_;
-
-  zx_rights_t rights_ = ZX_DEFAULT_VMO_RIGHTS;
-
-  // The 'const' here is load bearing; we give a raw pointer to
-  // ourselves to |vmo_| so we have to ensure we don't reset vmo_
-  // except during destruction.
-  fbl::RefPtr<VmObject> const vmo_;
-
-  // Manages the content size associated with this VMO. The content size is used by streams created
-  // against this VMO.
-  fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
-
-  // Indicates whether the VMO was immutable at creation time.
-  const VmObjectDispatcher::InitialMutability initial_mutability_;
-};
-
-enum class VmoOwnership { kHandle, kMapping, kIoBuffer };
-zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
-                             zx_rights_t handle_rights);
+// class bti;
 
 class vmo final : public object<vmo> {
  public:
@@ -61,7 +20,9 @@ class vmo final : public object<vmo> {
 
   constexpr vmo() = default;
 
-  explicit vmo(fbl::RefPtr<VmoStorage> value) : object(value) {}
+  explicit vmo(zx_handle_t value) : object(value) {}
+
+  explicit vmo(handle&& h) : object(h.release()) {}
 
   vmo(vmo&& other) : object(other.release()) {}
 
@@ -71,26 +32,29 @@ class vmo final : public object<vmo> {
   }
 
   static zx_status_t create(uint64_t size, uint32_t options, vmo* result);
+#if 0
+  static zx_status_t create_contiguous(const bti& bti, size_t size, uint32_t alignment_log2,
+                                       vmo* result) ZX_AVAILABLE_SINCE(7);
+  static zx_status_t create_physical(const resource& resource, zx_paddr_t paddr, size_t size,
+                                     vmo* result) ZX_AVAILABLE_SINCE(7);
+#endif
 
-  zx_status_t read(void* data, uint64_t offset, size_t len) const;
+  zx_status_t read(void* data, uint64_t offset, size_t len) const ZX_AVAILABLE_SINCE(7) {
+    return zx_vmo_read(get(), data, offset, len);
+  }
 
-  zx_status_t write(const void* data, uint64_t offset, size_t len) const;
+  zx_status_t write(const void* data, uint64_t offset, size_t len) const ZX_AVAILABLE_SINCE(7) {
+    return zx_vmo_write(get(), data, offset, len);
+  }
 
   zx_status_t transfer_data(uint32_t options, uint64_t offset, uint64_t length, vmo* src_vmo,
                             uint64_t src_offset) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t get_size(uint64_t* size) const {
-    const fbl::RefPtr<VmoStorage>& tmp = get();
-    if (!tmp) {
-      return ZX_ERR_BAD_HANDLE;
-    }
-    *size = tmp->vmo_->size();
-    return ZX_OK;
-  }
+  zx_status_t get_size(uint64_t* size) const { return zx_vmo_get_size(get(), size); }
 
-  zx_status_t set_size(uint64_t size) const;
+  zx_status_t set_size(uint64_t size) const { return zx_vmo_set_size(get(), size); }
 
   zx_status_t set_prop_content_size(uint64_t size) const {
     return set_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
@@ -100,25 +64,23 @@ class vmo final : public object<vmo> {
     return get_property(ZX_PROP_VMO_CONTENT_SIZE, size, sizeof(*size));
   }
 
-  zx_status_t create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const;
+  zx_status_t create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const {
+    // Allow for the caller aliasing |result| to |this|.
+    vmo h;
+    zx_status_t status =
+        zx_vmo_create_child(get(), options, offset, size, h.reset_and_get_address());
+    result->reset(h.release());
+    return status;
+  }
 
   zx_status_t op_range(uint32_t op, uint64_t offset, uint64_t size, void* buffer,
                        size_t buffer_size) const {
-    return range_op(op, offset, size, buffer, buffer_size);
+    return zx_vmo_op_range(get(), op, offset, size, buffer, buffer_size);
   }
 
   zx_status_t set_cache_policy(uint32_t cache_policy) const { return ZX_ERR_NOT_SUPPORTED; }
 
-  zx_status_t get_info(uint32_t topic, void* buffer, size_t buffer_size, size_t* actual_count,
-                       size_t* avail_count) const final;
-
-  zx_status_t get_property(uint32_t property, void* value, size_t size) const final;
-
-  zx_status_t set_property(uint32_t property, const void* value, size_t size) const final;
-
   zx_status_t replace_as_executable(const resource& vmex, vmo* result) {
-    // LTRACEF("repexec %p\n", get().get());
-#if 0
     zx_handle_t h = ZX_HANDLE_INVALID;
     zx_status_t status = zx_vmo_replace_as_executable(value_, vmex.get(), &h);
     // We store ZX_HANDLE_INVALID to value_ before calling reset on result
@@ -126,23 +88,10 @@ class vmo final : public object<vmo> {
     value_ = ZX_HANDLE_INVALID;
     result->reset(h);
     return status;
-#endif
-    return ZX_OK;
   }
-
- private:
-  zx_info_vmo_t get_vmo_info(zx_rights_t rights) const;
-  zx_status_t set_content_size(uint64_t content_size) const;
-  zx_status_t create_child_internal(uint32_t options, uint64_t offset, uint64_t size,
-                                    bool copy_name, fbl::RefPtr<VmObject>* child_vmo) const;
-  zx_status_t range_op(uint32_t op, uint64_t offset, uint64_t size, void* buffer,
-                       size_t buffer_size) const;
 };
 
 using unowned_vmo = unowned<vmo>;
-
-template <>
-bool operator<(const unowned<vmo>& a, const unowned<vmo>& b);
 
 }  // namespace zx
 

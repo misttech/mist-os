@@ -19,7 +19,9 @@ class suspend_token final : public object<suspend_token> {
 
   constexpr suspend_token() = default;
 
-  explicit suspend_token(raw_ptr_t value) : object<suspend_token>(value) {}
+  explicit suspend_token(zx_handle_t value) : object<suspend_token>(value) {}
+
+  explicit suspend_token(handle&& h) : object<suspend_token>(h.release()) {}
 
   suspend_token(suspend_token&& other) : object<suspend_token>(other.release()) {}
 

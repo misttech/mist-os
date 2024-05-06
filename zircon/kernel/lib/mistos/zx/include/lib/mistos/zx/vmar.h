@@ -6,36 +6,12 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_VMAR_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_VMAR_H_
 
-#include <lib/fit/defer.h>
-#include <lib/mistos/util/process.h>
 #include <lib/mistos/zx/object.h>
 #include <lib/mistos/zx/vmo.h>
 #include <zircon/features.h>
-
-#include <fbl/ref_ptr.h>
-#include <vm/vm_address_region.h>
+#include <zircon/process.h>
 
 namespace zx {
-
-namespace {
-
-template <uint32_t FromFlag, uint32_t ToFlag>
-uint32_t ExtractFlag(uint32_t* flags) {
-  const uint32_t flag_set = *flags & FromFlag;
-  // Unconditionally clear |flags| so that the compiler can more easily see that multiple
-  // ExtractFlag invocations can just use a single combined clear, greatly reducing code-gen.
-  *flags &= ~FromFlag;
-  if (flag_set) {
-    return ToFlag;
-  }
-  return 0;
-}
-
-}  // namespace
-
-zx_status_t split_flags(uint32_t flags, uint32_t* vmar_flags, uint* arch_mmu_flags,
-                        uint8_t* align_pow2);
-bool is_valid_mapping_protection(uint32_t flags);
 
 // A wrapper for handles to VMARs.  Note that vmar::~vmar() does not execute
 // vmar::destroy(), it just closes the handle.
@@ -45,27 +21,29 @@ class vmar final : public object<vmar> {
 
   constexpr vmar() = default;
 
-  explicit vmar(fbl::RefPtr<VmAddressRegion> value) : object(value) {}
+  explicit vmar(zx_handle_t value) : object(value) {}
 
-  vmar(vmar&& other) : object(other.release()) {}
+  explicit vmar(handle&& h) : object(h.release()) {}
+
+  vmar(vmar&& other) : vmar(other.release()) {}
 
   vmar& operator=(vmar&& other) {
     reset(other.release());
     return *this;
   }
 
-  zx_status_t map(zx_vm_option_t options, size_t vmar_offset, const vmo& vmo, uint64_t vmo_offset,
-                  size_t len, zx_vaddr_t* ptr, bool is_user = false) const;
-
-  zx_status_t unmap(uintptr_t address, size_t len) const {
-    if (!get()) {
-      return ZX_ERR_BAD_HANDLE;
-    }
-    return get()->Unmap(address, len, VmAddressRegionOpChildren::Yes);
+  zx_status_t map(zx_vm_option_t options, size_t vmar_offset, const vmo& vmo_handle,
+                  uint64_t vmo_offset, size_t len, zx_vaddr_t* ptr) const {
+    return zx_vmar_map(get(), options, vmar_offset, vmo_handle.get(), vmo_offset, len, ptr);
   }
 
-  zx_status_t protect(zx_vm_option_t options, uintptr_t address, size_t len,
-                      bool is_user = false) const;
+  zx_status_t unmap(uintptr_t address, size_t len) const {
+    return zx_vmar_unmap(get(), address, len);
+  }
+
+  zx_status_t protect(zx_vm_option_t prot, uintptr_t address, size_t len) const {
+    return zx_vmar_protect(get(), prot, address, len);
+  }
 
   zx_status_t op_range(uint32_t op, uint64_t offset, uint64_t size, void* buffer,
                        size_t buffer_size) const {
@@ -73,20 +51,12 @@ class vmar final : public object<vmar> {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t destroy() const {
-    if (!get()) {
-      return ZX_ERR_BAD_HANDLE;
-    }
-    return get()->Destroy();
-  }
+  zx_status_t destroy() const { return zx_vmar_destroy(get()); }
 
   zx_status_t allocate(uint32_t options, size_t offset, size_t size, vmar* child,
-                       uintptr_t* child_addr, bool is_user = false) const;
+                       uintptr_t* child_addr) const;
 
   static inline unowned<vmar> root_self() { return unowned<vmar>(zx_vmar_root_self()); }
-
-  zx_status_t get_info(uint32_t topic, void* buffer, size_t buffer_size, size_t* actual_count,
-                       size_t* avail_count) const final;
 };
 
 using unowned_vmar = unowned<vmar>;

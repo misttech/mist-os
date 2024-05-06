@@ -6,12 +6,9 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_JOB_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_JOB_H_
 
-#include <lib/mistos/util/process.h>
 #include <lib/mistos/zx/process.h>
 #include <lib/mistos/zx/task.h>
 #include <zircon/errors.h>
-
-#include <object/job_dispatcher.h>
 
 namespace zx {
 
@@ -23,7 +20,9 @@ class job final : public task<job> {
 
   constexpr job() = default;
 
-  explicit job(fbl::RefPtr<JobDispatcher> value) : task(value) {}
+  explicit job(zx_handle_t value) : task(value) {}
+
+  explicit job(handle&& h) : task(h.release()) {}
 
   job(job&& other) : task(other.release()) {}
 
@@ -39,21 +38,19 @@ class job final : public task<job> {
   zx_status_t get_child(uint64_t koid, zx_rights_t rights, job* result) const {
     // Allow for |result| and |this| aliasing the same container.
     job h;
-    // zx_status_t status = zx_object_get_child(value_, koid, rights, h.reset_and_get_address());
+    zx_status_t status = zx_object_get_child(value_, koid, rights, h.reset_and_get_address());
     result->reset(h.release());
-    return ZX_OK;
+    return status;
   }
   zx_status_t get_child(uint64_t koid, zx_rights_t rights, process* result) const;
 
   zx_status_t set_policy(uint32_t options, uint32_t topic, const void* policy,
                          uint32_t count) const {
-    // return zx_job_set_policy(get(), options, topic, policy, count);
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx_job_set_policy(get(), options, topic, policy, count);
   }
 
   zx_status_t set_critical(uint32_t options, const zx::process& process) const {
-    // return zx_job_set_critical(get(), options, process.get());
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx_job_set_critical(get(), options, process.get());
   }
 
   // Ideally this would be called zx::job::default(), but default is a

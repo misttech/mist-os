@@ -13,14 +13,17 @@
 
 namespace zx {
 
+// class port;
 class suspend_token;
 
-template <typename T = raw_ptr_t>
+template <typename T = void>
 class task : public object<T> {
  public:
   constexpr task() = default;
 
-  explicit task(typename object<T>::StorageType value) : object<T>(value) {}
+  explicit task(zx_handle_t value) : object<T>(value) {}
+
+  explicit task(handle&& h) : object<T>(h.release()) {}
 
   task(task&& other) : object<T>(other.release()) {}
 
@@ -37,9 +40,12 @@ class task : public object<T> {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // zx_status_t create_exception_channel(uint32_t options, object<channel>* channel) const {
-  //   return ZX_ERR_NOT_SUPPORTED;
-  // }
+#if 0
+  zx_status_t create_exception_channel(uint32_t options, object<channel>* channel) const {
+    return zx_task_create_exception_channel(object<T>::get(), options,
+                                            channel->reset_and_get_address());
+  }
+#endif
 };
 
 }  // namespace zx
