@@ -274,7 +274,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             TypeError: Return value not a list.
         """
         resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.GET_SAVED_NETWORKS
+            method=_Sl4fMethods.SCAN_FOR_NETWORKS
         )
         result: object = resp.get("result")
 
