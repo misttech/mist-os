@@ -13,7 +13,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	pm_build "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
@@ -291,7 +290,7 @@ func TestMakeShards(t *testing.T) {
 
 	t.Run("shard with package repo", func(t *testing.T) {
 		buildDir := t.TempDir()
-		var blobMerkle, indirectBlobMerkle pm_build.MerkleRoot
+		var blobMerkle, indirectBlobMerkle build.MerkleRoot
 		for i := 0; i < 32; i++ {
 			blobMerkle[i] = byte(1)
 			indirectBlobMerkle[i] = byte(2)
@@ -311,9 +310,9 @@ func TestMakeShards(t *testing.T) {
 			if err := os.MkdirAll(filepath.Dir(subAbsPath), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			subpackageManifest := pm_build.PackageManifest{
+			subpackageManifest := build.PackageManifest{
 				Version: "1",
-				Blobs: []pm_build.PackageBlobInfo{
+				Blobs: []build.PackageBlobInfo{
 					{Merkle: indirectBlobMerkle},
 				},
 			}
@@ -321,12 +320,12 @@ func TestMakeShards(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			packageManifest := pm_build.PackageManifest{
+			packageManifest := build.PackageManifest{
 				Version: "1",
-				Blobs: []pm_build.PackageBlobInfo{
+				Blobs: []build.PackageBlobInfo{
 					{Merkle: blobMerkle},
 				},
-				Subpackages: []pm_build.PackageSubpackageInfo{
+				Subpackages: []build.PackageSubpackageInfo{
 					{Name: subpackageName, ManifestPath: subpackageManifestPath},
 				},
 			}
@@ -347,7 +346,7 @@ func TestMakeShards(t *testing.T) {
 		)
 
 		// Create regular blob.
-		writeBlob := func(blobsDir string, blobMerkle pm_build.MerkleRoot) {
+		writeBlob := func(blobsDir string, blobMerkle build.MerkleRoot) {
 			if err := os.MkdirAll(blobsDir, 0o700); err != nil {
 				t.Fatal(err)
 			}

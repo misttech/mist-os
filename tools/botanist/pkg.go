@@ -22,8 +22,8 @@ import (
 
 	"cloud.google.com/go/storage"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pmhttp"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
+	"go.fuchsia.dev/fuchsia/tools/botanist/repo"
 	"go.fuchsia.dev/fuchsia/tools/lib/gcsutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
@@ -276,7 +276,7 @@ func NewPackageServer(ctx context.Context, repoPath, remoteRepoURL, remoteBlobUR
 	if err != nil {
 		return nil, err
 	}
-	cs := pmhttp.NewConfigServerV2(func() []byte {
+	cs := repo.NewConfigServer(func() []byte {
 		return rootJsonBytes
 	}, false)
 	cPkgRepo, err := newCachedPkgRepo(ctx, repoPath, remoteRepoURL, remoteBlobURL)
