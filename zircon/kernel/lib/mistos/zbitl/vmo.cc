@@ -6,6 +6,8 @@
 #include <lib/mistos/zbitl/vmo.h>
 #include <zircon/errors.h>
 
+#include <ktl/limits.h>
+
 #include <ktl/enforce.h>
 
 namespace zbitl {

@@ -12,8 +12,7 @@
 
 #include <ktl/enforce.h>
 
-namespace zbitl {
-namespace decompress {
+namespace zbitl::decompress {
 
 fit::result<ktl::string_view, ktl::unique_ptr<ktl::byte[]>> DefaultAllocator(size_t bytes) {
   fbl::AllocChecker ac;
@@ -24,5 +23,4 @@ fit::result<ktl::string_view, ktl::unique_ptr<ktl::byte[]>> DefaultAllocator(siz
   return fit::error{"out of memory"};
 }
 
-}  // namespace decompress
-}  // namespace zbitl
+}  // namespace zbitl::decompress

@@ -76,9 +76,8 @@ struct VmoTestTraits {
     ASSERT_EQ(ZX_OK, storage.write(data.data(), offset, data.size()));
   }
 
-  static bool ToPayload(const storage_type& storage, uint32_t offset, payload_type& payload) {
+  static void ToPayload(const storage_type& storage, uint32_t offset, payload_type& payload) {
     payload = static_cast<payload_type>(offset);
-    return true;
   }
 
   static const zx::vmo& GetVmo(const storage_type& storage) { return storage; }
