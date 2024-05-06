@@ -3,105 +3,151 @@
 // found in the LICENSE file.
 
 //! FFX plugin for get a path of the image inside product bundle.
-
-use anyhow::{anyhow, Context, Result};
 use assembly_manifest::Image;
+use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
-use errors::ffx_bail;
-use ffx_core::ffx_plugin;
+use ffx_config::EnvironmentContext;
 use ffx_product_get_image_path_args::{GetImagePathCommand, ImageType, Slot};
-use ffx_writer::Writer;
-use fidl_fuchsia_developer_ffx_ext::RepositoryConfig;
+use fho::{return_user_error, user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use schemars::JsonSchema;
 use sdk_metadata::ProductBundle;
-use std::io::Write;
+use serde::{Deserialize, Serialize};
 use utf8_path::path_relative_from;
 
-/// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
-#[ffx_plugin()]
-pub async fn pb_get_image_path(
-    cmd: GetImagePathCommand,
-    #[ffx(machine = Vec<RepositoryConfig>)] mut writer: Writer,
-) -> Result<()> {
-    let product_bundle = ProductBundle::try_load_from(&cmd.product_bundle)
-        .context("Failed to load product bundle")?;
-    let path = extract_image_path(product_bundle, cmd)?;
-    if writer.is_machine() {
-        writer.machine(&path)?;
-    } else {
-        writeln!(writer, "{}", path.ok_or(anyhow!("Cannot find corresponding image"))?)?;
-    }
-    Ok(())
+/// CommandStatus is returned to indicate exit status of
+/// a command. The Ok variant returns the list of artifacts.
+#[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandStatus {
+    /// Successful execution with an optional informational string.
+    Ok { path: String },
+    /// Unexpected error with string.
+    UnexpectedError { message: String },
+    /// A known kind of error that can be reported usefully to the user
+    UserError { message: String },
 }
 
-fn extract_image_path(
-    product_bundle: ProductBundle,
-    cmd: GetImagePathCommand,
-) -> Result<Option<Utf8PathBuf>> {
-    let product_bundle = match product_bundle {
-        ProductBundle::V2(pb) => pb,
-    };
+/// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
+#[derive(FfxTool)]
+pub struct PbGetImagePathTool {
+    #[command]
+    pub cmd: GetImagePathCommand,
+    env: EnvironmentContext,
+}
 
-    if cmd.bootloader.is_some() && cmd.slot.is_some() {
-        ffx_bail!("Cannot pass in both --bootloader and --slot parameters");
-    }
+fho::embedded_plugin!(PbGetImagePathTool);
 
-    let compute_path = |path: &Utf8Path| -> Result<Utf8PathBuf> {
-        if cmd.relative_path {
-            path_relative_from(path, &cmd.product_bundle)
-        } else {
-            Ok(path.into())
+#[async_trait(?Send)]
+impl FfxMain for PbGetImagePathTool {
+    type Writer = VerifiedMachineWriter<CommandStatus>;
+
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        // TODO in next CL - read $product.path as the default product bundle.
+        if self.env.env_var("Here-to-avoid-dead-code").is_ok() {
+            unreachable!("This var does not exist")
         }
-    };
+        match self.pb_get_image_path().await {
+            Ok(Some(image_path)) => writer
+                .machine_or(
+                    &CommandStatus::Ok { path: image_path.to_string() },
+                    image_path.to_string(),
+                )
+                .map_err(Into::into),
+            Ok(None) => {
+                let e = user_error!("No image found based on the specified options");
+                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
+                Err(e)
+            }
+            Err(Error::User(e)) => {
+                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
+                Err(Error::User(e))
+            }
+            Err(err) => {
+                writer.machine(&CommandStatus::UnexpectedError { message: err.to_string() })?;
+                Err(err)
+            }
+        }
+    }
+}
 
-    if let Some(bootloader) = cmd.bootloader {
-        let bootloader_type = bootloader
-            .strip_prefix("firmware")
-            .ok_or(anyhow!("Bootloader name must begin with 'firmware'"))?
-            .trim_start_matches("_");
-        return product_bundle
-            .partitions
-            .bootloader_partitions
+impl PbGetImagePathTool {
+    pub async fn pb_get_image_path(&self) -> Result<Option<Utf8PathBuf>> {
+        let product_bundle = ProductBundle::try_load_from(&self.cmd.product_bundle)
+            .map_err(Into::<fho::Error>::into)?;
+        self.extract_image_path(product_bundle)
+    }
+
+    fn compute_path(&self, artifact_path: &Utf8Path) -> Result<Utf8PathBuf> {
+        if self.cmd.relative_path {
+            path_relative_from(artifact_path, &self.cmd.product_bundle).map_err(Into::into)
+        } else {
+            Ok(artifact_path.into())
+        }
+    }
+
+    fn extract_image_path(&self, product_bundle: ProductBundle) -> Result<Option<Utf8PathBuf>> {
+        let product_bundle = match product_bundle {
+            ProductBundle::V2(pb) => pb,
+        };
+
+        if self.cmd.bootloader.is_some() && self.cmd.slot.is_some() {
+            return_user_error!("Cannot pass in both --bootloader and --slot parameters");
+        }
+
+        if let Some(bootloader) = &self.cmd.bootloader {
+            let bootloader_type = bootloader
+                .strip_prefix("firmware")
+                .ok_or(user_error!("Bootloader name must begin with 'firmware'"))?
+                .trim_start_matches("_");
+            return product_bundle
+                .partitions
+                .bootloader_partitions
+                .iter()
+                .find_map(|b| {
+                    if b.partition_type == bootloader_type {
+                        Some(self.compute_path(&b.image))
+                    } else {
+                        None
+                    }
+                })
+                .transpose();
+        }
+
+        let system = match self.cmd.slot {
+            Some(Slot::A) => product_bundle.system_a,
+            Some(Slot::B) => product_bundle.system_b,
+            Some(Slot::R) => product_bundle.system_r,
+            _ => return_user_error!("No valid slot passed in {:#?}", self.cmd.slot),
+        }
+        .ok_or(user_error!("No image found in slot"))?;
+
+        system
             .iter()
-            .find_map(|b| {
-                if b.partition_type == bootloader_type {
-                    Some(compute_path(&b.image))
-                } else {
-                    None
+            .find_map(|i| match (i, self.cmd.image_type) {
+                (Image::ZBI { path, .. }, Some(ImageType::Zbi))
+                | (Image::VBMeta(path), Some(ImageType::VBMeta))
+                | (Image::FVM(path), Some(ImageType::Fvm))
+                | (Image::Fxfs { path, .. }, Some(ImageType::Fxfs))
+                | (Image::QemuKernel(path), Some(ImageType::QemuKernel)) => {
+                    Some(self.compute_path(path))
                 }
+                _ => None,
             })
-            .transpose();
+            .transpose()
     }
-
-    let system = match cmd.slot {
-        Some(Slot::A) => product_bundle.system_a,
-        Some(Slot::B) => product_bundle.system_b,
-        Some(Slot::R) => product_bundle.system_r,
-        _ => ffx_bail!("No valid slot passed in {:#?}", cmd.slot),
-    }
-    .ok_or(anyhow!("No image found in slot"))?;
-
-    system
-        .iter()
-        .find_map(|i| match (i, cmd.image_type) {
-            (Image::ZBI { path, .. }, Some(ImageType::Zbi))
-            | (Image::VBMeta(path), Some(ImageType::VBMeta))
-            | (Image::FVM(path), Some(ImageType::Fvm))
-            | (Image::Fxfs { path, .. }, Some(ImageType::Fxfs))
-            | (Image::QemuKernel(path), Some(ImageType::QemuKernel)) => Some(compute_path(path)),
-            _ => None,
-        })
-        .transpose()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use assembly_partitions_config::PartitionsConfig;
+    use fho::{Format, TestBuffers};
     use sdk_metadata::ProductBundleV2;
+    use std::fs;
 
-    #[test]
-    fn test_get_image_path() {
+    #[fuchsia::test]
+    async fn test_get_image_path() {
+        let env = ffx_config::test_init().await.expect("test env");
         let json = r#"
             {
                 bootloader_partitions: [
@@ -161,64 +207,88 @@ mod tests {
             update_package_hash: None,
             virtual_devices_path: None,
         });
-        let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::new(),
-            slot: Some(Slot::A),
-            image_type: Some(ImageType::Zbi),
-            relative_path: false,
-            bootloader: None,
-        };
-        let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
-        let expected_path = Utf8PathBuf::from("zbi/path");
-        assert_eq!(expected_path, path);
 
-        let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::new(),
-            slot: Some(Slot::A),
-            image_type: Some(ImageType::QemuKernel),
-            relative_path: false,
-            bootloader: None,
-        };
-        let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
-        let expected_path = Utf8PathBuf::from("qemu/path");
-        assert_eq!(expected_path, path);
-
-        let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
-            slot: Some(Slot::A),
-            image_type: Some(ImageType::Fvm),
-            relative_path: true,
-            bootloader: None,
-        };
-        let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
-        let expected_path = Utf8PathBuf::from("system_a/fvm.blk");
-        assert_eq!(expected_path, path);
-
-        let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
-            slot: None,
-            image_type: None,
-            relative_path: true,
-            bootloader: Some(String::from("firmware_bl2")),
-        };
-        let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
-        let expected_path = Utf8PathBuf::from("bootloader/path");
-        assert_eq!(expected_path, path);
-
-        let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
-            slot: None,
-            image_type: None,
-            relative_path: true,
-            bootloader: Some(String::from("firmware")),
-        };
-        let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
-        let expected_path = Utf8PathBuf::from("bootloader/empty/path");
-        assert_eq!(expected_path, path);
+        // Each test case is in its own scope
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: Utf8PathBuf::new(),
+                    slot: Some(Slot::A),
+                    image_type: Some(ImageType::Zbi),
+                    relative_path: false,
+                    bootloader: None,
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("zbi/path");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: Utf8PathBuf::new(),
+                    slot: Some(Slot::A),
+                    image_type: Some(ImageType::QemuKernel),
+                    relative_path: false,
+                    bootloader: None,
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("qemu/path");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
+                    slot: Some(Slot::A),
+                    image_type: Some(ImageType::Fvm),
+                    relative_path: true,
+                    bootloader: None,
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("system_a/fvm.blk");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
+                    slot: None,
+                    image_type: None,
+                    relative_path: true,
+                    bootloader: Some(String::from("firmware_bl2")),
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("bootloader/path");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
+                    slot: None,
+                    image_type: None,
+                    relative_path: true,
+                    bootloader: Some(String::from("firmware")),
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("bootloader/empty/path");
+            assert_eq!(expected_path, path);
+        }
     }
 
-    #[test]
-    fn test_get_image_path_not_found() {
+    #[fuchsia::test]
+    async fn test_get_image_path_not_found() {
+        let env = ffx_config::test_init().await.expect("test env");
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
             product_version: "".to_string(),
@@ -235,14 +305,166 @@ mod tests {
             update_package_hash: None,
             virtual_devices_path: None,
         });
-        let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::new(),
-            slot: Some(Slot::A),
-            image_type: Some(ImageType::VBMeta),
-            relative_path: false,
-            bootloader: None,
+        let tool = PbGetImagePathTool {
+            cmd: GetImagePathCommand {
+                product_bundle: Utf8PathBuf::new(),
+                slot: Some(Slot::A),
+                image_type: Some(ImageType::VBMeta),
+                relative_path: false,
+                bootloader: None,
+            },
+            env: env.context.clone(),
         };
-        let path = extract_image_path(pb, cmd).unwrap();
+        let path = tool.extract_image_path(pb).unwrap();
         assert_eq!(None, path);
+    }
+
+    #[fuchsia::test]
+    async fn test_get_image_path_not_found_machine() {
+        let env = ffx_config::test_init().await.expect("test env");
+        let pb_path = env.isolate_root.path().join("test_bundle");
+        fs::create_dir_all(&pb_path).expect("create test bundle dir");
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: Some(vec![
+                Image::ZBI {
+                    path: Utf8PathBuf::from_path_buf(pb_path.join("zbi/path")).expect("utf8 path"),
+                    signed: false,
+                },
+                Image::FVM(
+                    Utf8PathBuf::from_path_buf(pb_path.join("fvm/path")).expect("utf8 path"),
+                ),
+                Image::QemuKernel(
+                    Utf8PathBuf::from_path_buf(pb_path.join("qemu/path")).expect("utf8 path"),
+                ),
+            ]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
+            .expect("temp test product bundle");
+
+        let tool = PbGetImagePathTool {
+            cmd: GetImagePathCommand {
+                product_bundle: Utf8PathBuf::from_path_buf(pb_path).expect("utf8 path"),
+                slot: Some(Slot::A),
+                image_type: Some(ImageType::VBMeta),
+                relative_path: false,
+                bootloader: None,
+            },
+            env: env.context.clone(),
+        };
+        let test_buffers = TestBuffers::default();
+        let writer: <PbGetImagePathTool as FfxMain>::Writer =
+            <PbGetImagePathTool as FfxMain>::Writer::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers,
+            );
+
+        let result = tool.main(writer).await;
+
+        assert!(result.is_err(), "Expect result to be an error");
+        let raw = test_buffers.into_stdout_str();
+
+        let got: CommandStatus = serde_json::from_str(&raw).expect("parse output");
+        let want = CommandStatus::UserError {
+            message: "No image found based on the specified options".to_string(),
+        };
+        assert_eq!(got, want);
+        let test_buffers2 = TestBuffers::default();
+        let data: serde_json::Value = serde_json::from_str(&raw).expect("serde value");
+        let writer2: <PbGetImagePathTool as FfxMain>::Writer =
+            <PbGetImagePathTool as FfxMain>::Writer::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers2,
+            );
+
+        match writer2.verify_schema(&data) {
+            Ok(_) => (),
+            Err(e) => {
+                assert_eq!("", format!("Error verifying schema: {e:?}\n{data:?}"));
+            }
+        };
+    }
+
+    #[fuchsia::test]
+    async fn test_get_image_path_machine() {
+        let env = ffx_config::test_init().await.expect("test env");
+        let pb_path = env.isolate_root.path().join("test_bundle");
+        fs::create_dir_all(&pb_path).expect("create test bundle dir");
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: Some(vec![
+                Image::ZBI {
+                    path: Utf8PathBuf::from_path_buf(pb_path.join("zbi/path")).expect("utf8 path"),
+                    signed: false,
+                },
+                Image::FVM(
+                    Utf8PathBuf::from_path_buf(pb_path.join("fvm/path")).expect("utf8 path"),
+                ),
+                Image::QemuKernel(
+                    Utf8PathBuf::from_path_buf(pb_path.join("qemu/path")).expect("utf8 path"),
+                ),
+            ]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
+            .expect("temp test product bundle");
+
+        let tool = PbGetImagePathTool {
+            cmd: GetImagePathCommand {
+                product_bundle: Utf8Path::from_path(&pb_path).expect("utf8 path").into(),
+                slot: Some(Slot::A),
+                image_type: Some(ImageType::Zbi),
+                relative_path: false,
+                bootloader: None,
+            },
+            env: env.context.clone(),
+        };
+        let test_buffers = TestBuffers::default();
+        let writer: <PbGetImagePathTool as FfxMain>::Writer =
+            <PbGetImagePathTool as FfxMain>::Writer::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers,
+            );
+
+        let result = tool.main(writer).await;
+
+        assert!(result.is_ok(), "Expect result to be ok");
+        let raw = test_buffers.into_stdout_str();
+
+        let got: CommandStatus = serde_json::from_str(&raw).expect("parse output");
+        let want =
+            CommandStatus::Ok { path: pb_path.join("zbi/path").to_string_lossy().to_string() };
+        assert_eq!(got, want);
+        let test_buffers2 = TestBuffers::default();
+        let data: serde_json::Value = serde_json::from_str(&raw).expect("serde value");
+        let writer2: <PbGetImagePathTool as FfxMain>::Writer =
+            <PbGetImagePathTool as FfxMain>::Writer::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers2,
+            );
+
+        match writer2.verify_schema(&data) {
+            Ok(_) => (),
+            Err(e) => {
+                assert_eq!("", format!("Error verifying schema: {e:?}\n{data:?}"));
+            }
+        };
     }
 }

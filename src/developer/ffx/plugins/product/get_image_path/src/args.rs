@@ -62,11 +62,11 @@ pub struct GetImagePathCommand {
     #[argh(positional)]
     pub product_bundle: Utf8PathBuf,
 
-    /// the slot where image will be located in.
+    /// the slot where image will be located in. Valid slots are A,B,R.
     #[argh(option)]
     pub slot: Option<Slot>,
 
-    /// the type of image.
+    /// the type of image. Supported types are fvm, fxfs, qemu-kernel, vbmeta, zbi.
     #[argh(option)]
     pub image_type: Option<ImageType>,
 

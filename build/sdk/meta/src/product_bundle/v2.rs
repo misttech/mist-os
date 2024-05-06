@@ -354,8 +354,12 @@ impl ProductBundleV2 {
         let relativize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
                 for image in system.iter_mut() {
-                    let path = diff_utf8_paths(&image.source(), &product_bundle_dir)
-                        .ok_or(anyhow!("failed to rebase the file"))?;
+                    let path =
+                        diff_utf8_paths(&image.source(), &product_bundle_dir).ok_or(anyhow!(
+                            "failed to rebase the file: {} in {}",
+                            &image.source(),
+                            &product_bundle_dir
+                        ))?;
                     image.set_source(path);
                 }
             }
