@@ -6957,7 +6957,7 @@ Valid alternatives vary by machine, but include "linuxboot".
 
 **Current value (from the default):** `"linuxboot"`
 
-From //zircon/kernel/phys/qemu.gni:93
+From //zircon/kernel/phys/qemu.gni:105
 
 ### qr_codes_path
 
