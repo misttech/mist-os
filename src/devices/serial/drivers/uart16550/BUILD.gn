@@ -36,14 +36,14 @@ template("define_common_lib") {
       "//build/config/fuchsia:enable_zircon_asserts",
     ]
     sources = [ "uart16550.cc" ]
-    deps = [
-      ":uart16550_bind",
-      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
-    ]
+    deps = [ ":uart16550_bind" ]
     public_deps = [
-      "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
-      "//sdk/banjo/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_banjo_cpp",
+      "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
+      "//sdk/lib/driver/outgoing/cpp",
+      "//sdk/lib/fit",
+      "//sdk/lib/stdcompat",
       "//src/devices/lib/acpi",
+      "//src/devices/lib/driver:driver_runtime",
       "//src/lib/ddk",
       "//src/lib/ddktl",
       "//zircon/system/ulib/fbl",
@@ -106,6 +106,8 @@ test("uart16550-test-bin") {
   sources = [ "uart16550-test.cc" ]
   deps = [
     ":uart16550_lib_for_testing",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/fit",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/hwreg:hwreg-mock",
     "//zircon/system/ulib/zx",
