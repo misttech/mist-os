@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/ddk/trace/event.h>
+#include <lib/trace/event.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>

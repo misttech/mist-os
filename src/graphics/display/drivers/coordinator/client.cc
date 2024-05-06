@@ -12,7 +12,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
@@ -21,6 +20,7 @@
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>

@@ -8,10 +8,7 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
@@ -40,8 +37,6 @@
 #include <utility>
 #include <vector>
 
-#include <ddktl/device.h>
-#include <ddktl/unbind-txn.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>

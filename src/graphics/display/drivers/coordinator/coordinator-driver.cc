@@ -11,7 +11,6 @@
 #include <zircon/types.h>
 
 #include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/coordinator/controller.h"

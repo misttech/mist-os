@@ -6,9 +6,9 @@
 
 #include <lib/async/cpp/wait.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
+#include <lib/trace/event.h>
 #include <lib/zx/event.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>

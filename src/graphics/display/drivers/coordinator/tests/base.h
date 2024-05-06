@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/zx/bti.h>
 #include <threads.h>
 
@@ -17,7 +16,6 @@
 #include <memory>
 #include <vector>
 
-#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <gtest/gtest.h>
 

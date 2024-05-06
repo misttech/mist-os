@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <cstdint>
