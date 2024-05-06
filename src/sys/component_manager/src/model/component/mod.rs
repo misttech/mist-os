@@ -31,7 +31,6 @@ use {
         resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage},
     },
     async_trait::async_trait,
-    bedrock_error::{Explain, RouterError},
     cm_moniker::{IncarnationId, InstancedMoniker},
     cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::{Name, Url},
@@ -57,6 +56,7 @@ use {
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    router_error::{Explain, RouterError},
     sandbox::{Capability, Dict, Open, Request, Routable, Router},
     std::{
         clone::Clone,

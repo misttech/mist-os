@@ -19,7 +19,6 @@ use {
         error::{ComponentInstanceError, RoutingError},
     },
     async_trait::async_trait,
-    bedrock_error::RouterError,
     cm_rust::{
         CapabilityDecl, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
     },
@@ -31,6 +30,7 @@ use {
     futures::FutureExt,
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
+    router_error::RouterError,
     sandbox::Routable,
     sandbox::{Capability, Dict, Request, Router, Unit},
     std::{collections::HashMap, fmt::Debug, sync::Arc},

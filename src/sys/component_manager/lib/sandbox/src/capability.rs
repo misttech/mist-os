@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bedrock_error::Explain;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
+use router_error::Explain;
 use std::{fmt::Debug, sync::Arc};
 use thiserror::Error;
 use vfs::directory::entry::DirectoryEntry;

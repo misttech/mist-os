@@ -7,12 +7,12 @@ use crate::model::component::ComponentInstance;
 use crate::model::component::WeakComponentInstance;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
-use bedrock_error::{Explain, RouterError};
 use cm_types::Availability;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use router_error::{Explain, RouterError};
 use routing::error::ComponentInstanceError;
 use sandbox::Capability;
 use sandbox::Dict;
@@ -312,7 +312,7 @@ impl WeakComponentTokenExt for WeakComponentToken {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use bedrock_error::DowncastErrorForTest;
+    use router_error::DowncastErrorForTest;
     use sandbox::Data;
 
     #[derive(Debug)]

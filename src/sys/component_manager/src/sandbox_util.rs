@@ -12,7 +12,6 @@ use {
         error::RoutingError, policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
-    bedrock_error::RouterError,
     cm_types::IterablePath,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -22,6 +21,7 @@ use {
     },
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
+    router_error::RouterError,
     sandbox::{Capability, Dict, Message, Open, Request, Routable, Router, Sendable, Sender},
     std::{fmt::Debug, sync::Arc},
     tracing::warn,
@@ -442,10 +442,10 @@ pub mod tests {
 
     use super::*;
     use assert_matches::assert_matches;
-    use bedrock_error::DowncastErrorForTest;
     use cm_rust::Availability;
     use cm_types::RelativePath;
     use fuchsia_async::TestExecutor;
+    use router_error::DowncastErrorForTest;
     use sandbox::{Data, Receiver, WeakComponentToken};
     use std::{pin::pin, sync::Weak, task::Poll};
 

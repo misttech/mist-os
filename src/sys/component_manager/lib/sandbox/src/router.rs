@@ -4,13 +4,13 @@
 
 use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken};
 use async_trait::async_trait;
-use bedrock_error::RouterError;
 use cm_types::Availability;
 use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::TryStreamExt;
+use router_error::RouterError;
 use std::fmt::Debug;
 use std::{fmt, sync::Arc};
 

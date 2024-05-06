@@ -4,12 +4,12 @@
 
 use {
     crate::{policy::PolicyError, rights::Rights},
-    bedrock_error::{Explain, RouterError},
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
     moniker::{ChildName, Moniker, MonikerError},
+    router_error::{Explain, RouterError},
     std::sync::Arc,
     thiserror::Error,
 };

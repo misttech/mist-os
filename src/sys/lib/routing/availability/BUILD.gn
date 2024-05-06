@@ -18,7 +18,7 @@ rustc_library("availability") {
 
   deps = [
     "//src/lib/zircon/rust:fuchsia-zircon-status",
-    "//src/sys/component_manager/lib/bedrock_error",
+    "//src/sys/component_manager/lib/router_error",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:thiserror",
   ]

@@ -15,7 +15,6 @@ use {
     },
     assert_matches::assert_matches,
     async_utils::PollExt,
-    bedrock_error::{DowncastErrorForTest, RouterError},
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
@@ -27,6 +26,7 @@ use {
     fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, pin_mut, StreamExt},
     moniker::{Moniker, MonikerBase},
+    router_error::{DowncastErrorForTest, RouterError},
     routing::{error::RoutingError, RouteRequest},
     std::path::Path,
     vfs::{

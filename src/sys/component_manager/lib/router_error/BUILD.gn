@@ -4,7 +4,7 @@
 
 import("//build/rust/rustc_library.gni")
 
-rustc_library("bedrock_error") {
+rustc_library("router_error") {
   edition = "2021"
   with_unit_tests = false
 

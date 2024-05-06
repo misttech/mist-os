@@ -40,7 +40,6 @@ use {
     assert_matches::assert_matches,
     async_trait::async_trait,
     async_utils::PollExt,
-    bedrock_error::{DowncastErrorForTest, RouterError},
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::RelativePath,
@@ -61,6 +60,7 @@ use {
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    router_error::{DowncastErrorForTest, RouterError},
     routing::component_instance::ComponentInstanceInterface,
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,

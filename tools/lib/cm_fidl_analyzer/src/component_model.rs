@@ -10,7 +10,6 @@ use {
         PkgUrlMatch,
     },
     anyhow::{anyhow, Context, Result},
-    bedrock_error::Explain,
     cm_config::RuntimeConfig,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
@@ -26,6 +25,7 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::FutureExt,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    router_error::Explain,
     routing::{
         capability_source::{CapabilitySource, ComponentCapability},
         component_instance::{

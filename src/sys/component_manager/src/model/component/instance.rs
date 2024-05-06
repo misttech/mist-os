@@ -1254,7 +1254,7 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
-    async fn route(&self, request: Request) -> Result<Capability, bedrock_error::RouterError> {
+    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
         self.source
             .ensure_started(&StartReason::AccessCapability {
                 target: request.target.moniker().clone(),
