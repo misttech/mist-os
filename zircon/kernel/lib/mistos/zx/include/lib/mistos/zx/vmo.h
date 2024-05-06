@@ -6,9 +6,12 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_VMO_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_VMO_H_
 
+#include <lib/mistos/zx/arc.h>
 #include <lib/mistos/zx/handle.h>
 #include <lib/mistos/zx/object.h>
 #include <lib/mistos/zx/resource.h>
+
+#include "fbl/ref_ptr.h"
 
 namespace zx {
 
@@ -92,6 +95,7 @@ class vmo final : public object<vmo> {
 };
 
 using unowned_vmo = unowned<vmo>;
+using ArcVmo = fbl::RefPtr<Arc<vmo>>;
 
 }  // namespace zx
 

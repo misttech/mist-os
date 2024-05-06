@@ -4,6 +4,7 @@
 
 source_set("tests") {
   sources = [
+    "arc.cc",
     "object-test.cc",
     "vmo-clone.cc",
     "vmo-clone2.cc",
