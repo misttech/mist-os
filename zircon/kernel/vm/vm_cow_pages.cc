@@ -7063,7 +7063,6 @@ uint64_t VmCowPages::DiscardPages(zx_duration_t min_duration_since_reclaimable,
   zx_status_t status = UnmapAndRemovePagesLocked(0, size_, freed_list, &pages_freed);
 
   if (status != ZX_OK) {
-    printf("Failed to remove pages from discardable vmo %p: %d\n", this, status);
     return pages_freed;
   }
 
