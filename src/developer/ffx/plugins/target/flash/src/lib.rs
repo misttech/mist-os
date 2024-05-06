@@ -49,7 +49,7 @@ impl FfxMain for FlashTool {
         preflight_checks(&self.cmd, &mut writer)?;
 
         // Massage FlashCommand
-        let cmd = preprocess_flash_cmd(self.cmd).await?;
+        let cmd = preprocess_flash_cmd(&mut writer, self.cmd).await?;
 
         flash_plugin_impl(self.target_proxy.await?, cmd, &mut writer).await
     }
@@ -68,7 +68,10 @@ fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
     Ok(())
 }
 
-async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
+async fn preprocess_flash_cmd<W: Write>(
+    mut writer: W,
+    mut cmd: FlashCommand,
+) -> Result<FlashCommand> {
     match cmd.authorized_keys.as_ref() {
         Some(ssh) => {
             let ssh_file = match std::fs::canonicalize(ssh) {
@@ -104,6 +107,27 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
             }
         }
     };
+
+    if cmd.product_bundle.is_some()
+        && cmd.product_bundle.clone().unwrap().starts_with("\"")
+        && cmd.product_bundle.clone().unwrap().ends_with("\"")
+    {
+        let cleaned_product_bundle = cmd
+            .product_bundle
+            .unwrap()
+            .strip_prefix('"')
+            .unwrap()
+            .strip_suffix('"')
+            .unwrap()
+            .to_string();
+        writeln!(
+            writer,
+            "Passed product bundle was wrapped in quotes, trimming it to: {}",
+            cleaned_product_bundle
+        )
+        .user_message("Error writing ser message")?;
+        cmd.product_bundle = Some(cleaned_product_bundle);
+    }
     Ok(cmd)
 }
 
@@ -266,23 +290,54 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_file_throws_err() {
-        assert!(preprocess_flash_cmd(FlashCommand {
-            manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
-            ..Default::default()
-        })
+        let writer = Vec::new();
+        assert!(preprocess_flash_cmd(
+            writer,
+            FlashCommand {
+                manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
+                ..Default::default()
+            }
+        )
         .await
         .is_err())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_clean_quotes() {
+        let pb_tmp_file = NamedTempFile::new().expect("tmp access failed");
+        let pb_tmp_file_name = pb_tmp_file.path().to_string_lossy().to_string();
+        let wrapped_pb_tmp_file_name = format!("\"{}\"", pb_tmp_file_name);
+
+        let ssh_tmp_file = NamedTempFile::new().expect("tmp access failed");
+        let ssh_tmp_file_name = ssh_tmp_file.path().to_string_lossy().to_string();
+
+        let writer = Vec::new();
+        let cmd = preprocess_flash_cmd(
+            writer,
+            FlashCommand {
+                product_bundle: Some(wrapped_pb_tmp_file_name),
+                authorized_keys: Some(ssh_tmp_file_name),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(Some(pb_tmp_file_name), cmd.product_bundle);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_ssh_file_throws_err() {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        assert!(preprocess_flash_cmd(FlashCommand {
-            manifest_path: Some(PathBuf::from(tmp_file_name)),
-            authorized_keys: Some("ssh_does_not_exist".to_string()),
-            ..Default::default()
-        },)
+        let writer = Vec::new();
+        assert!(preprocess_flash_cmd(
+            writer,
+            FlashCommand {
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
+                authorized_keys: Some("ssh_does_not_exist".to_string()),
+                ..Default::default()
+            },
+        )
         .await
         .is_err())
     }
