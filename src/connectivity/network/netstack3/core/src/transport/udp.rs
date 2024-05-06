@@ -2440,12 +2440,10 @@ impl<
         *dual_stack_enabled
     }
 
-    type OtherSendOptions = DatagramSocketOptions<Ipv4, CC::WeakDeviceId>;
-
-    fn to_other_send_options<'a>(
+    fn to_other_socket_options<'a>(
         &self,
         state: &'a IpOptions<Ipv6, Self::WeakDeviceId, Udp<BC>>,
-    ) -> &'a Self::OtherSendOptions {
+    ) -> &'a DatagramSocketOptions<Ipv4, Self::WeakDeviceId> {
         &state.other_stack().socket_options
     }
 

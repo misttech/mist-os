@@ -10,7 +10,7 @@ use core::num::{NonZeroU32, NonZeroU8};
 
 use net_types::{
     ip::{Ip, Ipv6Addr, Ipv6SourceAddr, Mtu},
-    MulticastAddress, SpecifiedAddr,
+    SpecifiedAddr,
 };
 use packet::{BufferMut, SerializeError};
 use thiserror::Error;
@@ -79,7 +79,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     where
         S: TransportPacketSerializer,
         S::Buffer: BufferMut,
-        O: SendOptions<I, Self::WeakDeviceId>;
+        O: SendOptions<I>;
 
     /// Creates a temporary IP socket and sends a single packet on it.
     ///
@@ -118,7 +118,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         S: TransportPacketSerializer,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
-        O: SendOptions<I, Self::WeakDeviceId>,
+        O: SendOptions<I>,
     {
         let tmp = self
             .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
@@ -146,7 +146,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         S: TransportPacketSerializer,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> S,
-        O: SendOptions<I, Self::WeakDeviceId>,
+        O: SendOptions<I>,
     {
         self.send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
@@ -421,7 +421,7 @@ where
     where
         S: TransportPacketSerializer,
         S::Buffer: BufferMut,
-        O: SendOptions<I, Self::WeakDeviceId>,
+        O: SendOptions<I>,
     {
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
         self.increment(|counters| &counters.send_ip_packet);
@@ -437,28 +437,21 @@ where
 /// instead of an inherent impl on a type so that users of sockets that don't
 /// need certain option types, like TCP for anything multicast-related, can
 /// avoid allocating space for those options.
-pub trait SendOptions<I: Ip, D> {
+pub trait SendOptions<I: Ip> {
     /// Returns the hop limit to set on a packet going to the given destination.
     ///
     /// If `Some(u)`, `u` will be used as the hop limit (IPv6) or TTL (IPv4) for
     /// a packet going to the given destination. Otherwise the default value
     /// will be used.
     fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8>;
-
-    /// Returns the interface selected for outgoing multicast packets.`
-    fn multicast_interface(&self) -> Option<&D>;
 }
 
 /// Empty send options that never overrides default values.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct DefaultSendOptions;
 
-impl<I: Ip, D> SendOptions<I, D> for DefaultSendOptions {
+impl<I: Ip> SendOptions<I> for DefaultSendOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
-        None
-    }
-
-    fn multicast_interface(&self) -> Option<&D> {
         None
     }
 }
@@ -513,17 +506,12 @@ where
     BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
     CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
-    O: SendOptions<I, CC::WeakDeviceId> + ?Sized,
+    O: SendOptions<I> + ?Sized,
 {
     trace_duration!(bindings_ctx, c"ip::send_packet");
 
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto } } = socket;
-
-    let device = device.as_ref().or_else(|| {
-        remote_ip.addr().is_multicast().then(|| options.multicast_interface()).flatten()
-    });
-
-    let device = match device.map(|d| d.upgrade()) {
+    let device = match device.as_ref().map(|d| d.upgrade()) {
         Some(Some(device)) => Some(device),
         Some(None) => return Err((body, ResolveRouteError::Unreachable.into())),
         None => None,
@@ -1032,7 +1020,7 @@ pub(crate) mod testutil {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I, Self::WeakDeviceId>,
+            O: SendOptions<I>,
         {
             panic!("FakeIpSocketCtx can't send packets, wrap it in a FakeCoreCtx instead");
         }
@@ -1073,7 +1061,7 @@ pub(crate) mod testutil {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I, Self::WeakDeviceId>,
+            O: SendOptions<I>,
         {
             let meta = match self.state.as_mut().resolve_send_meta(socket, mtu, options) {
                 Ok(meta) => meta,
@@ -1280,7 +1268,7 @@ pub(crate) mod testutil {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I, Self::WeakDeviceId>,
+            O: SendOptions<I>,
         {
             IpSocketHandler::<I, BC>::send_ip_packet(
                 self.inner_mut::<I>(),
@@ -1321,7 +1309,7 @@ pub(crate) mod testutil {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I, Self::WeakDeviceId>,
+            O: SendOptions<I>,
         {
             let meta = match self.state.inner_mut::<I>().resolve_send_meta(socket, mtu, options) {
                 Ok(meta) => meta,
@@ -1530,7 +1518,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, IpSockSendError>
         where
-            O: SendOptions<I, D::Weak>,
+            O: SendOptions<I>,
         {
             let IpSockDefinition { remote_ip, local_ip, device, proto } = &socket.definition;
             let device = device
@@ -1639,14 +1627,10 @@ mod tests {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct WithHopLimit(Option<NonZeroU8>);
 
-    impl<I: Ip, D> SendOptions<I, D> for WithHopLimit {
+    impl<I: Ip> SendOptions<I> for WithHopLimit {
         fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
             let Self(hop_limit) = self;
             *hop_limit
-        }
-
-        fn multicast_interface(&self) -> Option<&D> {
-            None
         }
     }
 
@@ -2104,14 +2088,10 @@ mod tests {
 
         const SET_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(42));
 
-        impl<A: IpAddress, D> SendOptions<A::Version, D> for SetHopLimitFor<A> {
+        impl<A: IpAddress> SendOptions<A::Version> for SetHopLimitFor<A> {
             fn hop_limit(&self, destination: &SpecifiedAddr<A>) -> Option<NonZeroU8> {
                 let Self(expected_destination) = self;
                 (destination == expected_destination).then_some(SET_HOP_LIMIT)
-            }
-
-            fn multicast_interface(&self) -> Option<&D> {
-                None
             }
         }
 

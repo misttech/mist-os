@@ -5489,7 +5489,7 @@ mod tests {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I, Self::WeakDeviceId>,
+            O: SendOptions<I>,
         {
             self.inner.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }

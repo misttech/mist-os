@@ -21,18 +21,16 @@ use crate::{
     convert::BidirectionalConverter,
     device::{self, Device, DeviceIdContext},
     ip::{
-        socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError,
-            SendOptions,
-        },
+        socket::{DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError, SendOptions},
         EitherDeviceId, HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError,
         TransportIpContext,
     },
     socket::{
         address::SocketIpAddr,
         datagram::{
-            self, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketSpec,
-            DualStackDatagramBoundStateContext, NonDualStackDatagramBoundStateContext,
+            self, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
+            DatagramSocketSpec, DualStackDatagramBoundStateContext,
+            NonDualStackDatagramBoundStateContext,
         },
         MaybeDualStack,
     },
@@ -167,12 +165,10 @@ where
         self.uninstantiable_unreachable()
     }
 
-    type OtherSendOptions = DefaultSendOptions;
-
-    fn to_other_send_options<'a>(
+    fn to_other_socket_options<'a>(
         &self,
         _state: &'a datagram::IpOptions<I, Self::WeakDeviceId, S>,
-    ) -> &'a Self::OtherSendOptions {
+    ) -> &'a DatagramSocketOptions<I::OtherVersion, Self::WeakDeviceId> {
         self.uninstantiable_unreachable()
     }
 
@@ -327,7 +323,7 @@ impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for Uninstanti
     where
         S: Serializer,
         S::Buffer: BufferMut,
-        O: SendOptions<I, Self::WeakDeviceId>,
+        O: SendOptions<I>,
     {
         self.uninstantiable_unreachable()
     }
