@@ -173,6 +173,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
             .add_developer_overrides(
                 developer_overrides.developer_only_options,
                 developer_overrides.kernel,
+                developer_overrides.packages,
             )
             .context("Setting developer overrides")?;
     }
@@ -359,6 +360,14 @@ fn print_developer_overrides_banner(
         println!("  Additional kernel command line arguments:");
         for arg in &overrides.kernel.command_line_args {
             println!("    {arg}");
+        }
+    }
+
+    if !overrides.packages.is_empty() {
+        println!();
+        println!("  Additional packages:");
+        for details in &overrides.packages {
+            println!("    {} -> {}", details.set, details.package);
         }
     }
     println!();

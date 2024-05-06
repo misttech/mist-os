@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::PackageDetails;
+
 /// Developer Overrides struct that is similar to the AssemblyConfig struct,
 /// but has extra fields added that allow it to convey extra fields.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -32,6 +34,10 @@ pub struct DeveloperOverrides {
     /// platform configuration before that's parsed into it's real type.
     #[serde(default)]
     pub platform: serde_json::Value,
+
+    /// Packages to add to the build.
+    #[serde(default)]
+    pub packages: Vec<PackageDetails>,
 }
 
 /// Special flags for assembly that can only be used in the context of developer

@@ -42,7 +42,11 @@ impl AssemblyGenerated for PackageDestination {
     fn assembly_generated(&self) -> bool {
         match self {
             // These are all provided to assembly:
-            Self::FromAIB(_) | Self::FromBoard(_) | Self::FromProduct(_) | Self::ForTest => false,
+            Self::FromAIB(_)
+            | Self::FromBoard(_)
+            | Self::FromProduct(_)
+            | Self::FromDeveloper(_)
+            | Self::ForTest => false,
             // Everything else is assembly-generated.
             _ => true,
         }
@@ -97,7 +101,7 @@ impl AssemblyGenerated for BootfsPackageDestination {
         match self {
             // Package in bootfs that come from AIB, Boards, or are for testing
             // assembly itself are not "assembly generated".
-            Self::FromAIB(_) | Self::FromBoard(_) | Self::ForTest => false,
+            Self::FromAIB(_) | Self::FromBoard(_) | Self::FromDeveloper(_) | Self::ForTest => false,
             // Everything else is assembly-generated.
             _ => true,
         }
