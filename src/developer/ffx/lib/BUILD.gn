@@ -23,7 +23,6 @@ libs = [
   "netext",
   "pbms",
   "pkg",
-  "port_picker",
   "protocols",
   "rcs",
   "schema",
