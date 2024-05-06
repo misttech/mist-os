@@ -2,15 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod escrow;
-pub mod lifecycle;
-
 /// This module tests the diagnostics code with the actual component hierarchy.
 #[cfg(test)]
 mod tests {
     use {
-        super::escrow::DurationStats,
-        super::lifecycle::ComponentLifecycleTimeStats,
         crate::model::{
             component::{testing::wait_until_event_get_timestamp, ComponentInstance, StartReason},
             events::registry::EventSubscription,
@@ -21,6 +16,8 @@ mod tests {
         cm_rust::{Availability, UseEventStreamDecl, UseSource},
         cm_rust_testing::*,
         cm_types::Name,
+        diagnostics::escrow::DurationStats,
+        diagnostics::lifecycle::ComponentLifecycleTimeStats,
         diagnostics_assertions::{assert_data_tree, AnyProperty, HistogramAssertion},
         diagnostics_hierarchy::DiagnosticsHierarchy,
         fidl::endpoints::ServerEnd,

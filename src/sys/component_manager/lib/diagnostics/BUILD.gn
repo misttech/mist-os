@@ -11,10 +11,13 @@ rustc_library("diagnostics") {
 
   deps = [
     "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
+    "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/lib/injectable-time",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/component_manager/lib/errors",
@@ -31,10 +34,13 @@ rustc_library("diagnostics") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:itertools",
   ]
 
   sources = [
+    "src/escrow.rs",
     "src/lib.rs",
+    "src/lifecycle.rs",
     "src/task_metrics/component_stats.rs",
     "src/task_metrics/component_tree_stats.rs",
     "src/task_metrics/constants.rs",
