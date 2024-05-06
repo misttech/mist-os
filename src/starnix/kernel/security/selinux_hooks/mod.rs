@@ -235,7 +235,7 @@ pub fn set_procattr(
 }
 
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
-fn check_permission(
+pub(super) fn check_permission(
     permission_check: &impl PermissionCheck,
     source_sid: SecurityId,
     target_sid: SecurityId,

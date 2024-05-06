@@ -10,6 +10,7 @@ use crate::{
 
 use {
     selinux::{security_server::SecurityServer, InitialSid, SecurityId},
+    selinux_common::ProcessPermission,
     starnix_uapi::{error, errors::Errno, signals::Signal},
     std::sync::Arc,
 };
@@ -199,6 +200,21 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
+        )
+    })
+}
+
+/// Called when the current task queries the session Id of the `target` task.
+/// Corresponds to the `task_getsid` LSM hook.
+pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
+    check_if_selinux(source, |security_server| {
+        let source_sid = get_current_sid(&source.thread_group);
+        let target_sid = get_current_sid(&target.thread_group);
+        selinux_hooks::check_permission(
+            &security_server.as_permission_check(),
+            source_sid,
+            target_sid,
+            ProcessPermission::GetSession,
         )
     })
 }
@@ -753,6 +769,24 @@ mod tests {
     async fn setpgid_access_allowed_for_permissive_mode() {
         let (source_task, target_task) = create_task_pair_with_permissive_selinux();
         assert_eq!(check_setpgid_access(&source_task, &target_task), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn task_getsid_allowed_for_selinux_disabled() {
+        let (source_task, target_task) = create_task_pair_with_selinux_disabled();
+        assert_eq!(check_task_getsid(&source_task, &target_task), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn task_getsid_allowed_for_fake_mode() {
+        let (source_task, target_task) = create_task_pair_with_fake_selinux();
+        assert_eq!(check_task_getsid(&source_task, &target_task), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn task_getsid_allowed_for_permissive_mode() {
+        let (source_task, target_task) = create_task_pair_with_permissive_selinux();
+        assert_eq!(check_task_getsid(&source_task, &target_task), Ok(()));
     }
 
     #[fuchsia::test]

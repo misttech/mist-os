@@ -381,8 +381,9 @@ pub fn sys_getsid(
     pid: pid_t,
 ) -> Result<pid_t, Errno> {
     let weak = get_task_or_current(current_task, pid);
-    let task = Task::from_weak(&weak)?;
-    let sid = task.thread_group.read().process_group.session.leader;
+    let target_task = Task::from_weak(&weak)?;
+    security::check_task_getsid(current_task, &target_task)?;
+    let sid = target_task.thread_group.read().process_group.session.leader;
     Ok(sid)
 }
 
