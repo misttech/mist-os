@@ -10,6 +10,7 @@ fidl("fuchsia.wlan.policy") {
   excluded_checks = [ "vector-bounds-not-specified" ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [

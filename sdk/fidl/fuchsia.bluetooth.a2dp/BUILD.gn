@@ -8,6 +8,7 @@ fidl("fuchsia.bluetooth.a2dp") {
   name = "fuchsia.bluetooth.a2dp"
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [ "audio_mode.fidl" ]

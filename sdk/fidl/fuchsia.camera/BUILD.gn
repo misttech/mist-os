@@ -12,6 +12,7 @@ fidl("fuchsia.camera") {
   ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Media"
 
   sources = [

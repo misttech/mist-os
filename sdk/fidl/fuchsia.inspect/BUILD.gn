@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.inspect") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Diagnostics"
   api = "fuchsia.inspect.api"
   sources = [

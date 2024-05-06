@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.tracing.provider") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   api = "fuchsia.tracing.provider.api"
   sources = [ "provider.fidl" ]

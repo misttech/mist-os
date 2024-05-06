@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.media.sounds") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Media"
 
   sources = [ "sound_player.fidl" ]

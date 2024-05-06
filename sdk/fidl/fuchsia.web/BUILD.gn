@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.web") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   sources = [
     "constants.fidl",

@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.wlan.product.deprecatedconfiguration") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [ "wlan_deprecated_configuration.fidl" ]

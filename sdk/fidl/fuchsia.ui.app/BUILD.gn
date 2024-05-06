@@ -8,6 +8,7 @@ import("//build/fidl/fidl.gni")
 # reorganized.
 fidl("fuchsia.ui.app") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [

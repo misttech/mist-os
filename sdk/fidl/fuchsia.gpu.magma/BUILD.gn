@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.gpu.magma") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Graphics"
   sources = [ "magma.fidl" ]
   public_deps = [

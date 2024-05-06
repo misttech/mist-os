@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.camera2.hal") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Media"
 
   sources = [ "hal.fidl" ]

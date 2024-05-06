@@ -8,6 +8,7 @@ fidl("fuchsia.bluetooth.hfp") {
   name = "fuchsia.bluetooth.hfp"
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [ "hfp.fidl" ]

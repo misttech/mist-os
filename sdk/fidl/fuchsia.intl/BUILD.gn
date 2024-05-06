@@ -12,6 +12,7 @@ fidl("fuchsia.intl") {
   ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [

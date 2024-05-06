@@ -41,7 +41,7 @@ import("//build/testing/golden_files.gni")
 #    - Type: list(path)
 #
 #  * api, available, excluded_checks, experimental_checks, experimental_flags,
-#    goldens_dir, non_fidl_deps, sdk_category, sdk_area, versioned
+#    goldens_dir, non_fidl_deps, sdk_category, sdk_area, versioned, stable
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
 #  * testonly, visibility, public_deps, applicable_licenses
@@ -68,11 +68,10 @@ template("fidl_library") {
       is_sdk_included && invoker.sdk_category != "internal" &&
       invoker.sdk_category != "experimental" &&
       invoker.sdk_category != "partner_internal"
-  is_sdk_included_publishable_nontest =
-      is_sdk_included_publishable && invoker.sdk_category != "cts"
   requires_compatibility_tests = is_sdk_included_publishable ||
                                  (defined(invoker.sdk_category) &&
                                   invoker.sdk_category == "partner_internal")
+  stable = defined(invoker.stable) && invoker.stable
   in_fuchsia_namespace =
       invoker.library_name ==
       "fuchsia." + string_replace(invoker.library_name, "fuchsia.", "", 1)
@@ -94,7 +93,7 @@ template("fidl_library") {
                  "in_fuchsia_namespace",
                ])
   }
-  if (!is_sdk_included_publishable_nontest) {
+  if (!stable) {
     not_needed(invoker, [ "api" ])
   }
 
@@ -404,7 +403,7 @@ template("fidl_library") {
 
   if (is_sdk_included) {
     sdk_category = invoker.sdk_category
-    if (is_sdk_included_publishable_nontest) {
+    if (stable) {
       api_reference = "$library_name.api"
       if (defined(invoker.api)) {
         api_reference = invoker.api
@@ -467,6 +466,10 @@ template("fidl_library") {
       ]
       args += [ "--specs" ] + rebase_path(sdk_metas, root_build_dir)
       args += [ "--sources" ] + sdk_sources
+
+      if (stable) {
+        args += [ "--stable" ]
+      }
 
       deps = sdk_deps
     }

@@ -15,6 +15,7 @@ fidl("fuchsia.sys") {
   ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [

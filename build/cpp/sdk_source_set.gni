@@ -26,8 +26,7 @@ import("//build/sdk/sdk_atom.gni")
 #   api (optional)
 #     Path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
-#     explicitly acknowledged. It is mandatory for publication categories of
-#     "partner" or "public".
+#     explicitly acknowledged. It is mandatory for stable = true.
 #     Defaults to "<SDK name>.api".
 #
 #   sdk_name (required)

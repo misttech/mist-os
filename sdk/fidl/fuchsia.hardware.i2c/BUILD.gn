@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.i2c") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   sources = [ "i2c.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

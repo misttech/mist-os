@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.temperature") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   sources = [ "temperature.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
