@@ -142,8 +142,7 @@ if (toolchain_environment == "kernel") {
             #"//zircon/kernel/lib/mistos/starnix_uapi/tests",
             #"//zircon/kernel/lib/mistos/userloader/tests",
             "//zircon/kernel/lib/mistos/util/tests",
-
-            #"//zircon/kernel/lib/mistos/zbi_parser/tests",
+            "//zircon/kernel/lib/mistos/zbi_parser/tests",
             "//zircon/kernel/lib/mistos/zbitl/tests",
             "//zircon/kernel/lib/mistos/zx/tests:tests",
             "//zircon/system/ulib/fbl/test:tests-mistos",

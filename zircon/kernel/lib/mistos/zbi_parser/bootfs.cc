@@ -38,7 +38,8 @@ void PrintBootfsError(const Bootfs::BootfsView::Error& error) {
   });
 }
 
-Bootfs::Bootfs(zx::unowned_vmar vmar, zx::vmo vmo) {
+Bootfs::Bootfs(zx::unowned_vmar vmar, zx::vmo vmo, zx::resource vmex_resource)
+    : vmex_resource_(ktl::move(vmex_resource)) {
   zbitl::MapOwnedVmo mapvmo{ktl::move(vmo), /*writable=*/false, ktl::move(vmar)};
   if (auto result = BootfsReader::Create(ktl::move(mapvmo)); result.is_error()) {
     PrintBootfsError(result.error_value());
@@ -86,6 +87,9 @@ fit::result<zx_status_t, zx::vmo> Bootfs::Open(ktl::string_view root, ktl::strin
   uint64_t size = it->size;
   status = file_vmo.set_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
   check(log_, status, "failed to set ZX_PROP_VMO_CONTENT_SIZE\n");
+
+  status = file_vmo.replace_as_executable(vmex_resource_, &file_vmo);
+  check(log_, status, "zx_vmo_replace_as_executable failed");
 
   return fit::ok(ktl::move(file_vmo));
 }

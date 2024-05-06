@@ -15,6 +15,7 @@
 #include <trace.h>
 
 #include <ktl/string_view.h>
+#include <ktl/algorithm.h>
 
 #include <ktl/enforce.h>
 

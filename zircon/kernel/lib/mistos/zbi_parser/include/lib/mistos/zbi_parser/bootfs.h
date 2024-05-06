@@ -23,7 +23,7 @@ namespace zbi_parser {
 
 class Bootfs {
  public:
-  Bootfs(zx::unowned_vmar vmar, zx::vmo vmo);
+  Bootfs(zx::unowned_vmar vmar, zx::vmo vmo, zx::resource vmex_resource);
   fit::result<zx_status_t, zx::vmo> Open(ktl::string_view root, ktl::string_view filename,
                                          ktl::string_view purpose);
 
@@ -36,6 +36,7 @@ class Bootfs {
   friend void PrintBootfsError(const BootfsReader::Error& error);
 
   BootfsReader bootfs_reader_;
+  zx::resource vmex_resource_;
   bool is_valid_ = false;
 };
 

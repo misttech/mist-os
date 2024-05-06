@@ -10,6 +10,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/string.h>
+#include <ktl/span.h>
 #include <zxtest/zxtest.h>
 
 #include "data/bootfs.zbi.h"
@@ -36,28 +37,32 @@ class BootFs : public zxtest::Test {
   }
 
   static zx::vmo boof_fs_zbi;
+  static zx::resource boof_fs_vmex;
 };
 
 zx::vmo BootFs::boof_fs_zbi;
+zx::resource BootFs::boof_fs_vmex;
 
 TEST_F(BootFs, Ctor) {
   const zx::unowned_vmo zbi{BootFs::boof_fs_zbi};
-  zx::vmar vmar_self{VmAspace::kernel_aspace()->RootVmar()};
+  zx::unowned_vmar vmar_self = zx::vmar::root_self();
 
-  auto result = zbi_parser::GetBootfsFromZbi(vmar_self, *zbi, false);
+  auto result = zbi_parser::GetBootfsFromZbi(*vmar_self, *zbi, false);
   ASSERT_FALSE(result.is_error());
-  zbi_parser::Bootfs bootfs{vmar_self.borrow(), std::move(result.value())};
+  zbi_parser::Bootfs bootfs{vmar_self->borrow(), ktl::move(result.value()),
+                            ktl::move(BootFs::boof_fs_vmex)};
   ASSERT_TRUE(bootfs.is_valid());
 }
 
 TEST_F(BootFs, Open) {
   const zx::unowned_vmo zbi{BootFs::boof_fs_zbi};
-  zx::vmar vmar_self{VmAspace::kernel_aspace()->RootVmar()};
+  zx::unowned_vmar vmar_self = zx::vmar::root_self();
 
-  auto result = zbi_parser::GetBootfsFromZbi(vmar_self, *zbi, false);
+  auto result = zbi_parser::GetBootfsFromZbi(*vmar_self, *zbi, false);
   ASSERT_FALSE(result.is_error());
 
-  zbi_parser::Bootfs bootfs{vmar_self.borrow(), std::move(result.value())};
+  zbi_parser::Bootfs bootfs{vmar_self->borrow(), std::move(result.value()),
+                            ktl::move(BootFs::boof_fs_vmex)};
   ASSERT_TRUE(bootfs.is_valid());
 
   auto open_result = bootfs.Open("", "A.txt", "bootfs_test");
