@@ -361,7 +361,7 @@ async fn test_malformed_allocation() {
                 fs.block_size(),
             );
             let item = Item::new(
-                AllocatorKey { device_range: end..end - fs.block_size() },
+                AllocatorKey { device_range: end..end },
                 AllocatorValue::Abs { count: 2, owner_object_id: 9 },
             );
             writer.write(item.as_item_ref()).await.expect("write failed");

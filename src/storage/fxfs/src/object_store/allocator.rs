@@ -647,7 +647,7 @@ impl<'a> Drop for TrimmableExtents<'a> {
     fn drop(&mut self) {
         let mut inner = self.allocator.inner.lock().unwrap();
         for device_range in std::mem::take(&mut self.extents) {
-            inner.strategy.free(device_range);
+            inner.strategy.free(device_range).expect("drop trim extent");
         }
         inner.trim_reserved_bytes = 0;
     }
@@ -665,7 +665,7 @@ impl Allocator {
         // Note that we use BestFit strategy for new filesystems to favour dense packing of
         // data and 'FirstFit' for existing filesystems for better fragmentation.
         let mut strategy = Box::new(strategy::BestFit::default());
-        strategy.free(0..filesystem.device().size());
+        strategy.free(0..filesystem.device().size()).expect("new fs");
         Allocator {
             filesystem: Arc::downgrade(&filesystem),
             block_size,
@@ -842,12 +842,12 @@ impl Allocator {
                 match iter.get() {
                     None => {
                         ensure!(last_offset <= self.device_size, FxfsError::Inconsistent);
-                        strategy.free(last_offset..self.device_size);
+                        strategy.free(last_offset..self.device_size).expect("open fs");
                         break;
                     }
                     Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
                         if device_range.start > last_offset {
-                            strategy.free(last_offset..device_range.start);
+                            strategy.free(last_offset..device_range.start).expect("open fs");
                         }
                         last_offset = device_range.end;
                     }
@@ -1157,12 +1157,13 @@ impl Allocator {
             listener.await;
         }
 
-        let result = self.inner.lock().unwrap().strategy.allocate(len).ok_or_else(|| {
-            let err =
-                anyhow!(FxfsError::NoSpace).context("Unexpectedly found no space after search");
-            tracing::error!(%err, "Likely filesystem corruption.");
-            err
-        })?;
+        let result = match self.inner.lock().unwrap().strategy.allocate(len) {
+            Err(err) => {
+                tracing::error!(%err, "Likely filesystem corruption.");
+                Err(err)
+            }
+            x => x,
+        }?;
 
         debug!(device_range = ?result, "allocate");
 
@@ -1224,17 +1225,11 @@ impl Allocator {
             }
             owner_entry.uncommitted_allocated_bytes += len;
             // Done last to avoid leaking free list entries if we error out.
-            ensure!(
-                inner
-                    .strategy
-                    .allocate_fixed_offset(
-                        device_range.start,
-                        device_range.end - device_range.start
-                    )
-                    .ok_or(FxfsError::NoSpace)?
-                    == device_range,
-                FxfsError::Inconsistent
-            );
+            let range = inner
+                .strategy
+                .allocate_fixed_offset(device_range.start, device_range.end - device_range.start)
+                .context("mark_allocated)")?;
+            ensure!(range == device_range, FxfsError::Inconsistent);
         }
         let mutation =
             AllocatorMutation::Allocate { device_range: device_range.into(), owner_object_id };
@@ -1373,7 +1368,7 @@ impl Allocator {
             }
             let mut inner = self.inner.lock().unwrap();
             for range in ranges {
-                inner.strategy.free(range);
+                inner.strategy.free(range).expect("committed encrypted volume deletions");
             }
         }
 
@@ -1383,7 +1378,7 @@ impl Allocator {
         for dealloc in deallocs {
             *(totals.entry(dealloc.owner_object_id).or_default()) +=
                 dealloc.range.length().unwrap();
-            inner.strategy.free(dealloc.range);
+            inner.strategy.free(dealloc.range).expect("dealloced ranges");
         }
 
         // This *must* come after we've removed the records from reserved reservations because the
@@ -1630,7 +1625,7 @@ impl JournalingObject for Allocator {
                     inner.add_reservation(res_owner, len);
                     reservation.release_reservation(res_owner, len);
                 }
-                inner.strategy.free(device_range.clone().into());
+                inner.strategy.free(device_range.clone().into()).expect("drop_mutation");
             }
             _ => {}
         }

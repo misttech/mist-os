@@ -16,10 +16,14 @@
 //!
 //! Strategies should be concerned only with selecting which free regions of disk to hand out.
 
-use std::{
-    collections::{btree_map, BTreeMap, BTreeSet},
-    fmt::Debug,
-    ops::Range,
+use {
+    crate::object_store::FxfsError,
+    anyhow::{Context, Error},
+    std::{
+        collections::{btree_map, BTreeMap, BTreeSet},
+        fmt::Debug,
+        ops::Range,
+    },
 };
 
 /// An allocation strategy that returns the smallest extent that is large enough to hold the
@@ -54,7 +58,7 @@ impl BestFit {
     ///
     /// There are no special requirements on alignment of `bytes` but the caller is generally
     /// encouraged to align to device block size.
-    pub fn allocate(&mut self, bytes: u64) -> Option<Range<u64>> {
+    pub fn allocate(&mut self, bytes: u64) -> Result<Range<u64>, FxfsError> {
         let mut result = self.ranges.range_mut(bytes..).next();
         if result.is_none() {
             // Insufficient space. Return the biggest range we have.
@@ -68,13 +72,13 @@ impl BestFit {
             }
             self.by_end.remove(&(offset + size));
             if size > bytes {
-                self.free(offset + bytes..offset + size);
-                Some(offset..offset + bytes)
+                self.free(offset + bytes..offset + size).expect("give extra back");
+                Ok(offset..offset + bytes)
             } else {
-                Some(offset..offset + size)
+                Ok(offset..offset + size)
             }
         } else {
-            None
+            Err(FxfsError::NoSpace)
         }
     }
 
@@ -82,7 +86,11 @@ impl BestFit {
     ///
     /// Used only in allocating space for the first extent of each Fxfs superblock.
     /// (This is the only data only in the filesystem that is stored at a fixed device offset.)
-    pub fn allocate_fixed_offset(&mut self, start: u64, bytes: u64) -> Option<Range<u64>> {
+    pub fn allocate_fixed_offset(
+        &mut self,
+        start: u64,
+        bytes: u64,
+    ) -> Result<Range<u64>, FxfsError> {
         let mut to_remove = vec![];
         let mut cur_end = start;
         let mut first_offset = None;
@@ -91,7 +99,7 @@ impl BestFit {
             if first_offset.is_none() {
                 // Check that range covers start.
                 if offset > start {
-                    return None;
+                    return Err(FxfsError::NoSpace);
                 }
                 first_offset = Some(offset);
             }
@@ -101,7 +109,7 @@ impl BestFit {
             if let Some(prev) = prev_end {
                 if prev != offset {
                     // Non-contiguous ranges. Can't allocate.
-                    return None;
+                    return Err(FxfsError::NoSpace);
                 }
             }
             prev_end = Some(end);
@@ -109,7 +117,7 @@ impl BestFit {
             to_remove.push((end, offset));
         }
         if cur_end < start + bytes {
-            return None;
+            return Err(FxfsError::NoSpace);
         }
 
         for (end, offset) in to_remove.into_iter() {
@@ -118,14 +126,14 @@ impl BestFit {
 
         if let Some(first_offset) = first_offset {
             if first_offset < start {
-                self.free(first_offset..start);
+                self.free(first_offset..start).expect("give prefix back");
             }
             if cur_end > start + bytes {
-                self.free(start + bytes..cur_end);
+                self.free(start + bytes..cur_end).expect("give suffix back");
             }
-            Some(start..start + bytes)
+            Ok(start..start + bytes)
         } else {
-            None
+            Err(FxfsError::NoSpace)
         }
     }
 
@@ -136,11 +144,11 @@ impl BestFit {
             self.remove_range(offset..end);
             let mut range = offset..end;
             if range.start < start {
-                self.free(range.start..start);
+                self.free(range.start..start).expect("give prefix back");
                 range.start = start;
             }
             if range.start + bytes < range.end {
-                self.free(range.start + bytes..range.end);
+                self.free(range.start + bytes..range.end).expect("give suffix back");
                 range.end = range.start + bytes;
             }
             Some(range)
@@ -159,7 +167,30 @@ impl BestFit {
         if offsets.get().is_empty() {
             offsets.remove_entry();
         }
-        self.by_end.remove(&range.end);
+        assert_eq!(Some(range.start), self.by_end.remove(&range.end));
+    }
+
+    /// Internal helper function. Inserts range if room to do so, appends overflow marker if needed.
+    fn insert_range(&mut self, range: Range<u64>) -> Result<(), Error> {
+        let len = range.end - range.start;
+        let entry = self.ranges.entry(len).or_default();
+        if !entry.insert(range.start) {
+            // This might happen if there is some high-level logic error that causes a range to be
+            // freed twice. It may indicate a disk corruption or a software bug and shouldn't happen
+            // under normal circumstances. While the low-level data structure held here will not be
+            // compromised by this error, it is probably not safe to continue if a condition such
+            // as this is detected, thus we return "Inconsistent".
+            return Err(FxfsError::Inconsistent).context("Range already in 'ranges'.");
+        }
+        let other = self.by_end.insert(range.end, range.start);
+        if let Some(_other) = other {
+            // self.by_end and self.ranges should always remain consistant.
+            // If this occurs it is almost certainly a software bug and continued use of this
+            // data structure will likely lead to undefined behaviour.
+            return Err(FxfsError::Inconsistent)
+                .context("Range already in 'by_end'. Potential logic bug.");
+        };
+        Ok(())
     }
 
     /// Adds an arbitrary range of bytes to the pool of available ranges.
@@ -167,7 +198,7 @@ impl BestFit {
     /// Note that we keep these ranges in a map keyed by their length. To bound the size of this
     /// map we only track ranges up to N blocks long (up to 2MB). Longer ranges
     /// are broken up into ranges of this size.
-    pub fn free(&mut self, mut range: Range<u64>) {
+    pub fn free(&mut self, mut range: Range<u64>) -> Result<(), Error> {
         // If there is a free range immediately before this one, merge with it.
         let mut iter = self.by_end.range(range.start..);
         let mut next_item = iter.next();
@@ -177,6 +208,13 @@ impl BestFit {
                 range.start = start;
                 iter = self.by_end.range(range.start + 1..);
                 next_item = iter.next();
+            } else if start < range.end {
+                // There exists a range already that overlaps with this.
+                // We have a double free or freeing of overlapping allocations.
+                // While the data-structure here remains valid after this error, the fact that
+                // an overlapping free was attempted indicates that the filesystem is not in a
+                // safe state to continue, thus we return "Inconsistent".
+                return Err(FxfsError::Inconsistent).context("overlapping free");
             }
         }
         // If there is a free range immediately after this one, merge with it.
@@ -191,15 +229,14 @@ impl BestFit {
         // a range, we want the smaller fragment to come first (pushing small fragments together at
         // the start of the device).
         while (range.end - range.start) > DEFAULT_MAX_EXTENT_SIZE {
-            self.ranges
-                .entry(DEFAULT_MAX_EXTENT_SIZE)
-                .or_default()
-                .insert(range.end - DEFAULT_MAX_EXTENT_SIZE);
-            self.by_end.insert(range.end, range.end - DEFAULT_MAX_EXTENT_SIZE);
+            self.insert_range(range.end - DEFAULT_MAX_EXTENT_SIZE..range.end)
+                .context("adding max_extent_size fragment")?;
             range.end -= DEFAULT_MAX_EXTENT_SIZE;
         }
-        self.ranges.entry(range.end - range.start).or_default().insert(range.start);
-        self.by_end.insert(range.end, range.start);
+        if range.start < range.end {
+            self.insert_range(range).context("adding final range")?;
+        }
+        Ok(())
     }
 }
 
@@ -210,65 +247,65 @@ mod test {
     #[test]
     fn allocate() {
         let mut bestfit = BestFit::default();
-        bestfit.free(0..0); // NOOP
-        bestfit.free(0..100);
-        assert_eq!(bestfit.allocate(10), Some(0..10));
-        assert_eq!(bestfit.allocate(10), Some(10..20));
-        assert_eq!(bestfit.allocate(10), Some(20..30));
-        assert_eq!(bestfit.allocate(10), Some(30..40));
-        assert_eq!(bestfit.allocate(10), Some(40..50));
+        bestfit.free(0..0).unwrap(); // NOOP
+        bestfit.free(0..100).unwrap();
+        assert_eq!(bestfit.allocate(10), Ok(0..10));
+        assert_eq!(bestfit.allocate(10), Ok(10..20));
+        assert_eq!(bestfit.allocate(10), Ok(20..30));
+        assert_eq!(bestfit.allocate(10), Ok(30..40));
+        assert_eq!(bestfit.allocate(10), Ok(40..50));
         // Make some holes.
-        bestfit.free(30..40);
-        bestfit.free(10..20);
+        bestfit.free(30..40).unwrap();
+        bestfit.free(10..20).unwrap();
         // Holes get filled first.
-        assert_eq!(bestfit.allocate(10), Some(10..20));
-        assert_eq!(bestfit.allocate(10), Some(30..40));
-        assert_eq!(bestfit.allocate(10), Some(50..60));
+        assert_eq!(bestfit.allocate(10), Ok(10..20));
+        assert_eq!(bestfit.allocate(10), Ok(30..40));
+        assert_eq!(bestfit.allocate(10), Ok(50..60));
         // Free a contiguous bunch of allocations at once.
-        bestfit.free(0..50);
+        bestfit.free(0..50).unwrap();
         // Return less than requested.
-        assert_eq!(bestfit.allocate(100), Some(0..50));
+        assert_eq!(bestfit.allocate(100), Ok(0..50));
         // Return all remaining space.
-        assert_eq!(bestfit.allocate(100), Some(60..100));
+        assert_eq!(bestfit.allocate(100), Ok(60..100));
         // No space left. Return None.
-        assert_eq!(bestfit.allocate(100), None);
+        assert_eq!(bestfit.allocate(100), Err(FxfsError::NoSpace));
         // Now we have some more back.
-        bestfit.free(50..100);
-        assert_eq!(bestfit.allocate(100), Some(50..100));
+        bestfit.free(50..100).unwrap();
+        assert_eq!(bestfit.allocate(100), Ok(50..100));
     }
 
     #[test]
     fn fixed_offset() {
         let mut bestfit = BestFit::default();
-        bestfit.free(0..100);
-        assert_eq!(bestfit.allocate_fixed_offset(25, 50), Some(25..75));
-        assert_eq!(bestfit.allocate_fixed_offset(25, 10), None);
+        bestfit.free(0..100).unwrap();
+        assert_eq!(bestfit.allocate_fixed_offset(25, 50), Ok(25..75));
+        assert_eq!(bestfit.allocate_fixed_offset(25, 10), Err(FxfsError::NoSpace));
 
         // Test coalescing of adjacent available ranges if the request is large.
         let mut bestfit = BestFit::default();
-        bestfit.free(0..DEFAULT_MAX_EXTENT_SIZE * 3 + 10000);
+        bestfit.free(0..DEFAULT_MAX_EXTENT_SIZE * 3 + 10000).unwrap();
         assert_eq!(
             bestfit.allocate_fixed_offset(0, DEFAULT_MAX_EXTENT_SIZE * 2),
-            Some(0..DEFAULT_MAX_EXTENT_SIZE * 2)
+            Ok(0..DEFAULT_MAX_EXTENT_SIZE * 2)
         );
 
         // Try to allocate a range with a hole in it.
         let mut bestfit = BestFit::default();
-        bestfit.free(0..100);
-        bestfit.free(200..400);
-        assert_eq!(bestfit.allocate_fixed_offset(50, 300), None);
+        bestfit.free(0..100).unwrap();
+        bestfit.free(200..400).unwrap();
+        assert_eq!(bestfit.allocate_fixed_offset(50, 300), Err(FxfsError::NoSpace));
         //
         // Try to allocate a range missing a tail.
         let mut bestfit = BestFit::default();
-        bestfit.free(0..250);
-        assert_eq!(bestfit.allocate_fixed_offset(50, 300), None);
+        bestfit.free(0..250).unwrap();
+        assert_eq!(bestfit.allocate_fixed_offset(50, 300), Err(FxfsError::NoSpace));
     }
 
     #[test]
     fn next_available() {
         let mut bestfit = BestFit::default();
-        bestfit.free(0..96);
-        assert_eq!(bestfit.allocate(1), Some(0..1));
+        bestfit.free(0..96).unwrap();
+        assert_eq!(bestfit.allocate(1), Ok(0..1));
         assert_eq!(bestfit.allocate_next_available(15, 15), Some(15..30));
         assert_eq!(bestfit.allocate_next_available(15, 15), Some(30..45));
         assert_eq!(bestfit.allocate_next_available(15, 15), Some(45..60));
@@ -283,33 +320,63 @@ mod test {
     fn coalescing_free() {
         let mut bestfit = BestFit::default();
         // Free some bytes at the start and end.
-        bestfit.free(0..10);
-        bestfit.free(20..32);
+        bestfit.free(0..10).unwrap();
+        bestfit.free(20..32).unwrap();
         // Now free the space in the middle, which should coalesce with ranges on both sides.
-        bestfit.free(10..20);
+        bestfit.free(10..20).unwrap();
         // Confirm that we can allocate one block of 32 bytes. This will fail if coalescing
         // didn't occur.
-        assert_eq!(bestfit.allocate_fixed_offset(0, 32), Some(0..32));
+        assert_eq!(bestfit.allocate_fixed_offset(0, 32), Ok(0..32));
     }
 
     #[test]
     fn max_range() {
         let mut bestfit = BestFit::default();
-        bestfit.free(10..10 + 10 * DEFAULT_MAX_EXTENT_SIZE);
+        bestfit.free(10..10 + 10 * DEFAULT_MAX_EXTENT_SIZE).unwrap();
 
         // We can't allocate bigger than DEFAULT_MAX_EXTENT_SIZE.
         assert_eq!(
             bestfit.allocate(2 * DEFAULT_MAX_EXTENT_SIZE),
-            Some(10..10 + DEFAULT_MAX_EXTENT_SIZE)
+            Ok(10..10 + DEFAULT_MAX_EXTENT_SIZE)
         );
 
         // Make sure that coalescing still works properly
-        bestfit.free(10..10 + DEFAULT_MAX_EXTENT_SIZE);
-        assert_eq!(bestfit.allocate(10), Some(10..20));
-        assert_eq!(bestfit.allocate(10), Some(20..30));
+        bestfit.free(10..10 + DEFAULT_MAX_EXTENT_SIZE).unwrap();
+        assert_eq!(bestfit.allocate(10), Ok(10..20));
+        assert_eq!(bestfit.allocate(10), Ok(20..30));
         assert_eq!(
             bestfit.allocate(DEFAULT_MAX_EXTENT_SIZE - 20),
-            Some(30..10 + DEFAULT_MAX_EXTENT_SIZE)
+            Ok(30..10 + DEFAULT_MAX_EXTENT_SIZE)
         );
+    }
+
+    #[test]
+    fn fragmenting_free() {
+        // It shouldn't matter how we allocate and free here so long as there are no overlaps.
+        let mut bestfit = BestFit::default();
+        bestfit.free(0..100).unwrap();
+        assert_eq!(bestfit.allocate(30), Ok(0..30));
+        assert!(bestfit.free(20..30).is_ok());
+        assert_eq!(bestfit.allocate(10), Ok(20..30));
+        assert!(bestfit.free(0..30).is_ok());
+        assert!(bestfit.free(0..30).is_err());
+
+        // Merge left and right and middle.
+        let mut bestfit = BestFit::default();
+        bestfit.free(10..20).unwrap();
+        bestfit.free(30..40).unwrap();
+        bestfit.free(0..10).unwrap(); // before
+        bestfit.free(40..50).unwrap(); // after
+        bestfit.free(20..30).unwrap(); // middle
+
+        // Check all combinations of overlaps.
+        let mut bestfit = BestFit::default();
+        bestfit.free(10..20).unwrap();
+        assert!(bestfit.free(9..11).is_err());
+        assert!(bestfit.free(19..21).is_err());
+        assert!(bestfit.free(11..29).is_err());
+        assert!(bestfit.free(10..20).is_err());
+        assert!(bestfit.free(9..10).is_ok());
+        assert!(bestfit.free(20..21).is_ok());
     }
 }
