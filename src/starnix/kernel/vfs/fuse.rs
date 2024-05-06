@@ -10,10 +10,10 @@ use crate::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
         fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, CheckAccessReason, DirEntry,
-        DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode,
-        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
+        DirEntryOps, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
+        DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
         SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
     },
 };
@@ -49,6 +49,7 @@ use std::{
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
+const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
 const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
 
 #[derive(Debug)]
@@ -149,11 +150,11 @@ pub fn new_fuse_fs(
         FuseFs { connection: connection.clone(), default_permissions },
         options,
     );
-    let fuse_node = FuseNode::new(connection.clone(), uapi::FUSE_ROOT_ID as u64);
+    let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64);
     fuse_node.state.lock().nlookup += 1;
 
     let mut root_node = FsNode::new_root(fuse_node.clone());
-    root_node.node_id = uapi::FUSE_ROOT_ID as u64;
+    root_node.node_id = FUSE_ROOT_ID_U64;
     fs.set_root_node(root_node);
     {
         let mut state = connection.lock();
@@ -905,6 +906,81 @@ impl FileOps for FuseFileObject {
     }
 }
 
+struct FuseDirEntry {
+    valid_until: AtomicTime,
+}
+
+impl Default for FuseDirEntry {
+    fn default() -> Self {
+        Self { valid_until: zx::Time::INFINITE_PAST.into() }
+    }
+}
+
+impl DirEntryOps for FuseDirEntry {
+    fn revalidate(&self, current_task: &CurrentTask, dir_entry: &DirEntry) -> Result<bool, Errno> {
+        // Relaxed because the attributes valid until atomic is not used to synchronize
+        // anything.
+        const VALID_UNTIL_ORDERING: Ordering = Ordering::Relaxed;
+
+        let now = zx::Time::get_monotonic();
+        if self.valid_until.load(VALID_UNTIL_ORDERING) >= now {
+            return Ok(true);
+        }
+
+        let node = FuseNode::from_node(&dir_entry.node);
+        if node.nodeid == FUSE_ROOT_ID_U64 {
+            // The root node entry is always valid.
+            return Ok(true);
+        }
+
+        // Perform a lookup on this entry's parent FUSE node to revalidate this
+        // entry.
+        let parent = dir_entry.parent().expect("non-root nodes always has a parent");
+        let parent = FuseNode::from_node(&parent.node);
+        let name = dir_entry.local_name();
+        let response = parent.connection.lock().execute_operation(
+            current_task,
+            parent,
+            FuseOperation::Lookup { name },
+        )?;
+        let FuseResponse::Entry(uapi::fuse_entry_out {
+            nodeid,
+            entry_valid,
+            entry_valid_nsec,
+            attr,
+            attr_valid,
+            attr_valid_nsec,
+            ..
+        }) = response
+        else {
+            return error!(EINVAL);
+        };
+
+        if nodeid != node.nodeid {
+            // A new entry exists with the name. This `DirEntry` is no longer
+            // valid. The caller should attempt to restart the path walk at this
+            // node.
+            return Ok(false);
+        }
+
+        dir_entry.node.update_info(|info| {
+            FuseNode::set_node_info(
+                info,
+                attr,
+                attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
+                &node.attributes_valid_until,
+            )?;
+
+            self.valid_until.store(
+                zx::Time::after(attr_valid_to_duration(entry_valid, entry_valid_nsec)?),
+                VALID_UNTIL_ORDERING,
+            );
+
+            Ok(true)
+        })
+    }
+}
+
 // `FuseFs.default_permissions` is not used to synchronize anything.
 const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
 
@@ -967,6 +1043,10 @@ impl FsNodeOps for Arc<FuseNode> {
                 );
             }
         }
+    }
+
+    fn create_dir_entry_ops(&self) -> Box<dyn DirEntryOps> {
+        Box::new(FuseDirEntry::default())
     }
 
     fn create_file_ops(

@@ -1089,7 +1089,9 @@ TEST_P(FuseServerPermissionCheck, PermissionCheck) {
 
   std::string path = GetMountDir() + "/node";
   ASSERT_NO_FATAL_FAILURE(test_case.fn(path));
-  EXPECT_EQ(server->LookupCount(), test_case.expected_lookup_count);
+  // TODO(https://fxbug.dev/331965426): Don't perform an extra lookup.
+  const uint64_t lookup_count_offset = test_helper::IsStarnix() ? 1 : 0;
+  EXPECT_EQ(server->LookupCount(), test_case.expected_lookup_count + lookup_count_offset);
   EXPECT_EQ(server->AccessCount(), test_case.expected_access_count);
   EXPECT_EQ(server->NonRootGetAttrCount(), test_case.expected_non_root_getattr_count);
 }
@@ -1485,6 +1487,14 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   EXPECT_EQ(server->LookupCount(), 0u);
 
   constexpr uint64_t kNumberOfNodesInPath = 3;
+  // TODO(https://fxbug.dev/331965426): Don't perform an extra set of lookups each
+  // time we create a new DirEntry in starnix. Note that refreshing a DirEntry
+  // does not result in extra lookups, only the initial lookup to populate a new
+  // DirEntry does.
+  const uint64_t extra_initial_lookups_per_node = test_helper::IsStarnix() ? 1 : 0;
+  const uint64_t lookup_offset = extra_initial_lookups_per_node * kNumberOfNodesInPath;
+  const uint64_t expected_initial_lookup_count = kNumberOfNodesInPath + lookup_offset;
+  const uint64_t expected_post_update_lookup_extra_offset = extra_initial_lookups_per_node;
   std::string filename = GetMountDir() + "/dir1/dir2/file";
 
   auto check_open = [&]() {
@@ -1493,10 +1503,10 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   };
 
   ASSERT_NO_FATAL_FAILURE(check_open());
-  EXPECT_EQ(server->LookupCount(), kNumberOfNodesInPath);
+  EXPECT_EQ(server->LookupCount(), expected_initial_lookup_count);
 
   ASSERT_NO_FATAL_FAILURE(check_open());
-  EXPECT_EQ(server->LookupCount(), 2 * kNumberOfNodesInPath);
+  EXPECT_EQ(server->LookupCount(), expected_initial_lookup_count + kNumberOfNodesInPath);
 
   // When the kernel attempts to refresh the entry and sees a node ID or generation
   // different from what the kernel has cached for the same name, the kernel will
@@ -1512,7 +1522,9 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
     dir2->IncrementGeneration();
   }
   ASSERT_NO_FATAL_FAILURE(check_open());
-  EXPECT_EQ(server->LookupCount(), 3 * kNumberOfNodesInPath + test_case.expected_extra_lookups);
+  EXPECT_EQ(server->LookupCount(),
+            expected_initial_lookup_count + (2 * kNumberOfNodesInPath) +
+                test_case.expected_extra_lookups * (1 + expected_post_update_lookup_extra_offset));
 }
 
 INSTANTIATE_TEST_SUITE_P(FusePathWalkRefreshDirEntryTest, FusePathWalkRefreshDirEntryTest,

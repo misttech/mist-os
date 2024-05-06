@@ -16,9 +16,10 @@ use crate::{
         pipe::{Pipe, PipeHandle},
         rw_queue::RwQueue,
         socket::SocketHandle,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
-        FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
-        RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
+        DefaultDirEntryOps, DirEntryOps, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileWriteGuard, FileWriteGuardMode, FileWriteGuardState, FsNodeReleaser, FsStr, FsString,
+        MountInfo, NamespaceNode, OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
+        WeakFileHandle, MAX_LFS_FILESIZE,
     },
 };
 use bitflags::bitflags;
@@ -516,6 +517,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         _reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         node.default_check_access_impl(current_task, access, info.read())
+    }
+
+    /// Build the [`DirEntryOps`] for a new [`DirEntry`] that will be associated
+    /// to this node.
+    fn create_dir_entry_ops(&self) -> Box<dyn DirEntryOps> {
+        Box::new(DefaultDirEntryOps)
     }
 
     /// Build the `FileOps` for the file associated to this node.
@@ -1155,6 +1162,10 @@ impl FsNode {
     /// Release all record locks acquired by the given owner.
     pub fn record_lock_release(&self, owner: RecordLockOwner) {
         self.record_locks.release_locks(owner);
+    }
+
+    pub fn create_dir_entry_ops(&self) -> Box<dyn DirEntryOps> {
+        self.ops().create_dir_entry_ops()
     }
 
     pub fn create_file_ops<L>(
