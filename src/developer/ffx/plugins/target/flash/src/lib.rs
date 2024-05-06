@@ -108,6 +108,17 @@ async fn preprocess_flash_cmd<W: Write>(
         }
     };
 
+    if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
+        let product_path: String = ffx_config::get("product.path").await?;
+        writeln!(
+            writer,
+            "No product bundle or manifest passed. Inferring product bundle path from config: {}",
+            product_path
+        )
+        .user_message("Error writing user message")?;
+        cmd.product_bundle = Some(product_path);
+    }
+
     if cmd.product_bundle.is_some()
         && cmd.product_bundle.clone().unwrap().starts_with("\"")
         && cmd.product_bundle.clone().unwrap().ends_with("\"")
@@ -287,6 +298,21 @@ mod test {
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_preprocess_flash_command_infers_product_bundle() {
+        let env = ffx_config::test_init().await.expect("Failed to initialize test env");
+        env.context
+            .query("product.path")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set("foo".into())
+            .await
+            .expect("creating temp product.path");
+        let writer = Vec::new();
+        let cmd =
+            preprocess_flash_cmd(writer, FlashCommand { ..Default::default() }).await.unwrap();
+        assert_eq!(cmd.product_bundle, Some("foo".to_string()));
+    }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_file_throws_err() {

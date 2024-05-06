@@ -14,6 +14,7 @@ ffx_plugin("ffx_flash") {
   config_data = [ "data/config.json" ]
 
   deps = [
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/errors:lib",
