@@ -150,13 +150,18 @@ pub enum GA4Value {
 
 impl From<String> for GA4Value {
     fn from(s: String) -> Self {
-        GA4Value::Str(s)
+        <Self as From<&str>>::from(&s)
     }
 }
 
 impl From<&str> for GA4Value {
     fn from(s: &str) -> Self {
-        GA4Value::Str(String::from(s))
+        // Truncate to PARAM_VALUE_LENGTH_MAX
+        if s.len() > PARAM_VALUE_LENGTH_MAX {
+            GA4Value::Str(s[..PARAM_VALUE_LENGTH_MAX].into())
+        } else {
+            GA4Value::Str(s.into())
+        }
     }
 }
 
@@ -581,5 +586,16 @@ mod tests {
         let post = &mut Post::new("1".to_string(), None, None, vec![event]);
 
         assert_eq!(expected, post.to_json());
+    }
+
+    #[test]
+    fn test_ga4_crash_event_validation() {
+        // Tests that short strings are truncated and validation is OK.
+        let short_event = make_ga4_crash_event("short description", None, None);
+        short_event.validate().expect("is valid");
+
+        let long_description = "This string is 30 chars long..".repeat(5);
+        let long_event = make_ga4_crash_event(&long_description, None, None);
+        long_event.validate().expect("is valid");
     }
 }
