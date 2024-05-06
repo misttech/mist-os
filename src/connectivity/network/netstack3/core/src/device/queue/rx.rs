@@ -188,7 +188,7 @@ mod tests {
 
     impl ReceiveQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeBindingsCtxImpl {
         fn wake_rx_task(&mut self, device_id: &FakeLinkDeviceId) {
-            self.state_mut().woken_rx_tasks.push(device_id.clone())
+            self.state.woken_rx_tasks.push(device_id.clone())
         }
     }
 
@@ -266,7 +266,7 @@ mod tests {
                 );
                 // We should only ever be woken up once when the first frame
                 // was enqueued.
-                assert_eq!(bindings_ctx.state().woken_rx_tasks, [FakeLinkDeviceId]);
+                assert_eq!(bindings_ctx.state.woken_rx_tasks, [FakeLinkDeviceId]);
             }
 
             let body = Buf::new(vec![131], ..);
@@ -282,10 +282,7 @@ mod tests {
             );
             // We should only ever be woken up once when the first frame
             // was enqueued.
-            assert_eq!(
-                core::mem::take(&mut bindings_ctx.state_mut().woken_rx_tasks),
-                [FakeLinkDeviceId]
-            );
+            assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_rx_tasks), [FakeLinkDeviceId]);
 
             assert!(MAX_RX_QUEUED_LEN > MAX_BATCH_SIZE);
             for i in (0..(MAX_RX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
@@ -314,7 +311,7 @@ mod tests {
             );
             // Should not have woken up the RX task since the queue should be
             // empty.
-            assert_eq!(core::mem::take(&mut bindings_ctx.state_mut().woken_rx_tasks), []);
+            assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_rx_tasks), []);
 
             // The queue should now be empty so the next iteration of queueing
             // `MAX_RX_QUEUED_LEN` frames should succeed.

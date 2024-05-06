@@ -352,11 +352,11 @@ mod tests {
 
         let now = bindings_ctx.now();
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_timers_installed_range([(RS_TIMER_ID, now..=now + MAX_RTR_SOLICITATION_DELAY)]);
 
         RsHandler::stop_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         assert_eq!(core_ctx.frames(), &[][..]);
     }
@@ -425,7 +425,7 @@ mod tests {
             );
             let now = bindings_ctx.now();
             bindings_ctx
-                .timer_ctx()
+                .timers
                 .assert_timers_installed_range([(RS_TIMER_ID, now..=now + duration)]);
 
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(RS_TIMER_ID));
@@ -444,7 +444,7 @@ mod tests {
             duration = RTR_SOLICITATION_INTERVAL;
         }
 
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.get_ref().rs_state.remaining, None);
         let frames = core_ctx.frames();
         assert_eq!(frames.len(), usize::from(max_router_solicitations), "frames = {:?}", frames);

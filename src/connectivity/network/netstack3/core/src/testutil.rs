@@ -581,20 +581,16 @@ pub type FakeCtx = Ctx<FakeBindingsCtx>;
 /// Shorthand for [`StackState`] that uses a [`FakeBindingsCtx`].
 pub type FakeCoreCtx = StackState<FakeBindingsCtx>;
 
+type InnerFakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
+    TimerId<FakeBindingsCtx>,
+    DispatchedEvent,
+    FakeBindingsCtxState,
+    DispatchedFrame,
+>;
+
 /// Test-only implementation of [`crate::BindingsContext`].
 #[derive(Default, Clone)]
-pub struct FakeBindingsCtx(
-    Arc<
-        Mutex<
-            crate::context::testutil::FakeBindingsCtx<
-                TimerId<Self>,
-                DispatchedEvent,
-                FakeBindingsCtxState,
-                DispatchedFrame,
-            >,
-        >,
-    >,
-);
+pub struct FakeBindingsCtx(Arc<Mutex<InnerFakeBindingsCtx>>);
 
 /// A wrapper type that makes it easier to implement `Deref` (and optionally
 /// `DerefMut`) for a value that is protected by a lock.
@@ -603,6 +599,8 @@ pub struct FakeBindingsCtx(
 /// probably a lock guard. The second and third fields are functions that, given
 /// the first field, provide shared and mutable access (respectively) to the
 /// inner value.
+// TODO(https://github.com/rust-lang/rust/issues/117108): Replace this with
+// mapped mutex guards once stable.
 struct Wrapper<S, Callback, CallbackMut>(S, Callback, CallbackMut);
 
 impl<T: ?Sized, S: Deref, Callback: for<'a> Fn(&'a <S as Deref>::Target) -> &'a T, CallbackMut>
@@ -632,39 +630,13 @@ impl<
 }
 
 impl FakeBindingsCtx {
-    fn with_inner<
-        F: FnOnce(
-            &crate::context::testutil::FakeBindingsCtx<
-                TimerId<Self>,
-                DispatchedEvent,
-                FakeBindingsCtxState,
-                DispatchedFrame,
-            >,
-        ) -> O,
-        O,
-    >(
-        &self,
-        f: F,
-    ) -> O {
+    fn with_inner<F: FnOnce(&InnerFakeBindingsCtx) -> O, O>(&self, f: F) -> O {
         let Self(this) = self;
         let locked = this.lock();
         f(&*locked)
     }
 
-    fn with_inner_mut<
-        F: FnOnce(
-            &mut crate::context::testutil::FakeBindingsCtx<
-                TimerId<Self>,
-                DispatchedEvent,
-                FakeBindingsCtxState,
-                DispatchedFrame,
-            >,
-        ) -> O,
-        O,
-    >(
-        &self,
-        f: F,
-    ) -> O {
+    fn with_inner_mut<F: FnOnce(&mut InnerFakeBindingsCtx) -> O, O>(&self, f: F) -> O {
         let Self(this) = self;
         let mut locked = this.lock();
         f(&mut *locked)
@@ -672,15 +644,26 @@ impl FakeBindingsCtx {
 
     #[cfg(test)]
     pub(crate) fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
-        Wrapper(self.0.lock(), crate::context::testutil::FakeBindingsCtx::timer_ctx, ())
+        // NB: Helper function is required to satisfy lifetime requirements of
+        // borrow.
+        fn get_timers<'a>(
+            i: &'a InnerFakeBindingsCtx,
+        ) -> &'a FakeTimerCtx<TimerId<FakeBindingsCtx>> {
+            &i.timers
+        }
+        Wrapper(self.0.lock(), get_timers, ())
     }
 
     pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
-        Wrapper(
-            self.0.lock(),
-            crate::context::testutil::FakeBindingsCtx::state,
-            crate::context::testutil::FakeBindingsCtx::state_mut,
-        )
+        // NB: Helper functions are required to satisfy lifetime requirements of
+        // borrow.
+        fn get_state<'a>(i: &'a InnerFakeBindingsCtx) -> &'a FakeBindingsCtxState {
+            &i.state
+        }
+        fn get_state_mut<'a>(i: &'a mut InnerFakeBindingsCtx) -> &'a mut FakeBindingsCtxState {
+            &mut i.state
+        }
+        Wrapper(self.0.lock(), get_state, get_state_mut)
     }
 
     /// Copy all ethernet frames sent so far.
@@ -693,7 +676,7 @@ impl FakeBindingsCtx {
         &mut self,
     ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| {
-            ctx.frame_ctx_mut()
+            ctx.frames
                 .frames()
                 .into_iter()
                 .map(|(meta, frame)| match meta {
@@ -713,7 +696,7 @@ impl FakeBindingsCtx {
         &mut self,
     ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| {
-            ctx.frame_ctx_mut()
+            ctx.frames
                 .take_frames()
                 .into_iter()
                 .map(|(meta, frame)| match meta {
@@ -731,7 +714,7 @@ impl FakeBindingsCtx {
     /// Panics if the there are non-IP frames stored.
     pub fn take_ip_frames(&mut self) -> Vec<(PureIpDeviceAndIpVersion<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| {
-            ctx.frame_ctx_mut()
+            ctx.frames
                 .take_frames()
                 .into_iter()
                 .map(|(meta, frame)| match meta {
@@ -1545,7 +1528,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
-        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, frame.into_inner()));
+        self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, frame.into_inner()));
         Ok(())
     }
 
@@ -1559,7 +1542,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
             device: device.downgrade(),
             version: ip_version,
         });
-        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, packet.into_inner()));
+        self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, packet.into_inner()));
         Ok(())
     }
 }

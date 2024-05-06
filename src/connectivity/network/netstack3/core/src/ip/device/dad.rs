@@ -701,7 +701,7 @@ mod tests {
         let options = Options::parse(&frame[..]).expect("parse NDP options");
         assert_eq!(options.iter().count(), 0);
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_timers_installed([(dad_timer_id(), bindings_ctx.now() + retrans_timer.get())]);
     }
 
@@ -801,7 +801,7 @@ mod tests {
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
             core_ctx.get_ref();
         assert_matches!(*state, Ipv6DadState::Uninitialized);

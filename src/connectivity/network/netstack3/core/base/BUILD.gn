@@ -21,6 +21,7 @@ rustc_library_with_features("netstack3-base") {
     "src/lib.rs",
     "src/resource_references.rs",
     "src/rng.rs",
+    "src/testutil/fake_bindings.rs",
     "src/time.rs",
     "src/time/local_timer_heap.rs",
     "src/time/testutil.rs",

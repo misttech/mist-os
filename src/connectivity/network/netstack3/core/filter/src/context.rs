@@ -47,6 +47,14 @@ pub trait FilterContext<BT: FilterBindingsTypes> {
     ) -> O;
 }
 
+#[cfg(feature = "testutils")]
+impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta>
+    FilterBindingsTypes
+    for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+{
+    type DeviceClass = ();
+}
+
 #[cfg(test)]
 pub(crate) mod testutil {
     use core::time::Duration;

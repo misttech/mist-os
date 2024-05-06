@@ -2928,7 +2928,7 @@ mod tests {
                 }
             }
             NeighborState::Dynamic(DynamicNeighborState::Stale { .. })
-            | NeighborState::Static(_) => bindings_ctx.timer_ctx().assert_no_timers_installed(),
+            | NeighborState::Static(_) => bindings_ctx.timers.assert_no_timers_installed(),
         }
     }
 
@@ -4017,7 +4017,7 @@ mod tests {
                 [timer_id]
             );
             assert_neighbor_probe_sent(&mut core_ctx, /* multicast */ None);
-            bindings_ctx.timer_ctx().assert_timers_installed([(
+            bindings_ctx.timers.assert_timers_installed([(
                 timer_id,
                 bindings_ctx.now() + next_backoff_timer(&mut core_ctx, probes_sent + 1),
             )]);
@@ -4028,7 +4028,7 @@ mod tests {
         let current_timer = next_backoff_timer(&mut core_ctx, u32::from(ITERATIONS));
         assert_eq!(bindings_ctx.trigger_timers_for(current_timer, &mut core_ctx,), [timer_id]);
         assert_eq!(core_ctx.inner.take_frames(), []);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         // Finally, if another packet is sent, we resume transmitting multicast probes
         // and "reset" the exponential backoff.
@@ -4055,7 +4055,7 @@ mod tests {
                 )
             ]
         );
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timers.assert_timers_installed([(
             timer_id,
             bindings_ctx.now() + next_backoff_timer(&mut core_ctx, 1),
         )]);
@@ -4185,7 +4185,7 @@ mod tests {
                 LINK_ADDR1,
                 ExpectedEvent::Changed,
             );
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            bindings_ctx.timers.assert_no_timers_installed();
         }
         assert_eq!(
             core_ctx.inner.take_frames(),
@@ -4204,7 +4204,7 @@ mod tests {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_static_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1, ExpectedEvent::Added);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
         check_lookup_has(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
 
@@ -4230,7 +4230,7 @@ mod tests {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_stale_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
         check_lookup_has(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
 
@@ -4267,7 +4267,7 @@ mod tests {
     #[ip_test]
     fn send_solicitation_on_lookup<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         let mut pending_frames = VecDeque::new();
@@ -4331,7 +4331,7 @@ mod tests {
     #[ip_test]
     fn solicitation_failure_in_incomplete<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         let pending_frames = init_incomplete_neighbor(&mut core_ctx, &mut bindings_ctx, false);
@@ -4355,7 +4355,7 @@ mod tests {
             );
 
             bindings_ctx
-                .timer_ctx()
+                .timers
                 .assert_timers_installed([(timer_id, bindings_ctx.now() + ONE_SECOND.get())]);
             assert_neighbor_probe_sent(&mut core_ctx, /* multicast */ None);
 
@@ -4364,7 +4364,7 @@ mod tests {
 
         // The neighbor entry should have been removed.
         assert_neighbor_removed_with_ip(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         // The ICMP destination unreachable error sent as a result of solicitation failure
         // will be dropped because the packets pending address resolution in this test
@@ -4378,7 +4378,7 @@ mod tests {
     #[ip_test]
     fn solicitation_failure_in_probe<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         init_probe_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1, false);
@@ -4398,7 +4398,7 @@ mod tests {
             );
 
             bindings_ctx
-                .timer_ctx()
+                .timers
                 .assert_timers_installed([(timer_id, bindings_ctx.now() + ONE_SECOND.get())]);
             assert_neighbor_probe_sent(&mut core_ctx, Some(LINK_ADDR1));
 
@@ -4414,14 +4414,14 @@ mod tests {
             }),
             Some(ExpectedEvent::Changed),
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
     }
 
     #[ip_test]
     fn flush_entries<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         init_static_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1, ExpectedEvent::Added);
@@ -4472,13 +4472,13 @@ mod tests {
                 .map(|addr| { Event::removed(&FakeLinkDeviceId, addr, bindings_ctx.now()) })
                 .collect(),
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[ip_test]
     fn delete_dynamic_entry<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -4489,7 +4489,7 @@ mod tests {
         // Entry should be removed and timer cancelled.
         let FakeNudContext { nud: NudState { neighbors, .. }, .. } = &core_ctx.outer;
         assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     fn assert_neighbors<
@@ -4517,7 +4517,7 @@ mod tests {
     #[test_case(InitialState::Unreachable; "unreachable neighbor")]
     fn resolve_cached_linked_addr<I: Ip + TestIpExt>(initial_state: InitialState) {
         let mut ctx = new_context::<I>();
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(ctx.core_ctx.inner.take_frames(), []);
 
         let _ = init_neighbor_in_state(&mut ctx.core_ctx, &mut ctx.bindings_ctx, initial_state);
@@ -4737,7 +4737,7 @@ mod tests {
         // Advance the clock by less than ReachableTime and confirm reachability again.
         // The existing timer should not have been rescheduled; only the entry's
         // `last_confirmed_at` timestamp should have been updated.
-        bindings_ctx.timer_ctx_mut().instant.sleep(base_reachable_time / 2);
+        bindings_ctx.timers.instant.sleep(base_reachable_time / 2);
         confirm_reachable(&mut core_ctx, &mut bindings_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1);
         let now = bindings_ctx.now();
         assert_neighbor_state(
@@ -4788,7 +4788,7 @@ mod tests {
             DynamicNeighborState::Stale(Stale { link_address: LINK_ADDR1 }),
             Some(ExpectedEvent::Changed),
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     fn generate_ip_addr<I: Ip>(i: usize) -> SpecifiedAddr<I::Addr> {
@@ -4922,13 +4922,13 @@ mod tests {
         );
         let expected_gc_time = bindings_ctx.now() + MIN_GARBAGE_COLLECTION_INTERVAL.get();
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
 
         // Advance the clock by less than the GC interval and add another STALE entry to
         // trigger GC again. The existing GC timer should not have been rescheduled
         // given a GC pass is already pending.
-        bindings_ctx.timer_ctx_mut().instant.sleep(ONE_SECOND.get());
+        bindings_ctx.timers.instant.sleep(ONE_SECOND.get());
         init_stale_neighbor_with_ip(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -4936,7 +4936,7 @@ mod tests {
             LINK_ADDR1,
         );
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
     }
 
@@ -4969,7 +4969,7 @@ mod tests {
         let expected_gc_time =
             core_ctx.outer.nud.last_gc.unwrap() + MIN_GARBAGE_COLLECTION_INTERVAL.get();
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
 
         // Add a new entry and transition it to UNREACHABLE. The existing GC timer
@@ -4981,7 +4981,7 @@ mod tests {
             LINK_ADDR1,
         );
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
     }
 
@@ -5008,7 +5008,7 @@ mod tests {
             true,
         );
         assert_eq!(
-            bindings_ctx.timer_ctx().scheduled_instant(&mut core_ctx.outer.nud.timer_heap.gc),
+            bindings_ctx.timers.scheduled_instant(&mut core_ctx.outer.nud.timer_heap.gc),
             None
         );
     }

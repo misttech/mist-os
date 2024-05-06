@@ -174,7 +174,7 @@ pub(crate) mod testutil {
         collections::{BinaryHeap, HashMap},
         vec::Vec,
     };
-    use core::{convert::Infallible as Never, fmt::Debug};
+    use core::fmt::Debug;
     #[cfg(test)]
     use core::{hash::Hash, marker::PhantomData, time::Duration};
 
@@ -184,23 +184,22 @@ pub(crate) mod testutil {
     #[cfg(test)]
     use packet::Buf;
 
-    use super::*;
-    use crate::{
-        device::{link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes},
-        filter::FilterBindingsTypes,
-        ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
-        sync::{DynDebugReferences, Mutex},
-    };
     #[cfg(test)]
     use crate::{
+        context::{ContextProvider, CounterContext, InstantContext},
         device::{EthernetDeviceId, EthernetWeakDeviceId},
-        filter::FilterHandlerProvider,
+        filter::{FilterBindingsTypes, FilterHandlerProvider},
         testutil::DispatchedFrame,
+    };
+    use crate::{
+        device::{link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes},
+        ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
+        sync::Mutex,
     };
 
     pub use netstack3_base::testutil::{
-        FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeInstantCtx, FakeTimerCtx,
-        FakeTimerCtxExt, FakeTracingCtx, InstantAndData, WithFakeFrameContext,
+        FakeBindingsCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeInstantCtx,
+        FakeTimerCtx, FakeTimerCtxExt, FakeTracingCtx, InstantAndData, WithFakeFrameContext,
         WithFakeTimerContext,
     };
 
@@ -212,207 +211,15 @@ pub(crate) mod testutil {
         pub(crate) version: IpVersion,
     }
 
-    /// A test helper used to provide an implementation of a bindings context.
-    pub(crate) struct FakeBindingsCtx<TimerId, Event: Debug, State, FrameMeta> {
-        pub(crate) rng: FakeCryptoRng,
-        pub(crate) timers: FakeTimerCtx<TimerId>,
-        pub(crate) events: FakeEventCtx<Event>,
-        pub(crate) frames: FakeFrameCtx<FrameMeta>,
-        state: State,
-    }
-
-    impl<TimerId, Event: Debug, State, FrameMeta> ContextProvider
-        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
-    {
-        type Context = Self;
-        fn context(&mut self) -> &mut Self::Context {
-            self
-        }
-    }
-
-    impl<TimerId, Event: Debug, State: Default, FrameMeta> Default
-        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
-    {
-        fn default() -> Self {
-            Self {
-                rng: FakeCryptoRng::new_xorshift(0),
-                timers: FakeTimerCtx::default(),
-                events: FakeEventCtx::default(),
-                frames: FakeFrameCtx::default(),
-                state: Default::default(),
-            }
-        }
-    }
-
-    impl<TimerId, Event: Debug, State, FrameMeta> FakeBindingsCtx<TimerId, Event, State, FrameMeta> {
-        /// Seed the testing RNG with a specific value.
-        #[cfg(test)]
-        pub(crate) fn seed_rng(&mut self, seed: u128) {
-            self.rng = FakeCryptoRng::new_xorshift(seed);
-        }
-
-        /// Move the clock forward by the given duration without firing any
-        /// timers.
-        ///
-        /// If any timers are scheduled to fire in the given duration, future
-        /// use of this `FakeCoreCtx` may have surprising or buggy behavior.
-        #[cfg(test)]
-        pub(crate) fn sleep_skip_timers(&mut self, duration: Duration) {
-            self.timers.instant.sleep(duration);
-        }
-
-        #[cfg(test)]
-        pub(crate) fn timer_ctx(&self) -> &FakeTimerCtx<TimerId> {
-            &self.timers
-        }
-
-        #[cfg(test)]
-        pub(crate) fn timer_ctx_mut(&mut self) -> &mut FakeTimerCtx<TimerId> {
-            &mut self.timers
-        }
-
-        #[cfg(test)]
-        pub(crate) fn take_events(&mut self) -> Vec<Event> {
-            self.events.take()
-        }
-
-        pub(crate) fn frame_ctx_mut(&mut self) -> &mut FakeFrameCtx<FrameMeta> {
-            &mut self.frames
-        }
-
-        pub(crate) fn state(&self) -> &State {
-            &self.state
-        }
-
-        pub(crate) fn state_mut(&mut self) -> &mut State {
-            &mut self.state
-        }
-    }
-
-    impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta>
-        FilterBindingsTypes for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
-    {
-        type DeviceClass = ();
-    }
-
-    impl<TimerId, Event: Debug, State, FrameMeta> RngContext
-        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
-    {
-        type Rng<'a> = FakeCryptoRng where Self: 'a;
-
-        fn rng(&mut self) -> Self::Rng<'_> {
-            self.rng.clone()
-        }
-    }
-
-    impl<Id, Event: Debug, State, FrameMeta> AsRef<FakeInstantCtx>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn as_ref(&self) -> &FakeInstantCtx {
-            self.timers.as_ref()
-        }
-    }
-
-    impl<Id, Event: Debug, State, FrameMeta> AsRef<FakeTimerCtx<Id>>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn as_ref(&self) -> &FakeTimerCtx<Id> {
-            &self.timers
-        }
-    }
-
-    impl<Id, Event: Debug, State, FrameMeta> AsMut<FakeTimerCtx<Id>>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
-            &mut self.timers
-        }
-    }
-
-    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta>
-        TimerBindingsTypes for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        type Timer = <FakeTimerCtx<Id> as TimerBindingsTypes>::Timer;
-        type DispatchId = <FakeTimerCtx<Id> as TimerBindingsTypes>::DispatchId;
-    }
-
-    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-            self.timers.new_timer(id)
-        }
-
-        fn schedule_timer_instant(
-            &mut self,
-            time: Self::Instant,
-            timer: &mut Self::Timer,
-        ) -> Option<Self::Instant> {
-            self.timers.schedule_timer_instant(time, timer)
-        }
-
-        fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.cancel_timer(timer)
-        }
-
-        fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.scheduled_instant(timer)
-        }
-    }
-
-    impl<Id, Event: Debug, State, FrameMeta> EventContext<Event>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn on_event(&mut self, event: Event) {
-            self.events.on_event(event)
-        }
-    }
-
-    impl<Id, Event: Debug, State, FrameMeta> TracingContext
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        type DurationScope = ();
-
-        fn duration(&self, _: &'static core::ffi::CStr) {}
-    }
-
     impl<D: LinkDevice, Id, Event: Debug, State, FrameMeta> LinkResolutionContext<D>
         for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         type Notifier = FakeLinkResolutionNotifier<D>;
     }
 
-    impl<Id, Event: Debug, State, FrameMeta> ReferenceNotifiers
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        type ReferenceReceiver<T: 'static> = Never;
-
-        type ReferenceNotifier<T: Send + 'static> = Never;
-
-        fn new_reference_notifier<T: Send + 'static>(
-            debug_references: DynDebugReferences,
-        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-            // NB: We don't want deferred destruction in core tests. These are
-            // always single-threaded and single-task, and we want to encourage
-            // explicit cleanup.
-            panic!(
-                "FakeBindingsCtx can't create deferred reference notifiers for type {}: \
-                debug_references={debug_references:?}",
-                core::any::type_name::<T>()
-            );
-        }
-    }
-
-    impl<Id, Event: Debug, State, FrameMeta> DeferredResourceRemovalContext
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
-            match receiver {}
-        }
-    }
-
+    /// A fake implementation of [`LinkResolutionNotifier`].
     #[derive(Debug)]
-    pub(crate) struct FakeLinkResolutionNotifier<D: LinkDevice>(
+    pub struct FakeLinkResolutionNotifier<D: LinkDevice>(
         Arc<Mutex<Option<Result<D::Address, crate::error::AddressResolutionFailed>>>>,
     );
 
@@ -448,22 +255,6 @@ pub(crate) mod testutil {
         ) -> O {
             let Self { core_ctx: _, bindings_ctx } = self;
             f(&mut bindings_ctx.timers)
-        }
-    }
-
-    #[cfg(test)]
-    impl<TimerId, Event: Debug, State, FrameMeta> WithFakeTimerContext<TimerId>
-        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
-    {
-        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
-            f(&self.timers)
-        }
-
-        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O {
-            f(&mut self.timers)
         }
     }
 

@@ -65,6 +65,7 @@ pub mod sync {
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
+    mod fake_bindings;
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
@@ -73,4 +74,5 @@ pub mod testutil {
         WithFakeTimerContext,
     };
     pub use crate::trace::testutil::FakeTracingCtx;
+    pub use fake_bindings::FakeBindingsCtx;
 }

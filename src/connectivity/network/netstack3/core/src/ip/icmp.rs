@@ -4927,10 +4927,10 @@ mod tests {
             let mut ctx = with_errors_per_second(0);
             send(&mut ctx);
             assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), 0);
-            ctx.bindings_ctx.sleep_skip_timers(Duration::from_secs(1));
+            ctx.bindings_ctx.timers.instant.sleep(Duration::from_secs(1));
             send(&mut ctx);
             assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), 0);
-            ctx.bindings_ctx.sleep_skip_timers(Duration::from_secs(1));
+            ctx.bindings_ctx.timers.instant.sleep(Duration::from_secs(1));
             send(&mut ctx);
             assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), 0);
         }

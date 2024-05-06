@@ -1968,7 +1968,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(valid_lifetime_secs),
         );
         assert_empty(core_ctx.get_ref().iter_slaac_addrs());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     fn calculate_addr_sub(
@@ -2030,7 +2030,7 @@ mod tests {
         // Trigger the invalidation timer.
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()));
         assert_empty(core_ctx.get_ref().iter_slaac_addrs());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[test]
@@ -2062,7 +2062,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(LIFETIME_SECS),
         );
         assert_empty(core_ctx.get_ref().iter_slaac_addrs());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[test_case(AddressRemovedReason::Manual; "manual")]
@@ -2121,7 +2121,7 @@ mod tests {
             config,
             reason,
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     struct RefreshStableAddressTimersTest {
@@ -2469,7 +2469,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(valid_lifetime_secs),
         );
         assert_empty(core_ctx.get_ref().iter_slaac_addrs());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     struct GenerateTemporaryAddressTest {

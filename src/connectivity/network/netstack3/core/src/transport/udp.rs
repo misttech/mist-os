@@ -2749,7 +2749,7 @@ mod tests {
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {
-            self.state_mut().received_mut::<I>().entry(id.downgrade()).or_default().packets.push(
+            self.state.received_mut::<I>().entry(id.downgrade()).or_default().packets.push(
                 ReceivedPacket {
                     addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
                     body: body.as_ref().to_owned(),
@@ -3280,7 +3280,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().received::<I>(),
+            bindings_ctx.state.received::<I>(),
             &HashMap::from([(
                 socket.downgrade(),
                 SocketReceived {
@@ -3366,7 +3366,7 @@ mod tests {
             LOCAL_PORT,
             &body[..],
         );
-        assert_eq!(&bindings_ctx.state().socket_data::<I>(), &HashMap::new());
+        assert_eq!(&bindings_ctx.state.socket_data::<I>(), &HashMap::new());
     }
 
     /// Tests that UDP connections can be created and data can be transmitted
@@ -3402,7 +3402,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&body[..]])])
         );
 
@@ -3924,7 +3924,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
         api.shutdown(&socket, which).expect("is connected");
@@ -3940,7 +3940,7 @@ mod tests {
             &packet[..],
         );
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
 
@@ -3958,7 +3958,7 @@ mod tests {
             &packet[..],
         );
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
     }
@@ -4027,7 +4027,7 @@ mod tests {
                 src_port: Some(REMOTE_PORT),
             },
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_conn2 = [2, 2, 2, 2];
         receive_udp_packet(
@@ -4048,7 +4048,7 @@ mod tests {
             },
             body: body_conn2.into(),
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_list1 = [3, 3, 3, 3];
         receive_udp_packet(
@@ -4069,7 +4069,7 @@ mod tests {
             },
             body: body_list1.into(),
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_list2 = [4, 4, 4, 4];
         receive_udp_packet(
@@ -4090,7 +4090,7 @@ mod tests {
                 src_port: Some(REMOTE_PORT),
             },
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_wildcard_list = [5, 5, 5, 5];
         receive_udp_packet(
@@ -4111,7 +4111,7 @@ mod tests {
             },
             body: body_wildcard_list.into(),
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
     }
 
     /// Tests UDP wildcard listeners for different IP versions.
@@ -4153,7 +4153,7 @@ mod tests {
 
         // Check that we received both packets for the listener.
         assert_eq!(
-            bindings_ctx.state().received::<I>(),
+            bindings_ctx.state.received::<I>(),
             &HashMap::from([(
                 listener.downgrade(),
                 SocketReceived {
@@ -4205,7 +4205,7 @@ mod tests {
         );
         // Check that we received both packets for the listener.
         assert_eq!(
-            bindings_ctx.state().received(),
+            bindings_ctx.state.received(),
             &HashMap::from([(
                 listener.downgrade(),
                 SocketReceived {
@@ -4240,7 +4240,7 @@ mod tests {
         );
         // Check that we received the packet on the listener.
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(listener.downgrade(), vec![&body[..]])])
         );
     }
@@ -4336,7 +4336,7 @@ mod tests {
         receive_packet(3, multicast_addr_other);
 
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([
                 (specific_listeners[0].downgrade(), vec![[1].as_slice(), &[2]]),
                 (specific_listeners[1].downgrade(), vec![&[1], &[2]]),
@@ -4421,7 +4421,7 @@ mod tests {
             &body[..],
         );
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([
                 (bound_first_device.downgrade(), vec![&body[..]]),
                 (bound_second_device.downgrade(), vec![&body[..]])
@@ -4518,14 +4518,14 @@ mod tests {
         // Since it is bound, it does not receive a packet from another device.
         let (core_ctx, bindings_ctx) = api.contexts();
         receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B);
-        let received = &bindings_ctx.state().socket_data::<I>();
+        let received = &bindings_ctx.state.socket_data::<I>();
         assert_eq!(received, &HashMap::new());
 
         // When unbound, the socket can receive packets on the other device.
         api.set_device(&socket, None).expect("clearing bound device failed");
         let (core_ctx, bindings_ctx) = api.contexts();
         receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B);
-        let received = bindings_ctx.state().received::<I>().iter().collect::<Vec<_>>();
+        let received = bindings_ctx.state.received::<I>().iter().collect::<Vec<_>>();
         let (rx_socket, socket_received) =
             assert_matches!(received[..], [(rx_socket, packets)] => (rx_socket, packets));
         assert_eq!(rx_socket, &socket);
@@ -4656,7 +4656,7 @@ mod tests {
             receive_packet(remote_ip, device);
         }
 
-        let per_socket_data = bindings_ctx.state().socket_data();
+        let per_socket_data = bindings_ctx.state.socket_data();
         for (device, listener) in bound_on_devices {
             assert_eq!(per_socket_data[&listener.downgrade()], vec![&[index_for_device(device)]]);
         }
@@ -6080,7 +6080,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().received::<Ipv6>(),
+            bindings_ctx.state.received::<Ipv6>(),
             &HashMap::from([(
                 listener.downgrade(),
                 SocketReceived {

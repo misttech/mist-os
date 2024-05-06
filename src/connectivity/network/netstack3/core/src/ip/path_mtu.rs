@@ -679,7 +679,7 @@ mod tests {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Make sure there are no timers.
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         let new_mtu1 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 50);
         let start_time = bindings_ctx.now();
@@ -700,7 +700,7 @@ mod tests {
         );
 
         // Make sure a task got scheduled.
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timers.assert_timers_installed([(
             PmtuTimerId::default(),
             FakeInstant::from(MAINTENANCE_PERIOD + Duration::from_secs(1)),
         )]);
@@ -739,7 +739,7 @@ mod tests {
 
         // Make sure there is still a task scheduled. (we know no timers got
         // triggered because the `run_for` methods returned 0 so far).
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timers.assert_timers_installed([(
             PmtuTimerId::default(),
             FakeInstant::from(MAINTENANCE_PERIOD + Duration::from_secs(1)),
         )]);
@@ -792,7 +792,7 @@ mod tests {
             start_time + (duration * 1800)
         );
         // Should still have another task scheduled.
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timers.assert_timers_installed([(
             PmtuTimerId::default(),
             FakeInstant::from(MAINTENANCE_PERIOD * 2 + Duration::from_secs(1)),
         )]);
@@ -821,7 +821,7 @@ mod tests {
             start_time + (duration * 1800)
         );
         // Should still have another task scheduled.
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timers.assert_timers_installed([(
             PmtuTimerId::default(),
             FakeInstant::from(MAINTENANCE_PERIOD * 4 + Duration::from_secs(1)),
         )]);
@@ -844,6 +844,6 @@ mod tests {
         assert_eq!(get_pmtu(&core_ctx, fake_config.local_ip.get(), other_ip.get()), None);
         assert_eq!(get_last_updated(&core_ctx, fake_config.local_ip.get(), other_ip.get()), None);
         // Should not have a task scheduled since there is no more PMTU data.
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 }
