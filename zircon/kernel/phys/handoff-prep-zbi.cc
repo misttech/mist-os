@@ -136,6 +136,8 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
               [&uart_periph_range, &extra_mem_config_ranges](const auto& uart) {
                 using dcfg_type = ktl::decay_t<decltype(uart.config())>;
                 if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
+                  // If this range overlaps with other peripheral ranges, it will be coalesced,
+                  // otherwise it will be a single page.
                   uart_periph_range = {
                       .paddr = fbl::round_down(uart.config().mmio_phys, ZX_PAGE_SIZE),
                       .length = ZX_PAGE_SIZE,

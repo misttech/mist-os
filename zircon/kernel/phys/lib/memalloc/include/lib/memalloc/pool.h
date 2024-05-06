@@ -285,6 +285,16 @@ class Pool {
   // is returned.
   fit::result<fit::failed> MarkAsPeripheral(const memalloc::Range& range);
 
+  // This method will generate one peripheral range for every run of consecutive peripheral ranges
+  // the pool knows of. This peripheral range will be aligned to oen of the provided alignments.
+  //
+  // Each of the provided alignments is tried, and the first one not to generate invalid ranges,
+  // such as overlapping with free ram ranges, is selected.
+  //
+  // `alignments` is a collection of power of two alignments, that is the mask for alignment is
+  // equivalent to `(1 << alignments[n]) - 1`.
+  fit::result<fit::failed> CoalescePeripherals(cpp20::span<const size_t> alignments);
+
   // Pretty-prints the memory ranges contained in the pool.
   void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const;
 

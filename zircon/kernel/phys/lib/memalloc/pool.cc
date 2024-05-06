@@ -18,9 +18,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <string_view>
 #include <utility>
 
+#include <fbl/algorithm.h>
 #include <pretty/cpp/sizes.h>
 
 #include "algorithm.h"
@@ -304,6 +307,71 @@ fit::result<fit::failed> Pool::MarkAsPeripheral(const memalloc::Range& range) {
   // peripheral ranges adjacent to `range`.
   Coalesce(first_intersecting_range);
   return fit::success();
+}
+
+fit::result<fit::failed> Pool::CoalescePeripherals(cpp20::span<const size_t> alignments) {
+  for (auto curr = ranges_.begin(), prev = ranges_.end(); curr != ranges_.end();) {
+    if (curr->type != memalloc::Type::kPeripheral) {
+      prev = curr++;
+      continue;
+    }
+    auto last = curr;
+    for (auto next = std::next(curr); next != ranges_.end(); ++next) {
+      if (next->type != memalloc::Type::kPeripheral) {
+        break;
+      }
+      last = next;
+    }
+
+    // `prev` is the non peripheral range preceding `curr`.
+    // `curr` is the first peripheral range in this run.
+    // `last` is the last peripheral range in the run.
+    //
+    // `prev->end()` and `std::next(last)->end()` will determine the limits
+    // for the inflated range. And `curr->addr` and `last->end()` will determine
+    // the minimum range to cover.
+    const uint64_t min_base_addr = prev == ranges_.end() ? 0 : prev->end();
+    const uint64_t max_base_addr = curr->addr;
+    const uint64_t min_end_address = last->end();
+    auto next = std::next(last);
+    const uint64_t max_end_address =
+        next == ranges_.end() ? std::numeric_limits<uint64_t>::max() : next->addr;
+
+    // Try alignments from first to last, first viable alignment, we keep.
+    // These allows to adjust in cases where given a layout we can't pick
+    // biggest alignment but second biggest, thus minimizing the number of
+    // pages required to map this range.
+    uint64_t base_address = min_base_addr;
+    uint64_t end_address = min_end_address;
+
+    // Handle the unlikely case were we may not be able to generate larger ranges
+    // due to layout.
+    for (auto align : alignments) {
+      const uint64_t alignment = 1ull << align;
+      uint64_t tmp_base_address = fbl::round_down(max_base_addr, alignment);
+      uint64_t tmp_end_address = fbl::round_up(min_end_address, alignment);
+      if (tmp_base_address < min_base_addr) {
+        continue;
+      }
+      if (tmp_end_address > max_end_address) {
+        continue;
+      }
+      base_address = tmp_base_address;
+      end_address = tmp_end_address;
+      break;
+    }
+
+    // Might be invalidated by merging ranges afterwards.
+    curr = ++last;
+    auto res = MarkAsPeripheral({.addr = base_address,
+                                 .size = end_address - base_address,
+                                 .type = memalloc::Type::kPeripheral});
+    if (res.is_error()) {
+      return res;
+    }
+  }
+
+  return fit::ok();
 }
 
 fit::result<fit::failed, uint64_t> Pool::FindAllocatable(Type type, uint64_t size,

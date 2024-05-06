@@ -11,12 +11,16 @@
 #include <lib/boot-shim/pool-mem-config.h>
 #include <lib/boot-shim/uart.h>
 #include <lib/fit/result.h>
+#include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
+#include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
 #include <lib/zircon-internal/align.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -27,6 +31,7 @@
 #include <ktl/align.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/type_traits.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-shim/devicetree.h>
@@ -74,34 +79,12 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
       boot_shim::ArmDevicetreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
-    // This attempts to generate a peripheral ramge the covers as much as possible from the
-    // non free ram ranges.
     auto& pool = Allocation::GetPool();
     memalloc::Range peripheral_range = {
         .addr = mmio_range.address,
         .size = mmio_range.size,
         .type = memalloc::Type::kPeripheral,
     };
-
-    // Look for the range that comes right after `peripheral_range`. While fancier search algorithms
-    // exist, the underlying structure is a linked list, so a linear search is unavoidable.
-    auto next_range_it = ktl::find_if(
-        pool.begin(), pool.end(),
-        [peripheral_range](const auto& range) { return range.addr >= peripheral_range.end(); });
-
-    if (next_range_it != pool.end()) {
-      peripheral_range.size = next_range_it->addr - peripheral_range.addr;
-    } else {
-      peripheral_range.size = fbl::round_up(peripheral_range.end(), 1ull << 30);
-    }
-
-    // Make sure generate ranges are always page aligned. The address is rounded to the containing
-    // page, and the end is rounded up to the following page.
-    uint64_t page_aligned_start = ZX_ROUNDDOWN(peripheral_range.addr, ZX_PAGE_SIZE);
-    uint64_t page_aligned_end = ZX_PAGE_ALIGN(peripheral_range.end());
-    peripheral_range.addr = page_aligned_start;
-    peripheral_range.size = page_aligned_end - page_aligned_start;
-
     // This may reintroduce reserved ranges from the initial memory bootstrap as peripheral ranges,
     // since reserved ranges are no longer tracked and are represented as wholes in the memory. This
     // should be harmless, since the implications is that an uncached mapping will be created but
@@ -123,6 +106,27 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   shim.Get<PlatformIdItem>().set_payload(kQemuPlatformId);
   shim.Get<BoardInfoItem>().set_payload(kQemuBoardInfo);
 
+  // Mark the UART MMIO range as peripheral range.
+  uart::internal::Visit(
+      [&shim](const auto& driver) {
+        using config_type = ktl::decay_t<decltype(driver.config())>;
+        if constexpr (ktl::is_same_v<config_type, zbi_dcfg_simple_t>) {
+          const zbi_dcfg_simple_t& uart_mmio_config = driver.config();
+          uint64_t base_addr = fbl::round_down<uint64_t>(uart_mmio_config.mmio_phys, ZX_PAGE_SIZE);
+          if (Allocation::GetPool()
+                  .MarkAsPeripheral({
+                      .addr = base_addr,
+                      .size = ZX_PAGE_SIZE,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_error()) {
+            printf("%s: Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n",
+                   shim.shim_name(), base_addr, base_addr + ZX_PAGE_SIZE);
+          }
+        }
+      },
+      GetUartDriver().uart());
+
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());
 
@@ -132,12 +136,19 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   BootZbi::InputZbi zbi_view(gDevicetreeBoot.ramdisk);
   BootZbi boot;
 
-  if (shim.Check("Not a bootable ZBI", boot.Init(zbi_view)) &&
-      shim.Check("Failed to load ZBI", boot.Load(static_cast<uint32_t>(shim.size_bytes()))) &&
-      shim.Check("Failed to append boot loader items to data ZBI",
-                 shim.AppendItems(boot.DataZbi()))) {
-    boot.Log();
-    boot.Boot();
+  if (shim.Check("Not a bootable ZBI", boot.Init(zbi_view))) {
+    // All MMIO Ranges have been observed by now.
+    if (Allocation::GetPool().CoalescePeripherals(kAddressSpacePageSizeShifts).is_error()) {
+      printf(
+          "%s: WARNING Failed to inflate peripheral ranges, page allocation may be suboptimal.\n",
+          shim.shim_name());
+    }
+    if (shim.Check("Failed to load ZBI", boot.Load(static_cast<uint32_t>(shim.size_bytes()))) &&
+        shim.Check("Failed to append boot loader items to data ZBI",
+                   shim.AppendItems(boot.DataZbi()))) {
+      boot.Log();
+      boot.Boot();
+    }
   }
   __UNREACHABLE;
 }
