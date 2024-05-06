@@ -119,6 +119,20 @@ local delivery when strict device requirements are in effect, due to:
 It is technically possible to permit this, but doing so correctly is difficult,
 so this is forbidden for now until a clear need for this arises.
 
+### Dualstack UDP connect/send-to mismatched IP version
+
+Netstack3 enforces that the peer address has the same IP version as the local
+address while sending. For example on a IPv6 UDP socket:
+  1. Binding to an IPv4-mapped-IPv6 address then connecting or sending to an
+  IPv6 address will result in EAFNOSUPPORT.
+  2. Binding to an IPv6 address then connecting or sending to an
+  IPv4-mapped-IPv6 address will result in ENETUNREACH.
+On Linux, both of these operations are supported (with slightly different
+semantics). The first case will result in the packet being sent to the IPv6
+destination with a system-selected IPv6 source address. The second case will
+result in the packet being sent to the IPv4-mapped-IPv6 destination *as an IPv6
+address* with the bound IPv6 source address.
+
 [Fuchsia RFC-0184]: /docs/contribute/governance/rfcs/0184_posix_compatibility_for_the_system_netstack
 [`fuchsia.posix.socket`]: /sdk/fidl/fuchsia.posix.socket/socket.fidl
 [core and bindings]: ./CORE_BINDINGS.md#core-and-bindings
