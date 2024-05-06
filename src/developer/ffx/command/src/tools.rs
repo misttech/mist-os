@@ -49,7 +49,6 @@ impl From<&argh::CommandInfo> for FfxToolInfo {
 
 #[async_trait(?Send)]
 pub trait ToolRunner {
-    fn forces_stdout_log(&self) -> bool;
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus, Error>;
 }
 

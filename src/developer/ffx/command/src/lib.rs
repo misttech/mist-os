@@ -161,8 +161,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         }
     };
 
-    let log_to_stdio = tool.as_ref().map(|tool| tool.forces_stdout_log()).unwrap_or(false);
-    ffx_config::logging::init(&context, log_to_stdio || app.verbose, !log_to_stdio).await?;
+    ffx_config::logging::init(&context, app.verbose, true).await?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
 
     let metrics = MetricsSession::start(&context).await?;

@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashSet;
-
 use crate::errors::ParseError;
-use syn::{spanned::Spanned, ExprCall, NestedMeta};
+use syn::{spanned::Spanned, ExprCall};
 
 fn attr_name(attr: &syn::Attribute) -> Result<String, ParseError> {
     if attr.path.segments.len() == 1 {
@@ -13,11 +11,6 @@ fn attr_name(attr: &syn::Attribute) -> Result<String, ParseError> {
     } else {
         Err(ParseError::InvalidAttr(attr.span()))
     }
-}
-
-fn is_forces_stdout_logs_path(path: &syn::Path) -> bool {
-    path.segments.len() == 1
-        && path.segments.first().unwrap().ident == FfxFlag::ForcesStdoutLogs.to_string().as_str()
 }
 
 #[derive(Clone, Debug)]
@@ -57,9 +50,6 @@ impl<'a> NamedFieldTy<'a> {
                         attr.parse_args().map_err(|_| ParseError::InvalidWithAttr(attr.span()))?;
                     res.replace(Self::With(expr, NamedField { field_ty, field_name }));
                 }
-                name @ ("ffx" | "check") => {
-                    return Err(ParseError::UnexpectedAttr(name.to_owned(), attr.span()));
-                }
                 _ => {} // ignore unknown attributes (like derive)
             }
         }
@@ -67,58 +57,16 @@ impl<'a> NamedFieldTy<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum FfxFlag {
-    ForcesStdoutLogs,
-}
-
-impl ToString for FfxFlag {
-    fn to_string(&self) -> String {
-        match self {
-            Self::ForcesStdoutLogs => "forces_stdout_logs".to_owned(),
-        }
-    }
-}
-
-impl TryFrom<&NestedMeta> for FfxFlag {
-    type Error = ParseError;
-    fn try_from(value: &NestedMeta) -> Result<Self, Self::Error> {
-        match value {
-            syn::NestedMeta::Meta(syn::Meta::Path(path)) if is_forces_stdout_logs_path(path) => {
-                Ok(Self::ForcesStdoutLogs)
-            }
-            _ => Err(ParseError::MalformedFfxAttr(value.span())),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct FromEnvAttributes {
-    pub flags: HashSet<FfxFlag>,
     pub checks: Vec<ExprCall>,
 }
 
 impl FromEnvAttributes {
     pub fn from_attrs(attrs: &Vec<syn::Attribute>) -> Result<Self, ParseError> {
-        let mut flags = HashSet::new();
         let mut checks = Vec::new();
         for attr in attrs.iter() {
             match attr_name(attr)?.as_str() {
-                "ffx" => {
-                    let meta_list = match attr
-                        .parse_meta()
-                        .map_err(|_| ParseError::MalformedFfxAttr(attr.span()))?
-                    {
-                        syn::Meta::List(list) => Ok(list),
-                        meta => Err(ParseError::MalformedFfxAttr(meta.span())),
-                    }?;
-                    for item in &meta_list.nested {
-                        let flag = item.try_into()?;
-                        if !flags.insert(flag) {
-                            return Err(ParseError::DuplicateFfxAttr(item.span()));
-                        }
-                    }
-                }
                 "check" => checks.push(
                     attr.parse_args().map_err(|_| ParseError::InvalidCheckAttr(attr.span()))?,
                 ),
@@ -128,7 +76,7 @@ impl FromEnvAttributes {
                 _ => {} // ignore unknown attributes
             }
         }
-        Ok(Self { flags, checks })
+        Ok(Self { checks })
     }
 }
 
@@ -136,72 +84,6 @@ impl FromEnvAttributes {
 mod tests {
     use super::*;
     use crate::testing::parse_macro_derive;
-
-    #[test]
-    fn test_parse_ffx_attr_ty() {
-        let ast = parse_macro_derive(
-            r#"
-            #[derive(FfxTool)]
-            #[ffx(forces_stdout_logs)]
-            struct Foo {}
-            "#,
-        );
-        assert!(
-            FromEnvAttributes::from_attrs(&ast.attrs)
-                .unwrap()
-                .flags
-                .contains(&FfxFlag::ForcesStdoutLogs),
-            "Expected forces_stdout_logs attribute"
-        );
-    }
-
-    #[test]
-    fn test_parse_ffx_attr_ty_failure_duplicate() {
-        let ast = parse_macro_derive(
-            r#"
-            #[derive(FfxTool)]
-            #[ffx(forces_stdout_logs, forces_stdout_logs)]
-            struct Foo {}
-            "#,
-        );
-        match FromEnvAttributes::from_attrs(&ast.attrs) {
-            Ok(r) => panic!("Expected failure. Instead received {r:?}"),
-            Err(ParseError::DuplicateFfxAttr(_)) => {}
-            e => panic!("Received unexpected error: {e:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_ffx_attr_ty_typo() {
-        let ast = parse_macro_derive(
-            r#"
-            #[derive(FfxTool)]
-            #[ffx(force_stdout_loggerooooo)]
-            struct Foo {}
-            "#,
-        );
-        match FromEnvAttributes::from_attrs(&ast.attrs) {
-            Ok(r) => panic!("Expected failure. Instead received {r:?}"),
-            Err(ParseError::MalformedFfxAttr(_)) => {}
-            e => panic!("Received unexpected error: {e:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_ffx_attr_ty_empty() {
-        let ast = parse_macro_derive(
-            r#"
-            #[derive(FfxTool)]
-            #[ffx]
-            struct Foo {}
-            "#,
-        );
-        match FromEnvAttributes::from_attrs(&ast.attrs) {
-            Ok(r) => panic!("Expected failure. Instead received {r:?}"),
-            Err(ParseError::MalformedFfxAttr(_)) => {}
-            e => panic!("Received unexpected error: {e:?}"),
-        }
-    }
 
     #[test]
     fn test_parse_ffx_attr_ty_check() {

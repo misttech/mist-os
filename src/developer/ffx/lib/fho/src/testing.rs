@@ -221,7 +221,6 @@ mod internal {
     }
 
     #[derive(fho_macro::FfxTool, Debug)]
-    #[ffx(forces_stdout_logs)]
     #[check(SimpleCheck(true))]
     pub struct FakeTool {
         from_env_string: NewTypeString,

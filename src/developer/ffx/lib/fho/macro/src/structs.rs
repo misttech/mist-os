@@ -4,7 +4,7 @@
 
 use crate::{
     errors::ParseError,
-    types::{FfxFlag, FromEnvAttributes, NamedField, NamedFieldTy},
+    types::{FromEnvAttributes, NamedField, NamedFieldTy},
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
@@ -178,7 +178,6 @@ impl ToTokens for CheckCollection {
 }
 
 pub struct NamedFieldStruct<'a> {
-    forces_stdout_logs: bool,
     command_field_decl: CommandFieldTypeDecl<'a>,
     struct_decl: StructDecl<'a>,
     checks: CheckCollection,
@@ -206,19 +205,18 @@ impl<'a> NamedFieldStruct<'a> {
         let command_field_decl = CommandFieldTypeDecl(extract_command_field(&mut fields)?);
         let struct_decl = StructDecl(&parent_ast);
         let attrs = FromEnvAttributes::from_attrs(&parent_ast.attrs)?;
-        let forces_stdout_logs = attrs.flags.contains(&FfxFlag::ForcesStdoutLogs);
         let checks = CheckCollection(attrs.checks);
         let mut vcc = VariableCreationCollection::new();
         for field in fields.into_iter() {
             vcc.add_field(field)?;
         }
-        Ok(Self { forces_stdout_logs, command_field_decl, struct_decl, checks, vcc })
+        Ok(Self { command_field_decl, struct_decl, checks, vcc })
     }
 }
 
 impl ToTokens for NamedFieldStruct<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Self { forces_stdout_logs, command_field_decl, struct_decl, checks, vcc } = self;
+        let Self { command_field_decl, struct_decl, checks, vcc } = self;
         let command_field_name = command_field_decl.0.field_name;
         let join_results_names = &vcc.join_results_names;
         let span = Span::call_site();
@@ -243,10 +241,6 @@ impl ToTokens for NamedFieldStruct<'_> {
                         #(#join_results_names,)*
                         #command_field_name: cmd
                     })
-                }
-
-                fn forces_stdout_log(&self) -> bool {
-                    #forces_stdout_logs
                 }
 
                 fn supports_machine_output(&self) -> bool {

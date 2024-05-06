@@ -166,14 +166,6 @@ impl ToolSuite for FfxSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolRunner for FfxSubCommand {
-    /// Whether the given subcommand forces logging to stdout
-    fn forces_stdout_log(&self) -> bool {
-        match &self.cmd {
-            subcommand @ FfxBuiltIn { subcommand: Some(_) } if is_daemon(subcommand) => true,
-            _ => false,
-        }
-    }
-
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
         if self.app.global.machine.is_some()
             && !ffx_lib_suite::ffx_plugin_is_machine_supported(&self.cmd)
@@ -259,18 +251,6 @@ async fn run_legacy_subcommand(
     tracing::debug!("Overnet initialized, creating injector");
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
     ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
-}
-
-fn is_daemon(subcommand: &FfxBuiltIn) -> bool {
-    use ffx_daemon_plugin_args::FfxPluginCommand;
-    use ffx_daemon_plugin_sub_command::SubCommand::FfxDaemonStart;
-    use SubCommand::FfxDaemonPlugin;
-    matches!(
-        subcommand,
-        FfxBuiltIn {
-            subcommand: Some(FfxDaemonPlugin(FfxPluginCommand { subcommand: FfxDaemonStart(_) }))
-        }
-    )
 }
 
 #[fuchsia_async::run_singlethreaded]
