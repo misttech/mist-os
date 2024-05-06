@@ -494,6 +494,8 @@ async def generate_test_list(
                 f"Could not generate a new test-list.json{suffix}"
             )
 
+        exec_env.test_list_file = out_path
+
         # Load the generated test-list.json file.
         try:
             parse_id = recorder.emit_start_file_parsing(

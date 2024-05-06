@@ -35,7 +35,7 @@ class ExecutionEnvironment:
     test_json_file: str
 
     # Path to the input test-list.json file.
-    test_list_file: str
+    test_list_file: str | None = None
 
     # Path to the package-repositories.json file.
     package_repositories_file: str | None = None
@@ -109,13 +109,11 @@ class ExecutionEnvironment:
         # Get the input files from their expected locations directly
         # under the output directory.
         tests_json_file = os.path.join(out_dir, "tests.json")
-        test_list_file = os.path.join(out_dir, "test-list.json")
         package_repositories_file = os.path.join(
             out_dir, "package-repositories.json"
         )
         for expected_file in [
             tests_json_file,
-            test_list_file,
         ]:
             if not os.path.isfile(expected_file):
                 raise EnvironmentError(f"Expected a file at {expected_file}")
@@ -124,7 +122,6 @@ class ExecutionEnvironment:
             out_dir,
             log_file,
             tests_json_file,
-            test_list_file,
             package_repositories_file=(
                 package_repositories_file
                 if os.path.isfile(package_repositories_file)

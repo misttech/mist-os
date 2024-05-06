@@ -58,9 +58,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                 self.assertEqual(
                     env.test_json_file, os.path.join(out_dir, "tests.json")
                 )
-                self.assertEqual(
-                    env.test_list_file, os.path.join(out_dir, "test-list.json")
-                )
+                self.assertIsNone(env.test_list_file)
 
                 self.assertEqual(
                     env.relative_to_root(os.path.join(tmp, "foo", "bar")),
@@ -97,9 +95,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                 self.assertEqual(
                     env.test_json_file, os.path.join(out_dir, "tests.json")
                 )
-                self.assertEqual(
-                    env.test_list_file, os.path.join(out_dir, "test-list.json")
-                )
+                self.assertIsNone(env.test_list_file)
 
                 self.assertEqual(
                     env.relative_to_root(os.path.join(tmp, "foo", "bar")),
@@ -157,21 +153,6 @@ class TestExecutionEnvironment(unittest.TestCase):
                 self.assertRaisesRegex(
                     environment.EnvironmentError,
                     r"tests.json",
-                    lambda: environment.ExecutionEnvironment.initialize_from_args(
-                        default_flags
-                    ),
-                )
-
-    def test_missing_test_list_file(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            self._make_test_files(tmp)
-            os.remove(os.path.join(tmp, "out", "foo", "test-list.json"))
-
-            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}):
-                default_flags = args.parse_args([])
-                self.assertRaisesRegex(
-                    environment.EnvironmentError,
-                    r"test-list.json",
                     lambda: environment.ExecutionEnvironment.initialize_from_args(
                         default_flags
                     ),
