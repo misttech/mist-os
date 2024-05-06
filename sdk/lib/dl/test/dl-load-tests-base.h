@@ -36,6 +36,9 @@ class DlLoadTestsBase : public DlTestsBase {
 
   static void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
+  // There are no expectations set on this base class to verify and clear.
+  void VerifyAndClearNeeded() {}
+
   // Check that startup modules are not retrieved from the filesystem.
   static void FileCheck(std::string_view filename);
 

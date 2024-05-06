@@ -46,6 +46,8 @@ class DlLoadZirconTestsBase : public DlLoadTestsBase {
 
   void CallWithLdsvcInstalled(fit::closure func) { mock_.CallWithLdsvcInstalled(std::move(func)); }
 
+  void VerifyAndClearNeeded() { mock_.VerifyAndClearExpectations(); }
+
   // Retrieve a VMO from the test package.
   std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 
