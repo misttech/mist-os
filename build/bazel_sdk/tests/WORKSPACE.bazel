@@ -102,8 +102,29 @@ fuchsia_sdk_repository(
     ],
 )
 
+local_repository(
+    name = "fuchsia-infra-bazel-rules",
+    path = "../../../third_party/fuchsia-infra-bazel-rules/src",
+)
+
+new_local_repository(
+    name = "bazel",
+    build_file_content = """
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]),
+    visibility = ["//visibility:public"],
+)
+""",
+    path = "../../../prebuilt/third_party/bazel/" + build_config.host_tag,
+)
+
 # gTest.
 local_repository(
     name = "com_google_googletest",
-    path = "third_party/googletest",
+    path = "../../../third_party/googletest",
 )
