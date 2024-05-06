@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::time::{Duration, SystemTime};
+
 use {
     anyhow::Result,
     fuchsia_hyper::{new_https_client, HttpsClient},
@@ -185,9 +187,23 @@ impl GA4MetricsService {
         self.state.uuid.map_or("No uuid".to_string(), |u| u.to_string())
     }
 
+    fn user_first_touch_timestamp_micros(&self) -> String {
+        self.state
+            .user_first_touch_timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or(Duration::from_micros(0))
+            .as_micros()
+            .to_string()
+    }
     /// Create the GA4 Post object that will be sent to Google Analytics.
     fn init_post(&mut self) {
-        self.post = Post::new(self.uuid_as_str(), None, Some(self.make_user_properties()), vec![]);
+        self.post = Post::new(
+            self.uuid_as_str(),
+            None,
+            self.user_first_touch_timestamp_micros(),
+            Some(self.make_user_properties()),
+            vec![],
+        );
     }
 
     /// Initialize the UserProperties to be sent to GA4 with events.

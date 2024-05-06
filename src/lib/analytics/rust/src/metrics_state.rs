@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
-use std::fs::{create_dir_all, read_to_string, remove_file, File};
+use std::fs::{self, create_dir_all, read_to_string, remove_file, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use uuid::Uuid;
 
 const OPT_IN_STATUS_FILENAME: &str = "analytics-status";
@@ -28,6 +29,7 @@ pub struct MetricsState {
     pub(crate) ga4_key: String,
     pub(crate) status: MetricsStatus,
     pub(crate) uuid: Option<Uuid>,
+    pub(crate) user_first_touch_timestamp: SystemTime,
     metrics_dir: PathBuf,
     pub(crate) invoker: Option<String>,
 }
@@ -118,6 +120,9 @@ impl MetricsState {
             }
         }
 
+        // Set the user_first_touch_timestamp to the modified time of the uuid.
+        metrics.user_first_touch_timestamp = get_modified_time_uuid_file(metrics_dir);
+
         if metrics.status == MetricsStatus::NewUser {
             // record usage of the app on disk, but, stay 'NewUser' to prevent collection on first usage.
             if let Err(e) = write_app_status(metrics_dir, &metrics.app_name, true) {
@@ -193,6 +198,7 @@ impl Default for MetricsState {
             ga4_key: UNKNOWN_GA4_KEY.to_string(),
             status: MetricsStatus::NewUser,
             uuid: None,
+            user_first_touch_timestamp: SystemTime::now(),
             metrics_dir: PathBuf::from("/tmp"),
             invoker: None,
         }
@@ -245,6 +251,23 @@ fn read_uuid_file(metrics_dir: &PathBuf) -> Result<Uuid, Error> {
     }
 }
 
+/// Returns the modified time of the uuid file. It is infallible,
+/// falling back to the current time in the case
+/// of any error.
+fn get_modified_time_uuid_file(metrics_dir: &PathBuf) -> SystemTime {
+    let file = metrics_dir.join("uuid");
+    let mut modified_time = SystemTime::now();
+    if file.exists() {
+        match fs::metadata(&file) {
+            Ok(data) => modified_time = data.modified().unwrap_or(SystemTime::now()),
+            Err(e) => {
+                eprintln!("Error reading uuid metadata: {e}");
+            }
+        }
+    }
+    modified_time
+}
+
 fn delete_uuid_file(metrics_dir: &PathBuf) -> Result<(), Error> {
     let file = metrics_dir.join("uuid");
     let path = file.as_path();
@@ -287,6 +310,7 @@ mod tests {
             ga4_key: UNKNOWN_GA4_KEY.to_string(),
             status: MetricsStatus::NewUser,
             uuid: Some(Uuid::new_v4()),
+            user_first_touch_timestamp: SystemTime::now(),
             metrics_dir: PathBuf::from("/tmp"),
             invoker: None,
         };
