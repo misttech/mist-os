@@ -370,11 +370,14 @@ pub struct Daemon {
 }
 
 impl Daemon {
+    #[tracing::instrument]
     pub fn new(socket_path: PathBuf) -> Daemon {
+        tracing::debug!("About to create Daemon");
         let target_collection = Rc::new(TargetCollection::new());
         let event_queue = events::Queue::new(&target_collection);
         target_collection.set_event_queue(event_queue.clone());
 
+        tracing::debug!("Creating Daemon structure");
         Self {
             socket_path,
             target_collection,
@@ -386,6 +389,7 @@ impl Daemon {
         }
     }
 
+    #[tracing::instrument(skip(self, node))]
     pub async fn start(&mut self, node: Arc<overnet_core::Router>) -> Result<()> {
         tracing::debug!("starting daemon");
         self.overnet_node = Some(Arc::clone(&node));
