@@ -31,7 +31,7 @@ use std::{
 use vfs::{
     attributes,
     directory::{self, entry_container::Directory},
-    execution_scope, file, path, ToObjectRequest,
+    execution_scope, file, path, ObjectRequestRef, ToObjectRequest,
 };
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
@@ -465,6 +465,17 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
                 }
             }
         })
+    }
+
+    fn open2(
+        self: Arc<Self>,
+        _scope: execution_scope::ExecutionScope,
+        _path: path::Path,
+        _protocols: fio::ConnectionProtocols,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        // TODO(https://fxbug.dev/324112547)
+        Err(zx::Status::NOT_SUPPORTED)
     }
 
     async fn read_dirents<'a>(

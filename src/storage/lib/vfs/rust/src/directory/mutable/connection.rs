@@ -388,14 +388,14 @@ mod tests {
     #[async_trait]
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-            panic!("Not implemented");
+            unimplemented!("Not implemented");
         }
 
         async fn get_attributes(
             &self,
             _query: fio::NodeAttributesQuery,
         ) -> Result<fio::NodeAttributes2, Status> {
-            panic!("Not implemented");
+            unimplemented!("Not implemented");
         }
 
         fn close(self: Arc<Self>) {
@@ -412,7 +412,17 @@ mod tests {
             _path: Path,
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            panic!("Not implemented!");
+            unimplemented!("Not implemented!");
+        }
+
+        fn open2(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _path: Path,
+            _protocols: fio::ConnectionProtocols,
+            _object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            unimplemented!("Not implemented!");
         }
 
         async fn read_dirents<'a>(
@@ -420,7 +430,7 @@ mod tests {
             _pos: &'a TraversalPosition,
             _sink: Box<dyn dirents_sink::Sink>,
         ) -> Result<(TraversalPosition, Box<dyn dirents_sink::Sealed>), Status> {
-            panic!("Not implemented");
+            unimplemented!("Not implemented");
         }
 
         fn register_watcher(
@@ -429,11 +439,11 @@ mod tests {
             _mask: fio::WatchMask,
             _watcher: DirectoryWatcher,
         ) -> Result<(), Status> {
-            panic!("Not implemented");
+            unimplemented!("Not implemented");
         }
 
         fn unregister_watcher(self: Arc<Self>, _key: usize) {
-            panic!("Not implemented");
+            unimplemented!("Not implemented");
         }
     }
 

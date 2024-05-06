@@ -20,12 +20,12 @@ use {
         execution_scope::ExecutionScope,
         immutable_attributes,
         path::Path as VfsPath,
-        ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
 #[cfg(feature = "supports_open2")]
-use vfs::{ObjectRequestRef, ProtocolsExt as _};
+use vfs::ProtocolsExt as _;
 
 /// The pkgfs /ctl/validation directory, except it contains only the "missing" file (e.g. does not
 /// have the "present" file).
@@ -157,6 +157,17 @@ impl vfs::directory::entry_container::Directory for Validation {
         }
 
         object_request.shutdown(zx::Status::NOT_FOUND);
+    }
+
+    #[cfg(not(feature = "supports_open2"))]
+    fn open2(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _path: VfsPath,
+        _protocols: fio::ConnectionProtocols,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
     }
 
     #[cfg(feature = "supports_open2")]
