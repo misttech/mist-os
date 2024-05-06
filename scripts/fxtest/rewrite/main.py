@@ -265,25 +265,6 @@ async def async_main(
         else:
             output_file = gzip.open(exec_env.log_file, "wt")
         tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
-        # TODO(https://fxbug.dev/326214131): Remove log path printing when we support `-pr logpath`.
-        recorder.emit_instruction_message(
-            f"Logging all output to: {exec_env.log_file}"
-        )
-        recorder.emit_instruction_message(
-            "Use the `--logpath` argument to specify a log location or `--no-log` to disable"
-        )
-
-        # For convenience, display the log output path when the program exits.
-        # Since the async loop may already be exited at that point, directly
-        # print to the console.
-        if not exec_env.log_to_stdout():
-            atexit.register(
-                print,
-                statusinfo.dim(
-                    f"Output was logged to: {os.path.relpath(exec_env.log_file, os.getcwd())}",
-                    style=flags.style,
-                ),
-            )
 
     if flags.has_debugger():
         recorder.emit_warning_message(
