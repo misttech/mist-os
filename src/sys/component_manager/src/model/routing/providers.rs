@@ -9,7 +9,7 @@ use {
     },
     ::routing::error::RoutingError,
     async_trait::async_trait,
-    bedrock_error::BedrockError,
+    bedrock_error::RouterError,
     clonable_error::ClonableError,
     cm_rust::Availability,
     cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
@@ -60,11 +60,11 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
                 name: self.name.to_string(),
             })
-            .map_err(BedrockError::from)?;
+            .map_err(RouterError::from)?;
         let entry = capability
             .try_into_directory_entry()
             .map_err(OpenError::DoesNotSupportOpen)
-            .map_err(BedrockError::from)?;
+            .map_err(RouterError::from)?;
         entry.open_entry(open_request).map_err(|err| CapabilityProviderError::VfsOpenError(err))
     }
 }

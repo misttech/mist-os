@@ -15,7 +15,7 @@ use {
     },
     assert_matches::assert_matches,
     async_utils::PollExt,
-    bedrock_error::{BedrockError, DowncastErrorForTest},
+    bedrock_error::{DowncastErrorForTest, RouterError},
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
@@ -655,7 +655,7 @@ async fn use_restricted_storage_open_failure() {
     .await;
     assert_matches!(
         result,
-        Err(BedrockError::RoutingError(err))
+        Err(RouterError::NotFound(err))
         if matches!(
             err.downcast_for_test::<RoutingError>(),
             RoutingError::ComponentNotInIdIndex { .. }

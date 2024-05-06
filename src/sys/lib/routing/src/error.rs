@@ -4,7 +4,7 @@
 
 use {
     crate::{policy::PolicyError, rights::Rights},
-    bedrock_error::{BedrockError, Explain},
+    bedrock_error::{Explain, RouterError},
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
@@ -386,9 +386,9 @@ impl Explain for RoutingError {
     }
 }
 
-impl From<RoutingError> for BedrockError {
+impl From<RoutingError> for RouterError {
     fn from(value: RoutingError) -> Self {
-        BedrockError::RoutingError(Arc::new(value))
+        Self::NotFound(Arc::new(value))
     }
 }
 

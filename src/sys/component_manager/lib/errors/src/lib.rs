@@ -9,7 +9,7 @@ use {
         resolving::ResolverError,
     },
     anyhow::Error,
-    bedrock_error::{BedrockError, Explain},
+    bedrock_error::{Explain, RouterError},
     clonable_error::ClonableError,
     cm_config::CompatibilityCheckError,
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
@@ -110,9 +110,9 @@ pub enum ModelError {
         err: OpenOutgoingDirError,
     },
     #[error(transparent)]
-    BedrockError {
+    RouterError {
         #[from]
-        err: BedrockError,
+        err: RouterError,
     },
     #[error("error with capability provider: {err}")]
     CapabilityProviderError {
@@ -144,7 +144,7 @@ impl Explain for ModelError {
             ModelError::StartActionError { err } => err.as_zx_status(),
             ModelError::ComponentInstanceError { err } => err.as_zx_status(),
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
-            ModelError::BedrockError { err } => err.as_zx_status(),
+            ModelError::RouterError { err } => err.as_zx_status(),
             ModelError::CapabilityProviderError { err } => err.as_zx_status(),
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
@@ -242,9 +242,9 @@ impl From<OpenOutgoingDirError> for fsys::OpenError {
     }
 }
 
-impl From<OpenOutgoingDirError> for BedrockError {
+impl From<OpenOutgoingDirError> for RouterError {
     fn from(value: OpenOutgoingDirError) -> Self {
-        BedrockError::OpenError(Arc::new(value))
+        Self::NotFound(Arc::new(value))
     }
 }
 
@@ -431,9 +431,9 @@ impl Explain for ActionError {
     }
 }
 
-impl From<ActionError> for BedrockError {
+impl From<ActionError> for RouterError {
     fn from(value: ActionError) -> Self {
-        BedrockError::LifecycleError(Arc::new(value))
+        Self::NotFound(Arc::new(value))
     }
 }
 
@@ -708,9 +708,9 @@ pub enum CapabilityProviderError {
         err: ClonableError,
     },
     #[error(transparent)]
-    BedrockError {
+    RouterError {
         #[from]
-        err: BedrockError,
+        err: RouterError,
     },
     #[error("could not route: {0}")]
     RoutingError(#[from] RoutingError),
@@ -727,7 +727,7 @@ impl CapabilityProviderError {
             Self::PkgDirError { err } => err.as_zx_status(),
             Self::EventSourceError(err) => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),
-            Self::BedrockError { err } => err.as_zx_status(),
+            Self::RouterError { err } => err.as_zx_status(),
             Self::RoutingError(err) => err.as_zx_status(),
             Self::VfsOpenError(err) => *err,
         }
@@ -774,9 +774,9 @@ impl Explain for OpenError {
     }
 }
 
-impl From<OpenError> for BedrockError {
+impl From<OpenError> for RouterError {
     fn from(value: OpenError) -> Self {
-        BedrockError::OpenError(Arc::new(value))
+        Self::NotFound(Arc::new(value))
     }
 }
 
@@ -797,7 +797,7 @@ pub enum StartActionError {
         moniker: Moniker,
         runner: Name,
         #[source]
-        err: Box<BedrockError>,
+        err: Box<RouterError>,
     },
     #[error("Couldn't start `{moniker}` because it uses `\"on_terminate\": \"reboot\"` but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {

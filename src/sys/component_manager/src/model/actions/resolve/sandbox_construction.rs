@@ -19,7 +19,7 @@ use {
         error::{ComponentInstanceError, RoutingError},
     },
     async_trait::async_trait,
-    bedrock_error::BedrockError,
+    bedrock_error::RouterError,
     cm_rust::{
         CapabilityDecl, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
     },
@@ -260,7 +260,7 @@ fn extend_dict_with_dictionary(
                 }
                 #[async_trait]
                 impl Routable for ProgramRouter {
-                    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+                    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                         fn open_error(e: OpenOutgoingDirError) -> OpenError {
                             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
                         }
@@ -285,7 +285,7 @@ fn extend_dict_with_dictionary(
                             .route(request.into())
                             .await
                             .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
-                            .map_err(BedrockError::from)?;
+                            .map_err(RouterError::from)?;
                         let cap = Capability::try_from(cap)
                             .map_err(|_| RoutingError::BedrockRemoteCapability)?;
                         if !matches!(cap, Capability::Dictionary(_)) {
@@ -775,7 +775,7 @@ impl UnitRouter {
 
 #[async_trait]
 impl sandbox::Routable for UnitRouter {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         match request.availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {
                 Err(RoutingError::SourceCapabilityIsVoid.into())

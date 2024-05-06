@@ -12,7 +12,7 @@ use {
         error::RoutingError, policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
-    bedrock_error::BedrockError,
+    bedrock_error::RouterError,
     cm_types::IterablePath,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -59,7 +59,7 @@ pub trait DictExt {
         &self,
         path: &'a impl IterablePath,
         request: Request,
-    ) -> Result<Option<Capability>, BedrockError>;
+    ) -> Result<Option<Capability>, RouterError>;
 }
 
 impl DictExt for Dict {
@@ -143,7 +143,7 @@ impl DictExt for Dict {
         &self,
         path: &'a impl IterablePath,
         request: Request,
-    ) -> Result<Option<Capability>, BedrockError> {
+    ) -> Result<Option<Capability>, RouterError> {
         let mut current_capability: Capability = self.clone().into();
         for next_name in path.iter_segments() {
             // We have another name but no subdictionary, so exit.
@@ -227,7 +227,7 @@ impl LaunchTaskOnReceive {
         }
         #[async_trait]
         impl Routable for LaunchTaskRouter {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 Ok(self.inner.clone().into_sender(request.target.to_instance()).into())
             }
         }
@@ -315,7 +315,7 @@ pub trait RoutableExt: Routable {
     /// Returns a router that requests capabilities from the specified `path` relative to
     /// the base routable or fails the request with `not_found_error` if the member is not
     /// found. The base routable should resolve with a dictionary capability.
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<BedrockError>) -> Router
+    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
     where
         P: IterablePath + Debug + 'static;
 }
@@ -331,7 +331,7 @@ impl<T: Routable + 'static> RoutableExt for T {
 
         #[async_trait]
         impl Routable for OnReadableRouter {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 let target =
                     request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?;
                 let entry = self.router.clone().into_directory_entry(
@@ -403,7 +403,7 @@ impl<T: Routable + 'static> RoutableExt for T {
         Router::new(OnReadableRouter { router, scope, entry_type })
     }
 
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<BedrockError>) -> Router
+    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
     where
         P: IterablePath + Debug + 'static,
     {
@@ -411,12 +411,12 @@ impl<T: Routable + 'static> RoutableExt for T {
         struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
             router: Router,
             path: P,
-            not_found_error: BedrockError,
+            not_found_error: RouterError,
         }
 
         #[async_trait]
         impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 match self.router.route(request.clone()).await? {
                     Capability::Dictionary(dict) => {
                         let maybe_capability =
@@ -551,7 +551,7 @@ pub mod tests {
             .await;
         assert_matches!(
             cap,
-            Err(BedrockError::RoutingError(err))
+            Err(RouterError::NotFound(err))
             if matches!(
                 err.downcast_for_test::<RoutingError>(),
                 RoutingError::SourceCapabilityIsVoid
@@ -623,7 +623,7 @@ pub mod tests {
 
     #[async_trait]
     impl Routable for RouteCounter {
-        async fn route(&self, _: Request) -> Result<Capability, BedrockError> {
+        async fn route(&self, _: Request) -> Result<Capability, RouterError> {
             self.counter.inc();
             Ok(self.capability.clone())
         }

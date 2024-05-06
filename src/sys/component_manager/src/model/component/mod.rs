@@ -31,7 +31,7 @@ use {
         resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage},
     },
     async_trait::async_trait,
-    bedrock_error::{BedrockError, Explain},
+    bedrock_error::{Explain, RouterError},
     cm_moniker::{IncarnationId, InstancedMoniker},
     cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::{Name, Url},
@@ -970,7 +970,7 @@ impl ComponentInstance {
     }
 
     /// Obtains the program output dict.
-    pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, BedrockError> {
+    pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
         Ok(self.lock_resolved_state().await?.program_output_dict.clone())
     }
 
@@ -987,7 +987,7 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ProgramOutput {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
                 component.get_program_output_dict().await?.route(request).await
             }
@@ -997,7 +997,7 @@ impl ComponentInstance {
     }
 
     /// Obtains the component output dict.
-    pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, BedrockError> {
+    pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
         Ok(self.lock_resolved_state().await?.component_output_dict.clone())
     }
 
@@ -1010,7 +1010,7 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ComponentOutput {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
                 component.get_component_output_dict().await?.route(request).await
             }

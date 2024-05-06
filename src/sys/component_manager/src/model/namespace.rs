@@ -16,7 +16,7 @@ use {
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
         route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
-    bedrock_error::{BedrockError, Explain},
+    bedrock_error::{Explain, RouterError},
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
     errors::CreateNamespaceError,
     fidl::{endpoints::ClientEnd, prelude::*},
@@ -270,7 +270,7 @@ async fn route_directory(
     target: Arc<ComponentInstance>,
     use_: UseDecl,
     open_request: OpenRequest<'_>,
-) -> Result<(), BedrockError> {
+) -> Result<(), RouterError> {
     let (route_request, open_request) = match &use_ {
         UseDecl::Directory(use_dir_decl) => {
             (RouteRequest::UseDirectory(use_dir_decl.clone()), open_request)
@@ -332,7 +332,7 @@ fn service_or_protocol_use(
                 request,
                 fio::DirentType::Service,
                 component.execution_scope.clone(),
-                move |error: &BedrockError| {
+                move |error: &RouterError| {
                     let Ok(target) = weak_component.upgrade() else {
                         return None;
                     };

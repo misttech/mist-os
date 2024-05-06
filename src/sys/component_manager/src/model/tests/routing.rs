@@ -40,7 +40,7 @@ use {
     assert_matches::assert_matches,
     async_trait::async_trait,
     async_utils::PollExt,
-    bedrock_error::{BedrockError, DowncastErrorForTest},
+    bedrock_error::{DowncastErrorForTest, RouterError},
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::RelativePath,
@@ -1711,7 +1711,7 @@ async fn use_runner_from_environment_not_found() {
 
     assert_matches!(
         *err,
-        BedrockError::RoutingError(err)
+        RouterError::NotFound(err)
         if matches!(
             err.downcast_for_test::<RoutingError>(),
             RoutingError::UseFromEnvironmentNotFound {

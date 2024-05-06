@@ -195,18 +195,11 @@ type RouteRequest = resource table {
 
 @available(added=HEAD)
 type RouterError = flexible enum : uint32 {
-    /// Routing the capability failed.
-    ROUTING = 1;
-
-    /// A lifecycle transition failed for some capability in the
-    /// routing chain.
-    LIFECYCLE = 2;
-
-    /// Could not open the capability in the provider component.
-    OPEN = 3;
+    /// The router failed to find the capability.
+    NOT_FOUND = 1;
 
     /// The arguments provided to the function are invalid.
-    INVALID_ARGS = 4;
+    INVALID_ARGS = 2;
 };
 
 /// A router allows a client to request a capability.

@@ -7,7 +7,7 @@ use crate::model::component::ComponentInstance;
 use crate::model::component::WeakComponentInstance;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
-use bedrock_error::{BedrockError, Explain};
+use bedrock_error::{Explain, RouterError};
 use cm_types::Availability;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
@@ -68,7 +68,7 @@ pub trait RouterExt: Send + Sync {
         errors_fn: F,
     ) -> Arc<dyn DirectoryEntry>
     where
-        for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static;
+        for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static;
 }
 
 impl RouterExt for Router {
@@ -144,7 +144,7 @@ impl RouterExt for Router {
         errors_fn: F,
     ) -> Arc<dyn DirectoryEntry>
     where
-        for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+        for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
     {
         struct RouterEntry<F> {
             router: Router,
@@ -156,7 +156,7 @@ impl RouterExt for Router {
 
         impl<F> DirectoryEntry for RouterEntry<F>
         where
-            for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
             fn entry_info(&self) -> EntryInfo {
                 EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
@@ -174,7 +174,7 @@ impl RouterExt for Router {
 
         impl<F> DirectoryEntryAsync for RouterEntry<F>
         where
-            for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
             async fn open_entry_async(
                 self: Arc<Self>,
@@ -236,7 +236,7 @@ impl PolicyCheckRouter {
 
 #[async_trait]
 impl Routable for PolicyCheckRouter {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         match self
             .policy_checker
             .can_route_capability(&self.capability_source, &request.target.moniker())
@@ -364,7 +364,7 @@ mod tests {
         use ::routing::error::AvailabilityRoutingError;
         assert_matches!(
             error,
-            BedrockError::RoutingError(err)
+            RouterError::NotFound(err)
             if matches!(
                 err.downcast_for_test::<RoutingError>(),
                 RoutingError::AvailabilityRoutingError(

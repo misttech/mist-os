@@ -19,7 +19,7 @@ use {
     },
     ::routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
     async_trait::async_trait,
-    bedrock_error::{BedrockError, Explain},
+    bedrock_error::{Explain, RouterError},
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     cm_types::{Availability, Name},
     errors::ModelError,
@@ -68,7 +68,7 @@ pub(super) async fn route_and_open_capability(
     route_request: &RouteRequest,
     target: &Arc<ComponentInstance>,
     open_request: OpenRequest<'_>,
-) -> Result<(), BedrockError> {
+) -> Result<(), RouterError> {
     match route_request.clone() {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
             let storage_source = r.route(target).await?;
@@ -91,7 +91,7 @@ pub(super) async fn route_and_open_capability(
             // clone the source as additional context in case of an error
 
             Ok(CapabilityOpenRequest::new_from_route_source(route_source, target, open_request)
-                .map_err(|e| BedrockError::RoutingError(Arc::new(e)))?
+                .map_err(|e| RouterError::NotFound(Arc::new(e)))?
                 .open()
                 .await?)
         }
@@ -103,7 +103,7 @@ pub(super) async fn route_and_open_capability(
 pub(super) async fn open_capability<Proxy: fidl::endpoints::Proxy>(
     route_request: &RouteRequest,
     target: &Arc<ComponentInstance>,
-) -> Result<Proxy, BedrockError> {
+) -> Result<Proxy, RouterError> {
     let (proxy, server) = create_proxy::<Proxy::Protocol>().unwrap();
     let mut object_request = fio::OpenFlags::empty().to_object_request(server);
     route_and_open_capability(
