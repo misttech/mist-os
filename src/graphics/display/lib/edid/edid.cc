@@ -4,8 +4,6 @@
 
 #include "src/graphics/display/lib/edid/edid.h"
 
-#include <lib/ddk/debug.h>
-
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -17,6 +15,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/edid/eisa_vid_lut.h"
 #include "src/graphics/display/lib/edid/timings.h"
 
