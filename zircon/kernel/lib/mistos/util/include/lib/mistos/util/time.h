@@ -12,10 +12,8 @@ extern "C" {
 #endif
 
 zx_time_t zx_deadline_after(zx_duration_t nanoseconds);
-zx_ticks_t zx_ticks_get(void);
 zx_time_t zx_clock_get_monotonic(void);
 zx_ticks_t zx_ticks_per_second(void);
-zx_status_t zx_nanosleep(zx_time_t deadline);
 
 #ifdef __cplusplus
 }

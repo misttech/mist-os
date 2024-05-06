@@ -9,3 +9,5 @@
 #include <platform/timer.h>
 
 zx_time_t zx_clock_get_monotonic(void) { return current_time(); }
+
+zx_time_t zx_ticks_per_second(void) { return ticks_per_second(); }
