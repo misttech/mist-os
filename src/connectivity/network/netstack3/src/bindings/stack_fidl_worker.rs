@@ -126,10 +126,7 @@ impl StackFidlWorker {
         self.netstack
             .ctx
             .bindings_ctx()
-            .apply_route_change_either(routes::ChangeEither::add(
-                entry,
-                routes::SetMembership::Global,
-            ))
+            .apply_route_change_either(routes::ChangeEither::global_add(entry))
             .await
             .map_err(|err| match err {
                 routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::BorrowMut, collections::HashSet, pin::pin};
+use std::{borrow::BorrowMut, collections::HashSet, marker::PhantomData, pin::pin};
 
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
@@ -13,7 +13,7 @@ use fnet_routes_ext::{
 };
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
 use futures::{TryStream, TryStreamExt as _};
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
 
 use crate::bindings::{
@@ -38,14 +38,14 @@ async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
 ) {
     let mut route_set = UserRouteSet::new(ctx);
 
-    serve_route_set::<I, UserRouteSet, _>(stream, &mut route_set).await;
+    serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut route_set).await;
 
     route_set.close().await;
 }
 
 pub(crate) async fn serve_route_set<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
-    R: RouteSet,
+    R: RouteSet<I>,
     B: BorrowMut<R>,
 >(
     stream: I::RouteSetRequestStream,
@@ -167,21 +167,21 @@ pub(crate) async fn serve_route_table_v6(
 }
 
 #[derive(Debug)]
-pub(crate) struct UserRouteSetId {
-    _private_field_to_prevent_construction_outside_of_this_mod: (),
+pub(crate) struct UserRouteSetId<I: Ip> {
+    _private_field_to_prevent_construction_outside_of_this_mod: PhantomData<I>,
 }
 
-pub(crate) type WeakUserRouteSet = netstack3_core::sync::WeakRc<UserRouteSetId>;
-pub(crate) type StrongUserRouteSet = netstack3_core::sync::StrongRc<UserRouteSetId>;
+pub(crate) type WeakUserRouteSet<I> = netstack3_core::sync::WeakRc<UserRouteSetId<I>>;
+pub(crate) type StrongUserRouteSet<I> = netstack3_core::sync::StrongRc<UserRouteSetId<I>>;
 
 #[must_use = "UserRouteSets must explicitly have `.close()` called on them before dropping them"]
-pub(crate) struct UserRouteSet {
+pub(crate) struct UserRouteSet<I: Ip> {
     ctx: crate::bindings::Ctx,
-    set: Option<netstack3_core::sync::PrimaryRc<UserRouteSetId>>,
+    set: Option<netstack3_core::sync::PrimaryRc<UserRouteSetId<I>>>,
     authorization_set: HashSet<WeakDeviceId>,
 }
 
-impl Drop for UserRouteSet {
+impl<I: Ip> Drop for UserRouteSet<I> {
     fn drop(&mut self) {
         if self.set.is_some() {
             panic!("UserRouteSet must not be dropped without calling close()");
@@ -189,16 +189,16 @@ impl Drop for UserRouteSet {
     }
 }
 
-impl UserRouteSet {
+impl<I: Ip> UserRouteSet<I> {
     #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn new(ctx: crate::bindings::Ctx) -> Self {
         let set = netstack3_core::sync::PrimaryRc::new(UserRouteSetId {
-            _private_field_to_prevent_construction_outside_of_this_mod: (),
+            _private_field_to_prevent_construction_outside_of_this_mod: PhantomData,
         });
         Self { ctx, set: Some(set), authorization_set: HashSet::new() }
     }
 
-    fn weak_set_id(&self) -> netstack3_core::sync::WeakRc<UserRouteSetId> {
+    fn weak_set_id(&self) -> netstack3_core::sync::WeakRc<UserRouteSetId<I>> {
         netstack3_core::sync::PrimaryRc::downgrade(
             self.set.as_ref().expect("close() can't have been called because it takes ownership"),
         )
@@ -231,26 +231,21 @@ impl UserRouteSet {
         consume_outcome(
             self.ctx
                 .bindings_ctx()
-                .apply_route_change::<Ipv4>(routes::Change::RemoveSet(self.weak_set_id()))
-                .await,
-        );
-        consume_outcome(
-            self.ctx
-                .bindings_ctx()
-                .apply_route_change::<Ipv6>(routes::Change::RemoveSet(self.weak_set_id()))
+                .apply_route_change::<I>(routes::Change::RemoveSet(self.weak_set_id()))
                 .await,
         );
 
         let UserRouteSet { ctx: _, set, authorization_set: _ } = &mut self;
-        let UserRouteSetId { _private_field_to_prevent_construction_outside_of_this_mod: () } =
-            netstack3_core::sync::PrimaryRc::unwrap(
-                set.take().expect("close() can't be called twice"),
-            );
+        let UserRouteSetId {
+            _private_field_to_prevent_construction_outside_of_this_mod: PhantomData,
+        } = netstack3_core::sync::PrimaryRc::unwrap(
+            set.take().expect("close() can't be called twice"),
+        );
     }
 }
 
-impl RouteSet for UserRouteSet {
-    fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId>> {
+impl<I: Ip + FidlRouteAdminIpExt> RouteSet<I> for UserRouteSet<I> {
+    fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId<I>>> {
         routes::SetMembership::User(self.weak_set_id())
     }
 
@@ -279,10 +274,10 @@ impl GlobalRouteSet {
     }
 }
 
-impl RouteSet for GlobalRouteSet {
+impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
     fn set(
         &self,
-    ) -> routes::SetMembership<netstack3_core::sync::WeakRc<routes::admin::UserRouteSetId>> {
+    ) -> routes::SetMembership<netstack3_core::sync::WeakRc<routes::admin::UserRouteSetId<I>>> {
         routes::SetMembership::Global
     }
 
@@ -299,16 +294,13 @@ impl RouteSet for GlobalRouteSet {
     }
 }
 
-pub(crate) trait RouteSet: Send + Sync {
-    fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId>>;
+pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
+    fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId<I>>>;
     fn ctx(&self) -> &crate::bindings::Ctx;
     fn authorization_set(&self) -> &HashSet<WeakDeviceId>;
     fn authorization_set_mut(&mut self) -> &mut HashSet<WeakDeviceId>;
 
-    async fn handle_request<I: Ip + FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt>(
-        &mut self,
-        request: RouteSetRequest<I>,
-    ) -> Result<(), fidl::Error> {
+    async fn handle_request(&mut self, request: RouteSetRequest<I>) -> Result<(), fidl::Error> {
         tracing::debug!("RouteSet::handle_request {request:?}");
 
         match request {
@@ -340,17 +332,17 @@ pub(crate) trait RouteSet: Send + Sync {
         }
     }
 
-    async fn apply_route_op<A: IpAddress>(
+    async fn apply_route_op(
         &self,
-        op: routes::RouteOp<A>,
+        op: routes::RouteOp<I::Addr>,
     ) -> Result<routes::ChangeOutcome, routes::Error> {
         self.ctx()
             .bindings_ctx()
-            .apply_route_change::<A::Version>(routes::Change::RouteOp(op, self.set()))
+            .apply_route_change::<I>(routes::Change::RouteOp(op, self.set()))
             .await
     }
 
-    async fn add_fidl_route<I: Ip>(
+    async fn add_fidl_route(
         &self,
         route: fnet_routes_ext::Route<I>,
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
@@ -361,7 +353,7 @@ pub(crate) trait RouteSet: Send + Sync {
             return Err(fnet_routes_admin::RouteSetError::Unauthenticated);
         }
 
-        let result = self.apply_route_op::<I::Addr>(routes::RouteOp::Add(addable_entry)).await;
+        let result = self.apply_route_op(routes::RouteOp::Add(addable_entry)).await;
 
         match result {
             Ok(outcome) => match outcome {
@@ -381,7 +373,7 @@ pub(crate) trait RouteSet: Send + Sync {
         }
     }
 
-    async fn remove_fidl_route<I: Ip>(
+    async fn remove_fidl_route(
         &self,
         route: fnet_routes_ext::Route<I>,
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
@@ -394,7 +386,7 @@ pub(crate) trait RouteSet: Send + Sync {
         }
 
         let result = self
-            .apply_route_op::<I::Addr>(routes::RouteOp::RemoveMatching {
+            .apply_route_op(routes::RouteOp::RemoveMatching {
                 subnet,
                 device,
                 gateway,
