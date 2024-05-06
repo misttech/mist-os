@@ -658,7 +658,14 @@ async def do_build(
             build_command_line.append(f"--toolchain={key}")
         build_command_line.extend(vals)
 
+    if tests.has_e2e_test():
+        build_command_line.extend(["--default", "updates"])
+
     build_id = recorder.emit_build_start(targets=build_command_line)
+    if tests.has_e2e_test():
+        recorder.emit_instruction_message(
+            "E2E test selected, building updates package"
+        )
     recorder.emit_instruction_message("Use --no-build to skip building")
 
     status_suffix = " Status output suspended." if termout.is_init() else ""
