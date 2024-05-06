@@ -195,8 +195,13 @@ struct FuseFs {
 }
 
 impl FuseFs {
-    fn from_fs(fs: &FileSystem) -> Result<&FuseFs, Errno> {
-        fs.downcast_ops::<FuseFs>().ok_or_else(|| errno!(ENOENT))
+    /// Downcasts this `fs` to a [`FuseFs`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `fs` is not a `FuseFs`.
+    fn from_fs(fs: &FileSystem) -> &FuseFs {
+        fs.downcast_ops::<FuseFs>().expect("FUSE should only handle `FuseFs`s")
     }
 }
 
@@ -220,12 +225,7 @@ impl FileSystemOps for FuseFs {
     }
 
     fn statfs(&self, fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        let node = if let Ok(node) = FuseNode::from_node(&fs.root().node) {
-            node
-        } else {
-            log_error!("Unexpected file type");
-            return error!(EINVAL);
-        };
+        let node = FuseNode::from_node(&fs.root().node);
         let response =
             self.connection.lock().execute_operation(current_task, node, FuseOperation::Statfs)?;
         let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
@@ -467,8 +467,13 @@ impl FuseNode {
         })
     }
 
-    fn from_node(node: &FsNode) -> Result<&Arc<FuseNode>, Errno> {
-        node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
+    /// Downcasts this `node` to a [`FuseNode`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `node` is not a `FuseNode`.
+    fn from_node(node: &FsNode) -> &Arc<FuseNode> {
+        node.downcast_ops::<Arc<FuseNode>>().expect("FUSE should only handle `FuseNode`s")
     }
 
     fn default_check_access_with_valid_node_attributes(
@@ -599,7 +604,7 @@ impl FuseNode {
         })?;
         // . and .. do not get their lookup count increased.
         if !DirEntry::is_reserved_name(name) {
-            let fuse_node = FuseNode::from_node(&node)?;
+            let fuse_node = FuseNode::from_node(&node);
             fuse_node.state.lock().nlookup += 1;
         }
         Ok(node)
@@ -614,19 +619,14 @@ struct FuseFileObject {
 
 impl FuseFileObject {
     /// Returns the `FuseNode` associated with the opened file.
-    fn get_fuse_node<'a>(&self, file: &'a FileObject) -> Result<&'a Arc<FuseNode>, Errno> {
+    fn get_fuse_node(file: &FileObject) -> &Arc<FuseNode> {
         FuseNode::from_node(file.node())
     }
 }
 
 impl FileOps for FuseFileObject {
     fn close(&self, file: &FileObject, current_task: &CurrentTask) {
-        let node = if let Ok(node) = self.get_fuse_node(file) {
-            node
-        } else {
-            log_error!("Unexpected file type");
-            return;
-        };
+        let node = Self::get_fuse_node(file);
         let mode = file.node().info().mode;
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
@@ -638,12 +638,7 @@ impl FileOps for FuseFileObject {
     }
 
     fn flush(&self, file: &FileObject, current_task: &CurrentTask) {
-        let node = if let Ok(node) = self.get_fuse_node(file) {
-            node
-        } else {
-            log_error!("Unexpected file type");
-            return;
-        };
+        let node = Self::get_fuse_node(file);
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
             node,
@@ -665,7 +660,7 @@ impl FileOps for FuseFileObject {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
             node,
@@ -695,7 +690,7 @@ impl FileOps for FuseFileObject {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let content = data.peek_all()?;
         let response = self.connection.lock().execute_operation(
             current_task,
@@ -734,7 +729,7 @@ impl FileOps for FuseFileObject {
     ) -> Result<off_t, Errno> {
         // Only delegate SEEK_DATA and SEEK_HOLE to the userspace process.
         if matches!(target, SeekTarget::Data(_) | SeekTarget::Hole(_)) {
-            let node = self.get_fuse_node(file)?;
+            let node = Self::get_fuse_node(file);
             let response = self.connection.lock().execute_operation(
                 current_task,
                 node,
@@ -783,7 +778,7 @@ impl FileOps for FuseFileObject {
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
             node,
@@ -834,7 +829,7 @@ impl FileOps for FuseFileObject {
         } else {
             *PAGE_SIZE as usize
         };
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let response = state.execute_operation(
             current_task,
             node,
@@ -924,9 +919,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<(), Errno> {
         // Perform access checks regardless of the reason when userspace configured
         // the kernel to perform its default access checks on behalf of the FUSE fs.
-        if FuseFs::from_fs(&node.fs())?
-            .default_permissions
-            .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
+        if FuseFs::from_fs(&node.fs()).default_permissions.load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
         {
             return self.default_check_access_with_valid_node_attributes(
                 node,
@@ -1101,7 +1094,7 @@ impl FsNodeOps for Arc<FuseNode> {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let child_node = FuseNode::from_node(child)?;
+        let child_node = FuseNode::from_node(child);
         self.connection
             .lock()
             .execute_operation(
@@ -1673,7 +1666,6 @@ impl FuseMutableState {
                     // `default_permissions` mount option.
                     if let Some(fs) = fs.upgrade() {
                         FuseFs::from_fs(&fs)
-                            .expect("should only perform FUSE ops with FUSE fs")
                             .default_permissions
                             .store(true, DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
                     } else {
