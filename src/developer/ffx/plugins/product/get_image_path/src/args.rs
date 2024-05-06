@@ -58,9 +58,10 @@ impl FromStr for ImageType {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get-image-path")]
 pub struct GetImagePathCommand {
-    /// path to product bundle directory.
+    /// path to product bundle directory. Defaults to the configured
+    /// path in `product.path`.
     #[argh(positional)]
-    pub product_bundle: Utf8PathBuf,
+    pub product_bundle: Option<Utf8PathBuf>,
 
     /// the slot where image will be located in. Valid slots are A,B,R.
     #[argh(option)]
