@@ -58,14 +58,10 @@ zx_status_t sys_restricted_bind_state(uint32_t options, zx_handle_t* out) {
   // Now wrap the VMO in a VmObjectDispatcher so we can give a handle back to the user.
   ktl::unique_ptr<RestrictedState> rs = ktl::move(result.value());
   fbl::RefPtr<VmObjectPaged> vmo = rs->vmo();
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(vmo->size(), &content_size_manager);
-  if (status != ZX_OK) {
-    return status;
-  }
   KernelHandle<VmObjectDispatcher> kernel_handle;
   zx_rights_t rights;
-  status = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
+  const uint64_t size = vmo->size();
+  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
                                       VmObjectDispatcher::InitialMutability::kMutable,
                                       &kernel_handle, &rights);
   if (status != ZX_OK) {

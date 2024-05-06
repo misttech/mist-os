@@ -61,11 +61,12 @@ zx::result<VmObjectDispatcher::CreateStats> VmObjectDispatcher::parse_create_sys
   return zx::ok(res);
 }
 
-zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo,
-                                       fbl::RefPtr<ContentSizeManager> content_size_manager,
-                                       zx_koid_t pager_koid, InitialMutability initial_mutability,
-                                       KernelHandle<VmObjectDispatcher>* handle,
-                                       zx_rights_t* rights) {
+zx_status_t VmObjectDispatcher::CreateWithCsm(fbl::RefPtr<VmObject> vmo,
+                                              fbl::RefPtr<ContentSizeManager> content_size_manager,
+                                              zx_koid_t pager_koid,
+                                              InitialMutability initial_mutability,
+                                              KernelHandle<VmObjectDispatcher>* handle,
+                                              zx_rights_t* rights) {
   fbl::AllocChecker ac;
   KernelHandle new_handle(fbl::AdoptRef(new (&ac) VmObjectDispatcher(
       ktl::move(vmo), ktl::move(content_size_manager), pager_koid, initial_mutability)));
@@ -78,6 +79,19 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo,
       default_rights() | (new_handle.dispatcher()->vmo()->is_resizable() ? ZX_RIGHT_RESIZE : 0);
   *handle = ktl::move(new_handle);
   return ZX_OK;
+}
+
+zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t content_size,
+                                       zx_koid_t pager_koid, InitialMutability initial_mutability,
+                                       KernelHandle<VmObjectDispatcher>* handle,
+                                       zx_rights_t* rights) {
+  fbl::RefPtr<ContentSizeManager> content_size_manager;
+  zx_status_t status = ContentSizeManager::Create(content_size, &content_size_manager);
+  if (status != ZX_OK) {
+    return status;
+  }
+  return CreateWithCsm(ktl::move(vmo), ktl::move(content_size_manager), pager_koid,
+                       initial_mutability, handle, rights);
 }
 
 VmObjectDispatcher::VmObjectDispatcher(fbl::RefPtr<VmObject> vmo,

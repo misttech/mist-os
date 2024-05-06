@@ -162,17 +162,11 @@ zx_status_t get_vmo_handle(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t co
   if (!vmo)
     return ZX_ERR_NO_MEMORY;
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  zx_status_t result = ContentSizeManager::Create(content_size, &content_size_manager);
-  if (result != ZX_OK) {
-    return result;
-  }
-
   zx_rights_t rights;
   KernelHandle<VmObjectDispatcher> vmo_kernel_handle;
-  result = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
-                                      VmObjectDispatcher::InitialMutability::kMutable,
-                                      &vmo_kernel_handle, &rights);
+  zx_status_t result = VmObjectDispatcher::Create(ktl::move(vmo), content_size,
+                                                  VmObjectDispatcher::InitialMutability::kMutable,
+                                                  &vmo_kernel_handle, &rights);
   if (result == ZX_OK) {
     if (disp_ptr)
       *disp_ptr = vmo_kernel_handle.dispatcher();

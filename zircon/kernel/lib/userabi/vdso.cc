@@ -388,12 +388,8 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
       PANIC("VDso::CreateVariant called with bad variant");
   }
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(size(), &content_size_manager);
-  ASSERT(status == ZX_OK);
-
   zx_rights_t rights;
-  status = VmObjectDispatcher::Create(ktl::move(new_vmo), ktl::move(content_size_manager),
+  status = VmObjectDispatcher::Create(ktl::move(new_vmo), size(),
                                       VmObjectDispatcher::InitialMutability::kMutable,
                                       vmo_kernel_handle, &rights);
   ASSERT(status == ZX_OK);
