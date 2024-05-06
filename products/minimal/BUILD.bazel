@@ -141,6 +141,29 @@ fuchsia_product_bundle(
 )
 
 fuchsia_product(
+    name = "image.emac",
+    board_config = "//boards/emac",
+    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":product_config",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.emac",
+    product = ":image.emac",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle.emac",
+    board_name = "emac",
+    main = ":image.emac",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
+    product_bundle_name = "fuchsia",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+)
+
+fuchsia_product(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
