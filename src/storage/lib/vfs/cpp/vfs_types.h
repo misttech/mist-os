@@ -79,24 +79,6 @@ enum class VnodeProtocol : uint8_t {
 #endif
 };
 
-inline zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds protocols) {
-  if (protocols & fuchsia_io::NodeProtocolKinds::kConnector) {
-    return zx::ok(VnodeProtocol::kService);
-  }
-  if (protocols & fuchsia_io::NodeProtocolKinds::kDirectory) {
-    return zx::ok(VnodeProtocol::kDirectory);
-  }
-  if (protocols & fuchsia_io::NodeProtocolKinds::kFile) {
-    return zx::ok(VnodeProtocol::kFile);
-  }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  if (protocols & fuchsia_io::NodeProtocolKinds::kSymlink) {
-    return zx::ok(VnodeProtocol::kSymlink);
-  }
-#endif
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 // Options specified during opening and cloning.
 struct VnodeConnectionOptions {
   fuchsia_io::OpenFlags flags;
@@ -175,9 +157,9 @@ struct VnodeConnectionOptions {
   // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
   static zx::result<VnodeConnectionOptions> FromOpen1Flags(fuchsia_io::OpenFlags flags);
 
-  // Converts from fuchsia.io/Directory.Clone flags to |VnodeConnectionOptions|. Note that in io1,
-  // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
-  static zx::result<VnodeConnectionOptions> FromCloneFlags(fuchsia_io::OpenFlags flags);
+  // Converts from fuchsia.io/Directory.Clone flags to |VnodeConnectionOptions|.
+  static zx::result<VnodeConnectionOptions> FromCloneFlags(fuchsia_io::OpenFlags flags,
+                                                           VnodeProtocol protocol);
 
   // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
   fuchsia_io::OpenFlags ToIoV1Flags() const;
@@ -258,6 +240,19 @@ enum class CreationMode : uint8_t {
 };
 
 namespace internal {
+
+// Downscope |rights| to only include those operations which |protocol| supports, or those which are
+// applicable to child nodes. This follows the principle of least privilege.
+fuchsia_io::Rights DownscopeRights(fuchsia_io::Rights rights, VnodeProtocol protocol);
+
+// Determines the protocol to use for serving a connection, based on the |supported| protocols for
+// a node, and those which were |requested|.
+//
+// Note that this function is not part of the |Vnode| interface. The fuchsia.io protocol does not
+// define a specific order of protocol resolution when |requested| is ambiguous, but we define a
+// strict mapping here to enforce consistency across the Fuchsia VFS libraries.
+zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds supported,
+                                            fuchsia_io::NodeProtocolKinds requested);
 
 #if !defined(__Fuchsia__) || __Fuchsia_API_level__ >= 19
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::CreationMode mode) {

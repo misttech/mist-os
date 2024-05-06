@@ -95,13 +95,11 @@ class FuchsiaVfs : public Vfs {
 
   // Begins serving VFS messages over the specified channel. The protocol to use will be determined
   // by the intersection of the protocols requested in |options| and those supported by |vnode|.
-  // See |fs::NegotiateProtocol| for details.
-  //
   // |server_end| usually speaks a protocol that composes |fuchsia.io/Node|, but may speak an
   // arbitrary arbitrary protocol for service connections.
   //
-  // For non-node reference connections, |vnode| should be opened before calling this function, and
-  // will be closed on failure.
+  // *NOTE*: |vnode| must be opened before calling this function, and will be automatically closed
+  // on failure. This does not apply to node reference connections, which should not open |vnode|.
   zx_status_t Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                     VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 

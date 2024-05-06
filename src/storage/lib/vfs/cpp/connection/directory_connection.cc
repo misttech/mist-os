@@ -27,7 +27,7 @@
 
 namespace fio = fuchsia_io;
 
-namespace fs {
+namespace fs::internal {
 
 namespace {
 
@@ -77,11 +77,12 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
 
 }  // namespace
 
-namespace internal {
-
 DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                          fuchsia_io::Rights rights, zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), rights), koid_(koid) {}
+    : Connection(vfs, std::move(vnode), rights), koid_(koid) {
+  // Ensure the VFS does not create connections that have privileges which cannot be used.
+  ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kDirectory) == rights);
+}
 
 DirectoryConnection::~DirectoryConnection() {
   [[maybe_unused]] zx::result result = Unbind();
@@ -365,6 +366,4 @@ zx::result<> DirectoryConnection::WithNodeInfoDeprecated(
   return zx::ok();
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

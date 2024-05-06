@@ -19,15 +19,13 @@
 
 namespace fio = fuchsia_io;
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                fuchsia_io::Rights rights)
     : Connection(vfs, std::move(vnode), rights) {
-  // Only Rights.GET_ATTRIBUTES is allowed for node connections.
-  ZX_DEBUG_ASSERT(!(rights - fio::Rights::kGetAttributes));
+  // Ensure the VFS does not create connections that have privileges which cannot be used.
+  ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kNode) == rights);
 }
 
 NodeConnection::~NodeConnection() { [[maybe_unused]] zx::result result = Unbind(); }
@@ -47,6 +45,7 @@ zx::result<> NodeConnection::Unbind() {
   }
   return zx::ok();
 }
+
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   Connection::NodeClone(request->flags, VnodeProtocol::kNode, std::move(request->object));
 }
@@ -76,8 +75,7 @@ void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
 }
 
 void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
-  zx::result<> result = Connection::NodeSetAttr(request->flags, request->attributes);
-  completer.Reply(result.status_value());
+  completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
@@ -121,6 +119,4 @@ zx::result<> NodeConnection::WithNodeInfoDeprecated(
   return zx::ok();
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

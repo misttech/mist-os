@@ -23,13 +23,14 @@
 
 namespace fio = fuchsia_io;
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                fuchsia_io::Rights rights, bool append, zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), rights), koid_(koid), append_(append) {}
+    : Connection(vfs, std::move(vnode), rights), koid_(koid), append_(append) {
+  // Ensure the VFS does not create connections that have privileges which cannot be used.
+  ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kFile) == rights);
+}
 
 FileConnection::~FileConnection() {
   [[maybe_unused]] zx::result result = Unbind();
@@ -138,15 +139,8 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  // Filter out directory-only operations for consistency with Rust VFS.
-  // TODO(https://fxbug.dev/324112857): When adding Open2 support, use the node's abilities to
-  // filter out unsupported rights. Although the protocol currently allows rights to exceed the
-  // abilities of a node, this can be confusing. Instead, we can make it such that rights can
-  // only be downscoped, and can only be requested if the node type supports or allows it.
-  fio::Rights file_rights = rights() & ~(fio::Rights::kConnect | fio::Rights::kModifyDirectory |
-                                         fio::Rights::kEnumerate | fio::Rights::kTraverse);
   fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(file_rights).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights()).Build());
 }
 
 void FileConnection::Sync(SyncCompleter::Sync& completer) {
@@ -178,7 +172,16 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 }
 
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  fio::OpenFlags flags = RightsToOpenFlags(rights());
+  fio::OpenFlags flags = {};
+  if (rights() & fio::Rights::kReadBytes) {
+    flags |= fio::OpenFlags::kRightReadable;
+  }
+  if (rights() & fio::Rights::kWriteBytes) {
+    flags |= fio::OpenFlags::kRightWritable;
+  }
+  if (rights() & fio::Rights::kExecute) {
+    flags |= fio::OpenFlags::kRightExecutable;
+  }
   if (append()) {
     flags |= fio::OpenFlags::kAppend;
   }
@@ -254,6 +257,4 @@ void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockReque
   advisory_lock(koid_, vnode(), true, request->request, std::move(callback));
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

@@ -51,7 +51,7 @@ Connection::~Connection() {
 void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
                            fidl::ServerEnd<fio::Node> server_end) {
   auto clone_result = [=]() -> zx::result<std::tuple<fbl::RefPtr<Vnode>, VnodeConnectionOptions>> {
-    zx::result clone_options = VnodeConnectionOptions::FromCloneFlags(flags);
+    zx::result clone_options = VnodeConnectionOptions::FromCloneFlags(flags, protocol);
     if (clone_options.is_error()) {
       FS_PRETTY_TRACE_DEBUG("[NodeClone] invalid clone flags: ", flags);
       return clone_options.take_error();
@@ -67,28 +67,12 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
       return zx::error(ZX_ERR_ACCESS_DENIED);
     }
 
-    // Ensure we map the request to the correct flags based on the connection's protocol.
-    switch (protocol) {
-      case fs::VnodeProtocol::kNode: {
-        clone_options->flags |= fio::OpenFlags::kNodeReference;
-        break;
-      }
-      case fs::VnodeProtocol::kDirectory: {
-        clone_options->flags |= fio::OpenFlags::kDirectory;
-        break;
-      }
-      default: {
-        clone_options->flags |= fio::OpenFlags::kNotDirectory;
-        break;
-      }
-    }
-
     if (zx::result validated = vnode()->ValidateOptions(*clone_options); validated.is_error()) {
       return validated.take_error();
     }
     fbl::RefPtr vn = vnode();
+    // We only need to open the Vnode for non-node reference connection.
     if (protocol != VnodeProtocol::kNode) {
-      // We only need to open the underlying Vnode again if this isn't a node reference connection.
       if (zx_status_t open_status = OpenVnode(&vn); open_status != ZX_OK) {
         return zx::error(open_status);
       }

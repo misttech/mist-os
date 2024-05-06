@@ -319,17 +319,23 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
   if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
     return result.error_value();
   }
-  VnodeProtocol protocol = VnodeProtocol::kNode;
-  if (!(options.flags & fio::OpenFlags::kNodeReference)) {
-    zx::result negotiated = NegotiateProtocol(options.protocols() & vnode->GetProtocols());
+  // Determine the protocol we should use to serve |vnode| based on |options|.
+  VnodeProtocol protocol;
+  if (options.flags & fio::OpenFlags::kNodeReference) {
+    protocol = VnodeProtocol::kNode;
+  } else {
+    zx::result negotiated = internal::NegotiateProtocol(vnode->GetProtocols(), options.protocols());
     if (negotiated.is_error()) {
       return negotiated.error_value();
     }
     protocol = *negotiated;
   }
+  // Downscope the set of rights granted to this connection to only include those which are relevant
+  // for the protocol which will be served.
+  options.rights = internal::DownscopeRights(options.rights, protocol);
+
   fidl::ServerEnd<fuchsia_io::Node> node(std::move(server_end));
   std::unique_ptr<internal::Connection> connection;
-
   switch (protocol) {
     case VnodeProtocol::kFile: {
       zx::result koid = GetObjectKoid(node.channel());
