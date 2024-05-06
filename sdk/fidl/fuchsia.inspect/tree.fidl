@@ -26,18 +26,11 @@ closed protocol TreeNameIterator {
     ///
     /// Returns an empty vector and closes the channel when no more names are present.
     /// Implementors may eagerly close the channel after sending the last batch.
-    @available(added=9)
     strict GetNext() -> (struct {
-        name vector<TreeName>:MAX;
-    });
-
-    /// Get the next batch of names.
-    ///
-    /// Returns an empty vector and closes the channel when no more names are present.
-    /// Implementors may eagerly close the channel after sending the last batch.
-    @available(replaced=9)
-    strict GetNext() -> (struct {
+        @available(replaced=9)
         name vector<TreeName>:MAX_TREE_NAME_LIST_SIZE;
+        @available(added=9)
+        name vector<TreeName>:MAX;
     });
 };
 

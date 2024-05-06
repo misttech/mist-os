@@ -253,19 +253,14 @@ closed protocol RealmQuery {
     }) error GetDeclarationError;
 
     /// Gets the structured config of an instance identified by its moniker.
-    @available(added=13)
+    @available(added=11)
     strict GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
-        config fuchsia.component.decl.ResolvedConfig;
-    }) error GetStructuredConfigError;
-
-    // replaced by ABI-compatible version above
-    @available(added=11, replaced=13)
-    strict GetStructuredConfig(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (struct {
+        @available(replaced=13)
         config fuchsia.component.config.ResolvedConfig;
+        @available(added=13)
+        config fuchsia.component.decl.ResolvedConfig;
     }) error GetStructuredConfigError;
 
     /// Returns an iterator over all component instances in this realm and instances within resolved

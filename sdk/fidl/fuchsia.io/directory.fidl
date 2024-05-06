@@ -205,40 +205,16 @@ closed protocol Openable {
     /// `OnOpen` event if applicable, and the `object` connection closed.
     ///
     /// `mode` is ignored.
-    @available(deprecated=11, replaced=12, note="Use the new signature of Open.")
     @selector("fuchsia.io1/Directory.Open")
     strict Open(resource struct {
         flags OpenFlags;
         mode ModeType;
-        path string:MAX_PATH;
-        object server_end:Node;
-    });
 
-    /// Opens a new object relative to this directory object.
-    ///
-    /// `path` may contain multiple segments, separated by "/" characters, and should never be
-    /// empty; i.e. "" is an invalid path. A trailing slash implies OpenFlags.DIRECTORY. Components
-    /// must not be empty (i.e. "foo//bar" is invalid). ".." is disallowed anywhere in the path. "."
-    /// is only allowed if the path is exactly ".", but not otherwise. A leading '/' is allowed (and
-    /// is treated the same way as if not present, i.e. "/foo/bar' and "foo/bar" are the same).
-    ///
-    /// If an unknown value is sent for flags the connection should be closed.
-    ///
-    /// `OpenFlags.RIGHT_*` flags provided in `flags` will restrict access rights on
-    /// the `object` channel which will be connected to the opened entity.
-    ///
-    /// Rights are never increased. When you open a nested entity within a directory, you may only
-    /// request the same rights as what the directory connection already has, or a subset of those.
-    /// Exceeding those rights causes an access denied error to be transmitted in the
-    /// `OnOpen` event if applicable, and the `object` connection closed.
-    ///
-    /// `mode` is ignored.
-    @available(added=12)
-    @selector("fuchsia.io1/Directory.Open")
-    strict Open(resource struct {
-        flags OpenFlags;
-        mode ModeType;
+        @available(deprecated=11, replaced=12)
+        path string:MAX_PATH;
+        @available(added=12)
         path string:MAX_PATH_LENGTH;
+
         object server_end:Node;
     });
 };

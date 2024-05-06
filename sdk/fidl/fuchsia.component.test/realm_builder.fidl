@@ -672,7 +672,7 @@ closed protocol Realm {
     /// - `NO_CONFIG_SCHEMA`: component does not have a config schema
     /// - `NO_SUCH_CONFIG_FIELD`: `key` could not be found in component's config schema
     /// - `CONFIG_VALUE_INVALID`: `value` does not meet config schema constraints
-    @available(added=13)
+    @available(added=9)
     strict SetConfigValue(struct {
         /// The name of the component whose config value is being replaced.
         name fuchsia.component.name;
@@ -681,19 +681,9 @@ closed protocol Realm {
         key fuchsia.component.decl.ConfigKey;
 
         /// The config value being replaced.
-        value fuchsia.component.decl.ConfigValueSpec;
-    }) -> () error RealmBuilderError;
-
-    // replaced by ABI-compatible type above
-    @available(added=9, replaced=13)
-    strict SetConfigValue(struct {
-        /// The name of the component whose config value is being replaced.
-        name fuchsia.component.name;
-
-        /// The key of the config field whose value is being replaced.
-        key fuchsia.component.decl.ConfigKey;
-
-        /// The config value being replaced.
+        @available(replaced=13)
         value fuchsia.component.config.ValueSpec;
+        @available(added=13)
+        value fuchsia.component.decl.ConfigValueSpec;
     }) -> () error RealmBuilderError;
 };
