@@ -416,14 +416,14 @@ mod tests {
         ip::{AddrSubnet, IpAddress as _},
         Witness as _,
     };
-    use packet::EmptyBuf;
+    use packet::{BufferMut, EmptyBuf, Serializer};
     use packet_formats::icmp::ndp::Options;
 
     use super::*;
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _, TimerHandler,
+            InstantContext as _, SendFrameContext as _, SendableFrameMeta, TimerHandler,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::{
@@ -546,6 +546,21 @@ mod tests {
         type OuterEvent = DadEvent<FakeDeviceId>;
         fn convert_event(event: DadEvent<FakeDeviceId>) -> DadEvent<FakeDeviceId> {
             event
+        }
+    }
+
+    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for DadMessageMeta {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
         }
     }
 

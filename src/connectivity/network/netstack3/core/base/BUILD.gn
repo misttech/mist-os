@@ -16,6 +16,7 @@ rustc_library_with_features("netstack3-base") {
     "src/data_structures.rs",
     "src/data_structures/ref_counted_hash_map.rs",
     "src/event.rs",
+    "src/frame.rs",
     "src/inspect.rs",
     "src/lib.rs",
     "src/resource_references.rs",
@@ -29,6 +30,7 @@ rustc_library_with_features("netstack3-base") {
     "//src/connectivity/lib/net-types",
     "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
+    "//src/lib/network/packet",
     "//third_party/rust_crates:rand",
   ]
 

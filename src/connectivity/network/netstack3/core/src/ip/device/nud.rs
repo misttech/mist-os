@@ -2611,7 +2611,7 @@ mod tests {
                 FakeNetworkContext as _, FakeNetworkLinks, FakeTimerCtxExt as _,
                 WithFakeFrameContext, WrappedFakeCoreCtx,
             },
-            CtxPair, InstantContext, SendFrameContext as _,
+            CtxPair, InstantContext, SendFrameContext as _, SendableFrameMeta,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -2711,6 +2711,23 @@ mod tests {
     impl<I: Ip> DeviceIdContext<FakeLinkDevice> for FakeCoreCtxImpl<I> {
         type DeviceId = FakeLinkDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
+    }
+
+    impl<I: Ip> SendableFrameMeta<FakeInnerCtxImpl<I>, FakeBindingsCtxImpl<I>>
+        for FakeNudMessageMeta<I>
+    {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeInnerCtxImpl<I>,
+            bindings_ctx: &mut FakeBindingsCtxImpl<I>,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
+        }
     }
 
     impl<I: Ip> NudContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {

@@ -35,11 +35,7 @@
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
 
-use core::{convert::Infallible as Never, fmt::Debug};
-
 use lock_order::Unlocked;
-
-use packet::{BufferMut, Serializer};
 
 use crate::{
     marker::{BindingsContext, BindingsTypes},
@@ -49,51 +45,12 @@ use crate::{
 pub use netstack3_base::{
     ContextPair, ContextProvider, CoreEventContext, CoreTimerContext, CounterContext, CtxPair,
     DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
-    InstantContext, NestedIntoCoreTimerCtx, NonTestCtxMarker, ReferenceNotifiers,
-    ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
-    TracingContext,
+    InstantContext, NestedIntoCoreTimerCtx, NonTestCtxMarker, ReceivableFrameMeta,
+    RecvFrameContext, ReferenceNotifiers, ResourceCounterContext, RngContext, SendFrameContext,
+    SendableFrameMeta, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
 };
 
 impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
-
-/// A context for receiving frames.
-pub trait RecvFrameContext<BC, Meta> {
-    /// Receive a frame.
-    ///
-    /// `receive_frame` receives a frame with the given metadata.
-    fn receive_frame<B: BufferMut + Debug>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        metadata: Meta,
-        frame: B,
-    );
-}
-
-/// Any type can implement a receive frame context with uninstantiable metadata.
-impl<T, BC> RecvFrameContext<BC, Never> for T {
-    fn receive_frame<B: BufferMut>(&mut self, _bindings_ctx: &mut BC, metadata: Never, _frame: B) {
-        match metadata {}
-    }
-}
-
-/// A context for sending frames.
-pub trait SendFrameContext<BC, Meta> {
-    // TODO(joshlf): Add an error type parameter or associated type once we need
-    // different kinds of errors.
-
-    /// Send a frame.
-    ///
-    /// `send_frame` sends a frame with the given metadata. The frame itself is
-    /// passed as a [`Serializer`] which `send_frame` is responsible for
-    /// serializing. If serialization fails for any reason, the original,
-    /// unmodified `Serializer` is returned.
-    ///
-    /// [`Serializer`]: packet::Serializer
-    fn send_frame<S>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: S) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut;
-}
 
 /// Provides access to core context implementations.
 ///
@@ -209,11 +166,13 @@ mod locked {
 /// will take care of the rest.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
-    use alloc::{boxed::Box, sync::Arc, vec::Vec};
+    use alloc::sync::Arc;
+    #[cfg(test)]
+    use alloc::vec;
     #[cfg(test)]
     use alloc::{
         collections::{BinaryHeap, HashMap},
-        vec,
+        vec::Vec,
     };
     use core::{convert::Infallible as Never, fmt::Debug};
     #[cfg(test)]
@@ -221,7 +180,6 @@ pub(crate) mod testutil {
 
     use derivative::Derivative;
     use net_types::ip::IpVersion;
-    use netstack3_base::testutil::FakeCryptoRng;
 
     #[cfg(test)]
     use packet::Buf;
@@ -241,73 +199,10 @@ pub(crate) mod testutil {
     };
 
     pub use netstack3_base::testutil::{
-        FakeEventCtx, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTracingCtx,
-        InstantAndData, WithFakeTimerContext,
+        FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeInstantCtx, FakeTimerCtx,
+        FakeTimerCtxExt, FakeTracingCtx, InstantAndData, WithFakeFrameContext,
+        WithFakeTimerContext,
     };
-
-    /// A fake [`FrameContext`].
-    pub struct FakeFrameCtx<Meta> {
-        frames: Vec<(Meta, Vec<u8>)>,
-        should_error_for_frame: Option<Box<dyn Fn(&Meta) -> bool + Send>>,
-    }
-
-    #[cfg(test)]
-    impl<Meta> FakeFrameCtx<Meta> {
-        /// Closure which can decide to cause an error to be thrown when
-        /// handling a frame, based on the metadata.
-        pub(crate) fn set_should_error_for_frame<F: Fn(&Meta) -> bool + Send + 'static>(
-            &mut self,
-            f: F,
-        ) {
-            self.should_error_for_frame = Some(Box::new(f));
-        }
-    }
-
-    impl<Meta> Default for FakeFrameCtx<Meta> {
-        fn default() -> FakeFrameCtx<Meta> {
-            FakeFrameCtx { frames: Vec::new(), should_error_for_frame: None }
-        }
-    }
-
-    impl<Meta> FakeFrameCtx<Meta> {
-        /// Take all frames sent so far.
-        pub(crate) fn take_frames(&mut self) -> Vec<(Meta, Vec<u8>)> {
-            core::mem::take(&mut self.frames)
-        }
-
-        /// Get the frames sent so far.
-        #[cfg(test)]
-        pub(crate) fn frames(&self) -> &[(Meta, Vec<u8>)] {
-            self.frames.as_slice()
-        }
-
-        pub(crate) fn push(&mut self, meta: Meta, frame: Vec<u8>) {
-            self.frames.push((meta, frame))
-        }
-    }
-
-    impl<C, Meta> SendFrameContext<C, Meta> for FakeFrameCtx<Meta> {
-        fn send_frame<S>(
-            &mut self,
-            _bindings_ctx: &mut C,
-            metadata: Meta,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            if let Some(should_error_for_frame) = &self.should_error_for_frame {
-                if should_error_for_frame(&metadata) {
-                    return Err(frame);
-                }
-            }
-
-            let buffer = frame.serialize_vec_outer().map_err(|(_err, s)| s)?;
-            self.push(metadata, buffer.as_ref().to_vec());
-            Ok(())
-        }
-    }
 
     /// A tuple of device ID and IP version.
     #[derive(Derivative)]
@@ -536,14 +431,6 @@ pub(crate) mod testutil {
             assert_eq!(*inner, None, "resolved link address was set more than once");
             *inner = Some(result);
         }
-    }
-
-    #[cfg(test)]
-    pub(crate) trait WithFakeFrameContext<SendMeta> {
-        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<SendMeta>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O;
     }
 
     #[cfg(test)]
@@ -809,25 +696,6 @@ pub(crate) mod testutil {
             f: F,
         ) -> O {
             self.inner.with_fake_frame_ctx_mut(f)
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState, FrameMeta>
-        SendFrameContext<FakeBindingsCtx<Id, Event, BindingsCtxState, FrameMeta>, Meta>
-        for FakeCoreCtx<S, Meta, DeviceId>
-    {
-        fn send_frame<SS>(
-            &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, FrameMeta>,
-            metadata: Meta,
-            frame: SS,
-        ) -> Result<(), SS>
-        where
-            SS: Serializer,
-            SS::Buffer: BufferMut,
-        {
-            self.frames.send_frame(bindings_ctx, metadata, frame)
         }
     }
 
@@ -1198,10 +1066,11 @@ pub(crate) mod testutil {
                 .iter_mut()
                 .filter_map(|(n, ctx)| {
                     ctx.with_fake_frame_ctx_mut(|ctx| {
-                        if ctx.frames.is_empty() {
+                        let frames = ctx.take_frames();
+                        if frames.is_empty() {
                             None
                         } else {
-                            Some((n.clone(), ctx.frames.drain(..).collect()))
+                            Some((n.clone(), frames))
                         }
                     })
                 })

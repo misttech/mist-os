@@ -4,7 +4,7 @@
 
 //! Implementations of device layer traits for [`CoreCtx`].
 
-use core::{num::NonZeroU8, ops::Deref as _};
+use core::{fmt::Debug, num::NonZeroU8, ops::Deref as _};
 
 use lock_order::{
     lock::{RwLockFor, UnlockedAccess},
@@ -21,7 +21,7 @@ use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
     context::{
-        CoreCtxAndResource, CounterContext, Locked, RecvFrameContext, ResourceCounterContext,
+        CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta, ResourceCounterContext,
     },
     device::{
         config::DeviceConfigurationContext,
@@ -895,40 +895,30 @@ impl<BT: BindingsTypes, L> DeviceIdContext<AnyDevice> for CoreCtx<'_, BT, L> {
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
-    RecvFrameContext<BC, RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv4>> for CoreCtx<'_, BC, L>
+    ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv4>
 {
-    fn receive_frame<B: BufferMut>(
-        &mut self,
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CoreCtx<'_, BC, L>,
         bindings_ctx: &mut BC,
-        metadata: RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv4>,
         frame: B,
     ) {
-        crate::ip::receive_ipv4_packet(
-            self,
-            bindings_ctx,
-            &metadata.device.into(),
-            metadata.frame_dst,
-            frame,
-        );
+        let Self { device, frame_dst, _marker } = self;
+        crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
-    RecvFrameContext<BC, RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv6>> for CoreCtx<'_, BC, L>
+    ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv6>
 {
-    fn receive_frame<B: BufferMut>(
-        &mut self,
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CoreCtx<'_, BC, L>,
         bindings_ctx: &mut BC,
-        metadata: RecvIpFrameMeta<EthernetDeviceId<BC>, Ipv6>,
         frame: B,
     ) {
-        crate::ip::receive_ipv6_packet(
-            self,
-            bindings_ctx,
-            &metadata.device.into(),
-            metadata.frame_dst,
-            frame,
-        );
+        let Self { device, frame_dst, _marker } = self;
+        crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 

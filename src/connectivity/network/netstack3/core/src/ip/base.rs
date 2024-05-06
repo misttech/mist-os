@@ -3569,20 +3569,31 @@ pub(crate) mod testutil {
 
     #[cfg(test)]
     impl<I: packet_formats::ip::IpExt + IpTypesIpExt, S, DeviceId, BC>
-        crate::context::SendFrameContext<BC, SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>>
-        for crate::context::testutil::FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
+        crate::context::SendableFrameMeta<
+            crate::context::testutil::FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>,
+            BC,
+        > for SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>
     {
-        fn send_frame<SS>(
-            &mut self,
+        fn send_meta<SS>(
+            self,
+            core_ctx: &mut crate::context::testutil::FakeCoreCtx<
+                S,
+                DualStackSendIpPacketMeta<DeviceId>,
+                DeviceId,
+            >,
             bindings_ctx: &mut BC,
-            metadata: SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
             frame: SS,
         ) -> Result<(), SS>
         where
             SS: Serializer,
             SS::Buffer: BufferMut,
         {
-            self.frames.send_frame(bindings_ctx, DualStackSendIpPacketMeta::from(metadata), frame)
+            crate::context::SendFrameContext::send_frame(
+                &mut core_ctx.frames,
+                bindings_ctx,
+                DualStackSendIpPacketMeta::from(self),
+                frame,
+            )
         }
     }
 

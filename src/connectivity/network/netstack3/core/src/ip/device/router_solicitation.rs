@@ -243,6 +243,7 @@ mod tests {
 
     use net_declare::net_ip_v6;
     use netstack3_base::IntoCoreTimerCtx;
+    use packet::BufferMut;
     use packet_formats::icmp::ndp::{options::NdpOption, Options};
     use test_case::test_case;
 
@@ -250,7 +251,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _,
+            InstantContext as _, SendFrameContext as _, SendableFrameMeta,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::testutil::FakeIpDeviceIdCtx,
@@ -278,6 +279,21 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
     type FakeBindingsCtxImpl =
         FakeBindingsCtx<RsTimerId<FakeWeakDeviceId<FakeDeviceId>>, (), (), ()>;
+
+    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for RsMessageMeta {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
+        }
+    }
 
     impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;

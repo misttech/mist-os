@@ -569,7 +569,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _, SendFrameContext as _,
+            InstantContext as _, SendFrameContext as _, SendableFrameMeta,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -663,6 +663,21 @@ mod tests {
         ) -> O {
             let FakeIgmpCtx { groups, .. } = self.get_ref();
             cb(groups)
+        }
+    }
+
+    impl SendableFrameMeta<FakeCoreCtx, FakeBindingsCtx> for IgmpPacketMetadata<FakeDeviceId> {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtx,
+            bindings_ctx: &mut FakeBindingsCtx,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
         }
     }
 

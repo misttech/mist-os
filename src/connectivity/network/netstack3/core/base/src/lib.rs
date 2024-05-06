@@ -16,6 +16,7 @@ mod context;
 mod counters;
 mod data_structures;
 mod event;
+mod frame;
 mod inspect;
 mod resource_references;
 mod rng;
@@ -25,6 +26,7 @@ mod trace;
 pub use context::{ContextPair, ContextProvider, CtxPair, NonTestCtxMarker};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use event::{CoreEventContext, EventContext};
+pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
@@ -64,6 +66,7 @@ pub mod sync {
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::event::testutil::FakeEventCtx;
+    pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
         FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
