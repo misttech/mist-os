@@ -25,7 +25,6 @@ libs = [
   "pkg",
   "protocols",
   "rcs",
-  "schema",
   "sdk",
   "ssh",
   "stream_util",
