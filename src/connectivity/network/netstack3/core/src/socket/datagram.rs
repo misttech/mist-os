@@ -4934,6 +4934,37 @@ pub(crate) fn get_ip_transparent<
     })
 }
 
+pub(crate) fn set_multicast_interface<
+    I: IpExt,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateBindingsContext<I, S>,
+    S: DatagramSocketSpec,
+>(
+    core_ctx: &mut CC,
+    id: &S::SocketId<I, CC::WeakDeviceId>,
+    value: Option<&CC::DeviceId>,
+) {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        get_options_mut(core_ctx, state).socket_options.multicast_interface =
+            value.map(|v| v.downgrade());
+    })
+}
+
+pub(crate) fn get_multicast_interface<
+    I: IpExt,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateBindingsContext<I, S>,
+    S: DatagramSocketSpec,
+>(
+    core_ctx: &mut CC,
+    id: &S::SocketId<I, CC::WeakDeviceId>,
+) -> Option<CC::WeakDeviceId> {
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (options, _device) = get_options_device(core_ctx, state);
+        options.socket_options.multicast_interface.clone()
+    })
+}
+
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;

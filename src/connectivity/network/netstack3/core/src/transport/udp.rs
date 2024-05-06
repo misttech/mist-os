@@ -2056,6 +2056,57 @@ where
         .map(|IpInvariant(multicast)| multicast)
     }
 
+    pub fn get_multicast_interface(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        ip_version: IpVersion,
+    ) -> Result<
+        Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        NotDualStackCapableError,
+    > {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::get_multicast_interface(core_ctx, id));
+        };
+
+        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
+            I::map_ip::<_, Result<IpInvariant<Option<_>>, _>>(
+                WrapOtherStackIpOptions(other_stack),
+                |_v4| Err(NotDualStackCapableError),
+                |WrapOtherStackIpOptions(other_stack)| {
+                    Ok(IpInvariant(other_stack.socket_options.multicast_interface.clone()))
+                },
+            )
+        })
+        .map(|IpInvariant(result)| result)
+    }
+
+    pub fn set_multicast_interface(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        interface: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+
+        if ip_version == I::VERSION {
+            crate::socket::datagram::set_multicast_interface(core_ctx, id, interface);
+            return Ok(());
+        };
+
+        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+            I::map_ip(
+                (IpInvariant(interface), WrapOtherStackIpOptionsMut(other_stack)),
+                |(IpInvariant(_interface), _v4)| Err(NotDualStackCapableError),
+                |(IpInvariant(interface), WrapOtherStackIpOptionsMut(other_stack))| {
+                    other_stack.socket_options.multicast_interface =
+                        interface.map(|device| device.downgrade());
+                    Ok(())
+                },
+            )
+        })
+    }
+
     /// Gets the transparent option.
     pub fn get_transparent(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
         crate::socket::datagram::get_ip_transparent(self.core_ctx(), id)
@@ -4356,11 +4407,18 @@ mod tests {
                 MultipleDevicesId::all().into_iter().enumerate().map(|(i, device)| {
                     FakeDeviceConfig {
                         device,
-                        local_ips: vec![I::get_other_ip_address((i + 1).try_into().unwrap())],
+                        local_ips: vec![Self::local_ip(i)],
                         remote_ips: remote_ips.clone(),
                     }
                 }),
             ))
+        }
+
+        fn local_ip<A: IpAddress>(index: usize) -> SpecifiedAddr<A>
+        where
+            A::Version: TestIpExt,
+        {
+            A::Version::get_other_ip_address((index + 1).try_into().unwrap())
         }
     }
 
@@ -4684,6 +4742,90 @@ mod tests {
                 remote_identifier: REMOTE_PORT.into(),
             })
         );
+    }
+
+    #[ip_test]
+    fn test_multicast_sendto<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+
+        let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
+            UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
+        );
+
+        // Add multicsat route for every device.
+        for device in MultipleDevicesId::all().iter() {
+            let (core_ctx, _bindings_ctx) = ctx.contexts();
+            core_ctx.inner.inner.get_mut().add_subnet_route(*device, I::MULTICAST_SUBNET);
+        }
+
+        let mut api = UdpApi::<I, _>::new(ctx.as_mut());
+        let socket = api.create();
+
+        for (i, target_device) in MultipleDevicesId::all().iter().enumerate() {
+            api.set_multicast_interface(&socket, Some(&target_device), I::VERSION)
+                .expect("bind should succeed");
+
+            let multicast_ip = I::get_multicast_addr(i.try_into().unwrap());
+            api.send_to(
+                &socket,
+                Some(ZonedAddr::Unzoned(multicast_ip.into())),
+                REMOTE_PORT.into(),
+                Buf::new(b"packet".to_vec(), ..),
+            )
+            .expect("send should succeed");
+
+            let packets = api.core_ctx().inner.inner.take_frames();
+            assert_eq!(packets.len(), 1usize);
+            for (meta, _body) in packets {
+                let meta = meta.try_as::<I>().unwrap();
+                assert_eq!(meta.device, *target_device);
+                assert_eq!(meta.proto, IpProto::Udp.into());
+                assert_eq!(meta.src_ip, UdpMultipleDevicesCoreCtx::local_ip(i));
+                assert_eq!(meta.dst_ip, multicast_ip.into());
+                assert_eq!(meta.next_hop, multicast_ip.into());
+            }
+        }
+    }
+
+    #[ip_test]
+    fn test_multicast_send<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+
+        let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
+            UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
+        );
+
+        // Add multicsat route for every device.
+        for device in MultipleDevicesId::all().iter() {
+            let (core_ctx, _bindings_ctx) = ctx.contexts();
+            core_ctx.inner.inner.get_mut().add_subnet_route(*device, I::MULTICAST_SUBNET);
+        }
+
+        let mut api = UdpApi::<I, _>::new(ctx.as_mut());
+        let multicast_ip = I::get_multicast_addr(42);
+
+        for (i, target_device) in MultipleDevicesId::all().iter().enumerate() {
+            let socket = api.create();
+
+            api.set_multicast_interface(&socket, Some(&target_device), I::VERSION)
+                .expect("set_multicast_interface should succeed");
+
+            api.connect(&socket, Some(ZonedAddr::Unzoned(multicast_ip.into())), REMOTE_PORT.into())
+                .expect("send should succeed");
+
+            api.send(&socket, Buf::new(b"packet".to_vec(), ..)).expect("send should succeed");
+
+            let packets = api.core_ctx().inner.inner.take_frames();
+            assert_eq!(packets.len(), 1usize);
+            for (meta, _body) in packets {
+                let meta = meta.try_as::<I>().unwrap();
+                assert_eq!(meta.device, *target_device);
+                assert_eq!(meta.proto, IpProto::Udp.into());
+                assert_eq!(meta.src_ip, UdpMultipleDevicesCoreCtx::local_ip(i));
+                assert_eq!(meta.dst_ip, multicast_ip.into());
+                assert_eq!(meta.next_hop, multicast_ip.into());
+            }
+        }
     }
 
     /// Tests local port allocation for [`connect`].

@@ -910,7 +910,7 @@ pub(crate) mod testutil {
 
     use derivative::Derivative;
     use net_types::{
-        ip::{GenericOverIp, IpAddr, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
+        ip::{GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Subnet},
         MulticastAddr, Witness as _,
     };
 
@@ -1209,6 +1209,28 @@ pub(crate) mod testutil {
                     device,
                 ),
             }
+        }
+
+        pub(crate) fn add_subnet_route<A: IpAddress>(&mut self, device: D, subnet: Subnet<A>) {
+            let entry = crate::routes::Entry {
+                subnet,
+                device,
+                gateway: None,
+                metric: crate::routes::Metric::ExplicitMetric(crate::routes::RawMetric(0)),
+            };
+            A::Version::map_ip::<_, ()>(
+                entry,
+                |entry_v4| {
+                    let _ =
+                        crate::ip::forwarding::testutil::add_entry(&mut self.v4.table, entry_v4)
+                            .expect("Failed to add route");
+                },
+                |entry_v6| {
+                    let _ =
+                        crate::ip::forwarding::testutil::add_entry(&mut self.v6.table, entry_v6)
+                            .expect("Failed to add route");
+                },
+            );
         }
 
         pub(crate) fn get_device_state_mut<I: IpLayerIpExt>(

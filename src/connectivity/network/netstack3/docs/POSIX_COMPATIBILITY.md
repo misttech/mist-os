@@ -62,6 +62,13 @@ controls the interface used for sending and receiving, including
 - [`IPV6_MULTICAST_IF`] and [`IP_MULTICAST_IF`],
 - for an IPv6 socket, the scope ID associated with its local or remote address,
 
+### `IP_MULTICAST_IF`
+
+On Linux the IPv4 address set with `IP_MULTICAST_IF` is also used as the source
+address for outgoing multicast packets. Netstack3 uses the regular source
+address selection algorithm, using the provided address only to pick the
+multicast interface.
+
 ### `SO_SNDBUF` and `SO_RCVBUF`
 
 Netstack3 supports the [`SO_SNDBUF` and `SO_RCVBUF`][POSIX buffer sizes] socket
