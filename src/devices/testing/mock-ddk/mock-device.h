@@ -43,7 +43,10 @@ struct ProtocolEntry {
   Protocol proto;
 };
 
-using ConnectCallback = fit::function<zx_status_t(zx::channel)>;
+using AnyHandler = fit::function<zx_status_t(zx::channel)>;
+
+template <typename Protocol>
+using TypedHandler = fit::function<void(fidl::internal::ServerEndType<Protocol> request)>;
 
 // The driver runtime for all mock devices is shared.
 // This is because there can only be one DriverRuntime,
@@ -187,6 +190,25 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // if you want to add a protocol to a fragment, add the fragment's name as 'name'.
   void AddProtocol(uint32_t id, const void* ops, void* ctx, const char* name = "");
 
+  // Add a protocol that is served by the namespace.
+  // This is similar to AddProtocol, but the protocol is served by the namespace
+  // instead of the device.
+  template <typename Protocol>
+  void AddNsProtocol(mock_ddk::TypedHandler<Protocol> handler,
+                     const char* protocol_name = fidl::DiscoverableProtocolName<Protocol>) {
+    auto bridge_func = [handler = std::move(handler)](zx::channel request) {
+      fidl::ServerEnd<Protocol> server_end(std::move(request));
+      handler(std::move(server_end));
+      return ZX_OK;
+    };
+    AddNsProtocol(protocol_name, std::move(bridge_func));
+  }
+
+  // Add a protocol that is served by the namespace.
+  // This is similar to AddProtocol, but the protocol is served by the namespace
+  // instead of the device.
+  void AddNsProtocol(const char* protocol_name, mock_ddk::AnyHandler callback);
+
   // You can add FIDL service here to your device or your parent device.
   // if you want to add a service to a fragment, add the fragment's name as 'name'.
   // Devices will use `device_connect_fidl_protocol2` or
@@ -281,6 +303,10 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
                                                               const char* protocol_name,
                                                               fdf_handle_t request);
 
+  zx_status_t ConnectToNsProtocol(const char* protocol_name, zx::channel request);
+  friend zx_status_t device_connect_ns_protocol(zx_device_t* device, const char* protocol_name,
+                                                zx_handle_t request);
+
   // device_get_metadata calls GetMetadata:
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
   friend zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf,
@@ -316,13 +342,13 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   std::unordered_map<std::string, std::list<mock_ddk::ProtocolEntry>> protocols_;
   // The first key is the first key is the fragment name and the second key is the protocol name. ""
   // is used as the key when there is no fragment.
-  std::unordered_map<std::string, std::unordered_map<std::string, mock_ddk::ConnectCallback>>
-      fidl_protocols_;
+  std::unordered_map<std::string, mock_ddk::AnyHandler> fidl_protocols_;
   // The first key is the first key is the fragment name and the second key is the service name. ""
   // is used as the key when there is no fragment.
   std::unordered_map<std::string,
                      std::unordered_map<std::string, fidl::ClientEnd<fuchsia_io::Directory>>>
       fidl_services_;
+
   std::unordered_map<std::string_view, std::vector<uint8_t>> firmware_;
 
   // Map of metadata set by SetMetadata.

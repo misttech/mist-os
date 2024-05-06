@@ -241,6 +241,10 @@ void MockDevice::AddProtocol(uint32_t id, const void* ops, void* ctx, const char
   protocols_[fragment_name].push_back(mock_ddk::ProtocolEntry{id, {ops, ctx}});
 }
 
+void MockDevice::AddNsProtocol(const char* protocol_name, mock_ddk::AnyHandler callback) {
+  fidl_protocols_[protocol_name] = std::move(callback);
+}
+
 void MockDevice::AddFidlService(const char* service_name, fidl::ClientEnd<fuchsia_io::Directory> ns,
                                 const char* name) {
   fidl_services_.try_emplace(
@@ -328,6 +332,14 @@ zx_status_t MockDevice::ConnectToRuntimeProtocol(const char* service_name,
     return status;
   }
   return ConnectToFidlProtocol(service_name, protocol_name, std::move(server_token), fragment_name);
+}
+
+zx_status_t MockDevice::ConnectToNsProtocol(const char* protocol_name, zx::channel request) {
+  auto callback = fidl_protocols_.find(protocol_name);
+  if (callback == fidl_protocols_.end()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return callback->second(std::move(request));
 }
 
 size_t MockDevice::descendant_count() const {

@@ -527,6 +527,35 @@ class EchoServer : public fidl::WireServer<fidl_examples_echo::Echo> {
   }
 };
 
+TEST(MockDdk, SetNsProtocol) {
+  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
+  auto result = TestDevice::Bind(parent.get());
+  ASSERT_OK(result.status_value());
+  TestDevice* test_device = result.value();
+
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+  EchoServer server;
+  parent->AddNsProtocol<fidl_examples_echo::Echo>(
+      [&](fidl::ServerEnd<fidl_examples_echo::Echo> request) {
+        server.Bind(loop.dispatcher(), std::move(request));
+      });
+
+  auto echo_client = test_device->DdkConnectNsProtocol<fidl_examples_echo::Echo>();
+  ASSERT_OK(echo_client.status_value());
+
+  ASSERT_TRUE(echo_client.value().is_valid());
+  fidl::WireClient client(std::move(*echo_client), loop.dispatcher());
+
+  constexpr std::string_view kInput = "Test String";
+
+  client->EchoString(fidl::StringView::FromExternal(kInput))
+      .ThenExactlyOnce([&](fidl::WireUnownedResult<fidl_examples_echo::Echo::EchoString>& result) {
+        EXPECT_OK(result.status());
+        EXPECT_EQ(result.value().response.get(), kInput);
+      });
+  EXPECT_OK(loop.RunUntilIdle());
+}
+
 TEST(MockDdk, SetFidlService) {
   auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
   auto result = TestDevice::Bind(parent.get());
