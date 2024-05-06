@@ -250,6 +250,16 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  # Just putting this in deps of a phys_executable() in the kernel.phys
+  # environment...TODO(https://fxbug.dev/335547883): makes it not useful yet
+  source_set("linuxboot64") {
+    libs = [ "//zircon/kernel/phys/linuxboot-pic.ld" ]
+    deps = [
+      ":linuxboot-init",
+      "//zircon/kernel/phys:raw-header",
+    ]
+  }
+
   source_set("linuxboot.h") {
     public = [ "linuxboot.h" ]
     public_deps = [
@@ -279,6 +289,7 @@ if (current_toolchain == default_toolchain) {
     deps = [
       ":linuxboot.h",
       "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:address-space",
       "//zircon/kernel/phys:allocation",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:symbolize",

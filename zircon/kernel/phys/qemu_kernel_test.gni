@@ -83,6 +83,8 @@ template("qemu_kernel_test") {
         if (defined(invoker.initrd)) {
           zbi = invoker.initrd
         }
+
+        forward_variables_from(qemu, [ "disabled" ])
       }
     } else {
       group(test_target) {
