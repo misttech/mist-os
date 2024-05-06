@@ -20,10 +20,9 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6,
+        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
     },
-    MulticastAddr, MulticastAddress, SpecifiedAddr, Witness, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
@@ -47,7 +46,7 @@ use crate::{
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
         base::TransparentLocalDelivery,
-        socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SendOptions},
+        socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
         TransportReceiveError,
     },
@@ -60,13 +59,13 @@ use crate::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
-            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
-            DatagramStateContext, DualStackConnState, DualStackDatagramBoundStateContext,
-            DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, FoundSockets,
-            InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
-            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
-            SetMulticastMembershipError, SocketHopLimits, SocketInfo,
-            SocketState as DatagramSocketState, WrapOtherStackIpOptions,
+            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet,
+            DatagramSocketSpec, DatagramStateContext, DualStackConnState,
+            DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
+            ExpectedUnboundError, FoundSockets, InUseError, IpExt, IpOptions,
+            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
+            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
+            SocketInfo, SocketState as DatagramSocketState, WrapOtherStackIpOptions,
             WrapOtherStackIpOptionsMut,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
@@ -545,28 +544,9 @@ pub struct DualStackSocketState<D: device::WeakId> {
     /// Match Linux's behavior by enabling dualstack operations by default.
     #[derivative(Default(value = "true"))]
     dual_stack_enabled: bool,
-    /// The IPv4 hop limits (e.g. TTL) to be used when sending packets in the
-    /// IPv4 stack.
-    hop_limits: SocketHopLimits<Ipv4>,
 
-    /// The multicast interface which can be set for IPv4 independently from
-    /// the interface selected for IPv6.
-    multicast_interface: Option<D>,
-}
-
-impl<D: device::WeakId> SendOptions<Ipv4, D> for DualStackSocketState<D> {
-    fn hop_limit(&self, destination: &SpecifiedAddr<Ipv4Addr>) -> Option<NonZeroU8> {
-        let Self { hop_limits: SocketHopLimits { unicast, multicast, version: _ }, .. } = self;
-        if destination.is_multicast() {
-            *multicast
-        } else {
-            *unicast
-        }
-    }
-
-    fn multicast_interface(&self) -> Option<&D> {
-        self.multicast_interface.as_ref()
-    }
+    /// Send options used when sending on the IPv4 stack.
+    socket_options: DatagramSocketOptions<Ipv4, D>,
 }
 
 /// Serialization errors for Udp Packets.
@@ -1923,7 +1903,11 @@ where
                 |(IpInvariant(_unicast_hop_limit), _v4)| Err(NotDualStackCapableError),
                 |(IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
                     let DualStackSocketState {
-                        hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                        socket_options:
+                            DatagramSocketOptions {
+                                hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                                ..
+                            },
                         ..
                     } = other_stack;
                     *unicast = unicast_hop_limit;
@@ -1962,7 +1946,11 @@ where
                 |(IpInvariant(_multicast_hop_limit), _v4)| Err(NotDualStackCapableError),
                 |(IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
                     let DualStackSocketState {
-                        hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                        socket_options:
+                            DatagramSocketOptions {
+                                hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                                ..
+                            },
                         ..
                     } = other_stack;
                     *multicast = multicast_hop_limit;
@@ -2004,7 +1992,12 @@ where
                         IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
                     )| {
                         let DualStackSocketState {
-                            hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                            socket_options:
+                                DatagramSocketOptions {
+                                    hop_limits:
+                                        SocketHopLimits { unicast, multicast: _, version: _ },
+                                    ..
+                                },
                             ..
                         } = other_stack;
                         Ok(IpInvariant(unicast.unwrap_or(default_unicast)))
@@ -2047,7 +2040,12 @@ where
                         IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
                     )| {
                         let DualStackSocketState {
-                            hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                            socket_options:
+                                DatagramSocketOptions {
+                                    hop_limits:
+                                        SocketHopLimits { unicast: _, multicast, version: _ },
+                                    ..
+                                },
                             ..
                         } = other_stack;
                         Ok(IpInvariant(multicast.unwrap_or(default_multicast)))
@@ -2442,13 +2440,13 @@ impl<
         *dual_stack_enabled
     }
 
-    type OtherSendOptions = DualStackSocketState<CC::WeakDeviceId>;
+    type OtherSendOptions = DatagramSocketOptions<Ipv4, CC::WeakDeviceId>;
 
     fn to_other_send_options<'a>(
         &self,
         state: &'a IpOptions<Ipv6, Self::WeakDeviceId, Udp<BC>>,
     ) -> &'a Self::OtherSendOptions {
-        state.other_stack()
+        &state.other_stack().socket_options
     }
 
     type Converter = ();
@@ -2538,7 +2536,7 @@ mod tests {
     use net_declare::net_ip_v4 as ip_v4;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{IpAddr, Ipv4, Ipv6, Ipv6Addr, Ipv6SourceAddr},
+        ip::{IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
     use packet::Buf;
