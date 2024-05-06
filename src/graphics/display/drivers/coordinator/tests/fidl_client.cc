@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include <fbl/auto_lock.h>
@@ -18,6 +17,7 @@
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/testing/predicates/status.h"
 #include "zircon/status.h"
 

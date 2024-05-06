@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/debug.h>
 #include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/trace/event.h>
@@ -23,6 +22,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 

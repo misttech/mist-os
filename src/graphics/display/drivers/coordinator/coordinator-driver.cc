@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>

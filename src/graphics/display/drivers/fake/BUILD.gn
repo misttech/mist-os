@@ -83,6 +83,7 @@ static_library("fake-display-stack") {
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
     "//src/graphics/display/drivers/coordinator:shared",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/lib/ddktl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

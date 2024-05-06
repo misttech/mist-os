@@ -9,6 +9,7 @@
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 
 #include <cstdint>
 
@@ -22,29 +23,32 @@
 #include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 
 namespace {
 
 zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(zx_device_t* parent) {
-  zx::result display_fidl_client = ddk::Device<void>::DdkConnectRuntimeProtocol<
-      fuchsia_hardware_display_engine::Service::Engine>(parent);
-  if (display_fidl_client.is_error()) {
+  auto [engine_client, engine_server] =
+      fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
+  zx_status_t status =
+      device_connect_runtime_protocol(parent, fuchsia_hardware_display_engine::Service::Name,
+                                      fuchsia_hardware_display_engine::Service::Engine::Name,
+                                      engine_server.TakeChannel().release());
+  if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to connect to display engine FIDL client: %s",
-           display_fidl_client.status_string());
-    return display_fidl_client.take_error();
+           zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine =
-      std::move(display_fidl_client).value();
-  if (!engine.is_valid()) {
+  if (!engine_client.is_valid()) {
     zxlogf(WARNING, "Display engine FIDL device is invalid");
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
 
   fdf::Arena arena(kArenaTag);
-  fdf::WireUnownedResult result = fdf::WireCall(engine).buffer(arena)->IsAvailable();
+  fdf::WireUnownedResult result = fdf::WireCall(engine_client).buffer(arena)->IsAvailable();
   if (!result.ok()) {
     zxlogf(WARNING, "Display engine FIDL device is not available: %s",
            result.FormatDescription().c_str());
@@ -53,7 +57,7 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(zx_
 
   fbl::AllocChecker alloc_checker;
   auto engine_driver_client =
-      fbl::make_unique_checked<EngineDriverClient>(&alloc_checker, std::move(engine));
+      fbl::make_unique_checked<EngineDriverClient>(&alloc_checker, std::move(engine_client));
   if (!alloc_checker.check()) {
     zxlogf(WARNING, "Failed to allocate memory for EngineDriverClient");
     return zx::error(ZX_ERR_NO_MEMORY);

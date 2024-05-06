@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/image.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/trace/event.h>
 #include <threads.h>
 #include <zircon/assert.h>
@@ -23,6 +22,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 

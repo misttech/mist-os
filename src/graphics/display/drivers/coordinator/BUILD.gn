@@ -18,9 +18,16 @@ fuchsia_driver("coordinator-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
+  sources = [
+    "coordinator-driver.cc",
+    "coordinator-driver.h",
+  ]
   deps = [
     ":shared",
     "//src/devices/lib/driver",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
   ]
 }
 
@@ -54,8 +61,6 @@ source_set("shared") {
     "client.h",
     "controller.cc",
     "controller.h",
-    "coordinator-driver.cc",
-    "coordinator-driver.h",
     "display-info.cc",
     "display-info.h",
     "eld.cc",
@@ -89,11 +94,8 @@ source_set("shared") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/graphics/display/lib/edid",
     "//src/lib/async-watchdog",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/eld",
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//zircon/system/ulib/async:async-cpp",
