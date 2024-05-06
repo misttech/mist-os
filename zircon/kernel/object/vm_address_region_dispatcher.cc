@@ -140,8 +140,10 @@ zx_status_t VmAddressRegionDispatcher::Allocate(size_t offset, size_t size, uint
     return ZX_ERR_INVALID_ARGS;
   }
 
+  bool is_user_vmar = (base_arch_mmu_flags_ & ARCH_MMU_FLAG_PERM_USER) == ARCH_MMU_FLAG_PERM_USER;
   fbl::RefPtr<VmAddressRegion> new_vmar;
-  status = vmar_->CreateSubVmar(offset, size, alignment, vmar_flags, "useralloc", &new_vmar);
+  status = vmar_->CreateSubVmar(offset, size, alignment, vmar_flags,
+                                is_user_vmar ? "useralloc" : "kernelalloc", &new_vmar);
   if (status != ZX_OK)
     return status;
 
@@ -195,8 +197,11 @@ zx::result<VmAddressRegionDispatcher::MapResult> VmAddressRegionDispatcher::Map(
     }
   }
 
-  return vmar_->CreateVmMapping(vmar_offset, len, alignment, vmar_flags, ktl::move(vmo), vmo_offset,
-                                arch_mmu_flags, "useralloc");
+  bool is_user_vmar = (base_arch_mmu_flags_ & ARCH_MMU_FLAG_PERM_USER) == ARCH_MMU_FLAG_PERM_USER;
+  return vmar_->CreateVmMapping(
+      vmar_offset, len, alignment,
+      vmar_flags | (is_user_vmar ? 0 : VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING), ktl::move(vmo),
+      vmo_offset, arch_mmu_flags, is_user_vmar ? "useralloc" : "kernelalloc");
 }
 
 zx_status_t VmAddressRegionDispatcher::Protect(vaddr_t base, size_t len, uint32_t flags,
