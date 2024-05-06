@@ -303,8 +303,9 @@ def _make_prebuilt_package(
 
         select_file(
             name = name + ".far",
-            srcs = "%s_fuchsia_package" % name,
-            subpath = name + ".far",
+            srcs = ":%s_fuchsia_package" % name,
+            subpath = "%s_fuchsia_package.far" % name,
+            **kwargs
         )
 
 # buildifier: disable=function-docstring
