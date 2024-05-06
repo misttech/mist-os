@@ -67,6 +67,11 @@ struct [[gnu::packed]] setup_header {
     kLoadedHigh = 1 << 0,  // Load at 1MiB fixed address.
   };
 
+  enum XLoadFlags : uint16_t {
+    kKernel64 = 1 << 0,            // Can use 64-bit entry point.
+    kCanBeLoadedAbove4g = 1 << 1,  // All chosen addresses can be anywhere.
+  };
+
   static constexpr uint16_t kBootFlag = 0xaa55;  // boot_flag must match this.
 
   uint8_t setup_sects;
@@ -111,6 +116,9 @@ struct [[gnu::packed]] setup_header {
 };
 
 static constexpr uint32_t kLoadedHighAddress = 0x100000;
+
+// Offset from the load address where the 64-bit entry protocol will jump.
+static constexpr uint32_t kEntry64Offset = 0x200;
 
 // Many of these inner struct types are not actually consulted by shim code.
 // But their layouts are complete here to get the overall boot_params layout.

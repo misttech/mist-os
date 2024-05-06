@@ -116,16 +116,6 @@ LegacyBoot gLegacyBoot;
 
 // This populates the allocator and also collects other information.
 void InitMemory(void* bootloader_data, AddressSpace* aspace) {
-  if (aspace) {
-    // This is a no-op in 32-bit mode, which doesn't have paging turned on yet.
-    // There, paging will only be used as part of switching to long mode.  In
-    // the 64-bit build, this is necessary to ensure full identity mapping is
-    // in place, as the Linux/x86 64-bit boot protocol only requires the boot
-    // loader to set up mappings covering the kernel image itself and the
-    // pointers it passes in (boot_params, cmdline, ramdisk).
-    ArchSetUpAddressSpaceEarly(*aspace);
-  }
-
   auto& bp = *static_cast<const linuxboot::boot_params*>(bootloader_data);
 
   // Synthesize a boot loader name from the few bits we get.
@@ -169,4 +159,14 @@ void InitMemory(void* bootloader_data, AddressSpace* aspace) {
   // Note this doesn't remove the memory covering the boot_params (zero page)
   // just examined.  We assume those have already been consumed as needed
   // before allocation starts.
+
+  if (aspace) {
+    // This is a no-op in 32-bit mode, which doesn't have paging turned on yet.
+    // There, paging will only be used as part of switching to long mode.  In
+    // the 64-bit build, this is necessary to ensure full identity mapping is
+    // in place, as the Linux/x86 64-bit boot protocol only requires the boot
+    // loader to set up mappings covering the kernel image itself and the
+    // pointers it passes in (boot_params, cmdline, ramdisk).
+    ArchSetUpAddressSpaceEarly(*aspace);
+  }
 }

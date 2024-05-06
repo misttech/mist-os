@@ -213,7 +213,10 @@ if (current_toolchain == default_toolchain) {
     # environment makes it a Linux x86 (bzImage) compatible kernel image.
     source_set("linuxboot") {
       sources = [ "linuxboot-header.S" ]
-      libs = [ "./linuxboot.ld" ]
+      libs = [
+        "./linuxboot.ld",
+        "./linuxboot32.ld",
+      ]
       deps = [
         ":linuxboot-asm",
         ":linuxboot-init",
@@ -251,12 +254,15 @@ if (current_toolchain == default_toolchain) {
   }
 
   # Just putting this in deps of a phys_executable() in the kernel.phys
-  # environment...TODO(https://fxbug.dev/335547883): makes it not useful yet
+  # environment makes it a Linux/x86 (bzImage) compatible kernel image that
+  # requires a boot loader that prefers the 64-bit boot protocol.
   source_set("linuxboot64") {
-    libs = [ "//zircon/kernel/phys/linuxboot-pic.ld" ]
+    sources = [ "linuxboot64-header.S" ]
+    configs += [ ":ikconfig.config" ]
+    libs = [ "./linuxboot.ld" ]
     deps = [
+      ":linuxboot-asm",
       ":linuxboot-init",
-      "//zircon/kernel/phys:raw-header",
     ]
   }
 
@@ -269,7 +275,10 @@ if (current_toolchain == default_toolchain) {
   }
 
   config("ikconfig.config") {
-    visibility = [ ":linuxboot" ]
+    visibility = [
+      ":linuxboot",
+      ":linuxboot64",
+    ]
 
     # This input is a gzipped linux in-kernel config.
     # To update this file, edit ikconfig.txt in this directory and run:
@@ -382,7 +391,10 @@ hwreg_asm_header("phys32.h") {
 }
 
 hwreg_asm_header("linuxboot-asm") {
-  visibility = [ ":linuxboot" ]
+  visibility = [
+    ":linuxboot",
+    ":linuxboot64",
+  ]
   output_name = "linuxboot-asm.h"
   sources = [ "linuxboot-asm-gen.cc" ]
   deps = [ ":linuxboot.h" ]
