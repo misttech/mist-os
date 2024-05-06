@@ -75,6 +75,9 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
             finally:
                 process.kill()
 
+    # Note: in this test we do _not_ want to probe the device, since we will try
+    # to probe every device visible in the builder. But in EngProd environments,
+    # that could be dozens of devices
     def test_target_list_without_discovery(self) -> None:
         """Test `ffx target list` output returns as expected when discovery is off."""
         self.dut.ffx.run(["daemon", "stop"])
@@ -84,8 +87,6 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
                 "json",
                 "-c",
                 "ffx.isolated=true",
-                "-c",
-                "ffx.target-list.local-connect=true",
                 "target",
                 "list",
             ]
@@ -96,11 +97,10 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         ]
         # Assert ffx's target list device name contain's Honeydew's device.
         asserts.assert_greater(len(devices), 0)
-        # Assert that we can correctly identify the RCS state
-        asserts.assert_equal(devices[0]["rcs_state"], "Y")
-        # Assert that we can correctly identify the product
-        asserts.assert_not_equal(devices[0]["target_type"], "<unknown>")
-        # Make sure the daemon hadn't started running
+        # Assert that we are not probing the device to identify the RCS state
+        asserts.assert_equal(devices[0]["rcs_state"], "N")
+        # Assert that we are not probing the device to identify the type
+        asserts.assert_equal(devices[0]["target_type"], "Unknown")
         with asserts.assert_raises(honeydew.errors.FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
@@ -121,9 +121,16 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
             ]
         )
         output_json = json.loads(output)
-        device_names = [o["nodename"] for o in output_json]
-        # Assert FFX's target list device name contain's Honeydew's device.
-        asserts.assert_in(self.dut.device_name, device_names)
+        devices = [
+            o for o in output_json if o["nodename"] == self.dut.device_name
+        ]
+        # Assert Honeydew's device is the only device returned.
+        asserts.assert_equal(len(devices), 1)
+        # Assert that we can correctly identify the RCS state
+        asserts.assert_equal(devices[0]["rcs_state"], "Y")
+        # Assert that we can correctly identify the product
+        asserts.assert_not_equal(devices[0]["target_type"], "Unknown")
+
         # Make sure the daemon hadn't started running
         with asserts.assert_raises(honeydew.errors.FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
