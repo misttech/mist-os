@@ -407,8 +407,8 @@
     </ul>
 
 - name: 'Testing'
-  api_primary: 'crjohns@google.com'
-  api_secondary: ''
+  api_primary: 'anmittal@google.com'
+  api_secondary: 'crjohns@google.com'
   description: |
     The set of APIs responsible for executing, observing, and returning the results
     of tests executed on a device. These APIs abstract over different
