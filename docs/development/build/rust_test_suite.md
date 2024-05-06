@@ -36,7 +36,7 @@ required for running the test suite.
    python3 $TEST_TOOLCHAIN start \
      --rust $DEV_ROOT/rust/install/fuchsia-rust \
      --sdk $DEV_ROOT/sdk \
-     --target-arch {{ '<var>' }}x64|arm64{{ '</var>' }}
+     --target {{ '<var>' }}x64_64|arm64{{ '</var>' }}-unknown-fuchsia
    ```
 
    Note: If the host architecture doesn't match the target architecture,
@@ -55,7 +55,7 @@ required for running the test suite.
        --config $DEV_ROOT/rust/fuchsia-config.toml \
        --stage=2 \
        test {{ '<var>' }}TEST_SUITE{{ '</var>' }} \
-       --target {{ '<var>' }}x86_64|aarch64{{ '</var>' }}-fuchsia \
+       --target {{ '<var>' }}x86_64|aarch64{{ '</var>' }}-unknown-fuchsia \
        --run=always \
        --jobs 1 \
        --test-args --target-rustcflags \
