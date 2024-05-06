@@ -32,14 +32,6 @@
             to: "#carnelian-examples",
         },
         {
-            protocol: [
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-            ],
-            from: "#ui",
-            to: "#carnelian-examples",
-        },
-        {
             storage: "cache",
             from: "self",
             to: "#carnelian-examples",

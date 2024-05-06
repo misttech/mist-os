@@ -574,11 +574,6 @@ fn make_text_alignment(
 #[cfg(test)]
 mod test {
     use super::*;
-    use carnelian::{
-        scene::{layout::MainAxisSize, scene::SceneBuilder},
-        Rect, Size,
-    };
-    use euclid::size2;
     use itertools::assert_equal;
 
     const TEST_LAYOUT_SIZE: Size = size2(1024.0, 600.00);

@@ -310,7 +310,6 @@ rustc_test("layout_gallery_test") {
   deps = [
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
     "//third_party/rust_crates:itertools",
@@ -541,7 +540,7 @@ template("carnelian_example") {
     example_deps += [ ":direct_config" ]
   }
 
-  example_component_target = "$target_name" + "_v2"
+  example_component_target = "$target_name" + "_component"
   component_name = "$target_name"
   fuchsia_component(example_component_target) {
     component_name = component_name
