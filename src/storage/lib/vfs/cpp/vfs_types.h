@@ -171,18 +171,16 @@ struct VnodeConnectionOptions {
     return kSupportedIo1Protocols;
   }
 
-#ifdef __Fuchsia__
   // Converts from fuchsia.io/Directory.Open1 flags to |VnodeConnectionOptions|. Note that in io1,
   // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
-  static VnodeConnectionOptions FromOpen1Flags(fuchsia_io::OpenFlags open1_flags);
+  static zx::result<VnodeConnectionOptions> FromOpen1Flags(fuchsia_io::OpenFlags flags);
 
   // Converts from fuchsia.io/Directory.Clone flags to |VnodeConnectionOptions|. Note that in io1,
   // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
-  static VnodeConnectionOptions FromCloneFlags(fuchsia_io::OpenFlags clone_flags);
+  static zx::result<VnodeConnectionOptions> FromCloneFlags(fuchsia_io::OpenFlags flags);
 
   // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
   fuchsia_io::OpenFlags ToIoV1Flags() const;
-#endif  // __Fuchsia__
 };
 
 fuchsia_io::OpenFlags RightsToOpenFlags(fuchsia_io::Rights rights);
@@ -203,10 +201,8 @@ struct VnodeAttributes {
            creation_time == other.creation_time && modification_time == other.modification_time;
   }
 
-#ifdef __Fuchsia__
   // Converts from |VnodeAttributes| to fuchsia.io v1 |NodeAttributes|.
   fuchsia_io::wire::NodeAttributes ToIoV1NodeAttributes() const;
-#endif  // __Fuchsia__
 };
 
 // A request to update pieces of the |VnodeAttributes|. The fuchsia.io protocol only allows mutating
@@ -251,10 +247,74 @@ class VnodeAttributesUpdate {
   std::optional<uint64_t> modification_time_ = {};
 };
 
+// Indicates if and when a new object should be created when opening a node.
+enum class CreationMode : uint8_t {
+  // Never create an object. Will return `ZX_ERR_NOT_FOUND` if there is no existing object.
+  kNever,
+  // Create a new object if one doesn't already exist, otherwise open the existing object.
+  kAllowExisting,
+  // Always create an object. Will return `ZX_ERR_ALREADY_EXISTS` if one already exists.
+  kAlways,
+};
+
 namespace internal {
 
-bool ValidateCloneFlags(fuchsia_io::OpenFlags flags);
-bool ValidateOpenFlags(fuchsia_io::OpenFlags flags);
+#if !defined(__Fuchsia__) || __Fuchsia_API_level__ >= 19
+constexpr CreationMode CreationModeFromFidl(fuchsia_io::CreationMode mode) {
+  switch (mode) {
+    case fuchsia_io::CreationMode::kNever:
+    case fuchsia_io::CreationMode::kNeverDeprecated:
+      return CreationMode::kNever;
+    case fuchsia_io::CreationMode::kAllowExisting:
+      return CreationMode::kAllowExisting;
+    case fuchsia_io::CreationMode::kAlways:
+      return CreationMode::kAlways;
+  }
+}
+
+constexpr fuchsia_io::CreationMode CreationModeToFidl(CreationMode mode) {
+  switch (mode) {
+    case CreationMode::kNever:
+      return fuchsia_io::CreationMode::kNever;
+    case CreationMode::kAllowExisting:
+      return fuchsia_io::CreationMode::kAllowExisting;
+    case CreationMode::kAlways:
+      return fuchsia_io::CreationMode::kAlways;
+  }
+}
+#else
+constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenMode mode) {
+  switch (mode) {
+    case fuchsia_io::OpenMode::kOpenExisting:
+      return CreationMode::kNever;
+    case fuchsia_io::OpenMode::kMaybeCreate:
+      return CreationMode::kAllowExisting;
+    case fuchsia_io::OpenMode::kAlwaysCreate:
+      return CreationMode::kAlways;
+  }
+}
+
+constexpr fuchsia_io::OpenMode CreationModeToFidl(CreationMode mode) {
+  switch (mode) {
+    case CreationMode::kNever:
+      return fuchsia_io::OpenMode::kOpenExisting;
+    case CreationMode::kAllowExisting:
+      return fuchsia_io::OpenMode::kMaybeCreate;
+    case CreationMode::kAlways:
+      return fuchsia_io::OpenMode::kAlwaysCreate;
+  }
+}
+#endif
+
+constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
+  if (flags & fuchsia_io::OpenFlags::kCreateIfAbsent) {
+    return CreationMode::kAlways;
+  }
+  if (flags & fuchsia_io::OpenFlags::kCreate) {
+    return CreationMode::kAllowExisting;
+  }
+  return CreationMode::kNever;
+}
 
 }  // namespace internal
 

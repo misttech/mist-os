@@ -97,10 +97,11 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     if (root.has_entries()) {
       PopulateDirectory(root.entries(), *directory);
     }
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromOpen1Flags(
+    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(
         fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
+    ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
     zx_status_t status =
-        runner_->Serve(std::move(directory), directory_request.TakeChannel(), options);
+        runner_->Serve(std::move(directory), directory_request.TakeChannel(), *options);
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve test directory: %s",
                   zx_status_get_string(status));
   }

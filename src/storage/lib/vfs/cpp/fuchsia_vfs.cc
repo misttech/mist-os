@@ -184,17 +184,6 @@ bool FuchsiaVfs::IsTokenAssociatedWithVnode(zx::event token) {
   return TokenToVnode(std::move(token), nullptr) == ZX_OK;
 }
 
-zx::result<bool> FuchsiaVfs::EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
-                                          CreationType type, bool allow_existing,
-                                          fuchsia_io::Rights parent_rights,
-                                          fbl::RefPtr<Vnode>* out_vn) {
-  zx::result result = Vfs::EnsureExists(vndir, path, type, allow_existing, parent_rights, out_vn);
-  if (result.is_ok() && result.value()) {
-    vndir->Notify(path, fio::wire::WatchEvent::kAdded);
-  }
-  return result;
-}
-
 zx_status_t FuchsiaVfs::TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) {
   zx::result koid = GetObjectKoid(token);
   if (koid.is_error()) {

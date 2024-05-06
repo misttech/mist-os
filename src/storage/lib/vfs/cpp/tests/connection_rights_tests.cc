@@ -98,9 +98,9 @@ TEST(ConnectionRightsTest, RightsBehaveAsExpected) {
     for (test_row_t& row : test_data) {
       // Set up a vfs connection with the testcase's connection flags
       auto file = fidl::Endpoints<fio::File>::Create();
-      fio::wire::OpenFlags flags = row.connection_flags;
-      vfs->Serve(vnode, file.server.TakeChannel(),
-                 fs::VnodeConnectionOptions::FromOpen1Flags(flags));
+      zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(row.connection_flags);
+      ASSERT_TRUE(options.is_ok());
+      vfs->Serve(vnode, file.server.TakeChannel(), *options);
 
       // Call FileGetBuffer on the channel with the testcase's request flags. Check that we get the
       // expected result.

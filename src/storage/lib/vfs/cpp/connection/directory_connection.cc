@@ -162,62 +162,50 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView request,
 }
 
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
-  auto write_error = [describe = request->flags & fio::wire::OpenFlags::kDescribe](
-                         fidl::ServerEnd<fio::Node> channel, zx_status_t error) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] error: ", zx_status_get_string(error));
-    if (describe) {
-      // Ignore errors since there is nothing we can do if this fails.
-      [[maybe_unused]] auto result =
-          fidl::WireSendEvent(channel)->OnOpen(error, fio::wire::NodeInfoDeprecated());
-      channel.reset();
-    }
-  };
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the TRAVERSE right.
+  zx_status_t status = [&]() {
+    std::string_view path(request->path.data(), request->path.size());
+    fio::OpenFlags flags = request->flags;
+    if (path.empty() || ((path == "." || path == "/") && (flags & fio::OpenFlags::kNotDirectory))) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (path.back() == '/') {
+      flags |= fio::OpenFlags::kDirectory;
+    }
+    zx::result open_options = VnodeConnectionOptions::FromOpen1Flags(flags);
+    if (open_options.is_error()) {
+      FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] invalid flags: ", request->flags,
+                            ", path: ", request->path);
+      return open_options.error_value();
+    }
+    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our rights ", rights(),
+                          ", incoming options: ", *open_options, ", path: ", path);
+    // The POSIX compatibility flags allow the child directory connection to inherit the writable
+    // and executable rights.  If there exists a directory without the corresponding right along
+    // the Open() chain, we remove that POSIX flag preventing it from being inherited down the line
+    // (this applies both for local and remote mount points, as the latter may be served using
+    // a connection with vastly greater rights).
+    if (!(rights() & fio::Rights::kWriteBytes)) {
+      open_options->flags &= ~fio::OpenFlags::kPosixWritable;
+    }
+    if (!(rights() & fio::Rights::kExecute)) {
+      open_options->flags &= ~fio::OpenFlags::kPosixExecutable;
+    }
+    // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
+    if (open_options->rights - rights()) {
+      return ZX_ERR_ACCESS_DENIED;
+    }
+    OpenAt(vfs(), vnode(), std::move(request->object), path, *open_options, rights());
+    return ZX_OK;
+  }();
 
-  std::string_view path(request->path.data(), request->path.size());
-  if (path.size() > fio::wire::kMaxPathLength) {
-    return write_error(std::move(request->object), ZX_ERR_BAD_PATH);
+  if (status != ZX_OK) {
+    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] error: ", status);
+    if (request->flags & fio::wire::OpenFlags::kDescribe) {
+      // Ignore errors since there is nothing we can do if this fails.
+      [[maybe_unused]] auto result = fidl::WireSendEvent(request->object)->OnOpen(status, {});
+    }
   }
-
-  if (path.empty() ||
-      ((path == "." || path == "/") && (request->flags & fio::wire::OpenFlags::kNotDirectory))) {
-    return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
-  }
-
-  fio::wire::OpenFlags flags = request->flags;
-  if (path.back() == '/') {
-    flags |= fio::wire::OpenFlags::kDirectory;
-  }
-
-  auto open_options = VnodeConnectionOptions::FromOpen1Flags(flags);
-
-  if (!ValidateOpenFlags(flags)) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] Invalid open flags: ", request->flags,
-                          ", path: ", request->path);
-    return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
-  }
-
-  FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our rights ", rights(),
-                        ", incoming options: ", open_options, ", path: ", request->path);
-
-  // The POSIX compatibility flags allow the child directory connection to inherit the writable
-  // and executable rights.  If there exists a directory without the corresponding right along
-  // the Open() chain, we remove that POSIX flag preventing it from being inherited down the line
-  // (this applies both for local and remote mount points, as the latter may be served using
-  // a connection with vastly greater rights).
-  if (!(rights() & fio::Rights::kWriteBytes)) {
-    open_options.flags &= ~fio::OpenFlags::kPosixWritable;
-  }
-  if (!(rights() & fio::Rights::kExecute)) {
-    open_options.flags &= ~fio::OpenFlags::kPosixExecutable;
-  }
-  // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
-  if (open_options.rights - rights()) {
-    write_error(std::move(request->object), ZX_ERR_ACCESS_DENIED);
-    return;
-  }
-
-  OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, rights());
 }
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {

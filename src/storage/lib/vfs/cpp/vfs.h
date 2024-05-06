@@ -60,7 +60,7 @@ class Vfs {
   // The return value will suggest the next action to take. Refer to the variants in |OpenResult|
   // for more information.
   OpenResult Open(fbl::RefPtr<Vnode> vn, std::string_view path, VnodeConnectionOptions options,
-                  fuchsia_io::Rights parent_rights) __TA_EXCLUDES(vfs_lock_);
+                  fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
 
   // Implements Unlink for a pre-validated and trimmed name.
   virtual zx_status_t Unlink(fbl::RefPtr<Vnode> vn, std::string_view name, bool must_be_dir)
@@ -86,17 +86,12 @@ class Vfs {
   // directory.
   static zx::result<bool> TrimName(std::string_view& name);
 
-  // Attempt to create an entry with name |name| within the |vndir| directory.
-  //
-  // - Upon success, returns a reference to the new vnode via |out_vn|, and return ZX_OK.
-  // - Upon recoverable error (e.g. target already exists but |options| did not specify this to be
-  //   fatal), attempt to lookup the vnode.
-  //
-  // In the success case, returns a boolean indicating whether an entry was created.
-  virtual zx::result<bool> EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
-                                        CreationType type, bool allow_existing,
-                                        fuchsia_io::Rights parent_rights,
-                                        fbl::RefPtr<Vnode>* out_vn) __TA_REQUIRES(vfs_lock_);
+  // Create or lookup an entry with |name| inside of |vndir|. Returns a tuple of the resulting node,
+  // and a boolean indicating if the returned vnode is open or not.
+  zx::result<std::tuple<fbl::RefPtr<Vnode>, /*vnode_is_open*/ bool>> CreateOrLookup(
+      fbl::RefPtr<fs::Vnode> vndir, std::string_view name, CreationMode mode,
+      std::optional<CreationType> type, fuchsia_io::Rights connection_rights)
+      __TA_REQUIRES(vfs_lock_);
 
   // A lock which should be used to protect lookup and walk operations
   mutable std::mutex vfs_lock_;
@@ -108,16 +103,6 @@ class Vfs {
   mutable std::mutex live_nodes_lock_;
 
  private:
-  // Starting at vnode |vn|, walk the tree described by the path string, until either there is only
-  // one path segment remaining in the string or we encounter a vnode that represents a remote
-  // filesystem
-  //
-  // On success,
-  // |out| is the vnode at which we stopped searching.
-  // |pathout| is the remainder of the path to search.
-  zx_status_t Walk(fbl::RefPtr<Vnode> vn, std::string_view path, fbl::RefPtr<Vnode>* out_vn,
-                   std::string_view* out_path) __TA_REQUIRES(vfs_lock_);
-
   bool readonly_ = false;
 };
 

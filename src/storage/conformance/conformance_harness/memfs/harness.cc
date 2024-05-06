@@ -109,9 +109,11 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
       }
     }
 
-    fs::VnodeConnectionOptions options =
-        fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
-    ZX_ASSERT(memfs_->Serve(root_dir, request.directory_request().TakeChannel(), options) == ZX_OK);
+    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
+    ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
+    zx_status_t status =
+        memfs_->Serve(root_dir, request.directory_request().TakeChannel(), *options);
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve directory: %s", zx_status_get_string(status));
   }
 
  private:

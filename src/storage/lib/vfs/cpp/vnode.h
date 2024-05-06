@@ -140,6 +140,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // For files opened with O_PATH (as a file descriptor only) the base classes' implementation of
   // some of these functions may be invoked anyway.
 
+  // Invoked by the VFS layer whenever files are added or removed.
+  virtual void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {}
+
 #ifdef __Fuchsia__
   // Serves a custom FIDL protocol over the specified |channel|, when the node protocol is
   // |VnodeProtocol::kConnector|.
@@ -147,9 +150,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // The default implementation returns |ZX_ERR_NOT_SUPPORTED|.
   // Subclasses may override this behavior to serve custom protocols over the channel.
   virtual zx_status_t ConnectService(zx::channel channel);
-
-  // Invoked by the VFS layer whenever files are added or removed.
-  virtual void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event);
 
   virtual zx_status_t WatchDir(FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                                fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher);

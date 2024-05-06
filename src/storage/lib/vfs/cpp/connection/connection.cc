@@ -51,18 +51,18 @@ Connection::~Connection() {
 void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
                            fidl::ServerEnd<fio::Node> server_end) {
   auto clone_result = [=]() -> zx::result<std::tuple<fbl::RefPtr<Vnode>, VnodeConnectionOptions>> {
-    if (!ValidateCloneFlags(flags)) {
-      FS_PRETTY_TRACE_DEBUG("[NodeClone] invalid flags: ", flags);
-      return zx::error(ZX_ERR_INVALID_ARGS);
+    zx::result clone_options = VnodeConnectionOptions::FromCloneFlags(flags);
+    if (clone_options.is_error()) {
+      FS_PRETTY_TRACE_DEBUG("[NodeClone] invalid clone flags: ", flags);
+      return clone_options.take_error();
     }
-    auto clone_options = VnodeConnectionOptions::FromCloneFlags(flags);
-    FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", clone options: ", clone_options);
+    FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", options: ", *clone_options);
 
     // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those
     // from the originating connection.
-    if (clone_options.flags & fio::OpenFlags::kCloneSameRights) {
-      clone_options.rights = rights_;
-    } else if (clone_options.rights - rights_) {
+    if (clone_options->flags & fio::OpenFlags::kCloneSameRights) {
+      clone_options->rights = rights_;
+    } else if (clone_options->rights - rights_) {
       // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
       return zx::error(ZX_ERR_ACCESS_DENIED);
     }
@@ -70,20 +70,20 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
     // Ensure we map the request to the correct flags based on the connection's protocol.
     switch (protocol) {
       case fs::VnodeProtocol::kNode: {
-        clone_options.flags |= fio::OpenFlags::kNodeReference;
+        clone_options->flags |= fio::OpenFlags::kNodeReference;
         break;
       }
       case fs::VnodeProtocol::kDirectory: {
-        clone_options.flags |= fio::OpenFlags::kDirectory;
+        clone_options->flags |= fio::OpenFlags::kDirectory;
         break;
       }
       default: {
-        clone_options.flags |= fio::OpenFlags::kNotDirectory;
+        clone_options->flags |= fio::OpenFlags::kNotDirectory;
         break;
       }
     }
 
-    if (zx::result validated = vnode()->ValidateOptions(clone_options); validated.is_error()) {
+    if (zx::result validated = vnode()->ValidateOptions(*clone_options); validated.is_error()) {
       return validated.take_error();
     }
     fbl::RefPtr vn = vnode();
@@ -94,7 +94,7 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
       }
     }
 
-    return zx::ok(std::make_tuple(std::move(vn), clone_options));
+    return zx::ok(std::make_tuple(std::move(vn), *clone_options));
   }();
 
   if (clone_result.is_ok()) {
