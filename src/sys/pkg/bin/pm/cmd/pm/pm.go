@@ -21,7 +21,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/snapshot"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/update"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/verify"
 )
@@ -44,9 +43,6 @@ Repository Commands:
     publish  - publish a package to a local repository
     serve    - serve a local repository
     expand   - (deprecated) expand an archive
-
-Tools:
-    snapshot - capture metadata from multiple packages in a single file
 
 For help with individual commands run "pm <command> --help"
 `
@@ -119,7 +115,8 @@ func doMain() int {
 		err = serve.Run(cfg, flag.Args()[1:], nil)
 
 	case "snapshot":
-		err = snapshot.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "snapshot is deprecated without replacement")
+		err = nil
 
 	case "update":
 		err = update.Run(cfg, flag.Args()[1:])
