@@ -5,6 +5,7 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_USERLOADER_INCLUDE_LIB_MISTOS_USERLOADER_START_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_USERLOADER_INCLUDE_LIB_MISTOS_USERLOADER_START_H_
 
+#include <lib/mistos/userloader/userloader.h>
 #include <lib/mistos/zbi_parser/bootfs.h>
 #include <lib/mistos/zbi_parser/option.h>
 #include <lib/mistos/zx/debuglog.h>
@@ -16,7 +17,6 @@
 #include <fbl/vector.h>
 #include <ktl/string_view.h>
 #include <object/handle.h>
-#include <object/vm_address_region_dispatcher.h>
 
 struct ChildContext {
   ChildContext() = default;
@@ -28,6 +28,21 @@ struct ChildContext {
   zx::vmar vmar;
   zx::thread thread;
 };
+
+// Set of resources created in userboot.
+struct Resources {
+  // Needed for properly implementing the epilogue.
+  zx::resource power;
+
+  // Needed for vending executable memory from bootfs.
+  zx::resource vmex;
+};
+
+ktl::array<zx_handle_t, userloader::kHandleCount> ExtractHandles(
+    ktl::array<Handle*, userloader::kHandleCount>);
+
+Resources CreateResources(const zx::debuglog& log,
+                          ktl::span<const zx_handle_t, userloader::kHandleCount> handles);
 
 ChildContext CreateChildContext(const zx::debuglog& log, ktl::string_view name);
 zx_status_t StartChildProcess(const zx::debuglog& log,

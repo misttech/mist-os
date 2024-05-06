@@ -1,6 +1,9 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2024 Mist Tecnologia LTDA
+// Copyright 2016 The Fuchsia Authors
+//
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT
 
 #include "lib/mistos/userloader/userloader.h"
 
@@ -8,6 +11,7 @@
 #include <lib/counters.h>
 #include <lib/crashlog.h>
 #include <lib/elfldltl/machine.h>
+#include <lib/mistos/userloader/userloader_internal.h>
 #include <lib/zircon-internal/default_stack_size.h>
 #include <zircon/assert.h>
 
@@ -23,10 +27,14 @@
 #include <platform/crashlog.h>
 #include <vm/vm_object_paged.h>
 
+#if ENABLE_ENTROPY_COLLECTOR_TEST
+#include <lib/crypto/entropy/quality_test.h>
+#endif
+
 #include <ktl/enforce.h>
 
 namespace userloader {
-ktl::array<zx::vmo, userloader::kHandleCount> gVmos;
+ktl::array<Handle*, userloader::kHandleCount> gHandles;
 }
 
 namespace {
@@ -90,8 +98,8 @@ constexpr const char kZbiVmoName[] = "zbi";
 fbl::RefPtr<VmObject> kcounters_vmo_ref;
 
 // Get a handle to a VM object, with full rights except perhaps for writing.
-zx_status_t get_vmo(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_size,
-                    zx::vmo* vmo_out) {
+zx_status_t get_vmo_handle(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_size,
+                           fbl::RefPtr<VmObjectDispatcher>* disp_ptr, Handle** ptr) {
   if (!vmo)
     return ZX_ERR_NO_MEMORY;
 
@@ -101,19 +109,19 @@ zx_status_t get_vmo(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_s
     return result;
   }
 
-  fbl::AllocChecker ac;
-  auto storage = fbl::MakeRefCountedChecked<zx::VmoStorage>(
-      &ac, ktl::move(vmo), ktl::move(content_size_manager),
-      VmObjectDispatcher::InitialMutability::kMutable);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  zx_rights_t rights;
+  KernelHandle<VmObjectDispatcher> vmo_kernel_handle;
+  result = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
+                                      VmObjectDispatcher::InitialMutability::kMutable,
+                                      &vmo_kernel_handle, &rights);
+  if (result == ZX_OK) {
+    if (disp_ptr)
+      *disp_ptr = vmo_kernel_handle.dispatcher();
+    if (readonly)
+      rights &= ~ZX_RIGHT_WRITE;
+    if (ptr)
+      *ptr = Handle::Make(ktl::move(vmo_kernel_handle), rights).release();
   }
-
-  // if (readonly)
-  //   rights &= ~ZX_RIGHT_WRITE;
-
-  vmo_out->reset(ktl::move(storage));
-
   return result;
 }
 
@@ -158,7 +166,7 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
 }
 #endif
 
-void bootstrap_vmos(ktl::array<zx::vmo, userloader::kHandleCount>& vmos) {
+void bootstrap_vmos(ktl::array<Handle*, userloader::kHandleCount>& handles) {
   ktl::span<ktl::byte> zbi = ZbiInPhysmap(true);
   void* rbase = zbi.data();
   size_t rsize = ROUNDUP_PAGE_SIZE(zbi.size_bytes());
@@ -176,7 +184,8 @@ void bootstrap_vmos(ktl::array<zx::vmo, userloader::kHandleCount>& vmos) {
   zx_status_t status = VmObjectPaged::CreateFromWiredPages(rbase, rsize, true, &rootfs_vmo);
   ASSERT(status == ZX_OK);
   rootfs_vmo->set_name(kZbiVmoName, sizeof(kZbiVmoName) - 1);
-  status = get_vmo(rootfs_vmo, false, rsize, &vmos[userloader::kZbi]);
+  status =
+      get_vmo_handle(rootfs_vmo, false, rsize, nullptr, &userloader::gHandles[userloader::kZbi]);
   ASSERT(status == ZX_OK);
   // The rootfs vmo was created with exclusive=true, which means that the VMO is sole owner of those
   // pages. gPhysHandoff represents a pointer to the previous physmap location of the data, but the
@@ -240,7 +249,11 @@ void bootstrap_vmos(ktl::array<zx::vmo, userloader::kHandleCount>& vmos) {
 }
 
 void userloader_init(uint) {  // zx_status_t status;
-  bootstrap_vmos(userloader::gVmos);
+  bootstrap_vmos(userloader::gHandles);
+
+  userloader::gHandles[userloader::kSystemResource] =
+      get_resource_handle(ZX_RSRC_KIND_SYSTEM).release();
+  ASSERT(userloader::gHandles[userloader::kSystemResource]);
 }
 
 }  // namespace

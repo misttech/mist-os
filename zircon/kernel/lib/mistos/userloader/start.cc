@@ -15,10 +15,13 @@
 #include <lib/mistos/zbi_parser/zbi.h>
 #include <lib/mistos/zx/job.h>
 #include <lib/mistos/zx/process.h>
+#include <lib/mistos/zx/resource.h>
 #include <lib/mistos/zx/thread.h>
 #include <lib/mistos/zx/vmar.h>
+#include <lib/mistos/zx_syscalls/util.h>
 #include <lib/zircon-internal/default_stack_size.h>
 #include <zircon/assert.h>
+#include <zircon/syscalls/resource.h>
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
@@ -78,6 +81,26 @@ static zx_status_t unpack_strings(char* buffer, uint32_t num, fbl::Vector<fbl::S
   return ZX_OK;
 }
 
+static void MapHandleToValue(Handle* handle, uint32_t* out) {
+  ProcessDispatcher* dispatcher = nullptr;
+  if (handle) {
+    *out = handle_table(dispatcher).MapHandleToValue(handle);
+    HandleOwner h(handle);
+    handle_table(dispatcher).AddHandle(ktl::move(h));
+  } else {
+    *out = ZX_HANDLE_INVALID;
+  }
+}
+
+ktl::array<zx_handle_t, kHandleCount> ExtractHandles(
+    const ktl::array<Handle*, kHandleCount> handles) {
+  ktl::array<zx_handle_t, kHandleCount> _handles = {};
+  for (size_t i = 0; i < handles.size(); ++i) {
+    MapHandleToValue(handles[i], &_handles[i]);
+  }
+  return _handles;
+}
+
 ChildContext CreateChildContext(const zx::debuglog& log, ktl::string_view name) {
   ChildContext child;
   auto status =
@@ -93,6 +116,20 @@ ChildContext CreateChildContext(const zx::debuglog& log, ktl::string_view name) 
         static_cast<int>(name.length()), name.data());
 
   return child;
+}
+
+Resources CreateResources(const zx::debuglog& log,
+                          ktl::span<const zx_handle_t, kHandleCount> handles) {
+  Resources resources = {};
+  zx::unowned_resource system(handles[kSystemResource]);
+  auto status = zx::resource::create(*system, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_POWER_BASE, 1,
+                                     nullptr, 0, &resources.power);
+  CHECK(log, status, "Failed to created power resource.");
+
+  status = zx::resource::create(*system, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_VMEX_BASE, 1, nullptr,
+                                0, &resources.vmex);
+  CHECK(log, status, "Failed to created vmex resource.");
+  return resources;
 }
 
 zx_status_t StartChildProcess(const zx::debuglog& log,
@@ -124,8 +161,8 @@ zx_status_t StartChildProcess(const zx::debuglog& log,
 
   stack_vmo.set_property(ZX_PROP_NAME, kStackVmoName, sizeof(kStackVmoName) - 1);
   zx_vaddr_t stack_base;
-  status = child.vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, stack_vmo, 0, stack_size,
-                          &stack_base, true);
+  status =
+      child.vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, stack_vmo, 0, stack_size, &stack_base);
   if (status != ZX_OK) {
     printl(log, "zx_vmar_map failed for child stack");
     return status;
@@ -166,7 +203,7 @@ zx_status_t StartChildProcess(const zx::debuglog& log,
     printl(log, "stack_result=%p", reinterpret_cast<void*>(stack_result.stack_pointer));
 
     // Start the process going.
-    status = child.process.start(child.thread, entry, stack_result.stack_pointer, 0, 0);
+    status = child.process.start(child.thread, entry, stack_result.stack_pointer, {}, 0);
     CHECK(log, status, "zx_process_start failed");
     child.thread.reset();
     return ZX_OK;
@@ -223,14 +260,27 @@ struct TerminationInfo {
 // 3. Start the child process running.
 // 4. Optionally, wait for it to exit and then shut down.
 void Bootstrap(uint) {
+  // We pass all the same handles the kernel gives us along to the child,
+  // except replacing our own process/root-VMAR handles with its, and
+  // passing along the three extra handles (BOOTFS, thread-self, and a debuglog
+  // handle tied to stdout).
+  ktl::array<zx_handle_t, userloader::kHandleCount> handles = ExtractHandles(gHandles);
+
   zx::debuglog log;
   zx::debuglog::create(zx::resource(), 0, &log);
+
+  zx::vmar vmar_self{handles[kVmarRootSelf]};
+  handles[kVmarRootSelf] = ZX_HANDLE_INVALID;
+
+  // zx::process proc_self{handles[kProcSelf]};
+  // handles[kProcSelf] = ZX_HANDLE_INVALID;
+
+  auto [power, vmex] = CreateResources(log, handles);
 
   // Locate the ZBI_TYPE_STORAGE_BOOTFS item and decompress it. This will be used to load
   // the binary referenced by userboot.next, as well as libc. Bootfs will be fully parsed
   // and hosted under '/boot' either by bootsvc or component manager.
-  const zx::unowned_vmo zbi{userloader::gVmos[userloader::kZbi]};
-  zx::vmar vmar_self{VmAspace::kernel_aspace()->RootVmar()};
+  const zx::unowned_vmo zbi{handles[userloader::kZbi]};
 
   auto result = zbi_parser::GetBootfsFromZbi(vmar_self, *zbi, true);
   if (result.is_error()) {
@@ -256,7 +306,7 @@ void Bootstrap(uint) {
 
   {
     // auto borrowed_bootfs = bootfs_vmo.borrow();
-    zbi_parser::Bootfs bootfs{vmar_self.borrow(), ktl::move(bootfs_vmo)};
+    zbi_parser::Bootfs bootfs{vmar_self.borrow(), ktl::move(bootfs_vmo), ktl::move(vmex)};
     auto launch_process = [&](auto& elf_entry) -> ChildContext {
       ChildContext child = CreateChildContext(log, elf_entry.filename());
       uint32_t argc = 0;

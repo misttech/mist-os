@@ -116,8 +116,6 @@ zx_vaddr_t load(const zx::debuglog& log, ktl::string_view what, const zx::vmar& 
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, zbi_parser::Bootfs& bootfs,
                            ktl::string_view root, const zx::vmar& vmar, ktl::string_view filename,
                            size_t* stack_size, ElfInfo* info) {
-  uintptr_t interp_off = 0;
-  size_t interp_len = 0;
   auto result = bootfs.Open(root, filename, "program");
   if (result.is_error()) {
     return result.error_value();
@@ -128,6 +126,8 @@ zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, zbi_parser::Bootfs& bootfs,
     return ZX_ERR_INVALID_ARGS;
   }
 
+  uintptr_t interp_off = 0;
+  size_t interp_len = 0;
   zx_vaddr_t entry = load(log, filename, vmar, vmo, &interp_off, &interp_len, NULL, stack_size,
                           true, &info->main_elf);
 

@@ -44,13 +44,19 @@ static int elf_main(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
+    ktl::array<zx_handle_t, userloader::kHandleCount> handles =
+        ExtractHandles(userloader::gHandles);
+
+    zx::unowned_vmar vmar_self = zx::vmar::root_self();
+
+    auto [power, vmex] = CreateResources(log, handles);
+
     // Locate the ZBI_TYPE_STORAGE_BOOTFS item and decompress it. This will be used to load
     // the binary referenced by userboot.next, as well as libc. Bootfs will be fully parsed
     // and hosted under '/boot' either by bootsvc or component manager.
-    const zx::unowned_vmo zbi{userloader::gVmos[userloader::kZbi]};
-    zx::vmar vmar_self{VmAspace::kernel_aspace()->RootVmar()};
+    const zx::unowned_vmo zbi{handles[userloader::kZbi]};
 
-    auto result = zbi_parser::GetBootfsFromZbi(vmar_self, *zbi, true);
+    auto result = zbi_parser::GetBootfsFromZbi(*vmar_self, *zbi, true);
     if (result.is_error()) {
       printl(log, "failed to load bootfs from zbi");
       return -1;
@@ -62,8 +68,7 @@ static int elf_main(int argc, const cmd_args* argv, uint32_t flags) {
       return -1;
     }
 
-    auto borrowed_bootfs = bootfs_vmo.borrow();
-    zbi_parser::Bootfs bootfs{vmar_self.borrow(), ktl::move(bootfs_vmo)};
+    zbi_parser::Bootfs bootfs{vmar_self->borrow(), ktl::move(bootfs_vmo), ktl::move(vmex)};
 
     ChildContext child = CreateChildContext(log, argv[2].str);
 
