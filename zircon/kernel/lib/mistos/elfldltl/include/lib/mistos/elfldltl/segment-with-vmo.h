@@ -13,7 +13,8 @@
 #include <lib/mistos/zx/vmo.h>
 #include <zircon/assert.h>
 
-#include <type_traits>
+#include <ktl/type_traits.h>
+#include <ktl/variant.h>
 
 #include "lib/mistos/elfldltl/mapped-vmo-file.h"
 #include "lib/mistos/elfldltl/vmar-loader.h"

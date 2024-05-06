@@ -17,7 +17,11 @@
 
 #include <type_traits>
 
+#include <ktl/algorithm.h>
+#include <ktl/array.h>
 #include <ktl/byte.h>
+#include <ktl/move.h>
+#include <ktl/optional.h>
 #include <ktl/span.h>
 
 namespace elfldltl {
@@ -425,7 +429,7 @@ class VmarLoader {
   zx_status_t Map(uintptr_t vmar_offset, zx_vm_option_t options, zx::unowned_vmo vmo,
                   uint64_t vmo_offset, size_t size) {
     zx_vaddr_t vaddr;
-    return load_image_vmar_.map(options, vmar_offset, *vmo, vmo_offset, size, &vaddr, true);
+    return load_image_vmar_.map(options, vmar_offset, *vmo, vmo_offset, size, &vaddr);
   }
 
   template <bool ZeroPartialPage>

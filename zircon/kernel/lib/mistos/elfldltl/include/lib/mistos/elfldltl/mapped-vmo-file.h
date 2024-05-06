@@ -11,6 +11,10 @@
 #include <lib/mistos/zx/vmo.h>
 #include <lib/zx/result.h>
 
+#include <ktl/algorithm.h>
+#include <ktl/move.h>
+#include <ktl/optional.h>
+
 namespace elfldltl {
 
 // elfldltl::MappedVmoFile provides the File and Memory APIs and most other
