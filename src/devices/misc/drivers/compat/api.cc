@@ -17,6 +17,10 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
   return parent->driver()->AddDevice(parent, args, out);
 }
 
+__EXPORT zx_status_t device_get_properties(zx_device_t* device, device_props_args_t* out_args) {
+  return device->driver()->GetProperties(out_args);
+}
+
 __EXPORT void device_init_reply(zx_device_t* dev, zx_status_t status,
                                 const device_init_reply_args_t* args) {
   dev->InitReply(status);

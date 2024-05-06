@@ -198,6 +198,33 @@ typedef struct device_init_reply_args {
   uint8_t power_state_count;
 } device_init_reply_args_t;
 
+typedef struct {
+  // Optional list of device properties.
+  // Memory owned by the caller.
+  zx_device_prop_t* props;
+
+  // Size of the device properties array.
+  // To be filled by the caller.
+  const uint32_t prop_count;
+
+  // Count of properties filled with valid data.
+  // Will be filled by the callee.
+  uint32_t actual_prop_count;
+
+  // Optional list of device string properties.
+  // Memory owned by the caller.
+  zx_device_str_prop_t* str_props;
+
+  // Size of the device string properties array.
+  // To be filled by the caller.
+  const uint32_t str_prop_count;
+
+  // Count of string properties filled with valid data.
+  // Will be filled by the callee.
+  uint32_t actual_str_prop_count;
+
+} device_props_args_t;
+
 struct zx_driver_rec {
   const zx_driver_ops_t* ops;
   zx_driver_t* driver;
@@ -205,6 +232,8 @@ struct zx_driver_rec {
 
 // This global symbol is initialized by the driver loader in devhost
 extern zx_driver_rec_t __zircon_driver_rec__;
+
+zx_status_t device_get_properties(zx_device_t* parent, device_props_args_t* out_args);
 
 zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
                                    zx_device_t** out);
