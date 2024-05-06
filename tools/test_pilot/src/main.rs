@@ -14,7 +14,7 @@ const INVALID_ARGS_CONFIG_EXIT_CODE: i32 = 222;
 // We need multiple threads to stream stdout/err in parallel until we can switch this to use tokio.
 #[fuchsia::main(threads = 2)]
 async fn main() {
-    let args = opts::EnvironmentArgs::from_env().unwrap();
+    let args = opts::TestPilotArgs::from_env_and_cmd().unwrap();
     let test_config = parse_test_config(&args)
         .map_err(|e| {
             eprintln!("Invalid config: {}", e);
@@ -37,7 +37,7 @@ async fn main() {
 }
 
 pub fn parse_test_config(
-    args: &opts::EnvironmentArgs,
+    args: &opts::TestPilotArgs,
 ) -> Result<test_config::TestConfiguration, Error> {
     test_config::TestConfiguration::try_from(args.test_config.as_path())
 }
