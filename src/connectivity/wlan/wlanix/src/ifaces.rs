@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::security::{get_authenticator, Credential},
+    crate::{
+        bss_scorer::BssScorer,
+        security::{get_authenticator, Credential},
+    },
     anyhow::{bail, format_err, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
@@ -207,7 +210,7 @@ pub(crate) trait ClientIface: Sync + Send {
     fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication);
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct SmeClientIface {
     sme_proxy: fidl_sme::ClientSmeProxy,
     last_scan_results: Arc<Mutex<Vec<fidl_sme::ScanResult>>>,
@@ -215,6 +218,7 @@ pub(crate) struct SmeClientIface {
     connected_network_rssi: Arc<Mutex<Option<i8>>>,
     // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
     wlanix_provisioned: bool,
+    bss_scorer: BssScorer,
 }
 
 impl SmeClientIface {
@@ -225,6 +229,7 @@ impl SmeClientIface {
             scan_abort_signal: Arc::new(Mutex::new(None)),
             connected_network_rssi: Arc::new(Mutex::new(None)),
             wlanix_provisioned: true,
+            bss_scorer: BssScorer::new(),
         }
     }
 }
@@ -290,15 +295,7 @@ impl ClientIface for SmeClientIface {
                 }
             })
             .collect::<Vec<_>>();
-        scan_results.sort_by_key(|(bss_description, _)| {
-            // 5GHz score bonus taken from wlancfg. Why this particular value was picked:
-            // "This was from intuition + looking at scans in a couple crowded locations
-            // (apartments), where a ~10dB difference between 2.4GHz and 5GHz signals from
-            // the same AP was pretty common, so 15 gives an edge to 5GHz most of the time"
-            const FIVE_GHZ_BONUS: i8 = 15;
-            let score_bonus = if bss_description.channel.is_5ghz() { FIVE_GHZ_BONUS } else { 0 };
-            bss_description.rssi_dbm + score_bonus
-        });
+        scan_results.sort_by_key(|(bss_description, _)| self.bss_scorer.score_bss(bss_description));
 
         let (bss_description, compatibility) = match scan_results.pop() {
             Some(scan_result) => scan_result,
@@ -349,6 +346,7 @@ impl ClientIface for SmeClientIface {
                 transaction_stream: stream,
             }))
         } else {
+            self.bss_scorer.report_connect_failure(bssid, &sme_result);
             Ok(ConnectResult::Fail(ConnectFail {
                 ssid: ssid.to_vec(),
                 bssid,
@@ -1222,15 +1220,16 @@ mod tests {
                 rssi_dbm: -50,
             ),
         ],
+        None,
         Bssid::from([2, 3, 4, 5, 6, 7]);
-        "same_channel_band"
+        "no_penalty"
     )]
     #[test_case(
         vec![
             fake_fidl_bss_description!(Open,
                 ssid: Ssid::try_from("foo").unwrap(),
                 bssid: [1, 2, 3, 4, 5, 6],
-                channel: Channel::new(44, Cbw::Cbw40),
+                channel: Channel::new(1, Cbw::Cbw20),
                 rssi_dbm: -40,
             ),
             fake_fidl_bss_description!(Open,
@@ -1246,12 +1245,26 @@ mod tests {
                 rssi_dbm: -50,
             ),
         ],
+        Some((
+            fake_fidl_bss_description!(Open,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [2, 3, 4, 5, 6, 7],
+                channel: Channel::new(1, Cbw::Cbw20),
+                rssi_dbm: -30,
+            ),
+            fidl_sme::ConnectResult {
+                code: fidl_ieee80211::StatusCode::RefusedExternalReason,
+                is_credential_rejected: true,
+                is_reconnect: false,
+            }
+        )),
         Bssid::from([1, 2, 3, 4, 5, 6]);
-        "5ghz_bonus"
+        "recent_connect_failure"
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_connect_to_network_bss_selection(
         scan_bss_descriptions: Vec<fidl_internal::BssDescription>,
+        recent_connect_failure: Option<(fidl_internal::BssDescription, fidl_sme::ConnectResult)>,
         expected_bssid: Bssid,
     ) {
         let (mut exec, _monitor_stream, manager) = setup_test();
@@ -1260,6 +1273,27 @@ mod tests {
         manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
         let mut client_fut = manager.get_client_iface(1);
         let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        if let Some((bss_description, connect_failure)) = recent_connect_failure {
+            // Set up a connect failure so that later in the test, there'd be a score penalty
+            // for the BSS described by `bss_description`
+            *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
+                bss_description: bss_description,
+                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                    mutual_security_protocols: vec![fidl_security::Protocol::Open],
+                })),
+                timestamp_nanos: 1,
+            }];
+
+            let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+            let (_req, connect_txn) = assert_variant!(
+                exec.run_until_stalled(&mut sme_stream.next()),
+                Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
+            let connect_txn_handle = connect_txn.into_stream_and_control_handle().unwrap().1;
+            let _result = connect_txn_handle.send_on_connect_result(&connect_failure);
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_r)));
+        }
 
         *iface.last_scan_results.lock() = scan_bss_descriptions
             .into_iter()

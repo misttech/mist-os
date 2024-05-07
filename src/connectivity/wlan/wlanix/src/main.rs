@@ -21,6 +21,7 @@ use {
     wlan_common::channel::{Cbw, Channel},
 };
 
+mod bss_scorer;
 mod default_drop;
 mod ifaces;
 mod nl80211;
