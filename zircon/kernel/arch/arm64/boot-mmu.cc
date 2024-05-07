@@ -34,7 +34,7 @@ const uintptr_t l1_large_page_size_mask = l1_large_page_size - 1;
 
 // 2MB pages
 const uintptr_t l2_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 2);
-const uintptr_t l2_large_page_size_mask = l2_large_page_size - 2;
+const uintptr_t l2_large_page_size_mask = l2_large_page_size - 1;
 
 size_t vaddr_to_l0_index(uintptr_t addr) {
   return (addr >> MMU_KERNEL_TOP_SHIFT) & (MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP - 1);
