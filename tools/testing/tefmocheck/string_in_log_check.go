@@ -739,5 +739,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToRunSnapshotMsg),
 			Type:   swarmingOutputType,
 		},
+		// For https://fxbug.dev/338520852 and similar issues.
+		// This is caused by lacewing tests which fail to harness the device.
+		&stringInLogCheck{
+			String: "Termination Signal Type: FuchsiaDeviceError",
+			Type:   swarmingOutputType,
+		},
 	}
 }
