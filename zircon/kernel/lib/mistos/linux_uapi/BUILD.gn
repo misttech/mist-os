@@ -4,32 +4,40 @@
 
 import("//build/zircon/migrated_targets.gni")
 import("//build/zircon/zircon_cpu.gni")
+import("uapi.gni")
 
 zx_library("linux_uapi") {
   sources = []
-  public_deps = [ ":generate_uapi_headers" ]
   public_configs = [ ":uapi" ]
 }
 
 config("uapi") {
-  include_dirs = [ "$target_gen_dir/uapi/$zircon_cpu/include" ]
-  defines = [
-    "_STRUCT_TIMESPEC",
-    "_KERNEL_MISTOS_UAPI",
+  include_dirs = [
+    "uapi/$linux_kernel_version/$zircon_cpu/include",
+    "stub",
   ]
+  defines = [ "_STRUCT_TIMESPEC" ]
 }
 
-action("generate_uapi_headers") {
-  script = "generate_uapi_headers.sh"
-  outputs = [ "$target_gen_dir/uapi" ]
-  no_output_dir_leaks = false
-  args = [
-    "--download-kernel",
+# Run generate_uapi_headers.sh manually and commit the headers save some build time
+# ./generate_uapi_headers.sh --download-kernel --branch $linux_kernel_version --out-dir uapi/$linux_kernel_version/
+# cd uapi/$linux_kernel_version/uapi
+# mv $zircon_cpu ../
 
-    # Kernel 6.6 LTS version
-    "--branch",
-    "v6.6",
-    "--out-dir",
-    rebase_path(target_gen_dir, root_build_dir),
-  ]
-}
+#
+# Leave it here for documentation purpodes.
+# NOTE: This action generate the header in root_build_dir not in the current dir.
+#
+#action("generate_uapi_headers") {
+#  script = "generate_uapi_headers.sh"
+#  outputs = [ "$target_gen_dir/uapi" ]
+#  no_output_dir_leaks = false
+#  args = [
+#    "--download-kernel",
+#
+#    "--branch",
+#    "$linux_kernel_version",
+#    "--out-dir",
+#    rebase_path(target_gen_dir, root_build_dir),
+#  ]
+#}
