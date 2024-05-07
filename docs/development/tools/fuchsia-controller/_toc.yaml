@@ -8,5 +8,5 @@
 toc:
 - title: "Fuchsia Controller tutorial"
   path: /docs/development/tools/fuchsia-controller/getting-started-in-tree.md
-- title: "Best Practices on using async Python in Fuchsia Controller"
+- title: "Best practices on using async Python in Fuchsia Controller"
   path: /docs/development/tools/fuchsia-controller/async-python.md

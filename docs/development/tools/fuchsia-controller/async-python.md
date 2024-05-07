@@ -1,4 +1,4 @@
-# Best Practices on using async Python in Fuchsia Controller
+# Best practices on using async Python in Fuchsia Controller
 
 This page discusses the common task flows of async Python as well as possible
 pitfalls when using async Python.
