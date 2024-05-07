@@ -5049,7 +5049,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCtxWithCoreCtx, Wrapped, WrappedFakeCoreCtx},
+        context::testutil::FakeCtxWithCoreCtx,
         data_structures::socketmap::SocketMap,
         device::testutil::{
             FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
@@ -5436,35 +5436,67 @@ mod test {
         }
     }
 
-    type FakeSocketsState<I, D> = DatagramSocketSet<I, FakeWeakDeviceId<D>, FakeStateSpec>;
+    type FakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<(), (), (), ()>;
 
-    type FakeInnerCoreCtx<D> = crate::context::testutil::FakeCoreCtx<
+    type FakeSocketSet<I, D> = DatagramSocketSet<I, FakeWeakDeviceId<D>, FakeStateSpec>;
+
+    type InnerIpSocketCtx<D> = crate::context::testutil::FakeCoreCtx<
         FakeDualStackIpSocketCtx<D>,
         DualStackSendIpPacketMeta<D>,
         D,
     >;
 
-    type FakeCoreCtx<I, D> =
-        Wrapped<FakeSocketsState<I, D>, Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
+    struct FakeDualStackCoreCtx<D: FakeStrongDeviceId> {
+        bound_sockets: FakeBoundSockets<D>,
+        ip_socket_ctx: InnerIpSocketCtx<D>,
+    }
+
+    struct FakeCoreCtx<I: IpExt, D: FakeStrongDeviceId> {
+        dual_stack: FakeDualStackCoreCtx<D>,
+        // NB: socket set is last in the struct so all the strong refs are
+        // dropped before the primary refs contained herein.
+        socket_set: FakeSocketSet<I, D>,
+    }
 
     impl<I: IpExt, D: FakeStrongDeviceId> FakeCoreCtx<I, D> {
-        fn new_with_sockets(state: FakeSocketsState<I, D>, bound: FakeBoundSockets<D>) -> Self {
+        fn new_with_sockets(
+            socket_set: FakeSocketSet<I, D>,
+            bound_sockets: FakeBoundSockets<D>,
+        ) -> Self {
             Self {
-                outer: state,
-                inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                    FakeDualStackIpSocketCtx::default(),
-                    bound,
-                ),
+                socket_set,
+                dual_stack: FakeDualStackCoreCtx {
+                    bound_sockets,
+                    ip_socket_ctx: Default::default(),
+                },
+            }
+        }
+
+        fn new_with_ip_socket_ctx(ip_socket_ctx: FakeDualStackIpSocketCtx<D>) -> Self {
+            Self {
+                socket_set: Default::default(),
+                dual_stack: FakeDualStackCoreCtx {
+                    bound_sockets: Default::default(),
+                    ip_socket_ctx: InnerIpSocketCtx::with_state(ip_socket_ctx),
+                },
             }
         }
     }
 
+    impl<I: IpExt, D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeCoreCtx<I, D> {
+        type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+    }
+
+    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeDualStackCoreCtx<D> {
+        type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+    }
+
     impl<D: FakeStrongDeviceId, I: DatagramIpExt<D> + IpLayerIpExt>
-        DatagramStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
-        for FakeCoreCtx<I, D>
+        DatagramStateContext<I, FakeBindingsCtx, FakeStateSpec> for FakeCoreCtx<I, D>
     {
-        type SocketsStateCtx<'a> =
-            Wrapped<FakeBoundSockets<Self::DeviceId>, FakeInnerCoreCtx<Self::DeviceId>>;
+        type SocketsStateCtx<'a> = FakeDualStackCoreCtx<D>;
 
         fn with_all_sockets_mut<
             O,
@@ -5473,7 +5505,7 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer)
+            cb(&mut self.socket_set)
         }
 
         fn with_all_sockets<
@@ -5483,7 +5515,7 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&self.outer)
+            cb(&self.socket_set)
         }
 
         fn with_socket_state<
@@ -5497,7 +5529,7 @@ mod test {
             id: &Id<I, Self::WeakDeviceId>,
             cb: F,
         ) -> O {
-            cb(&mut self.inner, &id.get())
+            cb(&mut self.dual_stack, &id.get())
         }
 
         fn with_socket_state_mut<
@@ -5511,7 +5543,7 @@ mod test {
             id: &Id<I, Self::WeakDeviceId>,
             cb: F,
         ) -> O {
-            cb(&mut self.inner, &mut id.get_mut())
+            cb(&mut self.dual_stack, &mut id.get_mut())
         }
 
         fn for_each_socket<
@@ -5524,9 +5556,9 @@ mod test {
             &mut self,
             mut cb: F,
         ) {
-            self.outer.keys().for_each(|id| {
+            self.socket_set.keys().for_each(|id| {
                 let id = Id::from(id.clone());
-                cb(&mut self.inner, &id, &id.get());
+                cb(&mut self.dual_stack, &id, &id.get());
             })
         }
     }
@@ -5541,50 +5573,47 @@ mod test {
     trait DualStackContextsIpExt<D: FakeStrongDeviceId>: Ip + DualStackIpExt {
         type DualStackContext: DualStackDatagramBoundStateContext<
             Self,
-            FakeBindingsCtx<(), (), (), ()>,
+            FakeBindingsCtx,
             FakeStateSpec,
             DeviceId = D,
             WeakDeviceId = FakeWeakDeviceId<D>,
         >;
         type NonDualStackContext: NonDualStackDatagramBoundStateContext<
             Self,
-            FakeBindingsCtx<(), (), (), ()>,
+            FakeBindingsCtx,
             FakeStateSpec,
             DeviceId = D,
             WeakDeviceId = FakeWeakDeviceId<D>,
         >;
         fn dual_stack_context(
-            core_ctx: &mut Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext>;
     }
 
     impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv4 {
-        type DualStackContext =
-            UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
-        type NonDualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
+        type DualStackContext = UninstantiableWrapper<FakeDualStackCoreCtx<D>>;
+        type NonDualStackContext = FakeDualStackCoreCtx<D>;
         fn dual_stack_context(
-            core_ctx: &mut Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
             MaybeDualStack::NotDualStack(core_ctx)
         }
     }
 
     impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv6 {
-        type DualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
-        type NonDualStackContext =
-            UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
+        type DualStackContext = FakeDualStackCoreCtx<D>;
+        type NonDualStackContext = UninstantiableWrapper<FakeDualStackCoreCtx<D>>;
         fn dual_stack_context(
-            core_ctx: &mut Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
             MaybeDualStack::DualStack(core_ctx)
         }
     }
 
     impl<D: FakeStrongDeviceId, I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>>
-        DatagramBoundStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
-        for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
+        DatagramBoundStateContext<I, FakeBindingsCtx, FakeStateSpec> for FakeDualStackCoreCtx<D>
     {
-        type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
+        type IpSocketsCtx<'a> = InnerIpSocketCtx<D>;
         type DualStackContext = I::DualStackContext;
         type NonDualStackContext = I::NonDualStackContext;
 
@@ -5603,8 +5632,8 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer.as_ref())
+            let Self { bound_sockets, ip_socket_ctx } = self;
+            cb(ip_socket_ctx, bound_sockets.as_ref())
         }
         fn with_bound_sockets_mut<
             O,
@@ -5621,16 +5650,15 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer.as_mut())
+            let Self { bound_sockets, ip_socket_ctx } = self;
+            cb(ip_socket_ctx, bound_sockets.as_mut())
         }
 
         fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer: _, inner } = self;
-            cb(inner)
+            cb(&mut self.ip_socket_ctx)
         }
 
         fn dual_stack_context(
@@ -5641,8 +5669,8 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId>
-        NonDualStackDatagramBoundStateContext<Ipv4, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
-        for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
+        NonDualStackDatagramBoundStateContext<Ipv4, FakeBindingsCtx, FakeStateSpec>
+        for FakeDualStackCoreCtx<D>
     {
         type Converter = ();
         fn converter(&self) -> Self::Converter {
@@ -5651,10 +5679,10 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId>
-        DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
-        for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
+        DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx, FakeStateSpec>
+        for FakeDualStackCoreCtx<D>
     {
-        type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
+        type IpSocketsCtx<'a> = InnerIpSocketCtx<D>;
         fn dual_stack_enabled(
             &self,
             _state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>>,
@@ -5712,9 +5740,8 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { ref mut outer, inner } = self;
-            let FakeBoundSockets { v4, v6 } = outer;
-            cb(inner, v6, v4)
+            let Self { bound_sockets: FakeBoundSockets { v4, v6 }, ip_socket_ctx } = self;
+            cb(ip_socket_ctx, v6, v4)
         }
 
         fn with_other_bound_sockets_mut<
@@ -5732,16 +5759,15 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer.as_mut())
+            let Self { bound_sockets, ip_socket_ctx } = self;
+            cb(ip_socket_ctx, bound_sockets.as_mut())
         }
 
         fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer: _, inner } = self;
-            cb(inner)
+            cb(&mut self.ip_socket_ctx)
         }
     }
 
@@ -5773,17 +5799,14 @@ mod test {
     #[ip_test]
     fn set_get_device_hop_limits<I: Ip + DatagramIpExt<FakeReferencyDeviceId> + IpLayerIpExt>() {
         let device = FakeReferencyDeviceId::default();
-        let mut core_ctx = FakeCoreCtx::<I, _> {
-            outer: FakeSocketsState::default(),
-            inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
+        let mut core_ctx =
+            FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
+                FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
                     device: device.clone(),
                     local_ips: Default::default(),
                     remote_ips: Default::default(),
-                }]),
-                Default::default(),
-            ),
-        };
+                },
+            ]));
         let mut bindings_ctx = FakeBindingsCtx::default();
 
         let unbound = create(&mut core_ctx, ());
@@ -5792,7 +5815,8 @@ mod test {
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
-            let device_state = core_ctx.inner.inner.state.get_device_state_mut::<I>(&device);
+            let device_state =
+                core_ctx.dual_stack.ip_socket_ctx.state.get_device_state_mut::<I>(&device);
             assert_ne!(device_state.default_hop_limit, unicast);
             device_state.default_hop_limit = unicast;
         }
@@ -5857,17 +5881,13 @@ mod test {
 
     #[ip_test]
     fn send_to_binds_unbound<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
-        let mut core_ctx = FakeCoreCtx::<I, FakeDeviceId> {
-            outer: Default::default(),
-            inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
-                    device: FakeDeviceId,
-                    local_ips: vec![I::FAKE_CONFIG.local_ip],
-                    remote_ips: vec![I::FAKE_CONFIG.remote_ip],
-                }]),
-                Default::default(),
-            ),
-        };
+        let mut core_ctx = FakeCoreCtx::<I, FakeDeviceId>::new_with_ip_socket_ctx(
+            FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
+                device: FakeDeviceId,
+                local_ips: vec![I::FAKE_CONFIG.local_ip],
+                remote_ips: vec![I::FAKE_CONFIG.remote_ip],
+            }]),
+        );
         let mut bindings_ctx = FakeBindingsCtx::default();
 
         let socket = create(&mut core_ctx, ());
@@ -5890,17 +5910,14 @@ mod test {
 
     #[ip_test]
     fn send_to_no_route_still_binds<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
-        let mut core_ctx = FakeCoreCtx::<I, _> {
-            outer: Default::default(),
-            inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
+        let mut core_ctx =
+            FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
+                FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: vec![I::FAKE_CONFIG.local_ip],
                     remote_ips: vec![],
-                }]),
-                Default::default(),
-            ),
-        };
+                },
+            ]));
         let mut bindings_ctx = FakeBindingsCtx::default();
 
         let socket = create(&mut core_ctx, ());
@@ -5938,7 +5955,7 @@ mod test {
                 remote_ips: Default::default(),
             }),
         );
-        let mut bindings_ctx = FakeBindingsCtx::<(), (), (), ()>::default();
+        let mut bindings_ctx = FakeBindingsCtx::default();
 
         let multicast_addr1 = I::get_multicast_addr(1);
         let mut memberships = MulticastMemberships::default();
@@ -6005,17 +6022,14 @@ mod test {
 
     #[ip_test]
     fn set_get_transparent<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
-        let mut core_ctx = FakeCoreCtx::<I, _> {
-            outer: FakeSocketsState::default(),
-            inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
+        let mut core_ctx =
+            FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
+                FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
                     device: FakeDeviceId,
                     local_ips: Default::default(),
                     remote_ips: Default::default(),
-                }]),
-                Default::default(),
-            ),
-        };
+                },
+            ]));
 
         let unbound = create(&mut core_ctx, ());
 
@@ -6078,12 +6092,10 @@ mod test {
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
                 [FakeDeviceId {}],
-                |device_configs| FakeCoreCtx::<I, _> {
-                    outer: FakeSocketsState::default(),
-                    inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                        FakeDualStackIpSocketCtx::new(device_configs),
-                        Default::default(),
-                    ),
+                |device_configs| {
+                    FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new(
+                        device_configs,
+                    ))
                 },
             );
 
@@ -6185,12 +6197,10 @@ mod test {
                 Ipv6::UNSPECIFIED_ADDRESS.into(),
                 remote_ip.into(),
                 [FakeDeviceId {}],
-                |device_configs| FakeCoreCtx::<Ipv6, _> {
-                    outer: FakeSocketsState::default(),
-                    inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                        FakeDualStackIpSocketCtx::new(device_configs),
-                        Default::default(),
-                    ),
+                |device_configs| {
+                    FakeCoreCtx::<Ipv6, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new(
+                        device_configs,
+                    ))
                 },
             );
 
@@ -6254,12 +6264,10 @@ mod test {
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
                 [DEVICE_ID1, DEVICE_ID2],
-                |device_configs| FakeCoreCtx::<I, _> {
-                    outer: FakeSocketsState::default(),
-                    inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
-                        FakeDualStackIpSocketCtx::new(device_configs),
-                        Default::default(),
-                    ),
+                |device_configs| {
+                    FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new(
+                        device_configs,
+                    ))
                 },
             );
 
