@@ -36,6 +36,7 @@ source_set("fake-lib") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]

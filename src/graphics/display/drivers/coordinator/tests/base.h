@@ -33,7 +33,7 @@ class TestBase : public testing::Test {
   Controller* controller() { return tree_->coordinator_controller(); }
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
-  fidl::ClientEnd<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1();
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> ConnectToSysmemAllocatorV2();
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_fidl();
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }

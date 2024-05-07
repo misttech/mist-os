@@ -6,7 +6,9 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/assert.h>
 
 #include <fbl/auto_lock.h>
@@ -23,7 +25,8 @@
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
-namespace sysmem = fuchsia_sysmem;
+namespace sysmem1 = fuchsia_sysmem;
+namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display {
 
@@ -318,21 +321,28 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
 zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     const fhdt::wire::ImageMetadata& image_metadata) {
   // Create all the tokens.
-  fidl::WireSyncClient<sysmem::BufferCollectionToken> local_token;
+  fidl::WireSyncClient<sysmem2::BufferCollectionToken> local_token;
   {
-    auto [client, server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
-    auto result = sysmem_->AllocateSharedCollection(std::move(server));
+    auto [client, server] = fidl::Endpoints<sysmem2::BufferCollectionToken>::Create();
+    fidl::Arena arena;
+    auto allocate_shared_request =
+        sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena);
+    allocate_shared_request.token_request(std::move(server));
+    auto result = sysmem_->AllocateSharedCollection(allocate_shared_request.Build());
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to allocate shared collection: %s", result.status_string());
       return zx::error(result.status());
     }
-    local_token = fidl::WireSyncClient<sysmem::BufferCollectionToken>(std::move(client));
+    local_token = fidl::WireSyncClient<sysmem2::BufferCollectionToken>(std::move(client));
     EXPECT_NE(ZX_HANDLE_INVALID, local_token.client_end().channel().get());
   }
-  auto [client, server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
+  auto [client, server] = fidl::Endpoints<sysmem2::BufferCollectionToken>::Create();
   {
-    if (auto result = local_token->Duplicate(ZX_RIGHT_SAME_RIGHTS, std::move(server));
-        !result.ok()) {
+    fidl::Arena arena;
+    auto duplicate_request = sysmem2::wire::BufferCollectionTokenDuplicateRequest::Builder(arena);
+    duplicate_request.rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+    duplicate_request.token_request(std::move(server));
+    if (auto result = local_token->Duplicate(duplicate_request.Build()); !result.ok()) {
       zxlogf(ERROR, "Failed to duplicate token: %s", result.FormatDescription().c_str());
       return zx::error(ZX_ERR_NO_MEMORY);
     }
@@ -349,7 +359,9 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_display_collection_id =
       ToFidlBufferCollectionId(display_collection_id);
-  const auto result = dc_->ImportBufferCollection(fidl_display_collection_id, std::move(client));
+  const auto result = dc_->ImportBufferCollection(
+      fidl_display_collection_id,
+      fidl::ClientEnd<sysmem1::BufferCollectionToken>(client.TakeChannel()));
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to call FIDL ImportBufferCollection %lu (%s)",
            display_collection_id.value(), result.status_string());
@@ -384,42 +396,59 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   // Use the local collection so we can read out the error if allocation
   // fails, and to ensure everything's allocated before trying to import it
   // into another process.
-  fidl::WireSyncClient<sysmem::BufferCollection> sysmem_collection;
+  fidl::WireSyncClient<sysmem2::BufferCollection> sysmem_collection;
   {
-    auto [client, server] = fidl::Endpoints<sysmem::BufferCollection>::Create();
-    if (auto result = sysmem_->BindSharedCollection(local_token.TakeClientEnd(), std::move(server));
-        !result.ok()) {
+    auto [client, server] = fidl::Endpoints<sysmem2::BufferCollection>::Create();
+    fidl::Arena arena;
+    auto bind_shared_request = sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena);
+    bind_shared_request.token(local_token.TakeClientEnd());
+    bind_shared_request.buffer_collection_request(std::move(server));
+    if (auto result = sysmem_->BindSharedCollection(bind_shared_request.Build()); !result.ok()) {
       zxlogf(ERROR, "Failed to bind shared collection: %s", result.FormatDescription().c_str());
       return zx::error(result.status());
     }
-    sysmem_collection = fidl::WireSyncClient<sysmem::BufferCollection>(std::move(client));
+    sysmem_collection = fidl::WireSyncClient<sysmem2::BufferCollection>(std::move(client));
   }
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  (void)sysmem_collection->SetName(10000u, "display-client-unittest");
-  sysmem::wire::BufferCollectionConstraints constraints = {};
-  constraints.min_buffer_count = 1;
-  constraints.usage.none = sysmem::wire::kNoneUsage;
+  fidl::Arena arena;
+  auto set_name_request = sysmem2::wire::NodeSetNameRequest::Builder(arena);
+  set_name_request.priority(10000u);
+  set_name_request.name("display-client-unittest");
+  (void)sysmem_collection->SetName(set_name_request.Build());
+  arena.Reset();
+  auto constraints = sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints.min_buffer_count(1);
+  constraints.usage(
+      sysmem2::wire::BufferUsage::Builder(arena).none(sysmem2::wire::kNoneUsage).Build());
   // We specify min_size_bytes 1 so that something is specifying a minimum size.  More typically the
   // display client would specify ImageFormatConstraints that implies a non-zero min_size_bytes.
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints.min_size_bytes = 1;
-  constraints.buffer_memory_constraints.ram_domain_supported = true;
-  zx_status_t status = sysmem_collection->SetConstraints(true, constraints).status();
+  constraints.buffer_memory_constraints(sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+                                            .min_size_bytes(1)
+                                            .ram_domain_supported(true)
+                                            .Build());
+  auto set_constraints_request =
+      sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  set_constraints_request.constraints(constraints.Build());
+  zx_status_t status = sysmem_collection->SetConstraints(set_constraints_request.Build()).status();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Unable to set constraints (%d)", status);
     return zx::error(status);
   }
   // Wait for the buffers to be allocated.
-  auto info_result = sysmem_collection->WaitForBuffersAllocated();
-  if (!info_result.ok() || info_result.value().status != ZX_OK) {
-    zxlogf(ERROR, "Waiting for buffers failed (fidl=%d res=%d)", info_result.status(),
-           info_result.value().status);
-    return zx::error(info_result.ok() ? info_result.value().status : info_result.status());
+  auto info_result = sysmem_collection->WaitForAllBuffersAllocated();
+  if (!info_result.ok()) {
+    zxlogf(ERROR, "Waiting for buffers failed (fidl=%d res=%u)", info_result.status(),
+           fidl::ToUnderlying(info_result->error_value()));
+    zx_status_t status = info_result.status();
+    if (status == ZX_OK) {
+      status = sysmem::V1CopyFromV2Error(info_result->error_value());
+    }
+    return zx::error(status);
   }
 
-  auto& info = info_result.value().buffer_collection_info;
-  if (info.buffer_count < 1) {
-    zxlogf(ERROR, "Incorrect buffer collection count %d", info.buffer_count);
+  auto& info = info_result.value()->buffer_collection_info();
+  if (info.buffers().count() < 1) {
+    zxlogf(ERROR, "Incorrect buffer collection count %zu", info.buffers().count());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -444,7 +473,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  (void)sysmem_collection->Close();
+  (void)sysmem_collection->Release();
   return zx::ok(image_id);
 }
 

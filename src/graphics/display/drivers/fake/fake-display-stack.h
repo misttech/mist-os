@@ -42,7 +42,7 @@ class FakeDisplayStack {
   fake_display::FakeDisplay* display() { return display_.get(); }
 
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
-  fidl::ClientEnd<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1();
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> ConnectToSysmemAllocatorV2();
 
   // Join all threads providing display and sysmem protocols, and remove all
   // the devices bound to the mock root device.
