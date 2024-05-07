@@ -50,10 +50,21 @@ template("qemu_kernel_test") {
       public_visibility = [ "*" ]
     }
 
-    if (toolchain_variant.base == qemu.environment) {
+    if (toolchain_variant.base == qemu.environment ||
+        (defined(qemu.target_second_environment) &&
+         toolchain_variant.base == qemu.target_second_environment)) {
       executable_target = "_qemu_phys_test.$test_target.executable"
 
-      phys_executable(executable_target) {
+      if (defined(qemu.import)) {
+        import(qemu.import)
+      }
+      if (defined(qemu.target_type)) {
+        target_type = qemu.target_type
+      } else {
+        target_type = "phys_executable"
+      }
+
+      target(target_type, executable_target) {
         testonly = true
         visibility = [ ":*" ]
         output_name = test_target
@@ -78,13 +89,19 @@ template("qemu_kernel_test") {
         visibility = public_visibility
 
         # The special kernel is all that really matters for this test.
-        device_types = [ "QEMU" ]
         qemu_kernel = ":$executable_target"
         if (defined(invoker.initrd)) {
           zbi = invoker.initrd
         }
 
-        forward_variables_from(qemu, [ "disabled" ])
+        forward_variables_from(qemu,
+                               [
+                                 "device_types",
+                                 "disabled",
+                               ])
+        if (!defined(device_types)) {
+          device_types = [ "QEMU" ]
+        }
       }
     } else {
       group(test_target) {

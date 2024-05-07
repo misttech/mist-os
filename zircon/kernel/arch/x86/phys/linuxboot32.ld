@@ -22,7 +22,13 @@ HIDDEN(LINUXBOOT_LOAD_ADDRESS = 0x100000);
  * assembly code to embed this value, which cannot be calculated directly by a
  * single relocation record.
  */
-HIDDEN(LINUXBOOT_INIT_SIZE = _end - LINUXBOOT_LOAD_ADDRESS);
+HIDDEN(LINUXBOOT32_INIT_SIZE = _end - LINUXBOOT_LOAD_ADDRESS);
+
+/*
+ * In a pure phys32 image, this will be used.  In a bi-arch image, it will be
+ * defined to the MAX of LINUXBOOT32_INIT_SIZE and the 64-bit image's value.
+ */
+PROVIDE_HIDDEN(LINUXBOOT_INIT_SIZE = LINUXBOOT32_INIT_SIZE);
 
 /*
  * This _start symbol just sets e_entry in ELF headers (as per phys.ld), which

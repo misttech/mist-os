@@ -266,6 +266,20 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  # Just putting this in deps of a phys_executable() in the kernel.phys
+  # environment makes it into a raw image that expects to be entered at the
+  # start of the image in memory, but with the Linux/x86 64-bit boot protocol.
+  # This won't be started by a Linux-compatible boot loader, which would enter
+  # at 0x200 past the start of the image.  Instead, it will be embedded by
+  # linuxbiboot.S into the outer phys32 image of a linuxbiboot_executable().
+  source_set("linuxbiboot64") {
+    public_configs = [ "//zircon/kernel/phys:load-pic" ]
+    deps = [
+      ":linuxboot-init",
+      "//zircon/kernel/phys:raw-header",
+    ]
+  }
+
   source_set("linuxboot.h") {
     public = [ "linuxboot.h" ]
     public_deps = [
@@ -391,10 +405,6 @@ hwreg_asm_header("phys32.h") {
 }
 
 hwreg_asm_header("linuxboot-asm") {
-  visibility = [
-    ":linuxboot",
-    ":linuxboot64",
-  ]
   output_name = "linuxboot-asm.h"
   sources = [ "linuxboot-asm-gen.cc" ]
   deps = [ ":linuxboot.h" ]

@@ -122,19 +122,39 @@
   .byte LOADFLAGS_LOADED_HIGH
 
   // This gives the boot loader license to place the initrd RAMDISK image
-  // anywhere in the 4G address space.
+  // anywhere in the 4G address space.  (This will probably be ignored by a
+  // boot loader using the 64-bit boot protocol, where it can be above 4GiB.)
   .org BOOT_PARAMS_HDR + SETUP_HEADER_INITRD_ADDR_MAX
   .int 0xffffffff
 
   // Preferred alignment for the load address is just 4KiB.  Without
   // relocatable_kernel set, this shouldn't matter either way for the 32-bit
-  // (or 16-bit) boot path--the load address is fixed.
+  // (or 16-bit) boot path--the load address is fixed.  But a boot loader
+  // taking the 64-bit boot path instead might use it.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_KERNEL_ALIGNMENT
   .int 0x1000
 
   // Load addresses must be aligned to 4KiB (1 << 12).
+  // As above, only relevant if using the 64-bit boot protocol.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_MIN_ALIGNMENT
   .byte 12
+
+  // The value (XLF_KERNEL_64 | XLF_CAN_BE_LOADED_ABOVE_4G), here indicates a
+  // 64-bit kernel that can both use the 64-bit protocol and accept all
+  // addresses of interest being past the 4GiB barrier (that's how this is set
+  // in linuxboot64-header.S).
+  //
+  // In a pure phys32 image, LINUXBOOT_XLOADFLAGS is undefined and so filled as
+  // zero: no flags set in xloadflags, so the image can be loaded using the
+  // 32-bit protocol or the 16-bit protocol, both of which are implemented here
+  // in this file.
+  //
+  // In a bi-arch image, LINUXBOOT_XLOADFLAGS will be defined to set the
+  // xloadflags value above.  Linux64Entry will be defined to point directly to
+  // _start (in start.S), preempting the weak definition below.
+  .weak LINUXBOOT_XLOADFLAGS
+  .org BOOT_PARAMS_HDR + SETUP_HEADER_XLOADFLAGS
+  .short LINUXBOOT_XLOADFLAGS
 
    // This constrains the maximum size of kernel command line data passed.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_CMDLINE_SIZE
@@ -323,7 +343,10 @@
 // This is the entrypoint for bootloaders using the 32-bit Linux boot protocol.
 // The data earlier in the image is not actually part of what's loaded into
 // memory.  Instead, the kernel's memory image starts here.  For the 32-bit
-// non-relocatable protocol, that's exactly at 1MiB.
+// non-relocatable protocol, that's exactly at 1MiB.  For the relocatable
+// protocol, it's at some aligned address.  In the 64-bit boot protocol, it's
+// anywhere in the address space, not necessarily in the low 4GiB, and the boot
+// loader jumps to 0x200 past here in 64-bit mode.
 .function Linux32Entry, nosection=nosection
   // Jump to the start32.S entry point at its fixed address.
   mov $Phys32Entry, %eax
@@ -335,3 +358,18 @@
 .ascii "IKCFG_ST"
 .incbin IKCONFIG_FILE
 .ascii "IKCFG_ED"
+
+// The 64-bit boot protocol always jumps here.  Just trampoline to where the
+// entry point for 64-bit mode is defined elsewhere.
+.org Linux32Entry + 0x200
+.code64
+.function Linux64Trampoline, nosection=nosection
+  jmp Linux64Entry
+.end_function
+
+// If no other definition overrides it, a 64-bit entry gets here to crash.
+// (Note this is defined in its own section so it can be GC'd if overridden.)
+.function Linux64Entry, weak
+0:ud2
+  jmp 0b
+.end_function
