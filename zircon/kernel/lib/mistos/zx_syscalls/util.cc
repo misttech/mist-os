@@ -56,7 +56,7 @@ zx_status_t MakeAndAddHandle(KernelHandle<Dispatcher> kernel_handle, zx_rights_t
   return ZX_OK;
 }
 
-static void Init(uint level) {
+static void zx_syscall_init(uint level) {
   gHandleTable.Initialize();
 
   // Create a dispatcher for the root VMAR.
@@ -78,4 +78,4 @@ ZX_HANDLE_ACQUIRE_UNOWNED zx_handle_t zx_vmar_root_self(void) { return __zircon_
 zx_handle_t zx_job_default(void) { return __zircon_job_default; }
 zx_handle_t zx_thread_self(void) { return ZX_HANDLE_INVALID; }
 
-LK_INIT_HOOK(mistos_zx_syscalls, Init, LK_INIT_LEVEL_USER - 2)
+LK_INIT_HOOK(mist_os_zx_syscall, zx_syscall_init, LK_INIT_LEVEL_USER - 2)

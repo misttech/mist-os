@@ -12,6 +12,7 @@
 #include <lib/crashlog.h>
 #include <lib/elfldltl/machine.h>
 #include <lib/mistos/userloader/userloader_internal.h>
+#include <lib/mistos/zx_syscalls/util.h>
 #include <lib/zircon-internal/default_stack_size.h>
 #include <zircon/assert.h>
 
@@ -248,8 +249,17 @@ void userloader_init(uint) {  // zx_status_t status;
   userloader::gHandles[userloader::kSystemResource] =
       get_resource_handle(ZX_RSRC_KIND_SYSTEM).release();
   ASSERT(userloader::gHandles[userloader::kSystemResource]);
+
+  // Inject basic handles in the kernel handle_table.
+  ProcessDispatcher* dispatcher = nullptr;
+  for (auto handle : userloader::gHandles) {
+    if (handle) {
+      HandleOwner h(handle);
+      handle_table(dispatcher).AddHandle(ktl::move(h));
+    }
+  }
 }
 
 }  // namespace
 
-LK_INIT_HOOK(mist_os_init, userloader_init, LK_INIT_LEVEL_USER - 1)
+LK_INIT_HOOK(mist_os_userloader, userloader_init, LK_INIT_LEVEL_USER - 1)

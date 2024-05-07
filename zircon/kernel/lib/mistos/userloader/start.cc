@@ -85,8 +85,6 @@ static void MapHandleToValue(Handle* handle, uint32_t* out) {
   ProcessDispatcher* dispatcher = nullptr;
   if (handle) {
     *out = handle_table(dispatcher).MapHandleToValue(handle);
-    HandleOwner h(handle);
-    handle_table(dispatcher).AddHandle(ktl::move(h));
   } else {
     *out = ZX_HANDLE_INVALID;
   }
