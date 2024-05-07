@@ -109,13 +109,15 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
       image->PrepareFences(nullptr, signal_fence->GetReference());
     }
     auto lifecycle_task = new async::Task(
-        [image, &retire_count](async_dispatcher_t*, async::Task* task, zx_status_t) {
+        [image, &retire_count](async_dispatcher_t*, async::Task* task_ptr, zx_status_t) {
+          // Ensures that `task` gets deleted when the handler completes.
+          std::unique_ptr<async::Task> task(task_ptr);
+
           fbl::AutoLock l(image->mtx());
           image->StartPresent();
           retire_count++;
           image->StartRetire();
           image->OnRetire();
-          delete task;
         });
     EXPECT_OK(lifecycle_task->Post(loop.dispatcher()));
 

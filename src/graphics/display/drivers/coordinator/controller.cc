@@ -232,45 +232,46 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
   task->set_handler([this, added_display_infos = std::move(added_display_infos),
                      removed_display_ids = std::move(removed_display_ids)](
-                        async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-    if (status == ZX_OK) {
-      for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
-        if (added_display_info->edid.has_value()) {
-          PopulateDisplayTimings(added_display_info);
-        }
-      }
+                        async_dispatcher_t* dispatcher, async::Task* task_ptr, zx_status_t status) {
+    // Ensures that `task` gets deleted when the handler completes.
+    std::unique_ptr<async::Task> task(task_ptr);
 
-      // TODO(b/317914671): Pass parsed display metadata to driver.
-
-      fbl::AutoLock lock(mtx());
-
-      fbl::Vector<DisplayId> added_ids;
-      added_ids.reserve(added_display_infos.size());
-      for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
-        // Dropping some add events can result in spurious removes, but
-        // those are filtered out in the clients.
-        if (!added_display_info->edid.has_value() ||
-            !added_display_info->edid->timings.is_empty()) {
-          added_ids.push_back(added_display_info->id);
-          added_display_info->init_done = true;
-          added_display_info->InitializeInspect(&root_);
-        } else {
-          zxlogf(WARNING, "Ignoring display with no compatible edid timings");
-        }
-      }
-      if (virtcon_client_ready_) {
-        ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-        virtcon_client_->OnDisplaysChanged(added_ids, removed_display_ids);
-      }
-      if (primary_client_ready_) {
-        ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-        primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
-      }
-    } else {
-      zxlogf(ERROR, "Failed to dispatch display change task %d", status);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to dispatch display change task: %s", zx_status_get_string(status));
+      return;
     }
 
-    delete task;
+    for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
+      if (added_display_info->edid.has_value()) {
+        PopulateDisplayTimings(added_display_info);
+      }
+    }
+
+    // TODO(b/317914671): Pass parsed display metadata to driver.
+
+    fbl::AutoLock lock(mtx());
+
+    fbl::Vector<DisplayId> added_ids;
+    added_ids.reserve(added_display_infos.size());
+    for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
+      // Dropping some add events can result in spurious removes, but
+      // those are filtered out in the clients.
+      if (!added_display_info->edid.has_value() || !added_display_info->edid->timings.is_empty()) {
+        added_ids.push_back(added_display_info->id);
+        added_display_info->init_done = true;
+        added_display_info->InitializeInspect(&root_);
+      } else {
+        zxlogf(WARNING, "Ignoring display with no compatible edid timings");
+      }
+    }
+    if (virtcon_client_ready_) {
+      ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+      virtcon_client_->OnDisplaysChanged(added_ids, removed_display_ids);
+    }
+    if (primary_client_ready_) {
+      ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+      primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
+    }
   });
   task.release()->Post(dispatcher_.async_dispatcher());
 }
@@ -285,27 +286,31 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
 
   std::unique_ptr<async::Task> task = std::make_unique<async::Task>();
   fbl::AutoLock lock(mtx());
-  task->set_handler([this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-    if (status == ZX_OK) {
-      // Free an image that was previously used by the hardware.
-      if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
-        ReleaseCaptureImage(pending_release_capture_image_id_);
-        pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
-      }
+  task->set_handler([this](async_dispatcher_t* dispatcher, async::Task* task_ptr,
+                           zx_status_t status) {
+    // Ensures that `task` gets deleted when the handler completes.
+    std::unique_ptr<async::Task> task(task_ptr);
 
-      fbl::AutoLock lock(mtx());
-      if (virtcon_client_ready_) {
-        ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-        virtcon_client_->OnCaptureComplete();
-      }
-      if (primary_client_ready_) {
-        ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-        primary_client_->OnCaptureComplete();
-      }
-    } else {
-      zxlogf(ERROR, "Failed to dispatch capture complete task %d", status);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to dispatch capture complete task: %s", zx_status_get_string(status));
+      return;
     }
-    delete task;
+
+    // Free an image that was previously used by the hardware.
+    if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
+      ReleaseCaptureImage(pending_release_capture_image_id_);
+      pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
+    }
+
+    fbl::AutoLock lock(mtx());
+    if (virtcon_client_ready_) {
+      ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+      virtcon_client_->OnCaptureComplete();
+    }
+    if (primary_client_ready_) {
+      ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+      primary_client_->OnCaptureComplete();
+    }
   });
   task.release()->Post(dispatcher_.async_dispatcher());
 }
@@ -793,41 +798,45 @@ zx_status_t Controller::CreateClient(
   }
   HandleClientOwnershipChanges();
 
-  task->set_handler(
-      [this, client_ptr](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-        if (status == ZX_OK) {
-          fbl::AutoLock lock(mtx());
-          if (unbinding_) {
-            return;
-          }
-          if (client_ptr == virtcon_client_ || client_ptr == primary_client_) {
-            // Add all existing displays to the client
-            if (displays_.size() > 0) {
-              DisplayId current_displays[displays_.size()];
-              int initialized_display_count = 0;
-              for (const DisplayInfo& display : displays_) {
-                if (display.init_done) {
-                  current_displays[initialized_display_count] = display.id;
-                  ++initialized_display_count;
-                }
-              }
-              cpp20::span<DisplayId> removed_display_ids = {};
-              client_ptr->OnDisplaysChanged(
-                  cpp20::span<DisplayId>(current_displays, initialized_display_count),
-                  removed_display_ids);
-            }
+  task->set_handler([this, client_ptr](async_dispatcher_t* dispatcher, async::Task* task_ptr,
+                                       zx_status_t status) {
+    // Ensures that `task` gets deleted when the handler completes.
+    std::unique_ptr<async::Task> task(task_ptr);
 
-            if (virtcon_client_ == client_ptr) {
-              ZX_DEBUG_ASSERT(!virtcon_client_ready_);
-              virtcon_client_ready_ = true;
-            } else {
-              ZX_DEBUG_ASSERT(!primary_client_ready_);
-              primary_client_ready_ = true;
-            }
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to dispatch client ready task: %s", zx_status_get_string(status));
+      return;
+    }
+    fbl::AutoLock lock(mtx());
+    if (unbinding_) {
+      return;
+    }
+    if (client_ptr == virtcon_client_ || client_ptr == primary_client_) {
+      // Add all existing displays to the client
+      if (displays_.size() > 0) {
+        DisplayId current_displays[displays_.size()];
+        int initialized_display_count = 0;
+        for (const DisplayInfo& display : displays_) {
+          if (display.init_done) {
+            current_displays[initialized_display_count] = display.id;
+            ++initialized_display_count;
           }
         }
-        delete task;
-      });
+        cpp20::span<DisplayId> removed_display_ids = {};
+        client_ptr->OnDisplaysChanged(
+            cpp20::span<DisplayId>(current_displays, initialized_display_count),
+            removed_display_ids);
+      }
+
+      if (virtcon_client_ == client_ptr) {
+        ZX_DEBUG_ASSERT(!virtcon_client_ready_);
+        virtcon_client_ready_ = true;
+      } else {
+        ZX_DEBUG_ASSERT(!primary_client_ready_);
+        primary_client_ready_ = true;
+      }
+    }
+  });
 
   return task.release()->Post(dispatcher_.async_dispatcher());
 }

@@ -1746,11 +1746,13 @@ void ClientProxy::CloseTest() { handler_.TearDownTest(); }
 
 void ClientProxy::CloseOnControllerLoop() {
   auto task = new async::Task();
-  task->set_handler([client_handler = &handler_](async_dispatcher_t* dispatcher, async::Task* task,
-                                                 zx_status_t status) {
+  task->set_handler([client_handler = &handler_](async_dispatcher_t* dispatcher,
+                                                 async::Task* task_ptr, zx_status_t status) {
+    // Ensures that `task` gets deleted when the handler completes.
+    std::unique_ptr<async::Task> task(task_ptr);
     client_handler->TearDown();
-    delete task;
   });
+
   if (task->Post(controller_->async_dispatcher()) != ZX_OK) {
     // Tasks only fail to post if the looper is dead. That can happen if the controller is unbinding
     // and shutting down active clients, but if it does then it's safe to call Reset on this thread
