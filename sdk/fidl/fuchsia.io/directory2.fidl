@@ -173,6 +173,8 @@ type NodeOptions = table {
     /// node type supports. For example, if the target node is a file and both
     /// [`Rights.WRITE_BYTES`] and [`Rights.MODIFY_DIRECTORY`] are requested, the resulting
     /// connection will only be granted [`Rights.WRITE_BYTES`].
+    ///
+    /// If the rights field is absent, it is the equivalent of empty rights.
     4: rights Rights;
 
     /// If the [`NodeFlags.GET_REPRESENTATION`] flag is set, attributes to be returned in

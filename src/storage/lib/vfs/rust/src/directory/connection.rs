@@ -215,21 +215,15 @@ where
             } => {
                 {
                     trace::duration!(c"storage", c"Directory::Open2");
-                    // Fill in rights from the parent connection if it's absent.
-                    if let fio::ConnectionProtocols::Node(fio::NodeOptions {
-                        rights,
-                        protocols,
-                        ..
-                    }) = &mut protocols
+                    if let fio::ConnectionProtocols::Node(fio::NodeOptions { rights, .. }) =
+                        &mut protocols
                     {
                         if rights.is_none() {
-                            if matches!(protocols, Some(fio::NodeProtocols { node: Some(_), .. })) {
-                                // Only inherit the GET_ATTRIBUTES right for node connections.
-                                *rights =
-                                    Some(self.options.rights & fio::Operations::GET_ATTRIBUTES);
-                            } else {
-                                *rights = Some(self.options.rights);
-                            }
+                            // If no rights were set, it is the equivalent of opening the connection
+                            // with empty rights. The rights need to be set to some value as the
+                            // ProtocolsExt library expects some value when converting the protocols
+                            // to Directory / File / Node / Symlink options.
+                            *rights = Some(fio::Operations::empty());
                         }
                     }
                     // If optional_rights is set, remove any rights that are not present on the
@@ -239,7 +233,7 @@ where
                             Some(fio::NodeProtocols {
                                 directory:
                                     Some(fio::DirectoryProtocolOptions {
-                                        optional_rights: Some(rights),
+                                        optional_rights: Some(optional_rights),
                                         ..
                                     }),
                                 ..
@@ -247,7 +241,7 @@ where
                         ..
                     }) = &mut protocols
                     {
-                        *rights &= self.options.rights;
+                        *optional_rights &= self.options.rights;
                     }
                     protocols
                         .to_object_request(object_request)

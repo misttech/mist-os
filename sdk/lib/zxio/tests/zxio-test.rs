@@ -110,6 +110,7 @@ async fn test_fsverity_enabled() {
                             file: Some(Default::default()),
                             ..Default::default()
                         }),
+                        rights: fio::Operations::UPDATE_ATTRIBUTES,
                         ..Default::default()
                     },
                     Some(&mut attrs),
@@ -193,6 +194,7 @@ async fn test_not_fsverity_enabled() {
                             file: Some(Default::default()),
                             ..Default::default()
                         }),
+                        rights: fio::Operations::UPDATE_ATTRIBUTES,
                         ..Default::default()
                     },
                     Some(&mut attrs),
@@ -495,7 +497,11 @@ async fn test_open2() {
         let test_dir = dir_zxio
             .open2(
                 "test_dir",
-                OpenOptions { mode: CreationMode::Always, ..OpenOptions::directory(None) },
+                OpenOptions {
+                    mode: CreationMode::Always,
+                    rights: fio::RW_STAR_DIR,
+                    ..OpenOptions::directory(None)
+                },
                 None,
             )
             .expect("open2 failed");
@@ -506,6 +512,7 @@ async fn test_open2() {
                 "test_file",
                 OpenOptions {
                     mode: CreationMode::Always,
+                    rights: fio::Operations::WRITE_BYTES,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,
@@ -528,7 +535,11 @@ async fn test_open2() {
             ..Default::default()
         };
         let test_dir = dir_zxio
-            .open2("test_dir", OpenOptions::default(), Some(&mut attr))
+            .open2(
+                "test_dir",
+                OpenOptions { rights: fio::RW_STAR_DIR, ..Default::default() },
+                Some(&mut attr),
+            )
             .expect("open2 failed");
 
         assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_DIRECTORY);
@@ -575,13 +586,25 @@ async fn test_open2() {
         // Create and open a symlink.
         test_dir.create_symlink("symlink", b"target").expect("create_symlink failed");
 
-        let symlink =
-            test_dir.open2("symlink", OpenOptions::default(), None).expect("open2 failed");
+        let symlink = test_dir
+            .open2(
+                "symlink",
+                OpenOptions { rights: fio::Operations::GET_ATTRIBUTES, ..Default::default() },
+                None,
+            )
+            .expect("open2 failed");
         assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
 
         // Test file protocol flags.
         let test_file = test_dir
-            .open2("test_file", OpenOptions::file(fio::FileProtocolFlags::APPEND), None)
+            .open2(
+                "test_file",
+                OpenOptions {
+                    rights: fio::Operations::WRITE_BYTES | fio::Operations::READ_BYTES,
+                    ..OpenOptions::file(fio::FileProtocolFlags::APPEND)
+                },
+                None,
+            )
             .expect("open2 failed");
         const APPEND_CONTENT: &[u8] = b" there";
         test_file.write(APPEND_CONTENT).expect("write failed");
@@ -621,6 +644,7 @@ async fn test_open2_rights() {
                 "test_file",
                 OpenOptions {
                     mode: CreationMode::Always,
+                    rights: fio::Operations::WRITE_BYTES,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,
@@ -655,7 +679,13 @@ async fn test_open2_rights() {
             )
             .expect("open2 failed");
 
-        let test_file = dir.open2("test_file", OpenOptions::default(), None).expect("open2 failed");
+        let test_file = dir
+            .open2(
+                "test_file",
+                OpenOptions { rights: fio::Operations::READ_BYTES, ..Default::default() },
+                None,
+            )
+            .expect("open2 failed");
 
         assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
@@ -676,8 +706,16 @@ async fn test_open2_rights() {
             .expect("open2 failed");
 
         // Now make sure we can open and write to the test file.
-        let test_file =
-            test_dir.open2("test_file", OpenOptions::default(), None).expect("open2 failed");
+        let test_file = test_dir
+            .open2(
+                "test_file",
+                OpenOptions {
+                    rights: fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES,
+                    ..Default::default()
+                },
+                None,
+            )
+            .expect("open2 failed");
 
         assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
@@ -713,6 +751,7 @@ async fn test_open2_node() {
                 "test_file",
                 OpenOptions {
                     mode: CreationMode::Always,
+                    rights: fio::Operations::WRITE_BYTES,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,
@@ -947,6 +986,7 @@ async fn test_get_set_attributes_node() {
                 "test_file",
                 OpenOptions {
                     mode: CreationMode::Always,
+                    rights: fio::W_STAR_DIR,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,

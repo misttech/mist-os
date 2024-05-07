@@ -50,6 +50,7 @@ use syncio::{
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
     DirentIterator, OpenOptions, XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
 };
+use vfs::ProtocolsExt;
 
 pub struct RemoteFs {
     supports_open2: bool,
@@ -176,6 +177,16 @@ impl RemoteFs {
                 ".",
                 &fio::ConnectionProtocols::Node(fio::NodeOptions {
                     flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                    protocols: Some(fio::NodeProtocols {
+                        directory: Some(fio::DirectoryProtocolOptions {
+                            // Optional rights will be negotiated. By setting `optional_rights` to
+                            // the full set of rights, this connection will have rights that the
+                            // `root_proxy` connection have.
+                            optional_rights: Some(fio::Operations::all()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
                     attributes: Some(fio::NodeAttributesQuery::ID),
                     ..Default::default()
                 }),
@@ -415,6 +426,9 @@ impl FsNodeOps for RemoteNode {
 
         let zxio;
         let mut node_id;
+        let open_flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE;
         if fs_ops.supports_open2 {
             if !(mode.is_reg()
                 || mode.is_chr()
@@ -428,6 +442,7 @@ impl FsNodeOps for RemoteNode {
                 has: zxio_node_attr_has_t { id: true, ..Default::default() },
                 ..Default::default()
             };
+            let io2_rights = open_flags.rights().unwrap_or(fio::Operations::empty());
             zxio = Arc::new(
                 self.zxio
                     .open2(
@@ -438,6 +453,7 @@ impl FsNodeOps for RemoteNode {
                                 ..Default::default()
                             }),
                             mode: CreationMode::Always,
+                            rights: io2_rights,
                             create_attr: Some(zxio_node_attributes_t {
                                 mode: mode.bits(),
                                 uid: owner.uid,
@@ -463,9 +479,6 @@ impl FsNodeOps for RemoteNode {
             if !mode.is_reg() || dev.bits() != 0 {
                 return error!(EINVAL, name);
             }
-            let open_flags = fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_READABLE;
             zxio = Arc::new(
                 self.zxio
                     .open(open_flags, name)
@@ -519,11 +532,16 @@ impl FsNodeOps for RemoteNode {
 
         let zxio;
         let mut node_id;
+        let open_flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::DIRECTORY;
         if fs_ops.supports_open2 {
             let mut attrs = zxio_node_attributes_t {
                 has: zxio_node_attr_has_t { id: true, ..Default::default() },
                 ..Default::default()
             };
+            let io2_rights = open_flags.rights().unwrap_or(fio::Operations::empty());
             zxio = Arc::new(
                 self.zxio
                     .open2(
@@ -534,6 +552,7 @@ impl FsNodeOps for RemoteNode {
                                 ..Default::default()
                             }),
                             mode: CreationMode::Always,
+                            rights: io2_rights,
                             create_attr: Some(zxio_node_attributes_t {
                                 mode: mode.bits(),
                                 uid: owner.uid,
@@ -554,10 +573,6 @@ impl FsNodeOps for RemoteNode {
             );
             node_id = attrs.id;
         } else {
-            let open_flags = fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::DIRECTORY;
             zxio = Arc::new(
                 self.zxio
                     .open(open_flags, name)
@@ -617,6 +632,7 @@ impl FsNodeOps for RemoteNode {
                 },
                 ..Default::default()
             };
+            let io2_rights = self.rights.rights().unwrap_or(fio::Operations::empty());
             zxio = Arc::new(
                 self.zxio
                     .open2(
@@ -628,6 +644,7 @@ impl FsNodeOps for RemoteNode {
                                 symlink: Some(Default::default()),
                                 ..Default::default()
                             }),
+                            rights: io2_rights,
                             ..Default::default()
                         },
                         Some(&mut attrs),
