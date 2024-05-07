@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    super::CtrlSubtype,
+    super::{CtrlFrame, CtrlSubtype},
     zerocopy::{ByteSlice, Ref},
 };
 
@@ -26,6 +26,17 @@ impl<B: ByteSlice> CtrlBody<B> {
             }
             subtype => Some(CtrlBody::Unsupported { subtype }),
         }
+    }
+}
+
+impl<B> TryFrom<CtrlFrame<B>> for CtrlBody<B>
+where
+    B: ByteSlice,
+{
+    type Error = ();
+
+    fn try_from(ctrl_frame: CtrlFrame<B>) -> Result<Self, Self::Error> {
+        CtrlBody::parse(ctrl_frame.ctrl_subtype(), ctrl_frame.body).ok_or(())
     }
 }
 

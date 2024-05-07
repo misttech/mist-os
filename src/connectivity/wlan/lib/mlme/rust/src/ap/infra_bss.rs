@@ -495,12 +495,9 @@ impl InfraBss {
     pub fn handle_ctrl_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        frame_ctrl: mac::FrameControl,
-        body: B,
+        ctrl_frame: mac::CtrlFrame<B>,
     ) -> Result<(), Rejection> {
-        match mac::CtrlBody::parse(frame_ctrl.ctrl_subtype(), body)
-            .ok_or(Rejection::FrameMalformed)?
-        {
+        match ctrl_frame.try_into_ctrl_body().ok_or(Rejection::FrameMalformed)? {
             mac::CtrlBody::PsPoll { ps_poll } => {
                 let client = match self.clients.get_mut(&ps_poll.ta) {
                     Some(client) => client,
@@ -2063,14 +2060,16 @@ mod tests {
 
         bss.handle_ctrl_frame(
             &mut ctx,
-            mac::FrameControl(0)
-                .with_frame_type(mac::FrameType::CTRL)
-                .with_ctrl_subtype(mac::CtrlSubtype::PS_POLL),
-            &[
-                0b00000001, 0b11000000, // Masked AID
-                2, 2, 2, 2, 2, 2, // RA
-                4, 4, 4, 4, 4, 4, // TA
-            ][..],
+            mac::CtrlFrame {
+                frame_ctrl: mac::FrameControl(0)
+                    .with_frame_type(mac::FrameType::CTRL)
+                    .with_ctrl_subtype(mac::CtrlSubtype::PS_POLL),
+                body: &[
+                    0b00000001, 0b11000000, // Masked AID
+                    2, 2, 2, 2, 2, 2, // RA
+                    4, 4, 4, 4, 4, 4, // TA
+                ][..],
+            },
         )
         .expect("expected OK");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);

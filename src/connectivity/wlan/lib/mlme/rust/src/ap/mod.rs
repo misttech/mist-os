@@ -458,9 +458,7 @@ impl<D: DeviceOps> Ap<D> {
         if let Err(e) = match mac_frame {
             mac::MacFrame::Mgmt(mgmt) => bss.handle_mgmt_frame(&mut self.ctx, mgmt).await,
             mac::MacFrame::Data(data_frame) => bss.handle_data_frame(&mut self.ctx, data_frame),
-            mac::MacFrame::Ctrl { frame_ctrl, body } => {
-                bss.handle_ctrl_frame(&mut self.ctx, frame_ctrl, body)
-            }
+            mac::MacFrame::Ctrl(ctrl_frame) => bss.handle_ctrl_frame(&mut self.ctx, ctrl_frame),
             mac::MacFrame::Unsupported { frame_ctrl } => {
                 error!("received unsupported MAC frame: frame_ctrl = {:?}", frame_ctrl);
                 wtrace::async_end_wlansoftmac_rx(async_id, "received unsupported frame");
