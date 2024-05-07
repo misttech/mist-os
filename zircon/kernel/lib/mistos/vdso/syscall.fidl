@@ -6,7 +6,7 @@ library linux;
 @no_protocol_prefix
 @transport("Syscall")
 closed protocol Syscall {
-    /// SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+    // #0, SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
     strict Read(resource struct {
         fd uint32;
         @out
@@ -14,7 +14,7 @@ closed protocol Syscall {
         count uint64;
     }) -> () error int64;
 
-    /// SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf, size_t, count)
+    // #1, SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf, size_t, count)
     strict Write(resource struct {
         fd uint32;
         @in
@@ -22,7 +22,7 @@ closed protocol Syscall {
         count uint64;
     }) -> () error int64;
 
-    /// SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+    // #2, SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
     strict Open(resource struct {
         @in
         filename experimental_pointer<uchar>;
@@ -30,7 +30,7 @@ closed protocol Syscall {
         mode uint16;
     }) -> () error int64;
 
-    /// SYSCALL_DEFINE1(close, unsigned int, fd)
+    // #3, SYSCALL_DEFINE1(close, unsigned int, fd)
     strict Close(resource struct {
         fd uint32;
     }) -> () error int64;
@@ -147,8 +147,12 @@ closed protocol Syscall {
     strict Vfork() -> () error int64;
     ///STUB 59
     strict Execve() -> () error int64;
-    ///STUB 60
-    strict Exit() -> () error int64;
+
+    // #60, SYSCALL_DEFINE1(exit, int, error_code)
+    strict Exit(resource struct {
+        error_code int32;
+    }) -> () error int64;
+
     ///STUB 61
     strict Wait4() -> () error int64;
     ///STUB 62

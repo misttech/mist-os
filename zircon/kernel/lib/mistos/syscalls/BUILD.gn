@@ -30,6 +30,7 @@ source_set("impl") {
   visibility = [ ":*" ]
   sources = [
     "fs.cc",
+    "kernel/exit.cc",
     "not_implemented.cc",
     "test.cc",
   ]
