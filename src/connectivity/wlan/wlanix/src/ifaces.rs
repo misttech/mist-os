@@ -662,9 +662,13 @@ pub mod test_utils {
 
         async fn get_client_iface(&self, iface_id: u16) -> Result<Arc<TestClientIface>, Error> {
             self.calls.lock().push(IfaceManagerCall::GetClientIface(iface_id));
-            match self.client_iface.lock().as_ref() {
-                Some(iface) => Ok(Arc::clone(iface)),
-                None => panic!("Requested client iface but none configured"),
+            if iface_id == FAKE_IFACE_RESPONSE.id {
+                match self.client_iface.lock().as_ref() {
+                    Some(iface) => Ok(Arc::clone(iface)),
+                    None => Err(format_err!("Unexpected get_client_iface when no client exists")),
+                }
+            } else {
+                Err(format_err!("Unexpected get_client_iface for missing iface id {}", iface_id))
             }
         }
 

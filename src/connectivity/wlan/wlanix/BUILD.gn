@@ -58,6 +58,7 @@ rustc_binary("wlanix_bin") {
   ]
 
   sources = [
+    "src/default_drop.rs",
     "src/ifaces.rs",
     "src/main.rs",
     "src/nl80211/attr/band.rs",

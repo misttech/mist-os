@@ -21,11 +21,13 @@ use {
     wlan_common::channel::{Cbw, Channel},
 };
 
+mod default_drop;
 mod ifaces;
 mod nl80211;
 mod security;
 
 use {
+    default_drop::{DefaultDrop, WithDefaultDrop},
     ifaces::{ClientIface, ConnectResult, IfaceManager, ScanEnd},
     nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
 };
@@ -873,7 +875,7 @@ fn get_supported_frequencies() -> Vec<Vec<Nl80211FrequencyAttr>> {
 
 async fn handle_nl80211_message<I: IfaceManager>(
     netlink_message: fidl_wlanix::Nl80211Message,
-    responder: fidl_wlanix::Nl80211MessageResponder,
+    responder: WithDefaultDrop<fidl_wlanix::Nl80211MessageResponder>,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
 ) -> Result<(), Error> {
@@ -888,6 +890,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
     let deserialized = GenlMessage::<Nl80211>::deserialize(&NetlinkHeader::default(), &payload[..]);
     let Ok(message) = deserialized else {
         responder
+            .take()
             .send(Err(zx::sys::ZX_ERR_INTERNAL))
             .context("sending error status on failing to parse nl80211 message")?;
         bail!("Failed to parse nl80211 message: {}", deserialized.unwrap_err())
@@ -917,7 +920,10 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     ],
                 ));
             }
-            responder.send(Ok(nl80211_message_resp(resp))).context("Failed to send NewWiphy")?;
+            responder
+                .take()
+                .send(Ok(nl80211_message_resp(resp)))
+                .context("Failed to send NewWiphy")?;
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
@@ -936,6 +942,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
             }
             resp.push(build_nl80211_done());
             responder
+                .take()
                 .send(Ok(nl80211_message_resp(resp)))
                 .context("Failed to send scan results")?;
         }
@@ -944,12 +951,12 @@ async fn handle_nl80211_message<I: IfaceManager>(
             use crate::nl80211::Nl80211StaInfoAttr;
             // GetStation also has a MAC address attribute. We don't check whether it
             // matches the connected network BSSID and simply assume that it does.
-            match find_iface_id(&message.payload.attrs[..]) {
-                Some(iface_id) => {
-                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+            match get_client_iface_and_id(&message.payload.attrs[..], &iface_manager).await {
+                Ok((client_iface, _)) => {
                     const INVALID_RSSI: i8 = -127;
                     let rssi = client_iface.get_connected_network_rssi().unwrap_or(INVALID_RSSI);
                     responder
+                        .take()
                         .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
                             Nl80211Cmd::NewStation,
                             vec![Nl80211Attr::StaInfo(vec![
@@ -965,17 +972,16 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         )])))
                         .context("Failed to send GetStation")?;
                 }
-                None => {
-                    responder
-                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
-                        .context("sending error status due to missing iface id on GetStation")?;
-                    bail!("GetStation did not include an iface id")
+                Err(e) => {
+                    responder.take().send(Err(e)).context("sending error status for GetStation")?;
+                    bail!("Could not get a client iface for GetStation")
                 }
             }
         }
         Nl80211Cmd::GetProtocolFeatures => {
             info!("Nl80211Cmd::GetProtocolFeatures");
             responder
+                .take()
                 .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
                     Nl80211Cmd::GetProtocolFeatures,
                     vec![Nl80211Attr::ProtocolFeatures(0)],
@@ -984,10 +990,10 @@ async fn handle_nl80211_message<I: IfaceManager>(
         }
         Nl80211Cmd::TriggerScan => {
             info!("Nl80211Cmd::TriggerScan");
-            match find_iface_id(&message.payload.attrs[..]) {
-                Some(iface_id) => {
-                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+            match get_client_iface_and_id(&message.payload.attrs[..], &iface_manager).await {
+                Ok((client_iface, iface_id)) => {
                     responder
+                        .take()
                         .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
                         .context("Failed to ack TriggerScan")?;
                     match client_iface.trigger_scan().await {
@@ -1022,56 +1028,44 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         Err(e) => error!("Failed to run passive scan: {:?}", e),
                     }
                 }
-                None => {
+                Err(e) => {
                     responder
-                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
-                        .context("sending error status due to missing iface id on TriggerScan")?;
-                    bail!("TriggerScan did not include an iface id")
+                        .take()
+                        .send(Err(e))
+                        .context("sending error status for TriggerScan")?;
+                    bail!("Could not get a client iface for TriggerScan")
                 }
             }
         }
         Nl80211Cmd::AbortScan => {
             info!("Nl80211Cmd::AbortScan");
-            match find_iface_id(&message.payload.attrs[..]) {
-                Some(iface_id) => {
-                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
-                    match client_iface.abort_scan().await {
-                        Ok(()) => {
-                            info!("Aborted scan successfully");
-                            responder
-                                .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
-                                .context("Failed to ack AbortScan")?;
-                        }
-                        Err(e) => {
-                            error!("Failed to abort scan: {:?}", e);
-                            responder
-                                .send(Ok(nl80211_message_resp(vec![build_nl80211_err()])))
-                                .context("Failed to ack AbortScan")?;
-                        }
+            match get_client_iface_and_id(&message.payload.attrs[..], &iface_manager).await {
+                Ok((client_iface, _)) => match client_iface.abort_scan().await {
+                    Ok(()) => {
+                        info!("Aborted scan successfully");
+                        responder
+                            .take()
+                            .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                            .context("Failed to ack AbortScan")?;
                     }
-                }
-                None => {
-                    responder
-                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
-                        .context("sending error status due to missing iface id on AbortScan")?;
-                    bail!("AbortScan did not include an iface id")
+                    Err(e) => {
+                        error!("Failed to abort scan: {:?}", e);
+                        responder
+                            .take()
+                            .send(Ok(nl80211_message_resp(vec![build_nl80211_err()])))
+                            .context("Failed to ack AbortScan")?;
+                    }
+                },
+                Err(e) => {
+                    responder.take().send(Err(e)).context("sending error status for AbortScan")?;
+                    bail!("Could not get a client iface for AbortScan")
                 }
             }
         }
         Nl80211Cmd::GetScan => {
             info!("Nl80211Cmd::GetScan");
-            match find_iface_id(&message.payload.attrs[..]) {
-                Some(iface_id) => {
-                    let client_iface =
-                        match iface_manager.get_client_iface(iface_id.try_into()?).await {
-                            Ok(iface) => iface,
-                            Err(e) => {
-                                responder.send(Err(zx::sys::ZX_ERR_BAD_STATE)).context(
-                                    "sending error status due to missing iface for GetScan",
-                                )?;
-                                bail!("Failed to get client iface: {}", e);
-                            }
-                        };
+            match get_client_iface_and_id(&message.payload.attrs[..], &iface_manager).await {
+                Ok((client_iface, iface_id)) => {
                     let results = client_iface.get_last_scan_results();
                     info!("Processing {} scan results", results.len());
                     let mut resp = vec![];
@@ -1083,14 +1077,13 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     }
                     resp.push(build_nl80211_done());
                     responder
+                        .take()
                         .send(Ok(nl80211_message_resp(resp)))
                         .context("Failed to send scan results")?;
                 }
-                None => {
-                    responder
-                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
-                        .context("sending error status due to missing iface id on GetScan")?;
-                    bail!("GetScan did not include an iface id");
+                Err(e) => {
+                    responder.take().send(Err(e)).context("sending error status for GetScan")?;
+                    bail!("Could not get a client iface for GetScan");
                 }
             }
         }
@@ -1104,18 +1097,21 @@ async fn handle_nl80211_message<I: IfaceManager>(
                             vec![Nl80211Attr::RegulatoryRegionAlpha2(country)],
                         );
                         responder
+                            .take()
                             .send(Ok(nl80211_message_resp(vec![resp])))
                             .context("Failed to respond to GetReg")?;
                     }
                     Err(e) => {
                         error!("Failed to get regulatory region from phy: {:?}", e);
                         responder
+                            .take()
                             .send(Err(zx::sys::ZX_ERR_INTERNAL))
                             .context("Failed to respond to GetReg with error")?;
                     }
                 },
                 None => {
                     responder
+                        .take()
                         .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
                         .context("sending error status due to missing iface id on GetReg")?;
                     bail!("GetReg did not include a phy id");
@@ -1125,11 +1121,21 @@ async fn handle_nl80211_message<I: IfaceManager>(
         _ => {
             warn!("Dropping nl80211 message: {:?}", message);
             responder
+                .take()
                 .send(Ok(nl80211_message_resp(vec![])))
                 .context("Failed to respond to unhandled message")?;
         }
     }
     Ok(())
+}
+
+impl DefaultDrop for fidl_wlanix::Nl80211MessageResponder {
+    fn default_drop(self) {
+        error!("Dropped Nl80211MessageResponder without responding.");
+        if let Err(e) = self.send(Err(zx::sys::ZX_ERR_INTERNAL)) {
+            error!("Failed to send internal error response: {}", e);
+        }
+    }
 }
 
 fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
@@ -1174,6 +1180,23 @@ fn find_iface_id(attrs: &[Nl80211Attr]) -> Option<u32> {
         .next()
 }
 
+async fn get_client_iface_and_id<I: IfaceManager>(
+    attrs: &[Nl80211Attr],
+    iface_manager: &Arc<I>,
+) -> Result<(Arc<I::Client>, u32), i32> {
+    match find_iface_id(attrs) {
+        Some(iface_id) => {
+            let iface_id_u16 = u16::try_from(iface_id).map_err(|_| zx::sys::ZX_ERR_BAD_STATE)?;
+            iface_manager
+                .get_client_iface(iface_id_u16)
+                .await
+                .map(|iface| (iface, iface_id))
+                .map_err(|_| zx::sys::ZX_ERR_NOT_FOUND)
+        }
+        None => Err(zx::sys::ZX_ERR_INVALID_ARGS),
+    }
+}
+
 async fn serve_nl80211<I: IfaceManager>(
     mut reqs: fidl_wlanix::Nl80211RequestStream,
     state: Arc<Mutex<WifiState>>,
@@ -1189,7 +1212,7 @@ async fn serve_nl80211<I: IfaceManager>(
                 if let Some(message) = payload.message {
                     if let Err(e) = handle_nl80211_message(
                         message,
-                        responder,
+                        WithDefaultDrop::new(responder),
                         Arc::clone(&state),
                         Arc::clone(&iface_manager),
                     )
@@ -2392,8 +2415,10 @@ mod tests {
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
         let mut nl80211_fut = pin!(nl80211_fut);
 
-        let get_station_message =
-            build_nl80211_message(Nl80211Cmd::GetStation, vec![Nl80211Attr::IfaceIndex(0)]);
+        let get_station_message = build_nl80211_message(
+            Nl80211Cmd::GetStation,
+            vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
+        );
         let get_station_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
             message: Some(get_station_message),
             ..Default::default()
@@ -2427,8 +2452,10 @@ mod tests {
         let mut next_mcast = pin!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
-        let trigger_scan_message =
-            build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(0)]);
+        let trigger_scan_message = build_nl80211_message(
+            Nl80211Cmd::TriggerScan,
+            vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
+        );
         let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
             message: Some(trigger_scan_message),
             ..Default::default()
@@ -2475,6 +2502,32 @@ mod tests {
     }
 
     #[test]
+    fn trigger_scan_invalid_iface() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let mut nl80211_fut = pin!(nl80211_fut);
+
+        let trigger_scan_message =
+            build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(123)]);
+        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(trigger_scan_message),
+            ..Default::default()
+        });
+
+        let mut trigger_scan_fut = pin!(trigger_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut trigger_scan_fut),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_NOT_FOUND))),
+        );
+    }
+
+    #[test]
     fn scan_cancelled() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, stream) =
@@ -2494,8 +2547,10 @@ mod tests {
         let mut next_mcast = pin!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
-        let trigger_scan_message =
-            build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(0)]);
+        let trigger_scan_message = build_nl80211_message(
+            Nl80211Cmd::TriggerScan,
+            vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
+        );
         let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
             message: Some(trigger_scan_message),
             ..Default::default()
@@ -2523,8 +2578,10 @@ mod tests {
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
         let mut nl80211_fut = pin!(nl80211_fut);
 
-        let get_scan_message =
-            build_nl80211_message(Nl80211Cmd::GetScan, vec![Nl80211Attr::IfaceIndex(0)]);
+        let get_scan_message = build_nl80211_message(
+            Nl80211Cmd::GetScan,
+            vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
+        );
         let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
             message: Some(get_scan_message),
             ..Default::default()
