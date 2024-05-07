@@ -518,6 +518,14 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToServeMsg),
 			Type:   swarmingOutputType,
 		},
+		// For failures to resolve packages.
+		// LINT.IfChange(tuf_error)
+		&stringInLogCheck{
+			String:         "rust tuf error",
+			Type:           swarmingOutputType,
+			SkipPassedTask: true,
+		},
+		// LINT.ThenChange(/src/sys/pkg/bin/pkg-resolver/src/error.rs:tuf_error)
 		// For https://fxbug.dev/42143746.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.SerialReadErrorMsg),
