@@ -133,7 +133,6 @@ class Controller : public DeviceType,
   zx_status_t IntelGpuCoreGttClear(uint64_t addr);
   zx_status_t IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uint64_t page_offset,
                                     uint64_t page_count);
-  void GpuRelease();
 
   fdf::MmioBuffer* mmio_space() { return mmio_space_.has_value() ? &*mmio_space_ : nullptr; }
   Interrupts* interrupts() { return &interrupts_; }
@@ -272,8 +271,6 @@ class Controller : public DeviceType,
 
   zx_device_t* zx_gpu_dev_ = nullptr;
   zx_device_t* display_controller_dev_ = nullptr;
-  bool gpu_released_ = false;
-  bool display_released_ = false;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;

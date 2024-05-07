@@ -97,8 +97,7 @@ constexpr fuchsia_sysmem::wire::PixelFormatType kYuvPixelFormatTypes[2] = {
 };
 
 constexpr zx_protocol_device_t kGpuCoreDeviceProtocol = {
-    .version = DEVICE_OPS_VERSION,
-    .release = [](void* ctx) { static_cast<Controller*>(ctx)->GpuRelease(); }
+    .version = DEVICE_OPS_VERSION, .release = [](void* ctx) {}
     // zx_gpu_dev_ is removed when unbind is called for zxdev() (in ::DdkUnbind),
     // so it's not necessary to give it its own unbind method.
 };
@@ -2130,13 +2129,6 @@ zx_status_t Controller::IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uin
   return ZX_ERR_INVALID_ARGS;
 }
 
-void Controller::GpuRelease() {
-  gpu_released_ = true;
-  if (display_released_) {
-    delete this;
-  }
-}
-
 // Ddk methods
 
 void Controller::DdkInit(ddk::InitTxn txn) {
@@ -2185,12 +2177,7 @@ void Controller::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
-void Controller::DdkRelease() {
-  display_released_ = true;
-  if (gpu_released_) {
-    delete this;
-  }
-}
+void Controller::DdkRelease() { delete this; }
 
 void Controller::DdkSuspend(ddk::SuspendTxn txn) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
