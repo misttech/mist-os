@@ -51,12 +51,10 @@ impl Route for RouteRequest {
     }
 }
 
-// Helper function to log and return an error if the capability is void.
-fn check_source_for_void(source: &CapabilitySource) -> Result<(), RoutingError> {
-    if let CapabilitySource::Void { .. } = source {
-        return Err(RoutingError::SourceCapabilityIsVoid.into());
-    };
-    Ok(())
+#[derive(Debug)]
+pub enum RoutingOutcome {
+    Found,
+    FromVoid,
 }
 
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.
@@ -68,32 +66,43 @@ pub(super) async fn route_and_open_capability(
     route_request: &RouteRequest,
     target: &Arc<ComponentInstance>,
     open_request: OpenRequest<'_>,
-) -> Result<(), RouterError> {
-    match route_request.clone() {
-        r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
-            let storage_source = r.route(target).await?;
-            check_source_for_void(&storage_source.source)?;
+) -> Result<RoutingOutcome, RouterError> {
+    let source = route_request.clone().route(target).await.map_err(RouterError::from)?;
+    if let CapabilitySource::Void { .. } = source.source {
+        return Ok(RoutingOutcome::FromVoid);
+    };
 
-            let backing_dir_info =
-                storage::route_backing_directory(storage_source.source.clone()).await?;
-            Ok(CapabilityOpenRequest::new_from_storage_source(
-                backing_dir_info,
-                target,
-                open_request,
-            )
-            .open()
-            .await?)
+    match route_request {
+        RouteRequest::UseStorage(_) | RouteRequest::OfferStorage(_) => {
+            let backing_dir_info = storage::route_backing_directory(source.source.clone()).await?;
+            CapabilityOpenRequest::new_from_storage_source(backing_dir_info, target, open_request)
+                .open()
+                .await?;
         }
-        r => {
-            let route_source = r.route(target).await?;
-            check_source_for_void(&route_source.source)?;
-
+        _ => {
             // clone the source as additional context in case of an error
-
-            Ok(CapabilityOpenRequest::new_from_route_source(route_source, target, open_request)
+            CapabilityOpenRequest::new_from_route_source(source, target, open_request)
                 .map_err(|e| RouterError::NotFound(Arc::new(e)))?
                 .open()
-                .await?)
+                .await?;
+        }
+    };
+    Ok(RoutingOutcome::Found)
+}
+
+/// Same as `route_and_open_capability` except this reports the routing failure.
+pub(super) async fn route_and_open_capability_with_reporting(
+    route_request: &RouteRequest,
+    target: &Arc<ComponentInstance>,
+    open_request: OpenRequest<'_>,
+) -> Result<(), RouterError> {
+    let result = route_and_open_capability(route_request, &target, open_request).await;
+    match result {
+        Ok(RoutingOutcome::Found) => Ok(()),
+        Ok(RoutingOutcome::FromVoid) => Err(RoutingError::SourceCapabilityIsVoid.into()),
+        Err(e) => {
+            report_routing_failure(&route_request, &target, &e).await;
+            Err(e)
         }
     }
 }
