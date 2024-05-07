@@ -5511,7 +5511,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:121
+From //build/assembly/developer_overrides.gni:190
 
 ### product_bootfs_labels
 
@@ -6957,7 +6957,7 @@ Valid alternatives vary by machine, but include "linuxboot".
 
 **Current value (from the default):** `"linuxboot"`
 
-From //zircon/kernel/phys/qemu.gni:105
+From //zircon/kernel/phys/qemu.gni:129
 
 ### qr_codes_path
 
