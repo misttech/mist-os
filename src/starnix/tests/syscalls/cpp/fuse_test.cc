@@ -139,6 +139,11 @@ class Node {
  public:
   virtual ~Node() {}
 
+  void SetEntryValidDuration(uint64_t secs) {
+    std::lock_guard guard(mtx_);
+    entry_valid_secs_ = secs;
+  }
+
   uint64_t UpdateNodeid(uint64_t id) {
     std::lock_guard guard(mtx_);
     std::swap(id, id_);
@@ -167,6 +172,7 @@ class Node {
     entry_out = {
         .nodeid = id_,
         .generation = generation_,
+        .entry_valid = entry_valid_secs_,
     };
     PopulateAttrLocked(entry_out.attr);
   }
@@ -180,6 +186,7 @@ class Node {
   std::mutex mtx_;
   uint64_t id_ __TA_GUARDED(mtx_);
   uint64_t generation_ __TA_GUARDED(mtx_) = 1;
+  uint64_t entry_valid_secs_ __TA_GUARDED(mtx_) = 0;
 };
 
 class Directory : public Node {
@@ -1468,6 +1475,7 @@ INSTANTIATE_TEST_SUITE_P(
 struct PathWalkRefreshDirEntryTestCase {
   bool modify_nodeid;
   bool modify_generation;
+  uint64_t entry_valid_forever;
   uint64_t expected_extra_lookups;
 };
 
@@ -1483,6 +1491,11 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   std::shared_ptr<Directory> dir1 = fs.AddDirAtRoot("dir1");
   std::shared_ptr<Directory> dir2 = fs.AddDirAt(dir1, "dir2");
   std::shared_ptr<File> file = fs.AddFileAt(dir2, "file");
+  if (test_case.entry_valid_forever) {
+    dir1->SetEntryValidDuration(std::numeric_limits<uint64_t>::max());
+    dir2->SetEntryValidDuration(std::numeric_limits<uint64_t>::max());
+    file->SetEntryValidDuration(std::numeric_limits<uint64_t>::max());
+  }
   ASSERT_TRUE(Mount(server));
   EXPECT_EQ(server->LookupCount(), 0u);
 
@@ -1491,7 +1504,10 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   // time we create a new DirEntry in starnix. Note that refreshing a DirEntry
   // does not result in extra lookups, only the initial lookup to populate a new
   // DirEntry does.
-  const uint64_t extra_initial_lookups_per_node = test_helper::IsStarnix() ? 1 : 0;
+  const uint64_t extra_initial_lookups_per_node =
+      (!test_case.entry_valid_forever && test_helper::IsStarnix()) ? 1 : 0;
+  const uint64_t extra_subsequent_lookups_per_node =
+      test_case.entry_valid_forever ? 0 : kNumberOfNodesInPath;
   const uint64_t lookup_offset = extra_initial_lookups_per_node * kNumberOfNodesInPath;
   const uint64_t expected_initial_lookup_count = kNumberOfNodesInPath + lookup_offset;
   const uint64_t expected_post_update_lookup_extra_offset = extra_initial_lookups_per_node;
@@ -1506,7 +1522,8 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   EXPECT_EQ(server->LookupCount(), expected_initial_lookup_count);
 
   ASSERT_NO_FATAL_FAILURE(check_open());
-  EXPECT_EQ(server->LookupCount(), expected_initial_lookup_count + kNumberOfNodesInPath);
+  EXPECT_EQ(server->LookupCount(),
+            expected_initial_lookup_count + extra_subsequent_lookups_per_node);
 
   // When the kernel attempts to refresh the entry and sees a node ID or generation
   // different from what the kernel has cached for the same name, the kernel will
@@ -1523,7 +1540,7 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   }
   ASSERT_NO_FATAL_FAILURE(check_open());
   EXPECT_EQ(server->LookupCount(),
-            expected_initial_lookup_count + (2 * kNumberOfNodesInPath) +
+            expected_initial_lookup_count + (2 * extra_subsequent_lookups_per_node) +
                 test_case.expected_extra_lookups * (1 + expected_post_update_lookup_extra_offset));
 }
 
@@ -1532,20 +1549,50 @@ INSTANTIATE_TEST_SUITE_P(FusePathWalkRefreshDirEntryTest, FusePathWalkRefreshDir
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = false,
                                  .modify_generation = false,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 0,
                              },
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = false,
                                  .modify_generation = true,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 1,
                              },
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = true,
                                  .modify_generation = false,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 1,
                              },
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = true,
                                  .modify_generation = true,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 1,
+                             },
+
+                             // Same as above but with entryies valid forever.
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = false,
+                                 .modify_generation = false,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = false,
+                                 .modify_generation = true,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = true,
+                                 .modify_generation = false,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = true,
+                                 .modify_generation = true,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
                              }));
